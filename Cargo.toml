@@ -1,0 +1,10 @@
+[package]
+name = "layercake-ng"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+clap = { version = "4.3.0", features = ["derive"] }
+polars = { version = "0.43.1", features = ["lazy"] }
+anyhow = "1.0.71"
