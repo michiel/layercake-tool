@@ -1,6 +1,17 @@
 use serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Deserialize)]
+struct PlanConfig {
+    import: ImportConfig,
+    export: ExportConfig,
+}
+
+//
+// Import configuration
+//
+
+
+#[derive(Serialize, Deserialize)]
 struct ImportConfig {
     profiles: Vec<ImportProfile>,
 }
@@ -27,6 +38,28 @@ struct ImportProfile {
     filename: String,
     tablename: String,
     transformations: Vec<Transformation>,
+}
+
+//
+// Export configuration
+//
+
+#[derive(Serialize, Deserialize)]
+struct ExportConfig {
+    profiles: Vec<ExportProfile>,
+}
+#[derive(Serialize, Deserialize)]
+struct ExportProfile {
+    filename: String,
+    exporter: Exporter,
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum Exporter {
+    GML,
+    DOT,
+    CSVNodes,
+    CSVEdges,
 }
 
 #[cfg(test)]
@@ -61,7 +94,7 @@ profiles:
   - filename: "data.csv"
     tablename: "table1"
     transformations:
-      - AddSQLColumn: ["col1", "value1"]
+      - AddSQLColumn: ["repo_id", "SELECT repo_1, repo_2, repo_1 || '-' || repo_2 AS repo_id FROM df"]
       - FillColumnForward: "col2"
 "#;
 
@@ -70,5 +103,31 @@ profiles:
         assert_eq!(config.profiles[0].filename, "data.csv");
         assert_eq!(config.profiles[0].tablename, "table1");
         assert_eq!(config.profiles[0].transformations.len(), 2);
+    }
+
+    #[test]
+    fn test_planfile_deserialization() {
+        let yaml = r#"
+import:
+    profiles:
+    - filename: "data.csv"
+        tablename: "table1"
+        transformations:
+        - AddSQLColumn: ["repo_id", "SELECT repo_1, repo_2, repo_1 || '-' || repo_2 AS repo_id FROM df"]
+        - FillColumnForward: "col2"
+
+export:
+    profiles:
+    - filename: "output.gml"
+      exporter: GML
+    - filename: "output.dot"
+      exporter: DOT
+    - filename: "nodes-full.csv"
+      exporter: CSVNodes
+    - filename: "nodes-full.csv"
+      exporter: CSVEdges
+"#;
+
+        let config: PlanConfig = serde_yaml::from_str(yaml).unwrap();
     }
 }
