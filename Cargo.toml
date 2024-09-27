@@ -5,6 +5,10 @@ edition = "2021"
 
 [dependencies]
 
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+tracing-tree = "0.2.5"
+
 clap = { version = "4.3", features = ["derive"] }
 polars = { version = "0.43.1", features = ["lazy", "csv", "temporal", "sql"] }
 anyhow = "1.0"
