@@ -1,9 +1,9 @@
 use serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Deserialize)]
-struct PlanConfig {
-    import: ImportConfig,
-    export: ExportConfig,
+pub struct PlanConfig {
+    pub import: ImportConfig,
+    pub export: ExportConfig,
 }
 
 //
@@ -12,32 +12,32 @@ struct PlanConfig {
 
 
 #[derive(Serialize, Deserialize)]
-struct ImportConfig {
-    profiles: Vec<ImportProfile>,
+pub struct ImportConfig {
+    pub profiles: Vec<ImportProfile>,
 }
 
 #[derive(Serialize, Deserialize)]
-enum Transformation {
+pub enum Transformation {
     AddSQLColumn(String, String),
     FillColumnForward(String),
 }
 
 #[derive(Serialize, Deserialize)]
-enum FileImportProfile {
+pub enum FileImportProfile {
     CSV(CSVImportParams),
 }
 
 #[derive(Serialize, Deserialize)]
-struct CSVImportParams {
-    skiprows: Option<usize>,
-    separator: Option<char>,
+pub struct CSVImportParams {
+    pub skiprows: Option<usize>,
+    pub separator: Option<char>,
 }
 
 #[derive(Serialize, Deserialize)]
-struct ImportProfile {
-    filename: String,
-    tablename: String,
-    transformations: Vec<Transformation>,
+pub struct ImportProfile {
+    pub filename: String,
+    pub tablename: String,
+    pub transformations: Vec<Transformation>,
 }
 
 //
@@ -45,13 +45,13 @@ struct ImportProfile {
 //
 
 #[derive(Serialize, Deserialize)]
-struct ExportConfig {
-    profiles: Vec<ExportProfile>,
+pub struct ExportConfig {
+    pub profiles: Vec<ExportProfile>,
 }
 #[derive(Serialize, Deserialize)]
-struct ExportProfile {
-    filename: String,
-    exporter: Exporter,
+pub struct ExportProfile {
+    pub filename: String,
+    pub exporter: Exporter,
 }
 
 #[derive(Serialize, Deserialize)]
