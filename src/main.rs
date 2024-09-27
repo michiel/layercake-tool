@@ -1,4 +1,5 @@
 mod data_loader;
+mod config;
 use anyhow::Result;
 use polars::prelude::*;
 
