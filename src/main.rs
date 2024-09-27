@@ -49,7 +49,13 @@ fn main() -> Result<()> {
     // Read and deserialize the configuration file
     let config_content = fs::read_to_string(config_path)?;
 
-    let plan: config::PlanConfig = serde_yaml::from_str(&config_content)?;
+    let plan: config::PlanConfig = match serde_yaml::from_str(&config_content) {
+        Ok(config) => config,
+        Err(e) => {
+            tracing::error!("Failed to parse configuration file: {}", e);
+            return Err(e.into());
+        }
+    };
 
     // Use the deserialized configuration
     let filename = &plan.import.profiles[0].filename;
