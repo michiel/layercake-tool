@@ -111,9 +111,11 @@ profiles:
 import:
     profiles:
     - filename: "data.csv"
-        tablename: "table1"
-        transformations:
-        - AddSQLColumn: ["repo_id", "SELECT repo_1, repo_2, repo_1 || '-' || repo_2 AS repo_id FROM df"]
+      tablename: "table1"
+      transformations:
+        - AddSQLColumn: 
+            - "repo_id"
+            - "SELECT repo_1, repo_2, repo_1 || '-' || repo_2 AS repo_id FROM df"
         - FillColumnForward: "col2"
 
 export:

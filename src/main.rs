@@ -47,7 +47,13 @@ fn main() -> Result<()> {
     tracing::info!("Using configuration file: {}", config_path);
 
     // Read and deserialize the configuration file
-    let config_content = fs::read_to_string(config_path)?;
+    let config_content = match fs::read_to_string(config_path) {
+        Ok(content) => content,
+        Err(e) => {
+            tracing::error!("Failed to read configuration file: {}", e);
+            return Err(e.into());
+        }
+    };
 
     let plan: config::PlanConfig = match serde_yaml::from_str(&config_content) {
         Ok(config) => config,
