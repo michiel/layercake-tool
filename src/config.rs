@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 pub struct PlanConfig {
@@ -70,16 +70,14 @@ mod tests {
     #[test]
     fn test_serialization() {
         let config = ImportConfig {
-            profiles: vec![
-                ImportProfile {
-                    filename: "data.csv".to_string(),
-                    tablename: "table1".to_string(),
-                    transformations: vec![
-                        Transformation::AddSQLColumn("col1".to_string(), "value1".to_string()),
-                        Transformation::FillColumnForward("col2".to_string()),
-                    ],
-                },
-            ],
+            profiles: vec![ImportProfile {
+                filename: "data.csv".to_string(),
+                tablename: "table1".to_string(),
+                transformations: vec![
+                    Transformation::AddSQLColumn("col1".to_string(), "value1".to_string()),
+                    Transformation::FillColumnForward("col2".to_string()),
+                ],
+            }],
         };
 
         let toml_str = toml::to_string(&config).unwrap();
@@ -140,6 +138,6 @@ filename = "nodes-full.csv"
 exporter = "CSVEdges"
 "#;
 
-        let config: PlanConfig = toml::from_str(toml_str).unwrap();
+        let _config: PlanConfig = toml::from_str(toml_str).unwrap();
     }
 }

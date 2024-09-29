@@ -1,7 +1,3 @@
-use anyhow::Result;
-
-use anyhow::anyhow;
-
 use polars::prelude::*;
 use std::path::Path;
 
@@ -9,7 +5,7 @@ use polars::sql::SQLContext;
 
 use polars::prelude::FillNullStrategy;
 
-pub fn load_tsv(filename: &str) -> Result<DataFrame> {
+pub fn load_tsv(filename: &str) -> anyhow::Result<DataFrame> {
     let path = Path::new(filename);
     LazyCsvReader::new(path)
         .with_has_header(true)
@@ -19,7 +15,11 @@ pub fn load_tsv(filename: &str) -> Result<DataFrame> {
         .map_err(Into::into)
 }
 
-pub fn add_column_with_sql(df: &DataFrame, sql_query: &str, col_name: &str) -> Result<DataFrame> {
+pub fn add_column_with_sql(
+    df: &DataFrame,
+    sql_query: &str,
+    col_name: &str,
+) -> anyhow::Result<DataFrame> {
     let mut ctx = SQLContext::new();
     ctx.register("df", df.clone().lazy());
 
@@ -37,7 +37,7 @@ pub fn add_column_with_sql(df: &DataFrame, sql_query: &str, col_name: &str) -> R
 
     Ok(df_with_new_col)
 }
-pub fn fill_forward_columns(lf: LazyFrame, columns: Vec<String>) -> Result<LazyFrame> {
+pub fn fill_forward_columns(lf: LazyFrame, columns: Vec<String>) -> anyhow::Result<LazyFrame> {
     let mut lf = lf;
 
     for col_name in columns {
@@ -55,6 +55,7 @@ pub fn fill_forward_columns(lf: LazyFrame, columns: Vec<String>) -> Result<LazyF
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::Result;
 
     #[test]
     fn test_add_column_with_sql() -> Result<()> {
@@ -82,7 +83,7 @@ mod tests {
         Ok(())
     }
     #[test]
-    fn test_fill_forward_columns() -> Result<()> {
+    fn test_fill_forward_columns() -> anyhow::Result<()> {
         let df = df! [
             "A" => ["1", "2", "", "4", "5"],
             "B" => ["a", "", "", "d", "e"],
