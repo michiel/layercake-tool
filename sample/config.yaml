@@ -1,0 +1,25 @@
+[import]
+
+[[import.profiles]]
+filename = "data.csv"
+tablename = "table1"
+
+[[import.profiles.transformations]]
+
+
+[export]
+[[export.profiles]]
+filename = "output.gml"
+exporter = "GML"
+
+[[export.profiles]]
+filename = "output.dot"
+exporter = "DOT"
+
+[[export.profiles]]
+filename = "nodes-full.csv"
+exporter = "CSVNodes"
+
+[[export.profiles]]
+filename = "nodes-full.csv"
+exporter = "CSVEdges"

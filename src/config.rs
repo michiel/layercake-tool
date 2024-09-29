@@ -3,13 +3,12 @@ use serde::{Serialize, Deserialize};
 #[derive(Serialize, Deserialize)]
 pub struct PlanConfig {
     pub import: ImportConfig,
-    pub export: ExportConfig,
+    pub export: ExportProfile,
 }
 
 //
 // Import configuration
 //
-
 
 #[derive(Serialize, Deserialize)]
 pub struct ImportConfig {
@@ -45,11 +44,12 @@ pub struct ImportProfile {
 //
 
 #[derive(Serialize, Deserialize)]
-pub struct ExportConfig {
-    pub profiles: Vec<ExportProfile>,
-}
-#[derive(Serialize, Deserialize)]
 pub struct ExportProfile {
+    pub profiles: Vec<ExportProfileItem>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ExportProfileItem {
     pub filename: String,
     pub exporter: Exporter,
 }
@@ -65,7 +65,7 @@ pub enum Exporter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_yaml;
+    use toml;
 
     #[test]
     fn test_serialization() {
@@ -82,23 +82,26 @@ mod tests {
             ],
         };
 
-        let yaml = serde_yaml::to_string(&config).unwrap();
-        println!("{}", yaml);
-        assert!(yaml.contains("profiles"));
+        let toml_str = toml::to_string(&config).unwrap();
+        println!("{}", toml_str);
+        assert!(toml_str.contains("profiles"));
     }
 
     #[test]
     fn test_deserialization() {
-        let yaml = r#"
-profiles:
-  - filename: "data.csv"
-    tablename: "table1"
-    transformations:
-      - AddSQLColumn: ["repo_id", "SELECT repo_1, repo_2, repo_1 || '-' || repo_2 AS repo_id FROM df"]
-      - FillColumnForward: "col2"
+        let toml_str = r#"
+[[profiles]]
+filename = "data.csv"
+tablename = "table1"
+
+[[profiles.transformations]]
+AddSQLColumn = ["repo_id", "SELECT repo_1, repo_2, repo_1 || '-' || repo_2 AS repo_id FROM df"]
+
+[[profiles.transformations]]
+FillColumnForward = "col2"
 "#;
 
-        let config: ImportConfig = serde_yaml::from_str(yaml).unwrap();
+        let config: ImportConfig = toml::from_str(toml_str).unwrap();
         assert_eq!(config.profiles.len(), 1);
         assert_eq!(config.profiles[0].filename, "data.csv");
         assert_eq!(config.profiles[0].tablename, "table1");
@@ -107,29 +110,36 @@ profiles:
 
     #[test]
     fn test_planfile_deserialization() {
-        let yaml = r#"
-import:
-    profiles:
-    - filename: "data.csv"
-      tablename: "table1"
-      transformations:
-        - AddSQLColumn: 
-            - "repo_id"
-            - "SELECT repo_1, repo_2, repo_1 || '-' || repo_2 AS repo_id FROM df"
-        - FillColumnForward: "col2"
+        let toml_str = r#"
+[import]
+[[import.profiles]]
+filename = "data.csv"
+tablename = "table1"
 
-export:
-    profiles:
-    - filename: "output.gml"
-      exporter: GML
-    - filename: "output.dot"
-      exporter: DOT
-    - filename: "nodes-full.csv"
-      exporter: CSVNodes
-    - filename: "nodes-full.csv"
-      exporter: CSVEdges
+[[import.profiles.transformations]]
+AddSQLColumn = ["repo_id", "SELECT repo_1, repo_2, repo_1 || '-' || repo_2 AS repo_id FROM df"]
+
+[[import.profiles.transformations]]
+FillColumnForward = "col2"
+
+[export]
+[[export.profiles]]
+filename = "output.gml"
+exporter = "GML"
+
+[[export.profiles]]
+filename = "output.dot"
+exporter = "DOT"
+
+[[export.profiles]]
+filename = "nodes-full.csv"
+exporter = "CSVNodes"
+
+[[export.profiles]]
+filename = "nodes-full.csv"
+exporter = "CSVEdges"
 "#;
 
-        let config: PlanConfig = serde_yaml::from_str(yaml).unwrap();
+        let config: PlanConfig = toml::from_str(toml_str).unwrap();
     }
 }
