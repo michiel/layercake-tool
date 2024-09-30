@@ -5,6 +5,8 @@ edition = "2021"
 
 [dependencies]
 
+serde_yaml = "0.9"
+
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 tracing-tree = "0.2.5"

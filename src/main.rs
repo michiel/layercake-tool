@@ -1,9 +1,10 @@
-mod data_loader;
 mod config;
+mod data_loader;
 
 use anyhow::Result;
 use clap::Parser;
 use polars::prelude::*;
+use serde_yaml;
 use std::fs;
 use std::process;
 
@@ -33,7 +34,7 @@ fn main() -> Result<()> {
 
     // Read and deserialize the configuration file
     let config_content = fs::read_to_string(&config_path)?;
-    let plan_config: config::PlanConfig = toml::from_str(&config_content)?;
+    let plan_config: config::PlanConfig = serde_yaml::from_str(&config_content)?;
 
     // Use the deserialized configuration
     let filename = &plan_config.import.profiles[0].filename;

@@ -1,25 +1,19 @@
-[import]
+import:
+  profiles:
+    - filename: "data.csv"
+      tablename: "table1"
+      transformations:
+        - !AddSQLColumn
+          - "repo_id"
+          - "SELECT repo_1, repo_2, repo_1 || '-' || repo_2 AS repo_id FROM df"
 
-[[import.profiles]]
-filename = "data.csv"
-tablename = "table1"
-
-[[import.profiles.transformations]]
-
-
-[export]
-[[export.profiles]]
-filename = "output.gml"
-exporter = "GML"
-
-[[export.profiles]]
-filename = "output.dot"
-exporter = "DOT"
-
-[[export.profiles]]
-filename = "nodes-full.csv"
-exporter = "CSVNodes"
-
-[[export.profiles]]
-filename = "nodes-full.csv"
-exporter = "CSVEdges"
+export:
+  profiles:
+    - filename: "output.gml"
+      exporter: "GML"
+    - filename: "output.dot"
+      exporter: "DOT"
+    - filename: "nodes-full.csv"
+      exporter: "CSVNodes"
+    - filename: "nodes-full.csv"
+      exporter: "CSVEdges"
