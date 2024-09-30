@@ -80,6 +80,14 @@ mod tests {
         assert_eq!(sum_col.get(1).unwrap(), AnyValue::Int32(7));
         assert_eq!(sum_col.get(2).unwrap(), AnyValue::Int32(9));
 
+        let expected = df! [
+            "A" => [1, 2, 3],
+            "B" => [4, 5, 6],
+            "sum" => [5, 7, 9],
+        ]?;
+
+        assert_eq!(result, expected);
+
         Ok(())
     }
     #[test]
