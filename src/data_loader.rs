@@ -44,7 +44,7 @@ pub fn fill_forward_columns(lf: LazyFrame, columns: Vec<String>) -> anyhow::Resu
         // Apply the forward fill on each column
         lf = lf.with_column(
             col(col_name.as_str())
-                .fill_null_with_strategy(FillNullStrategy::Backward(None))
+                .fill_null_with_strategy(FillNullStrategy::Forward(None))
                 .alias(&col_name),
         );
     }
@@ -93,9 +93,9 @@ mod tests {
     #[test]
     fn test_fill_forward_columns() -> anyhow::Result<()> {
         let df = df! [
-            "A" => ["1", "2", "", "4", "5"],
-            "B" => ["a", "", "", "d", "e"],
-            "C" => ["1.1", "2.2", "3.3", "", "5.5"]
+            "A" => [Some(1), Some(2), None, Some(4), Some(5)],
+            "B" => [Some("a"), None, None, Some("d"), Some("e")],
+            "C" => [Some(1.1), Some(2.2), Some(3.3), None, Some(5.5)]
         ]?;
 
         let lf = df.lazy();
