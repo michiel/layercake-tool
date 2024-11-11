@@ -7,6 +7,11 @@ import:
           - "repo_id"
           - "SELECT repo_1, repo_2, repo_1 || '-' || repo_2 AS repo_id FROM df"
 
+create:
+  steps:
+    - !JsCreateEdgesFromRow
+        - 
+
 export:
   profiles:
     - filename: "output.gml"
@@ -15,5 +20,5 @@ export:
       exporter: "DOT"
     - filename: "nodes-full.csv"
       exporter: "CSVNodes"
-    - filename: "nodes-full.csv"
+    - filename: "edges-full.csv"
       exporter: "CSVEdges"

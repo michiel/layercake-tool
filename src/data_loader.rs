@@ -15,6 +15,19 @@ pub fn load_tsv(filename: &str) -> anyhow::Result<DataFrame> {
         .map_err(Into::into)
 }
 
+pub fn sql_create_edges(df: &DataFrame, sql_query: &str) -> anyhow::Result<DataFrame> {
+    let mut ctx = SQLContext::new();
+    ctx.register("df", df.clone().lazy());
+
+    // Execute the SQL query and get the resulting LazyFrame
+    let result_lf = ctx.execute(sql_query)?;
+
+    // Collect the LazyFrame into a DataFrame
+    let result_df = result_lf.collect()?;
+
+    Ok(result_df)
+}
+
 pub fn add_column_with_sql(
     df: &DataFrame,
     sql_query: &str,
@@ -110,6 +123,32 @@ mod tests {
         ]?;
 
         assert_eq!(result, expected);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_dependency_extraction() -> Result<()> {
+        /*
+                let df = DataFrame::new([
+                    col("node_id", &["node1"]),
+                    col("deps", &["node2,node3,node4"]),
+                ])?;
+
+                let expected_df = DataFrame::new([
+                    col("source_id", &["node2", "node3", "node4"]),
+                    col("target_id", &["node1", "node1", "node1"]),
+                ])?;
+
+                let actual_df = df.sql(
+                    r#"
+                    SELECT deps AS source_id, node_id AS target_id
+                    FROM explode(deps)
+                    "#,
+                )?;
+
+                assert_eq!(actual_df, expected_df);
+        */
 
         Ok(())
     }
