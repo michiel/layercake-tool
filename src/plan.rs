@@ -1,14 +1,34 @@
 use serde::{Deserialize, Serialize};
-
-#[derive(Serialize, Deserialize)]
-pub struct PlanConfig {
-    pub import: ImportConfig,
-    pub export: ExportProfile,
-}
+/// 
+/// ```
+/// Plan
+///   ├── import: ImportConfig
+///   │     └── profiles: Vec<ImportProfile>
+///   │            ├── filename: String
+///   │            ├── tablename: String
+///   │            └── transformations: Vec<Transformation>
+///   │                   ├── AddSQLColumn(String, String)
+///   │                   └── FillColumnForward(String)
+///   └── export: ExportProfile
+///         └── profiles: Vec<ExportProfileItem>
+///                ├── filename: String
+///                └── exporter: Exporter
+///                       ├── GML
+///                       ├── DOT
+///                       ├── CSVNodes
+///                       └── CSVEdges
+/// ```
+/// 
 
 //
 // Import configuration
 //
+
+#[derive(Serialize, Deserialize)]                                                                                                                                                                                                                                                                                                                                                                     
+pub struct Plan {                                                                                                                                                                                                                                                                                                                                                                               
+    pub import: ImportConfig,                                                                                                                                                                                                                                                                                                                                                                         
+    pub export: ExportProfile,                                                                                                                                                                                                                                                                                                                                                                        
+} 
 
 #[derive(Serialize, Deserialize)]
 pub struct ImportConfig {
@@ -126,6 +146,6 @@ export:
       exporter: CSVEdges
 "#;
 
-        let _config: PlanConfig = serde_yaml::from_str(yaml_str).unwrap();
+        let _config: Plan = serde_yaml::from_str(yaml_str).unwrap();
     }
 }
