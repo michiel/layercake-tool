@@ -1,0 +1,18 @@
+id,label,layer,is_container,belongs_to
+root,Root,cpu,y,
+root_ring3,Root / Ring 3,cpu_ring,y,root
+root_ring0,Root / Ring 0,cpu_ring,y,root
+non_root,,cpu,y,
+vm1,VM1,vm,y,non_root
+vm2,VM2,vm,y,non_root
+vm1_ring0,VM1 / Ring 0,cpu_ring,y,vm1
+vm1_ring3,VM1 / Ring 3,cpu_ring,y,vm1
+vm2_ring0,VM2 / Ring 0,cpu_ring,y,vm2
+vm2_ring3,VM2 / Ring 3,cpu_ring,y,vm2
+redhat_linux,RedHat Linux kernel,software,n,vm1_ring0
+webserver_apache,Webserver Apache,software,n,vm1_ring3
+windows,Microsoft Windows,software,n,vm2_ring0
+webserver_iis,Webserver IIS,software,n,vm2_ring3
+qemu_1,QEMU,software,n,root_ring3
+qemu_2,QEMU,software,n,root_ring3
+kvm,KVM,software,n,root_ring0

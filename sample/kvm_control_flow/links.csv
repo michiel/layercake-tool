@@ -1,0 +1,13 @@
+id,label,source,target,type
+link_01,,qemu1,kvm,gated
+link_02,,kvm,qemu1,ungated
+link_03,,qemu2,kvm,gated
+link_04,,kvm,qemu2,ungated
+link_05,,kvm,windows,ungated
+link_06,,windows,kvm,gated
+link_07,,kvm,redhat_linux,ungated
+link_08,,redhat_linux,kvm,gated
+link_09,,windows,webserver_iis,ungated
+link_10,,webserver_iis,windows,gated
+link_11,,redhat_linux,webserver_apache,ungated
+link_12,,webserver_apache,redhat_linux,gated
