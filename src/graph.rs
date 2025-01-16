@@ -1,8 +1,19 @@
+use polars::frame::row::Row;
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Graph {
     pub nodes: Vec<Node>,
-    pub edges: Vec<Edge>
+    pub edges: Vec<Edge>,
+}
+
+impl Default for Graph {
+    fn default() -> Self {
+        Graph {
+            nodes: Vec::new(),
+            edges: Vec::new(),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -25,3 +36,14 @@ pub struct Edge {
     pub comment: Option<String>,
 }
 
+impl Node {
+    pub fn from_row(row: &Row) -> Self {
+        unimplemented!()
+    }
+}
+
+impl Edge {
+    pub fn from_row(row: &Row) -> Self {
+        unimplemented!()
+    }
+}

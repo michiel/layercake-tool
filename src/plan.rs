@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 /// ## Structure
 /// This module contains the data structures for the configuration file.
-/// 
+///
 /// ```text
 /// Plan
 ///   ├── import: ImportConfig
@@ -18,17 +18,17 @@ use serde::{Deserialize, Serialize};
 ///                       ├── CSVNodes
 ///                       └── CSVEdges
 /// ```
-/// 
+///
 
 //
 // Import configuration
 //
 
-#[derive(Serialize, Deserialize, Debug)]                                                                                                                                                                                                                                                                                                                                                                     
-pub struct Plan {                                                                                                                                                                                                                                                                                                                                                                               
-    pub import: ImportConfig,                                                                                                                                                                                                                                                                                                                                                                         
-    pub export: ExportProfile,                                                                                                                                                                                                                                                                                                                                                                        
-} 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Plan {
+    pub import: ImportConfig,
+    pub export: ExportProfile,
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ImportConfig {
@@ -47,9 +47,16 @@ pub struct CSVImportParams {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub enum ImportFileType {
+    Edges,
+    Nodes,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ImportProfile {
     pub filename: String,
     pub tablename: String,
+    pub filetype: ImportFileType,
 }
 
 //
@@ -83,6 +90,7 @@ mod tests {
     fn test_serialization() {
         let config = ImportConfig {
             profiles: vec![ImportProfile {
+                filetype: ImportFileType::Nodes,
                 filename: "data.csv".to_string(),
                 tablename: "table1".to_string(),
             }],

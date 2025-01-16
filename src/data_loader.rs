@@ -22,18 +22,24 @@ pub fn load_csv(filename: &str) -> anyhow::Result<DataFrame> {
 }
 
 pub fn verify_nodes_df(df: &DataFrame) -> anyhow::Result<()> {
-    let columns: Vec<String> = df.get_column_names().into_iter().map(|s| s.to_string()).collect();
+    let columns: Vec<String> = df
+        .get_column_names()
+        .into_iter()
+        .map(|s| s.to_string())
+        .collect();
     let required_columns = ["id", "label", "layer", "is_container", "belongs_to"];
-    
+
     for &col in &required_columns {
         if !columns.contains(&col.to_string()) {
             return Err(anyhow::anyhow!("Missing required column: {}", col));
         }
     }
 
-
     if columns.len() < 5 {
-        return Err(anyhow::anyhow!("Expected a minimum of 5 columns, found {}", columns.len()));
+        return Err(anyhow::anyhow!(
+            "Expected a minimum of 5 columns, found {}",
+            columns.len()
+        ));
     }
 
     Ok(())
@@ -43,5 +49,4 @@ pub fn verify_nodes_df(df: &DataFrame) -> anyhow::Result<()> {
 mod tests {
     use super::*;
     use anyhow::Result;
-
 }
