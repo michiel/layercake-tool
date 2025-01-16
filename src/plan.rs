@@ -1,6 +1,9 @@
 use serde::{Deserialize, Serialize};
+
+/// ## Structure
+/// This module contains the data structures for the configuration file.
 /// 
-/// ```
+/// ```text
 /// Plan
 ///   ├── import: ImportConfig
 ///   │     └── profiles: Vec<ImportProfile>
