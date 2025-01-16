@@ -1,0 +1,24 @@
+import:
+  profiles:
+    - filename: "sample/kvm_control_flow/nodes.csv"
+      tablename: "nodes"
+      transformations:
+    - filename: "sample/kvm_control_flow/links.csv"
+      tablename: "links"
+      transformations:
+
+create:
+  steps:
+    - !JsCreateEdgesFromRow
+        - 
+
+export:
+  profiles:
+    - filename: "output.gml"
+      exporter: "GML"
+    - filename: "output.dot"
+      exporter: "DOT"
+    - filename: "nodes-full.csv"
+      exporter: "CSVNodes"
+    - filename: "edges-full.csv"
+      exporter: "CSVEdges"
