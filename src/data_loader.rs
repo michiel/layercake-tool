@@ -1,10 +1,6 @@
 use polars::prelude::*;
 use std::path::Path;
 
-use polars::sql::SQLContext;
-
-use polars::prelude::FillNullStrategy;
-
 pub fn load_tsv(filename: &str) -> anyhow::Result<DataFrame> {
     let path = Path::new(filename);
     LazyCsvReader::new(path)
@@ -15,54 +11,32 @@ pub fn load_tsv(filename: &str) -> anyhow::Result<DataFrame> {
         .map_err(Into::into)
 }
 
-pub fn sql_create_edges(df: &DataFrame, sql_query: &str) -> anyhow::Result<DataFrame> {
-    let mut ctx = SQLContext::new();
-    ctx.register("df", df.clone().lazy());
-
-    // Execute the SQL query and get the resulting LazyFrame
-    let result_lf = ctx.execute(sql_query)?;
-
-    // Collect the LazyFrame into a DataFrame
-    let result_df = result_lf.collect()?;
-
-    Ok(result_df)
+pub fn load_csv(filename: &str) -> anyhow::Result<DataFrame> {
+    let path = Path::new(filename);
+    LazyCsvReader::new(path)
+        .with_has_header(true)
+        .with_separator(b',')
+        .finish()?
+        .collect()
+        .map_err(Into::into)
 }
 
-pub fn add_column_with_sql(
-    df: &DataFrame,
-    sql_query: &str,
-    col_name: &str,
-) -> anyhow::Result<DataFrame> {
-    let mut ctx = SQLContext::new();
-    ctx.register("df", df.clone().lazy());
-
-    // Execute the SQL query and get the resulting LazyFrame
-    let result_lf = ctx.execute(sql_query)?;
-
-    // Collect the LazyFrame into a DataFrame
-    let result_df = result_lf.collect()?;
-
-    // Extract the new column from the result
-    let new_col = result_df.column(col_name)?;
-
-    // Add the new column to the original DataFrame
-    let df_with_new_col = df.hstack(&[new_col.clone()])?;
-
-    Ok(df_with_new_col)
-}
-pub fn fill_forward_columns(lf: LazyFrame, columns: Vec<String>) -> anyhow::Result<LazyFrame> {
-    let mut lf = lf;
-
-    for col_name in columns {
-        // Apply the forward fill on each column
-        lf = lf.with_column(
-            col(col_name.as_str())
-                .fill_null_with_strategy(FillNullStrategy::Forward(None))
-                .alias(&col_name),
-        );
+pub fn verify_nodes_df(df: &DataFrame) -> anyhow::Result<()> {
+    let columns: Vec<String> = df.get_column_names().into_iter().map(|s| s.to_string()).collect();
+    let required_columns = ["id", "label", "layer", "is_container", "belongs_to"];
+    
+    for &col in &required_columns {
+        if !columns.contains(&col.to_string()) {
+            return Err(anyhow::anyhow!("Missing required column: {}", col));
+        }
     }
 
-    Ok(lf)
+
+    if columns.len() < 5 {
+        return Err(anyhow::anyhow!("Expected a minimum of 5 columns, found {}", columns.len()));
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -70,86 +44,4 @@ mod tests {
     use super::*;
     use anyhow::Result;
 
-    #[test]
-    fn test_add_column_with_sql() -> Result<()> {
-        // Create a sample DataFrame
-        let df = df! [
-            "A" => [1, 2, 3],
-            "B" => [4, 5, 6]
-        ]?;
-
-        // SQL query to add a new column
-        let sql_query = "SELECT *, A + B AS sum FROM df";
-
-        // Add the new column
-        let result = add_column_with_sql(&df, sql_query, "sum")?;
-
-        // Check if the new column was added
-        assert!(result.column("sum").is_ok());
-
-        // Check if the values in the new column are correct
-        let sum_col = result.column("sum")?;
-        assert_eq!(sum_col.get(0).unwrap(), AnyValue::Int32(5));
-        assert_eq!(sum_col.get(1).unwrap(), AnyValue::Int32(7));
-        assert_eq!(sum_col.get(2).unwrap(), AnyValue::Int32(9));
-
-        let expected = df! [
-            "A" => [1, 2, 3],
-            "B" => [4, 5, 6],
-            "sum" => [5, 7, 9],
-        ]?;
-
-        assert_eq!(result, expected);
-
-        Ok(())
-    }
-    #[test]
-    fn test_fill_forward_columns() -> anyhow::Result<()> {
-        let df = df! [
-            "A" => [Some(1), Some(2), None, Some(4), Some(5)],
-            "B" => [Some("a"), None, None, Some("d"), Some("e")],
-            "C" => [Some(1.1), Some(2.2), Some(3.3), None, Some(5.5)]
-        ]?;
-
-        let lf = df.lazy();
-        let columns = vec!["A".to_string(), "B".to_string(), "C".to_string()];
-
-        let result = fill_forward_columns(lf, columns)?.collect()?;
-
-        let expected = df! [
-            "A" => [1, 2, 2, 4, 5],
-            "B" => ["a", "a", "a", "d", "e"],
-            "C" => [1.1, 2.2, 3.3, 3.3, 5.5]
-        ]?;
-
-        assert_eq!(result, expected);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_dependency_extraction() -> Result<()> {
-        /*
-                let df = DataFrame::new([
-                    col("node_id", &["node1"]),
-                    col("deps", &["node2,node3,node4"]),
-                ])?;
-
-                let expected_df = DataFrame::new([
-                    col("source_id", &["node2", "node3", "node4"]),
-                    col("target_id", &["node1", "node1", "node1"]),
-                ])?;
-
-                let actual_df = df.sql(
-                    r#"
-                    SELECT deps AS source_id, node_id AS target_id
-                    FROM explode(deps)
-                    "#,
-                )?;
-
-                assert_eq!(actual_df, expected_df);
-        */
-
-        Ok(())
-    }
 }

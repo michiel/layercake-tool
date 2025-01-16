@@ -1,4 +1,5 @@
 mod plan;
+mod plan_execution;
 mod data_loader;
 
 use anyhow::Result;
@@ -14,8 +15,21 @@ struct Cli {
     plan: Option<String>,
 }
 
-fn load_and_process_data(filename: &str) -> Result<DataFrame> {
-    let df = data_loader::load_tsv(filename)?;
+fn load_file(file_path: &str) -> Result<DataFrame, anyhow::Error> {
+    let extension = std::path::Path::new(file_path)
+        .extension()
+        .and_then(std::ffi::OsStr::to_str)
+        .unwrap_or("");
+
+    let df = match extension {
+        "csv" => data_loader::load_csv(file_path),
+        "tsv" => data_loader::load_tsv(file_path),
+        _ => {
+            eprintln!("Error: unsupported extension {}", extension);
+            process::exit(1);
+        }
+    }?;
+
     println!("Loaded DataFrame:\n{}", df);
     Ok(df)
 }
@@ -34,14 +48,13 @@ fn main() -> Result<()> {
 
     // Read and deserialize the configuration file
     let path_content = fs::read_to_string(&plan_file_path)?;
-    let plan_path: plan::Plan = serde_yaml::from_str(&path_content)?;
+    let plan: plan::Plan = serde_yaml::from_str(&path_content)?;
 
-    // Use the deserialized configuration
-    let filename = &plan_path.import.profiles[0].filename;
-    let mut df = load_and_process_data(filename)?;
+    plan_execution::execute_plan(plan)?;
 
-    let sql_query = "SELECT repo1, repo2, repo1 || '-' || repo2 AS repo_id FROM df";
-    df = data_loader::add_column_with_sql(&mut df, sql_query, "repo_id")?;
-    println!("Updated DataFrame:\n{}", df);
+    // // Use the deserialized configuration
+    // let filename = &plan.import.profiles[0].filename;
+    // let _df = load_file(filename)?;
+
     Ok(())
 }

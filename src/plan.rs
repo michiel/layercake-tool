@@ -8,10 +8,7 @@ use serde::{Deserialize, Serialize};
 ///   ├── import: ImportConfig
 ///   │     └── profiles: Vec<ImportProfile>
 ///   │            ├── filename: String
-///   │            ├── tablename: String
-///   │            └── transformations: Vec<Transformation>
-///   │                   ├── AddSQLColumn(String, String)
-///   │                   └── FillColumnForward(String)
+///   │            └── tablename: String
 ///   └── export: ExportProfile
 ///         └── profiles: Vec<ExportProfileItem>
 ///                ├── filename: String
@@ -27,57 +24,50 @@ use serde::{Deserialize, Serialize};
 // Import configuration
 //
 
-#[derive(Serialize, Deserialize)]                                                                                                                                                                                                                                                                                                                                                                     
+#[derive(Serialize, Deserialize, Debug)]                                                                                                                                                                                                                                                                                                                                                                     
 pub struct Plan {                                                                                                                                                                                                                                                                                                                                                                               
     pub import: ImportConfig,                                                                                                                                                                                                                                                                                                                                                                         
     pub export: ExportProfile,                                                                                                                                                                                                                                                                                                                                                                        
 } 
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ImportConfig {
     pub profiles: Vec<ImportProfile>,
 }
 
-#[derive(Serialize, Deserialize)]
-pub enum Transformation {
-    AddSQLColumn(String, String),
-    FillColumnForward(String),
-}
-
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum FileImportProfile {
     CSV(CSVImportParams),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct CSVImportParams {
     pub skiprows: Option<usize>,
     pub separator: Option<char>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ImportProfile {
     pub filename: String,
     pub tablename: String,
-    pub transformations: Vec<Transformation>,
 }
 
 //
 // Export configuration
 //
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ExportProfile {
     pub profiles: Vec<ExportProfileItem>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ExportProfileItem {
     pub filename: String,
     pub exporter: Exporter,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum Exporter {
     GML,
     DOT,
@@ -95,10 +85,6 @@ mod tests {
             profiles: vec![ImportProfile {
                 filename: "data.csv".to_string(),
                 tablename: "table1".to_string(),
-                transformations: vec![
-                    Transformation::AddSQLColumn("col1".to_string(), "value1".to_string()),
-                    Transformation::FillColumnForward("col2".to_string()),
-                ],
             }],
         };
 
@@ -112,18 +98,12 @@ mod tests {
 profiles:
   - filename: data.csv
     tablename: table1
-    transformations:
-      - !AddSQLColumn
-          - "repo_id"
-          - "SELECT repo_1, repo_2, repo_1 || '-' || repo_2 AS repo_id FROM df"
-      - !FillColumnForward "col2"
 "#;
 
         let config: ImportConfig = serde_yaml::from_str(yaml_str).unwrap();
         assert_eq!(config.profiles.len(), 1);
         assert_eq!(config.profiles[0].filename, "data.csv");
         assert_eq!(config.profiles[0].tablename, "table1");
-        assert_eq!(config.profiles[0].transformations.len(), 2);
     }
     #[test]
     fn test_planfile_deserialization() {
@@ -132,11 +112,6 @@ import:
   profiles:
     - filename: data.csv
       tablename: table1
-      transformations:
-        - !AddSQLColumn
-            - repo_id
-            - "SELECT repo_1, repo_2, repo_1 || '-' || repo_2 AS repo_id FROM df"
-        - !FillColumnForward col2
 export:
   profiles:
     - filename: output.gml
