@@ -1,4 +1,5 @@
 use polars::frame::row::Row;
+use polars::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -38,12 +39,26 @@ pub struct Edge {
 
 impl Node {
     pub fn from_row(row: &Row) -> Self {
-        unimplemented!()
+        Node {
+            id: row.0.get(0).unwrap().to_string(),
+            label: row.0.get(1).unwrap().to_string(),
+            layer: row.0.get(2).unwrap().to_string(),
+            is_container: row.0.get(3).unwrap().to_string() == "true",
+            belongs_to: row.0.get(4).unwrap().to_string(),
+            comment: row.0.get(5).map(|c| c.to_string()),
+        }
     }
 }
 
 impl Edge {
     pub fn from_row(row: &Row) -> Self {
-        unimplemented!()
+        Edge {
+            id: row.0.get(0).unwrap().to_string(),
+            source: row.0.get(1).unwrap().to_string(),
+            target: row.0.get(2).unwrap().to_string(),
+            label: row.0.get(3).unwrap().to_string(),
+            layer: row.0.get(4).unwrap().to_string(),
+            comment: row.0.get(5).map(|c| c.to_string()),
+        }
     }
 }

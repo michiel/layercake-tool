@@ -1,9 +1,11 @@
 import:
   profiles:
     - filename: "sample/kvm_control_flow/nodes.csv"
+      filetype: "Nodes"
       tablename: "nodes"
       transformations:
     - filename: "sample/kvm_control_flow/links.csv"
+      filetype: "Edges"
       tablename: "links"
       transformations:
 
