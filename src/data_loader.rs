@@ -46,7 +46,4 @@ pub fn verify_nodes_df(df: &DataFrame) -> anyhow::Result<()> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use anyhow::Result;
-}
+mod tests {}

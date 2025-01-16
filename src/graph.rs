@@ -1,5 +1,4 @@
 use polars::frame::row::Row;
-use polars::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]

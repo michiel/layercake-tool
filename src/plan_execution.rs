@@ -29,26 +29,32 @@ pub fn execute_plan(plan: Plan) -> Result<()> {
 
     let mut graph = Graph::default();
 
-    plan.import.profiles.iter().for_each(|profile| {
-        println!("Importing file: {}", profile.filename);
-        let df = load_file(&profile.filename).unwrap();
-        match profile.filetype {
-            ImportFileType::Nodes => {
-                for idx in 0..df.height() {
-                    let row = df.get_row(idx).unwrap();
-                    let node = Node::from_row(&row);
-                    graph.nodes.push(node);
+    plan.import
+        .profiles
+        .iter()
+        .try_for_each(|profile| -> Result<(), Box<dyn std::error::Error>> {
+            println!("Importing file: {}", profile.filename);
+            let df = load_file(&profile.filename)?;
+            match profile.filetype {
+                ImportFileType::Nodes => {
+                    data_loader::verify_nodes_df(&df)?;
+                    for idx in 0..df.height() {
+                        let row = df.get_row(idx)?;
+                        let node = Node::from_row(&row);
+                        graph.nodes.push(node);
+                    }
+                }
+                ImportFileType::Edges => {
+                    for idx in 0..df.height() {
+                        let row = df.get_row(idx)?;
+                        let edge = Edge::from_row(&row);
+                        graph.edges.push(edge);
+                    }
                 }
             }
-            ImportFileType::Edges => {
-                for idx in 0..df.height() {
-                    let row = df.get_row(idx).unwrap();
-                    let edge = Edge::from_row(&row);
-                    graph.edges.push(edge);
-                }
-            }
-        }
-    });
+            Ok(())
+        })
+        .unwrap();
 
     plan.export.profiles.iter().for_each(|profile| {
         println!("Exporting file: {}", profile.filename);
