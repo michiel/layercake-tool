@@ -1,6 +1,7 @@
 use crate::data_loader;
 use crate::graph::{Edge, Graph, Node};
 use crate::plan::{ExportFileType, ImportFileType, Plan};
+use tracing::{debug, error, info};
 
 use anyhow::Result;
 use polars::prelude::*;
@@ -15,12 +16,12 @@ fn load_file(file_path: &str) -> Result<DataFrame, anyhow::Error> {
         "csv" => data_loader::load_csv(file_path),
         "tsv" => data_loader::load_tsv(file_path),
         _ => {
-            eprintln!("Error: unsupported extension {}", extension);
+            error!("Error: unsupported extension {}", extension);
             anyhow::bail!("Unsupported extension");
         }
     }?;
 
-    println!("Loaded DataFrame:\n{}", df);
+    debug!("Loaded DataFrame:\n{}", df);
     Ok(df)
 }
 
@@ -29,7 +30,8 @@ fn is_empty_or_whitespace_or_quotes(s: &str) -> bool {
         .all(|c| c.is_whitespace() || c == '"' || c == '\'')
 }
 pub fn execute_plan(plan: Plan) -> Result<()> {
-    println!("Executing plan: {:?}", plan);
+    info!("Executing plan");
+    debug!("Executing plan: {:?}", plan);
 
     let mut graph = Graph::default();
 
@@ -37,7 +39,10 @@ pub fn execute_plan(plan: Plan) -> Result<()> {
         .profiles
         .iter()
         .try_for_each(|profile| -> Result<(), Box<dyn std::error::Error>> {
-            println!("Importing file: {}", profile.filename);
+            info!(
+                "Importing file: {} as {:?}",
+                profile.filename, profile.filetype
+            );
             let df = load_file(&profile.filename)?;
             match profile.filetype {
                 ImportFileType::Nodes => {
@@ -73,7 +78,10 @@ pub fn execute_plan(plan: Plan) -> Result<()> {
         .unwrap();
 
     plan.export.profiles.iter().for_each(|profile| {
-        println!("Exporting file: {}", profile.filename);
+        info!(
+            "Exporting file: {} using exporter {:?}",
+            profile.filename, profile.exporter
+        );
         let output = match profile.exporter {
             ExportFileType::GML => super::export::to_gml::render(graph.clone()),
             ExportFileType::DOT => "".to_string(),
@@ -85,7 +93,7 @@ pub fn execute_plan(plan: Plan) -> Result<()> {
         super::common::write_string_to_file(&profile.filename, &output).unwrap();
     });
 
-    println!("Graph: {:?}", graph);
+    debug!("Graph: {:?}", graph);
 
     Ok(())
 }

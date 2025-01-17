@@ -1,5 +1,6 @@
 use polars::prelude::*;
 use std::path::Path;
+use tracing::{debug, error, info};
 
 pub fn load_tsv(filename: &str) -> anyhow::Result<DataFrame> {
     let path = Path::new(filename);

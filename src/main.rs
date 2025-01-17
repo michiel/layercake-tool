@@ -10,21 +10,42 @@ use clap::Parser;
 use serde_yaml;
 use std::fs;
 use std::process;
+use tracing::Level;
+use tracing::{debug, error, info};
+use tracing_subscriber;
 
 #[derive(Parser)]
 struct Cli {
     #[clap(short, long)]
     plan: Option<String>,
+    #[clap(short, long)]
+    log_level: Option<String>,
 }
 
 fn main() -> Result<()> {
     let args = Cli::parse();
 
+    let log_level = match args
+        .log_level
+        .unwrap_or("info".to_string())
+        .to_lowercase()
+        .as_str()
+    {
+        "trace" => Level::TRACE,
+        "debug" => Level::DEBUG,
+        "info" => Level::INFO,
+        "warn" => Level::WARN,
+        "error" => Level::ERROR,
+        _ => Level::INFO,
+    };
+
+    tracing_subscriber::fmt().with_max_level(log_level).init();
+
     // Exit if args.path is not provided
     let plan_file_path = match args.plan {
         Some(path) => path,
         None => {
-            eprintln!("Error: configuration file must be provided with the -c option.");
+            error!("Error: configuration file must be provided with the -c option.");
             process::exit(1);
         }
     };
@@ -34,10 +55,6 @@ fn main() -> Result<()> {
     let plan: plan::Plan = serde_yaml::from_str(&path_content)?;
 
     plan_execution::execute_plan(plan)?;
-
-    // // Use the deserialized configuration
-    // let filename = &plan.import.profiles[0].filename;
-    // let _df = load_file(filename)?;
 
     Ok(())
 }
