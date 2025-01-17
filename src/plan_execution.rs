@@ -40,7 +40,7 @@ pub fn execute_plan(plan: Plan) -> Result<()> {
                     data_loader::verify_nodes_df(&df)?;
                     for idx in 0..df.height() {
                         let row = df.get_row(idx)?;
-                        let node = Node::from_row(&row);
+                        let node = Node::from_row(&row)?;
                         graph.nodes.push(node);
                     }
                 }
@@ -48,7 +48,7 @@ pub fn execute_plan(plan: Plan) -> Result<()> {
                     // TODO Add verification for edges
                     for idx in 0..df.height() {
                         let row = df.get_row(idx)?;
-                        let edge = Edge::from_row(&row);
+                        let edge = Edge::from_row(&row)?;
                         graph.edges.push(edge);
                     }
                 }

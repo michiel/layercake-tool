@@ -37,27 +37,27 @@ pub struct Edge {
 }
 
 impl Node {
-    pub fn from_row(row: &Row) -> Self {
-        Node {
-            id: row.0.get(0).unwrap().to_string(),
-            label: row.0.get(1).unwrap().to_string(),
-            layer: row.0.get(2).unwrap().to_string(),
-            is_container: row.0.get(3).unwrap().to_string() == "true",
-            belongs_to: row.0.get(4).unwrap().to_string(),
+    pub fn from_row(row: &Row) -> Result<Self, Box<dyn std::error::Error>> {
+        Ok(Node {
+            id: row.0.get(0).ok_or("Missing id")?.to_string(),
+            label: row.0.get(1).ok_or("Missing label")?.to_string(),
+            layer: row.0.get(2).ok_or("Missing layer")?.to_string(),
+            is_container: row.0.get(3).ok_or("Missing is_container")?.to_string() == "true",
+            belongs_to: row.0.get(4).ok_or("Missing belongs_to")?.to_string(),
             comment: row.0.get(5).map(|c| c.to_string()),
-        }
+        })
     }
 }
 
 impl Edge {
-    pub fn from_row(row: &Row) -> Self {
-        Edge {
-            id: row.0.get(0).unwrap().to_string(),
-            source: row.0.get(1).unwrap().to_string(),
-            target: row.0.get(2).unwrap().to_string(),
-            label: row.0.get(3).unwrap().to_string(),
-            layer: row.0.get(4).unwrap().to_string(),
+    pub fn from_row(row: &Row) -> Result<Self, Box<dyn std::error::Error>> {
+        Ok(Edge {
+            id: row.0.get(0).ok_or("Missing id")?.to_string(),
+            source: row.0.get(1).ok_or("Missing source")?.to_string(),
+            target: row.0.get(2).ok_or("Missing target")?.to_string(),
+            label: row.0.get(3).ok_or("Missing label")?.to_string(),
+            layer: row.0.get(4).ok_or("Missing layer")?.to_string(),
             comment: row.0.get(5).map(|c| c.to_string()),
-        }
+        })
     }
 }

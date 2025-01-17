@@ -79,6 +79,7 @@ pub struct ExportProfileItem {
 pub enum Exporter {
     GML,
     DOT,
+    PlantUML,
     CSVNodes,
     CSVEdges,
 }
