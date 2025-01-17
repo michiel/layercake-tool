@@ -6,17 +6,18 @@ use serde::{Deserialize, Serialize};
 /// ```text
 /// Plan
 ///   ├── import: ImportConfig
-///   │     └── profiles: Vec<ImportProfile>
-///   │            ├── filename: String
-///   │            └── tablename: String
+///   │   └── profiles: Vec<ImportProfile>
+///   │       ├── filename: String
+///   │       ├── tablename: String
+///   │       └── filetype: ImportFileType
 ///   └── export: ExportProfile
-///         └── profiles: Vec<ExportProfileItem>
-///                ├── filename: String
-///                └── exporter: Exporter
-///                       ├── GML
-///                       ├── DOT
-///                       ├── CSVNodes
-///                       └── CSVEdges
+///       └── profiles: Vec<ExportProfileItem>
+///           ├── filename: String
+///           └── exporter: Exporter
+///               ├── GML
+///               ├── DOT
+///               ├── CSVNodes
+///               └── CSVEdges
 /// ```
 ///
 
