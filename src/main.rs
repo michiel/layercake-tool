@@ -6,20 +6,32 @@ mod plan;
 mod plan_execution;
 
 use anyhow::Result;
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use serde_yaml;
 use std::fs;
-use std::process;
+use tracing::info;
 use tracing::Level;
-use tracing::{debug, error, info};
 use tracing_subscriber;
 
 #[derive(Parser)]
+#[clap(author, version, about)]
 struct Cli {
-    #[clap(short, long)]
-    plan: Option<String>,
-    #[clap(short, long)]
+    #[clap(short, long, global = true)]
     log_level: Option<String>,
+    #[clap(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    Run {
+        #[clap(short, long)]
+        plan: String,
+    },
+    Init {
+        #[clap(short, long)]
+        plan: String,
+    },
 }
 
 fn main() -> Result<()> {
@@ -41,20 +53,22 @@ fn main() -> Result<()> {
 
     tracing_subscriber::fmt().with_max_level(log_level).init();
 
-    // Exit if args.path is not provided
-    let plan_file_path = match args.plan {
-        Some(path) => path,
-        None => {
-            error!("Error: configuration file must be provided with the -c option.");
-            process::exit(1);
+    match args.command {
+        Commands::Run { plan } => {
+            info!("Running plan: {}", plan);
+            let plan_file_path = plan;
+            let path_content = fs::read_to_string(&plan_file_path)?;
+            let plan: plan::Plan = serde_yaml::from_str(&path_content)?;
+            plan_execution::execute_plan(plan)?;
         }
-    };
-
-    // Read and deserialize the configuration file
-    let path_content = fs::read_to_string(&plan_file_path)?;
-    let plan: plan::Plan = serde_yaml::from_str(&path_content)?;
-
-    plan_execution::execute_plan(plan)?;
+        Commands::Init { plan } => {
+            info!("Initializing plan: {}", plan);
+            let plan_file_path = plan;
+            let plan = plan::Plan::default();
+            let serialized_plan = serde_yaml::to_string(&plan)?;
+            common::write_string_to_file(&plan_file_path, &serialized_plan)?;
+        }
+    }
 
     Ok(())
 }

@@ -31,9 +31,26 @@ pub struct Plan {
     pub export: ExportProfile,
 }
 
+impl Default for Plan {
+    fn default() -> Self {
+        Plan {
+            import: ImportConfig::default(),
+            export: ExportProfile::default(),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ImportConfig {
     pub profiles: Vec<ImportProfile>,
+}
+
+impl Default for ImportConfig {
+    fn default() -> Self {
+        ImportConfig {
+            profiles: Vec::new(),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -67,6 +84,14 @@ pub struct ImportProfile {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ExportProfile {
     pub profiles: Vec<ExportProfileItem>,
+}
+
+impl Default for ExportProfile {
+    fn default() -> Self {
+        ExportProfile {
+            profiles: Vec::new(),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
