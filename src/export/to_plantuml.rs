@@ -1,8 +1,8 @@
-use super::model::{GraphConfig, GraphData};
+use crate::graph::Graph;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
-struct Node {
+struct PumlNode {
     id: String,
     label: String,
     zone: String,
@@ -39,22 +39,17 @@ fn layerconfig_default_shape() -> String {
     "rectangle".to_string()
 }
 
-fn nodes_from_raw_graphdata(data: &GraphData, config: &GraphConfig) -> Vec<Node> {
-    let mut pumlnodes = Vec::<Node>::new();
-    let layers = config.layers.merged_puml();
-    for node in &data.nodes {
+fn nodes_from_raw_graphdata(graph: &Graph) -> Vec<PumlNode> {
+    let mut pumlnodes = Vec::<PumlNode>::new();
+    for node in &graph.nodes {
         let mut shape = "rectangle";
-        if layers.contains_key(&node.layer) {
-            let layerconfig = layers.get(&node.layer).unwrap();
-            shape = &layerconfig.shape;
-        }
 
-        let zone = match &node.zone {
+        let zone = match node.layer {
             Some(s) => s.to_string().clone(),
             None => "rectangle".to_string(),
         };
 
-        pumlnodes.push(Node {
+        pumlnodes.push(PumlNode {
             id: node.id.clone(),
             label: node.label.clone(),
             shape: shape.to_string(),
@@ -65,7 +60,7 @@ fn nodes_from_raw_graphdata(data: &GraphData, config: &GraphConfig) -> Vec<Node>
     pumlnodes
 }
 
-pub fn render(data: GraphData, config: GraphConfig) -> String {
+pub fn render(graph: Graph) -> String {
     use serde_json::json;
 
     let nodes = nodes_from_raw_graphdata(&data, &config);
@@ -135,21 +130,21 @@ mod tests {
                         {
                             "id": "id1",
                             "layer": "layer1",
-                            "label": "Node 1"
+                            "label": "PumlNode 1"
                         },
                         {
                             "id": "id2",
                             "layer": "layer1",
-                            "label": "Node 2"
+                            "label": "PumlNode 2"
                         },
                         {
                             "id": "id3",
                             "layer": "layer2",
-                            "label": "Node 3"
+                            "label": "PumlNode 3"
                         },
                         {
                             "id": "id4",
-                            "label": "Node 4"
+                            "label": "PumlNode 4"
                         }
                     ],
                     "edges": [
@@ -184,7 +179,7 @@ mod tests {
 
         assert_eq!(
             res,
-            "\n@startuml\n  skinparam rectangle {\n    BackgroundColor LightBlue\n  }\n\n\n      rectangle \"Node 4\" as id4\n\n\n@enduml\n    "
+            "\n@startuml\n  skinparam rectangle {\n    BackgroundColor LightBlue\n  }\n\n\n      rectangle \"PumlNode 4\" as id4\n\n\n@enduml\n    "
         );
     }
 }
