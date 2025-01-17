@@ -3,24 +3,17 @@ import:
     - filename: "sample/kvm_control_flow/nodes.csv"
       filetype: "Nodes"
       tablename: "nodes"
-      transformations:
     - filename: "sample/kvm_control_flow/links.csv"
       filetype: "Edges"
       tablename: "links"
-      transformations:
-
-create:
-  steps:
-    - !JsCreateEdgesFromRow
-        - 
 
 export:
   profiles:
-    - filename: "out/output.gml"
+    - filename: "out/kvm-control-flow.gml"
       exporter: "GML"
-    - filename: "out/output.dot"
+    - filename: "out/kvm-control-flow.dot"
       exporter: "DOT"
-    - filename: "out/nodes-full.csv"
+    - filename: "out/kvm-control-flow-nodes-full.csv"
       exporter: "CSVNodes"
-    - filename: "out/edges-full.csv"
+    - filename: "out/kvm-control-flow-edges-full.csv"
       exporter: "CSVEdges"
