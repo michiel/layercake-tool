@@ -105,6 +105,7 @@ mod tests {
         let yaml_str = r#"
 profiles:
   - filename: data.csv
+    filetype: Nodes
     tablename: table1
 "#;
 
@@ -119,6 +120,7 @@ profiles:
 import:
   profiles:
     - filename: data.csv
+      filetype: Nodes
       tablename: table1
 export:
   profiles:

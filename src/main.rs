@@ -1,7 +1,8 @@
+mod common;
+mod data_loader;
+mod graph;
 mod plan;
 mod plan_execution;
-mod graph;
-mod data_loader;
 
 use anyhow::Result;
 use clap::Parser;

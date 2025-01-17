@@ -45,6 +45,7 @@ pub fn execute_plan(plan: Plan) -> Result<()> {
                     }
                 }
                 ImportFileType::Edges => {
+                    // TODO Add verification for edges
                     for idx in 0..df.height() {
                         let row = df.get_row(idx)?;
                         let edge = Edge::from_row(&row);
@@ -59,6 +60,8 @@ pub fn execute_plan(plan: Plan) -> Result<()> {
     plan.export.profiles.iter().for_each(|profile| {
         println!("Exporting file: {}", profile.filename);
     });
+
+    println!("Graph: {:?}", graph);
 
     Ok(())
 }
