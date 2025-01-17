@@ -1,8 +1,8 @@
 id,label,layer,is_container,belongs_to
-root,Root,cpu,y,
-root_ring3,Root / Ring 3,cpu_ring,y,root
+root,Root,cpu,true,root
+root_ring3,Root / Ring 3,cpu_ring,yes,root
 root_ring0,Root / Ring 0,cpu_ring,y,root
-non_root,,cpu,y,
+non_root,Non-Root,cpu,y,non_root
 vm1,VM1,vm,y,non_root
 vm2,VM2,vm,y,non_root
 vm1_ring0,VM1 / Ring 0,cpu_ring,y,vm1

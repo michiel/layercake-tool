@@ -16,11 +16,11 @@ create:
 
 export:
   profiles:
-    - filename: "output.gml"
+    - filename: "out/output.gml"
       exporter: "GML"
-    - filename: "output.dot"
+    - filename: "out/output.dot"
       exporter: "DOT"
-    - filename: "nodes-full.csv"
+    - filename: "out/nodes-full.csv"
       exporter: "CSVNodes"
-    - filename: "edges-full.csv"
+    - filename: "out/edges-full.csv"
       exporter: "CSVEdges"

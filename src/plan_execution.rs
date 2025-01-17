@@ -1,6 +1,6 @@
 use crate::data_loader;
 use crate::graph::{Edge, Graph, Node};
-use crate::plan::{ImportFileType, Plan};
+use crate::plan::{ExportFileType, ImportFileType, Plan};
 
 use anyhow::Result;
 use polars::prelude::*;
@@ -24,6 +24,10 @@ fn load_file(file_path: &str) -> Result<DataFrame, anyhow::Error> {
     Ok(df)
 }
 
+fn is_empty_or_whitespace_or_quotes(s: &str) -> bool {
+    s.chars()
+        .all(|c| c.is_whitespace() || c == '"' || c == '\'')
+}
 pub fn execute_plan(plan: Plan) -> Result<()> {
     println!("Executing plan: {:?}", plan);
 
@@ -41,6 +45,17 @@ pub fn execute_plan(plan: Plan) -> Result<()> {
                     for idx in 0..df.height() {
                         let row = df.get_row(idx)?;
                         let node = Node::from_row(&row)?;
+                        if !is_empty_or_whitespace_or_quotes(&node.belongs_to) {
+                            let edge = Edge {
+                                id: format!("{}-{}", node.id, node.belongs_to),
+                                source: node.id.clone(),
+                                target: node.belongs_to.clone(),
+                                label: "belongs_to".to_string(),
+                                layer: "nesting".to_string(),
+                                comment: None,
+                            };
+                            graph.edges.push(edge);
+                        }
                         graph.nodes.push(node);
                     }
                 }
@@ -59,6 +74,15 @@ pub fn execute_plan(plan: Plan) -> Result<()> {
 
     plan.export.profiles.iter().for_each(|profile| {
         println!("Exporting file: {}", profile.filename);
+        let output = match profile.exporter {
+            ExportFileType::GML => super::export::to_gml::render(graph.clone()),
+            ExportFileType::DOT => "".to_string(),
+            ExportFileType::CSVNodes => "".to_string(),
+            ExportFileType::CSVEdges => "".to_string(),
+            ExportFileType::PlantUML => "".to_string(),
+        };
+
+        super::common::write_string_to_file(&profile.filename, &output).unwrap();
     });
 
     println!("Graph: {:?}", graph);

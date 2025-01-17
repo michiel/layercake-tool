@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 ///   └── export: ExportProfile
 ///       └── profiles: Vec<ExportProfileItem>
 ///           ├── filename: String
-///           └── exporter: Exporter
+///           └── exporter: ExportFileType
 ///               ├── GML
 ///               ├── DOT
 ///               ├── CSVNodes
@@ -72,11 +72,11 @@ pub struct ExportProfile {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ExportProfileItem {
     pub filename: String,
-    pub exporter: Exporter,
+    pub exporter: ExportFileType,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub enum Exporter {
+pub enum ExportFileType {
     GML,
     DOT,
     PlantUML,

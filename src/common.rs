@@ -1,6 +1,17 @@
 use handlebars::{handlebars_helper, Handlebars};
 use serde_json::Value;
 
+use std::fs::File;
+use std::io::Write;
+use std::path::Path;
+
+pub fn write_string_to_file(filename: &str, content: &str) -> std::io::Result<()> {
+    let path = Path::new(filename);
+    let mut file = File::create(&path)?;
+    file.write_all(content.as_bytes())?;
+    Ok(())
+}
+
 pub fn get_handlebars() -> Handlebars<'static> {
     let mut handlebars = Handlebars::new();
 
