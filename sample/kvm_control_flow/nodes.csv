@@ -13,6 +13,6 @@ redhat_linux,RedHat Linux kernel,software,n,vm1_ring0
 webserver_apache,Webserver Apache,software,n,vm1_ring3
 windows,Microsoft Windows,software,n,vm2_ring0
 webserver_iis,Webserver IIS,software,n,vm2_ring3
-qemu_1,QEMU,software,n,root_ring3
-qemu_2,QEMU,software,n,root_ring3
+qemu1,QEMU,software,n,root_ring3
+qemu2,QEMU,software,n,root_ring3
 kvm,KVM,software,n,root_ring0
