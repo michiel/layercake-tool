@@ -17,6 +17,77 @@ impl Default for Graph {
     }
 }
 
+impl Graph {
+    pub fn get_root_nodes(&self) -> Vec<&Node> {
+        self.nodes
+            .iter()
+            .filter(|n| n.belongs_to.is_empty())
+            .collect()
+    }
+
+    pub fn get_children(&self, parent: &Node) -> Vec<&Node> {
+        self.nodes
+            .iter()
+            .filter(|n| n.belongs_to == parent.id)
+            .collect()
+    }
+
+    pub fn get_edges(&self, node: &Node) -> Vec<&Edge> {
+        self.edges
+            .iter()
+            .filter(|e| e.source == node.id || e.target == node.id)
+            .collect()
+    }
+
+    pub fn get_edges_from(&self, node: &Node) -> Vec<&Edge> {
+        self.edges.iter().filter(|e| e.source == node.id).collect()
+    }
+
+    pub fn get_edges_to(&self, node: &Node) -> Vec<&Edge> {
+        self.edges.iter().filter(|e| e.target == node.id).collect()
+    }
+
+    pub fn get_node_by_id(&self, id: &str) -> Option<&Node> {
+        self.nodes.iter().find(|n| n.id == id)
+    }
+
+    pub fn build_json_tree_recursive(&self, parent: &Node) -> serde_json::Value {
+        let children = self.get_children(parent);
+        let mut tree = Vec::new();
+        for child in children {
+            let node = serde_json::json!({
+                "id": child.id,
+                "label": child.label,
+                "layer": child.layer,
+                "is_container": child.is_container,
+                "belongs_to": child.belongs_to,
+                "comment": child.comment,
+                "children": self.build_json_tree_recursive(child),
+            });
+            tree.push(node);
+        }
+        serde_json::json!(tree)
+    }
+
+    pub fn build_json_tree(&self) -> serde_json::Value {
+        let root_nodes = self.get_root_nodes();
+        let mut tree = Vec::new();
+        for root_node in root_nodes {
+            let node = serde_json::json!({
+                "id": root_node.id,
+                "label": root_node.label,
+                "layer": root_node.layer,
+                "is_container": root_node.is_container,
+                "belongs_to": root_node.belongs_to,
+                "comment": root_node.comment,
+                "children": self.build_json_tree_recursive(root_node),
+            });
+            tree.push(node);
+        }
+        serde_json::json!(tree)
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Node {
     pub id: String,
@@ -125,5 +196,143 @@ mod tests {
         assert!(!is_truthy("  false  "));
         assert!(!is_truthy("\nfalse\n"));
         assert!(!is_truthy("  NO  "));
+    }
+
+    fn create_test_graph() -> Graph {
+        Graph {
+            nodes: vec![
+                Node {
+                    id: "1".to_string(),
+                    label: "Root".to_string(),
+                    layer: "Layer1".to_string(),
+                    is_container: true,
+                    belongs_to: "".to_string(),
+                    comment: None,
+                },
+                Node {
+                    id: "2".to_string(),
+                    label: "Child1".to_string(),
+                    layer: "Layer1".to_string(),
+                    is_container: false,
+                    belongs_to: "1".to_string(),
+                    comment: None,
+                },
+                Node {
+                    id: "3".to_string(),
+                    label: "Child2".to_string(),
+                    layer: "Layer1".to_string(),
+                    is_container: false,
+                    belongs_to: "1".to_string(),
+                    comment: None,
+                },
+            ],
+            edges: vec![
+                Edge {
+                    id: "e1".to_string(),
+                    source: "1".to_string(),
+                    target: "2".to_string(),
+                    label: "Edge1".to_string(),
+                    layer: "Layer1".to_string(),
+                    comment: None,
+                },
+                Edge {
+                    id: "e2".to_string(),
+                    source: "2".to_string(),
+                    target: "3".to_string(),
+                    label: "Edge2".to_string(),
+                    layer: "Layer1".to_string(),
+                    comment: None,
+                },
+            ],
+        }
+    }
+
+    #[test]
+    fn test_get_root_nodes() {
+        let graph = create_test_graph();
+        let root_nodes = graph.get_root_nodes();
+        assert_eq!(root_nodes.len(), 1);
+        assert_eq!(root_nodes[0].id, "1");
+    }
+
+    #[test]
+    fn test_get_children() {
+        let graph = create_test_graph();
+        let root_node = graph.get_node_by_id("1").unwrap();
+        let children = graph.get_children(root_node);
+        assert_eq!(children.len(), 2);
+        assert_eq!(children[0].id, "2");
+        assert_eq!(children[1].id, "3");
+    }
+
+    #[test]
+    fn test_get_edges() {
+        let graph = create_test_graph();
+        let node = graph.get_node_by_id("2").unwrap();
+        let edges = graph.get_edges(node);
+        assert_eq!(edges.len(), 2);
+        assert_eq!(edges[0].id, "e1");
+        assert_eq!(edges[1].id, "e2");
+    }
+
+    #[test]
+    fn test_get_edges_from() {
+        let graph = create_test_graph();
+        let node = graph.get_node_by_id("1").unwrap();
+        let edges = graph.get_edges_from(node);
+        assert_eq!(edges.len(), 1);
+        assert_eq!(edges[0].id, "e1");
+    }
+
+    #[test]
+    fn test_get_edges_to() {
+        let graph = create_test_graph();
+        let node = graph.get_node_by_id("3").unwrap();
+        let edges = graph.get_edges_to(node);
+        assert_eq!(edges.len(), 1);
+        assert_eq!(edges[0].id, "e2");
+    }
+
+    #[test]
+    fn test_get_node_by_id() {
+        let graph = create_test_graph();
+        let node = graph.get_node_by_id("2").unwrap();
+        assert_eq!(node.id, "2");
+        assert_eq!(node.label, "Child1");
+    }
+
+    #[test]
+    fn test_build_json_tree() {
+        let graph = create_test_graph();
+        let json_tree = graph.build_json_tree();
+        let expected_json = serde_json::json!([{
+            "id": "1",
+            "label": "Root",
+            "layer": "Layer1",
+            "is_container": true,
+            "belongs_to": "",
+            "comment": null,
+            "children": [
+                {
+                    "id": "2",
+                    "label": "Child1",
+                    "layer": "Layer1",
+                    "is_container": false,
+                    "belongs_to": "1",
+                    "comment": null,
+                    "children": []
+                },
+                {
+                    "id": "3",
+                    "label": "Child2",
+                    "layer": "Layer1",
+                    "is_container": false,
+                    "belongs_to": "1",
+                    "comment": null,
+                    "children": []
+                }
+            ]
+        }]);
+        assert_eq!(json_tree, expected_json);
     }
 }
