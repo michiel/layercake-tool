@@ -25,10 +25,6 @@ fn load_file(file_path: &str) -> Result<DataFrame, anyhow::Error> {
     Ok(df)
 }
 
-fn is_empty_or_whitespace_or_quotes(s: &str) -> bool {
-    s.chars()
-        .all(|c| c.is_whitespace() || c == '"' || c == '\'')
-}
 pub fn execute_plan(plan: Plan) -> Result<()> {
     info!("Executing plan");
     debug!("Executing plan: {:?}", plan);
@@ -50,16 +46,19 @@ pub fn execute_plan(plan: Plan) -> Result<()> {
                     for idx in 0..df.height() {
                         let row = df.get_row(idx)?;
                         let node = Node::from_row(&row)?;
-                        if !is_empty_or_whitespace_or_quotes(&node.belongs_to) {
-                            let edge = Edge {
-                                id: format!("{}-{}", node.id, node.belongs_to),
-                                source: node.id.clone(),
-                                target: node.belongs_to.clone(),
-                                label: "belongs_to".to_string(),
-                                layer: "nesting".to_string(),
-                                comment: None,
-                            };
-                            graph.edges.push(edge);
+                        match node.belongs_to {
+                            Some(ref belongs_to) => {
+                                let edge = Edge {
+                                    id: format!("{}-{}", node.id, belongs_to),
+                                    source: node.id.clone(),
+                                    target: belongs_to.to_string(),
+                                    label: "belongs_to".to_string(),
+                                    layer: "nesting".to_string(),
+                                    comment: None,
+                                };
+                                graph.edges.push(edge);
+                            }
+                            None => {}
                         }
                         graph.nodes.push(node);
                     }

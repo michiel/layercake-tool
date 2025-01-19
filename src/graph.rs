@@ -21,14 +21,14 @@ impl Graph {
     pub fn get_root_nodes(&self) -> Vec<&Node> {
         self.nodes
             .iter()
-            .filter(|n| n.belongs_to.is_empty() && n.is_container)
+            .filter(|n| n.belongs_to.is_none() && n.is_container)
             .collect()
     }
 
     pub fn get_children(&self, parent: &Node) -> Vec<&Node> {
         self.nodes
             .iter()
-            .filter(|n| n.belongs_to == parent.id)
+            .filter(|n| n.belongs_to.as_deref() == Some(&parent.id))
             .collect()
     }
 
@@ -94,7 +94,7 @@ pub struct Node {
     pub label: String,
     pub layer: String,
     pub is_container: bool,
-    pub belongs_to: String,
+    pub belongs_to: Option<String>,
     pub comment: Option<String>,
 }
 
@@ -110,11 +110,8 @@ pub struct Edge {
 
 fn is_truthy(s: &str) -> bool {
     let trimmed_lowercase = s.trim().to_lowercase();
-    // TODO memoize
     let re = Regex::new(r"(true|y|yes)").unwrap();
-    let res = re.is_match(&trimmed_lowercase);
-    // println!("is_truthy({}) -> {}", trimmed_lowercase, res); // Clone, Debug print
-    res
+    re.is_match(&trimmed_lowercase)
 }
 
 fn strip_quotes_and_whitespace(s: &str) -> &str {
@@ -148,7 +145,16 @@ impl Node {
             label: get_stripped_value(row, 1, "label")?,
             layer: get_stripped_value(row, 2, "layer")?,
             is_container: is_truthy(&get_stripped_value(row, 3, "is_container")?),
-            belongs_to: get_stripped_value(row, 4, "belongs_to")?,
+            belongs_to: {
+                let belongs_to = get_stripped_value(row, 4, "belongs_to")?;
+                if belongs_to.is_empty() {
+                    None
+                } else if belongs_to.to_lowercase() == "null" {
+                    None
+                } else {
+                    Some(belongs_to)
+                }
+            },
             comment: row.0.get(5).map(|c| c.to_string()),
         })
     }
@@ -206,7 +212,7 @@ mod tests {
                     label: "Root".to_string(),
                     layer: "Layer1".to_string(),
                     is_container: true,
-                    belongs_to: "".to_string(),
+                    belongs_to: None,
                     comment: None,
                 },
                 Node {
@@ -214,7 +220,7 @@ mod tests {
                     label: "Child1".to_string(),
                     layer: "Layer1".to_string(),
                     is_container: false,
-                    belongs_to: "1".to_string(),
+                    belongs_to: Some("1".to_string()),
                     comment: None,
                 },
                 Node {
@@ -222,7 +228,7 @@ mod tests {
                     label: "Child2".to_string(),
                     layer: "Layer1".to_string(),
                     is_container: false,
-                    belongs_to: "1".to_string(),
+                    belongs_to: Some("1".to_string()),
                     comment: None,
                 },
             ],
@@ -310,7 +316,7 @@ mod tests {
             "label": "Root",
             "layer": "Layer1",
             "is_container": true,
-            "belongs_to": "",
+            "belongs_to": null,
             "comment": null,
             "children": [
                 {

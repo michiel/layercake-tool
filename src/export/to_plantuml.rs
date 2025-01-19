@@ -89,60 +89,79 @@ mod tests {
             .render_template(
                 &get_template(),
                 &json!({
-                    "nodes": [
-                        {
-                            "id": "id1",
-                            "layer": "layer1",
-                            "label": "PumlNode 1"
+                    "nodes": [{
+                            "id": "1",
+                            "label": "Root",
+                            "layer": "Layer1",
+                            "is_container": true,
+                            "belongs_to": null,
+                            "comment": null,
                         },
                         {
-                            "id": "id2",
-                            "layer": "layer1",
-                            "label": "PumlNode 2"
+                            "id": "2",
+                            "label": "Child1",
+                            "layer": "Layer1",
+                            "is_container": false,
+                            "belongs_to": "1",
+                            "comment": null,
                         },
                         {
-                            "id": "id3",
-                            "layer": "layer2",
-                            "label": "PumlNode 3"
-                        },
-                        {
-                            "id": "id4",
-                            "label": "PumlNode 4"
+                            "id": "3",
+                            "label": "Child2",
+                            "layer": "Layer1",
+                            "is_container": false,
+                            "belongs_to": "1",
+                            "comment": null,
                         }
                     ],
                     "edges": [
                     ],
-                    "nodeconfigs": [
-                        {
-                            "key": "layer1",
-                            "backgroundcolor": "white",
-                            "fontcolor": "blue",
-                            "shape": "rectangle"
-                        },
-                        {
-                            "key": "layer2",
-                            "backgroundcolor": "pink",
-                            "fontcolor": "white",
-                            "shape": "circle"
-                        }
-                    ],
-                    "layerconfigs": [
-                        {
-                            "key": "layer1",
-                            "label": "Layer 1"
-                        },
-                        {
-                            "key": "layer2",
-                            "label": "Layer 2"
-                        }
-                    ]
+                    "tree" : [{
+                            "id": "id1",
+                            "label": "Root",
+                            "layer": "Layer1",
+                            "is_container": true,
+                            "belongs_to": null,
+                            "comment": null,
+                            "children": [
+                                {
+                                    "id": "id2",
+                                    "label": "Child1",
+                                    "layer": "Layer1",
+                                    "is_container": false,
+                                    "belongs_to": "1",
+                                    "comment": null,
+                                    "children": []
+                                },
+                                {
+                                    "id": "id3",
+                                    "label": "Child2",
+                                    "layer": "Layer1",
+                                    "is_container": false,
+                                    "belongs_to": "1",
+                                    "comment": null,
+                                    "children": []
+                                }
+                            ]
+                        }]
                 }),
             )
             .expect("This to render");
 
         assert_eq!(
             res,
-            "\n@startuml\n  skinparam rectangle {\n    BackgroundColor LightBlue\n  }\n\n\n      rectangle \"PumlNode 4\" as id4\n\n\n@enduml\n    "
+            r##"
+@startuml
+
+  rectangle "Root" as id1
+  rectangle "Child1" as id2
+  rectangle "Child2" as id3
+
+  id1 --> id2
+  id1 --> id3
+
+@enduml
+            "##
         );
     }
 }
