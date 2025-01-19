@@ -66,7 +66,7 @@ pub fn get_template() -> String {
 {{{puml_render_tree rootnode}}}
   {{/each}}
   {{#each edges as |edge|}}
- {{edge.source_id}} --> {{edge.target_id}}
+ {{edge.source}} --> {{edge.target}}
   {{/each}}
 
 @enduml
@@ -115,15 +115,15 @@ mod tests {
                     ],
                     "edges": [
                         {
-                            "source_id": "id1",
-                            "target_id": "id2",
+                            "source": "id1",
+                            "target": "id2",
                             "label": "belongs_to",
                             "layer": "nesting",
                             "comment": null,
                         },
                         {
-                            "source_id": "id1",
-                            "target_id": "id3",
+                            "source": "id1",
+                            "target": "id3",
                             "label": "belongs_to",
                             "layer": "nesting",
                             "comment": null,
