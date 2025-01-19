@@ -46,11 +46,11 @@ pub fn get_handlebars() -> Handlebars<'static> {
                 .and_then(|v| v.as_array())
                 .unwrap_or(&empty_vec);
 
-            let indent = " ".repeat(acc as usize);
+            let indent = " ".repeat((acc * 2) as usize);
 
-            let mut result = format!("\n{}rectangle \"{}\" as {} ", indent, label, id);
+            let mut result = format!("{}rectangle \"{}\" as {}", indent, label, id);
             if !children.is_empty() {
-                result += &format!("{{");
+                result += &format!("{{\n");
                 let children_rendered: Vec<String> = children
                     .iter()
                     .map(|child| puml_render_tree_inner(child.clone(), acc + 1))
@@ -82,12 +82,12 @@ pub fn get_handlebars() -> Handlebars<'static> {
 
                 // Render children recursively if any
                 if !children.is_empty() {
-                    result += " {";
+                    result += "{\n";
                     let children_rendered: Vec<String> = children.iter().map(|child| {
                         puml_render_tree_inner(child.clone(), 1)
                     }).collect();
                     result += &format!("{}", children_rendered.join(""));
-                    result += " }\n";
+                    result += "}\n";
                 } else {
                     result += "";
                 }

@@ -65,9 +65,8 @@ pub fn get_template() -> String {
   {{#each tree as |rootnode|}}
 {{{puml_render_tree rootnode}}}
   {{/each}}
-
   {{#each edges as |edge|}}
-    {{edge.source_id}} --> {{edge.target_id}}
+ {{edge.source_id}} --> {{edge.target_id}}
   {{/each}}
 
 @enduml
@@ -90,7 +89,7 @@ mod tests {
                 &get_template(),
                 &json!({
                     "nodes": [{
-                            "id": "1",
+                            "id": "id1",
                             "label": "Root",
                             "layer": "Layer1",
                             "is_container": true,
@@ -98,11 +97,11 @@ mod tests {
                             "comment": null,
                         },
                         {
-                            "id": "2",
+                            "id": "id2",
                             "label": "Child1",
                             "layer": "Layer1",
                             "is_container": false,
-                            "belongs_to": "1",
+                            "belongs_to": "id1",
                             "comment": null,
                         },
                         {
@@ -110,11 +109,25 @@ mod tests {
                             "label": "Child2",
                             "layer": "Layer1",
                             "is_container": false,
-                            "belongs_to": "1",
+                            "belongs_to": "id1",
                             "comment": null,
                         }
                     ],
                     "edges": [
+                        {
+                            "source_id": "id1",
+                            "target_id": "id2",
+                            "label": "belongs_to",
+                            "layer": "nesting",
+                            "comment": null,
+                        },
+                        {
+                            "source_id": "id1",
+                            "target_id": "id3",
+                            "label": "belongs_to",
+                            "layer": "nesting",
+                            "comment": null,
+                        }
                     ],
                     "tree" : [{
                             "id": "id1",
@@ -153,15 +166,16 @@ mod tests {
             r##"
 @startuml
 
-  rectangle "Root" as id1
+rectangle "Root" as id1 {
   rectangle "Child1" as id2
   rectangle "Child2" as id3
+}
 
-  id1 --> id2
-  id1 --> id3
+ id1 --> id2
+ id1 --> id3
 
 @enduml
-            "##
+    "##
         );
     }
 }
