@@ -11,6 +11,8 @@ export:
   profiles:
     - filename: "out/kvm-control-flow.gml"
       exporter: "GML"
+    - filename: "out/kvm-control-flow.puml"
+      exporter: "PlantUML"
     - filename: "out/kvm-control-flow.dot"
       exporter: "DOT"
     - filename: "out/kvm-control-flow-nodes-full.csv"

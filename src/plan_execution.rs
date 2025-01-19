@@ -87,7 +87,7 @@ pub fn execute_plan(plan: Plan) -> Result<()> {
             ExportFileType::DOT => "".to_string(),
             ExportFileType::CSVNodes => "".to_string(),
             ExportFileType::CSVEdges => "".to_string(),
-            ExportFileType::PlantUML => "".to_string(),
+            ExportFileType::PlantUML => super::export::to_plantuml::render(graph.clone()),
         };
 
         super::common::write_string_to_file(&profile.filename, &output).unwrap();

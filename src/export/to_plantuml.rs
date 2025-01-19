@@ -1,78 +1,58 @@
 use crate::graph::Graph;
 use serde::{Deserialize, Serialize};
+use tracing::error;
 
-#[derive(Serialize, Deserialize)]
-struct PumlNode {
-    id: String,
-    label: String,
-    zone: String,
-    layer: String,
-    shape: String,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct LayerConfig {
-    pub key: String,
-    #[serde(default = "layerconfig_default_fillcolor")]
-    pub fillcolor: String,
-    #[serde(default = "layerconfig_default_fontcolor")]
-    pub fontcolor: String,
-    #[serde(default = "layerconfig_default_style")]
-    pub style: String,
-    #[serde(default = "layerconfig_default_shape")]
-    pub shape: String,
-}
-
-fn layerconfig_default_fillcolor() -> String {
-    "white".to_string()
-}
-
-fn layerconfig_default_fontcolor() -> String {
-    "black".to_string()
-}
-
-fn layerconfig_default_style() -> String {
-    "filled".to_string()
-}
-
-fn layerconfig_default_shape() -> String {
-    "rectangle".to_string()
-}
-
-fn nodes_from_raw_graphdata(graph: &Graph) -> Vec<PumlNode> {
-    let mut pumlnodes = Vec::<PumlNode>::new();
-    for node in &graph.nodes {
-        let mut shape = "rectangle";
-
-        let zone = match node.layer {
-            Some(s) => s.to_string().clone(),
-            None => "rectangle".to_string(),
-        };
-
-        pumlnodes.push(PumlNode {
-            id: node.id.clone(),
-            label: node.label.clone(),
-            shape: shape.to_string(),
-            zone,
-            layer: node.layer.clone(),
-        });
-    }
-    pumlnodes
-}
+// #[derive(Serialize, Deserialize)]
+// struct PumlNode {
+//     id: String,
+//     label: String,
+//     zone: String,
+//     layer: String,
+//     shape: String,
+// }
+//
+// #[derive(Serialize, Deserialize, Debug)]
+// pub struct LayerConfig {
+//     pub key: String,
+//     #[serde(default = "layerconfig_default_fillcolor")]
+//     pub fillcolor: String,
+//     #[serde(default = "layerconfig_default_fontcolor")]
+//     pub fontcolor: String,
+//     #[serde(default = "layerconfig_default_style")]
+//     pub style: String,
+//     #[serde(default = "layerconfig_default_shape")]
+//     pub shape: String,
+// }
+//
+// fn layerconfig_default_fillcolor() -> String {
+//     "white".to_string()
+// }
+//
+// fn layerconfig_default_fontcolor() -> String {
+//     "black".to_string()
+// }
+//
+// fn layerconfig_default_style() -> String {
+//     "filled".to_string()
+// }
+//
+// fn layerconfig_default_shape() -> String {
+//     "rectangle".to_string()
+// }
 
 pub fn render(graph: Graph) -> String {
     use serde_json::json;
 
-    let nodes = nodes_from_raw_graphdata(&data, &config);
+    let data = graph.build_json_tree();
+    error!("Data: {:?}", data);
 
     let handlebars = crate::common::get_handlebars();
     let res = handlebars.render_template(
         &get_template(),
         &json!({
-        "nodes": nodes,
-        "edges": data.edges,
-        "layerconfigs": config.layers,
-        "zoneconfigs": config.zones,
+        "tree": data,
+        "nodes": graph.nodes,
+        "edges": graph.edges,
         }),
     );
     res.unwrap()
@@ -81,26 +61,9 @@ pub fn render(graph: Graph) -> String {
 pub fn get_template() -> String {
     let template = r##"
 @startuml
-  skinparam rectangle {
-    BackgroundColor LightBlue
-  }
 
-  {{#each zoneconfigs as |config| ~}}
-  rectangle "{{config.label}}" as {{config.key}} #White {
-    {{#each ../nodes as |node| ~}}
-      {{#if (exists node.zone) ~}}
-        {{#if (stringeq config.key node.zone)}}
-          {{node.shape}} "{{node.label}}" as {{node.id}}
-        {{/if ~}}
-      {{/if ~}}
-    {{/each}}
-  }
-  {{/each}}
-
-  {{#each nodes as |node|}}
-    {{#if (isnull node.layer) }}
-      rectangle "{{node.label}}" as {{node.id}}
-    {{/if}}
+  {{#each tree as |rootnode|}}
+{{{puml_render_tree rootnode}}}
   {{/each}}
 
   {{#each edges as |edge|}}

@@ -21,7 +21,7 @@ impl Graph {
     pub fn get_root_nodes(&self) -> Vec<&Node> {
         self.nodes
             .iter()
-            .filter(|n| n.belongs_to.is_empty())
+            .filter(|n| n.belongs_to.is_empty() && n.is_container)
             .collect()
     }
 
