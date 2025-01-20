@@ -43,6 +43,8 @@ pub fn execute_plan(plan: Plan) -> Result<()> {
             match profile.filetype {
                 ImportFileType::Nodes => {
                     data_loader::verify_nodes_df(&df)?;
+                    data_loader::verify_id_column_df(&df)?;
+
                     for idx in 0..df.height() {
                         let row = df.get_row(idx)?;
                         let node = Node::from_row(&row)?;
@@ -52,7 +54,7 @@ pub fn execute_plan(plan: Plan) -> Result<()> {
                                     id: format!("{}-{}", node.id, belongs_to),
                                     source: node.id.clone(),
                                     target: belongs_to.to_string(),
-                                    label: "belongs_to".to_string(),
+                                    label: "belongs to".to_string(),
                                     layer: "partition".to_string(),
                                     comment: None,
                                 };
@@ -65,6 +67,7 @@ pub fn execute_plan(plan: Plan) -> Result<()> {
                 }
                 ImportFileType::Edges => {
                     // TODO Add verification for edges
+                    data_loader::verify_id_column_df(&df)?;
                     for idx in 0..df.height() {
                         let row = df.get_row(idx)?;
                         let edge = Edge::from_row(&row)?;
@@ -75,6 +78,9 @@ pub fn execute_plan(plan: Plan) -> Result<()> {
             Ok(())
         })
         .unwrap();
+
+    // TODO verify that all nodes in edges are present in nodes
+    // TODO verify graph integrity
 
     plan.export.profiles.iter().for_each(|profile| {
         info!(

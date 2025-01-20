@@ -49,7 +49,10 @@ pub fn verify_nodes_df(df: &DataFrame) -> anyhow::Result<()> {
             ));
         }
     }
+    Ok(())
+}
 
+pub fn verify_id_column_df(df: &DataFrame) -> anyhow::Result<()> {
     // Ensure IDs are unique and not missing
     let id_series = df.column("id")?;
     let id_values: Vec<&str> = id_series.str()?.into_iter().flatten().collect();
@@ -76,13 +79,6 @@ pub fn verify_nodes_df(df: &DataFrame) -> anyhow::Result<()> {
         return Err(anyhow::anyhow!(
             "Duplicate IDs found in 'id' column: {:?}",
             duplicates
-        ));
-    }
-
-    if columns.len() < 5 {
-        return Err(anyhow::anyhow!(
-            "Expected a minimum of 5 columns, found {}",
-            columns.len()
         ));
     }
 
