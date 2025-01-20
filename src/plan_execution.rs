@@ -83,7 +83,7 @@ pub fn execute_plan(plan: Plan) -> Result<()> {
         );
         let output = match profile.exporter {
             ExportFileType::GML => super::export::to_gml::render(graph.clone()),
-            ExportFileType::DOT => "".to_string(),
+            ExportFileType::DOT => super::export::to_dot::render(graph.clone()),
             ExportFileType::CSVNodes => "".to_string(),
             ExportFileType::CSVEdges => "".to_string(),
             ExportFileType::PlantUML => super::export::to_plantuml::render(graph.clone()),

@@ -171,6 +171,79 @@ pub fn get_handlebars() -> Handlebars<'static> {
     });
     handlebars.register_helper("mermaid_render_tree", Box::new(mermaid_render_tree));
 
+    fn dot_render_tree_inner(node: Value, acc: i32) -> String {
+        if let Value::Object(map) = node {
+            let id = map.get("id").and_then(|v| v.as_str()).unwrap_or("no-id");
+            let label = map
+                .get("label")
+                .and_then(|v| v.as_str())
+                .unwrap_or("Unnamed");
+            let empty_vec = vec![];
+            let children = map
+                .get("children")
+                .and_then(|v| v.as_array())
+                .unwrap_or(&empty_vec);
+
+            let indent = " ".repeat((acc * 2) as usize);
+            let mut result = format!("");
+
+            if !children.is_empty() {
+                result += &format!("{}subgraph cluster_{} {{\n", indent, id);
+                result += &format!("{}label=\"{}\"", indent, label);
+                result += &format!("{}rank=same", indent);
+                let children_rendered: Vec<String> = children
+                    .iter()
+                    .map(|child| dot_render_tree_inner(child.clone(), acc + 1))
+                    .collect();
+                result += &format!("{}", children_rendered.join(""));
+                result += &format!("{}}}\n", indent);
+            } else {
+                result += &format!("{}{}[label=\"{}\"]\n", indent, id, label);
+            }
+
+            result
+        } else {
+            error!("Expected object, got: {:?}", node);
+            String::new()
+        }
+    }
+
+    handlebars_helper!(dot_render_tree: |node: Value| {
+        match node {
+            serde_json::Value::Object(map) => {
+                let id = map.get("id").and_then(|v| v.as_str()).unwrap_or("no-id");
+                let label = map.get("label").and_then(|v| v.as_str()).unwrap_or("Unnamed");
+                let empty_vec = vec![];
+                let children = map
+                    .get("children")
+                    .and_then(|v| v.as_array())
+                    .unwrap_or(&empty_vec);
+
+                let mut result = format!("");
+
+                if !children.is_empty() {
+                    result += &format!("subgraph cluster_{} {{\n", id);
+                    result += &format!("label=\"{}\"", label);
+                    result += &format!("rank=same");
+                    let children_rendered: Vec<String> = children.iter().map(|child| {
+                        dot_render_tree_inner(child.clone(), 1)
+                    }).collect();
+                    result += &format!("{}", children_rendered.join(""));
+                    result += &format!("}}\n");
+                } else {
+                    result += &format!("{}[label=\"{}\"]", id, label);
+                }
+
+                result
+            },
+            _ => {
+                error!("Expected object, got: {:?}", node);
+                String::new()
+            }
+        }
+    });
+    handlebars.register_helper("dot_render_tree", Box::new(dot_render_tree));
+
     handlebars
 }
 
