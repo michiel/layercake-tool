@@ -1,5 +1,5 @@
 use crate::graph::Graph;
-use tracing::error;
+use tracing::debug;
 
 // #[derive(Serialize, Deserialize)]
 // struct PumlNode {
@@ -43,7 +43,7 @@ pub fn render(graph: Graph) -> String {
     use serde_json::json;
 
     let data = graph.build_json_tree();
-    error!("Data: {:?}", data);
+    debug!("Data: {:?}", data);
 
     let handlebars = crate::common::get_handlebars();
     let res = handlebars.render_template(
