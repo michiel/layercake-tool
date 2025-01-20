@@ -52,7 +52,7 @@ pub fn render(graph: Graph) -> String {
         &json!({
         "tree": data,
         "nodes": graph.nodes,
-        "edges": graph.edges,
+        "edges": graph.get_non_partition_edges(),
         }),
     );
     res.unwrap()

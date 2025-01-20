@@ -51,6 +51,28 @@ impl Graph {
         self.nodes.iter().find(|n| n.id == id)
     }
 
+    pub fn get_partition_edges(&self) -> Vec<&Edge> {
+        self.edges
+            .iter()
+            .filter(|e| {
+                let source = self.get_node_by_id(&e.source).unwrap();
+                let target = self.get_node_by_id(&e.target).unwrap();
+                source.is_partition || target.is_partition
+            })
+            .collect()
+    }
+
+    pub fn get_non_partition_edges(&self) -> Vec<&Edge> {
+        self.edges
+            .iter()
+            .filter(|e| {
+                let source = self.get_node_by_id(&e.source).unwrap();
+                let target = self.get_node_by_id(&e.target).unwrap();
+                !(source.is_partition || target.is_partition)
+            })
+            .collect()
+    }
+
     pub fn build_json_tree_recursive(&self, parent: &Node) -> serde_json::Value {
         let children = self.get_children(parent);
         let mut tree = Vec::new();
