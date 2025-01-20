@@ -21,7 +21,7 @@ impl Graph {
     pub fn get_root_nodes(&self) -> Vec<&Node> {
         self.nodes
             .iter()
-            .filter(|n| n.belongs_to.is_none() && n.is_container)
+            .filter(|n| n.belongs_to.is_none() && n.is_partition)
             .collect()
     }
 
@@ -59,7 +59,7 @@ impl Graph {
                 "id": child.id,
                 "label": child.label,
                 "layer": child.layer,
-                "is_container": child.is_container,
+                "is_partition": child.is_partition,
                 "belongs_to": child.belongs_to,
                 "comment": child.comment,
                 "children": self.build_json_tree_recursive(child),
@@ -77,7 +77,7 @@ impl Graph {
                 "id": root_node.id,
                 "label": root_node.label,
                 "layer": root_node.layer,
-                "is_container": root_node.is_container,
+                "is_partition": root_node.is_partition,
                 "belongs_to": root_node.belongs_to,
                 "comment": root_node.comment,
                 "children": self.build_json_tree_recursive(root_node),
@@ -93,7 +93,7 @@ pub struct Node {
     pub id: String,
     pub label: String,
     pub layer: String,
-    pub is_container: bool,
+    pub is_partition: bool,
     pub belongs_to: Option<String>,
     pub comment: Option<String>,
 }
@@ -144,7 +144,7 @@ impl Node {
             id: get_stripped_value(row, 0, "id")?,
             label: get_stripped_value(row, 1, "label")?,
             layer: get_stripped_value(row, 2, "layer")?,
-            is_container: is_truthy(&get_stripped_value(row, 3, "is_container")?),
+            is_partition: is_truthy(&get_stripped_value(row, 3, "is_partition")?),
             belongs_to: {
                 let belongs_to = get_stripped_value(row, 4, "belongs_to")?;
                 if belongs_to.is_empty() {
@@ -211,7 +211,7 @@ mod tests {
                     id: "1".to_string(),
                     label: "Root".to_string(),
                     layer: "Layer1".to_string(),
-                    is_container: true,
+                    is_partition: true,
                     belongs_to: None,
                     comment: None,
                 },
@@ -219,7 +219,7 @@ mod tests {
                     id: "2".to_string(),
                     label: "Child1".to_string(),
                     layer: "Layer1".to_string(),
-                    is_container: false,
+                    is_partition: false,
                     belongs_to: Some("1".to_string()),
                     comment: None,
                 },
@@ -227,7 +227,7 @@ mod tests {
                     id: "3".to_string(),
                     label: "Child2".to_string(),
                     layer: "Layer1".to_string(),
-                    is_container: false,
+                    is_partition: false,
                     belongs_to: Some("1".to_string()),
                     comment: None,
                 },
@@ -315,7 +315,7 @@ mod tests {
             "id": "1",
             "label": "Root",
             "layer": "Layer1",
-            "is_container": true,
+            "is_partition": true,
             "belongs_to": null,
             "comment": null,
             "children": [
@@ -323,7 +323,7 @@ mod tests {
                     "id": "2",
                     "label": "Child1",
                     "layer": "Layer1",
-                    "is_container": false,
+                    "is_partition": false,
                     "belongs_to": "1",
                     "comment": null,
                     "children": []
@@ -332,7 +332,7 @@ mod tests {
                     "id": "3",
                     "label": "Child2",
                     "layer": "Layer1",
-                    "is_container": false,
+                    "is_partition": false,
                     "belongs_to": "1",
                     "comment": null,
                     "children": []

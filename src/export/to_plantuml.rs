@@ -92,7 +92,7 @@ mod tests {
                             "id": "id1",
                             "label": "Root",
                             "layer": "Layer1",
-                            "is_container": true,
+                            "is_partition": true,
                             "belongs_to": null,
                             "comment": null,
                         },
@@ -100,7 +100,7 @@ mod tests {
                             "id": "id2",
                             "label": "Child1",
                             "layer": "Layer1",
-                            "is_container": false,
+                            "is_partition": false,
                             "belongs_to": "id1",
                             "comment": null,
                         },
@@ -108,7 +108,7 @@ mod tests {
                             "id": "3",
                             "label": "Child2",
                             "layer": "Layer1",
-                            "is_container": false,
+                            "is_partition": false,
                             "belongs_to": "id1",
                             "comment": null,
                         }
@@ -133,7 +133,7 @@ mod tests {
                             "id": "id1",
                             "label": "Root",
                             "layer": "Layer1",
-                            "is_container": true,
+                            "is_partition": true,
                             "belongs_to": null,
                             "comment": null,
                             "children": [
@@ -141,7 +141,7 @@ mod tests {
                                     "id": "id2",
                                     "label": "Child1",
                                     "layer": "Layer1",
-                                    "is_container": false,
+                                    "is_partition": false,
                                     "belongs_to": "1",
                                     "comment": null,
                                     "children": []
@@ -150,7 +150,7 @@ mod tests {
                                     "id": "id3",
                                     "label": "Child2",
                                     "layer": "Layer1",
-                                    "is_container": false,
+                                    "is_partition": false,
                                     "belongs_to": "1",
                                     "comment": null,
                                     "children": []

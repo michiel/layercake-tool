@@ -27,7 +27,7 @@ pub fn verify_nodes_df(df: &DataFrame) -> anyhow::Result<()> {
         .into_iter()
         .map(|s| s.to_string())
         .collect();
-    let required_columns = ["id", "label", "layer", "is_container", "belongs_to"];
+    let required_columns = ["id", "label", "layer", "is_partition", "belongs_to"];
 
     for &col in &required_columns {
         if !columns.contains(&col.to_string()) {

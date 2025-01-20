@@ -1,4 +1,4 @@
-id,label,layer,is_container,belongs_to
+id,label,layer,is_partition,belongs_to
 root,Root,cpu,true,
 root_ring3,Root / Ring 3,cpu_ring,yes,root
 root_ring0,Root / Ring 0,cpu_ring,y,root
