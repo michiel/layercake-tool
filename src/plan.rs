@@ -98,6 +98,24 @@ impl Default for ExportProfile {
 pub struct ExportProfileItem {
     pub filename: String,
     pub exporter: ExportFileType,
+    pub options: Option<ExportOptions>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ExportOptions {
+    pub partitions_as_nodes: Option<bool>,
+    pub create_partition_crossings: Option<bool>,
+    pub partition_crossing_layer_tag: Option<String>,
+}
+
+impl Default for ExportOptions {
+    fn default() -> Self {
+        ExportOptions {
+            partitions_as_nodes: Some(false),
+            create_partition_crossings: Some(false),
+            partition_crossing_layer_tag: Some("boundary".to_string()),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -107,6 +125,7 @@ pub enum ExportFileType {
     PlantUML,
     CSVNodes,
     CSVEdges,
+    Mermaid,
 }
 
 #[cfg(test)]
