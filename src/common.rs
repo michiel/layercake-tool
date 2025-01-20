@@ -197,8 +197,7 @@ pub fn get_handlebars() -> Handlebars<'static> {
 
             if !children.is_empty() {
                 result += &format!("{}subgraph cluster_{} {{\n", indent, id);
-                result += &format!("{}label=\"{}\"", indent, label);
-                result += &format!("{}rank=same", indent);
+                result += &format!("{}  label=\"{}\"\n", indent, label);
                 let children_rendered: Vec<String> = children
                     .iter()
                     .map(|child| dot_render_tree_inner(child.clone(), acc + 1))
@@ -231,8 +230,8 @@ pub fn get_handlebars() -> Handlebars<'static> {
 
                 if !children.is_empty() {
                     result += &format!("subgraph cluster_{} {{\n", id);
-                    result += &format!("label=\"{}\"", label);
-                    result += &format!("rank=same");
+                    result += &format!("  label=\"{}\"\n", label);
+                    result += &format!("  rank=same\n");
                     let children_rendered: Vec<String> = children.iter().map(|child| {
                         dot_render_tree_inner(child.clone(), 1)
                     }).collect();

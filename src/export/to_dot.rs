@@ -55,8 +55,8 @@ digraph G {
     rankdir="TB";
     splines=true;
     overlap=false;
-    nodesep="0.2";
-    ranksep="0.4";
+    nodesep="0.3";
+    ranksep="1.2";
     labelloc="t";
     fontname="Lato";
     node [ shape="plaintext" style="filled, rounded" fontname="Lato" margin=0.2 ]
