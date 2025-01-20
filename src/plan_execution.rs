@@ -53,7 +53,7 @@ pub fn execute_plan(plan: Plan) -> Result<()> {
                                     source: node.id.clone(),
                                     target: belongs_to.to_string(),
                                     label: "belongs_to".to_string(),
-                                    layer: "nesting".to_string(),
+                                    layer: "partition".to_string(),
                                     comment: None,
                                 };
                                 graph.edges.push(edge);

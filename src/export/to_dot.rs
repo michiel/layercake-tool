@@ -41,7 +41,7 @@ pub fn render(graph: Graph) -> String {
         &get_template(),
         &json!({
             "nodes": graph.nodes,
-            "edges": graph.edges,
+            "edges": graph.get_non_partition_edges(),
             "tree": tree,
         }),
     );
@@ -52,8 +52,6 @@ pub fn get_template() -> String {
     let template = r##"
 
 digraph G {
-
-    layout="neato";
     rankdir="TB";
     splines=true;
     overlap=false;

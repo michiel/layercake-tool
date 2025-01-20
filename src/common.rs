@@ -16,7 +16,15 @@ pub fn write_string_to_file(filename: &str, content: &str) -> std::io::Result<()
 pub fn get_handlebars() -> Handlebars<'static> {
     let mut handlebars = Handlebars::new();
 
-    handlebars_helper!(exists: |v: Value| !v.is_null());
+    handlebars_helper!(exists: |v: Value| {
+        !v.is_null() &&
+        match v {
+            serde_json::Value::String(s) => {
+                !s.is_empty() && s != "null"
+            }
+            _ => true,
+        }
+    });
     handlebars.register_helper("exists", Box::new(exists));
 
     handlebars_helper!(isnull: |v: Value| v.is_null());
