@@ -17,7 +17,12 @@ jobs:
           - target: x86_64-apple-darwin
             archive: zip
     steps:
-      - uses: actions/checkout@master
+      - name: Load environment variables
+        uses: ./.github/actions/dotenv-action
+
+      - name: Checkout the code
+        uses: actions/checkout@master
+
       - name: Compile and release
         uses: rust-build/rust-build.action@v1.4.5
         env:
@@ -25,3 +30,4 @@ jobs:
         with:
           RUSTTARGET: ${{ matrix.target }}
           ARCHIVE_TYPES: ${{ matrix.archive }}
+          TOOLCHAIN_VERSION: stable
