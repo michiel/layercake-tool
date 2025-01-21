@@ -1,11 +1,13 @@
 use polars::frame::row::Row;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Graph {
     pub nodes: Vec<Node>,
     pub edges: Vec<Edge>,
+    pub layers: Vec<Layer>,
 }
 
 impl Default for Graph {
@@ -13,11 +15,19 @@ impl Default for Graph {
         Graph {
             nodes: Vec::new(),
             edges: Vec::new(),
+            layers: Vec::new(),
         }
     }
 }
 
 impl Graph {
+    pub fn get_layer_map(&self) -> HashMap<String, Layer> {
+        self.layers
+            .iter()
+            .cloned()
+            .map(|l| (l.id.clone(), l))
+            .collect()
+    }
     pub fn get_root_nodes(&self) -> Vec<&Node> {
         self.nodes
             .iter()
@@ -130,6 +140,15 @@ pub struct Edge {
     pub comment: Option<String>,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Layer {
+    pub id: String,
+    pub label: String,
+    pub background_color: String,
+    pub text_color: String,
+    pub border_color: String,
+}
+
 fn is_truthy(s: &str) -> bool {
     let trimmed_lowercase = s.trim().to_lowercase();
     let re = Regex::new(r"(true|y|yes)").unwrap();
@@ -191,6 +210,18 @@ impl Edge {
             label: get_stripped_value(row, 3, "label")?,
             layer: get_stripped_value(row, 4, "layer")?,
             comment: row.0.get(5).map(|c| c.to_string()),
+        })
+    }
+}
+
+impl Layer {
+    pub fn from_row(row: &Row) -> Result<Self, Box<dyn std::error::Error>> {
+        Ok(Self {
+            id: get_stripped_value(row, 0, "layer")?,
+            label: get_stripped_value(row, 1, "label")?,
+            background_color: get_stripped_value(row, 2, "background")?,
+            border_color: get_stripped_value(row, 3, "border_color")?,
+            text_color: get_stripped_value(row, 4, "text_color")?,
         })
     }
 }
@@ -272,6 +303,7 @@ mod tests {
                     comment: None,
                 },
             ],
+            layers: Vec::new(),
         }
     }
 

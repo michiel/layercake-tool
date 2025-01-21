@@ -1,0 +1,5 @@
+layer,label,background,border,text
+cpu,Intel x86 CPU,A2AEBB,000000,000000
+cpu_ring,Privilege Ring,75ABBC,000000,000000
+software,Software,23B5D3,000000,000000
+vm,Virtual Machine,071013,000000,ffffff

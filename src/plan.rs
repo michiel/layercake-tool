@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 ///   ├── import: ImportConfig
 ///   │   └── profiles: Vec<ImportProfile>
 ///   │       ├── filename: String
-///   │       ├── tablename: String
 ///   │       └── filetype: ImportFileType
 ///   └── export: ExportProfile
 ///       └── profiles: Vec<ExportProfileItem>
@@ -68,12 +67,12 @@ pub struct CSVImportParams {
 pub enum ImportFileType {
     Edges,
     Nodes,
+    Layers,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ImportProfile {
     pub filename: String,
-    pub tablename: String,
     pub filetype: ImportFileType,
 }
 
@@ -120,7 +119,6 @@ mod tests {
             profiles: vec![ImportProfile {
                 filetype: ImportFileType::Nodes,
                 filename: "data.csv".to_string(),
-                tablename: "table1".to_string(),
             }],
         };
 
@@ -134,13 +132,11 @@ mod tests {
 profiles:
   - filename: data.csv
     filetype: Nodes
-    tablename: table1
 "#;
 
         let config: ImportConfig = serde_yaml::from_str(yaml_str).unwrap();
         assert_eq!(config.profiles.len(), 1);
         assert_eq!(config.profiles[0].filename, "data.csv");
-        assert_eq!(config.profiles[0].tablename, "table1");
     }
     #[test]
     fn test_planfile_deserialization() {
@@ -149,7 +145,6 @@ import:
   profiles:
     - filename: data.csv
       filetype: Nodes
-      tablename: table1
 export:
   profiles:
     - filename: output.gml

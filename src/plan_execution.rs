@@ -1,5 +1,5 @@
 use crate::data_loader;
-use crate::graph::{Edge, Graph, Node};
+use crate::graph::{Edge, Graph, Layer, Node};
 use crate::plan::{ExportFileType, ImportFileType, Plan};
 use tracing::{debug, error, info};
 
@@ -72,6 +72,14 @@ pub fn execute_plan(plan: Plan) -> Result<()> {
                         let row = df.get_row(idx)?;
                         let edge = Edge::from_row(&row)?;
                         graph.edges.push(edge);
+                    }
+                }
+                ImportFileType::Layers => {
+                    // TODO Add verification for layers
+                    for idx in 0..df.height() {
+                        let row = df.get_row(idx)?;
+                        let layer = Layer::from_row(&row)?;
+                        graph.layers.push(layer.clone());
                     }
                 }
             }

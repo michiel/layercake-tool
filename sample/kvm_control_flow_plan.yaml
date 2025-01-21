@@ -2,19 +2,15 @@ import:
   profiles:
     - filename: "sample/kvm_control_flow/nodes.csv"
       filetype: "Nodes"
-      tablename: "nodes"
     - filename: "sample/kvm_control_flow/links.csv"
       filetype: "Edges"
-      tablename: "links"
+    - filename: "sample/kvm_control_flow/layers.csv"
+      filetype: "Layers"
 
 export:
   profiles:
     - filename: "out/kvm-control-flow.gml"
       exporter: "GML"
-      options:
-        partitions_as_nodes: true
-        create_partition_crossings: true
-        partition_crossing_layer: "boundary"
     - filename: "out/kvm-control-flow.puml"
       exporter: "PlantUML"
     - filename: "out/kvm-control-flow.mermaid"
