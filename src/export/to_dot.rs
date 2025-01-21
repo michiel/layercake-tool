@@ -40,9 +40,10 @@ pub fn render(graph: Graph) -> String {
     let res = handlebars.render_template(
         &get_template(),
         &json!({
-            "nodes": graph.nodes,
+            "nodes": graph.get_non_partition_nodes(),
             "edges": graph.get_non_partition_edges(),
             "tree": tree,
+            "layers": graph.get_layer_map(),
         }),
     );
     res.unwrap()
@@ -62,8 +63,20 @@ digraph G {
     node [ shape="plaintext" style="filled, rounded" fontname="Lato" margin=0.2 ]
     edge [ fontname="Lato" color="#2B303A" ]
 
+  {{#each layers as |layer|}}
+  node [style="filled, rounded" fillcolor="#{{layer.background_color}}" fontcolor="#{{layer.text_color}}"] {
+    {{#each ../nodes as |node|}}
+        {{#if (eq node.layer layer.id)}}
+            {{node.id}}[label="{{node.label}}"];
+        {{/if}}
+    {{/each}}
+    }
+  {{/each}}
+
+node [style="filled, rounded" fillcolor="#dddddd" fontcolor="#000000"];
+
   {{#each tree as |rootnode|}}
-{{{dot_render_tree rootnode}}}
+{{{dot_render_tree rootnode ../layers}}}
   {{/each}}
 
   {{#each edges as |edge|}}

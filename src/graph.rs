@@ -83,6 +83,10 @@ impl Graph {
             .collect()
     }
 
+    pub fn get_non_partition_nodes(&self) -> Vec<&Node> {
+        self.nodes.iter().filter(|n| !n.is_partition).collect()
+    }
+
     pub fn build_json_tree_recursive(&self, parent: &Node) -> serde_json::Value {
         let children = self.get_children(parent);
         let mut tree = Vec::new();
