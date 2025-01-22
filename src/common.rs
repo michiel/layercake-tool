@@ -41,72 +41,36 @@ pub fn get_handlebars() -> Handlebars<'static> {
     });
     handlebars.register_helper("is_empty", Box::new(is_empty));
 
-    fn puml_render_tree_inner(node: Value, acc: i32) -> String {
-        if let Value::Object(map) = node {
-            let id = map.get("id").and_then(|v| v.as_str()).unwrap_or("no-id");
-            let label = map
-                .get("label")
-                .and_then(|v| v.as_str())
-                .unwrap_or("Unnamed");
-            let empty_vec = vec![];
-            let children = map
-                .get("children")
-                .and_then(|v| v.as_array())
-                .unwrap_or(&empty_vec);
-
-            let indent = " ".repeat((acc * 2) as usize);
-
-            let mut result = format!("{}rectangle \"{}\" as {}", indent, label, id);
-            if !children.is_empty() {
-                result += &format!("{{\n");
-                let children_rendered: Vec<String> = children
-                    .iter()
-                    .map(|child| puml_render_tree_inner(child.clone(), acc + 1))
-                    .collect();
-                result += &format!("{}", children_rendered.join(""));
-                result += &format!("{}}}\n", indent);
-            } else {
-                result += "\n";
-            }
-            result
-        } else {
-            error!("Expected object, got: {:?}", node);
-            String::new()
-        }
-    }
-
     handlebars_helper!(puml_render_tree: |node: Value| {
-        match node {
-            serde_json::Value::Object(map) => {
+        // define inline to allow recursive reference
+        fn render_tree(node: Value, acc: i32) -> String {
+            if let Value::Object(map) = node {
                 let id = map.get("id").and_then(|v| v.as_str()).unwrap_or("no-id");
                 let label = map.get("label").and_then(|v| v.as_str()).unwrap_or("Unnamed");
                 let empty_vec = vec![];
-                let children = map
-                    .get("children")
-                    .and_then(|v| v.as_array())
-                    .unwrap_or(&empty_vec);
+                let children = map.get("children").and_then(|v| v.as_array()).unwrap_or(&empty_vec);
 
-                let mut result = format!("rectangle \"{}\" as {} ", label, id);
+                let indent = " ".repeat((acc * 2) as usize);
 
-                // Render children recursively if any
+                let mut result = format!("{}rectangle \"{}\" as {}", indent, label, id);
                 if !children.is_empty() {
-                    result += "{\n";
+                    result += &format!("{{\n");
                     let children_rendered: Vec<String> = children.iter().map(|child| {
-                        puml_render_tree_inner(child.clone(), 1)
+                        render_tree(child.clone(), acc + 1)
                     }).collect();
                     result += &format!("{}", children_rendered.join(""));
-                    result += "}\n";
+                    result += &format!("{}}}\n", indent);
                 } else {
-                    result += "";
+                    result += "\n";
                 }
-
                 result
-            },
-            _ => {
+            } else {
                 error!("Expected object, got: {:?}", node);
                 String::new()
             }
         }
+
+        render_tree(node, 0)
     });
     handlebars.register_helper("puml_render_tree", Box::new(puml_render_tree));
 
