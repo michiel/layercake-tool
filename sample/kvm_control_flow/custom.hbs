@@ -1,0 +1,35 @@
+digraph G {
+    rankdir="TB";
+    splines=true;
+    overlap=false;
+    nodesep="0.3";
+    ranksep="1.2";
+    labelloc="t";
+    fontname="Lato";
+    node [ shape="plaintext" style="filled, rounded" fontname="Lato" margin=0.2 ]
+    edge [ fontname="Lato" color="#2B303A" ]
+
+  {{#each layers as |layer|}}
+  node [style="filled, dashed" fillcolor="#{{layer.background_color}}" fontcolor="#{{layer.text_color}}" penwidth=1 color="#{{layer.border_color}}"]; {
+    {{#each ../nodes as |node|}}
+        {{#if (eq node.layer layer.id)}}
+            {{node.id}}[label="{{node.label}}"];
+        {{/if}}
+    {{/each}}
+    }
+  {{/each}}
+
+node [style="filled, rounded" fillcolor="#dddddd" fontcolor="#000000"];
+
+  {{#each tree as |rootnode|}}
+{{{dot_render_tree rootnode ../layers}}}
+  {{/each}}
+
+  {{#each edges as |edge|}}
+    {{#if (exists edge.label)}}
+      {{edge.source}} -> {{edge.target}} [label="{{edge.label}}"];
+    {{else}}
+      {{edge.source}} -> {{edge.target}};
+    {{/if}}
+  {{/each}}
+}

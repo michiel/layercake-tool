@@ -99,7 +99,7 @@ pub struct ExportProfileItem {
     pub exporter: ExportFileType,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum ExportFileType {
     GML,
     DOT,
@@ -107,6 +107,7 @@ pub enum ExportFileType {
     CSVNodes,
     CSVEdges,
     Mermaid,
+    Custom(String),
 }
 
 #[cfg(test)]

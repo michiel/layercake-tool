@@ -95,13 +95,16 @@ pub fn execute_plan(plan: Plan) -> Result<()> {
             "Exporting file: {} using exporter {:?}",
             profile.filename, profile.exporter
         );
-        let output = match profile.exporter {
+        let output = match profile.exporter.clone() {
             ExportFileType::GML => super::export::to_gml::render(graph.clone()),
             ExportFileType::DOT => super::export::to_dot::render(graph.clone()),
             ExportFileType::CSVNodes => "".to_string(),
             ExportFileType::CSVEdges => "".to_string(),
             ExportFileType::PlantUML => super::export::to_plantuml::render(graph.clone()),
             ExportFileType::Mermaid => super::export::to_mermaid::render(graph.clone()),
+            ExportFileType::Custom(template) => {
+                super::export::to_custom::render(graph.clone(), template)
+            }
         };
 
         super::common::write_string_to_file(&profile.filename, &output).unwrap();

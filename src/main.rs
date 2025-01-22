@@ -9,8 +9,8 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use serde_yaml;
 use std::fs;
-use tracing::info;
 use tracing::Level;
+use tracing::{error, info};
 use tracing_subscriber;
 
 #[derive(Parser)]
@@ -31,6 +31,9 @@ enum Commands {
     Init {
         #[clap(short, long)]
         plan: String,
+    },
+    Emit {
+        exporter: String,
     },
 }
 
@@ -67,6 +70,29 @@ fn main() -> Result<()> {
             let plan = plan::Plan::default();
             let serialized_plan = serde_yaml::to_string(&plan)?;
             common::write_string_to_file(&plan_file_path, &serialized_plan)?;
+        }
+        Commands::Emit { exporter } => {
+            info!("Emitting exporter template: {}", exporter);
+            match exporter.as_str() {
+                "mermaid" => {
+                    println!("{}", export::to_mermaid::get_template());
+                }
+                "dot" => {
+                    println!("{}", export::to_dot::get_template());
+                }
+                "plantuml" => {
+                    println!("{}", export::to_plantuml::get_template());
+                }
+                "gml" => {
+                    println!("{}", export::to_gml::get_template());
+                }
+                _ => {
+                    error!(
+                        "Unsupported exporter: {} - use mermaid, dot, plantuml, gml",
+                        exporter
+                    );
+                }
+            }
         }
     }
 
