@@ -179,13 +179,17 @@ pub fn get_handlebars() -> Handlebars<'static> {
     });
     handlebars.register_helper("mermaid_render_tree", Box::new(mermaid_render_tree));
 
-    fn dot_render_tree_inner(node: Value, acc: i32) -> String {
+    fn dot_render_tree_inner(node: Value, layermap: Value, acc: i32) -> String {
         if let Value::Object(map) = node {
             let id = map.get("id").and_then(|v| v.as_str()).unwrap_or("no-id");
             let label = map
                 .get("label")
                 .and_then(|v| v.as_str())
                 .unwrap_or("Unnamed");
+            let layer = map
+                .get("layer")
+                .and_then(|v| v.as_str())
+                .unwrap_or("no-layer");
             let empty_vec = vec![];
             let children = map
                 .get("children")
@@ -198,9 +202,28 @@ pub fn get_handlebars() -> Handlebars<'static> {
             if !children.is_empty() {
                 result += &format!("{}subgraph cluster_{} {{\n", indent, id);
                 result += &format!("{}  label=\"{}\"\n", indent, label);
+
+                if let Some(layer_props) = layermap.get(layer) {
+                    result += &format!("{}  style=filled\n", indent);
+                    if let Some(background_color) =
+                        layer_props.get("background_color").and_then(|v| v.as_str())
+                    {
+                        result += &format!("{}  fillcolor=\"#{}\"\n", indent, background_color);
+                    }
+                    if let Some(border_color) =
+                        layer_props.get("border_color").and_then(|v| v.as_str())
+                    {
+                        result += &format!("{}  color=\"#{}\"\n", indent, border_color);
+                    }
+                    if let Some(text_color) = layer_props.get("text_color").and_then(|v| v.as_str())
+                    {
+                        result += &format!("{}  fontcolor=\"#{}\"\n", indent, text_color);
+                    }
+                }
+
                 let children_rendered: Vec<String> = children
                     .iter()
-                    .map(|child| dot_render_tree_inner(child.clone(), acc + 1))
+                    .map(|child| dot_render_tree_inner(child.clone(), layermap.clone(), acc + 1))
                     .collect();
                 result += &format!("{}", children_rendered.join(""));
                 result += &format!("{}}}\n", indent);
@@ -242,9 +265,12 @@ pub fn get_handlebars() -> Handlebars<'static> {
                     result += &format!("  rank=same\n");
 
                     if let Some(layer_props) = layermap.get(layer) {
-                        result += &format!("  style=filled\n");
+                        result += &format!("  style=\"filled, dashed\"\n");
                         if let Some(background_color) = layer_props.get("background_color").and_then(|v| v.as_str()) {
-                            result += &format!("  color=\"#{}\"\n", background_color);
+                            result += &format!("  fillcolor=\"#{}\"\n", background_color);
+                        }
+                        if let Some(border_color) = layer_props.get("border_color").and_then(|v| v.as_str()) {
+                            result += &format!("  color=\"#{}\"\n", border_color);
                         }
                         if let Some(text_color) = layer_props.get("text_color").and_then(|v| v.as_str()) {
                             result += &format!("  fontcolor=\"#{}\"\n", text_color);
@@ -252,7 +278,7 @@ pub fn get_handlebars() -> Handlebars<'static> {
                     }
 
                     let children_rendered: Vec<String> = children.iter().map(|child| {
-                        dot_render_tree_inner(child.clone(), 1)
+                        dot_render_tree_inner(child.clone(), handlebars::JsonValue::Object(layermap.clone()), 1)
                     }).collect();
                     result += &format!("{}", children_rendered.join(""));
                     result += &format!("}}\n");

@@ -64,7 +64,7 @@ digraph G {
     edge [ fontname="Lato" color="#2B303A" ]
 
   {{#each layers as |layer|}}
-  node [style="filled, rounded" fillcolor="#{{layer.background_color}}" fontcolor="#{{layer.text_color}}"] {
+  node [style="filled, dashed" fillcolor="#{{layer.background_color}}" fontcolor="#{{layer.text_color}}" penwidth=1 color="#{{layer.border_color}}"]; {
     {{#each ../nodes as |node|}}
         {{#if (eq node.layer layer.id)}}
             {{node.id}}[label="{{node.label}}"];
