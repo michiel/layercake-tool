@@ -41,22 +41,23 @@ pub fn get_handlebars() -> Handlebars<'static> {
     });
     handlebars.register_helper("is_empty", Box::new(is_empty));
 
-    handlebars_helper!(puml_render_tree: |node: Value| {
+    handlebars_helper!(puml_render_tree: |node: Value, layermap: Value| {
         // define inline to allow recursive reference
-        fn render_tree(node: Value, acc: i32) -> String {
+        fn render_tree(node: Value, layermap: &serde_json::Map<String, Value>, acc: i32) -> String {
             if let Value::Object(map) = node {
                 let id = map.get("id").and_then(|v| v.as_str()).unwrap_or("no-id");
                 let label = map.get("label").and_then(|v| v.as_str()).unwrap_or("Unnamed");
+                let layer = map.get("layer").and_then(|v| v.as_str()).unwrap_or("no-layer");
                 let empty_vec = vec![];
                 let children = map.get("children").and_then(|v| v.as_array()).unwrap_or(&empty_vec);
 
                 let indent = " ".repeat((acc * 2) as usize);
 
-                let mut result = format!("{}rectangle \"{}\" as {}", indent, label, id);
+                let mut result = format!("{}rectangle \"{}\" as {} <<{}>> ", indent, label, id, layer);
                 if !children.is_empty() {
                     result += &format!("{{\n");
                     let children_rendered: Vec<String> = children.iter().map(|child| {
-                        render_tree(child.clone(), acc + 1)
+                        render_tree(child.clone(), layermap, acc + 1)
                     }).collect();
                     result += &format!("{}", children_rendered.join(""));
                     result += &format!("{}}}\n", indent);
@@ -70,7 +71,15 @@ pub fn get_handlebars() -> Handlebars<'static> {
             }
         }
 
-        render_tree(node, 0)
+        let layermap = match layermap {
+            serde_json::Value::Object(map) => map,
+            _ => {
+                error!("Expected layer map object, got: {:?}", layermap);
+                serde_json::Map::new()
+            }
+        };
+
+        render_tree(node, &layermap, 0)
     });
     handlebars.register_helper("puml_render_tree", Box::new(puml_render_tree));
 

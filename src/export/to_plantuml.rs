@@ -52,6 +52,7 @@ pub fn render(graph: Graph) -> String {
         "tree": data,
         "nodes": graph.nodes,
         "edges": graph.get_non_partition_edges(),
+        "layers": graph.get_layer_map(),
         }),
     );
     res.unwrap()
@@ -61,12 +62,24 @@ pub fn get_template() -> String {
     let template = r##"
 @startuml
 
-  {{#each tree as |rootnode|}}
-{{{puml_render_tree rootnode}}}
-  {{/each}}
-  {{#each edges as |edge|}}
+hide stereotype
+
+<style>
+{{#each layers as |layer|}}
+    .{{layer.id}} {
+        BackgroundColor #{{layer.background_color}};
+        BorderColor #{{layer.border_color}};
+        FontColor #{{layer.text_color}};
+    }
+{{/each}}
+</style>
+
+{{#each tree as |rootnode|}}
+{{{puml_render_tree rootnode ../layers}}}
+{{/each}}
+{{#each edges as |edge|}}
  {{edge.source}} --> {{edge.target}}
-  {{/each}}
+{{/each}}
 
 @enduml
     "##;
