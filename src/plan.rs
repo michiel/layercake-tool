@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
 ///               ├── DOT
 ///               ├── CSVNodes
 ///               └── CSVEdges
+///               └── Custom(String)
 /// ```
 ///
 

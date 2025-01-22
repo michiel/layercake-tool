@@ -21,6 +21,6 @@ export:
       exporter: "CSVNodes"
     - filename: "out/kvm-control-flow-edges-full.csv"
       exporter: "CSVEdges"
-    - filename: "out/kvm-control-flow-edges-full.csv"
-      exporter:
-        Custom: "sample/kvm_control_flow/custom.hbs"
+    - filename: "out/kvm-control-flow-custom.dot"
+      exporter: !Custom
+        "sample/kvm_control_flow/custom.hbs"
