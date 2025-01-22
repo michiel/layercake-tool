@@ -23,4 +23,6 @@ export:
       exporter: "CSVEdges"
     - filename: "out/kvm-control-flow-custom.dot"
       exporter: !Custom
-        "sample/kvm_control_flow/custom.hbs"
+        template: "sample/kvm_control_flow/custom.hbs"
+        # partials:
+        #   key: "sample/kvm_control_flow/partial_a.hbs"

@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// ## Structure
 /// This module contains the data structures for the configuration file.
@@ -101,6 +102,12 @@ pub struct ExportProfileItem {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CustomExportProfile {
+    pub template: String,
+    pub partials: Option<HashMap<String, String>>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum ExportFileType {
     GML,
     DOT,
@@ -108,7 +115,7 @@ pub enum ExportFileType {
     CSVNodes,
     CSVEdges,
     Mermaid,
-    Custom(String),
+    Custom(CustomExportProfile),
 }
 
 #[cfg(test)]
