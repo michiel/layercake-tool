@@ -3,6 +3,10 @@ name = "layercake-ng"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "layercake"
+path = "src/main.rs"
+
 [dependencies]
 
 serde_yaml = "0.9"
