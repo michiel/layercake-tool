@@ -1,6 +1,7 @@
 mod common;
 mod data_loader;
 mod export;
+mod generate_commands;
 mod graph;
 mod plan;
 mod plan_execution;
@@ -32,7 +33,7 @@ enum Commands {
         #[clap(short, long)]
         plan: String,
     },
-    Emit {
+    Generate {
         exporter: String,
     },
 }
@@ -71,28 +72,8 @@ fn main() -> Result<()> {
             let serialized_plan = serde_yaml::to_string(&plan)?;
             common::write_string_to_file(&plan_file_path, &serialized_plan)?;
         }
-        Commands::Emit { exporter } => {
-            info!("Emitting exporter template: {}", exporter);
-            match exporter.as_str() {
-                "mermaid" => {
-                    println!("{}", export::to_mermaid::get_template());
-                }
-                "dot" => {
-                    println!("{}", export::to_dot::get_template());
-                }
-                "plantuml" => {
-                    println!("{}", export::to_plantuml::get_template());
-                }
-                "gml" => {
-                    println!("{}", export::to_gml::get_template());
-                }
-                _ => {
-                    error!(
-                        "Unsupported exporter: {} - use mermaid, dot, plantuml, gml",
-                        exporter
-                    );
-                }
-            }
+        Commands::Generate { exporter } => {
+            generate_commands::generate_template(exporter);
         }
     }
 
