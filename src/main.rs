@@ -7,9 +7,12 @@ mod plan;
 mod plan_execution;
 
 use anyhow::Result;
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 use serde_yaml;
+use std::ffi::OsStr;
+use std::ffi::OsString;
 use std::fs;
+use std::path::PathBuf;
 use tracing::Level;
 use tracing::{error, info};
 use tracing_subscriber;
@@ -34,8 +37,15 @@ enum Commands {
         plan: String,
     },
     Generate {
-        exporter: String,
+        #[clap(subcommand)]
+        command: GenerateCommands,
     },
+}
+
+#[derive(Subcommand, Debug)]
+enum GenerateCommands {
+    Template { name: String },
+    Sample { dir: String },
 }
 
 fn main() -> Result<()> {
@@ -72,9 +82,16 @@ fn main() -> Result<()> {
             let serialized_plan = serde_yaml::to_string(&plan)?;
             common::write_string_to_file(&plan_file_path, &serialized_plan)?;
         }
-        Commands::Generate { exporter } => {
-            generate_commands::generate_template(exporter);
-        }
+        Commands::Generate { command } => match command {
+            GenerateCommands::Template { name } => {
+                info!("Generating template: {}", name);
+                generate_commands::generate_template(name);
+            }
+            GenerateCommands::Sample { dir } => {
+                info!("Generating sample: {}", dir);
+                generate_commands::generate_sample(dir);
+            }
+        },
     }
 
     Ok(())
