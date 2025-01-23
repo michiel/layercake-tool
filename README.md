@@ -1,5 +1,13 @@
 # Layercake tool
 
+## Installation
+
+### MacOS
+
+```
+xattr -d com.apple.quarantine ./layercake
+```
+
 ## Development
 
 ### Sample run
