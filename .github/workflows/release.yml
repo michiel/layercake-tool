@@ -40,4 +40,4 @@ jobs:
         with:
           executable-name: layercake
           target: ${{ matrix.platform.target }}
-          changes-file: ""
+          changes-file: "CHANGES.md"
