@@ -1,0 +1,28 @@
+import:
+  profiles:
+    - filename: "nodes.csv"
+      filetype: "Nodes"
+    - filename: "links.csv"
+      filetype: "Edges"
+    - filename: "layers.csv"
+      filetype: "Layers"
+
+export:
+  profiles:
+    - filename: "out/kvm-control-flow.gml"
+      exporter: "GML"
+    - filename: "out/kvm-control-flow.puml"
+      exporter: "PlantUML"
+    - filename: "out/kvm-control-flow.mermaid"
+      exporter: "Mermaid"
+    - filename: "out/kvm-control-flow.dot"
+      exporter: "DOT"
+    - filename: "out/kvm-control-flow-nodes-full.csv"
+      exporter: "CSVNodes"
+    - filename: "out/kvm-control-flow-edges-full.csv"
+      exporter: "CSVEdges"
+    # - filename: "out/kvm-control-flow-custom.dot"
+    #   exporter: !Custom
+    #     template: "sample/attack_tree/custom.hbs"
+    #     # partials:
+    #     #   key: "sample/attack_tree/partial_a.hbs"
