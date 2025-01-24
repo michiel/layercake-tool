@@ -3,7 +3,7 @@ use std::fs;
 use std::path::Path;
 use tracing::{error, info};
 
-static SAMPLE_DIR: Dir = include_dir!("sample");
+static SAMPLE_DIR: Dir = include_dir!("sample/kvm_control_flow");
 
 pub fn generate_template(exporter: String) -> () {
     info!("Generating exporter template: {}", exporter);
