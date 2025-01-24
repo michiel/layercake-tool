@@ -1,10 +1,10 @@
 import:
   profiles:
-    - filename: "sample/kvm_control_flow/nodes.csv"
+    - filename: "kvm_control_flow/nodes.csv"
       filetype: "Nodes"
-    - filename: "sample/kvm_control_flow/links.csv"
+    - filename: "kvm_control_flow/links.csv"
       filetype: "Edges"
-    - filename: "sample/kvm_control_flow/layers.csv"
+    - filename: "kvm_control_flow/layers.csv"
       filetype: "Layers"
 
 export:

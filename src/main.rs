@@ -70,9 +70,6 @@ fn main() -> Result<()> {
     match args.command {
         Commands::Run { plan } => {
             info!("Running plan: {}", plan);
-            let plan_file_path = plan;
-            let path_content = fs::read_to_string(&plan_file_path)?;
-            let plan: plan::Plan = serde_yaml::from_str(&path_content)?;
             plan_execution::execute_plan(plan)?;
         }
         Commands::Init { plan } => {

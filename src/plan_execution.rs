@@ -25,8 +25,13 @@ fn load_file(file_path: &str) -> Result<DataFrame, anyhow::Error> {
     Ok(df)
 }
 
-pub fn execute_plan(plan: Plan) -> Result<()> {
+pub fn execute_plan(plan: String) -> Result<()> {
     info!("Executing plan");
+
+    let plan_file_path = std::path::Path::new(&plan);
+    let path_content = std::fs::read_to_string(&plan_file_path)?;
+    let plan: Plan = serde_yaml::from_str(&path_content)?;
+
     debug!("Executing plan: {:?}", plan);
 
     let mut graph = Graph::default();
@@ -35,11 +40,13 @@ pub fn execute_plan(plan: Plan) -> Result<()> {
         .profiles
         .iter()
         .try_for_each(|profile| -> Result<(), Box<dyn std::error::Error>> {
+            let import_file_path = plan_file_path.parent().unwrap().join(&profile.filename);
             info!(
                 "Importing file: {} as {:?}",
-                profile.filename, profile.filetype
+                import_file_path.display(),
+                profile.filetype
             );
-            let df = load_file(&profile.filename)?;
+            let df = load_file(import_file_path.to_str().unwrap())?;
             match profile.filetype {
                 ImportFileType::Nodes => {
                     data_loader::verify_nodes_df(&df)?;

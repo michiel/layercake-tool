@@ -39,7 +39,7 @@ pub fn generate_sample(dir: String) -> () {
 
     fn write_dir_contents(dir: &Dir, target_path: &Path) {
         for file in dir.files() {
-            let relative_path = file.path();
+            let relative_path = file.path().strip_prefix(dir.path()).unwrap();
             let target_file_path = target_path.join(relative_path);
 
             if let Some(parent) = target_file_path.parent() {
@@ -56,7 +56,8 @@ pub fn generate_sample(dir: String) -> () {
         }
 
         for sub_dir in dir.dirs() {
-            let sub_dir_path = target_path.join(sub_dir.path());
+            let relative_path = sub_dir.path().strip_prefix(dir.path()).unwrap();
+            let sub_dir_path = target_path.join(relative_path);
             if let Err(e) = fs::create_dir_all(&sub_dir_path) {
                 error!("Failed to create subdirectory: {:?}", e);
                 return;
