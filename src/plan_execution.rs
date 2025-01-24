@@ -97,6 +97,13 @@ pub fn execute_plan(plan: String) -> Result<()> {
     // TODO verify that all nodes in edges are present in nodes
     // TODO verify graph integrity
 
+    info!(
+        "Graph loaded with {} nodes, {} edges and {} layers",
+        graph.nodes.len(),
+        graph.edges.len(),
+        graph.layers.len()
+    );
+
     plan.export.profiles.iter().for_each(|profile| {
         info!(
             "Exporting file: {} using exporter {:?}",
