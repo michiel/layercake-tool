@@ -26,40 +26,36 @@ use std::collections::HashMap;
 // Import configuration
 //
 
-#[derive(Serialize, Deserialize, Debug)]
-#[derive(Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct Plan {
     pub import: ImportConfig,
     pub export: ExportProfile,
 }
 
-
-#[derive(Serialize, Deserialize, Debug)]
-#[derive(Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct ImportConfig {
     pub profiles: Vec<ImportProfile>,
 }
 
-
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum FileImportProfile {
     CSV(CSVImportParams),
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CSVImportParams {
     pub skiprows: Option<usize>,
     pub separator: Option<char>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum ImportFileType {
     Edges,
     Nodes,
     Layers,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ImportProfile {
     pub filename: String,
     pub filetype: ImportFileType,
@@ -69,20 +65,18 @@ pub struct ImportProfile {
 // Export configuration
 //
 
-#[derive(Serialize, Deserialize, Debug)]
-#[derive(Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct ExportProfile {
     pub profiles: Vec<ExportProfileItem>,
 }
 
-
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ExportProfileItem {
     pub filename: String,
     pub exporter: ExportFileType,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CustomExportProfile {
     pub template: String,
     pub partials: Option<HashMap<String, String>>,
@@ -102,7 +96,7 @@ pub enum ExportFileType {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_serialization() {
         let config = ImportConfig {

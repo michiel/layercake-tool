@@ -1,6 +1,9 @@
 use crate::data_loader;
 use crate::graph::{Edge, Graph, Layer, Node};
 use crate::plan::{ExportFileType, ImportFileType, Plan};
+use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use std::sync::mpsc::channel;
+use std::time::Duration;
 use tracing::{debug, error, info};
 
 use anyhow::Result;
@@ -126,10 +129,42 @@ pub fn execute_plan(plan: String, watch: bool) -> Result<()> {
     let plan: Plan = serde_yaml::from_str(&path_content)?;
 
     debug!("Executing plan: {:?}", plan);
-    run_plan(plan, plan_file_path)?;
+    run_plan(plan.clone(), plan_file_path)?;
     if watch {
         info!("Watching for changes");
-        // TODO implement watching for changes
+        let files: Vec<String> = plan
+            .import
+            .profiles
+            .iter()
+            .map(|profile| profile.filename.clone())
+            .collect();
+
+        let (tx, rx) = channel();
+        let mut watcher = RecommendedWatcher::new(tx, Config::default())?;
+        for file in &files {
+            let path = plan_file_path.parent().unwrap().join(&file);
+            watcher.watch(&path, RecursiveMode::NonRecursive)?;
+        }
+
+        loop {
+            match rx.recv() {
+                Ok(event) => {
+                    // debug!("Event: {:?}", event);
+                    if event.is_ok() {
+                        let event = event.unwrap();
+                        match event.kind {
+                            EventKind::Modify(_) => {
+                                debug!("File modified {:?}", event.paths);
+                                info!("Change detected, re-executing plan");
+                                run_plan(plan.clone(), plan_file_path)?;
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                Err(e) => error!("Watch error: {:?}", e),
+            }
+        }
     }
 
     Ok(())
