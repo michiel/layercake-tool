@@ -7,14 +7,10 @@ mod plan;
 mod plan_execution;
 
 use anyhow::Result;
-use clap::{Args, Parser, Subcommand};
+use clap::{Parser, Subcommand};
 use serde_yaml;
-use std::ffi::OsStr;
-use std::ffi::OsString;
-use std::fs;
-use std::path::PathBuf;
 use tracing::Level;
-use tracing::{error, info};
+use tracing::info;
 use tracing_subscriber;
 
 #[derive(Parser)]

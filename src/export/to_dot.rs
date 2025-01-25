@@ -1,6 +1,5 @@
 use crate::graph::Graph;
 use serde::{Deserialize, Serialize};
-use tracing::debug;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct LayerConfig {
