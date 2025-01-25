@@ -25,15 +25,7 @@ fn load_file(file_path: &str) -> Result<DataFrame, anyhow::Error> {
     Ok(df)
 }
 
-pub fn execute_plan(plan: String) -> Result<()> {
-    info!("Executing plan");
-
-    let plan_file_path = std::path::Path::new(&plan);
-    let path_content = std::fs::read_to_string(plan_file_path)?;
-    let plan: Plan = serde_yaml::from_str(&path_content)?;
-
-    debug!("Executing plan: {:?}", plan);
-
+fn run_plan(plan: Plan, plan_file_path: &std::path::Path) -> Result<()> {
     let mut graph = Graph::default();
 
     plan.import
@@ -122,6 +114,23 @@ pub fn execute_plan(plan: String) -> Result<()> {
     });
 
     debug!("Graph: {:?}", graph);
+
+    Ok(())
+}
+
+pub fn execute_plan(plan: String, watch: bool) -> Result<()> {
+    info!("Executing plan");
+
+    let plan_file_path = std::path::Path::new(&plan);
+    let path_content = std::fs::read_to_string(plan_file_path)?;
+    let plan: Plan = serde_yaml::from_str(&path_content)?;
+
+    debug!("Executing plan: {:?}", plan);
+    run_plan(plan, plan_file_path)?;
+    if watch {
+        info!("Watching for changes");
+        // TODO implement watching for changes
+    }
 
     Ok(())
 }

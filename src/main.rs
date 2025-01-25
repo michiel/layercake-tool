@@ -8,8 +8,8 @@ mod plan_execution;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use tracing::Level;
 use tracing::info;
+use tracing::Level;
 
 #[derive(Parser)]
 #[clap(author, version, about)]
@@ -25,6 +25,8 @@ enum Commands {
     Run {
         #[clap(short, long)]
         plan: String,
+        #[clap(short, long)]
+        watch: bool,
     },
     Init {
         #[clap(short, long)]
@@ -62,9 +64,9 @@ fn main() -> Result<()> {
     tracing_subscriber::fmt().with_max_level(log_level).init();
 
     match args.command {
-        Commands::Run { plan } => {
+        Commands::Run { plan, watch } => {
             info!("Running plan: {}", plan);
-            plan_execution::execute_plan(plan)?;
+            plan_execution::execute_plan(plan, watch)?;
         }
         Commands::Init { plan } => {
             info!("Initializing plan: {}", plan);
