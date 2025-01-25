@@ -4,21 +4,13 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Default)]
 pub struct Graph {
     pub nodes: Vec<Node>,
     pub edges: Vec<Edge>,
     pub layers: Vec<Layer>,
 }
 
-impl Default for Graph {
-    fn default() -> Self {
-        Graph {
-            nodes: Vec::new(),
-            edges: Vec::new(),
-            layers: Vec::new(),
-        }
-    }
-}
 
 impl Graph {
     pub fn get_layer_map(&self) -> HashMap<String, Layer> {
@@ -164,7 +156,7 @@ fn strip_quotes_and_whitespace(s: &str) -> &str {
     if (trimmed.starts_with('"') && trimmed.ends_with('"'))
         || (trimmed.starts_with('\'') && trimmed.ends_with('\''))
     {
-        &trimmed[1..trimmed.len() - 1].trim()
+        trimmed[1..trimmed.len() - 1].trim()
     } else {
         trimmed
     }

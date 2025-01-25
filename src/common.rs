@@ -8,7 +8,7 @@ use std::path::Path;
 
 pub fn write_string_to_file(filename: &str, content: &str) -> std::io::Result<()> {
     let path = Path::new(filename);
-    let mut file = File::create(&path)?;
+    let mut file = File::create(path)?;
     file.write_all(content.as_bytes())?;
     Ok(())
 }
@@ -55,11 +55,11 @@ pub fn get_handlebars() -> Handlebars<'static> {
 
                 let mut result = format!("{}rectangle \"{}\" as {} <<{}>> ", indent, label, id, layer);
                 if !children.is_empty() {
-                    result += &format!("{{\n");
+                    result += "{\n";
                     let children_rendered: Vec<String> = children.iter().map(|child| {
                         render_tree(child.clone(), layermap, acc + 1)
                     }).collect();
-                    result += &format!("{}", children_rendered.join(""));
+                    result += &children_rendered.join("").to_string();
                     result += &format!("{}}}\n", indent);
                 } else {
                     result += "\n";
@@ -92,14 +92,14 @@ pub fn get_handlebars() -> Handlebars<'static> {
                 let children = map.get("children").and_then(|v| v.as_array()).unwrap_or(&empty_vec);
 
                 let indent = " ".repeat((acc * 2) as usize);
-                let mut result = format!("");
+                let mut result = String::new();
 
                 if !children.is_empty() {
                     result += &format!("{}subgraph {}\n", indent, label);
                     let children_rendered: Vec<String> = children.iter().map(|child| {
                         render_tree(child.clone(), acc + 1)
                     }).collect();
-                    result += &format!("{}", children_rendered.join(""));
+                    result += &children_rendered.join("").to_string();
                     result += &format!("{}end\n", indent);
                 } else {
                     result += &format!("{}{}[\"{}\"]\n", indent, id, label);
@@ -126,7 +126,7 @@ pub fn get_handlebars() -> Handlebars<'static> {
                 let children = map.get("children").and_then(|v| v.as_array()).unwrap_or(&empty_vec);
 
                 let indent = " ".repeat((acc * 2) as usize);
-                let mut result = format!("");
+                let mut result = String::new();
 
                 if !children.is_empty() {
                     result += &format!("{}subgraph cluster_{} {{\n", indent, id);
@@ -148,7 +148,7 @@ pub fn get_handlebars() -> Handlebars<'static> {
                     let children_rendered: Vec<String> = children.iter().map(|child| {
                         render_tree(child.clone(), layermap, acc + 1)
                     }).collect();
-                    result += &format!("{}", children_rendered.join(""));
+                    result += &children_rendered.join("").to_string();
                     result += &format!("{}}}\n", indent);
                 } else {
                     result += &format!("{}{}[label=\"{}\"]\n", indent, id, label);

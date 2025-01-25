@@ -29,7 +29,7 @@ pub fn execute_plan(plan: String) -> Result<()> {
     info!("Executing plan");
 
     let plan_file_path = std::path::Path::new(&plan);
-    let path_content = std::fs::read_to_string(&plan_file_path)?;
+    let path_content = std::fs::read_to_string(plan_file_path)?;
     let plan: Plan = serde_yaml::from_str(&path_content)?;
 
     debug!("Executing plan: {:?}", plan);
@@ -55,19 +55,16 @@ pub fn execute_plan(plan: String) -> Result<()> {
                     for idx in 0..df.height() {
                         let row = df.get_row(idx)?;
                         let node = Node::from_row(&row)?;
-                        match node.belongs_to {
-                            Some(ref belongs_to) => {
-                                let edge = Edge {
-                                    id: format!("{}-{}", node.id, belongs_to),
-                                    source: node.id.clone(),
-                                    target: belongs_to.to_string(),
-                                    label: "belongs to".to_string(),
-                                    layer: "partition".to_string(),
-                                    comment: None,
-                                };
-                                graph.edges.push(edge);
-                            }
-                            None => {}
+                        if let Some(ref belongs_to) = node.belongs_to {
+                            let edge = Edge {
+                                id: format!("{}-{}", node.id, belongs_to),
+                                source: node.id.clone(),
+                                target: belongs_to.to_string(),
+                                label: "belongs to".to_string(),
+                                layer: "partition".to_string(),
+                                comment: None,
+                            };
+                            graph.edges.push(edge);
                         }
                         graph.nodes.push(node);
                     }

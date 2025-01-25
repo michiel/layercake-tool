@@ -8,10 +8,8 @@ mod plan_execution;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use serde_yaml;
 use tracing::Level;
 use tracing::info;
-use tracing_subscriber;
 
 #[derive(Parser)]
 #[clap(author, version, about)]

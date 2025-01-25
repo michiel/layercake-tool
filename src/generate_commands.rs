@@ -5,7 +5,7 @@ use tracing::{error, info};
 
 static SAMPLE_DIR: Dir = include_dir!("sample/kvm_control_flow");
 
-pub fn generate_template(exporter: String) -> () {
+pub fn generate_template(exporter: String) {
     info!("Generating exporter template: {}", exporter);
     match exporter.as_str() {
         "mermaid" => {
@@ -29,7 +29,7 @@ pub fn generate_template(exporter: String) -> () {
     }
 }
 
-pub fn generate_sample(dir: String) -> () {
+pub fn generate_sample(dir: String) {
     info!("Generating sample project: {:?}", dir);
     let target_path = Path::new(&dir);
     if let Err(e) = fs::create_dir_all(target_path) {

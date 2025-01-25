@@ -27,32 +27,19 @@ use std::collections::HashMap;
 //
 
 #[derive(Serialize, Deserialize, Debug)]
+#[derive(Default)]
 pub struct Plan {
     pub import: ImportConfig,
     pub export: ExportProfile,
 }
 
-impl Default for Plan {
-    fn default() -> Self {
-        Plan {
-            import: ImportConfig::default(),
-            export: ExportProfile::default(),
-        }
-    }
-}
 
 #[derive(Serialize, Deserialize, Debug)]
+#[derive(Default)]
 pub struct ImportConfig {
     pub profiles: Vec<ImportProfile>,
 }
 
-impl Default for ImportConfig {
-    fn default() -> Self {
-        ImportConfig {
-            profiles: Vec::new(),
-        }
-    }
-}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum FileImportProfile {
@@ -83,17 +70,11 @@ pub struct ImportProfile {
 //
 
 #[derive(Serialize, Deserialize, Debug)]
+#[derive(Default)]
 pub struct ExportProfile {
     pub profiles: Vec<ExportProfileItem>,
 }
 
-impl Default for ExportProfile {
-    fn default() -> Self {
-        ExportProfile {
-            profiles: Vec::new(),
-        }
-    }
-}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ExportProfileItem {
@@ -121,7 +102,7 @@ pub enum ExportFileType {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_yaml;
+    
     #[test]
     fn test_serialization() {
         let config = ImportConfig {
