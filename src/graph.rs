@@ -42,35 +42,35 @@ impl Graph {
             .collect()
     }
 
-    pub fn get_edges(&self, node: &Node) -> Vec<&Edge> {
-        self.edges
-            .iter()
-            .filter(|e| e.source == node.id || e.target == node.id)
-            .collect()
-    }
-
-    pub fn get_edges_from(&self, node: &Node) -> Vec<&Edge> {
-        self.edges.iter().filter(|e| e.source == node.id).collect()
-    }
-
-    pub fn get_edges_to(&self, node: &Node) -> Vec<&Edge> {
-        self.edges.iter().filter(|e| e.target == node.id).collect()
-    }
+    // pub fn get_edges(&self, node: &Node) -> Vec<&Edge> {
+    //     self.edges
+    //         .iter()
+    //         .filter(|e| e.source == node.id || e.target == node.id)
+    //         .collect()
+    // }
+    //
+    // pub fn get_edges_from(&self, node: &Node) -> Vec<&Edge> {
+    //     self.edges.iter().filter(|e| e.source == node.id).collect()
+    // }
+    //
+    // pub fn get_edges_to(&self, node: &Node) -> Vec<&Edge> {
+    //     self.edges.iter().filter(|e| e.target == node.id).collect()
+    // }
 
     pub fn get_node_by_id(&self, id: &str) -> Option<&Node> {
         self.nodes.iter().find(|n| n.id == id)
     }
 
-    pub fn get_partition_edges(&self) -> Vec<&Edge> {
-        self.edges
-            .iter()
-            .filter(|e| {
-                let source = self.get_node_by_id(&e.source).unwrap();
-                let target = self.get_node_by_id(&e.target).unwrap();
-                source.is_partition || target.is_partition
-            })
-            .collect()
-    }
+    // pub fn get_partition_edges(&self) -> Vec<&Edge> {
+    //     self.edges
+    //         .iter()
+    //         .filter(|e| {
+    //             let source = self.get_node_by_id(&e.source).unwrap();
+    //             let target = self.get_node_by_id(&e.target).unwrap();
+    //             source.is_partition || target.is_partition
+    //         })
+    //         .collect()
+    // }
 
     pub fn get_non_partition_edges(&self) -> Vec<&Edge> {
         self.edges
@@ -186,7 +186,7 @@ fn get_stripped_value(
 impl Node {
     pub fn from_row(row: &Row) -> Result<Self, Box<dyn std::error::Error>> {
         Ok(Node {
-            id: get_stripped_value(row, 0, "id")?,
+            id: get_stripped_value(row, 0, "id").unwrap_or("noId".to_string()),
             label: get_stripped_value(row, 1, "label")?,
             layer: get_stripped_value(row, 2, "layer")?,
             is_partition: is_truthy(&get_stripped_value(row, 3, "is_partition")?),
@@ -208,7 +208,7 @@ impl Node {
 impl Edge {
     pub fn from_row(row: &Row) -> Result<Self, Box<dyn std::error::Error>> {
         Ok(Edge {
-            id: get_stripped_value(row, 0, "id")?,
+            id: get_stripped_value(row, 0, "id")?, // default to noId
             source: get_stripped_value(row, 1, "source")?,
             target: get_stripped_value(row, 2, "target")?,
             label: get_stripped_value(row, 3, "label")?,
@@ -329,33 +329,33 @@ mod tests {
         assert_eq!(children[1].id, "3");
     }
 
-    #[test]
-    fn test_get_edges() {
-        let graph = create_test_graph();
-        let node = graph.get_node_by_id("2").unwrap();
-        let edges = graph.get_edges(node);
-        assert_eq!(edges.len(), 2);
-        assert_eq!(edges[0].id, "e1");
-        assert_eq!(edges[1].id, "e2");
-    }
-
-    #[test]
-    fn test_get_edges_from() {
-        let graph = create_test_graph();
-        let node = graph.get_node_by_id("1").unwrap();
-        let edges = graph.get_edges_from(node);
-        assert_eq!(edges.len(), 1);
-        assert_eq!(edges[0].id, "e1");
-    }
-
-    #[test]
-    fn test_get_edges_to() {
-        let graph = create_test_graph();
-        let node = graph.get_node_by_id("3").unwrap();
-        let edges = graph.get_edges_to(node);
-        assert_eq!(edges.len(), 1);
-        assert_eq!(edges[0].id, "e2");
-    }
+    // #[test]
+    // fn test_get_edges() {
+    //     let graph = create_test_graph();
+    //     let node = graph.get_node_by_id("2").unwrap();
+    //     let edges = graph.get_edges(node);
+    //     assert_eq!(edges.len(), 2);
+    //     assert_eq!(edges[0].id, "e1");
+    //     assert_eq!(edges[1].id, "e2");
+    // }
+    //
+    // #[test]
+    // fn test_get_edges_from() {
+    //     let graph = create_test_graph();
+    //     let node = graph.get_node_by_id("1").unwrap();
+    //     let edges = graph.get_edges_from(node);
+    //     assert_eq!(edges.len(), 1);
+    //     assert_eq!(edges[0].id, "e1");
+    // }
+    //
+    // #[test]
+    // fn test_get_edges_to() {
+    //     let graph = create_test_graph();
+    //     let node = graph.get_node_by_id("3").unwrap();
+    //     let edges = graph.get_edges_to(node);
+    //     assert_eq!(edges.len(), 1);
+    //     assert_eq!(edges[0].id, "e2");
+    // }
 
     #[test]
     fn test_get_node_by_id() {

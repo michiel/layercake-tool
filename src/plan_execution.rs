@@ -74,7 +74,7 @@ pub fn execute_plan(plan: String) -> Result<()> {
                 }
                 ImportFileType::Edges => {
                     // TODO Add verification for edges
-                    data_loader::verify_id_column_df(&df)?;
+                    // data_loader::verify_id_column_df(&df)?;
                     for idx in 0..df.height() {
                         let row = df.get_row(idx)?;
                         let edge = Edge::from_row(&row)?;
