@@ -1,16 +1,15 @@
 use polars::frame::row::Row;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use tracing::error;
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[derive(Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct Graph {
     pub nodes: Vec<Node>,
     pub edges: Vec<Edge>,
     pub layers: Vec<Layer>,
 }
-
 
 impl Graph {
     pub fn get_layer_map(&self) -> HashMap<String, Layer> {
@@ -113,6 +112,26 @@ impl Graph {
             tree.push(node);
         }
         serde_json::json!(tree)
+    }
+
+    pub fn verify_graph_integrity(&self) -> Result<(), String> {
+        // TODO verify that all nodes in edges are present in nodes
+        // TODO verify graph integrity
+        //
+        let node_ids: HashSet<String> = self.nodes.iter().map(|n| n.id.clone()).collect();
+
+        for edge in &self.edges {
+            if !node_ids.contains(&edge.source) {
+                let err = format!("Edge source {:?} not found in nodes", edge.source);
+                error!(err);
+            }
+            if !node_ids.contains(&edge.target) {
+                let err = format!("Target source {:?} not found in nodes", edge.target);
+                error!(err);
+            }
+        }
+
+        Ok(())
     }
 }
 

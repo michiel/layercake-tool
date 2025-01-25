@@ -96,6 +96,16 @@ fn run_plan(plan: Plan, plan_file_path: &std::path::Path) -> Result<()> {
         graph.layers.len()
     );
 
+    match graph.verify_graph_integrity() {
+        Ok(_) => {
+            info!("Graph integrity verified");
+        }
+        Err(e) => {
+            error!("Error: {}", e);
+            // return Err(e.into());
+        }
+    }
+
     plan.export.profiles.iter().for_each(|profile| {
         info!(
             "Exporting file: {} using exporter {:?}",
