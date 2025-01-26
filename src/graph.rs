@@ -2,7 +2,7 @@ use polars::frame::row::Row;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use tracing::error;
+use tracing::{info, warn};
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct Graph {
@@ -114,24 +114,44 @@ impl Graph {
         serde_json::json!(tree)
     }
 
-    pub fn verify_graph_integrity(&self) -> Result<(), String> {
-        // TODO verify that all nodes in edges are present in nodes
+    pub fn verify_graph_integrity(&self) -> Result<(), Vec<String>> {
         // TODO verify graph integrity
-        //
-        let node_ids: HashSet<String> = self.nodes.iter().map(|n| n.id.clone()).collect();
+        // TODO verify that all nodes have unique ids
 
+        let node_ids: HashSet<String> = self.nodes.iter().map(|n| n.id.clone()).collect();
+        let mut errors = Vec::new();
+
+        let mut all_edges_have_nodes = true;
         for edge in &self.edges {
             if !node_ids.contains(&edge.source) {
-                let err = format!("Edge source {:?} not found in nodes", edge.source);
-                error!(err);
+                all_edges_have_nodes = false;
+                let err = format!(
+                    "Edge id:[{}] source {:?} not found in nodes",
+                    edge.id, edge.source
+                );
+                errors.push(err);
             }
             if !node_ids.contains(&edge.target) {
-                let err = format!("Target source {:?} not found in nodes", edge.target);
-                error!(err);
+                all_edges_have_nodes = false;
+                let err = format!(
+                    "Edge id:[{}] target {:?} not found in nodes",
+                    edge.id, edge.target
+                );
+                errors.push(err);
             }
         }
 
-        Ok(())
+        if all_edges_have_nodes {
+            info!("All edges have valid source and target nodes");
+        } else {
+            warn!("Some edges have missing source and/or target nodes");
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
     }
 }
 

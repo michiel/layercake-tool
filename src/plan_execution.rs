@@ -1,10 +1,9 @@
 use crate::data_loader;
 use crate::graph::{Edge, Graph, Layer, Node};
 use crate::plan::{ExportFileType, ImportFileType, Plan};
-use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{Config, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::sync::mpsc::channel;
-use std::time::Duration;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 
 use anyhow::Result;
 use polars::prelude::*;
@@ -98,33 +97,33 @@ fn run_plan(plan: Plan, plan_file_path: &std::path::Path) -> Result<()> {
 
     match graph.verify_graph_integrity() {
         Ok(_) => {
-            info!("Graph integrity verified");
+            info!("Graph integrity verified : ok - rendering exports");
+            plan.export.profiles.iter().for_each(|profile| {
+                info!(
+                    "Exporting file: {} using exporter {:?}",
+                    profile.filename, profile.exporter
+                );
+                let output = match profile.exporter.clone() {
+                    ExportFileType::GML => super::export::to_gml::render(graph.clone()),
+                    ExportFileType::DOT => super::export::to_dot::render(graph.clone()),
+                    ExportFileType::CSVNodes => "".to_string(),
+                    ExportFileType::CSVEdges => "".to_string(),
+                    ExportFileType::PlantUML => super::export::to_plantuml::render(graph.clone()),
+                    ExportFileType::Mermaid => super::export::to_mermaid::render(graph.clone()),
+                    ExportFileType::Custom(template) => {
+                        super::export::to_custom::render(graph.clone(), template)
+                    }
+                };
+
+                super::common::write_string_to_file(&profile.filename, &output).unwrap();
+            });
         }
-        Err(e) => {
-            error!("Error: {}", e);
-            // return Err(e.into());
+        Err(errors) => {
+            warn!("Identified {} graph integrity error(s)", errors.len());
+            errors.iter().for_each(|e| warn!("{}", e));
+            warn!("Not rendering exports");
         }
     }
-
-    plan.export.profiles.iter().for_each(|profile| {
-        info!(
-            "Exporting file: {} using exporter {:?}",
-            profile.filename, profile.exporter
-        );
-        let output = match profile.exporter.clone() {
-            ExportFileType::GML => super::export::to_gml::render(graph.clone()),
-            ExportFileType::DOT => super::export::to_dot::render(graph.clone()),
-            ExportFileType::CSVNodes => "".to_string(),
-            ExportFileType::CSVEdges => "".to_string(),
-            ExportFileType::PlantUML => super::export::to_plantuml::render(graph.clone()),
-            ExportFileType::Mermaid => super::export::to_mermaid::render(graph.clone()),
-            ExportFileType::Custom(template) => {
-                super::export::to_custom::render(graph.clone(), template)
-            }
-        };
-
-        super::common::write_string_to_file(&profile.filename, &output).unwrap();
-    });
 
     debug!("Graph: {:?}", graph);
 
