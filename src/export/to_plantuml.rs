@@ -78,7 +78,11 @@ hide stereotype
 {{{puml_render_tree rootnode ../layers}}}
 {{/each}}
 {{#each edges as |edge|}}
+    {{#if (exists edge.label)}}
+ {{edge.source}} --> {{edge.target}} : "{{edge.label}}"
+    {{else}}
  {{edge.source}} --> {{edge.target}}
+    {{/if}}
 {{/each}}
 
 @enduml
