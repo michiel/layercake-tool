@@ -68,8 +68,8 @@ pub fn generate_sample(sample: String, dir: String) {
     }
 
     match sample.to_lowercase().as_str() {
-        "kvm_control_flow" => write_dir_contents(&SAMPLE_DIR_KVM_CONTROL_FLOW, target_path),
         "attack_tree" => write_dir_contents(&SAMPLE_DIR_ATTACK_TREE, target_path),
+        "kvm_control_flow" => write_dir_contents(&SAMPLE_DIR_KVM_CONTROL_FLOW, target_path),
         _ => {
             error!(
                 "Unsupported sample: {} - use kvm_control_flow, attack_tree",
@@ -78,8 +78,6 @@ pub fn generate_sample(sample: String, dir: String) {
             return;
         }
     }
-
-    write_dir_contents(&SAMPLE_DIR_KVM_CONTROL_FLOW, target_path);
 
     info!("Sample project generated successfully at: {:?}", dir);
 }

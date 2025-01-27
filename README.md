@@ -50,8 +50,17 @@ _This tool only outputs text files, the following images are rendered using othe
 
 ### GML rendered with Gephi
 
+Sample control for for virtualized x86 architecture, output to GML and rendered using Gephi.
+
 ![Sample](images/sample-gml-gephi.png)
 
 ### PlantUML rendered
 
-![Sample](images/sample-puml.png)
+![Sample](images/kvm-plantuml.svg)
+
+Sample control for for virtualized x86 architecture, output rendered using [PlantUML](https://plantuml.com/).
+
+![Sample](images/kvm-plantuml.svg)
+
+Sample attack tree from [Kelly Shortridge's Security Descision Trees with Graphviz](https://kellyshortridge.com/blog/posts/security-decision-trees-with-graphviz/) output rendered using [Graphviz](https://graphviz.org/)
+

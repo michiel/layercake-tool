@@ -1,0 +1,562 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1472pt" height="1569pt" viewBox="0.00 0.00 1471.96 1569.20">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 1565.2)">
+<title>G</title>
+<polygon fill="white" stroke="none" points="-4,4 -4,-1565.2 1467.96,-1565.2 1467.96,4 -4,4"/>
+<!-- attack_1 -->
+<g id="node1" class="node">
+<title>attack_1</title>
+<polygon fill="#ed96ac" stroke="none" stroke-dasharray="5,2" points="226.16,-1439.4 0,-1439.4 0,-1403.4 226.16,-1403.4 226.16,-1439.4"/>
+<text text-anchor="middle" x="113.08" y="-1417.2" font-family="Lato" font-size="14.00" fill="#000000">API cache (e.g. Wayback Machine)"]</text>
+</g>
+<!-- attack_win -->
+<g id="node25" class="node">
+<title>attack_win</title>
+<polygon fill="#2b303a" stroke="none" stroke-dasharray="5,2" points="641.78,-36 328.38,-36 328.38,0 641.78,0 641.78,-36"/>
+<text text-anchor="middle" x="485.08" y="-13.8" font-family="Lato" font-size="14.00" fill="#ffffff">Access video recordings in S3 bucket (attackers win)</text>
+</g>
+<!-- attack_1&#45;&gt;attack_win -->
+<g id="edge2" class="edge">
+<title>attack_1-&gt;attack_win</title>
+<path fill="none" stroke="#2b303a" d="M113.08,-1403.67C113.08,-1387.02 113.08,-1360.75 113.08,-1338 113.08,-1338 113.08,-1338 113.08,-76 113.08,-53.74 218.46,-39.03 317.04,-30.14"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="317.24,-33.64 326.89,-29.27 316.62,-26.66 317.24,-33.64"/>
+</g>
+<!-- attack_2 -->
+<g id="node2" class="node">
+<title>attack_2</title>
+<polygon fill="#ed96ac" stroke="none" stroke-dasharray="5,2" points="318.64,-1392.4 147.52,-1392.4 147.52,-1356.4 318.64,-1356.4 318.64,-1392.4"/>
+<text text-anchor="middle" x="233.08" y="-1370.2" font-family="Lato" font-size="14.00" fill="#000000">AWS public buckets search</text>
+</g>
+<!-- attack_3 -->
+<g id="node3" class="node">
+<title>attack_3</title>
+<polygon fill="#ed96ac" stroke="none" stroke-dasharray="5,2" points="321.85,-1270.6 178.31,-1270.6 178.31,-1234.6 321.85,-1234.6 321.85,-1270.6"/>
+<text text-anchor="middle" x="250.08" y="-1248.4" font-family="Lato" font-size="14.00" fill="#000000">S3 bucket set to public</text>
+</g>
+<!-- attack_2&#45;&gt;attack_3 -->
+<g id="edge5" class="edge">
+<title>attack_2-&gt;attack_3</title>
+<path fill="none" stroke="#2b303a" d="M235.48,-1356.49C238.24,-1337.05 242.81,-1304.83 246.11,-1281.62"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="249.54,-1282.32 247.48,-1271.92 242.61,-1281.33 249.54,-1282.32"/>
+<text text-anchor="middle" x="264.3" y="-1332.8" font-family="Lato" font-size="14.00">#yolosec</text>
+</g>
+<!-- attack_3&#45;&gt;attack_win -->
+<g id="edge6" class="edge">
+<title>attack_3-&gt;attack_win</title>
+<path fill="none" stroke="#2b303a" d="M252.57,-1234.66C254.58,-1219.49 257.08,-1196.61 257.08,-1176.6 257.08,-1176.6 257.08,-1176.6 257.08,-76 257.08,-58.34 283.14,-46.11 317.64,-37.65"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="318.15,-41.13 327.12,-35.48 316.59,-34.3 318.15,-41.13"/>
+</g>
+<!-- attack_4 -->
+<g id="node4" class="node">
+<title>attack_4</title>
+<polygon fill="#ed96ac" stroke="none" stroke-dasharray="5,2" points="571.76,-1392.4 492.4,-1392.4 492.4,-1356.4 571.76,-1356.4 571.76,-1392.4"/>
+<text text-anchor="middle" x="532.08" y="-1370.2" font-family="Lato" font-size="14.00" fill="#000000">Brute force</text>
+</g>
+<!-- attack_6 -->
+<g id="node6" class="node">
+<title>attack_6</title>
+<polygon fill="#ed96ac" stroke="none" stroke-dasharray="5,2" points="645.73,-1317.6 466.44,-1317.6 466.44,-1281.6 645.73,-1281.6 645.73,-1317.6"/>
+<text text-anchor="middle" x="556.08" y="-1295.4" font-family="Lato" font-size="14.00" fill="#000000">Compromise user credentials</text>
+</g>
+<!-- attack_4&#45;&gt;attack_6 -->
+<g id="edge10" class="edge">
+<title>attack_4-&gt;attack_6</title>
+<path fill="none" stroke="#2b303a" d="M537.65,-1356.52C540.44,-1348.06 543.88,-1337.62 547.03,-1328.05"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="550.26,-1329.42 550.07,-1318.83 543.62,-1327.23 550.26,-1329.42"/>
+</g>
+<!-- attack_5 -->
+<g id="node5" class="node">
+<title>attack_5</title>
+<polygon fill="#ed96ac" stroke="none" stroke-dasharray="5,2" points="824.59,-987.6 759.58,-987.6 759.58,-951.6 824.59,-951.6 824.59,-987.6"/>
+<text text-anchor="middle" x="792.08" y="-965.4" font-family="Lato" font-size="14.00" fill="#000000">Phishing</text>
+</g>
+<!-- attack_5&#45;&gt;attack_6 -->
+<g id="edge11" class="edge">
+<title>attack_5-&gt;attack_6</title>
+<path fill="none" stroke="#2b303a" d="M785.66,-987.54C781.98,-998.74 778.08,-1013.84 778.08,-1027.6 778.08,-1206.6 778.08,-1206.6 778.08,-1206.6 778.08,-1263.33 715.44,-1285.75 656.71,-1294.31"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="656.38,-1290.82 646.92,-1295.59 657.29,-1297.76 656.38,-1290.82"/>
+</g>
+<!-- attack_9 -->
+<g id="node9" class="node">
+<title>attack_9</title>
+<polygon fill="#ed96ac" stroke="none" stroke-dasharray="5,2" points="1071.01,-928.6 911.15,-928.6 911.15,-892.6 1071.01,-892.6 1071.01,-928.6"/>
+<text text-anchor="middle" x="991.08" y="-906.4" font-family="Lato" font-size="14.00" fill="#000000">Compromise admin creds</text>
+</g>
+<!-- attack_5&#45;&gt;attack_9 -->
+<g id="edge19" class="edge">
+<title>attack_5-&gt;attack_9</title>
+<path fill="none" stroke="#2b303a" d="M824.5,-959.32C850.52,-951.86 888,-941.12 920.83,-931.72"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="921.65,-935.13 930.3,-929.01 919.73,-928.4 921.65,-935.13"/>
+</g>
+<!-- attack_13 -->
+<g id="node13" class="node">
+<title>attack_13</title>
+<polygon fill="#ed96ac" stroke="none" stroke-dasharray="5,2" points="889.32,-928.6 694.85,-928.6 694.85,-892.6 889.32,-892.6 889.32,-928.6"/>
+<text text-anchor="middle" x="792.08" y="-906.4" font-family="Lato" font-size="14.00" fill="#000000">Compromise AWS admin creds</text>
+</g>
+<!-- attack_5&#45;&gt;attack_13 -->
+<g id="edge27" class="edge">
+<title>attack_5-&gt;attack_13</title>
+<path fill="none" stroke="#2b303a" d="M792.08,-951.81C792.08,-948.01 792.08,-943.89 792.08,-939.77"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="795.58,-939.98 792.08,-929.98 788.58,-939.98 795.58,-939.98"/>
+</g>
+<!-- attack_14 -->
+<g id="node14" class="node">
+<title>attack_14</title>
+<polygon fill="#ed96ac" stroke="none" stroke-dasharray="5,2" points="661.69,-928.6 478.48,-928.6 478.48,-892.6 661.69,-892.6 661.69,-928.6"/>
+<text text-anchor="middle" x="570.08" y="-906.4" font-family="Lato" font-size="14.00" fill="#000000">Compromise presigned URLs</text>
+</g>
+<!-- attack_5&#45;&gt;attack_14 -->
+<g id="edge30" class="edge">
+<title>attack_5-&gt;attack_14</title>
+<path fill="none" stroke="#2b303a" d="M759.8,-960.31C730.23,-952.72 685.31,-941.19 646.6,-931.25"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="647.88,-927.96 637.33,-928.87 646.14,-934.74 647.88,-927.96"/>
+</g>
+<!-- attack_7 -->
+<g id="node7" class="node">
+<title>attack_7</title>
+<polygon fill="#ed96ac" stroke="none" stroke-dasharray="5,2" points="669.25,-1223.6 442.91,-1223.6 442.91,-1187.6 669.25,-1187.6 669.25,-1223.6"/>
+<text text-anchor="middle" x="556.08" y="-1201.4" font-family="Lato" font-size="14.00" fill="#000000">Subsystem with access to bucket data</text>
+</g>
+<!-- attack_6&#45;&gt;attack_7 -->
+<g id="edge12" class="edge">
+<title>attack_6-&gt;attack_7</title>
+<path fill="none" stroke="#2b303a" d="M556.08,-1281.73C556.08,-1268.63 556.08,-1250.18 556.08,-1234.84"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="559.58,-1234.88 556.08,-1224.88 552.58,-1234.88 559.58,-1234.88"/>
+</g>
+<!-- attack_7&#45;&gt;attack_win -->
+<g id="edge13" class="edge">
+<title>attack_7-&gt;attack_win</title>
+<path fill="none" stroke="#2b303a" d="M443.06,-1188.13C404.11,-1179.19 370.08,-1166.09 370.08,-1147.6 370.08,-1147.6 370.08,-1147.6 370.08,-76 370.08,-60.91 378.13,-49.81 389.97,-41.65"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="391.52,-44.8 398.39,-36.73 387.99,-38.76 391.52,-44.8"/>
+</g>
+<!-- defense_3 -->
+<g id="node28" class="node">
+<title>defense_3</title>
+<polygon fill="#abd2fa" stroke="none" stroke-dasharray="5,2" points="685.36,-1164.6 438.8,-1164.6 438.8,-1128.6 685.36,-1128.6 685.36,-1164.6"/>
+<text text-anchor="middle" x="562.08" y="-1142.4" font-family="Lato" font-size="14.00" fill="#000000">Lock down web client with creds / ACLs</text>
+</g>
+<!-- attack_7&#45;&gt;defense_3 -->
+<g id="edge14" class="edge">
+<title>attack_7-&gt;defense_3</title>
+<path fill="none" stroke="#2b303a" d="M557.85,-1187.81C558.25,-1184.01 558.68,-1179.89 559.12,-1175.77"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="562.58,-1176.29 560.15,-1165.98 555.62,-1175.55 562.58,-1176.29"/>
+</g>
+<!-- attack_8 -->
+<g id="node8" class="node">
+<title>attack_8</title>
+<polygon fill="#ed96ac" stroke="none" stroke-dasharray="5,2" points="743.6,-1105.6 404.56,-1105.6 404.56,-1069.6 743.6,-1069.6 743.6,-1105.6"/>
+<text text-anchor="middle" x="574.08" y="-1083.4" font-family="Lato" font-size="14.00" fill="#000000">Manually analyze web client for access control misconfig</text>
+</g>
+<!-- attack_8&#45;&gt;attack_win -->
+<g id="edge16" class="edge">
+<title>attack_8-&gt;attack_win</title>
+<path fill="none" stroke="#2b303a" d="M485.38,-1069.64C449.37,-1060.15 416.08,-1046.73 416.08,-1029.6 416.08,-1029.6 416.08,-1029.6 416.08,-76 416.08,-62.02 424.6,-50.83 435.65,-42.19"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="437.44,-45.21 443.7,-36.66 433.47,-39.44 437.44,-45.21"/>
+</g>
+<!-- defense_4 -->
+<g id="node29" class="node">
+<title>defense_4</title>
+<polygon fill="#abd2fa" stroke="none" stroke-dasharray="5,2" points="716.43,-1046.6 489.74,-1046.6 489.74,-1010.6 716.43,-1010.6 716.43,-1046.6"/>
+<text text-anchor="middle" x="603.08" y="-1024.4" font-family="Lato" font-size="14.00" fill="#000000">Perform all access control server-side</text>
+</g>
+<!-- attack_8&#45;&gt;defense_4 -->
+<g id="edge17" class="edge">
+<title>attack_8-&gt;defense_4</title>
+<path fill="none" stroke="#2b303a" d="M582.63,-1069.81C584.73,-1065.67 587.04,-1061.13 589.32,-1056.64"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="592.4,-1058.32 593.81,-1047.82 586.16,-1055.15 592.4,-1058.32"/>
+</g>
+<!-- attack_11 -->
+<g id="node11" class="node">
+<title>attack_11</title>
+<polygon fill="#ed96ac" stroke="none" stroke-dasharray="5,2" points="1071.06,-735.8 887.11,-735.8 887.11,-699.8 1071.06,-699.8 1071.06,-735.8"/>
+<text text-anchor="middle" x="979.08" y="-713.6" font-family="Lato" font-size="14.00" fill="#000000">SSH to an accessible machine</text>
+</g>
+<!-- attack_9&#45;&gt;attack_11 -->
+<g id="edge20" class="edge">
+<title>attack_9-&gt;attack_11</title>
+<path fill="none" stroke="#2b303a" d="M1003.98,-892.88C1006.08,-889.33 1007.94,-885.48 1009.08,-881.6 1025.96,-824.12 1032.96,-801.75 1009.08,-746.8 1008.81,-746.17 1008.51,-745.54 1008.19,-744.92"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="1011.15,-743.04 1002.5,-736.92 1005.44,-747.1 1011.15,-743.04"/>
+<text text-anchor="middle" x="1049.36" y="-810" font-family="Lato" font-size="14.00">#yolosec</text>
+</g>
+<!-- defense_5 -->
+<g id="node30" class="node">
+<title>defense_5</title>
+<polygon fill="#abd2fa" stroke="none" stroke-dasharray="5,2" points="895.08,-869.6 841.08,-869.6 841.08,-833.6 895.08,-833.6 895.08,-869.6"/>
+<text text-anchor="middle" x="868.08" y="-847.4" font-family="Lato" font-size="14.00" fill="#000000">2FA</text>
+</g>
+<!-- attack_9&#45;&gt;defense_5 -->
+<g id="edge21" class="edge">
+<title>attack_9-&gt;defense_5</title>
+<path fill="none" stroke="#2b303a" d="M954.51,-892.65C938.98,-885.45 920.89,-877.07 905.28,-869.84"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="906.86,-866.71 896.31,-865.68 903.92,-873.06 906.86,-866.71"/>
+</g>
+<!-- attack_10 -->
+<g id="node10" class="node">
+<title>attack_10</title>
+<polygon fill="#ed96ac" stroke="none" stroke-dasharray="5,2" points="958.15,-794.8 864.01,-794.8 864.01,-758.8 958.15,-758.8 958.15,-794.8"/>
+<text text-anchor="middle" x="911.08" y="-772.6" font-family="Lato" font-size="14.00" fill="#000000">Intercept 2FA</text>
+</g>
+<!-- attack_10&#45;&gt;attack_11 -->
+<g id="edge23" class="edge">
+<title>attack_10-&gt;attack_11</title>
+<path fill="none" stroke="#2b303a" d="M931.12,-759.01C937.15,-753.95 943.89,-748.3 950.37,-742.86"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="952.38,-745.75 957.8,-736.64 947.88,-740.38 952.38,-745.75"/>
+</g>
+<!-- defense_6 -->
+<g id="node31" class="node">
+<title>defense_6</title>
+<polygon fill="#abd2fa" stroke="none" stroke-dasharray="5,2" points="1063.67,-676.8 934.49,-676.8 934.49,-640.8 1063.67,-640.8 1063.67,-676.8"/>
+<text text-anchor="middle" x="999.08" y="-654.6" font-family="Lato" font-size="14.00" fill="#000000">IP allowlist for SSH</text>
+</g>
+<!-- attack_11&#45;&gt;defense_6 -->
+<g id="edge24" class="edge">
+<title>attack_11-&gt;defense_6</title>
+<path fill="none" stroke="#2b303a" d="M984.97,-700.01C986.39,-695.98 987.93,-691.58 989.46,-687.22"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="992.65,-688.69 992.66,-678.1 986.05,-686.38 992.65,-688.69"/>
+</g>
+<!-- attack_12 -->
+<g id="node12" class="node">
+<title>attack_12</title>
+<polygon fill="#ed96ac" stroke="none" stroke-dasharray="5,2" points="1463.96,-555 1122.2,-555 1122.2,-519 1463.96,-519 1463.96,-555"/>
+<text text-anchor="middle" x="1293.08" y="-532.8" font-family="Lato" font-size="14.00" fill="#000000">Lateral movement to machine with access to target bucket</text>
+</g>
+<!-- attack_12&#45;&gt;attack_win -->
+<g id="edge26" class="edge">
+<title>attack_12-&gt;attack_win</title>
+<path fill="none" stroke="#2b303a" d="M1277.58,-519.23C1265.97,-504.89 1252.08,-483.11 1252.08,-461 1252.08,-461 1252.08,-461 1252.08,-76 1252.08,-46.19 878.72,-30.23 652.99,-23.3"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="653.3,-19.81 643.2,-23.01 653.09,-26.81 653.3,-19.81"/>
+</g>
+<!-- attack_13&#45;&gt;attack_11 -->
+<g id="edge28" class="edge">
+<title>attack_13-&gt;attack_11</title>
+<path fill="none" stroke="#2b303a" d="M859.46,-892.61C875.55,-886.8 892.1,-879.25 906.08,-869.6 941.85,-844.91 951.54,-834.57 969.08,-794.8 975.67,-779.86 978.24,-761.79 979.13,-747.02"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="982.63,-747.16 979.48,-737.04 975.63,-746.91 982.63,-747.16"/>
+</g>
+<!-- attack_13&#45;&gt;defense_5 -->
+<g id="edge29" class="edge">
+<title>attack_13-&gt;defense_5</title>
+<path fill="none" stroke="#2b303a" d="M814.47,-892.81C821.37,-887.63 829.1,-881.84 836.49,-876.29"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="838.48,-879.18 844.38,-870.38 834.28,-873.58 838.48,-879.18"/>
+</g>
+<!-- attack_15 -->
+<g id="node15" class="node">
+<title>attack_15</title>
+<polygon fill="#ed96ac" stroke="none" stroke-dasharray="5,2" points="764.27,-794.8 523.9,-794.8 523.9,-758.8 764.27,-758.8 764.27,-794.8"/>
+<text text-anchor="middle" x="644.08" y="-772.6" font-family="Lato" font-size="14.00" fill="#000000">Compromise URL within N time period</text>
+</g>
+<!-- attack_14&#45;&gt;attack_15 -->
+<g id="edge32" class="edge">
+<title>attack_14-&gt;attack_15</title>
+<path fill="none" stroke="#2b303a" d="M624.32,-892.75C634.56,-887.04 643.96,-879.51 650.08,-869.6 661.82,-850.61 658.95,-824.99 653.93,-805.64"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="657.34,-804.84 651.15,-796.25 650.63,-806.83 657.34,-804.84"/>
+</g>
+<!-- attack_14&#45;&gt;attack_win -->
+<g id="edge31" class="edge">
+<title>attack_14-&gt;attack_win</title>
+<path fill="none" stroke="#2b303a" d="M492.45,-892.71C475.28,-884.25 462.08,-871.58 462.08,-852.6 462.08,-852.6 462.08,-852.6 462.08,-76 462.08,-65.72 465.34,-55.11 469.4,-45.87"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="472.43,-47.63 473.72,-37.11 466.16,-44.53 472.43,-47.63"/>
+</g>
+<!-- defense_7 -->
+<g id="node32" class="node">
+<title>defense_7</title>
+<polygon fill="#abd2fa" stroke="none" stroke-dasharray="5,2" points="639.27,-869.6 496.9,-869.6 496.9,-833.6 639.27,-833.6 639.27,-869.6"/>
+<text text-anchor="middle" x="568.08" y="-847.4" font-family="Lato" font-size="14.00" fill="#000000">Make URL short lived</text>
+</g>
+<!-- attack_14&#45;&gt;defense_7 -->
+<g id="edge33" class="edge">
+<title>attack_14-&gt;defense_7</title>
+<path fill="none" stroke="#2b303a" d="M569.49,-892.81C569.36,-889.01 569.21,-884.89 569.07,-880.77"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="572.58,-880.85 568.73,-870.98 565.58,-881.1 572.58,-880.85"/>
+</g>
+<!-- attack_15&#45;&gt;attack_win -->
+<g id="edge35" class="edge">
+<title>attack_15-&gt;attack_win</title>
+<path fill="none" stroke="#2b303a" d="M535.28,-758.89C519.29,-750.33 508.08,-737.62 508.08,-718.8 508.08,-718.8 508.08,-718.8 508.08,-76 508.08,-65.72 504.83,-55.11 500.77,-45.87"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="504.01,-44.53 496.44,-37.11 497.73,-47.63 504.01,-44.53"/>
+</g>
+<!-- defense_8 -->
+<g id="node33" class="node">
+<title>defense_8</title>
+<polygon fill="#abd2fa" stroke="none" stroke-dasharray="5,2" points="803.75,-735.8 542.41,-735.8 542.41,-699.8 803.75,-699.8 803.75,-735.8"/>
+<text text-anchor="middle" x="673.08" y="-713.6" font-family="Lato" font-size="14.00" fill="#000000">Disallow the use of URLs to access buckets</text>
+</g>
+<!-- attack_15&#45;&gt;defense_8 -->
+<g id="edge36" class="edge">
+<title>attack_15-&gt;defense_8</title>
+<path fill="none" stroke="#2b303a" d="M652.63,-759.01C654.73,-754.87 657.04,-750.33 659.32,-745.84"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="662.4,-747.52 663.81,-737.02 656.16,-744.35 662.4,-747.52"/>
+</g>
+<!-- attack_16 -->
+<g id="node16" class="node">
+<title>attack_16</title>
+<polygon fill="#ed96ac" stroke="none" stroke-dasharray="5,2" points="747.99,-676.8 614.17,-676.8 614.17,-640.8 747.99,-640.8 747.99,-676.8"/>
+<text text-anchor="middle" x="681.08" y="-654.6" font-family="Lato" font-size="14.00" fill="#000000">Recon on S3 buckets</text>
+</g>
+<!-- attack_17 -->
+<g id="node17" class="node">
+<title>attack_17</title>
+<polygon fill="#ed96ac" stroke="none" stroke-dasharray="5,2" points="889.92,-602 612.25,-602 612.25,-566 889.92,-566 889.92,-602"/>
+<text text-anchor="middle" x="751.08" y="-579.8" font-family="Lato" font-size="14.00" fill="#000000">Find systems with R/W access to target bucket</text>
+</g>
+<!-- attack_16&#45;&gt;attack_17 -->
+<g id="edge40" class="edge">
+<title>attack_16-&gt;attack_17</title>
+<path fill="none" stroke="#2b303a" d="M697.32,-640.92C706.15,-631.73 717.25,-620.18 727.07,-609.97"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="729.48,-612.52 733.89,-602.88 724.43,-607.67 729.48,-612.52"/>
+<text text-anchor="middle" x="747.23" y="-617.2" font-family="Lato" font-size="14.00">#yolosec</text>
+</g>
+<!-- attack_18 -->
+<g id="node18" class="node">
+<title>attack_18</title>
+<polygon fill="#ed96ac" stroke="none" stroke-dasharray="5,2" points="865.04,-508 637.12,-508 637.12,-472 865.04,-472 865.04,-508"/>
+<text text-anchor="middle" x="751.08" y="-485.8" font-family="Lato" font-size="14.00" fill="#000000">Exploit known 3rd party library vulns</text>
+</g>
+<!-- attack_17&#45;&gt;attack_18 -->
+<g id="edge43" class="edge">
+<title>attack_17-&gt;attack_18</title>
+<path fill="none" stroke="#2b303a" d="M751.08,-566.13C751.08,-553.03 751.08,-534.58 751.08,-519.24"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="754.58,-519.28 751.08,-509.28 747.58,-519.28 754.58,-519.28"/>
+</g>
+<!-- defense_9 -->
+<g id="node34" class="node">
+<title>defense_9</title>
+<polygon fill="#abd2fa" stroke="none" stroke-dasharray="5,2" points="1213.74,-508 924.42,-508 924.42,-472 1213.74,-472 1213.74,-508"/>
+<text text-anchor="middle" x="1069.08" y="-485.8" font-family="Lato" font-size="14.00" fill="#000000">No public system has R/W access (internal only)</text>
+</g>
+<!-- attack_17&#45;&gt;defense_9 -->
+<g id="edge41" class="edge">
+<title>attack_17-&gt;defense_9</title>
+<path fill="none" stroke="#2b303a" d="M809.78,-566.02C863.36,-550.52 942.64,-527.58 999.42,-511.15"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="1000.37,-514.52 1009,-508.38 998.43,-507.8 1000.37,-514.52"/>
+</g>
+<!-- defense_10 -->
+<g id="node35" class="node">
+<title>defense_10</title>
+<polygon fill="#abd2fa" stroke="none" stroke-dasharray="5,2" points="876.49,-449 625.67,-449 625.67,-413 876.49,-413 876.49,-449"/>
+<text text-anchor="middle" x="751.08" y="-426.8" font-family="Lato" font-size="14.00" fill="#000000">3rd party library checking / vuln scanning</text>
+</g>
+<!-- attack_18&#45;&gt;defense_10 -->
+<g id="edge44" class="edge">
+<title>attack_18-&gt;defense_10</title>
+<path fill="none" stroke="#2b303a" d="M751.08,-472.21C751.08,-468.41 751.08,-464.29 751.08,-460.17"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="754.58,-460.38 751.08,-450.38 747.58,-460.38 754.58,-460.38"/>
+</g>
+<!-- attack_19 -->
+<g id="node19" class="node">
+<title>attack_19</title>
+<polygon fill="#ed96ac" stroke="none" stroke-dasharray="5,2" points="881.37,-390 718.8,-390 718.8,-354 881.37,-354 881.37,-390"/>
+<text text-anchor="middle" x="800.08" y="-367.8" font-family="Lato" font-size="14.00" fill="#000000">Manual discovery of 0day</text>
+</g>
+<!-- attack_21 -->
+<g id="node21" class="node">
+<title>attack_21</title>
+<polygon fill="#ed96ac" stroke="none" stroke-dasharray="5,2" points="724.61,-331 633.55,-331 633.55,-295 724.61,-295 724.61,-331"/>
+<text text-anchor="middle" x="679.08" y="-308.8" font-family="Lato" font-size="14.00" fill="#000000">Exploit vulns</text>
+</g>
+<!-- attack_19&#45;&gt;attack_21 -->
+<g id="edge47" class="edge">
+<title>attack_19-&gt;attack_21</title>
+<path fill="none" stroke="#2b303a" d="M764.11,-354.05C751.9,-348.3 738.1,-341.8 725.21,-335.73"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="727.04,-332.72 716.5,-331.63 724.05,-339.05 727.04,-332.72"/>
+</g>
+<!-- attack_20 -->
+<g id="node20" class="node">
+<title>attack_20</title>
+<polygon fill="#ed96ac" stroke="none" stroke-dasharray="5,2" points="697.11,-390 627.06,-390 627.06,-354 697.11,-354 697.11,-390"/>
+<text text-anchor="middle" x="662.08" y="-367.8" font-family="Lato" font-size="14.00" fill="#000000">Buy 0day</text>
+</g>
+<!-- attack_20&#45;&gt;attack_21 -->
+<g id="edge48" class="edge">
+<title>attack_20-&gt;attack_21</title>
+<path fill="none" stroke="#2b303a" d="M667.09,-354.21C668.26,-350.3 669.53,-346.04 670.79,-341.79"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="674.11,-342.9 673.62,-332.32 667.41,-340.9 674.11,-342.9"/>
+</g>
+<!-- attack_21&#45;&gt;attack_win -->
+<g id="edge49" class="edge">
+<title>attack_21-&gt;attack_win</title>
+<path fill="none" stroke="#2b303a" d="M633.6,-309.32C597.86,-304.46 554.08,-291.13 554.08,-255 554.08,-255 554.08,-255 554.08,-76 554.08,-62.02 545.56,-50.83 534.51,-42.19"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="536.69,-39.44 526.47,-36.66 532.73,-45.21 536.69,-39.44"/>
+</g>
+<!-- defense_11 -->
+<g id="node36" class="node">
+<title>defense_11</title>
+<polygon fill="#abd2fa" stroke="none" stroke-dasharray="5,2" points="776.48,-272 593.69,-272 593.69,-236 776.48,-236 776.48,-272"/>
+<text text-anchor="middle" x="685.08" y="-249.8" font-family="Lato" font-size="14.00" fill="#000000">Exploit prevention / detection</text>
+</g>
+<!-- attack_21&#45;&gt;defense_11 -->
+<g id="edge50" class="edge">
+<title>attack_21-&gt;defense_11</title>
+<path fill="none" stroke="#2b303a" d="M680.85,-295.21C681.25,-291.41 681.68,-287.29 682.12,-283.17"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="685.58,-283.69 683.15,-273.38 678.62,-282.95 685.58,-283.69"/>
+</g>
+<!-- attack_22 -->
+<g id="node22" class="node">
+<title>attack_22</title>
+<polygon fill="#ed96ac" stroke="none" stroke-dasharray="5,2" points="805.74,-213 598.42,-213 598.42,-177 805.74,-177 805.74,-213"/>
+<text text-anchor="middle" x="702.08" y="-190.8" font-family="Lato" font-size="14.00" fill="#000000">0day in AWS multitenant systems</text>
+</g>
+<!-- attack_22&#45;&gt;attack_win -->
+<g id="edge52" class="edge">
+<title>attack_22-&gt;attack_win</title>
+<path fill="none" stroke="#2b303a" d="M767.35,-177.1C780.38,-171.41 793.1,-163.89 803.08,-154 834.02,-123.35 856.03,-91.53 827.08,-59 814.7,-45.08 733.31,-35.24 653.04,-28.8"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="653.48,-25.32 643.23,-28.03 652.93,-32.3 653.48,-25.32"/>
+</g>
+<!-- defense_12 -->
+<g id="node37" class="node">
+<title>defense_12</title>
+<polygon fill="#abd2fa" stroke="none" stroke-dasharray="5,2" points="792.52,-154 611.64,-154 611.64,-118 792.52,-118 792.52,-154"/>
+<text text-anchor="middle" x="702.08" y="-131.8" font-family="Lato" font-size="14.00" fill="#000000">Use single tenant AWS HSM</text>
+</g>
+<!-- attack_22&#45;&gt;defense_12 -->
+<g id="edge53" class="edge">
+<title>attack_22-&gt;defense_12</title>
+<path fill="none" stroke="#2b303a" d="M702.08,-177.21C702.08,-173.41 702.08,-169.29 702.08,-165.17"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="705.58,-165.38 702.08,-155.38 698.58,-165.38 705.58,-165.38"/>
+</g>
+<!-- attack_23 -->
+<g id="node23" class="node">
+<title>attack_23</title>
+<polygon fill="#ed96ac" stroke="none" stroke-dasharray="5,2" points="815.64,-95 588.52,-95 588.52,-59 815.64,-59 815.64,-95"/>
+<text text-anchor="middle" x="702.08" y="-72.8" font-family="Lato" font-size="14.00" fill="#000000">Supply chain compromise (backdoor)</text>
+</g>
+<!-- attack_23&#45;&gt;attack_win -->
+<g id="edge55" class="edge">
+<title>attack_23-&gt;attack_win</title>
+<path fill="none" stroke="#2b303a" d="M637.56,-59.05C613.4,-52.71 585.74,-45.44 560.67,-38.85"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="561.75,-35.52 551.19,-36.37 559.97,-42.29 561.75,-35.52"/>
+</g>
+<!-- reality -->
+<g id="node24" class="node">
+<title>reality</title>
+<polygon fill="#2b303a" stroke="none" stroke-dasharray="5,2" points="271.3,-1561.2 214.86,-1561.2 214.86,-1525.2 271.3,-1525.2 271.3,-1561.2"/>
+<text text-anchor="middle" x="243.08" y="-1539" font-family="Lato" font-size="14.00" fill="#ffffff">Reality</text>
+</g>
+<!-- reality&#45;&gt;attack_1 -->
+<g id="edge1" class="edge">
+<title>reality-&gt;attack_1</title>
+<path fill="none" stroke="#2b303a" d="M215.24,-1534.14C191.18,-1525.84 157.06,-1510.64 136.08,-1486.4 127.3,-1476.25 121.78,-1462.5 118.36,-1450.34"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="121.81,-1449.7 116.04,-1440.81 115.01,-1451.36 121.81,-1449.7"/>
+<text text-anchor="middle" x="195.5" y="-1501.6" font-family="Lato" font-size="14.00">#yolosec</text>
+</g>
+<!-- defense_1 -->
+<g id="node26" class="node">
+<title>defense_1</title>
+<polygon fill="#abd2fa" stroke="none" stroke-dasharray="5,2" points="339.34,-1486.4 146.82,-1486.4 146.82,-1450.4 339.34,-1450.4 339.34,-1486.4"/>
+<text text-anchor="middle" x="243.08" y="-1464.2" font-family="Lato" font-size="14.00" fill="#000000">Disallow crawling on site maps</text>
+</g>
+<!-- reality&#45;&gt;defense_1 -->
+<g id="edge3" class="edge">
+<title>reality-&gt;defense_1</title>
+<path fill="none" stroke="#2b303a" d="M243.08,-1525.32C243.08,-1517.05 243.08,-1506.87 243.08,-1497.47"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="246.58,-1497.71 243.08,-1487.71 239.58,-1497.71 246.58,-1497.71"/>
+</g>
+<!-- defense_2 -->
+<g id="node27" class="node">
+<title>defense_2</title>
+<polygon fill="#abd2fa" stroke="none" stroke-dasharray="5,2" points="593.58,-1486.4 362.59,-1486.4 362.59,-1450.4 593.58,-1450.4 593.58,-1486.4"/>
+<text text-anchor="middle" x="478.08" y="-1464.2" font-family="Lato" font-size="14.00" fill="#000000">Auth required / ACLs (private bucket)</text>
+</g>
+<!-- reality&#45;&gt;defense_2 -->
+<g id="edge7" class="edge">
+<title>reality-&gt;defense_2</title>
+<path fill="none" stroke="#2b303a" d="M270.96,-1533.56C305.63,-1522.82 365.92,-1504.15 412.55,-1489.7"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="413.51,-1493.07 422.03,-1486.76 411.44,-1486.38 413.51,-1493.07"/>
+</g>
+<!-- defense_1&#45;&gt;attack_2 -->
+<g id="edge4" class="edge">
+<title>defense_1-&gt;attack_2</title>
+<path fill="none" stroke="#2b303a" d="M241.25,-1450.53C239.81,-1437.3 237.78,-1418.61 236.1,-1403.18"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="239.63,-1403.24 235.07,-1393.67 232.67,-1403.99 239.63,-1403.24"/>
+</g>
+<!-- defense_2&#45;&gt;attack_4 -->
+<g id="edge8" class="edge">
+<title>defense_2-&gt;attack_4</title>
+<path fill="none" stroke="#2b303a" d="M487.99,-1450.53C495.98,-1436.91 507.37,-1417.51 516.57,-1401.83"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="519.43,-1403.87 521.47,-1393.47 513.39,-1400.32 519.43,-1403.87"/>
+</g>
+<!-- defense_2&#45;&gt;attack_5 -->
+<g id="edge9" class="edge">
+<title>defense_2-&gt;attack_5</title>
+<path fill="none" stroke="#2b303a" d="M593.3,-1458.66C693.95,-1447.74 824.08,-1424.19 824.08,-1375.4 824.08,-1375.4 824.08,-1375.4 824.08,-1027.6 824.08,-1016.6 819.49,-1005.76 813.79,-996.53"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="816.77,-994.68 808.2,-988.46 811.02,-998.68 816.77,-994.68"/>
+</g>
+<!-- defense_2&#45;&gt;attack_16 -->
+<g id="edge37" class="edge">
+<title>defense_2-&gt;attack_16</title>
+<path fill="none" stroke="#2b303a" d="M464.68,-1450.73C427.22,-1402.37 324.08,-1256.61 324.08,-1117.6 324.08,-1117.6 324.08,-1117.6 324.08,-746.8 324.08,-689.79 498.11,-669.98 603.16,-663.21"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="603.07,-666.72 612.84,-662.62 602.65,-659.74 603.07,-666.72"/>
+</g>
+<!-- defense_3&#45;&gt;attack_8 -->
+<g id="edge15" class="edge">
+<title>defense_3-&gt;attack_8</title>
+<path fill="none" stroke="#2b303a" d="M565.62,-1128.81C566.44,-1124.9 567.34,-1120.64 568.23,-1116.39"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="571.58,-1117.46 570.22,-1106.95 564.73,-1116.02 571.58,-1117.46"/>
+</g>
+<!-- defense_4&#45;&gt;attack_5 -->
+<g id="edge18" class="edge">
+<title>defense_4-&gt;attack_5</title>
+<path fill="none" stroke="#2b303a" d="M659.28,-1010.65C687.94,-1002.01 722.25,-991.66 748.82,-983.65"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="749.68,-987.04 758.25,-980.8 747.66,-980.34 749.68,-987.04"/>
+</g>
+<!-- defense_5&#45;&gt;attack_10 -->
+<g id="edge22" class="edge">
+<title>defense_5-&gt;attack_10</title>
+<path fill="none" stroke="#2b303a" d="M878.06,-833.72C883.21,-824.99 889.62,-814.13 895.42,-804.31"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="898.32,-806.29 900.39,-795.9 892.29,-802.73 898.32,-806.29"/>
+</g>
+<!-- defense_5&#45;&gt;attack_16 -->
+<g id="edge38" class="edge">
+<title>defense_5-&gt;attack_16</title>
+<path fill="none" stroke="#2b303a" d="M863.11,-833.76C851.96,-796.46 825.15,-709.4 815.08,-699.8 799.66,-685.1 779.08,-675.78 758.67,-669.88"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="759.74,-666.54 749.18,-667.4 757.97,-673.31 759.74,-666.54"/>
+</g>
+<!-- defense_6&#45;&gt;attack_12 -->
+<g id="edge25" class="edge">
+<title>defense_6-&gt;attack_12</title>
+<path fill="none" stroke="#2b303a" d="M1040.58,-640.89C1093.22,-619.44 1184.01,-582.45 1241.18,-559.15"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="1242.45,-562.41 1250.39,-555.4 1239.81,-555.93 1242.45,-562.41"/>
+</g>
+<!-- defense_7&#45;&gt;attack_15 -->
+<g id="edge34" class="edge">
+<title>defense_7-&gt;attack_15</title>
+<path fill="none" stroke="#2b303a" d="M585.71,-833.72C595.4,-824.44 607.59,-812.75 618.33,-802.47"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="620.66,-805.09 625.46,-795.64 615.82,-800.03 620.66,-805.09"/>
+</g>
+<!-- defense_8&#45;&gt;attack_16 -->
+<g id="edge39" class="edge">
+<title>defense_8-&gt;attack_16</title>
+<path fill="none" stroke="#2b303a" d="M675.44,-700.01C675.97,-696.21 676.55,-692.09 677.13,-687.97"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="680.58,-688.56 678.5,-678.17 673.65,-687.59 680.58,-688.56"/>
+</g>
+<!-- defense_9&#45;&gt;attack_5 -->
+<g id="edge42" class="edge">
+<title>defense_9-&gt;attack_5</title>
+<path fill="none" stroke="#2b303a" d="M1080.08,-507.86C1090.67,-525.75 1105.08,-555.21 1105.08,-583 1105.08,-911.6 1105.08,-911.6 1105.08,-911.6 1105.08,-924.31 1093.85,-923.81 1082.08,-928.6 999.52,-962.23 893.94,-968.55 835.65,-969.2"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="835.8,-965.7 825.82,-969.25 835.84,-972.7 835.8,-965.7"/>
+</g>
+<!-- defense_10&#45;&gt;attack_19 -->
+<g id="edge45" class="edge">
+<title>defense_10-&gt;attack_19</title>
+<path fill="none" stroke="#2b303a" d="M765.52,-413.21C769.47,-408.61 773.85,-403.52 778.12,-398.55"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="780.73,-400.88 784.59,-391.02 775.42,-396.32 780.73,-400.88"/>
+</g>
+<!-- defense_10&#45;&gt;attack_20 -->
+<g id="edge46" class="edge">
+<title>defense_10-&gt;attack_20</title>
+<path fill="none" stroke="#2b303a" d="M724.86,-413.21C716.43,-407.8 706.93,-401.72 697.93,-395.96"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="700.01,-393.13 689.7,-390.69 696.23,-399.03 700.01,-393.13"/>
+</g>
+<!-- defense_11&#45;&gt;attack_22 -->
+<g id="edge51" class="edge">
+<title>defense_11-&gt;attack_22</title>
+<path fill="none" stroke="#2b303a" d="M690.09,-236.21C691.26,-232.3 692.53,-228.04 693.79,-223.79"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="697.11,-224.9 696.62,-214.32 690.41,-222.9 697.11,-224.9"/>
+</g>
+<!-- defense_12&#45;&gt;attack_23 -->
+<g id="edge54" class="edge">
+<title>defense_12-&gt;attack_23</title>
+<path fill="none" stroke="#2b303a" d="M702.08,-118.21C702.08,-114.41 702.08,-110.29 702.08,-106.17"/>
+<polygon fill="#2b303a" stroke="#2b303a" points="705.58,-106.38 702.08,-96.38 698.58,-106.38 705.58,-106.38"/>
+</g>
+</g>
+</svg>
