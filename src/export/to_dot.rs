@@ -56,10 +56,10 @@ digraph G {
     splines=true;
     overlap=false;
     nodesep="0.3";
-    ranksep="1.2";
+    ranksep="0.3";
     labelloc="t";
     fontname="Lato";
-    node [ shape="plaintext" style="filled, rounded" fontname="Lato" margin=0.2 ]
+    node [ shape="plaintext" style="filled, rounded" fontname="Lato" ]
     edge [ fontname="Lato" color="#2B303A" ]
 
   {{#each layers as |layer|}}

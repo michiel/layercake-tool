@@ -3,7 +3,8 @@ use std::fs;
 use std::path::Path;
 use tracing::{error, info};
 
-static SAMPLE_DIR: Dir = include_dir!("sample/kvm_control_flow");
+static SAMPLE_DIR_KVM_CONTROL_FLOW: Dir = include_dir!("sample/kvm_control_flow");
+static SAMPLE_DIR_ATTACK_TREE: Dir = include_dir!("sample/attack_tree");
 
 pub fn generate_template(exporter: String) {
     info!("Generating exporter template: {}", exporter);
@@ -29,8 +30,8 @@ pub fn generate_template(exporter: String) {
     }
 }
 
-pub fn generate_sample(dir: String) {
-    info!("Generating sample project: {:?}", dir);
+pub fn generate_sample(sample: String, dir: String) {
+    info!("Generating sample project: {:?} in {:?}", sample, dir);
     let target_path = Path::new(&dir);
     if let Err(e) = fs::create_dir_all(target_path) {
         error!("Failed to create target directory: {:?}", e);
@@ -66,7 +67,19 @@ pub fn generate_sample(dir: String) {
         }
     }
 
-    write_dir_contents(&SAMPLE_DIR, target_path);
+    match sample.to_lowercase().as_str() {
+        "kvm_control_flow" => write_dir_contents(&SAMPLE_DIR_KVM_CONTROL_FLOW, target_path),
+        "attack_tree" => write_dir_contents(&SAMPLE_DIR_ATTACK_TREE, target_path),
+        _ => {
+            error!(
+                "Unsupported sample: {} - use kvm_control_flow, attack_tree",
+                sample
+            );
+            return;
+        }
+    }
+
+    write_dir_contents(&SAMPLE_DIR_KVM_CONTROL_FLOW, target_path);
 
     info!("Sample project generated successfully at: {:?}", dir);
 }

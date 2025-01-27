@@ -41,7 +41,7 @@ enum Commands {
 #[derive(Subcommand, Debug)]
 enum GenerateCommands {
     Template { name: String },
-    Sample { dir: String },
+    Sample { sample: String, dir: String },
 }
 
 fn main() -> Result<()> {
@@ -84,9 +84,9 @@ fn main() -> Result<()> {
                 info!("Generating template: {}", name);
                 generate_commands::generate_template(name);
             }
-            GenerateCommands::Sample { dir } => {
-                info!("Generating sample: {}", dir);
-                generate_commands::generate_sample(dir);
+            GenerateCommands::Sample { sample, dir } => {
+                info!("Generating sample: {} in {}", sample, dir);
+                generate_commands::generate_sample(sample, dir);
             }
         },
     }
