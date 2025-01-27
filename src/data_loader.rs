@@ -6,10 +6,10 @@ use tracing::info;
 pub struct DfNodeLoadProfile {
     pub id_column: usize,
     pub label_column: usize,
-    pub layer_columns: usize,
+    pub layer_column: usize,
     pub is_partition_column: usize,
     pub belongs_to_column: usize,
-    pub comment: usize,
+    pub comment_column: usize,
 }
 
 impl Default for DfNodeLoadProfile {
@@ -17,10 +17,10 @@ impl Default for DfNodeLoadProfile {
         Self {
             id_column: 0,
             label_column: 1,
-            layer_columns: 2,
+            layer_column: 2,
             is_partition_column: 3,
             belongs_to_column: 4,
-            comment: 5,
+            comment_column: 5,
         }
     }
 }
@@ -32,10 +32,47 @@ impl Display for DfNodeLoadProfile {
             "Node column offsets: id:{}, label:{}, layer:{}, is_partition:{}, belongs_to:{}, comment:{}",
             self.id_column,
             self.label_column,
-            self.layer_columns,
+            self.layer_column,
             self.is_partition_column,
             self.belongs_to_column,
-            self.comment
+            self.comment_column
+        )
+    }
+}
+
+pub struct DfEdgeLoadProfile {
+    pub id_column: usize,
+    pub source_column: usize,
+    pub target_column: usize,
+    pub label_column: usize,
+    pub layer_column: usize,
+    pub comment_column: usize,
+}
+
+impl Default for DfEdgeLoadProfile {
+    fn default() -> Self {
+        Self {
+            id_column: 0,
+            source_column: 1,
+            target_column: 2,
+            label_column: 3,
+            layer_column: 4,
+            comment_column: 5,
+        }
+    }
+}
+
+impl Display for DfEdgeLoadProfile {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Edge column offsets: id:{}, source:{}, target:{}, label:{}, layer:{}, comment:{}",
+            self.id_column,
+            self.source_column,
+            self.target_column,
+            self.label_column,
+            self.layer_column,
+            self.comment_column,
         )
     }
 }
@@ -46,10 +83,26 @@ pub fn create_df_node_load_profile(df: &DataFrame) -> DfNodeLoadProfile {
         match field.name().as_str() {
             "id" => profile.id_column = i as usize,
             "label" => profile.label_column = i as usize,
-            "layer" => profile.layer_columns = i as usize,
+            "layer" => profile.layer_column = i as usize,
             "is_partition" => profile.is_partition_column = i as usize,
             "belongs_to" => profile.belongs_to_column = i as usize,
-            "comment" => profile.comment = i as usize,
+            "comment" => profile.comment_column = i as usize,
+            _ => {}
+        }
+    }
+    profile
+}
+
+pub fn create_df_edge_load_profile(df: &DataFrame) -> DfEdgeLoadProfile {
+    let mut profile = DfEdgeLoadProfile::default();
+    for (i, field) in df.schema().iter_fields().enumerate() {
+        match field.name().as_str() {
+            "id" => profile.id_column = i as usize,
+            "source" => profile.source_column = i as usize,
+            "target" => profile.target_column = i as usize,
+            "label" => profile.label_column = i as usize,
+            "layer" => profile.layer_column = i as usize,
+            "comment" => profile.comment_column = i as usize,
             _ => {}
         }
     }

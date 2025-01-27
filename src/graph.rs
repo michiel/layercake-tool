@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use tracing::{info, warn};
 
-use crate::data_loader::DfNodeLoadProfile;
+use crate::data_loader::{DfEdgeLoadProfile, DfNodeLoadProfile};
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct Graph {
@@ -224,7 +224,7 @@ impl Node {
         Ok(Node {
             id: get_stripped_value(row, node_profile.id_column, "id").unwrap_or("noId".to_string()),
             label: get_stripped_value(row, node_profile.label_column, "label")?,
-            layer: get_stripped_value(row, node_profile.layer_columns, "layer")?,
+            layer: get_stripped_value(row, node_profile.layer_column, "layer")?,
             is_partition: is_truthy(&get_stripped_value(
                 row,
                 node_profile.is_partition_column,
@@ -241,20 +241,29 @@ impl Node {
                     Some(belongs_to)
                 }
             },
-            comment: row.0.get(5).map(|c| c.to_string()),
+            comment: row
+                .0
+                .get(node_profile.comment_column)
+                .map(|c| c.to_string()),
         })
     }
 }
 
 impl Edge {
-    pub fn from_row(row: &Row) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn from_row(
+        row: &Row,
+        edge_profile: &DfEdgeLoadProfile,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         Ok(Edge {
-            id: get_stripped_value(row, 0, "id")?, // default to noId
-            source: get_stripped_value(row, 1, "source")?,
-            target: get_stripped_value(row, 2, "target")?,
-            label: get_stripped_value(row, 3, "label")?,
-            layer: get_stripped_value(row, 4, "layer")?,
-            comment: row.0.get(5).map(|c| c.to_string()),
+            id: get_stripped_value(row, edge_profile.id_column, "id")?, // default to noId
+            source: get_stripped_value(row, edge_profile.source_column, "source")?,
+            target: get_stripped_value(row, edge_profile.target_column, "target")?,
+            label: get_stripped_value(row, edge_profile.label_column, "label")?,
+            layer: get_stripped_value(row, edge_profile.layer_column, "layer")?,
+            comment: row
+                .0
+                .get(edge_profile.comment_column)
+                .map(|c| c.to_string()),
         })
     }
 }

@@ -68,9 +68,11 @@ fn run_plan(plan: Plan, plan_file_path: &std::path::Path) -> Result<()> {
                 ImportFileType::Edges => {
                     // TODO Add verification for edges
                     // data_loader::verify_id_column_df(&df)?;
+                    let edge_profile = data_loader::create_df_edge_load_profile(&df);
+                    info!("{}", edge_profile);
                     for idx in 0..df.height() {
                         let row = df.get_row(idx)?;
-                        let edge = Edge::from_row(&row)?;
+                        let edge = Edge::from_row(&row, &edge_profile)?;
                         graph.edges.push(edge);
                     }
                 }
