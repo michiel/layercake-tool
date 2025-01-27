@@ -61,7 +61,11 @@ fn main() -> Result<()> {
         _ => Level::INFO,
     };
 
-    tracing_subscriber::fmt().with_max_level(log_level).init();
+    // tracing_subscriber::fmt().with_max_level(log_level).init();
+    tracing_subscriber::fmt()
+        .with_max_level(log_level)
+        .without_time() // This line removes the timestamp from the logging output
+        .init();
 
     match args.command {
         Commands::Run { plan, watch } => {
