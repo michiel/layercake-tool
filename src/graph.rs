@@ -149,6 +149,31 @@ impl Graph {
             warn!("Some edges have missing source and/or target nodes");
         }
 
+        self.nodes.iter().for_each(|n| {
+            if n.belongs_to.is_some() {
+                if !node_ids.contains(n.belongs_to.as_ref().unwrap()) {
+                    let err = format!(
+                        "Node id:[{}] belongs_to {:?} not found in nodes",
+                        n.id,
+                        n.belongs_to.as_ref().unwrap()
+                    );
+                    errors.push(err);
+                }
+            }
+        });
+
+        // verify that all nodes that are not partitions have a parent
+
+        self.nodes.iter().for_each(|n| {
+            if n.belongs_to.is_none() && !n.is_partition {
+                let err = format!(
+                    "Node id:[{}] is not a partition AND does not belong to a partition",
+                    n.id,
+                );
+                errors.push(err);
+            }
+        });
+
         if errors.is_empty() {
             Ok(())
         } else {
