@@ -155,7 +155,7 @@ pub fn execute_plan(plan: String, watch: bool) -> Result<()> {
         let (tx, rx) = channel();
         let mut watcher = RecommendedWatcher::new(tx, Config::default())?;
         for file in &files {
-            let path = plan_file_path.parent().unwrap().join(&file);
+            let path = plan_file_path.parent().unwrap().join(file);
             watcher.watch(&path, RecursiveMode::NonRecursive)?;
         }
 
@@ -165,13 +165,10 @@ pub fn execute_plan(plan: String, watch: bool) -> Result<()> {
                     // debug!("Event: {:?}", event);
                     if event.is_ok() {
                         let event = event.unwrap();
-                        match event.kind {
-                            EventKind::Modify(_) => {
-                                debug!("File modified {:?}", event.paths);
-                                info!("Change detected, re-executing plan");
-                                run_plan(plan.clone(), plan_file_path)?;
-                            }
-                            _ => {}
+                        if let EventKind::Modify(_) = event.kind {
+                            debug!("File modified {:?}", event.paths);
+                            info!("Change detected, re-executing plan");
+                            run_plan(plan.clone(), plan_file_path)?;
                         }
                     }
                 }

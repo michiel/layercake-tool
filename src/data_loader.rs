@@ -2,7 +2,6 @@ use polars::prelude::*;
 use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
 use std::path::Path;
-use tracing::info;
 
 pub struct DfNodeLoadProfile {
     pub id_column: usize,
@@ -82,12 +81,12 @@ pub fn create_df_node_load_profile(df: &DataFrame) -> DfNodeLoadProfile {
     let mut profile = DfNodeLoadProfile::default();
     for (i, field) in df.schema().iter_fields().enumerate() {
         match field.name().as_str() {
-            "id" => profile.id_column = i as usize,
-            "label" => profile.label_column = i as usize,
-            "layer" => profile.layer_column = i as usize,
-            "is_partition" => profile.is_partition_column = i as usize,
-            "belongs_to" => profile.belongs_to_column = i as usize,
-            "comment" => profile.comment_column = i as usize,
+            "id" => profile.id_column = i,
+            "label" => profile.label_column = i,
+            "layer" => profile.layer_column = i,
+            "is_partition" => profile.is_partition_column = i,
+            "belongs_to" => profile.belongs_to_column = i,
+            "comment" => profile.comment_column = i,
             _ => {}
         }
     }
@@ -98,12 +97,12 @@ pub fn create_df_edge_load_profile(df: &DataFrame) -> DfEdgeLoadProfile {
     let mut profile = DfEdgeLoadProfile::default();
     for (i, field) in df.schema().iter_fields().enumerate() {
         match field.name().as_str() {
-            "id" => profile.id_column = i as usize,
-            "source" => profile.source_column = i as usize,
-            "target" => profile.target_column = i as usize,
-            "label" => profile.label_column = i as usize,
-            "layer" => profile.layer_column = i as usize,
-            "comment" => profile.comment_column = i as usize,
+            "id" => profile.id_column = i,
+            "source" => profile.source_column = i,
+            "target" => profile.target_column = i,
+            "label" => profile.label_column = i,
+            "layer" => profile.layer_column = i,
+            "comment" => profile.comment_column = i,
             _ => {}
         }
     }
