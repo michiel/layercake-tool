@@ -1,4 +1,5 @@
 use polars::prelude::*;
+use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
 use std::path::Path;
 use tracing::info;
@@ -139,22 +140,19 @@ fn is_valid_id(id: &str) -> bool {
 }
 
 pub fn verify_nodes_df(df: &DataFrame) -> anyhow::Result<()> {
-    let columns: Vec<String> = df
+    let columns: HashSet<String> = df
         .get_column_names()
         .into_iter()
         .map(|s| s.to_string())
         .collect();
-    let required_columns = ["id", "label", "layer", "is_partition", "belongs_to"];
+    let required_columns: HashSet<&str> = ["id", "label", "layer", "is_partition", "belongs_to"]
+        .iter()
+        .cloned()
+        .collect();
 
-    // Check if columns are in the correct order and case-sensitive
-    for (i, &col) in required_columns.iter().enumerate() {
-        if columns.get(i) != Some(&col.to_string()) {
-            return Err(anyhow::anyhow!(
-                "Expected column '{}' at position {}, found '{}'",
-                col,
-                i,
-                columns.get(i).unwrap_or(&"".to_string())
-            ));
+    for &col in &required_columns {
+        if !columns.contains(col) {
+            return Err(anyhow::anyhow!("Missing required column '{}'", col));
         }
     }
     Ok(())
