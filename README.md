@@ -1,5 +1,15 @@
 # Layercake tool
 
+This tool takes graph definitions in CSV/TSV format and generates various graph formats for rendering.
+Export to,
+
+ - PlantUML
+ - Graphviz / dot
+ - Mermaid
+ - GML (Graph Modeling Language)
+
+Custom renders can be added using [Handlebars](https://handlebarsjs.com/) templates via [handlebars-rust](https://docs.rs/handlebars/latest/handlebars/).
+
 ## Installation
 
 ### MacOS
@@ -49,20 +59,20 @@ cargo run -- -p sample/kvm_control_flow_plan.yaml
 _This tool only outputs text files, the following images are rendered using other tools._
 
 ### GML rendered with Gephi
-
 Sample control for for virtualized x86 architecture, output to GML and rendered using Gephi.
 
 ![Sample](images/sample-gml-gephi.png)
 
 ### PlantUML rendered
+Sample control for for virtualized x86 architecture, output rendered using [PlantUML](https://plantuml.com/).
 
 ![Sample](images/kvm-plantuml.svg)
 
-Sample control for for virtualized x86 architecture, output rendered using [PlantUML](https://plantuml.com/).
-
 ### Graphviz rendered
+Sample attack tree from [Kelly Shortridge's Security Descision Trees with Graphviz](https://kellyshortridge.com/blog/posts/security-decision-trees-with-graphviz/) output rendered using [Graphviz](https://graphviz.org/)
 
 ![Sample](images/attack-tree.svg)
 
-Sample attack tree from [Kelly Shortridge's Security Descision Trees with Graphviz](https://kellyshortridge.com/blog/posts/security-decision-trees-with-graphviz/) output rendered using [Graphviz](https://graphviz.org/)
+
+
 
