@@ -43,12 +43,14 @@ fn run_plan(plan: Plan, plan_file_path: &std::path::Path) -> Result<()> {
             let df = load_file(import_file_path.to_str().unwrap())?;
             match profile.filetype {
                 ImportFileType::Nodes => {
+                    let node_profile = data_loader::create_df_node_load_profile(&df);
+                    info!("{}", node_profile);
                     data_loader::verify_nodes_df(&df)?;
-                    data_loader::verify_id_column_df(&df)?;
+                    data_loader::verify_id_column_df(&df, &node_profile)?;
 
                     for idx in 0..df.height() {
                         let row = df.get_row(idx)?;
-                        let node = Node::from_row(&row)?;
+                        let node = Node::from_row(&row, &node_profile)?;
                         if let Some(ref belongs_to) = node.belongs_to {
                             let edge = Edge {
                                 id: format!("{}-{}", node.id, belongs_to),

@@ -1,5 +1,60 @@
 use polars::prelude::*;
+use std::fmt::{Display, Formatter};
 use std::path::Path;
+use tracing::info;
+
+pub struct DfNodeLoadProfile {
+    pub id_column: usize,
+    pub label_column: usize,
+    pub layer_columns: usize,
+    pub is_partition_column: usize,
+    pub belongs_to_column: usize,
+    pub comment: usize,
+}
+
+impl Default for DfNodeLoadProfile {
+    fn default() -> Self {
+        Self {
+            id_column: 0,
+            label_column: 1,
+            layer_columns: 2,
+            is_partition_column: 3,
+            belongs_to_column: 4,
+            comment: 5,
+        }
+    }
+}
+
+impl Display for DfNodeLoadProfile {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Node column offsets: id:{}, label:{}, layer:{}, is_partition:{}, belongs_to:{}, comment:{}",
+            self.id_column,
+            self.label_column,
+            self.layer_columns,
+            self.is_partition_column,
+            self.belongs_to_column,
+            self.comment
+        )
+    }
+}
+
+pub fn create_df_node_load_profile(df: &DataFrame) -> DfNodeLoadProfile {
+    let mut profile = DfNodeLoadProfile::default();
+    for (i, field) in df.schema().iter_fields().enumerate() {
+        match field.name().as_str() {
+            "id" => profile.id_column = i as usize,
+            "label" => profile.label_column = i as usize,
+            "layer" => profile.layer_columns = i as usize,
+            "is_partition" => profile.is_partition_column = i as usize,
+            "belongs_to" => profile.belongs_to_column = i as usize,
+            "comment" => profile.comment = i as usize,
+            _ => {}
+        }
+    }
+    profile
+}
 
 pub fn load_tsv(filename: &str) -> anyhow::Result<DataFrame> {
     let path = Path::new(filename);
@@ -52,7 +107,10 @@ pub fn verify_nodes_df(df: &DataFrame) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn verify_id_column_df(df: &DataFrame) -> anyhow::Result<()> {
+pub fn verify_id_column_df(
+    df: &DataFrame,
+    _node_profile: &DfNodeLoadProfile,
+) -> anyhow::Result<()> {
     // Ensure IDs are unique and not missing
     let id_series = df.column("id")?;
     let id_values: Vec<&str> = id_series.str()?.into_iter().flatten().collect();

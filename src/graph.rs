@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use tracing::{info, warn};
 
+use crate::data_loader::DfNodeLoadProfile;
+
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct Graph {
     pub nodes: Vec<Node>,
@@ -215,14 +217,22 @@ fn get_stripped_value(
 }
 
 impl Node {
-    pub fn from_row(row: &Row) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn from_row(
+        row: &Row,
+        node_profile: &DfNodeLoadProfile,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         Ok(Node {
-            id: get_stripped_value(row, 0, "id").unwrap_or("noId".to_string()),
-            label: get_stripped_value(row, 1, "label")?,
-            layer: get_stripped_value(row, 2, "layer")?,
-            is_partition: is_truthy(&get_stripped_value(row, 3, "is_partition")?),
+            id: get_stripped_value(row, node_profile.id_column, "id").unwrap_or("noId".to_string()),
+            label: get_stripped_value(row, node_profile.label_column, "label")?,
+            layer: get_stripped_value(row, node_profile.layer_columns, "layer")?,
+            is_partition: is_truthy(&get_stripped_value(
+                row,
+                node_profile.is_partition_column,
+                "is_partition",
+            )?),
             belongs_to: {
-                let belongs_to = get_stripped_value(row, 4, "belongs_to")?;
+                let belongs_to =
+                    get_stripped_value(row, node_profile.belongs_to_column, "belongs_to")?;
                 if belongs_to.is_empty() {
                     None
                 } else if belongs_to.to_lowercase() == "null" {
