@@ -56,11 +56,13 @@ Sample control for for virtualized x86 architecture, output to GML and rendered 
 
 ### PlantUML rendered
 
-![Sample](images/attack-tree.svg)
+![Sample](images/kvm-plantuml.svg)
 
 Sample control for for virtualized x86 architecture, output rendered using [PlantUML](https://plantuml.com/).
 
-![Sample](images/kvm-plantuml.svg)
+### Graphviz rendered
+
+![Sample](images/attack-tree.svg)
 
 Sample attack tree from [Kelly Shortridge's Security Descision Trees with Graphviz](https://kellyshortridge.com/blog/posts/security-decision-trees-with-graphviz/) output rendered using [Graphviz](https://graphviz.org/)
 
