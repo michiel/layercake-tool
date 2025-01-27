@@ -56,7 +56,7 @@ Sample control for for virtualized x86 architecture, output to GML and rendered 
 
 ### PlantUML rendered
 
-![Sample](images/kvm-plantuml.svg)
+![Sample](images/attack-tree.svg)
 
 Sample control for for virtualized x86 architecture, output rendered using [PlantUML](https://plantuml.com/).
 
