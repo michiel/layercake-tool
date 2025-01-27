@@ -1,4 +1,4 @@
-id,source,target,label,edgetype
+id,source,target,label,layer
 edge01,reality,attack_1,#yolosec,
 edge02,attack_1,attack_win,,
 edge03,reality,defense_1,,

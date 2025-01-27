@@ -7,8 +7,8 @@ pub fn render(graph: Graph) -> String {
     let res = handlebars.render_template(
         &get_template(),
         &json!({
-        "nodes": graph.nodes,
-        "edges": graph.edges,
+        "nodes": graph.get_non_partition_nodes(),
+        "edges": graph.get_non_partition_edges(),
         }),
     );
     res.unwrap()
