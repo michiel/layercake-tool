@@ -16,8 +16,11 @@ _Project data flow, defined using this project. The data is available in the `sa
 
 ## Installation
 
+Download a release from the [releases page](https://github.com/michiel/layercake-tool/releases).
+
 ### MacOS
 
+Remove the quarantine attribute from the binary,
 ```
 xattr -d com.apple.quarantine ./layercake
 ```
@@ -29,17 +32,24 @@ Using the sample project,
 
 ```
 # Generate the sample project
-$ layercake generate sample kvm_control_flow
-INFO layercake::generate_commands: Sample project generated successfully at: "kvm_control_flow"
+
+```bash
+# Generate a sample project
+layercake generate sample kvm_control_flow example-project
 
 # Run the sample project with a plan, this will generate the output files
-$ layercake run -p kvm_control_flow/plan.yaml 
-INFO layercake: Running plan: kvm_control_flow/plan.yaml
+layercake run -p example-project/plan.yaml 
 
 # Run the sample project with a plan, re-run the plan on input changes
-$ layercake run -p kvm_control_flow/plan.yaml -w
+layercake run -p example-project/plan.yaml -w
 ```
 
+Now edit and change the CSV files. A collaborative workflow might include Google Sheets, with separate sheets for nodes and edges, followed by export to CSV. If you make local changes, re-import the changed CSV files back to the source.
+
+If you want to re-run the plan on input changes, you can use the `-w` (**watch**) flag. This will re-run the plan when any of the input files change. If you want to automatically generate images 
+from the output files, you can use a file watcher.
+
+## File watcher examples
 
 #### Example linux using inotifywait
 
