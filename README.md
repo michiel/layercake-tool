@@ -30,10 +30,9 @@ xattr -d com.apple.quarantine ./layercake
 
 Using the sample project,
 
-```
-# Generate the sample project
 
 ```bash
+# Generate the sample project
 # Generate a sample project
 layercake generate sample kvm_control_flow example-project
 
