@@ -10,6 +10,10 @@ Export to,
 
 Custom renders can be added using [Handlebars](https://handlebarsjs.com/) templates via [handlebars-rust](https://docs.rs/handlebars/latest/handlebars/).
 
+![Layercake project](images/layercake-project.svg)
+
+_Project data flow, defined using this project. The data is available in the `sample` directory._
+
 ## Installation
 
 ### MacOS

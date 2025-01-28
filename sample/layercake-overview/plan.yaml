@@ -1,0 +1,19 @@
+import:
+  profiles:
+    - filename: "nodes.csv"
+      filetype: "Nodes"
+    - filename: "links.csv"
+      filetype: "Edges"
+    - filename: "layers.csv"
+      filetype: "Layers"
+
+export:
+  profiles:
+    - filename: "out/layercake-project.gml"
+      exporter: "GML"
+    - filename: "out/layercake-project.puml"
+      exporter: "PlantUML"
+    - filename: "out/layercake-project.mermaid"
+      exporter: "Mermaid"
+    - filename: "out/layercake-project.dot"
+      exporter: "DOT"
