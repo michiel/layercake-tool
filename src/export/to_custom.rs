@@ -1,8 +1,9 @@
 use crate::{graph::Graph, plan::CustomExportProfile};
+use std::error::Error;
 use std::fs;
 use tracing::error;
 
-pub fn render(graph: Graph, params: CustomExportProfile) -> String {
+pub fn render(graph: Graph, params: CustomExportProfile) -> Result<String, Box<dyn Error>> {
     use serde_json::json;
 
     let tree = graph.build_json_tree();
@@ -26,6 +27,6 @@ pub fn render(graph: Graph, params: CustomExportProfile) -> String {
             "tree": tree,
             "layers": graph.get_layer_map(),
         }),
-    );
-    res.unwrap()
+    )?;
+    Ok(res)
 }

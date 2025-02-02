@@ -1,5 +1,6 @@
 use crate::graph::Graph;
 use serde::{Deserialize, Serialize};
+use std::error::Error;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct LayerConfig {
@@ -30,7 +31,7 @@ fn zoneconfig_puml_default_shape() -> String {
     "rectangle".to_string()
 }
 
-pub fn render(graph: Graph) -> String {
+pub fn render(graph: Graph) -> Result<String, Box<dyn Error>> {
     use serde_json::json;
 
     let tree = graph.build_json_tree();
@@ -44,8 +45,8 @@ pub fn render(graph: Graph) -> String {
             "tree": tree,
             "layers": graph.get_layer_map(),
         }),
-    );
-    res.unwrap()
+    )?;
+    Ok(res)
 }
 
 pub fn get_template() -> String {
@@ -56,11 +57,11 @@ digraph G {
     splines=true;
     overlap=false;
     nodesep="0.3";
-    ranksep="0.3";
+    ranksep="1.3";
     labelloc="t";
     fontname="Lato";
-    node [ shape="plaintext" style="filled, rounded" fontname="Lato" ]
-    edge [ fontname="Lato" color="#2B303A" ]
+    node [ shape="plaintext" style="filled, rounded" fontsize=12]
+    edge [ fontname="Lato" color="#2B303A" fontsize=8]
 
   {{#each layers as |layer|}}
   node [style="filled, dashed" fillcolor="#{{layer.background_color}}" fontcolor="#{{layer.text_color}}" penwidth=1 color="#{{layer.border_color}}"]; {
@@ -80,7 +81,7 @@ node [style="filled, rounded" fillcolor="#dddddd" fontcolor="#000000"];
 
   {{#each edges as |edge|}}
     {{#if (exists edge.label)}}
-      {{edge.source}} -> {{edge.target}} [label="{{edge.label}}"];
+      {{edge.source}} -> {{edge.target}} [label="{{edge.label}}" {{#each layer in ../layers}} {{#if (eq edge.layer layer.id)}} fontcolor="#{{layer.background_color}}" {{/if}} {{/each}}];
     {{else}}
       {{edge.source}} -> {{edge.target}};
     {{/if}}

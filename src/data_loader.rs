@@ -1,7 +1,9 @@
 use polars::prelude::*;
 use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
-use std::path::Path;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
+use std::sync::Arc;
 
 pub struct DfNodeLoadProfile {
     pub id_column: usize,
@@ -109,21 +111,43 @@ pub fn create_df_edge_load_profile(df: &DataFrame) -> DfEdgeLoadProfile {
     profile
 }
 
+fn infer_schema_from_file(filename: &str, separator: u8) -> anyhow::Result<Schema> {
+    let file = File::open(filename)?;
+    let reader = BufReader::new(file);
+    let mut lines = reader.lines();
+
+    if let Some(Ok(header)) = lines.next() {
+        let fields: Vec<Field> = header
+            .split(separator as char)
+            .map(|col_name| Field::new(PlSmallStr::from(col_name), DataType::String))
+            .collect();
+
+        let schema = Schema::from_iter(fields.into_iter());
+        Ok(schema)
+    } else {
+        Err(anyhow::anyhow!("Failed to read header from file"))
+    }
+}
+
 pub fn load_tsv(filename: &str) -> anyhow::Result<DataFrame> {
-    let path = Path::new(filename);
+    let schema = Arc::new(infer_schema_from_file(filename, b'\t')?);
+    let path = std::path::Path::new(filename);
     LazyCsvReader::new(path)
         .with_has_header(true)
         .with_separator(b'\t')
+        .with_dtype_overwrite(Some(schema))
         .finish()?
         .collect()
         .map_err(Into::into)
 }
 
 pub fn load_csv(filename: &str) -> anyhow::Result<DataFrame> {
-    let path = Path::new(filename);
+    let schema = Arc::new(infer_schema_from_file(filename, b',')?);
+    let path = std::path::Path::new(filename);
     LazyCsvReader::new(path)
         .with_has_header(true)
         .with_separator(b',')
+        .with_dtype_overwrite(Some(schema))
         .finish()?
         .collect()
         .map_err(Into::into)

@@ -21,6 +21,8 @@ export:
       exporter: "CSVNodes"
     - filename: "out/attack-tree-edges-full.csv"
       exporter: "CSVEdges"
+    - filename: "out/attack-tree.json"
+      exporter: "JSON"
     # - filename: "out/attack-tree-custom.dot"
     #   exporter: !Custom
     #     template: "sample/attack_tree/custom.hbs"

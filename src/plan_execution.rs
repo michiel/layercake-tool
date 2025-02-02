@@ -99,6 +99,8 @@ fn run_plan(plan: Plan, plan_file_path: &std::path::Path) -> Result<()> {
         graph.layers.len()
     );
 
+    debug!("Graph: {:?}", graph);
+
     match graph.verify_graph_integrity() {
         Ok(_) => {
             info!("Graph integrity verified : ok - rendering exports");
@@ -107,11 +109,12 @@ fn run_plan(plan: Plan, plan_file_path: &std::path::Path) -> Result<()> {
                     "Exporting file: {} using exporter {:?}",
                     profile.filename, profile.exporter
                 );
-                let output = match profile.exporter.clone() {
+                let result = match profile.exporter.clone() {
                     ExportFileType::GML => super::export::to_gml::render(graph.clone()),
                     ExportFileType::DOT => super::export::to_dot::render(graph.clone()),
-                    ExportFileType::CSVNodes => "".to_string(),
-                    ExportFileType::CSVEdges => "".to_string(),
+                    ExportFileType::JSON => super::export::to_json::render(graph.clone()),
+                    ExportFileType::CSVNodes => super::export::to_csv_nodes::render(graph.clone()),
+                    ExportFileType::CSVEdges => super::export::to_csv_edges::render(graph.clone()),
                     ExportFileType::PlantUML => super::export::to_plantuml::render(graph.clone()),
                     ExportFileType::Mermaid => super::export::to_mermaid::render(graph.clone()),
                     ExportFileType::Custom(template) => {
@@ -119,7 +122,18 @@ fn run_plan(plan: Plan, plan_file_path: &std::path::Path) -> Result<()> {
                     }
                 };
 
-                super::common::write_string_to_file(&profile.filename, &output).unwrap();
+                match result {
+                    Ok(output) => {
+                        if let Err(e) =
+                            super::common::write_string_to_file(&profile.filename, &output)
+                        {
+                            error!("Failed to write to file {}: {}", profile.filename, e);
+                        }
+                    }
+                    Err(e) => {
+                        error!("Failed to export file {}: {}", profile.filename, e);
+                    }
+                }
             });
         }
         Err(errors) => {
@@ -128,8 +142,6 @@ fn run_plan(plan: Plan, plan_file_path: &std::path::Path) -> Result<()> {
             warn!("Not rendering exports");
         }
     }
-
-    debug!("Graph: {:?}", graph);
 
     Ok(())
 }

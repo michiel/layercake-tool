@@ -1,6 +1,7 @@
 use crate::graph::Graph;
+use std::error::Error;
 
-pub fn render(graph: Graph) -> String {
+pub fn render(graph: Graph) -> Result<String, Box<dyn Error>> {
     use serde_json::json;
 
     let handlebars = crate::common::get_handlebars();
@@ -10,8 +11,8 @@ pub fn render(graph: Graph) -> String {
         "nodes": graph.get_non_partition_nodes(),
         "edges": graph.get_non_partition_edges(),
         }),
-    );
-    res.unwrap()
+    )?;
+    Ok(res)
 }
 
 pub fn get_template() -> String {
