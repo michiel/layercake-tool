@@ -15,7 +15,7 @@ pub fn render(graph: Graph) -> Result<String, Box<dyn Error>> {
             edge.target,
             edge.label,
             edge.layer,
-            edge.comment.unwrap_or_default(),
+            edge.comment.unwrap_or("".to_string()),
         ])?;
     }
 

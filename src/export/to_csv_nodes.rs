@@ -10,8 +10,8 @@ pub fn render(graph: Graph) -> Result<String, Box<dyn Error>> {
         "id",
         "label",
         "layer",
-        "belongs_to",
         "is_partition",
+        "belongs_to",
         "comment",
     ])?;
 
@@ -20,9 +20,9 @@ pub fn render(graph: Graph) -> Result<String, Box<dyn Error>> {
             node.id.to_string(),
             node.label,
             node.layer,
-            node.belongs_to.unwrap_or_default(),
             node.is_partition.to_string(),
-            node.comment.unwrap_or_default(),
+            node.belongs_to.unwrap_or("".to_string()),
+            node.comment.unwrap_or("".to_string()),
         ])?;
     }
 
