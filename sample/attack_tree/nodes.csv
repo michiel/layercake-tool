@@ -1,39 +1,39 @@
-id,label,layer,is_partition,belongs_to
-scope,Scope,scope,y,
-reality,Reality,base,no,scope
-attack_win,Access video recordings in S3 bucket (attackers win),base,no,scope
-attack_1,API cache (e.g. Wayback Machine),attack,no,scope
-attack_2,AWS public buckets search,attack,no,scope
-attack_3,S3 bucket set to public,attack,no,scope
-attack_4,Brute force,attack,no,scope
-attack_5,Phishing,attack,no,scope
-attack_6,Compromise user credentials,attack,no,scope
-attack_7,Subsystem with access to bucket data,attack,no,scope
-attack_8,Manually analyze web client for access control misconfig,attack,no,scope
-attack_9,Compromise admin creds,attack,no,scope
-attack_10,Intercept 2FA,attack,no,scope
-attack_11,SSH to an accessible machine,attack,no,scope
-attack_12,Lateral movement to machine with access to target bucket,attack,no,scope
-attack_13,Compromise AWS admin creds,attack,no,scope
-attack_14,Compromise presigned URLs,attack,no,scope
-attack_15,Compromise URL within N time period,attack,no,scope
-attack_16,Recon on S3 buckets,attack,no,scope
-attack_17,Find systems with R/W access to target bucket,attack,no,scope
-attack_18,Exploit known 3rd party library vulns,attack,no,scope
-attack_19,Manual discovery of 0day,attack,no,scope
-attack_20,Buy 0day,attack,no,scope
-attack_21,Exploit vulns,attack,no,scope
-attack_22,0day in AWS multitenant systems,attack,no,scope
-attack_23,Supply chain compromise (backdoor),attack,no,scope
-defense_1,Disallow crawling on site maps,defense,no,scope
-defense_2,Auth required / ACLs (private bucket),defense,no,scope
-defense_3,Lock down web client with creds / ACLs,defense,no,scope
-defense_4,Perform all access control server-side,defense,no,scope
-defense_5,2FA,defense,no,scope
-defense_6,IP allowlist for SSH,defense,no,scope
-defense_7,Make URL short lived,defense,no,scope
-defense_8,Disallow the use of URLs to access buckets,defense,no,scope
-defense_9,No public system has R/W access (internal only),defense,no,scope
-defense_10,3rd party library checking / vuln scanning,defense,no,scope
-defense_11,Exploit prevention / detection,defense,no,scope
-defense_12,Use single tenant AWS HSM,defense,no,scope
+id,label,layer,is_partition,belongs_to,weight,comment
+scope,Scope,scope,y,,1,
+reality,Reality,base,no,scope,1,
+attack_win,Access video recordings in S3 bucket (attackers win),base,no,scope,1,
+attack_1,API cache (e.g. Wayback Machine),attack,no,scope,1,
+attack_2,AWS public buckets search,attack,no,scope,1,
+attack_3,S3 bucket set to public,attack,no,scope,1,
+attack_4,Brute force,attack,no,scope,1,
+attack_5,Phishing,attack,no,scope,1,
+attack_6,Compromise user credentials,attack,no,scope,1,
+attack_7,Subsystem with access to bucket data,attack,no,scope,1,
+attack_8,Manually analyze web client for access control misconfig,attack,no,scope,1,
+attack_9,Compromise admin creds,attack,no,scope,1,
+attack_10,Intercept 2FA,attack,no,scope,1,
+attack_11,SSH to an accessible machine,attack,no,scope,1,
+attack_12,Lateral movement to machine with access to target bucket,attack,no,scope,1,
+attack_13,Compromise AWS admin creds,attack,no,scope,1,
+attack_14,Compromise presigned URLs,attack,no,scope,1,
+attack_15,Compromise URL within N time period,attack,no,scope,1,
+attack_16,Recon on S3 buckets,attack,no,scope,1,
+attack_17,Find systems with R/W access to target bucket,attack,no,scope,1,
+attack_18,Exploit known 3rd party library vulns,attack,no,scope,1,
+attack_19,Manual discovery of 0day,attack,no,scope,1,
+attack_20,Buy 0day,attack,no,scope,1,
+attack_21,Exploit vulns,attack,no,scope,1,
+attack_22,0day in AWS multitenant systems,attack,no,scope,1,
+attack_23,Supply chain compromise (backdoor),attack,no,scope,1,
+defense_1,Disallow crawling on site maps,defense,no,scope,1,
+defense_2,Auth required / ACLs (private bucket),defense,no,scope,1,
+defense_3,Lock down web client with creds / ACLs,defense,no,scope,1,
+defense_4,Perform all access control server-side,defense,no,scope,1,
+defense_5,2FA,defense,no,scope,1,
+defense_6,IP allowlist for SSH,defense,no,scope,1,
+defense_7,Make URL short lived,defense,no,scope,1,
+defense_8,Disallow the use of URLs to access buckets,defense,no,scope,1,
+defense_9,No public system has R/W access (internal only),defense,no,scope,1,
+defense_10,3rd party library checking / vuln scanning,defense,no,scope,1,
+defense_11,Exploit prevention / detection,defense,no,scope,1,
+defense_12,Use single tenant AWS HSM,defense,no,scope,1,

@@ -90,6 +90,7 @@ impl Graph {
                 "layer": child.layer,
                 "is_partition": child.is_partition,
                 "belongs_to": child.belongs_to,
+                "weight": child.weight,
                 "comment": child.comment,
                 "children": self.build_json_tree_recursive(child),
             });
@@ -108,6 +109,7 @@ impl Graph {
                 "layer": root_node.layer,
                 "is_partition": root_node.is_partition,
                 "belongs_to": root_node.belongs_to,
+                "weight": root_node.weight,
                 "comment": root_node.comment,
                 "children": self.build_json_tree_recursive(root_node),
             });
@@ -189,6 +191,7 @@ pub struct Node {
     pub layer: String,
     pub is_partition: bool,
     pub belongs_to: Option<String>,
+    pub weight: i32,
     pub comment: Option<String>,
 }
 
@@ -199,6 +202,7 @@ pub struct Edge {
     pub target: String,
     pub label: String,
     pub layer: String,
+    pub weight: i32,
     pub comment: Option<String>,
 }
 
@@ -266,6 +270,12 @@ impl Node {
                     Some(belongs_to)
                 }
             },
+            weight: get_stripped_value(row, node_profile.weight_column, "weight")
+                .and_then(|c| {
+                    c.parse::<i32>()
+                        .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
+                })
+                .unwrap_or(1),
             comment: row
                 .0
                 .get(node_profile.comment_column)
@@ -285,6 +295,12 @@ impl Edge {
             target: get_stripped_value(row, edge_profile.target_column, "target")?,
             label: get_stripped_value(row, edge_profile.label_column, "label")?,
             layer: get_stripped_value(row, edge_profile.layer_column, "layer")?,
+            weight: get_stripped_value(row, edge_profile.weight_column, "weight")
+                .and_then(|c| {
+                    c.parse::<i32>()
+                        .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
+                })
+                .unwrap_or(1),
             comment: row
                 .0
                 .get(edge_profile.comment_column)
@@ -345,6 +361,7 @@ mod tests {
                     layer: "Layer1".to_string(),
                     is_partition: true,
                     belongs_to: None,
+                    weight: 1,
                     comment: None,
                 },
                 Node {
@@ -353,6 +370,7 @@ mod tests {
                     layer: "Layer1".to_string(),
                     is_partition: false,
                     belongs_to: Some("1".to_string()),
+                    weight: 1,
                     comment: None,
                 },
                 Node {
@@ -361,6 +379,7 @@ mod tests {
                     layer: "Layer1".to_string(),
                     is_partition: false,
                     belongs_to: Some("1".to_string()),
+                    weight: 1,
                     comment: None,
                 },
             ],
@@ -371,6 +390,7 @@ mod tests {
                     target: "2".to_string(),
                     label: "Edge1".to_string(),
                     layer: "Layer1".to_string(),
+                    weight: 1,
                     comment: None,
                 },
                 Edge {
@@ -379,6 +399,7 @@ mod tests {
                     target: "3".to_string(),
                     label: "Edge2".to_string(),
                     layer: "Layer1".to_string(),
+                    weight: 1,
                     comment: None,
                 },
             ],
@@ -450,6 +471,7 @@ mod tests {
             "layer": "Layer1",
             "is_partition": true,
             "belongs_to": null,
+            "weight": 1,
             "comment": null,
             "children": [
                 {
@@ -459,6 +481,7 @@ mod tests {
                     "is_partition": false,
                     "belongs_to": "1",
                     "comment": null,
+                    "weight": 1,
                     "children": []
                 },
                 {
@@ -468,6 +491,7 @@ mod tests {
                     "is_partition": false,
                     "belongs_to": "1",
                     "comment": null,
+                    "weight": 1,
                     "children": []
                 }
             ]

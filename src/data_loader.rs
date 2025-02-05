@@ -11,6 +11,7 @@ pub struct DfNodeLoadProfile {
     pub layer_column: usize,
     pub is_partition_column: usize,
     pub belongs_to_column: usize,
+    pub weight_column: usize,
     pub comment_column: usize,
 }
 
@@ -22,7 +23,8 @@ impl Default for DfNodeLoadProfile {
             layer_column: 2,
             is_partition_column: 3,
             belongs_to_column: 4,
-            comment_column: 5,
+            weight_column: 5,
+            comment_column: 6,
         }
     }
 }
@@ -31,13 +33,14 @@ impl Display for DfNodeLoadProfile {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Node column offsets: id:{}, label:{}, layer:{}, is_partition:{}, belongs_to:{}, comment:{}",
+            "Node column offsets: id:{}, label:{}, layer:{}, is_partition:{}, belongs_to:{}, weight:{}, comment:{}",
             self.id_column,
             self.label_column,
             self.layer_column,
             self.is_partition_column,
             self.belongs_to_column,
-            self.comment_column
+            self.weight_column,
+            self.comment_column,
         )
     }
 }
@@ -48,6 +51,7 @@ pub struct DfEdgeLoadProfile {
     pub target_column: usize,
     pub label_column: usize,
     pub layer_column: usize,
+    pub weight_column: usize,
     pub comment_column: usize,
 }
 
@@ -59,7 +63,8 @@ impl Default for DfEdgeLoadProfile {
             target_column: 2,
             label_column: 3,
             layer_column: 4,
-            comment_column: 5,
+            weight_column: 5,
+            comment_column: 6,
         }
     }
 }
@@ -68,12 +73,13 @@ impl Display for DfEdgeLoadProfile {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Edge column offsets: id:{}, source:{}, target:{}, label:{}, layer:{}, comment:{}",
+            "Edge column offsets: id:{}, source:{}, target:{}, label:{}, layer:{}, weight:{}, comment:{}",
             self.id_column,
             self.source_column,
             self.target_column,
             self.label_column,
             self.layer_column,
+            self.weight_column,
             self.comment_column,
         )
     }
@@ -88,6 +94,7 @@ pub fn create_df_node_load_profile(df: &DataFrame) -> DfNodeLoadProfile {
             "layer" => profile.layer_column = i,
             "is_partition" => profile.is_partition_column = i,
             "belongs_to" => profile.belongs_to_column = i,
+            "weight" => profile.weight_column = i,
             "comment" => profile.comment_column = i,
             _ => {}
         }
@@ -104,6 +111,7 @@ pub fn create_df_edge_load_profile(df: &DataFrame) -> DfEdgeLoadProfile {
             "target" => profile.target_column = i,
             "label" => profile.label_column = i,
             "layer" => profile.layer_column = i,
+            "weight" => profile.weight_column = i,
             "comment" => profile.comment_column = i,
             _ => {}
         }

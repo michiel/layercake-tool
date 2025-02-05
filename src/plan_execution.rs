@@ -58,6 +58,7 @@ fn run_plan(plan: Plan, plan_file_path: &std::path::Path) -> Result<()> {
                                 target: belongs_to.to_string(),
                                 label: "belongs to".to_string(),
                                 layer: "partition".to_string(),
+                                weight: 1,
                                 comment: None,
                             };
                             graph.edges.push(edge);
