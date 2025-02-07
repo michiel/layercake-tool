@@ -2,7 +2,7 @@ use polars::frame::row::Row;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::data_loader::{DfEdgeLoadProfile, DfNodeLoadProfile};
 
@@ -134,9 +134,10 @@ impl Graph {
 
     pub fn modify_graph_limit_depth(&mut self, depth: i32) -> Result<(), String> {
         fn trim_node(node_id: &String, graph: &mut Graph, current_depth: i32, max_depth: i32) {
-            if current_depth >= max_depth {
-                return;
-            }
+            debug!(
+                "Trimming node: {} current_depth: {} max_depth: {}",
+                node_id, current_depth, max_depth
+            );
 
             // Clone child node IDs before any mutation
             let child_node_ids: Vec<String> = {
@@ -153,7 +154,7 @@ impl Graph {
                 trim_node(child_id, graph, current_depth + 1, max_depth);
             }
 
-            if current_depth < max_depth {
+            if current_depth >= max_depth {
                 // Clone the node before mutating the graph
                 let mut agg_node = {
                     let node = graph.get_node(node_id).unwrap();
@@ -161,9 +162,8 @@ impl Graph {
                 };
 
                 // HashSet to track edges that need modification
-                let mut updated_edges: HashMap<(String, String), Edge> = HashMap::new();
                 let mut nodes_to_remove = Vec::new();
-                let mut edges_to_replace = Vec::new();
+                let mut new_edges = graph.edges.clone();
 
                 for child_id in &child_node_ids {
                     if let Some(child) = graph.get_node(child_id) {
@@ -171,26 +171,13 @@ impl Graph {
                         agg_node.weight += child.weight;
 
                         // Process edges without duplicating them
-                        for edge in &graph.edges {
-                            let mut new_edge = edge.clone();
-
-                            let mut is_modified = false;
+                        for edge in &mut new_edges {
                             if edge.source == child.id {
-                                new_edge.source = agg_node.id.clone();
-                                is_modified = true;
+                                edge.source = agg_node.id.clone();
                             }
                             if edge.target == child.id {
-                                new_edge.target = agg_node.id.clone();
-                                is_modified = true;
+                                edge.target = agg_node.id.clone();
                             };
-
-                            if is_modified {
-                                edges_to_replace.push(new_edge.clone());
-                                updated_edges.insert(
-                                    (new_edge.source.clone(), new_edge.target.clone()),
-                                    new_edge,
-                                );
-                            }
                         }
 
                         // Mark child for removal
@@ -200,20 +187,6 @@ impl Graph {
                     }
                 }
 
-                // Apply edge modifications without duplicates
-                // create a vector of edges that are not connected to the child nodes
-                let mut new_edges: Vec<Edge> = graph
-                    .edges
-                    .iter()
-                    .filter(|edge| {
-                        !(child_node_ids.contains(&edge.source)
-                            || child_node_ids.contains(&edge.target))
-                    })
-                    .cloned()
-                    .collect();
-
-                // new_edges.extend(updated_edges.into_values());
-                new_edges.extend(edges_to_replace);
                 graph.edges = new_edges;
 
                 // Remove child nodes after edge updates

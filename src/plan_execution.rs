@@ -112,15 +112,15 @@ fn run_plan(plan: Plan, plan_file_path: &std::path::Path) -> Result<()> {
                 );
                 let mut graph = graph.clone();
                 if let Some(graph_config) = profile.graph_config {
-                    if let Some(max_depth) = graph_config.max_depth {
+                    if let Some(max_partition_depth) = graph_config.max_partition_depth {
                         info!("Graph stats {}", graph.stats());
-                        match graph.modify_graph_limit_depth(max_depth) {
+                        match graph.modify_graph_limit_depth(max_partition_depth) {
                             Ok(_) => {
-                                info!("Graph depth limited to {}", max_depth);
+                                info!("Graph partition depth limited to {}", max_partition_depth);
                                 info!("Graph stats {}", graph.stats());
                             }
                             Err(e) => {
-                                error!("Failed to limit graph depth: {}", e);
+                                error!("Failed to limit graph partition depth: {}", e);
                             }
                         }
                     }

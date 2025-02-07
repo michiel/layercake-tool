@@ -79,8 +79,8 @@ pub struct ExportProfileItem {
 
 #[derive(Serialize, Deserialize, Clone, Debug, Copy)]
 pub struct ExportProfileGraphConfig {
-    pub max_depth: Option<i32>,
-    pub max_width: Option<i32>,
+    pub max_partition_depth: Option<i32>,
+    pub max_partition_width: Option<i32>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

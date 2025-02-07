@@ -11,20 +11,16 @@ export:
   profiles:
     - filename: "out/kvm-control-flow.gml"
       exporter: "GML"
-    - filename: "out/kvm-control-flow-depth-limit.gml"
-      exporter: "GML"
-      graph_config:
-        max_depth: 2
     - filename: "out/kvm-control-flow.puml"
       exporter: "PlantUML"
     - filename: "out/kvm-control-flow.mermaid"
       exporter: "Mermaid"
     - filename: "out/kvm-control-flow.dot"
       exporter: "DOT"
-    - filename: "out/kvm-control-flow-nodes-full.csv"
-      exporter: "CSVNodes"
-    - filename: "out/kvm-control-flow-edges-full.csv"
-      exporter: "CSVEdges"
+    - filename: "out/kvm-control-flow-depth-limit.json"
+      exporter: "JSON"
+      graph_config:
+        max_partition_depth: 2
     # - filename: "out/kvm-control-flow-custom.dot"
     #   exporter: !Custom
     #     template: "sample/kvm_control_flow/custom.hbs"
