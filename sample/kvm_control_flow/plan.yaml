@@ -11,6 +11,10 @@ export:
   profiles:
     - filename: "out/kvm-control-flow.gml"
       exporter: "GML"
+    - filename: "out/kvm-control-flow-depth-limit.gml"
+      exporter: "GML"
+      graph_config:
+        max_depth: 2
     - filename: "out/kvm-control-flow.puml"
       exporter: "PlantUML"
     - filename: "out/kvm-control-flow.mermaid"

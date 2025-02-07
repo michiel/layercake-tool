@@ -80,41 +80,141 @@ impl Graph {
         self.nodes.iter().filter(|n| !n.is_partition).collect()
     }
 
-    pub fn build_json_tree_recursive(&self, parent: &Node) -> serde_json::Value {
-        let children = self.get_children(parent);
-        let mut tree = Vec::new();
-        for child in children {
-            let node = serde_json::json!({
-                "id": child.id,
-                "label": child.label,
-                "layer": child.layer,
-                "is_partition": child.is_partition,
-                "belongs_to": child.belongs_to,
-                "weight": child.weight,
-                "comment": child.comment,
-                "children": self.build_json_tree_recursive(child),
-            });
-            tree.push(node);
+    pub fn build_tree(&self) -> Vec<TreeNode> {
+        fn build_tree(
+            node: &Node,
+            depth: i32,
+            graph: &Graph,
+            tree: &mut Vec<TreeNode>,
+        ) -> TreeNode {
+            let mut tree_node = TreeNode::from_node(node);
+            tree_node.depth = depth;
+            let children = graph.get_children(node);
+            for child in children {
+                let child_node = build_tree(child, depth + 1, graph, tree);
+                tree_node.children.push(child_node);
+            }
+            tree_node
         }
-        serde_json::json!(tree)
-    }
 
-    pub fn build_json_tree(&self) -> serde_json::Value {
         let root_nodes = self.get_root_nodes();
         let mut tree = Vec::new();
         for root_node in root_nodes {
-            let node = serde_json::json!({
-                "id": root_node.id,
-                "label": root_node.label,
-                "layer": root_node.layer,
-                "is_partition": root_node.is_partition,
-                "belongs_to": root_node.belongs_to,
-                "weight": root_node.weight,
-                "comment": root_node.comment,
-                "children": self.build_json_tree_recursive(root_node),
-            });
+            let node = build_tree(root_node, 0, self, &mut tree);
             tree.push(node);
         }
+        tree
+    }
+
+    pub fn remove_node(&mut self, id: String) {
+        self.nodes.retain(|n| n.id != id);
+    }
+
+    pub fn set_node(&mut self, node: Node) {
+        let idx = self.nodes.iter().position(|n| n.id == node.id);
+        if let Some(idx) = idx {
+            self.nodes[idx] = node;
+        } else {
+            self.nodes.push(node);
+        }
+    }
+
+    pub fn get_node(&self, id: &str) -> Option<&Node> {
+        self.nodes.iter().find(|n| n.id == id)
+    }
+
+    pub fn stats(&self) -> String {
+        format!(
+            "Nodes: {}, Edges: {}, Layers: {}",
+            self.nodes.len(),
+            self.edges.len(),
+            self.layers.len()
+        )
+    }
+
+    pub fn modify_graph_limit_depth(&mut self, depth: i32) -> Result<(), String> {
+        fn trim_node(node_id: &String, graph: &mut Graph, current_depth: i32, max_depth: i32) {
+            if current_depth >= max_depth {
+                return;
+            }
+
+            // Clone child node IDs before any mutation
+            let child_node_ids: Vec<String> = {
+                let node = graph.get_node(node_id).unwrap();
+                graph
+                    .get_children(node)
+                    .iter()
+                    .map(|child| child.id.clone())
+                    .collect()
+            };
+
+            // Recursively process children first
+            for child_id in &child_node_ids {
+                trim_node(child_id, graph, current_depth + 1, max_depth);
+            }
+
+            if current_depth < max_depth {
+                // Clone the node before mutating the graph
+                let mut agg_node = {
+                    let node = graph.get_node(node_id).unwrap();
+                    node.clone()
+                };
+
+                // Collect modifications before applying them
+                let mut updated_edges = Vec::new();
+                let mut nodes_to_remove = Vec::new();
+
+                for child_id in &child_node_ids {
+                    if let Some(child) = graph.get_node(child_id) {
+                        // Aggregate weights
+                        agg_node.weight += child.weight;
+
+                        // Collect edge modifications
+                        for edge in &graph.edges {
+                            let mut new_edge = edge.clone();
+                            if edge.source == child.id {
+                                new_edge.source = agg_node.id.clone();
+                            }
+                            if edge.target == child.id {
+                                new_edge.target = agg_node.id.clone();
+                            }
+                            updated_edges.push(new_edge);
+                        }
+
+                        // Mark child for removal
+                        nodes_to_remove.push(child.id.clone());
+                    }
+                }
+
+                // Apply edge modifications
+                graph.edges = updated_edges;
+
+                // Remove children after edge updates
+                for node_id in nodes_to_remove {
+                    graph.remove_node(node_id);
+                }
+
+                // Update the parent node in the graph
+                graph.set_node(agg_node);
+            }
+        }
+
+        // Collect root nodes first to avoid borrowing issues
+        let root_node_ids: Vec<String> = self
+            .get_root_nodes()
+            .iter()
+            .map(|node| node.id.clone())
+            .collect();
+
+        for node_id in &root_node_ids {
+            trim_node(node_id, self, 0, depth);
+        }
+
+        Ok(())
+    }
+
+    pub fn build_json_tree(&self) -> serde_json::Value {
+        let tree = self.build_tree();
         serde_json::json!(tree)
     }
 
@@ -193,6 +293,35 @@ pub struct Node {
     pub belongs_to: Option<String>,
     pub weight: i32,
     pub comment: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct TreeNode {
+    pub id: String,
+    pub depth: i32,
+    pub label: String,
+    pub layer: String,
+    pub is_partition: bool,
+    pub belongs_to: Option<String>,
+    pub weight: i32,
+    pub comment: Option<String>,
+    pub children: Vec<TreeNode>,
+}
+
+impl TreeNode {
+    pub fn from_node(node: &Node) -> Self {
+        Self {
+            id: node.id.clone(),
+            depth: 0,
+            label: node.label.clone(),
+            layer: node.layer.clone(),
+            is_partition: node.is_partition,
+            belongs_to: node.belongs_to.clone(),
+            weight: node.weight,
+            comment: node.comment.clone(),
+            children: Vec::new(),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

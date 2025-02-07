@@ -110,16 +110,31 @@ fn run_plan(plan: Plan, plan_file_path: &std::path::Path) -> Result<()> {
                     "Exporting file: {} using exporter {:?}",
                     profile.filename, profile.exporter
                 );
+                let mut graph = graph.clone();
+                if let Some(graph_config) = profile.graph_config {
+                    if let Some(max_depth) = graph_config.max_depth {
+                        info!("Graph stats {}", graph.stats());
+                        match graph.modify_graph_limit_depth(max_depth) {
+                            Ok(_) => {
+                                info!("Graph depth limited to {}", max_depth);
+                                info!("Graph stats {}", graph.stats());
+                            }
+                            Err(e) => {
+                                error!("Failed to limit graph depth: {}", e);
+                            }
+                        }
+                    }
+                }
                 let result = match profile.exporter.clone() {
-                    ExportFileType::GML => super::export::to_gml::render(graph.clone()),
-                    ExportFileType::DOT => super::export::to_dot::render(graph.clone()),
-                    ExportFileType::JSON => super::export::to_json::render(graph.clone()),
-                    ExportFileType::CSVNodes => super::export::to_csv_nodes::render(graph.clone()),
-                    ExportFileType::CSVEdges => super::export::to_csv_edges::render(graph.clone()),
-                    ExportFileType::PlantUML => super::export::to_plantuml::render(graph.clone()),
-                    ExportFileType::Mermaid => super::export::to_mermaid::render(graph.clone()),
+                    ExportFileType::GML => super::export::to_gml::render(graph),
+                    ExportFileType::DOT => super::export::to_dot::render(graph),
+                    ExportFileType::JSON => super::export::to_json::render(graph),
+                    ExportFileType::CSVNodes => super::export::to_csv_nodes::render(graph),
+                    ExportFileType::CSVEdges => super::export::to_csv_edges::render(graph),
+                    ExportFileType::PlantUML => super::export::to_plantuml::render(graph),
+                    ExportFileType::Mermaid => super::export::to_mermaid::render(graph),
                     ExportFileType::Custom(template) => {
-                        super::export::to_custom::render(graph.clone(), template)
+                        super::export::to_custom::render(graph, template)
                     }
                 };
 

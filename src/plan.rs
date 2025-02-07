@@ -74,6 +74,13 @@ pub struct ExportProfile {
 pub struct ExportProfileItem {
     pub filename: String,
     pub exporter: ExportFileType,
+    pub graph_config: Option<ExportProfileGraphConfig>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Copy)]
+pub struct ExportProfileGraphConfig {
+    pub max_depth: Option<i32>,
+    pub max_width: Option<i32>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
