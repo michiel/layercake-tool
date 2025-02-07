@@ -2,7 +2,7 @@ use polars::frame::row::Row;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 
 use crate::data_loader::{DfEdgeLoadProfile, DfNodeLoadProfile};
 
@@ -160,36 +160,63 @@ impl Graph {
                     node.clone()
                 };
 
-                // Collect modifications before applying them
-                let mut updated_edges = Vec::new();
+                // HashSet to track edges that need modification
+                let mut updated_edges: HashMap<(String, String), Edge> = HashMap::new();
                 let mut nodes_to_remove = Vec::new();
+                let mut edges_to_replace = Vec::new();
 
                 for child_id in &child_node_ids {
                     if let Some(child) = graph.get_node(child_id) {
                         // Aggregate weights
                         agg_node.weight += child.weight;
 
-                        // Collect edge modifications
+                        // Process edges without duplicating them
                         for edge in &graph.edges {
                             let mut new_edge = edge.clone();
+
+                            let mut is_modified = false;
                             if edge.source == child.id {
                                 new_edge.source = agg_node.id.clone();
+                                is_modified = true;
                             }
                             if edge.target == child.id {
                                 new_edge.target = agg_node.id.clone();
+                                is_modified = true;
+                            };
+
+                            if is_modified {
+                                edges_to_replace.push(new_edge.clone());
+                                updated_edges.insert(
+                                    (new_edge.source.clone(), new_edge.target.clone()),
+                                    new_edge,
+                                );
                             }
-                            updated_edges.push(new_edge);
                         }
 
                         // Mark child for removal
                         nodes_to_remove.push(child.id.clone());
+                    } else {
+                        error!("Child node not found: {}", child_id);
                     }
                 }
 
-                // Apply edge modifications
-                graph.edges = updated_edges;
+                // Apply edge modifications without duplicates
+                // create a vector of edges that are not connected to the child nodes
+                let mut new_edges: Vec<Edge> = graph
+                    .edges
+                    .iter()
+                    .filter(|edge| {
+                        !(child_node_ids.contains(&edge.source)
+                            || child_node_ids.contains(&edge.target))
+                    })
+                    .cloned()
+                    .collect();
 
-                // Remove children after edge updates
+                // new_edges.extend(updated_edges.into_values());
+                new_edges.extend(edges_to_replace);
+                graph.edges = new_edges;
+
+                // Remove child nodes after edge updates
                 for node_id in nodes_to_remove {
                     graph.remove_node(node_id);
                 }

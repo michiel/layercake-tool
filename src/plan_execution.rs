@@ -124,7 +124,15 @@ fn run_plan(plan: Plan, plan_file_path: &std::path::Path) -> Result<()> {
                             }
                         }
                     }
+                    if let Err(errors) = graph.verify_graph_integrity() {
+                        warn!("Identified {} graph integrity error(s)", errors.len());
+                        errors.iter().for_each(|e| warn!("{}", e));
+                        error!("Failed to export file {}", profile.filename);
+                    } else {
+                        info!("Graph integrity verified : ok - rendering exports");
+                    }
                 }
+
                 let result = match profile.exporter.clone() {
                     ExportFileType::GML => super::export::to_gml::render(graph),
                     ExportFileType::DOT => super::export::to_dot::render(graph),
