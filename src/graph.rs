@@ -132,7 +132,7 @@ impl Graph {
         )
     }
 
-    pub fn modify_graph_limit_depth(&mut self, depth: i32) -> Result<(), String> {
+    pub fn modify_graph_limit_partition_depth(&mut self, depth: i32) -> Result<(), String> {
         fn trim_node(node_id: &String, graph: &mut Graph, current_depth: i32, max_depth: i32) {
             debug!(
                 "Trimming node: {} current_depth: {} max_depth: {}",
@@ -208,6 +208,85 @@ impl Graph {
 
         for node_id in &root_node_ids {
             trim_node(node_id, self, 0, depth);
+        }
+
+        Ok(())
+    }
+
+    pub fn modify_graph_limit_partition_width(&mut self, max_width: i32) -> Result<(), String> {
+        fn trim_node(node_id: &String, graph: &mut Graph, max_width: i32) {
+            let mut node = {
+                let node = graph.get_node(node_id).unwrap();
+                node.clone()
+            };
+
+            // Clone child node IDs before any mutation
+            let child_node_ids: Vec<String> = {
+                graph
+                    .get_children(&node)
+                    .iter()
+                    .map(|child| child.id.clone())
+                    .collect()
+            };
+
+            debug!(
+                "Trimming node: {} max_width: {}, children: {}",
+                node_id,
+                max_width,
+                child_node_ids.len()
+            );
+
+            // Recursively process children first
+            for child_id in &child_node_ids {
+                trim_node(child_id, graph, max_width);
+            }
+
+            if child_node_ids.len() as i32 > max_width {
+                info!("Chopping time");
+                let children: Vec<Node> = child_node_ids
+                    .iter()
+                    .map(|id| graph.get_node(id).unwrap().clone())
+                    .collect();
+
+                // Remove children beyond max_width
+                let mut nodes_to_remove = Vec::new();
+                let mut new_edges = graph.edges.clone();
+
+                for child in children.iter() {
+                    // Aggregate weights
+                    node.weight += child.weight;
+                    // Process edges without duplicating them
+                    for edge in &mut new_edges {
+                        if edge.source == child.id {
+                            edge.source = node.id.clone();
+                        }
+                        if edge.target == child.id {
+                            edge.target = node.id.clone();
+                        };
+                    }
+
+                    // Mark child for removal
+                    nodes_to_remove.push(child.id.clone());
+                }
+
+                graph.edges = new_edges;
+
+                // Remove child nodes after edge updates
+                for node_id in nodes_to_remove {
+                    graph.remove_node(node_id);
+                }
+            }
+        }
+
+        // Collect root nodes first to avoid borrowing issues
+        let root_node_ids: Vec<String> = self
+            .get_root_nodes()
+            .iter()
+            .map(|node| node.id.clone())
+            .collect();
+
+        for node_id in &root_node_ids {
+            trim_node(node_id, self, max_width);
         }
 
         Ok(())

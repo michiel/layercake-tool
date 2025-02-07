@@ -114,13 +114,25 @@ fn run_plan(plan: Plan, plan_file_path: &std::path::Path) -> Result<()> {
                 if let Some(graph_config) = profile.graph_config {
                     if let Some(max_partition_depth) = graph_config.max_partition_depth {
                         info!("Graph stats {}", graph.stats());
-                        match graph.modify_graph_limit_depth(max_partition_depth) {
+                        match graph.modify_graph_limit_partition_depth(max_partition_depth) {
                             Ok(_) => {
                                 info!("Graph partition depth limited to {}", max_partition_depth);
                                 info!("Graph stats {}", graph.stats());
                             }
                             Err(e) => {
                                 error!("Failed to limit graph partition depth: {}", e);
+                            }
+                        }
+                    }
+                    if let Some(max_partition_width) = graph_config.max_partition_width {
+                        info!("Graph stats {}", graph.stats());
+                        match graph.modify_graph_limit_partition_width(max_partition_width) {
+                            Ok(_) => {
+                                info!("Graph partition width limited to {}", max_partition_width);
+                                info!("Graph stats {}", graph.stats());
+                            }
+                            Err(e) => {
+                                error!("Failed to limit graph partition width: {}", e);
                             }
                         }
                     }

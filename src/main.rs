@@ -10,6 +10,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use tracing::info;
 use tracing::Level;
+use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
 #[clap(author, version, about)]
@@ -64,6 +65,9 @@ fn main() -> Result<()> {
     // tracing_subscriber::fmt().with_max_level(log_level).init();
     tracing_subscriber::fmt()
         .with_max_level(log_level)
+        .with_env_filter(
+            EnvFilter::new(format!("handlebars=off,{}", log_level)), // Exclude handlebars logs
+        )
         .without_time() // This line removes the timestamp from the logging output
         .init();
 
