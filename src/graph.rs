@@ -35,7 +35,14 @@ impl Graph {
             .collect()
     }
 
-    pub fn get_children_exluding_partition_nodes(&self, parent: &Node) -> Vec<&Node> {
+    pub fn get_children_non_partition_nodes(&self, parent: &Node) -> Vec<&Node> {
+        self.nodes
+            .iter()
+            .filter(|n| n.belongs_to.as_deref() == Some(&parent.id) && !n.is_partition)
+            .collect()
+    }
+
+    pub fn get_children_partition_nodes(&self, parent: &Node) -> Vec<&Node> {
         self.nodes
             .iter()
             .filter(|n| n.belongs_to.as_deref() == Some(&parent.id) && !n.is_partition)
@@ -85,6 +92,10 @@ impl Graph {
 
     pub fn get_non_partition_nodes(&self) -> Vec<&Node> {
         self.nodes.iter().filter(|n| !n.is_partition).collect()
+    }
+
+    pub fn get_partition_nodes(&self) -> Vec<&Node> {
+        self.nodes.iter().filter(|n| n.is_partition).collect()
     }
 
     pub fn build_tree(&self) -> Vec<TreeNode> {
@@ -150,7 +161,7 @@ impl Graph {
             let child_node_ids: Vec<String> = {
                 let node = graph.get_node(node_id).unwrap();
                 graph
-                    .get_children_exluding_partition_nodes(node)
+                    .get_children_non_partition_nodes(node)
                     .iter()
                     .map(|child| child.id.clone())
                     .collect()
@@ -236,15 +247,35 @@ impl Graph {
                     .collect()
             };
 
+            // Clone child node IDs before any mutation
+            let non_partition_child_node_ids: Vec<String> = {
+                graph
+                    .get_children_non_partition_nodes(&node)
+                    .iter()
+                    .map(|child| child.id.clone())
+                    .collect()
+            };
+
+            // Clone child node IDs before any mutation
+            let partition_child_node_ids: Vec<String> = {
+                graph
+                    .get_children_partition_nodes(&node)
+                    .iter()
+                    .map(|child| child.id.clone())
+                    .collect()
+            };
+
             debug!(
-                "Trimming node: {} max_width: {}, children: {}",
+                "Trimming node width: {} max_width: {}, children: {}, non_partition_children: {}, partition_children: {}",
                 node_id,
                 max_width,
-                child_node_ids.len()
+                child_node_ids.len(),
+                non_partition_child_node_ids.len(),
+                partition_child_node_ids.len()
             );
 
-            // Recursively process children first
-            for child_id in &child_node_ids {
+            // Recursively process partition children first
+            for child_id in &partition_child_node_ids {
                 trim_node(child_id, graph, max_width);
             }
 
