@@ -35,6 +35,13 @@ impl Graph {
             .collect()
     }
 
+    pub fn get_children_exluding_partition_nodes(&self, parent: &Node) -> Vec<&Node> {
+        self.nodes
+            .iter()
+            .filter(|n| n.belongs_to.as_deref() == Some(&parent.id) && !n.is_partition)
+            .collect()
+    }
+
     // pub fn get_edges(&self, node: &Node) -> Vec<&Edge> {
     //     self.edges
     //         .iter()
@@ -143,7 +150,7 @@ impl Graph {
             let child_node_ids: Vec<String> = {
                 let node = graph.get_node(node_id).unwrap();
                 graph
-                    .get_children(node)
+                    .get_children_exluding_partition_nodes(node)
                     .iter()
                     .map(|child| child.id.clone())
                     .collect()
@@ -275,6 +282,7 @@ impl Graph {
                 for node_id in nodes_to_remove {
                     graph.remove_node(node_id);
                 }
+                info!("Graph: {}", graph.stats());
             }
         }
 

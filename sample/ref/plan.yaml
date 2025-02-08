@@ -1,0 +1,27 @@
+import:
+  profiles:
+    - filename: "nodes.csv"
+      filetype: "Nodes"
+    - filename: "links.csv"
+      filetype: "Edges"
+    - filename: "layers.csv"
+      filetype: "Layers"
+
+export:
+  profiles:
+    - filename: "out/ref-model.gml"
+      exporter: "GML"
+    - filename: "out/ref-model.puml"
+      exporter: "PlantUML"
+    - filename: "out/ref-model.mermaid"
+      exporter: "Mermaid"
+    - filename: "out/ref-model.dot"
+      exporter: "DOT"
+    - filename: "out/ref-model-depth.json"
+      exporter: "JSON"
+      graph_config:
+        max_partition_depth: 1
+    - filename: "out/ref-model-width-2.csv"
+      exporter: "CSVNodes"
+      graph_config:
+        max_partition_width: 25
