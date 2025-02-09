@@ -51,18 +51,6 @@ fn run_plan(plan: Plan, plan_file_path: &std::path::Path) -> Result<()> {
                     for idx in 0..df.height() {
                         let row = df.get_row(idx)?;
                         let node = Node::from_row(&row, &node_profile)?;
-                        if let Some(ref belongs_to) = node.belongs_to {
-                            let edge = Edge {
-                                id: format!("{}-{}", node.id, belongs_to),
-                                source: node.id.clone(),
-                                target: belongs_to.to_string(),
-                                label: "belongs to".to_string(),
-                                layer: "partition".to_string(),
-                                weight: 1,
-                                comment: None,
-                            };
-                            graph.edges.push(edge);
-                        }
                         graph.nodes.push(node);
                     }
                 }
@@ -100,34 +88,60 @@ fn run_plan(plan: Plan, plan_file_path: &std::path::Path) -> Result<()> {
         graph.layers.len()
     );
 
-    debug!("Graph: {:?}", graph);
+    // debug!("Graph: {:?}", graph);
 
     match graph.verify_graph_integrity() {
         Ok(_) => {
             info!("Graph integrity verified : ok - rendering exports");
             plan.export.profiles.iter().for_each(|profile| {
                 info!(
-                    "Exporting file: {} using exporter {:?}",
+                    "Starting export to file: {} using exporter {:?}",
                     profile.filename, profile.exporter
                 );
                 let mut graph = graph.clone();
                 if let Some(graph_config) = profile.graph_config {
-                    if let Some(max_depth) = graph_config.max_depth {
-                        info!("Graph stats {}", graph.stats());
-                        match graph.modify_graph_limit_depth(max_depth) {
+                    if let Some(max_partition_depth) = graph_config.max_partition_depth {
+                        info!("Reducing graph partition depth to {}", max_partition_depth);
+                        debug!("Graph stats {}", graph.stats());
+                        match graph.modify_graph_limit_partition_depth(max_partition_depth) {
                             Ok(_) => {
-                                info!("Graph depth limited to {}", max_depth);
-                                info!("Graph stats {}", graph.stats());
+                                debug!("Graph partition depth limited to {}", max_partition_depth);
+                                debug!("Graph stats {}", graph.stats());
                             }
                             Err(e) => {
-                                error!("Failed to limit graph depth: {}", e);
+                                error!("Failed to limit graph partition depth: {}", e);
                             }
                         }
                     }
+                    if let Some(max_partition_width) = graph_config.max_partition_width {
+                        info!("Reducing graph partition width to {}", max_partition_width);
+                        debug!("Graph stats {}", graph.stats());
+                        match graph.modify_graph_limit_partition_width(max_partition_width) {
+                            Ok(_) => {
+                                debug!("Graph partition width limited to {}", max_partition_width);
+                                debug!("Graph stats {}", graph.stats());
+                            }
+                            Err(e) => {
+                                error!("Failed to limit graph partition width: {}", e);
+                            }
+                        }
+                    }
+                    if let Err(errors) = graph.verify_graph_integrity() {
+                        warn!("Identified {} graph integrity error(s)", errors.len());
+                        errors.iter().for_each(|e| warn!("{}", e));
+                        // TODO exit early
+                        error!("Failed to export file {}", profile.filename);
+                    } else {
+                        debug!("All clear for export target {}", profile.filename);
+                    }
                 }
+
+                graph.aggregate_edges();
+
                 let result = match profile.exporter.clone() {
                     ExportFileType::GML => super::export::to_gml::render(graph),
                     ExportFileType::DOT => super::export::to_dot::render(graph),
+                    ExportFileType::DOTHierarchy => super::export::to_dot_hierarchy::render(graph),
                     ExportFileType::JSON => super::export::to_json::render(graph),
                     ExportFileType::CSVNodes => super::export::to_csv_nodes::render(graph),
                     ExportFileType::CSVEdges => super::export::to_csv_edges::render(graph),
@@ -163,7 +177,7 @@ fn run_plan(plan: Plan, plan_file_path: &std::path::Path) -> Result<()> {
 }
 
 pub fn execute_plan(plan: String, watch: bool) -> Result<()> {
-    info!("Executing plan");
+    info!("Executing plan {}", plan);
 
     let plan_file_path = std::path::Path::new(&plan);
     let path_content = std::fs::read_to_string(plan_file_path)?;

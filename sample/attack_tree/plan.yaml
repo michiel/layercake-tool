@@ -17,6 +17,8 @@ export:
       exporter: "Mermaid"
     - filename: "out/attack-tree.dot"
       exporter: "DOT"
+    - filename: "out/attack-tree-limited.dot"
+      exporter: "DOT"
     - filename: "out/attack-tree-nodes-full.csv"
       exporter: "CSVNodes"
     - filename: "out/attack-tree-edges-full.csv"

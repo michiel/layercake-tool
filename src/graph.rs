@@ -2,7 +2,7 @@ use polars::frame::row::Row;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use tracing::{info, warn};
+use tracing::{debug, error, warn};
 
 use crate::data_loader::{DfEdgeLoadProfile, DfNodeLoadProfile};
 
@@ -21,6 +21,19 @@ impl Graph {
             .map(|l| (l.id.clone(), l))
             .collect()
     }
+
+    // Check if a layer exists
+    fn layer_exists(&self, layer_id: &str) -> bool {
+        self.layers.iter().any(|l| l.id == layer_id)
+    }
+
+    // Add a new layer if it does not exist
+    pub fn add_layer(&mut self, layer: Layer) {
+        if !self.layers.iter().any(|l| l.id == layer.id) {
+            self.layers.push(layer);
+        }
+    }
+
     pub fn get_root_nodes(&self) -> Vec<&Node> {
         self.nodes
             .iter()
@@ -32,6 +45,20 @@ impl Graph {
         self.nodes
             .iter()
             .filter(|n| n.belongs_to.as_deref() == Some(&parent.id))
+            .collect()
+    }
+
+    pub fn get_children_non_partition_nodes(&self, parent: &Node) -> Vec<&Node> {
+        self.nodes
+            .iter()
+            .filter(|n| n.belongs_to.as_deref() == Some(&parent.id) && !n.is_partition)
+            .collect()
+    }
+
+    pub fn get_children_partition_nodes(&self, parent: &Node) -> Vec<&Node> {
+        self.nodes
+            .iter()
+            .filter(|n| n.belongs_to.as_deref() == Some(&parent.id) && !n.is_partition)
             .collect()
     }
 
@@ -54,16 +81,25 @@ impl Graph {
         self.nodes.iter().find(|n| n.id == id)
     }
 
-    // pub fn get_partition_edges(&self) -> Vec<&Edge> {
-    //     self.edges
-    //         .iter()
-    //         .filter(|e| {
-    //             let source = self.get_node_by_id(&e.source).unwrap();
-    //             let target = self.get_node_by_id(&e.target).unwrap();
-    //             source.is_partition || target.is_partition
-    //         })
-    //         .collect()
-    // }
+    pub fn get_hierarchy_edges(&self) -> Vec<Edge> {
+        let mut edges = Vec::new();
+        self.nodes.iter().for_each(|node| {
+            if let Some(parent_id) = &node.belongs_to {
+                let parent = self.get_node(parent_id).unwrap();
+                edges.push(Edge {
+                    id: format!("{}_{}", parent.id, node.id),
+                    source: parent.id.clone(),
+                    target: node.id.clone(),
+                    label: "".to_string(), // format!("{} -> {}", parent.label, node.label),
+                    layer: parent.layer.clone(),
+                    weight: 1,
+                    comment: None,
+                });
+            }
+        });
+
+        edges
+    }
 
     pub fn get_non_partition_edges(&self) -> Vec<&Edge> {
         self.edges
@@ -78,6 +114,10 @@ impl Graph {
 
     pub fn get_non_partition_nodes(&self) -> Vec<&Node> {
         self.nodes.iter().filter(|n| !n.is_partition).collect()
+    }
+
+    pub fn get_partition_nodes(&self) -> Vec<&Node> {
+        self.nodes.iter().filter(|n| n.is_partition).collect()
     }
 
     pub fn build_tree(&self) -> Vec<TreeNode> {
@@ -132,65 +172,71 @@ impl Graph {
         )
     }
 
-    pub fn modify_graph_limit_depth(&mut self, depth: i32) -> Result<(), String> {
+    pub fn modify_graph_limit_partition_depth(&mut self, depth: i32) -> Result<(), String> {
         fn trim_node(node_id: &String, graph: &mut Graph, current_depth: i32, max_depth: i32) {
-            if current_depth >= max_depth {
-                return;
-            }
+            let node = graph.get_node(node_id).unwrap();
 
-            // Clone child node IDs before any mutation
-            let child_node_ids: Vec<String> = {
-                let node = graph.get_node(node_id).unwrap();
-                graph
-                    .get_children(node)
-                    .iter()
-                    .map(|child| child.id.clone())
-                    .collect()
-            };
+            let children = graph.get_children(&node);
+
+            let non_partition_child_node_ids: Vec<String> = children
+                .iter()
+                .filter(|n| !n.is_partition)
+                .map(|n| n.id.clone())
+                .collect();
+
+            let partition_child_node_ids: Vec<String> = children
+                .iter()
+                .filter(|n| n.is_partition)
+                .map(|n| n.id.clone())
+                .collect();
+
+            debug!(
+                "Trimming partition depth for node {} : current_depth: {} max_depth: {}",
+                node_id, current_depth, max_depth
+            );
 
             // Recursively process children first
-            for child_id in &child_node_ids {
+            for child_id in &partition_child_node_ids {
                 trim_node(child_id, graph, current_depth + 1, max_depth);
             }
 
-            if current_depth < max_depth {
+            if current_depth >= max_depth {
                 // Clone the node before mutating the graph
                 let mut agg_node = {
                     let node = graph.get_node(node_id).unwrap();
                     node.clone()
                 };
 
-                // Collect modifications before applying them
-                let mut updated_edges = Vec::new();
-                let mut nodes_to_remove = Vec::new();
+                // HashSet to track edges that need modification
+                let mut new_edges = graph.edges.clone();
 
-                for child_id in &child_node_ids {
+                for child_id in &non_partition_child_node_ids {
                     if let Some(child) = graph.get_node(child_id) {
                         // Aggregate weights
                         agg_node.weight += child.weight;
 
-                        // Collect edge modifications
-                        for edge in &graph.edges {
-                            let mut new_edge = edge.clone();
+                        // Process edges without duplicating them
+                        for edge in &mut new_edges {
                             if edge.source == child.id {
-                                new_edge.source = agg_node.id.clone();
+                                edge.source = agg_node.id.clone();
                             }
                             if edge.target == child.id {
-                                new_edge.target = agg_node.id.clone();
-                            }
-                            updated_edges.push(new_edge);
+                                edge.target = agg_node.id.clone();
+                            };
                         }
-
-                        // Mark child for removal
-                        nodes_to_remove.push(child.id.clone());
+                    } else {
+                        error!("Child node not found: {}", child_id);
                     }
                 }
 
-                // Apply edge modifications
-                graph.edges = updated_edges;
+                graph.edges = new_edges;
 
-                // Remove children after edge updates
-                for node_id in nodes_to_remove {
+                // Remove child nodes after edge updates
+                for node_id in non_partition_child_node_ids {
+                    graph.remove_node(node_id);
+                }
+
+                for node_id in partition_child_node_ids {
                     graph.remove_node(node_id);
                 }
 
@@ -211,6 +257,140 @@ impl Graph {
         }
 
         Ok(())
+    }
+
+    pub fn modify_graph_limit_partition_width(&mut self, max_width: i32) -> Result<(), String> {
+        fn trim_node(node_id: &String, graph: &mut Graph, max_width: i32) {
+            let node = {
+                let node = graph.get_node(node_id).unwrap();
+                node.clone()
+            };
+
+            let children = graph.get_children(&node);
+
+            let non_partition_child_node_ids: Vec<String> = children
+                .iter()
+                .filter(|n| !n.is_partition)
+                .map(|n| n.id.clone())
+                .collect();
+
+            let partition_child_node_ids: Vec<String> = children
+                .iter()
+                .filter(|n| n.is_partition)
+                .map(|n| n.id.clone())
+                .collect();
+
+            let child_node_ids: Vec<String> = children.iter().map(|n| n.id.clone()).collect();
+
+            debug!(
+                "Trimming width for node: {} max_width: {}, children: {}, non_partition_children: {}, partition_children: {}",
+                node_id,
+                max_width,
+                child_node_ids.len(),
+                non_partition_child_node_ids.len(),
+                partition_child_node_ids.len()
+            );
+
+            // Recursively process partition children first
+            for child_id in &partition_child_node_ids {
+                debug!("Processing partition child: {} / {}", node.id, child_id);
+                trim_node(child_id, graph, max_width);
+            }
+
+            if non_partition_child_node_ids.len() as i32 > max_width {
+                debug!("\tChopping time in node: {}", node.id);
+
+                let agg_node_id = format!("agg_{}", node.id.clone());
+
+                // Make sure there is an aggregated layer
+                if !graph.layer_exists("aggregated") {
+                    warn!("Aggregating nodes, but a layer 'aggregated' does not exist. Creating one. Add this layer to your graph config");
+                    graph.add_layer(Layer::new(
+                        "aggregated",
+                        "Aggregated",
+                        "222222",
+                        "ffffff",
+                        "dddddd",
+                    ));
+                }
+
+                let mut agg_node = {
+                    Node {
+                        id: agg_node_id.clone(),
+                        label: format!("{} nodes (aggregated)", non_partition_child_node_ids.len()),
+                        layer: "aggregated".to_string(),
+                        is_partition: false,
+                        belongs_to: Some(node.id),
+                        weight: 0,
+                        comment: node.comment.clone(),
+                    }
+                };
+
+                let children: Vec<Node> = non_partition_child_node_ids
+                    .iter()
+                    .map(|id| graph.get_node(id).unwrap().clone())
+                    .collect();
+
+                // Remove children beyond max_width
+                let mut new_edges = graph.edges.clone();
+
+                for child in children.iter() {
+                    // Aggregate weights
+                    agg_node.weight += child.weight;
+                    // Process edges without duplicating them
+                    for edge in &mut new_edges {
+                        if edge.source == child.id {
+                            edge.source = agg_node.id.clone();
+                        }
+                        if edge.target == child.id {
+                            edge.target = agg_node.id.clone();
+                        };
+                    }
+                }
+
+                graph.set_node(agg_node);
+                graph.edges = new_edges;
+
+                // Remove child nodes after edge updates
+                for node_id in non_partition_child_node_ids {
+                    debug!("\tRemoving node: {}", node_id);
+                    graph.remove_node(node_id);
+                }
+            }
+            debug!("Updated graph stats: {}", graph.stats());
+        }
+
+        // Collect root nodes first to avoid borrowing issues
+        let root_node_ids: Vec<String> = self
+            .get_root_nodes()
+            .iter()
+            .map(|node| node.id.clone())
+            .collect();
+
+        for node_id in &root_node_ids {
+            trim_node(node_id, self, max_width);
+        }
+
+        Ok(())
+    }
+
+    // Aggregate duplicate edges
+    pub fn aggregate_edges(&mut self) {
+        let mut edge_map: HashMap<String, Edge> = HashMap::new();
+        for edge in &self.edges {
+            let key = format!("{}_{}", edge.source, edge.target);
+            if let Some(existing_edge) = edge_map.get_mut(&key) {
+                existing_edge.weight += edge.weight;
+            } else {
+                edge_map.insert(key, edge.clone());
+            }
+        }
+        debug!(
+            "Aggregated {} edges to {}",
+            self.edges.len(),
+            edge_map.len()
+        );
+        self.edges = edge_map.values().cloned().collect();
     }
 
     pub fn build_json_tree(&self) -> serde_json::Value {
@@ -246,21 +426,55 @@ impl Graph {
         }
 
         if all_edges_have_nodes {
-            info!("All edges have valid source and target nodes");
+            debug!("All edges have valid source and target nodes");
         } else {
             warn!("Some edges have missing source and/or target nodes");
         }
 
+        let partition_node_ids = self
+            .nodes
+            .iter()
+            .filter(|n| n.is_partition)
+            .map(|n| n.id.clone())
+            .collect::<HashSet<String>>();
+
+        let non_partition_node_ids = self
+            .nodes
+            .iter()
+            .filter(|n| n.is_partition)
+            .map(|n| n.id.clone())
+            .collect::<HashSet<String>>();
+
+        //
+        // verify that partition nodes and non-partition nodes do not have edges between them
+
+        self.edges.iter().for_each(|e| {
+            if partition_node_ids.contains(&e.source) && non_partition_node_ids.contains(&e.target)
+            {
+                let err = format!(
+                    "Edge id:[{}] source {:?} is a partition node and target {:?} is a non-partition node",
+                    e.id, e.source, e.target
+                );
+                errors.push(err);
+            }
+            if partition_node_ids.contains(&e.target) && non_partition_node_ids.contains(&e.source)
+            {
+                let err = format!(
+                    "Edge id:[{}] target {:?} is a partition node and source {:?} is a non-partition node",
+                    e.id, e.target, e.source
+                );
+                errors.push(err);
+            }
+        });
+
         self.nodes.iter().for_each(|n| {
-            if n.belongs_to.is_some() {
-                if !node_ids.contains(n.belongs_to.as_ref().unwrap()) {
-                    let err = format!(
-                        "Node id:[{}] belongs_to {:?} not found in nodes",
-                        n.id,
-                        n.belongs_to.as_ref().unwrap()
-                    );
-                    errors.push(err);
-                }
+            if n.belongs_to.is_some() && !node_ids.contains(n.belongs_to.as_ref().unwrap()) {
+                let err = format!(
+                    "Node id:[{}] belongs_to {:?} not found in nodes",
+                    n.id,
+                    n.belongs_to.as_ref().unwrap()
+                );
+                errors.push(err);
             }
         });
 
@@ -272,6 +486,14 @@ impl Graph {
                     "Node id:[{}] is not a partition AND does not belong to a partition",
                     n.id,
                 );
+                errors.push(err);
+            }
+        });
+
+        // verify that all nodes are assigned to a layer
+        self.nodes.iter().for_each(|n| {
+            if !self.layers.iter().any(|l| l.id == n.layer) {
+                let err = format!("Node id:[{}] layer {:?} not found in layers", n.id, n.layer);
                 errors.push(err);
             }
         });
@@ -342,6 +564,24 @@ pub struct Layer {
     pub background_color: String,
     pub text_color: String,
     pub border_color: String,
+}
+
+impl Layer {
+    pub fn new(
+        id: &str,
+        label: &str,
+        background_color: &str,
+        text_color: &str,
+        border_color: &str,
+    ) -> Self {
+        Self {
+            id: id.to_string(),
+            label: label.to_string(),
+            background_color: background_color.to_string(),
+            text_color: text_color.to_string(),
+            border_color: border_color.to_string(),
+        }
+    }
 }
 
 fn is_truthy(s: &str) -> bool {

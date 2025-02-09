@@ -130,7 +130,7 @@ fn infer_schema_from_file(filename: &str, separator: u8) -> anyhow::Result<Schem
             .map(|col_name| Field::new(PlSmallStr::from(col_name), DataType::String))
             .collect();
 
-        let schema = Schema::from_iter(fields.into_iter());
+        let schema = Schema::from_iter(fields);
         Ok(schema)
     } else {
         Err(anyhow::anyhow!("Failed to read header from file"))
