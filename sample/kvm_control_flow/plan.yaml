@@ -17,12 +17,3 @@ export:
       exporter: "Mermaid"
     - filename: "out/kvm-control-flow.dot"
       exporter: "DOT"
-    - filename: "out/kvm-control-flow-depth-limit.json"
-      exporter: "JSON"
-      graph_config:
-        max_partition_depth: 2
-    # - filename: "out/kvm-control-flow-custom.dot"
-    #   exporter: !Custom
-    #     template: "sample/kvm_control_flow/custom.hbs"
-    #     # partials:
-    #     #   key: "sample/kvm_control_flow/partial_a.hbs"
