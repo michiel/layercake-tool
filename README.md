@@ -31,15 +31,16 @@ Nodes come in two types, partition and non-partition nodes. Partition nodes are 
 
 ## Usage
 
+See also [the tips and snippets](README-Tips.md) for file watchers, command line rendering, etc
+
 ### Example
 
 Using the sample project,
 
 
 ```bash
-# Generate the sample project
 # Generate a sample project
-layercake generate sample kvm_control_flow example-project
+layercake generate sample attack_tree example-project
 
 # Run the sample project with a plan, this will generate the output files
 layercake run -p example-project/plan.yaml 
@@ -53,40 +54,6 @@ Now edit and change the CSV files. A collaborative workflow might include Google
 If you want to re-run the plan on input changes, you can use the `-w` (**watch**) flag. This will re-run the plan when any of the input files change. If you want to automatically generate images 
 from the output files, you can use a file watcher.
 
-## File watcher examples
-
-#### Example linux using inotifywait
-
-```bash
-while true; \
-  do inotifywait -e close-write out/kvm-control-flow.dot && \
-  dot -Tpng out/kvm-control-flow.dot -o out/kvm-control-flow.png; \
-done
-```
-
-#### Example MacOS using built-in stat
-
-```bash
-prev_mod_time=$(stat -f "%m" out/kvm-control-flow.dot)                                                                                                                                                                                                                                                                                                [0/1306]
-
-while true; do                                                                         
-  sleep 1                                                                              
-  new_mod_time=$(stat -f "%m" out/kvm-control-flow.dot)
-  if [ "$new_mod_time" -ne "$prev_mod_time" ]; then
-    dot -Tpng out/kvm-control-flow.dot -o out/kvm-control-flow.png
-    prev_mod_time=$new_mod_time                                                                                                                                                                                                                                                                                                                               
-  fi                                                                                                                                                                                                                                                                                                                                                          
-done
-```
-
-#### Example MacOS using fswatch
-
-```bash
-while true; do
-  fswatch -1 -e ".*" -i "out/kvm-control-flow.dot" out/ && \
-  dot -Tpng out/kvm-control-flow.dot -o out/kvm-control-flow.png
-done
-```
 
 ## Development
 
