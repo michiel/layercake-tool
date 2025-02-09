@@ -48,35 +48,6 @@ impl Graph {
             .collect()
     }
 
-    pub fn get_children_non_partition_nodes(&self, parent: &Node) -> Vec<&Node> {
-        self.nodes
-            .iter()
-            .filter(|n| n.belongs_to.as_deref() == Some(&parent.id) && !n.is_partition)
-            .collect()
-    }
-
-    pub fn get_children_partition_nodes(&self, parent: &Node) -> Vec<&Node> {
-        self.nodes
-            .iter()
-            .filter(|n| n.belongs_to.as_deref() == Some(&parent.id) && !n.is_partition)
-            .collect()
-    }
-
-    // pub fn get_edges(&self, node: &Node) -> Vec<&Edge> {
-    //     self.edges
-    //         .iter()
-    //         .filter(|e| e.source == node.id || e.target == node.id)
-    //         .collect()
-    // }
-    //
-    // pub fn get_edges_from(&self, node: &Node) -> Vec<&Edge> {
-    //     self.edges.iter().filter(|e| e.source == node.id).collect()
-    // }
-    //
-    // pub fn get_edges_to(&self, node: &Node) -> Vec<&Edge> {
-    //     self.edges.iter().filter(|e| e.target == node.id).collect()
-    // }
-
     pub fn get_node_by_id(&self, id: &str) -> Option<&Node> {
         self.nodes.iter().find(|n| n.id == id)
     }
@@ -114,10 +85,6 @@ impl Graph {
 
     pub fn get_non_partition_nodes(&self) -> Vec<&Node> {
         self.nodes.iter().filter(|n| !n.is_partition).collect()
-    }
-
-    pub fn get_partition_nodes(&self) -> Vec<&Node> {
-        self.nodes.iter().filter(|n| n.is_partition).collect()
     }
 
     pub fn build_tree(&self) -> Vec<TreeNode> {
