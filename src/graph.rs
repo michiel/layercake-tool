@@ -22,6 +22,11 @@ impl Graph {
             .collect()
     }
 
+    // Check if a layer exists
+    fn layer_exists(&self, layer_id: &str) -> bool {
+        self.layers.iter().any(|l| l.id == layer_id)
+    }
+
     // Add a new layer if it does not exist
     pub fn add_layer(&mut self, layer: Layer) {
         if self.layers.iter().find(|l| l.id == layer.id).is_none() {
@@ -292,13 +297,16 @@ impl Graph {
                 let agg_node_id = format!("agg_{}", node.id.clone());
 
                 // Make sure there is an aggregated layer
-                graph.add_layer(Layer::new(
-                    "aggregated",
-                    "Aggregated",
-                    "222222",
-                    "ffffff",
-                    "dddddd",
-                ));
+                if !graph.layer_exists("aggregated") {
+                    warn!("Aggregating nodes, but a layer 'aggregated' does not exist. Creating one. Add this layer to your graph config");
+                    graph.add_layer(Layer::new(
+                        "aggregated",
+                        "Aggregated",
+                        "222222",
+                        "ffffff",
+                        "dddddd",
+                    ));
+                }
 
                 let mut agg_node = {
                     Node {
@@ -360,6 +368,25 @@ impl Graph {
         Ok(())
     }
 
+    // Aggregate duplicate edges
+    pub fn aggregate_edges(&mut self) {
+        let mut edge_map: HashMap<String, Edge> = HashMap::new();
+        for edge in &self.edges {
+            let key = format!("{}_{}", edge.source, edge.target);
+            if let Some(existing_edge) = edge_map.get_mut(&key) {
+                existing_edge.weight += edge.weight;
+            } else {
+                edge_map.insert(key, edge.clone());
+            }
+        }
+        debug!(
+            "Aggregated {} edges to {}",
+            self.edges.len(),
+            edge_map.len()
+        );
+        self.edges = edge_map.values().cloned().collect();
+    }
+
     pub fn build_json_tree(&self) -> serde_json::Value {
         let tree = self.build_tree();
         serde_json::json!(tree)
@@ -393,7 +420,7 @@ impl Graph {
         }
 
         if all_edges_have_nodes {
-            info!("All edges have valid source and target nodes");
+            debug!("All edges have valid source and target nodes");
         } else {
             warn!("Some edges have missing source and/or target nodes");
         }

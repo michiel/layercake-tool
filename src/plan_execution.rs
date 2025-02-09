@@ -88,25 +88,25 @@ fn run_plan(plan: Plan, plan_file_path: &std::path::Path) -> Result<()> {
         graph.layers.len()
     );
 
-    debug!("Graph: {:?}", graph);
+    // debug!("Graph: {:?}", graph);
 
     match graph.verify_graph_integrity() {
         Ok(_) => {
             info!("Graph integrity verified : ok - rendering exports");
             plan.export.profiles.iter().for_each(|profile| {
                 info!(
-                    "Exporting file: {} using exporter {:?}",
+                    "Starting export to file: {} using exporter {:?}",
                     profile.filename, profile.exporter
                 );
                 let mut graph = graph.clone();
                 if let Some(graph_config) = profile.graph_config {
                     if let Some(max_partition_depth) = graph_config.max_partition_depth {
                         info!("Reducing graph partition depth to {}", max_partition_depth);
-                        info!("Graph stats {}", graph.stats());
+                        debug!("Graph stats {}", graph.stats());
                         match graph.modify_graph_limit_partition_depth(max_partition_depth) {
                             Ok(_) => {
-                                info!("Graph partition depth limited to {}", max_partition_depth);
-                                info!("Graph stats {}", graph.stats());
+                                debug!("Graph partition depth limited to {}", max_partition_depth);
+                                debug!("Graph stats {}", graph.stats());
                             }
                             Err(e) => {
                                 error!("Failed to limit graph partition depth: {}", e);
@@ -115,11 +115,11 @@ fn run_plan(plan: Plan, plan_file_path: &std::path::Path) -> Result<()> {
                     }
                     if let Some(max_partition_width) = graph_config.max_partition_width {
                         info!("Reducing graph partition width to {}", max_partition_width);
-                        info!("Graph stats {}", graph.stats());
+                        debug!("Graph stats {}", graph.stats());
                         match graph.modify_graph_limit_partition_width(max_partition_width) {
                             Ok(_) => {
-                                info!("Graph partition width limited to {}", max_partition_width);
-                                info!("Graph stats {}", graph.stats());
+                                debug!("Graph partition width limited to {}", max_partition_width);
+                                debug!("Graph stats {}", graph.stats());
                             }
                             Err(e) => {
                                 error!("Failed to limit graph partition width: {}", e);
@@ -132,9 +132,11 @@ fn run_plan(plan: Plan, plan_file_path: &std::path::Path) -> Result<()> {
                         // TODO exit early
                         error!("Failed to export file {}", profile.filename);
                     } else {
-                        info!("Graph integrity verified : ok - rendering exports");
+                        debug!("All clear for export target {}", profile.filename);
                     }
                 }
+
+                graph.aggregate_edges();
 
                 let result = match profile.exporter.clone() {
                     ExportFileType::GML => super::export::to_gml::render(graph),
@@ -175,7 +177,7 @@ fn run_plan(plan: Plan, plan_file_path: &std::path::Path) -> Result<()> {
 }
 
 pub fn execute_plan(plan: String, watch: bool) -> Result<()> {
-    info!("Executing plan");
+    info!("Executing plan {}", plan);
 
     let plan_file_path = std::path::Path::new(&plan);
     let path_content = std::fs::read_to_string(plan_file_path)?;

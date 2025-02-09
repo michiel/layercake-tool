@@ -1,12 +1,10 @@
 use crate::graph::Graph;
 use std::error::Error;
-use tracing::debug;
 
 pub fn render(graph: Graph) -> Result<String, Box<dyn Error>> {
     use serde_json::json;
 
     let data = graph.build_json_tree();
-    debug!("Data: {:?}", data);
 
     let handlebars = crate::common::get_handlebars();
     let res = handlebars.render_template(
