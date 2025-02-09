@@ -2,7 +2,7 @@ use polars::frame::row::Row;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, warn};
 
 use crate::data_loader::{DfEdgeLoadProfile, DfNodeLoadProfile};
 
@@ -29,7 +29,7 @@ impl Graph {
 
     // Add a new layer if it does not exist
     pub fn add_layer(&mut self, layer: Layer) {
-        if self.layers.iter().find(|l| l.id == layer.id).is_none() {
+        if !self.layers.iter().any(|l| l.id == layer.id) {
             self.layers.push(layer);
         }
     }
@@ -255,7 +255,7 @@ impl Graph {
 
     pub fn modify_graph_limit_partition_width(&mut self, max_width: i32) -> Result<(), String> {
         fn trim_node(node_id: &String, graph: &mut Graph, max_width: i32) {
-            let mut node = {
+            let node = {
                 let node = graph.get_node(node_id).unwrap();
                 node.clone()
             };
@@ -462,15 +462,13 @@ impl Graph {
         });
 
         self.nodes.iter().for_each(|n| {
-            if n.belongs_to.is_some() {
-                if !node_ids.contains(n.belongs_to.as_ref().unwrap()) {
-                    let err = format!(
-                        "Node id:[{}] belongs_to {:?} not found in nodes",
-                        n.id,
-                        n.belongs_to.as_ref().unwrap()
-                    );
-                    errors.push(err);
-                }
+            if n.belongs_to.is_some() && !node_ids.contains(n.belongs_to.as_ref().unwrap()) {
+                let err = format!(
+                    "Node id:[{}] belongs_to {:?} not found in nodes",
+                    n.id,
+                    n.belongs_to.as_ref().unwrap()
+                );
+                errors.push(err);
             }
         });
 
@@ -488,7 +486,7 @@ impl Graph {
 
         // verify that all nodes are assigned to a layer
         self.nodes.iter().for_each(|n| {
-            if self.layers.iter().find(|l| l.id == n.layer).is_none() {
+            if !self.layers.iter().any(|l| l.id == n.layer) {
                 let err = format!("Node id:[{}] layer {:?} not found in layers", n.id, n.layer);
                 errors.push(err);
             }

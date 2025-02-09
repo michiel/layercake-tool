@@ -54,9 +54,9 @@ hide stereotype
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::common::get_handlebars;
-    use serde_json::json;
+    
+    
+    
 
     //     #[test]
     //     fn plantuml_template_can_render() {

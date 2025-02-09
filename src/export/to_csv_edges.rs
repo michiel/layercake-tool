@@ -6,7 +6,7 @@ pub fn render(graph: Graph) -> Result<String, Box<dyn Error>> {
     let mut wtr = Writer::from_writer(vec![]);
 
     // Write the header
-    wtr.write_record(&["id", "source", "target", "label", "layer", "comment"])?;
+    wtr.write_record(["id", "source", "target", "label", "layer", "comment"])?;
 
     for edge in graph.edges {
         wtr.write_record(&[

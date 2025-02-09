@@ -1,5 +1,4 @@
 use crate::graph::Graph;
-use serde::{Deserialize, Serialize};
 use std::error::Error;
 
 pub fn render(graph: Graph) -> Result<String, Box<dyn Error>> {
