@@ -93,6 +93,7 @@ pub struct CustomExportProfile {
 pub enum ExportFileType {
     GML,
     DOT,
+    DOTHierarchy,
     JSON,
     PlantUML,
     CSVNodes,

@@ -51,18 +51,6 @@ fn run_plan(plan: Plan, plan_file_path: &std::path::Path) -> Result<()> {
                     for idx in 0..df.height() {
                         let row = df.get_row(idx)?;
                         let node = Node::from_row(&row, &node_profile)?;
-                        if let Some(ref belongs_to) = node.belongs_to {
-                            let edge = Edge {
-                                id: format!("{}-{}", node.id, belongs_to),
-                                source: node.id.clone(),
-                                target: belongs_to.to_string(),
-                                label: "belongs to".to_string(),
-                                layer: "partition".to_string(),
-                                weight: 1,
-                                comment: None,
-                            };
-                            graph.edges.push(edge);
-                        }
                         graph.nodes.push(node);
                     }
                 }
@@ -151,6 +139,7 @@ fn run_plan(plan: Plan, plan_file_path: &std::path::Path) -> Result<()> {
                 let result = match profile.exporter.clone() {
                     ExportFileType::GML => super::export::to_gml::render(graph),
                     ExportFileType::DOT => super::export::to_dot::render(graph),
+                    ExportFileType::DOTHierarchy => super::export::to_dot_hierarchy::render(graph),
                     ExportFileType::JSON => super::export::to_json::render(graph),
                     ExportFileType::CSVNodes => super::export::to_csv_nodes::render(graph),
                     ExportFileType::CSVEdges => super::export::to_csv_edges::render(graph),

@@ -68,16 +68,25 @@ impl Graph {
         self.nodes.iter().find(|n| n.id == id)
     }
 
-    // pub fn get_partition_edges(&self) -> Vec<&Edge> {
-    //     self.edges
-    //         .iter()
-    //         .filter(|e| {
-    //             let source = self.get_node_by_id(&e.source).unwrap();
-    //             let target = self.get_node_by_id(&e.target).unwrap();
-    //             source.is_partition || target.is_partition
-    //         })
-    //         .collect()
-    // }
+    pub fn get_hierarchy_edges(&self) -> Vec<Edge> {
+        let mut edges = Vec::new();
+        self.nodes.iter().for_each(|node| {
+            if let Some(parent_id) = &node.belongs_to {
+                let parent = self.get_node(parent_id).unwrap();
+                edges.push(Edge {
+                    id: format!("{}_{}", parent.id, node.id),
+                    source: parent.id.clone(),
+                    target: node.id.clone(),
+                    label: "".to_string(), // format!("{} -> {}", parent.label, node.label),
+                    layer: parent.layer.clone(),
+                    weight: 1,
+                    comment: None,
+                });
+            }
+        });
+
+        edges
+    }
 
     pub fn get_non_partition_edges(&self) -> Vec<&Edge> {
         self.edges
@@ -238,35 +247,23 @@ impl Graph {
                 node.clone()
             };
 
-            // Clone child node IDs before any mutation
-            let child_node_ids: Vec<String> = {
-                graph
-                    .get_children(&node)
-                    .iter()
-                    .map(|child| child.id.clone())
-                    .collect()
-            };
+            let children = graph.get_children(&node);
 
-            // Clone child node IDs before any mutation
-            let non_partition_child_node_ids: Vec<String> = {
-                graph
-                    .get_children_non_partition_nodes(&node)
-                    .iter()
-                    .map(|child| child.id.clone())
-                    .collect()
-            };
+            let non_partition_child_node_ids: Vec<String> = children
+                .iter()
+                .filter(|n| !n.is_partition)
+                .map(|n| n.id.clone())
+                .collect();
 
-            // Clone child node IDs before any mutation
-            let partition_child_node_ids: Vec<String> = {
-                graph
-                    .get_children_partition_nodes(&node)
-                    .iter()
-                    .map(|child| child.id.clone())
-                    .collect()
-            };
+            let partition_child_node_ids: Vec<String> = children
+                .iter()
+                .filter(|n| n.is_partition)
+                .map(|n| n.id.clone())
+                .collect();
 
-            // TODO change log level
-            info!(
+            let child_node_ids: Vec<String> = children.iter().map(|n| n.id.clone()).collect();
+
+            debug!(
                 "Trimming width for node: {} max_width: {}, children: {}, non_partition_children: {}, partition_children: {}",
                 node_id,
                 max_width,
@@ -277,11 +274,12 @@ impl Graph {
 
             // Recursively process partition children first
             for child_id in &partition_child_node_ids {
+                debug!("Processing partition child: {} / {}", node.id, child_id);
                 trim_node(child_id, graph, max_width);
             }
 
             if child_node_ids.len() as i32 > max_width {
-                info!("Chopping time");
+                debug!("\tChopping time in node: {}", node.id);
                 let children: Vec<Node> = child_node_ids
                     .iter()
                     .map(|id| graph.get_node(id).unwrap().clone())
@@ -312,10 +310,11 @@ impl Graph {
 
                 // Remove child nodes after edge updates
                 for node_id in nodes_to_remove {
+                    debug!("\tRemoving node: {}", node_id);
                     graph.remove_node(node_id);
                 }
-                info!("Graph: {}", graph.stats());
             }
+            debug!("Updated graph stats: {}", graph.stats());
         }
 
         // Collect root nodes first to avoid borrowing issues
@@ -369,6 +368,42 @@ impl Graph {
         } else {
             warn!("Some edges have missing source and/or target nodes");
         }
+
+        let partition_node_ids = self
+            .nodes
+            .iter()
+            .filter(|n| n.is_partition)
+            .map(|n| n.id.clone())
+            .collect::<HashSet<String>>();
+
+        let non_partition_node_ids = self
+            .nodes
+            .iter()
+            .filter(|n| n.is_partition)
+            .map(|n| n.id.clone())
+            .collect::<HashSet<String>>();
+
+        //
+        // verify that partition nodes and non-partition nodes do not have edges between them
+
+        self.edges.iter().for_each(|e| {
+            if partition_node_ids.contains(&e.source) && non_partition_node_ids.contains(&e.target)
+            {
+                let err = format!(
+                    "Edge id:[{}] source {:?} is a partition node and target {:?} is a non-partition node",
+                    e.id, e.source, e.target
+                );
+                errors.push(err);
+            }
+            if partition_node_ids.contains(&e.target) && non_partition_node_ids.contains(&e.source)
+            {
+                let err = format!(
+                    "Edge id:[{}] target {:?} is a partition node and source {:?} is a non-partition node",
+                    e.id, e.target, e.source
+                );
+                errors.push(err);
+            }
+        });
 
         self.nodes.iter().for_each(|n| {
             if n.belongs_to.is_some() {

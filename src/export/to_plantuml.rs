@@ -2,44 +2,6 @@ use crate::graph::Graph;
 use std::error::Error;
 use tracing::debug;
 
-// #[derive(Serialize, Deserialize)]
-// struct PumlNode {
-//     id: String,
-//     label: String,
-//     zone: String,
-//     layer: String,
-//     shape: String,
-// }
-//
-// #[derive(Serialize, Deserialize, Debug)]
-// pub struct LayerConfig {
-//     pub key: String,
-//     #[serde(default = "layerconfig_default_fillcolor")]
-//     pub fillcolor: String,
-//     #[serde(default = "layerconfig_default_fontcolor")]
-//     pub fontcolor: String,
-//     #[serde(default = "layerconfig_default_style")]
-//     pub style: String,
-//     #[serde(default = "layerconfig_default_shape")]
-//     pub shape: String,
-// }
-//
-// fn layerconfig_default_fillcolor() -> String {
-//     "white".to_string()
-// }
-//
-// fn layerconfig_default_fontcolor() -> String {
-//     "black".to_string()
-// }
-//
-// fn layerconfig_default_style() -> String {
-//     "filled".to_string()
-// }
-//
-// fn layerconfig_default_shape() -> String {
-//     "rectangle".to_string()
-// }
-
 pub fn render(graph: Graph) -> Result<String, Box<dyn Error>> {
     use serde_json::json;
 

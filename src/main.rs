@@ -64,7 +64,7 @@ fn main() -> Result<()> {
 
     // tracing_subscriber::fmt().with_max_level(log_level).init();
     tracing_subscriber::fmt()
-        .with_max_level(log_level)
+        // .with_max_level(log_level)
         .with_env_filter(
             EnvFilter::new(format!("handlebars=off,{}", log_level)), // Exclude handlebars logs
         )
