@@ -10,17 +10,26 @@ use std::collections::HashMap;
 ///   │   └── profiles: Vec<ImportProfile>
 ///   │       ├── filename: String
 ///   │       └── filetype: ImportFileType
+///   │           ├── Edges
+///   │           ├── Nodes
+///   │           └── Layers
 ///   └── export: ExportProfile
 ///       └── profiles: Vec<ExportProfileItem>
 ///           ├── filename: String
-///           └── exporter: ExportFileType
-///               ├── GML
-///               ├── DOT
-///               ├── CSVNodes
-///               └── CSVEdges
-///               └── Custom(String)
-/// ```
-///
+///           ├── exporter: ExportFileType
+///           │   ├── GML
+///           │   ├── DOT
+///           │   ├── DOTHierarchy
+///           │   ├── JSON
+///           │   ├── PlantUML
+///           │   ├── CSVNodes
+///           │   ├── CSVEdges
+///           │   ├── Mermaid
+///           │   └── Custom(CustomExportProfile)
+///           └── graph_config: Option<ExportProfileGraphConfig>
+///               ├── generate_hierarchy: Option<bool>
+///               ├── max_partition_depth: Option<i32>
+///               └── max_partition_width: Option<i32>
 
 //
 // Import configuration
@@ -79,6 +88,7 @@ pub struct ExportProfileItem {
 
 #[derive(Serialize, Deserialize, Clone, Debug, Copy)]
 pub struct ExportProfileGraphConfig {
+    pub generate_hierarchy: Option<bool>,
     pub max_partition_depth: Option<i32>,
     pub max_partition_width: Option<i32>,
 }
