@@ -265,8 +265,9 @@ impl Graph {
                     .collect()
             };
 
-            debug!(
-                "Trimming node width: {} max_width: {}, children: {}, non_partition_children: {}, partition_children: {}",
+            // TODO change log level
+            info!(
+                "Trimming width for node: {} max_width: {}, children: {}, non_partition_children: {}, partition_children: {}",
                 node_id,
                 max_width,
                 child_node_ids.len(),

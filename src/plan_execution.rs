@@ -113,6 +113,7 @@ fn run_plan(plan: Plan, plan_file_path: &std::path::Path) -> Result<()> {
                 let mut graph = graph.clone();
                 if let Some(graph_config) = profile.graph_config {
                     if let Some(max_partition_depth) = graph_config.max_partition_depth {
+                        info!("Reducing graph partition depth to {}", max_partition_depth);
                         info!("Graph stats {}", graph.stats());
                         match graph.modify_graph_limit_partition_depth(max_partition_depth) {
                             Ok(_) => {
@@ -125,6 +126,7 @@ fn run_plan(plan: Plan, plan_file_path: &std::path::Path) -> Result<()> {
                         }
                     }
                     if let Some(max_partition_width) = graph_config.max_partition_width {
+                        info!("Reducing graph partition width to {}", max_partition_width);
                         info!("Graph stats {}", graph.stats());
                         match graph.modify_graph_limit_partition_width(max_partition_width) {
                             Ok(_) => {
@@ -139,6 +141,7 @@ fn run_plan(plan: Plan, plan_file_path: &std::path::Path) -> Result<()> {
                     if let Err(errors) = graph.verify_graph_integrity() {
                         warn!("Identified {} graph integrity error(s)", errors.len());
                         errors.iter().for_each(|e| warn!("{}", e));
+                        // TODO exit early
                         error!("Failed to export file {}", profile.filename);
                     } else {
                         info!("Graph integrity verified : ok - rendering exports");

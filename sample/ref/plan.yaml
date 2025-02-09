@@ -24,4 +24,4 @@ export:
     - filename: "out/ref-model-width-2.csv"
       exporter: "CSVNodes"
       graph_config:
-        max_partition_width: 25
+        max_partition_width: 2
