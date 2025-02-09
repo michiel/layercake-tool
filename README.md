@@ -115,6 +115,20 @@ Sample attack tree from [Kelly Shortridge's Security Descision Trees with Graphv
 
 ![Sample](images/attack-tree.svg)
 
+## Graph transformations
+
+### Partition width
+
+Aggregate the nodes in a partition of the limit exceeds the set parameter (`partition_width`).
+
+![Reference model](images/ref-model-hierarchy.svg)
+_Reference model with no transformation_
+
+![Reference model](images/ref-model-hierarchy-width-5.svg)
+_Reference model with a partition width of 5_
+
+![Reference model](images/ref-model-hierarchy-width-2.svg)
+_Reference model with a partition width of 2_
 
 
 
