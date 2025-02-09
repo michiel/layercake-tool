@@ -39,3 +39,8 @@ export:
       exporter: DOTHierarchy
       graph_config:
         max_partition_depth: 3
+    - filename: "out/ref-model-hierarchy-depth-3-width-3.dot"
+      exporter: DOTHierarchy
+      graph_config:
+        max_partition_width: 3
+        max_partition_depth: 3
