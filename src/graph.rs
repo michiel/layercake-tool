@@ -174,23 +174,29 @@ impl Graph {
 
     pub fn modify_graph_limit_partition_depth(&mut self, depth: i32) -> Result<(), String> {
         fn trim_node(node_id: &String, graph: &mut Graph, current_depth: i32, max_depth: i32) {
+            let node = graph.get_node(node_id).unwrap();
+
+            let children = graph.get_children(&node);
+
+            let non_partition_child_node_ids: Vec<String> = children
+                .iter()
+                .filter(|n| !n.is_partition)
+                .map(|n| n.id.clone())
+                .collect();
+
+            let partition_child_node_ids: Vec<String> = children
+                .iter()
+                .filter(|n| n.is_partition)
+                .map(|n| n.id.clone())
+                .collect();
+
             debug!(
-                "Trimming node: {} current_depth: {} max_depth: {}",
+                "Trimming partition depth for node {} : current_depth: {} max_depth: {}",
                 node_id, current_depth, max_depth
             );
 
-            // Clone child node IDs before any mutation
-            let child_node_ids: Vec<String> = {
-                let node = graph.get_node(node_id).unwrap();
-                graph
-                    .get_children_non_partition_nodes(node)
-                    .iter()
-                    .map(|child| child.id.clone())
-                    .collect()
-            };
-
             // Recursively process children first
-            for child_id in &child_node_ids {
+            for child_id in &partition_child_node_ids {
                 trim_node(child_id, graph, current_depth + 1, max_depth);
             }
 
@@ -202,10 +208,9 @@ impl Graph {
                 };
 
                 // HashSet to track edges that need modification
-                let mut nodes_to_remove = Vec::new();
                 let mut new_edges = graph.edges.clone();
 
-                for child_id in &child_node_ids {
+                for child_id in &non_partition_child_node_ids {
                     if let Some(child) = graph.get_node(child_id) {
                         // Aggregate weights
                         agg_node.weight += child.weight;
@@ -219,9 +224,6 @@ impl Graph {
                                 edge.target = agg_node.id.clone();
                             };
                         }
-
-                        // Mark child for removal
-                        nodes_to_remove.push(child.id.clone());
                     } else {
                         error!("Child node not found: {}", child_id);
                     }
@@ -230,7 +232,11 @@ impl Graph {
                 graph.edges = new_edges;
 
                 // Remove child nodes after edge updates
-                for node_id in nodes_to_remove {
+                for node_id in non_partition_child_node_ids {
+                    graph.remove_node(node_id);
+                }
+
+                for node_id in partition_child_node_ids {
                     graph.remove_node(node_id);
                 }
 

@@ -19,9 +19,23 @@ export:
       exporter: "DOT"
     - filename: "out/ref-model-depth.json"
       exporter: "JSON"
-      graph_config:
-        max_partition_depth: 1
     - filename: "out/ref-model-width-2.csv"
       exporter: "CSVNodes"
+    - filename: "out/ref-model-hierarchy.dot"
+      exporter: "DOTHierarchy"
+    - filename: "out/ref-model-hierarchy-width-2.dot"
+      exporter: DOTHierarchy
       graph_config:
         max_partition_width: 2
+    - filename: "out/ref-model-hierarchy-width-5.dot"
+      exporter: DOTHierarchy
+      graph_config:
+        max_partition_width: 5
+    - filename: "out/ref-model-hierarchy-depth-2.dot"
+      exporter: DOTHierarchy
+      graph_config:
+        max_partition_depth: 2
+    - filename: "out/ref-model-hierarchy-depth-3.dot"
+      exporter: DOTHierarchy
+      graph_config:
+        max_partition_depth: 3
