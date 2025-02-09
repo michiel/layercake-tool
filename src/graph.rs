@@ -21,6 +21,14 @@ impl Graph {
             .map(|l| (l.id.clone(), l))
             .collect()
     }
+
+    // Add a new layer if it does not exist
+    pub fn add_layer(&mut self, layer: Layer) {
+        if self.layers.iter().find(|l| l.id == layer.id).is_none() {
+            self.layers.push(layer);
+        }
+    }
+
     pub fn get_root_nodes(&self) -> Vec<&Node> {
         self.nodes
             .iter()
@@ -278,38 +286,59 @@ impl Graph {
                 trim_node(child_id, graph, max_width);
             }
 
-            if child_node_ids.len() as i32 > max_width {
+            if non_partition_child_node_ids.len() as i32 > max_width {
                 debug!("\tChopping time in node: {}", node.id);
-                let children: Vec<Node> = child_node_ids
+
+                let agg_node_id = format!("agg_{}", node.id.clone());
+
+                // Make sure there is an aggregated layer
+                graph.add_layer(Layer::new(
+                    "aggregated",
+                    "Aggregated",
+                    "222222",
+                    "ffffff",
+                    "dddddd",
+                ));
+
+                let mut agg_node = {
+                    Node {
+                        id: agg_node_id.clone(),
+                        label: format!("{} nodes (aggregated)", non_partition_child_node_ids.len()),
+                        layer: "aggregated".to_string(),
+                        is_partition: false,
+                        belongs_to: Some(node.id),
+                        weight: 0,
+                        comment: node.comment.clone(),
+                    }
+                };
+
+                let children: Vec<Node> = non_partition_child_node_ids
                     .iter()
                     .map(|id| graph.get_node(id).unwrap().clone())
                     .collect();
 
                 // Remove children beyond max_width
-                let mut nodes_to_remove = Vec::new();
                 let mut new_edges = graph.edges.clone();
 
                 for child in children.iter() {
                     // Aggregate weights
-                    node.weight += child.weight;
+                    agg_node.weight += child.weight;
                     // Process edges without duplicating them
                     for edge in &mut new_edges {
                         if edge.source == child.id {
-                            edge.source = node.id.clone();
+                            edge.source = agg_node.id.clone();
                         }
                         if edge.target == child.id {
-                            edge.target = node.id.clone();
+                            edge.target = agg_node.id.clone();
                         };
                     }
-
-                    // Mark child for removal
-                    nodes_to_remove.push(child.id.clone());
                 }
 
+                graph.set_node(agg_node);
                 graph.edges = new_edges;
 
                 // Remove child nodes after edge updates
-                for node_id in nodes_to_remove {
+                for node_id in non_partition_child_node_ids {
                     debug!("\tRemoving node: {}", node_id);
                     graph.remove_node(node_id);
                 }
@@ -430,6 +459,14 @@ impl Graph {
             }
         });
 
+        // verify that all nodes are assigned to a layer
+        self.nodes.iter().for_each(|n| {
+            if self.layers.iter().find(|l| l.id == n.layer).is_none() {
+                let err = format!("Node id:[{}] layer {:?} not found in layers", n.id, n.layer);
+                errors.push(err);
+            }
+        });
+
         if errors.is_empty() {
             Ok(())
         } else {
@@ -496,6 +533,24 @@ pub struct Layer {
     pub background_color: String,
     pub text_color: String,
     pub border_color: String,
+}
+
+impl Layer {
+    pub fn new(
+        id: &str,
+        label: &str,
+        background_color: &str,
+        text_color: &str,
+        border_color: &str,
+    ) -> Self {
+        Self {
+            id: id.to_string(),
+            label: label.to_string(),
+            background_color: background_color.to_string(),
+            text_color: text_color.to_string(),
+            border_color: border_color.to_string(),
+        }
+    }
 }
 
 fn is_truthy(s: &str) -> bool {
