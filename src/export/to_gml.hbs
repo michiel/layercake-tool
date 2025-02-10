@@ -1,0 +1,77 @@
+graph [
+    id 0
+    label "Graph"
+  {{#each flow_nodes as |node|}}
+    node [
+      id {{node.id}}
+      label "{{node.label}}"
+      type "flow"
+    {{#if (exists node.layer)}}
+      layer "{{node.layer}}"
+    {{/if}}
+    {{#if (exists node.weight)}}
+      weight {{node.weight}}
+    {{/if}}
+    {{#if (exists node.comment)}}
+      weight "{{node.comment}}"
+    {{/if}}
+    ]
+  {{/each}}
+
+  {{#each flow_edges as |edge|}}
+    edge [
+    {{#if (exists edge.id)}}
+      id {{edge.id}}
+    {{/if}}
+      type "flow"
+      source {{edge.source}}
+      target {{edge.target}}
+    {{#if (exists edge.layer)}}
+      layer "{{edge.layer}}"
+    {{/if}}
+    {{#if (exists edge.weight)}}
+      weight {{edge.weight}}
+    {{/if}}
+    {{#if (exists edge.comment)}}
+      weight "{{edge.comment}}"
+    {{/if}}
+    ]
+  {{/each}}
+
+  {{#each hierarchy_nodes as |node|}}
+    node [
+      id {{node.id}}
+      label "{{node.label}}"
+      type "hierarchy"
+    {{#if (exists node.layer)}}
+      layer "{{node.layer}}"
+    {{/if}}
+    {{#if (exists node.weight)}}
+      weight {{node.weight}}
+    {{/if}}
+    {{#if (exists node.comment)}}
+      weight "{{node.comment}}"
+    {{/if}}
+    ]
+  {{/each}}
+
+  {{#each hierarchy_edges as |edge|}}
+    edge [
+    {{#if (exists edge.id)}}
+      id {{edge.id}}
+    {{/if}}
+      type "hierarchy"
+      source {{edge.source}}
+      target {{edge.target}}
+    {{#if (exists edge.layer)}}
+      layer "{{edge.layer}}"
+    {{/if}}
+    {{#if (exists edge.weight)}}
+      weight {{edge.weight}}
+    {{/if}}
+    {{#if (exists edge.comment)}}
+      weight "{{edge.comment}}"
+    {{/if}}
+    ]
+  {{/each}}
+]

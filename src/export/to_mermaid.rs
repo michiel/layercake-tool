@@ -23,17 +23,5 @@ pub fn render(graph: Graph) -> Result<String, Box<dyn Error>> {
 }
 
 pub fn get_template() -> String {
-    let template = r##"
-flowchart LR
-
-  {{#each hierarchy_tree as |rootnode|}}
-{{{mermaid_render_tree rootnode}}}
-  {{/each}}
-  {{#each flow_edges as |edge|}}
- {{edge.source}} --> {{edge.target}}
-  {{/each}}
-
-    "##;
-
-    template.to_string()
+    include_str!("to_mermaid.hbs").to_string()
 }
