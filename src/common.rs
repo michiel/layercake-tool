@@ -129,63 +129,66 @@ pub fn get_handlebars() -> Handlebars<'static> {
     });
     handlebars.register_helper("mermaid_render_tree", Box::new(mermaid_render_tree));
 
-    handlebars_helper!(dot_render_tree: |node: Value, layermap: Value| {
-        fn render_tree(node: Value, layermap: &serde_json::Map<String, Value>, acc: i32) -> String {
-            if let Value::Object(map) = node {
-                let id = map.get("id").and_then(|v| v.as_str()).unwrap_or("no-id");
-                let label = map.get("label").and_then(|v| v.as_str()).unwrap_or("Unnamed");
-                let layer = map.get("layer").and_then(|v| v.as_str()).unwrap_or("no-layer");
-                let empty_vec = vec![];
-                let children = map.get("children").and_then(|v| v.as_array()).unwrap_or(&empty_vec);
-
-                let indent = " ".repeat((acc * 2) as usize);
-                let mut result = String::new();
-
-                if !children.is_empty() {
-                    result += &format!("{}subgraph cluster_{} {{\n", indent, id);
-                    result += &format!("{}  label=\"{}\"\n", indent, label);
-
-                    if let Some(layer_props) = layermap.get(layer) {
-                        result += &format!("{}  style=filled\n", indent);
-                        if let Some(background_color) = layer_props.get("background_color").and_then(|v| v.as_str()) {
-                            result += &format!("{}  fillcolor=\"#{}\"\n", indent, background_color);
-                        }
-                        if let Some(border_color) = layer_props.get("border_color").and_then(|v| v.as_str()) {
-                            result += &format!("{}  color=\"#{}\"\n", indent, border_color);
-                        }
-                        if let Some(text_color) = layer_props.get("text_color").and_then(|v| v.as_str()) {
-                            result += &format!("{}  fontcolor=\"#{}\"\n", indent, text_color);
-                        }
-                    }
-
-                    let children_rendered: Vec<String> = children.iter().map(|child| {
-                        render_tree(child.clone(), layermap, acc + 1)
-                    }).collect();
-                    result += &children_rendered.join("").to_string();
-                    result += &format!("{}}}\n", indent);
-                } else {
-                    result += &format!("{}{}[label=\"{}\"]\n", indent, id, label);
-                }
-
-                result
-            } else {
-                error!("Expected object, got: {:?}", node);
-                String::new()
-            }
-        }
-
-        let layermap = match layermap {
-            serde_json::Value::Object(map) => map,
-            _ => {
-                error!("Expected layer map object, got: {:?}", layermap);
-                serde_json::Map::new()
-            }
-        };
-
-        render_tree(node, &layermap, 0)
-    });
-
-    handlebars.register_helper("dot_render_tree", Box::new(dot_render_tree));
+    // handlebars_helper!(dot_render_tree: |node: Value, layermap: Value| {
+    //     fn render_tree(node: Value, layermap: &serde_json::Map<String, Value>, acc: i32) -> String {
+    //         if let Value::Object(map) = node {
+    //             let id = map.get("id").and_then(|v| v.as_str()).unwrap_or("no-id");
+    //             let label = map.get("label").and_then(|v| v.as_str()).unwrap_or("Unnamed");
+    //             let layer = map.get("layer").and_then(|v| v.as_str()).unwrap_or("no-layer");
+    //             let empty_vec = vec![];
+    //             let children = map.get("children").and_then(|v| v.as_array()).unwrap_or(&empty_vec);
+    //
+    //             let indent = " ".repeat((acc * 2) as usize);
+    //             let mut result = String::new();
+    //
+    //             if !children.is_empty() {
+    //                 result += &format!("{}subgraph cluster_{} {{\n", indent, id);
+    //                 result += &format!("{}  label=\"{}\"\n", indent, label);
+    //
+    //                 if let Some(layer_props) = layermap.get(layer) {
+    //                     result += &format!("{}  style=filled\n", indent);
+    //                     if let Some(background_color) = layer_props.get("background_color").and_then(|v| v.as_str()) {
+    //                         result += &format!("{}  fillcolor=\"#{}\"\n", indent, background_color);
+    //                     }
+    //                     if let Some(border_color) = layer_props.get("border_color").and_then(|v| v.as_str()) {
+    //                         result += &format!("{}  color=\"#{}\"\n", indent, border_color);
+    //                     }
+    //                     if let Some(text_color) = layer_props.get("text_color").and_then(|v| v.as_str()) {
+    //                         result += &format!("{}  fontcolor=\"#{}\"\n", indent, text_color);
+    //                     }
+    //                 }
+    //
+    //                 let children_rendered: Vec<String> = children.iter().map(|child| {
+    //                     render_tree(child.clone(), layermap, acc + 1)
+    //                 }).collect();
+    //                 result += &children_rendered.join("").to_string();
+    //                 result += &format!("{}}}\n", indent);
+    //             } else {
+    //                 result += &format!("{}{}[label=\"{}\"]\n", indent, id, label);
+    //             }
+    //
+    //             result
+    //         } else {
+    //             error!("Expected object, got: {:?}", node);
+    //             String::new()
+    //         }
+    //     }
+    //
+    //     let layermap = match layermap {
+    //         serde_json::Value::Object(map) => map,
+    //         _ => {
+    //             error!("Expected layer map object, got: {:?}", layermap);
+    //             serde_json::Map::new()
+    //         }
+    //     };
+    //
+    //     render_tree(node, &layermap, 0)
+    // });
+    //
+    // handlebars.register_helper("dot_render_tree", Box::new(dot_render_tree));
+    handlebars
+        .register_template_file("dot_render_tree", "src/export/partials/dot_render_tree.hbs")
+        .unwrap();
 
     handlebars
 }

@@ -1,0 +1,39 @@
+{{#*inline "dot_render_tree"}}
+{{#if (is_object node)}}
+    {{#let (get node "id") as |id|}}
+    {{#let (get node "label") as |label|}}
+    {{#let (get node "layer") as |layer|}}
+    {{#let (get node "children") as |children|}}
+    {{#if children}}
+        {{#let (repeat " " (multiply acc 2)) as |indent|}}
+        {{{indent}}}subgraph cluster_{{id}} {
+        {{{indent}}}  label="{{label}}"
+        {{#if (get layermap layer)}}
+            {{{indent}}}  style=filled
+            {{#if (get (get layermap layer) "background_color")}}
+                {{{indent}}}  fillcolor="#{{get (get layermap layer) "background_color"}}"
+            {{/if}}
+            {{#if (get (get layermap layer) "border_color")}}
+                {{{indent}}}  color="#{{get (get layermap layer) "border_color"}}"
+            {{/if}}
+            {{#if (get (get layermap layer) "text_color")}}
+                {{{indent}}}  fontcolor="#{{get (get layermap layer) "text_color"}}"
+            {{/if}}
+        {{/if}}
+        {{#each children}}
+            {{> dot_render_tree node=this layermap=../layermap acc=(add ../acc 1)}}
+        {{/each}}
+        {{{indent}}}}
+    {{else}}
+        {{#let (repeat " " (multiply acc 2)) as |indent|}}
+        {{{indent}}}{{id}}[label="{{label}}"]
+        {{/let}}
+    {{/if}}
+    {{/let}}
+    {{/let}}
+    {{/let}}
+    {{/let}}
+{{else}}
+    {{error "Expected object, got: " node}}
+{{/if}}
+{{/inline}}
