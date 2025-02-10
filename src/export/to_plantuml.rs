@@ -18,36 +18,7 @@ pub fn render(graph: Graph) -> Result<String, Box<dyn Error>> {
 }
 
 pub fn get_template() -> String {
-    let template = r##"
-@startuml
-
-hide stereotype
-
-<style>
-{{#each layers as |layer|}}
-    .{{layer.id}} {
-        BackgroundColor #{{layer.background_color}};
-        BorderColor #{{layer.border_color}};
-        FontColor #{{layer.text_color}};
-    }
-{{/each}}
-</style>
-
-{{#each tree as |rootnode|}}
-{{{puml_render_tree rootnode ../layers}}}
-{{/each}}
-{{#each edges as |edge|}}
-    {{#if (exists edge.label)}}
- {{edge.source}} --> {{edge.target}} : "{{edge.label}}"
-    {{else}}
- {{edge.source}} --> {{edge.target}}
-    {{/if}}
-{{/each}}
-
-@enduml
-    "##;
-
-    template.to_string()
+    include_str!("to_plantuml.hbs").to_string()
 }
 
 #[cfg(test)]
