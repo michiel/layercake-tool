@@ -11,12 +11,12 @@ path = "src/main.rs"
 
 serde_yaml = "0.9"
 
-tracing = "0.1.40"
-tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 tracing-tree = "0.2.5"
 include_dir = "0.6"
 
-clap = { version = "4.3", features = ["derive"] }
+clap = { version = "4.5", features = ["derive"] }
 
 polars = { version = "0.43.1", features = ["lazy", "csv", "temporal", "sql", "serde", "strings", "rows", "json"] }
 anyhow = "1.0"
