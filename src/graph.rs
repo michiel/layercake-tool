@@ -168,13 +168,11 @@ impl Graph {
             }
 
             if current_depth >= max_depth {
-                // Clone the node before mutating the graph
                 let mut agg_node = {
                     let node = graph.get_node(node_id).unwrap();
                     node.clone()
                 };
 
-                // HashSet to track edges that need modification
                 let mut new_edges = graph.edges.clone();
 
                 for child_id in &non_partition_child_node_ids {
@@ -760,34 +758,6 @@ mod tests {
         assert_eq!(children[0].id, "2");
         assert_eq!(children[1].id, "3");
     }
-
-    // #[test]
-    // fn test_get_edges() {
-    //     let graph = create_test_graph();
-    //     let node = graph.get_node_by_id("2").unwrap();
-    //     let edges = graph.get_edges(node);
-    //     assert_eq!(edges.len(), 2);
-    //     assert_eq!(edges[0].id, "e1");
-    //     assert_eq!(edges[1].id, "e2");
-    // }
-    //
-    // #[test]
-    // fn test_get_edges_from() {
-    //     let graph = create_test_graph();
-    //     let node = graph.get_node_by_id("1").unwrap();
-    //     let edges = graph.get_edges_from(node);
-    //     assert_eq!(edges.len(), 1);
-    //     assert_eq!(edges[0].id, "e1");
-    // }
-    //
-    // #[test]
-    // fn test_get_edges_to() {
-    //     let graph = create_test_graph();
-    //     let node = graph.get_node_by_id("3").unwrap();
-    //     let edges = graph.get_edges_to(node);
-    //     assert_eq!(edges.len(), 1);
-    //     assert_eq!(edges[0].id, "e2");
-    // }
 
     #[test]
     fn test_get_node_by_id() {
