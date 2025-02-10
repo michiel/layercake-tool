@@ -7,8 +7,10 @@ pub fn render(graph: Graph) -> Result<String, Box<dyn Error>> {
     let tree = graph.build_json_tree();
 
     let res = json!({
-        "nodes": graph.get_non_partition_nodes(),
-        "edges": graph.get_non_partition_edges(),
+        "hierarchy_nodes": graph.nodes,
+        "hierarchy_edges": graph.get_hierarchy_edges(),
+        "flow_nodes": graph.get_non_partition_nodes(),
+        "flow_edges": graph.get_non_partition_edges(),
         "tree": tree,
         "layers": graph.get_layer_map(),
     });

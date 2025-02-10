@@ -22,9 +22,11 @@ pub fn render(graph: Graph, params: CustomExportProfile) -> Result<String, Box<d
     let res = handlebars.render_template(
         &fs::read_to_string(&params.template).unwrap(),
         &json!({
-            "nodes": graph.get_non_partition_nodes(),
-            "edges": graph.get_non_partition_edges(),
-            "tree": tree,
+            "hierarchy_nodes": graph.nodes,
+            "hierarchy_edges": graph.get_hierarchy_edges(),
+            "hierarchy_tree": tree,
+            "flow_nodes": graph.get_non_partition_nodes(),
+            "flow_edges": graph.get_non_partition_edges(),
             "layers": graph.get_layer_map(),
         }),
     )?;

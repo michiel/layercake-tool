@@ -8,8 +8,12 @@ pub fn render(graph: Graph) -> Result<String, Box<dyn Error>> {
     let res = handlebars.render_template(
         &get_template(),
         &json!({
-        "nodes": graph.get_non_partition_nodes(),
-        "edges": graph.get_non_partition_edges(),
+        "hierarchy_nodes": graph.nodes,
+        "hierarchy_edges": graph.get_hierarchy_edges(),
+        // "hierarchy_tree": tree,
+        "flow_nodes": graph.get_non_partition_nodes(),
+        "flow_edges": graph.get_non_partition_edges(),
+        "layers": graph.get_layer_map(),
         }),
     )?;
     Ok(res)
@@ -19,29 +23,77 @@ pub fn get_template() -> String {
     let template = r##"graph [
     id 0
     label "Graph"
-  {{#each nodes as |node|}}
+  {{#each flow_nodes as |node|}}
     node [
       id {{node.id}}
       label "{{node.label}}"
-    {{#if (exists node.zone)}}
-      zone "{{node.zone}}"
-    {{/if}}
+      type "flow"
     {{#if (exists node.layer)}}
       layer "{{node.layer}}"
+    {{/if}}
+    {{#if (exists node.weight)}}
+      weight {{node.weight}}
+    {{/if}}
+    {{#if (exists node.comment)}}
+      weight "{{node.comment}}"
     {{/if}}
     ]
   {{/each}}
 
-  {{#each edges as |edge|}}
+  {{#each flow_edges as |edge|}}
     edge [
     {{#if (exists edge.id)}}
       id {{edge.id}}
     {{/if}}
-    {{#if (exists edge.edgetype)}}
-      type {{edge.type}}
-    {{/if}}
+      type "flow"
       source {{edge.source}}
       target {{edge.target}}
+    {{#if (exists edge.layer)}}
+      layer "{{edge.layer}}"
+    {{/if}}
+    {{#if (exists edge.weight)}}
+      weight {{edge.weight}}
+    {{/if}}
+    {{#if (exists edge.comment)}}
+      weight "{{edge.comment}}"
+    {{/if}}
+    ]
+  {{/each}}
+
+  {{#each hierarchy_nodes as |node|}}
+    node [
+      id {{node.id}}
+      label "{{node.label}}"
+      type "hierarchy"
+    {{#if (exists node.layer)}}
+      layer "{{node.layer}}"
+    {{/if}}
+    {{#if (exists node.weight)}}
+      weight {{node.weight}}
+    {{/if}}
+    {{#if (exists node.comment)}}
+      weight "{{node.comment}}"
+    {{/if}}
+    ]
+  {{/each}}
+
+  {{#each hierarchy_edges as |edge|}}
+    edge [
+    {{#if (exists edge.id)}}
+      id {{edge.id}}
+    {{/if}}
+      type "hierarchy"
+      source {{edge.source}}
+      target {{edge.target}}
+    {{#if (exists edge.layer)}}
+      layer "{{edge.layer}}"
+    {{/if}}
+    {{#if (exists edge.weight)}}
+      weight {{edge.weight}}
+    {{/if}}
+    {{#if (exists edge.comment)}}
+      weight "{{edge.comment}}"
+    {{/if}}
     ]
   {{/each}}
 ]

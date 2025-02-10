@@ -9,8 +9,11 @@ pub fn render(graph: Graph) -> Result<String, Box<dyn Error>> {
     let res = handlebars.render_template(
         &get_template(),
         &json!({
-            "nodes": graph.nodes,
-            "edges": graph.get_hierarchy_edges(),
+            "hierarchy_nodes": graph.nodes,
+            "hierarchy_edges": graph.get_hierarchy_edges(),
+            // "hierarchy_tree": tree,
+            // "flow_nodes": graph.get_non_partition_nodes(),
+            // "flow_edges": graph.get_non_partition_edges(),
             "layers": graph.get_layer_map(),
         }),
     )?;

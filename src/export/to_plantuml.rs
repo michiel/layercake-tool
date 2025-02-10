@@ -4,14 +4,12 @@ use std::error::Error;
 pub fn render(graph: Graph) -> Result<String, Box<dyn Error>> {
     use serde_json::json;
 
-    let data = graph.build_json_tree();
-
     let handlebars = crate::common::get_handlebars();
     let res = handlebars.render_template(
         &get_template(),
         &json!({
-        "tree": data,
-        "nodes": graph.nodes,
+        "tree": graph.build_json_tree(),
+        "nodes": graph.get_non_partition_nodes(),
         "edges": graph.get_non_partition_edges(),
         "layers": graph.get_layer_map(),
         }),
@@ -54,9 +52,6 @@ hide stereotype
 
 #[cfg(test)]
 mod tests {
-    
-    
-    
 
     //     #[test]
     //     fn plantuml_template_can_render() {

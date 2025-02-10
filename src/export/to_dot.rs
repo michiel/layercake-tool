@@ -1,35 +1,5 @@
 use crate::graph::Graph;
-use serde::{Deserialize, Serialize};
 use std::error::Error;
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct LayerConfig {
-    pub key: String,
-    #[serde(default = "zoneconfig_puml_default_fillcolor")]
-    pub fillcolor: String,
-    #[serde(default = "zoneconfig_puml_default_fontcolor")]
-    pub fontcolor: String,
-    #[serde(default = "zoneconfig_puml_default_style")]
-    pub style: String,
-    #[serde(default = "zoneconfig_puml_default_shape")]
-    pub shape: String,
-}
-
-fn zoneconfig_puml_default_fillcolor() -> String {
-    "white".to_string()
-}
-
-fn zoneconfig_puml_default_fontcolor() -> String {
-    "black".to_string()
-}
-
-fn zoneconfig_puml_default_style() -> String {
-    "filled".to_string()
-}
-
-fn zoneconfig_puml_default_shape() -> String {
-    "rectangle".to_string()
-}
 
 pub fn render(graph: Graph) -> Result<String, Box<dyn Error>> {
     use serde_json::json;
@@ -40,9 +10,11 @@ pub fn render(graph: Graph) -> Result<String, Box<dyn Error>> {
     let res = handlebars.render_template(
         &get_template(),
         &json!({
-            "nodes": graph.get_non_partition_nodes(),
-            "edges": graph.get_non_partition_edges(),
-            "tree": tree,
+            "hierarchy_nodes": graph.nodes,
+            "hierarchy_edges": graph.get_hierarchy_edges(),
+            "hierarchy_tree": tree,
+            "flow_nodes": graph.get_non_partition_nodes(),
+            "flow_edges": graph.get_non_partition_edges(),
             "layers": graph.get_layer_map(),
         }),
     )?;
@@ -65,7 +37,7 @@ digraph G {
 
   {{#each layers as |layer|}}
   node [style="filled, dashed" fillcolor="#{{layer.background_color}}" fontcolor="#{{layer.text_color}}" penwidth=1 color="#{{layer.border_color}}"]; {
-    {{#each ../nodes as |node|}}
+    {{#each ../flow_nodes as |node|}}
         {{#if (eq node.layer layer.id)}}
             {{node.id}}[label="{{node.label}}"];
         {{/if}}
@@ -79,7 +51,7 @@ node [style="filled, rounded" fillcolor="#dddddd" fontcolor="#000000"];
 {{{dot_render_tree rootnode ../layers}}}
   {{/each}}
 
-  {{#each edges as |edge|}}
+  {{#each flow_edges as |edge|}}
     {{#if (exists edge.label)}}
       {{edge.source}} -> {{edge.target}} [label="{{edge.label}}" {{#each layer in ../layers}} {{#if (eq edge.layer layer.id)}} fontcolor="#{{layer.background_color}}" {{/if}} {{/each}}];
     {{else}}
@@ -94,9 +66,6 @@ node [style="filled, rounded" fillcolor="#dddddd" fontcolor="#000000"];
 
 #[cfg(test)]
 mod tests {
-    
-    
-    
 
     // #[test]
     // fn graphviz_template_can_render() {
