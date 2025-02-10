@@ -1,12 +1,25 @@
 use handlebars::{handlebars_helper, Handlebars};
 use serde_json::Value;
-use tracing::error;
+use tracing::{error, info};
 
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
 
+pub fn create_path_if_not_exists(path: &str) -> std::io::Result<()> {
+    //
+    // remove the file name from the path
+
+    let path = Path::new(path).parent().unwrap();
+    if !path.exists() {
+        info!("Creating path: {:?}", path);
+        std::fs::create_dir_all(path)?;
+    }
+    Ok(())
+}
+
 pub fn write_string_to_file(filename: &str, content: &str) -> std::io::Result<()> {
+    create_path_if_not_exists(filename)?;
     let path = Path::new(filename);
     let mut file = File::create(path)?;
     file.write_all(content.as_bytes())?;
