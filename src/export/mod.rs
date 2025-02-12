@@ -4,6 +4,7 @@ pub mod to_custom;
 pub mod to_dot;
 pub mod to_dot_hierarchy;
 pub mod to_gml;
+pub mod to_jsgraph;
 pub mod to_json;
 pub mod to_mermaid;
 pub mod to_plantuml;

@@ -1,3 +1,5 @@
+meta:
+  name: "Sample Attack Tree"
 import:
   profiles:
     - filename: "nodes.csv"
@@ -25,6 +27,8 @@ export:
       exporter: "CSVEdges"
     - filename: "out/attack-tree.json"
       exporter: "JSON"
+    - filename: "out/attack-tree.js"
+      exporter: "JSGraph"
     # - filename: "out/attack-tree-custom.dot"
     #   exporter: !Custom
     #     template: "sample/attack_tree/custom.hbs"

@@ -36,7 +36,13 @@ use std::collections::HashMap;
 //
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct Meta {
+    pub name: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct Plan {
+    pub meta: Option<Meta>,
     pub import: ImportConfig,
     pub export: ExportProfile,
 }
@@ -109,6 +115,7 @@ pub enum ExportFileType {
     CSVNodes,
     CSVEdges,
     Mermaid,
+    JSGraph,
     Custom(CustomExportProfile),
 }
 
