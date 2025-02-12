@@ -8,6 +8,7 @@ use crate::data_loader::{DfEdgeLoadProfile, DfNodeLoadProfile};
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct Graph {
+    pub name: String,
     pub nodes: Vec<Node>,
     pub edges: Vec<Edge>,
     pub layers: Vec<Layer>,

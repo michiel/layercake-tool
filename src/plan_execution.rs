@@ -29,6 +29,13 @@ fn load_file(file_path: &str) -> Result<DataFrame, anyhow::Error> {
 
 fn run_plan(plan: Plan, plan_file_path: &std::path::Path) -> Result<()> {
     let mut graph = Graph::default();
+    graph.name = match plan.meta {
+        Some(meta) => match meta.name {
+            Some(name) => name,
+            _ => "Unnamed Graph".to_string(),
+        },
+        _ => "Unnamed Graph".to_string(),
+    };
 
     plan.import
         .profiles
@@ -147,6 +154,7 @@ fn run_plan(plan: Plan, plan_file_path: &std::path::Path) -> Result<()> {
                     ExportFileType::CSVEdges => super::export::to_csv_edges::render(graph),
                     ExportFileType::PlantUML => super::export::to_plantuml::render(graph),
                     ExportFileType::Mermaid => super::export::to_mermaid::render(graph),
+                    ExportFileType::JSGraph => super::export::to_jsgraph::render(graph),
                     ExportFileType::Custom(template) => {
                         super::export::to_custom::render(graph, template)
                     }
