@@ -1,0 +1,1822 @@
+{
+  "hierarchy_nodes": [
+    {
+      "id": "root",
+      "label": "Root",
+      "layer": "global",
+      "is_partition": true,
+      "belongs_to": null,
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "mgmt_a",
+      "label": "Management A",
+      "layer": "mgmt",
+      "is_partition": true,
+      "belongs_to": "root",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "mgmt_a_a",
+      "label": "Management A/A",
+      "layer": "mgmt",
+      "is_partition": true,
+      "belongs_to": "mgmt_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "mgmt_a_b",
+      "label": "Management A/B",
+      "layer": "mgmt",
+      "is_partition": true,
+      "belongs_to": "mgmt_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "mgmt_b",
+      "label": "Management B",
+      "layer": "mgmt",
+      "is_partition": true,
+      "belongs_to": "root",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "mgmt_b_a",
+      "label": "Management B/A",
+      "layer": "mgmt",
+      "is_partition": true,
+      "belongs_to": "mgmt_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "mgmt_b_a_b",
+      "label": "Management B/A/B",
+      "layer": "mgmt",
+      "is_partition": true,
+      "belongs_to": "mgmt_b_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "mgmt_b_b",
+      "label": "Management B/B",
+      "layer": "mgmt",
+      "is_partition": true,
+      "belongs_to": "mgmt_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "mgmt_b_b_a",
+      "label": "Management B/B/A",
+      "layer": "mgmt",
+      "is_partition": true,
+      "belongs_to": "mgmt_b_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_01",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_02",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_a_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_03",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_a_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_04",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_a_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_05",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_a_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_06",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_07",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_08",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_09",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_10",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_11",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_12",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_13",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_14",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_15",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_16",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_17",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_18",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_19",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_20",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_21",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_22",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_23",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_24",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_25",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_26",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_27",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_28",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_29",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_30",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_31",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_a_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_32",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_a_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_33",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_a_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_34",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_a_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_35",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_a_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_36",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_a_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_37",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_b_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_38",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_b_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_39",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_b_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_40",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_b_a",
+      "weight": 1,
+      "comment": "null"
+    }
+  ],
+  "hierarchy_edges": [
+    {
+      "id": "root_mgmt_a",
+      "source": "root",
+      "target": "mgmt_a",
+      "label": "",
+      "layer": "global",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_a_mgmt_a_a",
+      "source": "mgmt_a",
+      "target": "mgmt_a_a",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_a_mgmt_a_b",
+      "source": "mgmt_a",
+      "target": "mgmt_a_b",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "root_mgmt_b",
+      "source": "root",
+      "target": "mgmt_b",
+      "label": "",
+      "layer": "global",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_b_mgmt_b_a",
+      "source": "mgmt_b",
+      "target": "mgmt_b_a",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_b_a_mgmt_b_a_b",
+      "source": "mgmt_b_a",
+      "target": "mgmt_b_a_b",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_b_mgmt_b_b",
+      "source": "mgmt_b",
+      "target": "mgmt_b_b",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_b_b_mgmt_b_b_a",
+      "source": "mgmt_b_b",
+      "target": "mgmt_b_b_a",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_a_drone_01",
+      "source": "mgmt_a",
+      "target": "drone_01",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_a_a_drone_02",
+      "source": "mgmt_a_a",
+      "target": "drone_02",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_a_b_drone_03",
+      "source": "mgmt_a_b",
+      "target": "drone_03",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_a_b_drone_04",
+      "source": "mgmt_a_b",
+      "target": "drone_04",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_a_b_drone_05",
+      "source": "mgmt_a_b",
+      "target": "drone_05",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_b_a_drone_06",
+      "source": "mgmt_b_a",
+      "target": "drone_06",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_b_a_drone_07",
+      "source": "mgmt_b_a",
+      "target": "drone_07",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_b_a_drone_08",
+      "source": "mgmt_b_a",
+      "target": "drone_08",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_b_a_drone_09",
+      "source": "mgmt_b_a",
+      "target": "drone_09",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_b_a_drone_10",
+      "source": "mgmt_b_a",
+      "target": "drone_10",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_b_a_drone_11",
+      "source": "mgmt_b_a",
+      "target": "drone_11",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_b_a_drone_12",
+      "source": "mgmt_b_a",
+      "target": "drone_12",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_b_b_drone_13",
+      "source": "mgmt_b_b",
+      "target": "drone_13",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_b_b_drone_14",
+      "source": "mgmt_b_b",
+      "target": "drone_14",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_b_b_drone_15",
+      "source": "mgmt_b_b",
+      "target": "drone_15",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_b_b_drone_16",
+      "source": "mgmt_b_b",
+      "target": "drone_16",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_b_b_drone_17",
+      "source": "mgmt_b_b",
+      "target": "drone_17",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_b_b_drone_18",
+      "source": "mgmt_b_b",
+      "target": "drone_18",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_a_drone_19",
+      "source": "mgmt_a",
+      "target": "drone_19",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_a_drone_20",
+      "source": "mgmt_a",
+      "target": "drone_20",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_a_drone_21",
+      "source": "mgmt_a",
+      "target": "drone_21",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_a_drone_22",
+      "source": "mgmt_a",
+      "target": "drone_22",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_a_drone_23",
+      "source": "mgmt_a",
+      "target": "drone_23",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_a_drone_24",
+      "source": "mgmt_a",
+      "target": "drone_24",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_b_drone_25",
+      "source": "mgmt_b",
+      "target": "drone_25",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_b_drone_26",
+      "source": "mgmt_b",
+      "target": "drone_26",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_b_drone_27",
+      "source": "mgmt_b",
+      "target": "drone_27",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_b_drone_28",
+      "source": "mgmt_b",
+      "target": "drone_28",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_b_drone_29",
+      "source": "mgmt_b",
+      "target": "drone_29",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_b_drone_30",
+      "source": "mgmt_b",
+      "target": "drone_30",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_b_a_b_drone_31",
+      "source": "mgmt_b_a_b",
+      "target": "drone_31",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_b_a_b_drone_32",
+      "source": "mgmt_b_a_b",
+      "target": "drone_32",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_b_a_b_drone_33",
+      "source": "mgmt_b_a_b",
+      "target": "drone_33",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_b_a_b_drone_34",
+      "source": "mgmt_b_a_b",
+      "target": "drone_34",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_b_a_b_drone_35",
+      "source": "mgmt_b_a_b",
+      "target": "drone_35",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_b_a_b_drone_36",
+      "source": "mgmt_b_a_b",
+      "target": "drone_36",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_b_b_a_drone_37",
+      "source": "mgmt_b_b_a",
+      "target": "drone_37",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_b_b_a_drone_38",
+      "source": "mgmt_b_b_a",
+      "target": "drone_38",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_b_b_a_drone_39",
+      "source": "mgmt_b_b_a",
+      "target": "drone_39",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    },
+    {
+      "id": "mgmt_b_b_a_drone_40",
+      "source": "mgmt_b_b_a",
+      "target": "drone_40",
+      "label": "",
+      "layer": "mgmt",
+      "weight": 1,
+      "comment": null
+    }
+  ],
+  "flow_nodes": [
+    {
+      "id": "drone_01",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_02",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_a_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_03",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_a_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_04",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_a_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_05",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_a_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_06",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_07",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_08",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_09",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_10",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_11",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_12",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_13",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_14",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_15",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_16",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_17",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_18",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_19",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_20",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_21",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_22",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_23",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_24",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_25",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_26",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_27",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_28",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_29",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_30",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_31",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_a_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_32",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_a_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_33",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_a_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_34",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_a_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_35",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_a_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_36",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_a_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_37",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_b_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_38",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_b_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_39",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_b_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "drone_40",
+      "label": "Drone",
+      "layer": "drone",
+      "is_partition": false,
+      "belongs_to": "mgmt_b_b_a",
+      "weight": 1,
+      "comment": "null"
+    }
+  ],
+  "flow_edges": [],
+  "tree": [
+    {
+      "id": "root",
+      "depth": 0,
+      "label": "Root",
+      "layer": "global",
+      "is_partition": true,
+      "belongs_to": null,
+      "weight": 1,
+      "comment": "null",
+      "children": [
+        {
+          "id": "mgmt_a",
+          "depth": 1,
+          "label": "Management A",
+          "layer": "mgmt",
+          "is_partition": true,
+          "belongs_to": "root",
+          "weight": 1,
+          "comment": "null",
+          "children": [
+            {
+              "id": "mgmt_a_a",
+              "depth": 2,
+              "label": "Management A/A",
+              "layer": "mgmt",
+              "is_partition": true,
+              "belongs_to": "mgmt_a",
+              "weight": 1,
+              "comment": "null",
+              "children": [
+                {
+                  "id": "drone_02",
+                  "depth": 3,
+                  "label": "Drone",
+                  "layer": "drone",
+                  "is_partition": false,
+                  "belongs_to": "mgmt_a_a",
+                  "weight": 1,
+                  "comment": "null",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "mgmt_a_b",
+              "depth": 2,
+              "label": "Management A/B",
+              "layer": "mgmt",
+              "is_partition": true,
+              "belongs_to": "mgmt_a",
+              "weight": 1,
+              "comment": "null",
+              "children": [
+                {
+                  "id": "drone_03",
+                  "depth": 3,
+                  "label": "Drone",
+                  "layer": "drone",
+                  "is_partition": false,
+                  "belongs_to": "mgmt_a_b",
+                  "weight": 1,
+                  "comment": "null",
+                  "children": []
+                },
+                {
+                  "id": "drone_04",
+                  "depth": 3,
+                  "label": "Drone",
+                  "layer": "drone",
+                  "is_partition": false,
+                  "belongs_to": "mgmt_a_b",
+                  "weight": 1,
+                  "comment": "null",
+                  "children": []
+                },
+                {
+                  "id": "drone_05",
+                  "depth": 3,
+                  "label": "Drone",
+                  "layer": "drone",
+                  "is_partition": false,
+                  "belongs_to": "mgmt_a_b",
+                  "weight": 1,
+                  "comment": "null",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "drone_01",
+              "depth": 2,
+              "label": "Drone",
+              "layer": "drone",
+              "is_partition": false,
+              "belongs_to": "mgmt_a",
+              "weight": 1,
+              "comment": "null",
+              "children": []
+            },
+            {
+              "id": "drone_19",
+              "depth": 2,
+              "label": "Drone",
+              "layer": "drone",
+              "is_partition": false,
+              "belongs_to": "mgmt_a",
+              "weight": 1,
+              "comment": "null",
+              "children": []
+            },
+            {
+              "id": "drone_20",
+              "depth": 2,
+              "label": "Drone",
+              "layer": "drone",
+              "is_partition": false,
+              "belongs_to": "mgmt_a",
+              "weight": 1,
+              "comment": "null",
+              "children": []
+            },
+            {
+              "id": "drone_21",
+              "depth": 2,
+              "label": "Drone",
+              "layer": "drone",
+              "is_partition": false,
+              "belongs_to": "mgmt_a",
+              "weight": 1,
+              "comment": "null",
+              "children": []
+            },
+            {
+              "id": "drone_22",
+              "depth": 2,
+              "label": "Drone",
+              "layer": "drone",
+              "is_partition": false,
+              "belongs_to": "mgmt_a",
+              "weight": 1,
+              "comment": "null",
+              "children": []
+            },
+            {
+              "id": "drone_23",
+              "depth": 2,
+              "label": "Drone",
+              "layer": "drone",
+              "is_partition": false,
+              "belongs_to": "mgmt_a",
+              "weight": 1,
+              "comment": "null",
+              "children": []
+            },
+            {
+              "id": "drone_24",
+              "depth": 2,
+              "label": "Drone",
+              "layer": "drone",
+              "is_partition": false,
+              "belongs_to": "mgmt_a",
+              "weight": 1,
+              "comment": "null",
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "mgmt_b",
+          "depth": 1,
+          "label": "Management B",
+          "layer": "mgmt",
+          "is_partition": true,
+          "belongs_to": "root",
+          "weight": 1,
+          "comment": "null",
+          "children": [
+            {
+              "id": "mgmt_b_a",
+              "depth": 2,
+              "label": "Management B/A",
+              "layer": "mgmt",
+              "is_partition": true,
+              "belongs_to": "mgmt_b",
+              "weight": 1,
+              "comment": "null",
+              "children": [
+                {
+                  "id": "mgmt_b_a_b",
+                  "depth": 3,
+                  "label": "Management B/A/B",
+                  "layer": "mgmt",
+                  "is_partition": true,
+                  "belongs_to": "mgmt_b_a",
+                  "weight": 1,
+                  "comment": "null",
+                  "children": [
+                    {
+                      "id": "drone_31",
+                      "depth": 4,
+                      "label": "Drone",
+                      "layer": "drone",
+                      "is_partition": false,
+                      "belongs_to": "mgmt_b_a_b",
+                      "weight": 1,
+                      "comment": "null",
+                      "children": []
+                    },
+                    {
+                      "id": "drone_32",
+                      "depth": 4,
+                      "label": "Drone",
+                      "layer": "drone",
+                      "is_partition": false,
+                      "belongs_to": "mgmt_b_a_b",
+                      "weight": 1,
+                      "comment": "null",
+                      "children": []
+                    },
+                    {
+                      "id": "drone_33",
+                      "depth": 4,
+                      "label": "Drone",
+                      "layer": "drone",
+                      "is_partition": false,
+                      "belongs_to": "mgmt_b_a_b",
+                      "weight": 1,
+                      "comment": "null",
+                      "children": []
+                    },
+                    {
+                      "id": "drone_34",
+                      "depth": 4,
+                      "label": "Drone",
+                      "layer": "drone",
+                      "is_partition": false,
+                      "belongs_to": "mgmt_b_a_b",
+                      "weight": 1,
+                      "comment": "null",
+                      "children": []
+                    },
+                    {
+                      "id": "drone_35",
+                      "depth": 4,
+                      "label": "Drone",
+                      "layer": "drone",
+                      "is_partition": false,
+                      "belongs_to": "mgmt_b_a_b",
+                      "weight": 1,
+                      "comment": "null",
+                      "children": []
+                    },
+                    {
+                      "id": "drone_36",
+                      "depth": 4,
+                      "label": "Drone",
+                      "layer": "drone",
+                      "is_partition": false,
+                      "belongs_to": "mgmt_b_a_b",
+                      "weight": 1,
+                      "comment": "null",
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "drone_06",
+                  "depth": 3,
+                  "label": "Drone",
+                  "layer": "drone",
+                  "is_partition": false,
+                  "belongs_to": "mgmt_b_a",
+                  "weight": 1,
+                  "comment": "null",
+                  "children": []
+                },
+                {
+                  "id": "drone_07",
+                  "depth": 3,
+                  "label": "Drone",
+                  "layer": "drone",
+                  "is_partition": false,
+                  "belongs_to": "mgmt_b_a",
+                  "weight": 1,
+                  "comment": "null",
+                  "children": []
+                },
+                {
+                  "id": "drone_08",
+                  "depth": 3,
+                  "label": "Drone",
+                  "layer": "drone",
+                  "is_partition": false,
+                  "belongs_to": "mgmt_b_a",
+                  "weight": 1,
+                  "comment": "null",
+                  "children": []
+                },
+                {
+                  "id": "drone_09",
+                  "depth": 3,
+                  "label": "Drone",
+                  "layer": "drone",
+                  "is_partition": false,
+                  "belongs_to": "mgmt_b_a",
+                  "weight": 1,
+                  "comment": "null",
+                  "children": []
+                },
+                {
+                  "id": "drone_10",
+                  "depth": 3,
+                  "label": "Drone",
+                  "layer": "drone",
+                  "is_partition": false,
+                  "belongs_to": "mgmt_b_a",
+                  "weight": 1,
+                  "comment": "null",
+                  "children": []
+                },
+                {
+                  "id": "drone_11",
+                  "depth": 3,
+                  "label": "Drone",
+                  "layer": "drone",
+                  "is_partition": false,
+                  "belongs_to": "mgmt_b_a",
+                  "weight": 1,
+                  "comment": "null",
+                  "children": []
+                },
+                {
+                  "id": "drone_12",
+                  "depth": 3,
+                  "label": "Drone",
+                  "layer": "drone",
+                  "is_partition": false,
+                  "belongs_to": "mgmt_b_a",
+                  "weight": 1,
+                  "comment": "null",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "mgmt_b_b",
+              "depth": 2,
+              "label": "Management B/B",
+              "layer": "mgmt",
+              "is_partition": true,
+              "belongs_to": "mgmt_b",
+              "weight": 1,
+              "comment": "null",
+              "children": [
+                {
+                  "id": "mgmt_b_b_a",
+                  "depth": 3,
+                  "label": "Management B/B/A",
+                  "layer": "mgmt",
+                  "is_partition": true,
+                  "belongs_to": "mgmt_b_b",
+                  "weight": 1,
+                  "comment": "null",
+                  "children": [
+                    {
+                      "id": "drone_37",
+                      "depth": 4,
+                      "label": "Drone",
+                      "layer": "drone",
+                      "is_partition": false,
+                      "belongs_to": "mgmt_b_b_a",
+                      "weight": 1,
+                      "comment": "null",
+                      "children": []
+                    },
+                    {
+                      "id": "drone_38",
+                      "depth": 4,
+                      "label": "Drone",
+                      "layer": "drone",
+                      "is_partition": false,
+                      "belongs_to": "mgmt_b_b_a",
+                      "weight": 1,
+                      "comment": "null",
+                      "children": []
+                    },
+                    {
+                      "id": "drone_39",
+                      "depth": 4,
+                      "label": "Drone",
+                      "layer": "drone",
+                      "is_partition": false,
+                      "belongs_to": "mgmt_b_b_a",
+                      "weight": 1,
+                      "comment": "null",
+                      "children": []
+                    },
+                    {
+                      "id": "drone_40",
+                      "depth": 4,
+                      "label": "Drone",
+                      "layer": "drone",
+                      "is_partition": false,
+                      "belongs_to": "mgmt_b_b_a",
+                      "weight": 1,
+                      "comment": "null",
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "id": "drone_13",
+                  "depth": 3,
+                  "label": "Drone",
+                  "layer": "drone",
+                  "is_partition": false,
+                  "belongs_to": "mgmt_b_b",
+                  "weight": 1,
+                  "comment": "null",
+                  "children": []
+                },
+                {
+                  "id": "drone_14",
+                  "depth": 3,
+                  "label": "Drone",
+                  "layer": "drone",
+                  "is_partition": false,
+                  "belongs_to": "mgmt_b_b",
+                  "weight": 1,
+                  "comment": "null",
+                  "children": []
+                },
+                {
+                  "id": "drone_15",
+                  "depth": 3,
+                  "label": "Drone",
+                  "layer": "drone",
+                  "is_partition": false,
+                  "belongs_to": "mgmt_b_b",
+                  "weight": 1,
+                  "comment": "null",
+                  "children": []
+                },
+                {
+                  "id": "drone_16",
+                  "depth": 3,
+                  "label": "Drone",
+                  "layer": "drone",
+                  "is_partition": false,
+                  "belongs_to": "mgmt_b_b",
+                  "weight": 1,
+                  "comment": "null",
+                  "children": []
+                },
+                {
+                  "id": "drone_17",
+                  "depth": 3,
+                  "label": "Drone",
+                  "layer": "drone",
+                  "is_partition": false,
+                  "belongs_to": "mgmt_b_b",
+                  "weight": 1,
+                  "comment": "null",
+                  "children": []
+                },
+                {
+                  "id": "drone_18",
+                  "depth": 3,
+                  "label": "Drone",
+                  "layer": "drone",
+                  "is_partition": false,
+                  "belongs_to": "mgmt_b_b",
+                  "weight": 1,
+                  "comment": "null",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "drone_25",
+              "depth": 2,
+              "label": "Drone",
+              "layer": "drone",
+              "is_partition": false,
+              "belongs_to": "mgmt_b",
+              "weight": 1,
+              "comment": "null",
+              "children": []
+            },
+            {
+              "id": "drone_26",
+              "depth": 2,
+              "label": "Drone",
+              "layer": "drone",
+              "is_partition": false,
+              "belongs_to": "mgmt_b",
+              "weight": 1,
+              "comment": "null",
+              "children": []
+            },
+            {
+              "id": "drone_27",
+              "depth": 2,
+              "label": "Drone",
+              "layer": "drone",
+              "is_partition": false,
+              "belongs_to": "mgmt_b",
+              "weight": 1,
+              "comment": "null",
+              "children": []
+            },
+            {
+              "id": "drone_28",
+              "depth": 2,
+              "label": "Drone",
+              "layer": "drone",
+              "is_partition": false,
+              "belongs_to": "mgmt_b",
+              "weight": 1,
+              "comment": "null",
+              "children": []
+            },
+            {
+              "id": "drone_29",
+              "depth": 2,
+              "label": "Drone",
+              "layer": "drone",
+              "is_partition": false,
+              "belongs_to": "mgmt_b",
+              "weight": 1,
+              "comment": "null",
+              "children": []
+            },
+            {
+              "id": "drone_30",
+              "depth": 2,
+              "label": "Drone",
+              "layer": "drone",
+              "is_partition": false,
+              "belongs_to": "mgmt_b",
+              "weight": 1,
+              "comment": "null",
+              "children": []
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "layers": {
+    "mgmt": {
+      "id": "mgmt",
+      "label": "Management",
+      "background_color": "8194a0",
+      "text_color": "ffffff",
+      "border_color": "dddddd"
+    },
+    "global": {
+      "id": "global",
+      "label": "Global Ring",
+      "background_color": "426070",
+      "text_color": "ffffff",
+      "border_color": "dddddd"
+    },
+    "drone": {
+      "id": "drone",
+      "label": "Drone",
+      "background_color": "002a41",
+      "text_color": "ffffff",
+      "border_color": "dddddd"
+    },
+    "drone2": {
+      "id": "drone2",
+      "label": "Drone 2",
+      "background_color": "224558",
+      "text_color": "ffffff",
+      "border_color": "dddddd"
+    }
+  }
+}

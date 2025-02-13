@@ -780,7 +780,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "layercake-ng"
+name = "layercake-tool"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -788,6 +788,7 @@ dependencies = [
  "csv",
  "handlebars",
  "include_dir",
+ "indexmap",
  "notify",
  "polars",
  "regex",

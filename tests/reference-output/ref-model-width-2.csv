@@ -1,0 +1,50 @@
+id,label,layer,is_partition,belongs_to,comment
+root,Root,global,true,,null
+mgmt_a,Management A,mgmt,true,root,null
+mgmt_a_a,Management A/A,mgmt,true,mgmt_a,null
+mgmt_a_b,Management A/B,mgmt,true,mgmt_a,null
+mgmt_b,Management B,mgmt,true,root,null
+mgmt_b_a,Management B/A,mgmt,true,mgmt_b,null
+mgmt_b_a_b,Management B/A/B,mgmt,true,mgmt_b_a,null
+mgmt_b_b,Management B/B,mgmt,true,mgmt_b,null
+mgmt_b_b_a,Management B/B/A,mgmt,true,mgmt_b_b,null
+drone_01,Drone,drone,false,mgmt_a,null
+drone_02,Drone,drone,false,mgmt_a_a,null
+drone_03,Drone,drone,false,mgmt_a_b,null
+drone_04,Drone,drone,false,mgmt_a_b,null
+drone_05,Drone,drone,false,mgmt_a_b,null
+drone_06,Drone,drone,false,mgmt_b_a,null
+drone_07,Drone,drone,false,mgmt_b_a,null
+drone_08,Drone,drone,false,mgmt_b_a,null
+drone_09,Drone,drone,false,mgmt_b_a,null
+drone_10,Drone,drone,false,mgmt_b_a,null
+drone_11,Drone,drone,false,mgmt_b_a,null
+drone_12,Drone,drone,false,mgmt_b_a,null
+drone_13,Drone,drone,false,mgmt_b_b,null
+drone_14,Drone,drone,false,mgmt_b_b,null
+drone_15,Drone,drone,false,mgmt_b_b,null
+drone_16,Drone,drone,false,mgmt_b_b,null
+drone_17,Drone,drone,false,mgmt_b_b,null
+drone_18,Drone,drone,false,mgmt_b_b,null
+drone_19,Drone,drone,false,mgmt_a,null
+drone_20,Drone,drone,false,mgmt_a,null
+drone_21,Drone,drone,false,mgmt_a,null
+drone_22,Drone,drone,false,mgmt_a,null
+drone_23,Drone,drone,false,mgmt_a,null
+drone_24,Drone,drone,false,mgmt_a,null
+drone_25,Drone,drone,false,mgmt_b,null
+drone_26,Drone,drone,false,mgmt_b,null
+drone_27,Drone,drone,false,mgmt_b,null
+drone_28,Drone,drone,false,mgmt_b,null
+drone_29,Drone,drone,false,mgmt_b,null
+drone_30,Drone,drone,false,mgmt_b,null
+drone_31,Drone,drone,false,mgmt_b_a_b,null
+drone_32,Drone,drone,false,mgmt_b_a_b,null
+drone_33,Drone,drone,false,mgmt_b_a_b,null
+drone_34,Drone,drone,false,mgmt_b_a_b,null
+drone_35,Drone,drone,false,mgmt_b_a_b,null
+drone_36,Drone,drone,false,mgmt_b_a_b,null
+drone_37,Drone,drone,false,mgmt_b_b_a,null
+drone_38,Drone,drone,false,mgmt_b_b_a,null
+drone_39,Drone,drone,false,mgmt_b_b_a,null
+drone_40,Drone,drone,false,mgmt_b_b_a,null

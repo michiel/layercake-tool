@@ -1,0 +1,72 @@
+@startuml
+
+hide stereotype
+
+left to right direction
+
+<style>
+    .mgmt {
+        BackgroundColor #8194a0;
+        BorderColor #dddddd;
+        FontColor #ffffff;
+    }
+    .global {
+        BackgroundColor #426070;
+        BorderColor #dddddd;
+        FontColor #ffffff;
+    }
+    .drone {
+        BackgroundColor #002a41;
+        BorderColor #dddddd;
+        FontColor #ffffff;
+    }
+    .drone2 {
+        BackgroundColor #224558;
+        BorderColor #dddddd;
+        FontColor #ffffff;
+    }
+</style>
+
+  rectangle "Drone" as drone_01 <<drone>>
+  rectangle "Drone" as drone_02 <<drone>>
+  rectangle "Drone" as drone_03 <<drone>>
+  rectangle "Drone" as drone_04 <<drone>>
+  rectangle "Drone" as drone_05 <<drone>>
+  rectangle "Drone" as drone_06 <<drone>>
+  rectangle "Drone" as drone_07 <<drone>>
+  rectangle "Drone" as drone_08 <<drone>>
+  rectangle "Drone" as drone_09 <<drone>>
+  rectangle "Drone" as drone_10 <<drone>>
+  rectangle "Drone" as drone_11 <<drone>>
+  rectangle "Drone" as drone_12 <<drone>>
+  rectangle "Drone" as drone_13 <<drone>>
+  rectangle "Drone" as drone_14 <<drone>>
+  rectangle "Drone" as drone_15 <<drone>>
+  rectangle "Drone" as drone_16 <<drone>>
+  rectangle "Drone" as drone_17 <<drone>>
+  rectangle "Drone" as drone_18 <<drone>>
+  rectangle "Drone" as drone_19 <<drone>>
+  rectangle "Drone" as drone_20 <<drone>>
+  rectangle "Drone" as drone_21 <<drone>>
+  rectangle "Drone" as drone_22 <<drone>>
+  rectangle "Drone" as drone_23 <<drone>>
+  rectangle "Drone" as drone_24 <<drone>>
+  rectangle "Drone" as drone_25 <<drone>>
+  rectangle "Drone" as drone_26 <<drone>>
+  rectangle "Drone" as drone_27 <<drone>>
+  rectangle "Drone" as drone_28 <<drone>>
+  rectangle "Drone" as drone_29 <<drone>>
+  rectangle "Drone" as drone_30 <<drone>>
+  rectangle "Drone" as drone_31 <<drone>>
+  rectangle "Drone" as drone_32 <<drone>>
+  rectangle "Drone" as drone_33 <<drone>>
+  rectangle "Drone" as drone_34 <<drone>>
+  rectangle "Drone" as drone_35 <<drone>>
+  rectangle "Drone" as drone_36 <<drone>>
+  rectangle "Drone" as drone_37 <<drone>>
+  rectangle "Drone" as drone_38 <<drone>>
+  rectangle "Drone" as drone_39 <<drone>>
+  rectangle "Drone" as drone_40 <<drone>>
+
+
+@enduml

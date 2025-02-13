@@ -1,3 +1,4 @@
+use indexmap::IndexMap;
 use polars::frame::row::Row;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -15,7 +16,7 @@ pub struct Graph {
 }
 
 impl Graph {
-    pub fn get_layer_map(&self) -> HashMap<String, Layer> {
+    pub fn get_layer_map(&self) -> IndexMap<String, Layer> {
         self.layers
             .iter()
             .cloned()
@@ -689,6 +690,7 @@ mod tests {
 
     fn create_test_graph() -> Graph {
         Graph {
+            name: "Test Graph".to_string(),
             nodes: vec![
                 Node {
                     id: "1".to_string(),
@@ -779,6 +781,7 @@ mod tests {
             "is_partition": true,
             "belongs_to": null,
             "weight": 1,
+            "depth": 0,
             "comment": null,
             "children": [
                 {
@@ -787,6 +790,7 @@ mod tests {
                     "layer": "Layer1",
                     "is_partition": false,
                     "belongs_to": "1",
+                    "depth": 1,
                     "comment": null,
                     "weight": 1,
                     "children": []
@@ -797,6 +801,7 @@ mod tests {
                     "layer": "Layer1",
                     "is_partition": false,
                     "belongs_to": "1",
+                    "depth": 1,
                     "comment": null,
                     "weight": 1,
                     "children": []
