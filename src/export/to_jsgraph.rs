@@ -1,4 +1,5 @@
 use crate::graph::Graph;
+use crate::plan::RenderConfig;
 use serde::Serialize;
 use serde_json::json;
 use std::collections::HashMap;
@@ -67,13 +68,14 @@ fn from_graph(graph: Graph) -> JsGraph {
     }
 }
 
-pub fn render(graph: Graph) -> Result<String, Box<dyn Error>> {
+pub fn render(graph: Graph, render_config: RenderConfig) -> Result<String, Box<dyn Error>> {
     let layers = graph.get_layer_map().clone();
     let name = graph.name.clone();
     let data = from_graph(graph);
     let config = json!({
         "name": name,
         "layers": layers,
+        "config": render_config,
     });
 
     let handlebars = crate::common::get_handlebars();

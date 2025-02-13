@@ -13,6 +13,11 @@ export:
       exporter: "GML"
     - filename: "out/ref-model.puml"
       exporter: "PlantUML"
+    - filename: "out/ref-model-render-options.puml"
+      exporter: "PlantUML"
+      render_config:
+        orientation: "LR"
+        contain_nodes: false
     - filename: "out/ref-model.mermaid"
       exporter: "Mermaid"
     - filename: "out/ref-model.dot"
@@ -23,6 +28,10 @@ export:
       exporter: "CSVNodes"
     - filename: "out/ref-model-hierarchy.dot"
       exporter: "DOTHierarchy"
+    - filename: "out/ref-model-hierarchy-lr.dot"
+      exporter: "DOTHierarchy"
+      render_config:
+        orientation: "LR"
     - filename: "out/ref-model-hierarchy-width-2.dot"
       exporter: DOTHierarchy
       graph_config:

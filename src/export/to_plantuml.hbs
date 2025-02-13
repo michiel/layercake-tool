@@ -2,6 +2,12 @@
 
 hide stereotype
 
+{{#if (stringeq config.orientation "LR") }}
+left to right direction
+{{else}}
+top to bottom direction
+{{/if}}
+
 <style>
 {{#each layers as |layer|}}
     .{{layer.id}} {
@@ -12,9 +18,16 @@ hide stereotype
 {{/each}}
 </style>
 
-{{#each hierarchy_tree as |rootnode|}}
+{{#if config.contain_nodes}}
+    {{#each hierarchy_tree as |rootnode|}}
 {{{puml_render_tree rootnode ../layers}}}
-{{/each}}
+    {{/each}}
+{{else}}
+    {{#each flow_nodes as |node|}}
+  rectangle "{{node.label}}" as {{node.id}} <<{{node.layer}}>>
+    {{/each}}
+{{/if}}
+
 {{#each flow_edges as |edge|}}
     {{#if (exists edge.label)}}
  {{edge.source}} --> {{edge.target}} : "{{edge.label}}"

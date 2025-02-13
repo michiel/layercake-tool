@@ -1,8 +1,9 @@
 use crate::graph::Graph;
+use crate::plan::RenderConfig;
 use csv::Writer;
 use std::error::Error;
 
-pub fn render(graph: Graph) -> Result<String, Box<dyn Error>> {
+pub fn render(graph: Graph, _render_config: RenderConfig) -> Result<String, Box<dyn Error>> {
     let mut wtr = Writer::from_writer(vec![]);
 
     // Write the header

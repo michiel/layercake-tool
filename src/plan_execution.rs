@@ -145,18 +145,32 @@ fn run_plan(plan: Plan, plan_file_path: &std::path::Path) -> Result<()> {
 
                 graph.aggregate_edges();
 
+                let render_config = profile.get_render_config();
+
                 let result = match profile.exporter.clone() {
-                    ExportFileType::GML => super::export::to_gml::render(graph),
-                    ExportFileType::DOT => super::export::to_dot::render(graph),
-                    ExportFileType::DOTHierarchy => super::export::to_dot_hierarchy::render(graph),
-                    ExportFileType::JSON => super::export::to_json::render(graph),
-                    ExportFileType::CSVNodes => super::export::to_csv_nodes::render(graph),
-                    ExportFileType::CSVEdges => super::export::to_csv_edges::render(graph),
-                    ExportFileType::PlantUML => super::export::to_plantuml::render(graph),
-                    ExportFileType::Mermaid => super::export::to_mermaid::render(graph),
-                    ExportFileType::JSGraph => super::export::to_jsgraph::render(graph),
+                    ExportFileType::GML => super::export::to_gml::render(graph, render_config),
+                    ExportFileType::DOT => super::export::to_dot::render(graph, render_config),
+                    ExportFileType::DOTHierarchy => {
+                        super::export::to_dot_hierarchy::render(graph, render_config)
+                    }
+                    ExportFileType::JSON => super::export::to_json::render(graph, render_config),
+                    ExportFileType::CSVNodes => {
+                        super::export::to_csv_nodes::render(graph, render_config)
+                    }
+                    ExportFileType::CSVEdges => {
+                        super::export::to_csv_edges::render(graph, render_config)
+                    }
+                    ExportFileType::PlantUML => {
+                        super::export::to_plantuml::render(graph, render_config)
+                    }
+                    ExportFileType::Mermaid => {
+                        super::export::to_mermaid::render(graph, render_config)
+                    }
+                    ExportFileType::JSGraph => {
+                        super::export::to_jsgraph::render(graph, render_config)
+                    }
                     ExportFileType::Custom(template) => {
-                        super::export::to_custom::render(graph, template)
+                        super::export::to_custom::render(graph, render_config, template)
                     }
                 };
 
