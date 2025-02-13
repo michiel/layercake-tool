@@ -1,3 +1,5 @@
+meta:
+  name: "Reference Model"
 import:
   profiles:
     - filename: "nodes.csv"
