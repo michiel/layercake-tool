@@ -1,13 +1,15 @@
 use crate::graph::Graph;
+use crate::plan::RenderConfig;
 use std::error::Error;
 
-pub fn render(graph: Graph) -> Result<String, Box<dyn Error>> {
+pub fn render(graph: Graph, render_config: RenderConfig) -> Result<String, Box<dyn Error>> {
     use serde_json::json;
 
     let handlebars = crate::common::get_handlebars();
     let res = handlebars.render_template(
         &get_template(),
         &json!({
+        "config": render_config,
         "hierarchy_nodes": graph.nodes,
         "hierarchy_edges": graph.get_hierarchy_edges(),
         // "hierarchy_tree": tree,

@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::collections::HashMap;
 
 /// ## Structure
@@ -89,6 +90,7 @@ pub struct ExportProfile {
 pub struct ExportProfileItem {
     pub filename: String,
     pub exporter: ExportFileType,
+    pub render_config: Option<ExportProfileRenderConfig>,
     pub graph_config: Option<ExportProfileGraphConfig>,
 }
 
@@ -97,6 +99,18 @@ pub struct ExportProfileGraphConfig {
     pub generate_hierarchy: Option<bool>,
     pub max_partition_depth: Option<i32>,
     pub max_partition_width: Option<i32>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Copy)]
+pub struct ExportProfileRenderConfig {
+    pub contain_nodes: Option<bool>,
+    pub orientation: Option<RenderConfigOrientation>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Copy)]
+pub enum RenderConfigOrientation {
+    LR,
+    TB,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -117,6 +131,38 @@ pub enum ExportFileType {
     Mermaid,
     JSGraph,
     Custom(CustomExportProfile),
+}
+
+impl Default for ExportProfileRenderConfig {
+    fn default() -> Self {
+        Self {
+            contain_nodes: Some(true),
+            orientation: Some(RenderConfigOrientation::TB),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Copy)]
+pub struct RenderConfig {
+    pub contain_nodes: bool,
+    pub orientation: RenderConfigOrientation,
+}
+
+impl ExportProfileItem {
+    pub fn get_render_config(&self) -> RenderConfig {
+        let render_config = match self.render_config {
+            Some(config) => config,
+            None => ExportProfileRenderConfig::default(),
+        };
+        let orientation = render_config
+            .orientation
+            .unwrap_or(RenderConfigOrientation::TB);
+        let contain_nodes = render_config.contain_nodes.unwrap_or(true);
+        RenderConfig {
+            contain_nodes,
+            orientation,
+        }
+    }
 }
 
 #[cfg(test)]

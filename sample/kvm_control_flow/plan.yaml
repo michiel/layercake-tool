@@ -17,3 +17,7 @@ export:
       exporter: "Mermaid"
     - filename: "out/kvm-control-flow.dot"
       exporter: "DOT"
+      render_config:
+        orientation: "LR"
+        contain_nodes: false
+
