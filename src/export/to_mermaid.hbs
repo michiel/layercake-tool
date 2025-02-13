@@ -1,9 +1,10 @@
-flowchart LR
+flowchart {{config.orientation}}
 
-  {{#each hierarchy_tree as |rootnode|}}
+{{#each hierarchy_tree as |rootnode|}}
 {{{mermaid_render_tree rootnode}}}
-  {{/each}}
-  {{#each flow_edges as |edge|}}
+{{/each}}
+
+{{#each flow_edges as |edge|}}
  {{edge.source}} --> {{edge.target}}
-  {{/each}}
+{{/each}}
 

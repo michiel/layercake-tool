@@ -11,8 +11,6 @@ pub fn render(graph: Graph, render_config: RenderConfig) -> Result<String, Box<d
         &json!({
         "config": render_config,
         // "tree": data,
-        // "nodes": graph.nodes,
-        // "edges": graph.get_non_partition_edges(),
         "hierarchy_nodes": graph.nodes,
         "hierarchy_edges": graph.get_hierarchy_edges(),
         "hierarchy_tree": graph.build_json_tree(),
