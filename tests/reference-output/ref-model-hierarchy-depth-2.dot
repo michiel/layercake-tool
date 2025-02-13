@@ -1,0 +1,62 @@
+digraph G {
+    rankdir="TB";
+    splines=true;
+    overlap=false;
+    nodesep="0.3";
+    ranksep="1.3";
+    labelloc="t";
+    fontname="Lato";
+    node [ shape="plaintext" style="filled, rounded" fontsize=12]
+    edge [ fontname="Lato" color="#2B303A" fontsize=8]
+
+  node [style="filled, dashed" fillcolor="#8194a0" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
+            mgmt_a[label="Management A"];
+            mgmt_a_a[label="Management A/A"];
+            mgmt_a_b[label="Management A/B"];
+            mgmt_b[label="Management B"];
+            mgmt_b_a[label="Management B/A"];
+            mgmt_b_b[label="Management B/B"];
+    }
+  node [style="filled, dashed" fillcolor="#426070" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
+            root[label="Root"];
+    }
+  node [style="filled, dashed" fillcolor="#002a41" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
+            drone_01[label="Drone"];
+            drone_19[label="Drone"];
+            drone_20[label="Drone"];
+            drone_21[label="Drone"];
+            drone_22[label="Drone"];
+            drone_23[label="Drone"];
+            drone_24[label="Drone"];
+            drone_25[label="Drone"];
+            drone_26[label="Drone"];
+            drone_27[label="Drone"];
+            drone_28[label="Drone"];
+            drone_29[label="Drone"];
+            drone_30[label="Drone"];
+    }
+  node [style="filled, dashed" fillcolor="#224558" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
+    }
+
+node [style="filled, rounded" fillcolor="#dddddd" fontcolor="#000000"];
+
+      root -> mgmt_a;
+      mgmt_a -> mgmt_a_a;
+      mgmt_a -> mgmt_a_b;
+      root -> mgmt_b;
+      mgmt_b -> mgmt_b_a;
+      mgmt_b -> mgmt_b_b;
+      mgmt_a -> drone_01;
+      mgmt_a -> drone_19;
+      mgmt_a -> drone_20;
+      mgmt_a -> drone_21;
+      mgmt_a -> drone_22;
+      mgmt_a -> drone_23;
+      mgmt_a -> drone_24;
+      mgmt_b -> drone_25;
+      mgmt_b -> drone_26;
+      mgmt_b -> drone_27;
+      mgmt_b -> drone_28;
+      mgmt_b -> drone_29;
+      mgmt_b -> drone_30;
+}
