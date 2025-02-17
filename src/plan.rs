@@ -98,12 +98,17 @@ pub struct ExportProfileGraphConfig {
     pub generate_hierarchy: Option<bool>,
     pub max_partition_depth: Option<i32>,
     pub max_partition_width: Option<i32>,
+    pub flip_nodes_and_edges: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Copy)]
 pub struct ExportProfileRenderConfig {
     pub contain_nodes: Option<bool>,
     pub orientation: Option<RenderConfigOrientation>,
+    pub node_label_max_length: Option<usize>,
+    pub node_label_insert_newlines_at: Option<usize>,
+    pub edge_label_max_length: Option<usize>,
+    pub edge_label_insert_newlines_at: Option<usize>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Copy)]
@@ -137,6 +142,10 @@ impl Default for ExportProfileRenderConfig {
         Self {
             contain_nodes: Some(true),
             orientation: Some(RenderConfigOrientation::TB),
+            node_label_max_length: Some(0),
+            node_label_insert_newlines_at: Some(0),
+            edge_label_insert_newlines_at: Some(0),
+            edge_label_max_length: Some(0),
         }
     }
 }
@@ -145,6 +154,10 @@ impl Default for ExportProfileRenderConfig {
 pub struct RenderConfig {
     pub contain_nodes: bool,
     pub orientation: RenderConfigOrientation,
+    pub node_label_max_length: usize,
+    pub node_label_insert_newlines_at: usize,
+    pub edge_label_max_length: usize,
+    pub edge_label_insert_newlines_at: usize,
 }
 
 impl ExportProfileItem {
@@ -157,9 +170,20 @@ impl ExportProfileItem {
             .orientation
             .unwrap_or(RenderConfigOrientation::TB);
         let contain_nodes = render_config.contain_nodes.unwrap_or(true);
+        let node_label_max_length = render_config.node_label_max_length.unwrap_or(0);
+        let node_label_insert_newlines_at =
+            render_config.node_label_insert_newlines_at.unwrap_or(0);
+        let edge_label_max_length = render_config.edge_label_max_length.unwrap_or(0);
+        let edge_label_insert_newlines_at =
+            render_config.edge_label_insert_newlines_at.unwrap_or(0);
+
         RenderConfig {
             contain_nodes,
             orientation,
+            node_label_max_length,
+            node_label_insert_newlines_at,
+            edge_label_max_length,
+            edge_label_insert_newlines_at,
         }
     }
 }

@@ -250,13 +250,23 @@ impl Graph {
             let child_node_ids: Vec<String> = children.iter().map(|n| n.id.clone()).collect();
 
             debug!(
-                "Trimming width for node: {} max_width: {}, children: {}, non_partition_children: {}, partition_children: {}",
+                "Trimming non-partition width for node: {} max_width: {}, children: {}, non_partition_children: {}, partition_children: {}",
                 node_id,
                 max_width,
                 child_node_ids.len(),
                 non_partition_child_node_ids.len(),
                 partition_child_node_ids.len()
             );
+
+            if partition_child_node_ids.len() as i32 > max_width {
+                warn!(
+                    "Partition children count for node {} is {} and exceeds max_width {} for non-partition nodes. This might not be the intended behavior",
+                    node.id,
+                    partition_child_node_ids.len(),
+                    max_width
+                );
+                return;
+            }
 
             // Recursively process partition children first
             for child_id in &partition_child_node_ids {
@@ -271,7 +281,7 @@ impl Graph {
 
                 // Make sure there is an aggregated layer
                 if !graph.layer_exists("aggregated") {
-                    warn!("Aggregating nodes, but a layer 'aggregated' does not exist. Creating one. Add this layer to your graph config");
+                    warn!("Aggregating nodes, but a layer 'aggregated' does not exist. Creating one. Add this layer to your graph config if you want to style it");
                     graph.add_layer(Layer::new(
                         "aggregated",
                         "Aggregated",
