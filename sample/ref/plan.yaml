@@ -18,6 +18,13 @@ export:
   profiles:
     - filename: "out/ref-model.gml"
       exporter: "GML"
+    - filename: "out/ref-model-labels-chopped.gml"
+      exporter: "GML"
+      graph_config:
+        node_label_max_length: 2
+        node_label_insert_newlines_at: 1
+        edge_label_max_length: 2
+        edge_label_insert_newlines_at: 1
     - filename: "out/ref-model.puml"
       exporter: "PlantUML"
     - filename: "out/ref-model-render-options.puml"
