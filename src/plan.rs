@@ -132,6 +132,7 @@ pub enum ExportFileType {
     PlantUML,
     CSVNodes,
     CSVEdges,
+    CSVMatrix,
     Mermaid,
     JSGraph,
     Custom(CustomExportProfile),

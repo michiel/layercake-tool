@@ -54,6 +54,29 @@ impl Graph {
         self.nodes.iter().find(|n| n.id == id)
     }
 
+    pub fn get_max_hierarchy_depth(&self) -> i32 {
+        fn max_child_depth(node: &TreeNode) -> i32 {
+            let mut max_depth = node.depth;
+            for child in &node.children {
+                let child_depth = max_child_depth(child);
+                if child_depth > max_depth {
+                    max_depth = child_depth;
+                }
+            }
+            max_depth
+        }
+
+        let mut max_depth = 0;
+        let tree = self.build_tree();
+        for node in &tree {
+            let child_depth = max_child_depth(node);
+            if child_depth > max_depth {
+                max_depth = child_depth;
+            }
+        }
+        max_depth
+    }
+
     pub fn get_hierarchy_edges(&self) -> Vec<Edge> {
         let mut edges = Vec::new();
         self.nodes.iter().for_each(|node| {

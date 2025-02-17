@@ -196,6 +196,9 @@ fn run_plan(plan: Plan, plan_file_path: &std::path::Path) -> Result<()> {
                     ExportFileType::CSVEdges => {
                         super::export::to_csv_edges::render(graph, render_config)
                     }
+                    ExportFileType::CSVMatrix => {
+                        super::export::to_csv_matrix::render(graph, render_config)
+                    }
                     ExportFileType::PlantUML => {
                         super::export::to_plantuml::render(graph, render_config)
                     }

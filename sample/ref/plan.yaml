@@ -42,8 +42,15 @@ export:
         contain_nodes: false
     - filename: "out/ref-model-depth.json"
       exporter: "JSON"
-    - filename: "out/ref-model-width-2.csv"
+
+    - filename: "out/ref-model-nodes.csv"
       exporter: "CSVNodes"
+
+    - filename: "out/ref-model-edges.csv"
+      exporter: "CSVEdges"
+
+    - filename: "out/ref-model-matrix.csv"
+      exporter: "CSVMatrix"
 
     # The DOTHierarchy exporter does not render flow nodes, but renders the
     # belongs_to hierarchy of the graph nodes
