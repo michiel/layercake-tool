@@ -13,7 +13,7 @@ graph [
       weight {{node.weight}}
     {{/if}}
     {{#if (exists node.comment)}}
-      weight "{{node.comment}}"
+      comment "{{{node.comment}}}"
     {{/if}}
     ]
   {{/each}}
@@ -33,7 +33,7 @@ graph [
       weight {{edge.weight}}
     {{/if}}
     {{#if (exists edge.comment)}}
-      weight "{{edge.comment}}"
+      comment "{{{edge.comment}}}"
     {{/if}}
     ]
   {{/each}}
@@ -50,7 +50,7 @@ graph [
       weight {{node.weight}}
     {{/if}}
     {{#if (exists node.comment)}}
-      weight "{{node.comment}}"
+      comment "{{{node.comment}}}"
     {{/if}}
     ]
   {{/each}}
@@ -70,7 +70,7 @@ graph [
       weight {{edge.weight}}
     {{/if}}
     {{#if (exists edge.comment)}}
-      weight "{{edge.comment}}"
+      comment "{{{edge.comment}}}"
     {{/if}}
     ]
   {{/each}}
