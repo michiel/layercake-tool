@@ -106,41 +106,77 @@ fn run_plan(plan: Plan, plan_file_path: &std::path::Path) -> Result<()> {
                     profile.filename, profile.exporter
                 );
                 let mut graph = graph.clone();
-                if let Some(graph_config) = profile.graph_config {
-                    if let Some(max_partition_depth) = graph_config.max_partition_depth {
-                        info!("Reducing graph partition depth to {}", max_partition_depth);
-                        debug!("Graph stats {}", graph.stats());
-                        match graph.modify_graph_limit_partition_depth(max_partition_depth) {
-                            Ok(_) => {
-                                debug!("Graph partition depth limited to {}", max_partition_depth);
-                                debug!("Graph stats {}", graph.stats());
-                            }
-                            Err(e) => {
-                                error!("Failed to limit graph partition depth: {}", e);
-                            }
+                let graph_config = profile.get_graph_config();
+                if graph_config.flip_nodes_and_edges {
+                    info!("Flipping nodes and edges");
+                    unimplemented!();
+                }
+                if graph_config.max_partition_depth > 0 {
+                    let max_partition_depth = graph_config.max_partition_depth;
+                    info!("Reducing graph partition depth to {}", max_partition_depth);
+                    debug!("Graph stats {}", graph.stats());
+                    match graph.modify_graph_limit_partition_depth(max_partition_depth) {
+                        Ok(_) => {
+                            debug!("Graph partition depth limited to {}", max_partition_depth);
+                            debug!("Graph stats {}", graph.stats());
+                        }
+                        Err(e) => {
+                            error!("Failed to limit graph partition depth: {}", e);
                         }
                     }
-                    if let Some(max_partition_width) = graph_config.max_partition_width {
-                        info!("Reducing graph partition width to {}", max_partition_width);
-                        debug!("Graph stats {}", graph.stats());
-                        match graph.modify_graph_limit_partition_width(max_partition_width) {
-                            Ok(_) => {
-                                debug!("Graph partition width limited to {}", max_partition_width);
-                                debug!("Graph stats {}", graph.stats());
-                            }
-                            Err(e) => {
-                                error!("Failed to limit graph partition width: {}", e);
-                            }
+                }
+                if graph_config.max_partition_width > 0 {
+                    let max_partition_width = graph_config.max_partition_width;
+                    info!("Reducing graph partition width to {}", max_partition_width);
+                    debug!("Graph stats {}", graph.stats());
+                    match graph.modify_graph_limit_partition_width(max_partition_width) {
+                        Ok(_) => {
+                            debug!("Graph partition width limited to {}", max_partition_width);
+                            debug!("Graph stats {}", graph.stats());
+                        }
+                        Err(e) => {
+                            error!("Failed to limit graph partition width: {}", e);
                         }
                     }
-                    if let Err(errors) = graph.verify_graph_integrity() {
-                        warn!("Identified {} graph integrity error(s)", errors.len());
-                        errors.iter().for_each(|e| warn!("{}", e));
-                        // TODO exit early
-                        error!("Failed to export file {}", profile.filename);
-                    } else {
-                        debug!("All clear for export target {}", profile.filename);
-                    }
+                }
+
+                if graph_config.node_label_max_length > 0 {
+                    let node_label_max_length = graph_config.node_label_max_length;
+                    info!("Truncating node labels to {}", node_label_max_length);
+                    graph.truncate_node_labels(node_label_max_length);
+                }
+
+                if graph_config.node_label_insert_newlines_at > 0 {
+                    let node_label_insert_newlines_at = graph_config.node_label_insert_newlines_at;
+                    info!(
+                        "Inserting newlines in node labels at {}",
+                        node_label_insert_newlines_at
+                    );
+                    graph.insert_newlines_in_node_labels(node_label_insert_newlines_at);
+                }
+
+                if graph_config.edge_label_max_length > 0 {
+                    let edge_label_max_length = graph_config.edge_label_max_length;
+                    info!("Truncating edge labels to {}", edge_label_max_length);
+                    graph.truncate_edge_labels(edge_label_max_length);
+                }
+
+                if graph_config.edge_label_insert_newlines_at > 0 {
+                    let edge_label_insert_newlines_at = graph_config.edge_label_insert_newlines_at;
+                    info!(
+                        "Inserting newlines in edge labels at {}",
+                        edge_label_insert_newlines_at
+                    );
+                    graph.insert_newlines_in_edge_labels(edge_label_insert_newlines_at);
+                }
+
+                if let Err(errors) = graph.verify_graph_integrity() {
+                    warn!("Identified {} graph integrity error(s)", errors.len());
+                    errors.iter().for_each(|e| warn!("{}", e));
+                    // TODO exit early - or not if we're watching
+                    error!("Failed to export file {}", profile.filename);
+                } else {
+                    debug!("All clear for export target {}", profile.filename);
                 }
 
                 graph.aggregate_edges();
