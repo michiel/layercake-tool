@@ -99,16 +99,16 @@ pub struct ExportProfileGraphConfig {
     pub max_partition_depth: Option<i32>,
     pub max_partition_width: Option<i32>,
     pub flip_nodes_and_edges: Option<bool>,
+    pub node_label_max_length: Option<usize>,
+    pub node_label_insert_newlines_at: Option<usize>,
+    pub edge_label_max_length: Option<usize>,
+    pub edge_label_insert_newlines_at: Option<usize>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Copy)]
 pub struct ExportProfileRenderConfig {
     pub contain_nodes: Option<bool>,
     pub orientation: Option<RenderConfigOrientation>,
-    pub node_label_max_length: Option<usize>,
-    pub node_label_insert_newlines_at: Option<usize>,
-    pub edge_label_max_length: Option<usize>,
-    pub edge_label_insert_newlines_at: Option<usize>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Copy)]
@@ -137,15 +137,26 @@ pub enum ExportFileType {
     Custom(CustomExportProfile),
 }
 
+impl Default for ExportProfileGraphConfig {
+    fn default() -> Self {
+        Self {
+            generate_hierarchy: None,
+            max_partition_depth: None,
+            max_partition_width: None,
+            flip_nodes_and_edges: None,
+            node_label_max_length: None,
+            node_label_insert_newlines_at: None,
+            edge_label_insert_newlines_at: None,
+            edge_label_max_length: None,
+        }
+    }
+}
+
 impl Default for ExportProfileRenderConfig {
     fn default() -> Self {
         Self {
             contain_nodes: Some(true),
             orientation: Some(RenderConfigOrientation::TB),
-            node_label_max_length: Some(0),
-            node_label_insert_newlines_at: Some(0),
-            edge_label_insert_newlines_at: Some(0),
-            edge_label_max_length: Some(0),
         }
     }
 }
@@ -154,6 +165,14 @@ impl Default for ExportProfileRenderConfig {
 pub struct RenderConfig {
     pub contain_nodes: bool,
     pub orientation: RenderConfigOrientation,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Copy)]
+pub struct GraphConfig {
+    pub generate_hierarchy: bool,
+    pub max_partition_depth: i32,
+    pub max_partition_width: i32,
+    pub flip_nodes_and_edges: bool,
     pub node_label_max_length: usize,
     pub node_label_insert_newlines_at: usize,
     pub edge_label_max_length: usize,
@@ -161,6 +180,32 @@ pub struct RenderConfig {
 }
 
 impl ExportProfileItem {
+    pub fn get_graph_config(&self) -> GraphConfig {
+        let graph_config = match self.graph_config {
+            Some(config) => config,
+            None => ExportProfileGraphConfig::default(),
+        };
+
+        let generate_hierarchy = graph_config.generate_hierarchy.unwrap_or(false);
+        let max_partition_depth = graph_config.max_partition_depth.unwrap_or(0);
+        let max_partition_width = graph_config.max_partition_width.unwrap_or(0);
+        let flip_nodes_and_edges = graph_config.flip_nodes_and_edges.unwrap_or(false);
+        let node_label_max_length = graph_config.node_label_max_length.unwrap_or(0);
+        let node_label_insert_newlines_at = graph_config.node_label_insert_newlines_at.unwrap_or(0);
+        let edge_label_max_length = graph_config.edge_label_max_length.unwrap_or(0);
+        let edge_label_insert_newlines_at = graph_config.edge_label_insert_newlines_at.unwrap_or(0);
+
+        GraphConfig {
+            generate_hierarchy,
+            max_partition_depth,
+            max_partition_width,
+            flip_nodes_and_edges,
+            node_label_max_length,
+            node_label_insert_newlines_at,
+            edge_label_max_length,
+            edge_label_insert_newlines_at,
+        }
+    }
     pub fn get_render_config(&self) -> RenderConfig {
         let render_config = match self.render_config {
             Some(config) => config,
@@ -170,20 +215,10 @@ impl ExportProfileItem {
             .orientation
             .unwrap_or(RenderConfigOrientation::TB);
         let contain_nodes = render_config.contain_nodes.unwrap_or(true);
-        let node_label_max_length = render_config.node_label_max_length.unwrap_or(0);
-        let node_label_insert_newlines_at =
-            render_config.node_label_insert_newlines_at.unwrap_or(0);
-        let edge_label_max_length = render_config.edge_label_max_length.unwrap_or(0);
-        let edge_label_insert_newlines_at =
-            render_config.edge_label_insert_newlines_at.unwrap_or(0);
 
         RenderConfig {
             contain_nodes,
             orientation,
-            node_label_max_length,
-            node_label_insert_newlines_at,
-            edge_label_max_length,
-            edge_label_insert_newlines_at,
         }
     }
 }
