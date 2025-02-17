@@ -141,23 +141,66 @@ impl Graph {
         )
     }
 
+    pub fn truncate_node_labels(&mut self, max_length: usize) {
+        self.nodes.iter_mut().for_each(|n| {
+            if n.label.len() > max_length {
+                n.label = n.label[..max_length].to_string();
+            }
+        });
+    }
+
+    pub fn insert_newlines_in_node_labels(&mut self, max_length: usize) {
+        self.nodes.iter_mut().for_each(|n| {
+            if n.label.len() > max_length {
+                let mut new_label = String::new();
+                let mut current_length = 0;
+                for word in n.label.split_whitespace() {
+                    if current_length + word.len() > max_length {
+                        new_label.push_str("\n");
+                        current_length = 0;
+                    }
+                    new_label.push_str(word);
+                    new_label.push_str(" ");
+                    current_length += word.len() + 1;
+                }
+                n.label = new_label.trim().to_string();
+            }
+        });
+    }
+
+    pub fn truncate_edge_labels(&mut self, max_length: usize) {
+        self.edges.iter_mut().for_each(|n| {
+            if n.label.len() > max_length {
+                n.label = n.label[..max_length].to_string();
+            }
+        });
+    }
+
+    pub fn insert_newlines_in_edge_labels(&mut self, max_length: usize) {
+        self.edges.iter_mut().for_each(|n| {
+            if n.label.len() > max_length {
+                let mut new_label = String::new();
+                let mut current_length = 0;
+                for word in n.label.split_whitespace() {
+                    if current_length + word.len() > max_length {
+                        new_label.push_str("\n");
+                        current_length = 0;
+                    }
+                    new_label.push_str(word);
+                    new_label.push_str(" ");
+                    current_length += word.len() + 1;
+                }
+                n.label = new_label.trim().to_string();
+            }
+        });
+    }
+
     pub fn modify_graph_limit_partition_depth(&mut self, depth: i32) -> Result<(), String> {
         fn trim_node(node_id: &String, graph: &mut Graph, current_depth: i32, max_depth: i32) {
             let node = graph.get_node(node_id).unwrap();
-
             let children = graph.get_children(&node);
 
-            let non_partition_child_node_ids: Vec<String> = children
-                .iter()
-                .filter(|n| !n.is_partition)
-                .map(|n| n.id.clone())
-                .collect();
-
-            let partition_child_node_ids: Vec<String> = children
-                .iter()
-                .filter(|n| n.is_partition)
-                .map(|n| n.id.clone())
-                .collect();
+            let all_child_node_ids: Vec<String> = children.iter().map(|n| n.id.clone()).collect();
 
             debug!(
                 "Trimming partition depth for node {} : current_depth: {} max_depth: {}",
@@ -165,32 +208,47 @@ impl Graph {
             );
 
             // Recursively process children first
-            for child_id in &partition_child_node_ids {
+            for child_id in &all_child_node_ids {
                 trim_node(child_id, graph, current_depth + 1, max_depth);
             }
 
             if current_depth >= max_depth {
                 let mut agg_node = {
                     let node = graph.get_node(node_id).unwrap();
-                    node.clone()
+                    let mut cloned_node = node.clone();
+                    cloned_node.is_partition = false; // Ensure the aggregated node is non-partition
+                    cloned_node
                 };
 
-                let mut new_edges = graph.edges.clone();
+                let mut new_edges = Vec::new();
 
-                for child_id in &non_partition_child_node_ids {
-                    if let Some(child) = graph.get_node(child_id) {
-                        // Aggregate weights
-                        agg_node.weight += child.weight;
+                for edge in &graph.edges {
+                    let source_exists = graph.get_node(&edge.source).is_some();
+                    let target_exists = graph.get_node(&edge.target).is_some();
 
-                        // Process edges without duplicating them
-                        for edge in &mut new_edges {
-                            if edge.source == child.id {
-                                edge.source = agg_node.id.clone();
-                            }
-                            if edge.target == child.id {
-                                edge.target = agg_node.id.clone();
-                            };
+                    if source_exists && target_exists {
+                        if all_child_node_ids.contains(&edge.source) {
+                            new_edges.push(Edge {
+                                source: agg_node.id.clone(),
+                                target: edge.target.clone(),
+                                ..edge.clone()
+                            });
+                        } else if all_child_node_ids.contains(&edge.target) {
+                            new_edges.push(Edge {
+                                source: edge.source.clone(),
+                                target: agg_node.id.clone(),
+                                ..edge.clone()
+                            });
+                        } else {
+                            new_edges.push(edge.clone());
                         }
+                    }
+                }
+
+                // Aggregate weights
+                for child_id in &all_child_node_ids {
+                    if let Some(child) = graph.get_node(child_id) {
+                        agg_node.weight += child.weight;
                     } else {
                         error!("Child node not found: {}", child_id);
                     }
@@ -199,11 +257,7 @@ impl Graph {
                 graph.edges = new_edges;
 
                 // Remove child nodes after edge updates
-                for node_id in non_partition_child_node_ids {
-                    graph.remove_node(node_id);
-                }
-
-                for node_id in partition_child_node_ids {
+                for node_id in all_child_node_ids {
                     graph.remove_node(node_id);
                 }
 

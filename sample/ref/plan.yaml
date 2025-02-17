@@ -10,6 +10,11 @@ import:
       filetype: "Layers"
 
 export:
+  # The render_config and graph_config blocks are optional, as are all settings in them
+  # They can be used for all exporters, with the following caveats:
+  # - render_config is not used by all exporters (e.g. CSVNodes, CSVEdges, JSON), but where they are used they are applied in the handlebars templates
+  # - graph_config contains changes to the graph and its properties and there transformations are performed before rendering
+
   profiles:
     - filename: "out/ref-model.gml"
       exporter: "GML"
@@ -22,12 +27,20 @@ export:
         contain_nodes: false
     - filename: "out/ref-model.mermaid"
       exporter: "Mermaid"
-    - filename: "out/ref-model.dot"
+    - filename: "out/ref-model-with-partitions.dot"
       exporter: "DOT"
+    - filename: "out/ref-model-without-partitions.dot"
+      exporter: "DOT"
+      render_config:
+        contain_nodes: false
     - filename: "out/ref-model-depth.json"
       exporter: "JSON"
     - filename: "out/ref-model-width-2.csv"
       exporter: "CSVNodes"
+
+    # The DOTHierarchy exporter does not render flow nodes, but renders the
+    # belongs_to hierarchy of the graph nodes
+
     - filename: "out/ref-model-hierarchy.dot"
       exporter: "DOTHierarchy"
     - filename: "out/ref-model-hierarchy-lr.dot"
