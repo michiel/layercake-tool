@@ -3,280 +3,280 @@ graph [
     label "Graph"
     node [
       id drone_01
-      label "Drone"
+      label "Dr"
       type "flow"
       layer "drone"
       weight 1
     ]
     node [
       id drone_02
-      label "Drone"
+      label "Dr"
       type "flow"
       layer "drone"
       weight 1
     ]
     node [
       id drone_03
-      label "Drone"
+      label "Dr"
       type "flow"
       layer "drone"
       weight 1
     ]
     node [
       id drone_04
-      label "Drone"
+      label "Dr"
       type "flow"
       layer "drone"
       weight 1
     ]
     node [
       id drone_05
-      label "Drone"
+      label "Dr"
       type "flow"
       layer "drone"
       weight 1
     ]
     node [
       id drone_06
-      label "Drone"
+      label "Dr"
       type "flow"
       layer "drone"
       weight 1
     ]
     node [
       id drone_07
-      label "Drone"
+      label "Dr"
       type "flow"
       layer "drone"
       weight 1
     ]
     node [
       id drone_08
-      label "Drone"
+      label "Dr"
       type "flow"
       layer "drone"
       weight 1
     ]
     node [
       id drone_09
-      label "Drone"
+      label "Dr"
       type "flow"
       layer "drone"
       weight 1
     ]
     node [
       id drone_10
-      label "Drone"
+      label "Dr"
       type "flow"
       layer "drone"
       weight 1
     ]
     node [
       id drone_11
-      label "Drone"
+      label "Dr"
       type "flow"
       layer "drone"
       weight 1
     ]
     node [
       id drone_12
-      label "Drone"
+      label "Dr"
       type "flow"
       layer "drone"
       weight 1
     ]
     node [
       id drone_13
-      label "Drone"
+      label "Dr"
       type "flow"
       layer "drone"
       weight 1
     ]
     node [
       id drone_14
-      label "Drone"
+      label "Dr"
       type "flow"
       layer "drone"
       weight 1
     ]
     node [
       id drone_15
-      label "Drone"
+      label "Dr"
       type "flow"
       layer "drone"
       weight 1
     ]
     node [
       id drone_16
-      label "Drone"
+      label "Dr"
       type "flow"
       layer "drone"
       weight 1
     ]
     node [
       id drone_17
-      label "Drone"
+      label "Dr"
       type "flow"
       layer "drone"
       weight 1
     ]
     node [
       id drone_18
-      label "Drone"
+      label "Dr"
       type "flow"
       layer "drone"
       weight 1
     ]
     node [
       id drone_19
-      label "Drone"
+      label "Dr"
       type "flow"
       layer "drone"
       weight 1
     ]
     node [
       id drone_20
-      label "Drone"
+      label "Dr"
       type "flow"
       layer "drone"
       weight 1
     ]
     node [
       id drone_21
-      label "Drone"
+      label "Dr"
       type "flow"
       layer "drone"
       weight 1
     ]
     node [
       id drone_22
-      label "Drone"
+      label "Dr"
       type "flow"
       layer "drone"
       weight 1
     ]
     node [
       id drone_23
-      label "Drone"
+      label "Dr"
       type "flow"
       layer "drone"
       weight 1
     ]
     node [
       id drone_24
-      label "Drone"
+      label "Dr"
       type "flow"
       layer "drone"
       weight 1
     ]
     node [
       id drone_25
-      label "Drone"
+      label "Dr"
       type "flow"
       layer "drone"
       weight 1
     ]
     node [
       id drone_26
-      label "Drone"
+      label "Dr"
       type "flow"
       layer "drone"
       weight 1
     ]
     node [
       id drone_27
-      label "Drone"
+      label "Dr"
       type "flow"
       layer "drone"
       weight 1
     ]
     node [
       id drone_28
-      label "Drone"
+      label "Dr"
       type "flow"
       layer "drone"
       weight 1
     ]
     node [
       id drone_29
-      label "Drone"
+      label "Dr"
       type "flow"
       layer "drone"
       weight 1
     ]
     node [
       id drone_30
-      label "Drone"
+      label "Dr"
       type "flow"
       layer "drone"
       weight 1
     ]
     node [
       id drone_31
-      label "Drone"
+      label "Dr"
       type "flow"
       layer "drone"
       weight 1
     ]
     node [
       id drone_32
-      label "Drone"
+      label "Dr"
       type "flow"
       layer "drone"
       weight 1
     ]
     node [
       id drone_33
-      label "Drone"
+      label "Dr"
       type "flow"
       layer "drone"
       weight 1
     ]
     node [
       id drone_34
-      label "Drone"
+      label "Dr"
       type "flow"
       layer "drone"
       weight 1
     ]
     node [
       id drone_35
-      label "Drone"
+      label "Dr"
       type "flow"
       layer "drone"
       weight 1
     ]
     node [
       id drone_36
-      label "Drone"
+      label "Dr"
       type "flow"
       layer "drone"
       weight 1
     ]
     node [
       id drone_37
-      label "Drone"
+      label "Dr"
       type "flow"
       layer "drone"
       weight 1
     ]
     node [
       id drone_38
-      label "Drone"
+      label "Dr"
       type "flow"
       layer "drone"
       weight 1
     ]
     node [
       id drone_39
-      label "Drone"
+      label "Dr"
       type "flow"
       layer "drone"
       weight 1
     ]
     node [
       id drone_40
-      label "Drone"
+      label "Dr"
       type "flow"
       layer "drone"
       weight 1
@@ -708,343 +708,343 @@ graph [
 
     node [
       id root
-      label "Root"
+      label "Ro"
       type "hierarchy"
       layer "global"
       weight 1
     ]
     node [
       id mgmt_a
-      label "Management A"
+      label "Ma"
       type "hierarchy"
       layer "mgmt"
       weight 1
     ]
     node [
       id mgmt_a_a
-      label "Management A/A"
+      label "Ma"
       type "hierarchy"
       layer "mgmt"
       weight 1
     ]
     node [
       id mgmt_a_b
-      label "Management A/B"
+      label "Ma"
       type "hierarchy"
       layer "mgmt"
       weight 1
     ]
     node [
       id mgmt_b
-      label "Management B"
+      label "Ma"
       type "hierarchy"
       layer "mgmt"
       weight 1
     ]
     node [
       id mgmt_b_a
-      label "Management B/A"
+      label "Ma"
       type "hierarchy"
       layer "mgmt"
       weight 1
     ]
     node [
       id mgmt_b_a_b
-      label "Management B/A/B"
+      label "Ma"
       type "hierarchy"
       layer "mgmt"
       weight 1
     ]
     node [
       id mgmt_b_b
-      label "Management B/B"
+      label "Ma"
       type "hierarchy"
       layer "mgmt"
       weight 1
     ]
     node [
       id mgmt_b_b_a
-      label "Management B/B/A"
+      label "Ma"
       type "hierarchy"
       layer "mgmt"
       weight 1
     ]
     node [
       id drone_01
-      label "Drone"
+      label "Dr"
       type "hierarchy"
       layer "drone"
       weight 1
     ]
     node [
       id drone_02
-      label "Drone"
+      label "Dr"
       type "hierarchy"
       layer "drone"
       weight 1
     ]
     node [
       id drone_03
-      label "Drone"
+      label "Dr"
       type "hierarchy"
       layer "drone"
       weight 1
     ]
     node [
       id drone_04
-      label "Drone"
+      label "Dr"
       type "hierarchy"
       layer "drone"
       weight 1
     ]
     node [
       id drone_05
-      label "Drone"
+      label "Dr"
       type "hierarchy"
       layer "drone"
       weight 1
     ]
     node [
       id drone_06
-      label "Drone"
+      label "Dr"
       type "hierarchy"
       layer "drone"
       weight 1
     ]
     node [
       id drone_07
-      label "Drone"
+      label "Dr"
       type "hierarchy"
       layer "drone"
       weight 1
     ]
     node [
       id drone_08
-      label "Drone"
+      label "Dr"
       type "hierarchy"
       layer "drone"
       weight 1
     ]
     node [
       id drone_09
-      label "Drone"
+      label "Dr"
       type "hierarchy"
       layer "drone"
       weight 1
     ]
     node [
       id drone_10
-      label "Drone"
+      label "Dr"
       type "hierarchy"
       layer "drone"
       weight 1
     ]
     node [
       id drone_11
-      label "Drone"
+      label "Dr"
       type "hierarchy"
       layer "drone"
       weight 1
     ]
     node [
       id drone_12
-      label "Drone"
+      label "Dr"
       type "hierarchy"
       layer "drone"
       weight 1
     ]
     node [
       id drone_13
-      label "Drone"
+      label "Dr"
       type "hierarchy"
       layer "drone"
       weight 1
     ]
     node [
       id drone_14
-      label "Drone"
+      label "Dr"
       type "hierarchy"
       layer "drone"
       weight 1
     ]
     node [
       id drone_15
-      label "Drone"
+      label "Dr"
       type "hierarchy"
       layer "drone"
       weight 1
     ]
     node [
       id drone_16
-      label "Drone"
+      label "Dr"
       type "hierarchy"
       layer "drone"
       weight 1
     ]
     node [
       id drone_17
-      label "Drone"
+      label "Dr"
       type "hierarchy"
       layer "drone"
       weight 1
     ]
     node [
       id drone_18
-      label "Drone"
+      label "Dr"
       type "hierarchy"
       layer "drone"
       weight 1
     ]
     node [
       id drone_19
-      label "Drone"
+      label "Dr"
       type "hierarchy"
       layer "drone"
       weight 1
     ]
     node [
       id drone_20
-      label "Drone"
+      label "Dr"
       type "hierarchy"
       layer "drone"
       weight 1
     ]
     node [
       id drone_21
-      label "Drone"
+      label "Dr"
       type "hierarchy"
       layer "drone"
       weight 1
     ]
     node [
       id drone_22
-      label "Drone"
+      label "Dr"
       type "hierarchy"
       layer "drone"
       weight 1
     ]
     node [
       id drone_23
-      label "Drone"
+      label "Dr"
       type "hierarchy"
       layer "drone"
       weight 1
     ]
     node [
       id drone_24
-      label "Drone"
+      label "Dr"
       type "hierarchy"
       layer "drone"
       weight 1
     ]
     node [
       id drone_25
-      label "Drone"
+      label "Dr"
       type "hierarchy"
       layer "drone"
       weight 1
     ]
     node [
       id drone_26
-      label "Drone"
+      label "Dr"
       type "hierarchy"
       layer "drone"
       weight 1
     ]
     node [
       id drone_27
-      label "Drone"
+      label "Dr"
       type "hierarchy"
       layer "drone"
       weight 1
     ]
     node [
       id drone_28
-      label "Drone"
+      label "Dr"
       type "hierarchy"
       layer "drone"
       weight 1
     ]
     node [
       id drone_29
-      label "Drone"
+      label "Dr"
       type "hierarchy"
       layer "drone"
       weight 1
     ]
     node [
       id drone_30
-      label "Drone"
+      label "Dr"
       type "hierarchy"
       layer "drone"
       weight 1
     ]
     node [
       id drone_31
-      label "Drone"
+      label "Dr"
       type "hierarchy"
       layer "drone"
       weight 1
     ]
     node [
       id drone_32
-      label "Drone"
+      label "Dr"
       type "hierarchy"
       layer "drone"
       weight 1
     ]
     node [
       id drone_33
-      label "Drone"
+      label "Dr"
       type "hierarchy"
       layer "drone"
       weight 1
     ]
     node [
       id drone_34
-      label "Drone"
+      label "Dr"
       type "hierarchy"
       layer "drone"
       weight 1
     ]
     node [
       id drone_35
-      label "Drone"
+      label "Dr"
       type "hierarchy"
       layer "drone"
       weight 1
     ]
     node [
       id drone_36
-      label "Drone"
+      label "Dr"
       type "hierarchy"
       layer "drone"
       weight 1
     ]
     node [
       id drone_37
-      label "Drone"
+      label "Dr"
       type "hierarchy"
       layer "drone"
       weight 1
     ]
     node [
       id drone_38
-      label "Drone"
+      label "Dr"
       type "hierarchy"
       layer "drone"
       weight 1
     ]
     node [
       id drone_39
-      label "Drone"
+      label "Dr"
       type "hierarchy"
       layer "drone"
       weight 1
     ]
     node [
       id drone_40
-      label "Drone"
+      label "Dr"
       type "hierarchy"
       layer "drone"
       weight 1

@@ -75,18 +75,27 @@ impl Graph {
     }
 
     pub fn get_non_partition_edges(&self) -> Vec<&Edge> {
-        self.edges
+        let mut edges: Vec<&Edge> = self
+            .edges
             .iter()
             .filter(|e| {
                 let source = self.get_node_by_id(&e.source).unwrap();
                 let target = self.get_node_by_id(&e.target).unwrap();
                 !(source.is_partition || target.is_partition)
             })
-            .collect()
+            .collect();
+
+        // Sort edges by source and then by target
+        edges.sort_by_key(|e| (&e.source, &e.target));
+        edges
     }
 
     pub fn get_non_partition_nodes(&self) -> Vec<&Node> {
-        self.nodes.iter().filter(|n| !n.is_partition).collect()
+        let mut nodes: Vec<&Node> = self.nodes.iter().filter(|n| !n.is_partition).collect();
+
+        // Sort nodes by id or another consistent attribute
+        nodes.sort_by_key(|n| &n.id);
+        nodes
     }
 
     pub fn build_tree(&self) -> Vec<TreeNode> {

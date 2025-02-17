@@ -165,5 +165,52 @@ subgraph cluster_root {
 }
 
 
+      drone_03 -> drone_09 [label="link" ];
+      drone_03 -> drone_31 [label="link" ];
+      drone_04 -> drone_35 [label="link" ];
+      drone_05 -> drone_17 [label="link" ];
+      drone_05 -> drone_28 [label="link" ];
+      drone_05 -> drone_30 [label="link" ];
+      drone_06 -> drone_02 [label="link" ];
+      drone_06 -> drone_03 [label="link" ];
+      drone_06 -> drone_35 [label="link" ];
+      drone_09 -> drone_02 [label="link" ];
+      drone_09 -> drone_10 [label="link" ];
+      drone_10 -> drone_38 [label="link" ];
+      drone_11 -> drone_09 [label="link" ];
+      drone_13 -> drone_24 [label="link" ];
+      drone_14 -> drone_39 [label="link" ];
+      drone_15 -> drone_07 [label="link" ];
+      drone_15 -> drone_23 [label="link" ];
+      drone_17 -> drone_10 [label="link" ];
+      drone_17 -> drone_24 [label="link" ];
+      drone_18 -> drone_17 [label="link" ];
+      drone_18 -> drone_21 [label="link" ];
+      drone_18 -> drone_22 [label="link" ];
+      drone_19 -> drone_15 [label="link" ];
+      drone_23 -> drone_15 [label="link" ];
+      drone_23 -> drone_25 [label="link" ];
+      drone_25 -> drone_24 [label="link" ];
+      drone_26 -> drone_13 [label="link" ];
+      drone_26 -> drone_21 [label="link" ];
+      drone_26 -> drone_32 [label="link" ];
+      drone_27 -> drone_06 [label="link" ];
+      drone_28 -> drone_40 [label="link" ];
+      drone_29 -> drone_23 [label="link" ];
+      drone_29 -> drone_26 [label="link" ];
+      drone_30 -> drone_25 [label="link" ];
+      drone_31 -> drone_12 [label="link" ];
+      drone_31 -> drone_33 [label="link" ];
+      drone_32 -> drone_02 [label="link" ];
+      drone_32 -> drone_33 [label="link" ];
+      drone_35 -> drone_30 [label="link" ];
+      drone_36 -> drone_19 [label="link" ];
+      drone_37 -> drone_02 [label="link" ];
+      drone_37 -> drone_12 [label="link" ];
+      drone_38 -> drone_16 [label="link" ];
+      drone_38 -> drone_36 [label="link" ];
+      drone_40 -> drone_19 [label="link" ];
+      drone_40 -> drone_33 [label="link" ];
+      drone_40 -> drone_38 [label="link" ];
 }
 

@@ -15,9 +15,7 @@ digraph G {
             mgmt_a_b[label="Management A/B"];
             mgmt_b[label="Management B"];
             mgmt_b_a[label="Management B/A"];
-            mgmt_b_a_b[label="Management B/A/B"];
             mgmt_b_b[label="Management B/B"];
-            mgmt_b_b_a[label="Management B/B/A"];
     }
   node [style="filled, dashed" fillcolor="#426070" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
             root[label="Root"];
@@ -32,8 +30,8 @@ digraph G {
     }
   node [style="filled, dashed" fillcolor="#222222" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
             agg_mgmt_a[label="7 nodes (aggregated)"];
-            agg_mgmt_b_a[label="7 nodes (aggregated)"];
-            agg_mgmt_b_b[label="6 nodes (aggregated)"];
+            agg_mgmt_b_a[label="8 nodes (aggregated)"];
+            agg_mgmt_b_b[label="7 nodes (aggregated)"];
             agg_mgmt_b[label="6 nodes (aggregated)"];
     }
 
@@ -44,9 +42,7 @@ node [style="filled, rounded" fillcolor="#dddddd" fontcolor="#000000"];
       mgmt_a -> mgmt_a_b;
       root -> mgmt_b;
       mgmt_b -> mgmt_b_a;
-      mgmt_b_a -> mgmt_b_a_b;
       mgmt_b -> mgmt_b_b;
-      mgmt_b_b -> mgmt_b_b_a;
       mgmt_a_a -> drone_02;
       mgmt_a_b -> drone_03;
       mgmt_a_b -> drone_04;
