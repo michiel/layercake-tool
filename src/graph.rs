@@ -507,9 +507,10 @@ impl Graph {
         }
 
         // Step 2 & 3: Create a new node for each edge in the original graph
+        let mut node_counter = 0; // Initialize a counter for unique IDs
         for edge in &self.edges {
             let new_node = Node {
-                id: format!("n_{}_{}", edge.source, edge.target),
+                id: format!("n_{}_{}_{}", edge.source, edge.target, node_counter),
                 is_partition: false,
                 label: edge_label(&edge),
                 layer: edge.layer.clone(),
@@ -519,9 +520,11 @@ impl Graph {
             };
             inverted_graph.nodes.push(new_node.clone());
             edge_to_node_map.insert((edge.source.clone(), edge.target.clone()), new_node);
+            node_counter += 1; // Increment the counter for the next node
         }
 
         // Step 4, 5 & 6: Create edges in the inverted graph
+        let mut edge_counter = 0; // Initialize a counter for unique IDs
         for node in &self.nodes {
             // Find all edges incident to this node
             let incident_edges: Vec<&Edge> = self
@@ -546,7 +549,7 @@ impl Graph {
                         ))
                         .unwrap();
                     inverted_graph.edges.push(Edge {
-                        id: format!("{}_{}", node1.id, node2.id),
+                        id: format!("{}_{}_{}", node1.id, node2.id, edge_counter),
                         source: node1.id.clone(),
                         target: node2.id.clone(),
                         label: "".to_string(),
@@ -554,6 +557,7 @@ impl Graph {
                         weight: 1,
                         comment: None,
                     });
+                    edge_counter += 1; // Increment the counter for the next edge
                 }
             }
         }
@@ -692,6 +696,37 @@ impl Graph {
                 errors.push(err);
             }
         });
+
+        // TODO implement an info level log for the following
+        // // verify that all edges are assigned to a layer
+        // self.edges.iter().for_each(|e| {
+        //     if !self.layers.iter().any(|l| l.id == e.layer) {
+        //         let err = format!("Edge id:[{}] layer {:?} not found in layers", e.id, e.layer);
+        //         errors.push(err);
+        //     }
+        // });
+
+        // verify that all nodes have unique ids
+        let mut node_id_set = HashSet::new();
+        for node in &self.nodes {
+            if node_id_set.contains(&node.id) {
+                let err = format!("Duplicate node id: {}", node.id);
+                errors.push(err);
+            } else {
+                node_id_set.insert(node.id.clone());
+            }
+        }
+
+        // verify that all edges have unique ids
+        let mut edge_id_set = HashSet::new();
+        for edge in &self.edges {
+            if edge_id_set.contains(&edge.id) {
+                let err = format!("Duplicate edge id: {}", edge.id);
+                errors.push(err);
+            } else {
+                edge_id_set.insert(edge.id.clone());
+            }
+        }
 
         if errors.is_empty() {
             Ok(())
