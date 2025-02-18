@@ -1,11 +1,11 @@
 use crate::graph::Graph;
 use crate::plan::RenderConfig;
-use csv::Writer;
 use csv::WriterBuilder;
 use serde_json::json;
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 use std::error::Error;
+use tracing::warn;
 
 pub fn render(graph: Graph, _render_config: RenderConfig) -> Result<String, Box<dyn Error>> {
     warn!("Rendering to CSV matrix is an experimental feature, may not work as expected and will change.");
@@ -24,11 +24,13 @@ pub fn render(graph: Graph, _render_config: RenderConfig) -> Result<String, Box<
 
     let offset = 2;
 
-    let nodes = graph.get_non_partition_nodes();
-    let edges = graph.get_non_partition_edges();
+    let mut nodes = graph.get_non_partition_nodes();
+    let mut edges = graph.get_non_partition_edges();
 
     let mut matrix =
         create_dynamic_2d_array(nodes.len() + offset, nodes.len() + offset, JsonValue::Null);
+
+    nodes.sort_by(|a, b| a.id.cmp(&b.id));
     let positions: HashMap<String, usize> = nodes
         .iter()
         .enumerate()
@@ -46,6 +48,7 @@ pub fn render(graph: Graph, _render_config: RenderConfig) -> Result<String, Box<
         matrix[0 + 1][i + offset] = json!(node.label);
     }
 
+    edges.sort_by(|a, b| a.id.cmp(&b.id));
     for edge in edges.clone() {
         let i = positions[&edge.source];
         let j = positions[&edge.target];
