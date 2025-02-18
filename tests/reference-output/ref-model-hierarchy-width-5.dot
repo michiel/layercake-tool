@@ -10,17 +10,8 @@ digraph G {
     edge [ fontname="Lato" color="#2B303A" fontsize=8]
 
   node [style="filled, dashed" fillcolor="#8194a0" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
-            mgmt_a[label="Management A"];
-            mgmt_a_a[label="Management A/A"];
-            mgmt_a_b[label="Management A/B"];
-            mgmt_b[label="Management B"];
-            mgmt_b_a[label="Management B/A"];
-            mgmt_b_a_b[label="Management B/A/B"];
-            mgmt_b_b[label="Management B/B"];
-            mgmt_b_b_a[label="Management B/B/A"];
     }
   node [style="filled, dashed" fillcolor="#426070" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
-            root[label="Root"];
     }
   node [style="filled, dashed" fillcolor="#002a41" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
             drone_02[label="Drone"];
@@ -36,10 +27,10 @@ digraph G {
     }
   node [style="filled, dashed" fillcolor="#222222" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
             agg_mgmt_a[label="7 nodes (aggregated)"];
-            agg_mgmt_b_a_b[label="6 nodes (aggregated)"];
-            agg_mgmt_b_a[label="7 nodes (aggregated)"];
-            agg_mgmt_b_b[label="6 nodes (aggregated)"];
             agg_mgmt_b[label="6 nodes (aggregated)"];
+            agg_mgmt_b_a[label="7 nodes (aggregated)"];
+            agg_mgmt_b_a_b[label="6 nodes (aggregated)"];
+            agg_mgmt_b_b[label="6 nodes (aggregated)"];
     }
 
 node [style="filled, rounded" fillcolor="#dddddd" fontcolor="#000000"];

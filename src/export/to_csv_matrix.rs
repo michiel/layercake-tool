@@ -4,6 +4,7 @@ use csv::WriterBuilder;
 use serde_json::json;
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::error::Error;
 use tracing::warn;
 
@@ -22,10 +23,32 @@ pub fn render(graph: Graph, _render_config: RenderConfig) -> Result<String, Box<
         matrix
     }
 
+    fn check_unique_ids<T, F>(items: &[T], id_extractor: F) -> bool
+    where
+        F: Fn(&T) -> &String,
+    {
+        let mut seen_ids = HashSet::new();
+        for item in items {
+            let id = id_extractor(item);
+            if !seen_ids.insert(id.clone()) {
+                return false; // Duplicate found
+            }
+        }
+        true // All IDs are unique
+    }
+
     let offset = 2;
 
     let mut nodes = graph.get_non_partition_nodes();
     let mut edges = graph.get_non_partition_edges();
+
+    if !check_unique_ids(&nodes, |node| &node.id) {
+        return Err("Duplicate node IDs found.".into());
+    }
+
+    if !check_unique_ids(&edges, |edge| &edge.id) {
+        return Err("Duplicate edge IDs found.".into());
+    }
 
     let mut matrix =
         create_dynamic_2d_array(nodes.len() + offset, nodes.len() + offset, JsonValue::Null);

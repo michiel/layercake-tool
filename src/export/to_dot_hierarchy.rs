@@ -11,7 +11,7 @@ pub fn render(graph: Graph, render_config: RenderConfig) -> Result<String, Box<d
         &get_template(),
         &json!({
             "config": render_config,
-            "hierarchy_nodes": graph.nodes,
+            "hierarchy_nodes": graph.get_non_partition_nodes(),
             "hierarchy_edges": graph.get_hierarchy_edges(),
             // "hierarchy_tree": tree,
             // "flow_nodes": graph.get_non_partition_nodes(),

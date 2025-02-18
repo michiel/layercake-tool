@@ -9,7 +9,10 @@ pub fn render(graph: Graph, _render_config: RenderConfig) -> Result<String, Box<
     // Write the header
     wtr.write_record(["id", "source", "target", "label", "layer", "comment"])?;
 
-    for edge in graph.edges {
+    let mut edges = graph.edges.clone();
+    edges.sort_by(|a, b| a.id.cmp(&b.id));
+
+    for edge in edges {
         wtr.write_record(&[
             edge.id.to_string(),
             edge.source,

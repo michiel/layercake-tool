@@ -1,13 +1,4 @@
 id,label,layer,is_partition,belongs_to,comment
-root,Root,global,true,,null
-mgmt_a,Management A,mgmt,true,root,null
-mgmt_a_a,Management A/A,mgmt,true,mgmt_a,null
-mgmt_a_b,Management A/B,mgmt,true,mgmt_a,null
-mgmt_b,Management B,mgmt,true,root,null
-mgmt_b_a,Management B/A,mgmt,true,mgmt_b,null
-mgmt_b_a_b,Management B/A/B,mgmt,true,mgmt_b_a,null
-mgmt_b_b,Management B/B,mgmt,true,mgmt_b,null
-mgmt_b_b_a,Management B/B/A,mgmt,true,mgmt_b_b,null
 drone_01,Drone,drone,false,mgmt_a,null
 drone_02,Drone,drone,false,mgmt_a_a,null
 drone_03,Drone,drone,false,mgmt_a_b,null
@@ -48,3 +39,12 @@ drone_37,Drone,drone,false,mgmt_b_b_a,null
 drone_38,Drone,drone,false,mgmt_b_b_a,null
 drone_39,Drone,drone,false,mgmt_b_b_a,null
 drone_40,Drone,drone,false,mgmt_b_b_a,null
+mgmt_a,Management A,mgmt,true,root,null
+mgmt_a_a,Management A/A,mgmt,true,mgmt_a,null
+mgmt_a_b,Management A/B,mgmt,true,mgmt_a,null
+mgmt_b,Management B,mgmt,true,root,null
+mgmt_b_a,Management B/A,mgmt,true,mgmt_b,null
+mgmt_b_a_b,Management B/A/B,mgmt,true,mgmt_b_a,null
+mgmt_b_b,Management B/B,mgmt,true,mgmt_b,null
+mgmt_b_b_a,Management B/B/A,mgmt,true,mgmt_b_b,null
+root,Root,global,true,,null

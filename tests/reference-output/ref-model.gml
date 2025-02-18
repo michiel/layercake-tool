@@ -707,69 +707,6 @@ graph [
     ]
 
     node [
-      id root
-      label "Root"
-      type "hierarchy"
-      layer "global"
-      weight 1
-    ]
-    node [
-      id mgmt_a
-      label "Management A"
-      type "hierarchy"
-      layer "mgmt"
-      weight 1
-    ]
-    node [
-      id mgmt_a_a
-      label "Management A/A"
-      type "hierarchy"
-      layer "mgmt"
-      weight 1
-    ]
-    node [
-      id mgmt_a_b
-      label "Management A/B"
-      type "hierarchy"
-      layer "mgmt"
-      weight 1
-    ]
-    node [
-      id mgmt_b
-      label "Management B"
-      type "hierarchy"
-      layer "mgmt"
-      weight 1
-    ]
-    node [
-      id mgmt_b_a
-      label "Management B/A"
-      type "hierarchy"
-      layer "mgmt"
-      weight 1
-    ]
-    node [
-      id mgmt_b_a_b
-      label "Management B/A/B"
-      type "hierarchy"
-      layer "mgmt"
-      weight 1
-    ]
-    node [
-      id mgmt_b_b
-      label "Management B/B"
-      type "hierarchy"
-      layer "mgmt"
-      weight 1
-    ]
-    node [
-      id mgmt_b_b_a
-      label "Management B/B/A"
-      type "hierarchy"
-      layer "mgmt"
-      weight 1
-    ]
-    node [
       id drone_01
       label "Drone"
       type "hierarchy"
@@ -1047,6 +984,69 @@ graph [
       label "Drone"
       type "hierarchy"
       layer "drone"
+      weight 1
+    ]
+    node [
+      id mgmt_a
+      label "Management A"
+      type "hierarchy"
+      layer "mgmt"
+      weight 1
+    ]
+    node [
+      id mgmt_a_a
+      label "Management A/A"
+      type "hierarchy"
+      layer "mgmt"
+      weight 1
+    ]
+    node [
+      id mgmt_a_b
+      label "Management A/B"
+      type "hierarchy"
+      layer "mgmt"
+      weight 1
+    ]
+    node [
+      id mgmt_b
+      label "Management B"
+      type "hierarchy"
+      layer "mgmt"
+      weight 1
+    ]
+    node [
+      id mgmt_b_a
+      label "Management B/A"
+      type "hierarchy"
+      layer "mgmt"
+      weight 1
+    ]
+    node [
+      id mgmt_b_a_b
+      label "Management B/A/B"
+      type "hierarchy"
+      layer "mgmt"
+      weight 1
+    ]
+    node [
+      id mgmt_b_b
+      label "Management B/B"
+      type "hierarchy"
+      layer "mgmt"
+      weight 1
+    ]
+    node [
+      id mgmt_b_b_a
+      label "Management B/B/A"
+      type "hierarchy"
+      layer "mgmt"
+      weight 1
+    ]
+    node [
+      id root
+      label "Root"
+      type "hierarchy"
+      layer "global"
       weight 1
     ]
 

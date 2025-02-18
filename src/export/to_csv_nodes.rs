@@ -16,7 +16,10 @@ pub fn render(graph: Graph, _render_config: RenderConfig) -> Result<String, Box<
         "comment",
     ])?;
 
-    for node in graph.nodes {
+    let mut nodes = graph.nodes.clone();
+    nodes.sort_by(|a, b| a.id.cmp(&b.id));
+
+    for node in nodes {
         wtr.write_record(&[
             node.id.to_string(),
             node.label,

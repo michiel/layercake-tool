@@ -28,7 +28,7 @@ pub fn render(
         &fs::read_to_string(&params.template).unwrap(),
         &json!({
             "config": render_config,
-            "hierarchy_nodes": graph.nodes,
+            "hierarchy_nodes": graph.get_hierarchy_nodes(),
             "hierarchy_tree": tree,
             "flow_nodes": graph.get_non_partition_nodes(),
             "flow_edges": graph.get_non_partition_edges(),

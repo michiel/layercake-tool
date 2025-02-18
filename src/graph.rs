@@ -17,11 +17,14 @@ pub struct Graph {
 
 impl Graph {
     pub fn get_layer_map(&self) -> IndexMap<String, Layer> {
-        self.layers
+        let layers: IndexMap<String, Layer> = self
+            .layers
             .iter()
             .cloned()
             .map(|l| (l.id.clone(), l))
-            .collect()
+            .collect();
+
+        layers.into_iter().collect()
     }
 
     // Check if a layer exists
@@ -37,10 +40,13 @@ impl Graph {
     }
 
     pub fn get_root_nodes(&self) -> Vec<&Node> {
-        self.nodes
+        let mut nodes: Vec<&Node> = self
+            .nodes
             .iter()
             .filter(|n| n.belongs_to.is_none() && n.is_partition)
-            .collect()
+            .collect();
+        nodes.sort_by(|a, b| a.id.cmp(&b.id));
+        nodes
     }
 
     pub fn get_children(&self, parent: &Node) -> Vec<&Node> {
@@ -75,6 +81,12 @@ impl Graph {
             }
         }
         max_depth
+    }
+
+    pub fn get_hierarchy_nodes(&self) -> Vec<Node> {
+        let mut nodes = self.nodes.clone();
+        nodes.sort_by(|a, b| a.id.cmp(&b.id));
+        nodes
     }
 
     pub fn get_hierarchy_edges(&self) -> Vec<Edge> {

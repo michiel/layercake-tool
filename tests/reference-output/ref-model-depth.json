@@ -1,87 +1,6 @@
 {
   "hierarchy_nodes": [
     {
-      "id": "root",
-      "label": "Root",
-      "layer": "global",
-      "is_partition": true,
-      "belongs_to": null,
-      "weight": 1,
-      "comment": "null"
-    },
-    {
-      "id": "mgmt_a",
-      "label": "Management A",
-      "layer": "mgmt",
-      "is_partition": true,
-      "belongs_to": "root",
-      "weight": 1,
-      "comment": "null"
-    },
-    {
-      "id": "mgmt_a_a",
-      "label": "Management A/A",
-      "layer": "mgmt",
-      "is_partition": true,
-      "belongs_to": "mgmt_a",
-      "weight": 1,
-      "comment": "null"
-    },
-    {
-      "id": "mgmt_a_b",
-      "label": "Management A/B",
-      "layer": "mgmt",
-      "is_partition": true,
-      "belongs_to": "mgmt_a",
-      "weight": 1,
-      "comment": "null"
-    },
-    {
-      "id": "mgmt_b",
-      "label": "Management B",
-      "layer": "mgmt",
-      "is_partition": true,
-      "belongs_to": "root",
-      "weight": 1,
-      "comment": "null"
-    },
-    {
-      "id": "mgmt_b_a",
-      "label": "Management B/A",
-      "layer": "mgmt",
-      "is_partition": true,
-      "belongs_to": "mgmt_b",
-      "weight": 1,
-      "comment": "null"
-    },
-    {
-      "id": "mgmt_b_a_b",
-      "label": "Management B/A/B",
-      "layer": "mgmt",
-      "is_partition": true,
-      "belongs_to": "mgmt_b_a",
-      "weight": 1,
-      "comment": "null"
-    },
-    {
-      "id": "mgmt_b_b",
-      "label": "Management B/B",
-      "layer": "mgmt",
-      "is_partition": true,
-      "belongs_to": "mgmt_b",
-      "weight": 1,
-      "comment": "null"
-    },
-    {
-      "id": "mgmt_b_b_a",
-      "label": "Management B/B/A",
-      "layer": "mgmt",
-      "is_partition": true,
-      "belongs_to": "mgmt_b_b",
-      "weight": 1,
-      "comment": "null"
-    },
-    {
       "id": "drone_01",
       "label": "Drone",
       "layer": "drone",
@@ -438,6 +357,87 @@
       "layer": "drone",
       "is_partition": false,
       "belongs_to": "mgmt_b_b_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "mgmt_a",
+      "label": "Management A",
+      "layer": "mgmt",
+      "is_partition": true,
+      "belongs_to": "root",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "mgmt_a_a",
+      "label": "Management A/A",
+      "layer": "mgmt",
+      "is_partition": true,
+      "belongs_to": "mgmt_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "mgmt_a_b",
+      "label": "Management A/B",
+      "layer": "mgmt",
+      "is_partition": true,
+      "belongs_to": "mgmt_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "mgmt_b",
+      "label": "Management B",
+      "layer": "mgmt",
+      "is_partition": true,
+      "belongs_to": "root",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "mgmt_b_a",
+      "label": "Management B/A",
+      "layer": "mgmt",
+      "is_partition": true,
+      "belongs_to": "mgmt_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "mgmt_b_a_b",
+      "label": "Management B/A/B",
+      "layer": "mgmt",
+      "is_partition": true,
+      "belongs_to": "mgmt_b_a",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "mgmt_b_b",
+      "label": "Management B/B",
+      "layer": "mgmt",
+      "is_partition": true,
+      "belongs_to": "mgmt_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "mgmt_b_b_a",
+      "label": "Management B/B/A",
+      "layer": "mgmt",
+      "is_partition": true,
+      "belongs_to": "mgmt_b_b",
+      "weight": 1,
+      "comment": "null"
+    },
+    {
+      "id": "root",
+      "label": "Root",
+      "layer": "global",
+      "is_partition": true,
+      "belongs_to": null,
       "weight": 1,
       "comment": "null"
     }
