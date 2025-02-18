@@ -40,6 +40,12 @@ export:
       exporter: "DOT"
       render_config:
         contain_nodes: false
+    - filename: "out/ref-model-without-partitions-inverted.dot"
+      exporter: "DOT"
+      render_config:
+        contain_nodes: false
+      graph_config:
+        invert_graph: true
     - filename: "out/ref-model-depth.json"
       exporter: "JSON"
 
