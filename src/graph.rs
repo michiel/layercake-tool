@@ -54,6 +54,29 @@ impl Graph {
         self.nodes.iter().find(|n| n.id == id)
     }
 
+    pub fn get_max_hierarchy_depth(&self) -> i32 {
+        fn max_child_depth(node: &TreeNode) -> i32 {
+            let mut max_depth = node.depth;
+            for child in &node.children {
+                let child_depth = max_child_depth(child);
+                if child_depth > max_depth {
+                    max_depth = child_depth;
+                }
+            }
+            max_depth
+        }
+
+        let mut max_depth = 0;
+        let tree = self.build_tree();
+        for node in &tree {
+            let child_depth = max_child_depth(node);
+            if child_depth > max_depth {
+                max_depth = child_depth;
+            }
+        }
+        max_depth
+    }
+
     pub fn get_hierarchy_edges(&self) -> Vec<Edge> {
         let mut edges = Vec::new();
         self.nodes.iter().for_each(|node| {
@@ -431,6 +454,126 @@ impl Graph {
             edge_map.len()
         );
         self.edges = edge_map.values().cloned().collect();
+    }
+
+    pub fn invert_graph(&mut self) -> Graph {
+        /*
+         * Invert the graph
+         * 1. Create a new graph
+         * 2. For each edge (u,v) in the original graph G:
+         * 3. Create a new node N(u,v) in G'
+         * 4. For each original node x in G:
+         * 5. Find all edges incident to x in G
+         * 6. Create an edge in G' connecting the nodes that correspond to these original edges.
+         */
+        let mut inverted_graph = Graph {
+            name: format!("Inverted {}", self.name),
+            nodes: Vec::new(),
+            edges: Vec::new(),
+            layers: self.layers.clone(),
+        };
+
+        // Map to store new nodes created for each edge
+        let mut edge_to_node_map = std::collections::HashMap::new();
+
+        inverted_graph.nodes.push(Node {
+            id: "inverted_root".to_string(),
+            label: "Root".to_string(),
+            layer: "inverted_root".to_string(),
+            is_partition: true,
+            belongs_to: None,
+            weight: 0,
+            comment: None,
+        });
+
+        fn edge_label(edge: &Edge) -> String {
+            if edge.label.is_empty() {
+                format!("{} -> {}", edge.source, edge.target)
+            } else {
+                edge.label.clone()
+            }
+        }
+
+        // Step 2 & 3: Create a new node for each edge in the original graph
+        for edge in &self.edges {
+            let new_node = Node {
+                id: format!("n_{}_{}", edge.source, edge.target),
+                is_partition: false,
+                label: edge_label(&edge),
+                layer: edge.layer.clone(),
+                belongs_to: Some("inverted_root".to_string()),
+                weight: edge.weight,
+                comment: edge.comment.clone(),
+            };
+            inverted_graph.nodes.push(new_node.clone());
+            edge_to_node_map.insert((edge.source.clone(), edge.target.clone()), new_node);
+        }
+
+        // Step 4, 5 & 6: Create edges in the inverted graph
+        for node in &self.nodes {
+            // Find all edges incident to this node
+            let incident_edges: Vec<&Edge> = self
+                .edges
+                .iter()
+                .filter(|e| e.source == node.id || e.target == node.id)
+                .collect();
+
+            // Create edges in the inverted graph
+            for i in 0..incident_edges.len() {
+                for j in (i + 1)..incident_edges.len() {
+                    let node1 = edge_to_node_map
+                        .get(&(
+                            incident_edges[i].source.clone(),
+                            incident_edges[i].target.clone(),
+                        ))
+                        .unwrap();
+                    let node2 = edge_to_node_map
+                        .get(&(
+                            incident_edges[j].source.clone(),
+                            incident_edges[j].target.clone(),
+                        ))
+                        .unwrap();
+                    inverted_graph.edges.push(Edge {
+                        id: format!("{}_{}", node1.id, node2.id),
+                        source: node1.id.clone(),
+                        target: node2.id.clone(),
+                        label: "".to_string(),
+                        layer: node.layer.clone(),
+                        weight: 1,
+                        comment: None,
+                    });
+                }
+            }
+        }
+
+        let edge_layer_ids = inverted_graph
+            .edges
+            .iter()
+            .map(|e| e.layer.clone())
+            .collect::<HashSet<String>>();
+
+        let node_layer_ids = inverted_graph
+            .nodes
+            .iter()
+            .map(|e| e.layer.clone())
+            .collect::<HashSet<String>>();
+
+        let layer_ids = edge_layer_ids.union(&node_layer_ids);
+
+        for layer_id in layer_ids {
+            if !inverted_graph.layers.iter().any(|l| l.id == *layer_id) {
+                warn!("Layer {} not found in inverted graph, adding a placeholder - please add one if you want to style it", layer_id);
+                inverted_graph.add_layer(Layer::new(
+                    layer_id.as_str(),
+                    layer_id.as_str(),
+                    "222222",
+                    "ffffff",
+                    "dddddd",
+                ));
+            }
+        }
+
+        inverted_graph
     }
 
     pub fn build_json_tree(&self) -> serde_json::Value {

@@ -98,7 +98,7 @@ pub struct ExportProfileGraphConfig {
     pub generate_hierarchy: Option<bool>,
     pub max_partition_depth: Option<i32>,
     pub max_partition_width: Option<i32>,
-    pub flip_nodes_and_edges: Option<bool>,
+    pub invert_graph: Option<bool>,
     pub node_label_max_length: Option<usize>,
     pub node_label_insert_newlines_at: Option<usize>,
     pub edge_label_max_length: Option<usize>,
@@ -132,6 +132,7 @@ pub enum ExportFileType {
     PlantUML,
     CSVNodes,
     CSVEdges,
+    CSVMatrix,
     Mermaid,
     JSGraph,
     Custom(CustomExportProfile),
@@ -143,7 +144,7 @@ impl Default for ExportProfileGraphConfig {
             generate_hierarchy: None,
             max_partition_depth: None,
             max_partition_width: None,
-            flip_nodes_and_edges: None,
+            invert_graph: None,
             node_label_max_length: None,
             node_label_insert_newlines_at: None,
             edge_label_insert_newlines_at: None,
@@ -172,7 +173,7 @@ pub struct GraphConfig {
     pub generate_hierarchy: bool,
     pub max_partition_depth: i32,
     pub max_partition_width: i32,
-    pub flip_nodes_and_edges: bool,
+    pub invert_graph: bool,
     pub node_label_max_length: usize,
     pub node_label_insert_newlines_at: usize,
     pub edge_label_max_length: usize,
@@ -189,7 +190,7 @@ impl ExportProfileItem {
         let generate_hierarchy = graph_config.generate_hierarchy.unwrap_or(false);
         let max_partition_depth = graph_config.max_partition_depth.unwrap_or(0);
         let max_partition_width = graph_config.max_partition_width.unwrap_or(0);
-        let flip_nodes_and_edges = graph_config.flip_nodes_and_edges.unwrap_or(false);
+        let invert_graph = graph_config.invert_graph.unwrap_or(false);
         let node_label_max_length = graph_config.node_label_max_length.unwrap_or(0);
         let node_label_insert_newlines_at = graph_config.node_label_insert_newlines_at.unwrap_or(0);
         let edge_label_max_length = graph_config.edge_label_max_length.unwrap_or(0);
@@ -199,7 +200,7 @@ impl ExportProfileItem {
             generate_hierarchy,
             max_partition_depth,
             max_partition_width,
-            flip_nodes_and_edges,
+            invert_graph,
             node_label_max_length,
             node_label_insert_newlines_at,
             edge_label_max_length,

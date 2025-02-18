@@ -107,10 +107,13 @@ fn run_plan(plan: Plan, plan_file_path: &std::path::Path) -> Result<()> {
                 );
                 let mut graph = graph.clone();
                 let graph_config = profile.get_graph_config();
-                if graph_config.flip_nodes_and_edges {
-                    info!("Flipping nodes and edges");
-                    unimplemented!();
+
+                if graph_config.invert_graph {
+                    info!("Inverting graph (flipping nodes and edges)");
+                    warn!("Inverting graph is an experimental feature");
+                    graph = graph.invert_graph();
                 }
+
                 if graph_config.max_partition_depth > 0 {
                     let max_partition_depth = graph_config.max_partition_depth;
                     info!("Reducing graph partition depth to {}", max_partition_depth);
@@ -195,6 +198,9 @@ fn run_plan(plan: Plan, plan_file_path: &std::path::Path) -> Result<()> {
                     }
                     ExportFileType::CSVEdges => {
                         super::export::to_csv_edges::render(graph, render_config)
+                    }
+                    ExportFileType::CSVMatrix => {
+                        super::export::to_csv_matrix::render(graph, render_config)
                     }
                     ExportFileType::PlantUML => {
                         super::export::to_plantuml::render(graph, render_config)
