@@ -8,6 +8,8 @@ use std::collections::HashMap;
 use std::error::Error;
 
 pub fn render(graph: Graph, _render_config: RenderConfig) -> Result<String, Box<dyn Error>> {
+    warn!("Rendering to CSV matrix is an experimental feature, may not work as expected and will change.");
+
     fn create_dynamic_2d_array<T: Clone>(rows: usize, cols: usize, default: T) -> Vec<Vec<T>> {
         let mut matrix = Vec::with_capacity(rows);
         for _ in 0..rows {
