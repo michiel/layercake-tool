@@ -57,6 +57,10 @@ export:
 
     - filename: "out/ref-model-matrix.csv"
       exporter: "CSVMatrix"
+    - filename: "out/ref-model-matrix-inverted.csv"
+      exporter: "CSVMatrix"
+      graph_config:
+        invert_graph: true
 
     # The DOTHierarchy exporter does not render flow nodes, but renders the
     # belongs_to hierarchy of the graph nodes
