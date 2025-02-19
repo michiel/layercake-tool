@@ -40,7 +40,7 @@ done
 ### Explain the graph format
 
 ```
-To define a graph, I there are three CSV files,
+To define a graph, there are three CSV files,
 - A nodes.csv file, with a list of nodes
 - An edges.csv file, with a list of edges
 - A layers.csv file, with a list of layers that style the nodes and edges
