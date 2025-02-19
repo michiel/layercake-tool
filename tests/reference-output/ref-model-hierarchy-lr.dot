@@ -1,7 +1,10 @@
 digraph G {
+    // layout="dot"; // circo, dot, fdp, neato, osage, sfdp, twopi
     rankdir="LR";
     splines=true;
     overlap=false;
+    // K=0.6;
+    // sep="+50,50"; // increase this to make the graph more spread out
     nodesep="0.3";
     ranksep="1.3";
     labelloc="t";
