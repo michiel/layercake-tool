@@ -1,0 +1,9 @@
+id,label,background_color,text_color,border_color
+database,Database,ffcccc,990000,660000
+table,Table,ffebcc,996600,663300
+lambda,Lambda,ccffcc,009900,006600
+container,Container,ccccff,000099,000066
+stored_proc,Stored_proc,ffccff,990099,660066
+api_gateway,Api_gateway,ffff99,999900,666600
+s3,S3,ccffff,009999,006666
+root,Root,ffffff,000000,000000
