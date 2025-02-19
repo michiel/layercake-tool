@@ -40,7 +40,7 @@ done
 ### Explain the graph format
 
 ```
-To define a graph, I there are three CSV files,
+To define a graph there are three CSV files,
 - A nodes.csv file, with a list of nodes
 - An edges.csv file, with a list of edges
 - A layers.csv file, with a list of layers that style the nodes and edges
@@ -50,7 +50,7 @@ The nodes.csv file should have the following columns:
 - label: a human-readable label for the node
 - layer: the layer that the node belongs to
 - is_partition: a boolean value, true if the node used to group other nodes. Edges do not connect to partition nodes
-- belongs_to: the id of the partition node that the node belongs to, this represents the parent node in the hierarchy, every node belongs to a partition node except root nodes (which are empty, but have is_partition:true)
+- belongs_to: the id of the partition node that the node belongs to, this represents the parent node in the hierarchy, every node belongs to a partition node except root nodes (which are empty and have is_partition:true)
 - comment: an optional comment for the node
 
 The edges.csv file should have the following columns:
