@@ -35,4 +35,37 @@ while true; do
 done
 ```
 
+## LLM prompts
 
+### Explain the graph format
+
+```
+To define a graph, I there are three CSV files,
+- A nodes.csv file, with a list of nodes
+- An edges.csv file, with a list of edges
+- A layers.csv file, with a list of layers that style the nodes and edges
+
+The nodes.csv file should have the following columns:
+- id: a unique identifier for the node
+- label: a human-readable label for the node
+- layer: the layer that the node belongs to
+- is_partition: a boolean value, true if the node used to group other nodes. Edges do not connect to partition nodes
+- belongs_to: the id of the partition node that the node belongs to, this represents the parent node in the hierarchy, every node belongs to a partition node except root nodes (which are empty, but have is_partition:true)
+- comment: an optional comment for the node
+
+The edges.csv file should have the following columns:
+- id: a unique identifier for the node
+- source: the id of the source node
+- target: the id of the target node
+- label: a human-readable label for the node
+- layer: the layer that the node belongs to
+- comment: an optional comment for the node
+
+The layers.csv file should have the following columns:
+- id: a unique identifier for the layer
+- label: a human-readable label for the layer
+- background_color: the background color for the layer in hex format without the leading #
+- text_color: the text color for the layer in hex format without the leading #
+- border_color: the border color for the layer in hex format without the leading #
+
+```
