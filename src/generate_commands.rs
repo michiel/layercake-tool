@@ -6,6 +6,7 @@ use tracing::{error, info};
 static SAMPLE_DIR_KVM_CONTROL_FLOW: Dir = include_dir!("sample/kvm_control_flow");
 static SAMPLE_DIR_ATTACK_TREE: Dir = include_dir!("sample/attack_tree");
 static SAMPLE_DIR_REF: Dir = include_dir!("sample/ref");
+static SAMPLE_DIR_DISTRIBUTED_MONOLITH: Dir = include_dir!("sample/distributed-monolith");
 
 pub fn generate_template(exporter: String) {
     info!("Generating exporter template: {}", exporter);
@@ -15,6 +16,12 @@ pub fn generate_template(exporter: String) {
         }
         "dot" => {
             println!("{}", crate::export::to_dot::get_template());
+        }
+        "dothierarchy" => {
+            println!("{}", crate::export::to_dot_hierarchy::get_template());
+        }
+        "jsgraph" => {
+            println!("{}", crate::export::to_jsgraph::get_template());
         }
         "plantuml" => {
             println!("{}", crate::export::to_plantuml::get_template());
@@ -71,11 +78,14 @@ pub fn generate_sample(sample: String, dir: String) {
     match sample.to_lowercase().as_str() {
         "reference" => write_dir_contents(&SAMPLE_DIR_REF, target_path),
         "ref" => write_dir_contents(&SAMPLE_DIR_REF, target_path),
+        "attack-tree" => write_dir_contents(&SAMPLE_DIR_ATTACK_TREE, target_path),
         "attack_tree" => write_dir_contents(&SAMPLE_DIR_ATTACK_TREE, target_path),
         "kvm_control_flow" => write_dir_contents(&SAMPLE_DIR_KVM_CONTROL_FLOW, target_path),
+        "kvm-control-flow" => write_dir_contents(&SAMPLE_DIR_KVM_CONTROL_FLOW, target_path),
+        "distributed-monolith" => write_dir_contents(&SAMPLE_DIR_DISTRIBUTED_MONOLITH, target_path),
         _ => {
             error!(
-                "Unsupported sample: {} - use ref, reference, kvm_control_flow, attack_tree",
+                "Unsupported sample: {} - use ref, reference, kvm-control-flow, attack-tree, distributed-monolith",
                 sample
             );
             return;

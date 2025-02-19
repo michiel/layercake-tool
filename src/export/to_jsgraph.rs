@@ -80,11 +80,15 @@ pub fn render(graph: Graph, render_config: RenderConfig) -> Result<String, Box<d
 
     let handlebars = crate::common::get_handlebars();
     let res = handlebars.render_template(
-        &include_str!("to_jsgraph.hbs").to_string(),
+        &get_template(),
         &json!({
                 "graphData": serde_json::to_string_pretty(&data)?,
                 "graphConfig": serde_json::to_string_pretty(&config)?,
         }),
     )?;
     Ok(res)
+}
+
+pub fn get_template() -> String {
+    include_str!("to_jsgraph.hbs").to_string()
 }
