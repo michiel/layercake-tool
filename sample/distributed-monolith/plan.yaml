@@ -1,0 +1,32 @@
+meta:
+  name: "Distributed Monolith"
+import:
+  profiles:
+    - filename: "nodes.csv"
+      filetype: "Nodes"
+    - filename: "edges.csv"
+      filetype: "Edges"
+    - filename: "layers.csv"
+      filetype: "Layers"
+
+export:
+  profiles:
+    - filename: "out/distributed-monolith.gml"
+      exporter: "GML"
+    - filename: "out/distributed-monolith.puml"
+      exporter: "PlantUML"
+    - filename: "out/distributed-monolith.dot"
+      exporter: "DOT"
+      render_config:
+        contain_nodes: false
+    - filename: "out/distributed-monolith.js"
+      exporter: "JSGraph"
+    - filename: "out/distributed-monolith-matrix.csv"
+      exporter: "CSVMatrix"
+    - filename: "out/distributed-monolith-hierarchy.dot"
+      exporter: "DOTHierarchy"
+    - filename: "out/distributed-monolith-hierarchy-depth-3-width-3.dot"
+      exporter: DOTHierarchy
+      graph_config:
+        max_partition_width: 3
+        max_partition_depth: 3
