@@ -99,7 +99,7 @@ impl Graph {
         let mut edges = Vec::new();
         self.nodes.iter().for_each(|node| {
             if let Some(parent_id) = &node.belongs_to {
-                let parent = self.get_node(parent_id).unwrap();
+                let parent = self.get_node_by_id(parent_id).unwrap();
                 edges.push(Edge {
                     id: format!("{}_{}", parent.id, node.id),
                     source: parent.id.clone(),
@@ -243,7 +243,7 @@ impl Graph {
 
     pub fn modify_graph_limit_partition_depth(&mut self, depth: i32) -> Result<(), String> {
         fn trim_node(node_id: &String, graph: &mut Graph, current_depth: i32, max_depth: i32) {
-            let node = graph.get_node(node_id).unwrap();
+            let node = graph.get_node_by_id(node_id).unwrap();
             let children = graph.get_children(&node);
 
             let all_child_node_ids: Vec<String> = children.iter().map(|n| n.id.clone()).collect();
@@ -260,7 +260,7 @@ impl Graph {
 
             if current_depth >= max_depth {
                 let mut agg_node = {
-                    let node = graph.get_node(node_id).unwrap();
+                    let node = graph.get_node_by_id(node_id).unwrap();
                     let mut cloned_node = node.clone();
                     cloned_node.is_partition = false; // Ensure the aggregated node is non-partition
                     cloned_node
@@ -269,8 +269,8 @@ impl Graph {
                 let mut new_edges = Vec::new();
 
                 for edge in &graph.edges {
-                    let source_exists = graph.get_node(&edge.source).is_some();
-                    let target_exists = graph.get_node(&edge.target).is_some();
+                    let source_exists = graph.get_node_by_id(&edge.source).is_some();
+                    let target_exists = graph.get_node_by_id(&edge.target).is_some();
 
                     if source_exists && target_exists {
                         if all_child_node_ids.contains(&edge.source) {
@@ -293,7 +293,7 @@ impl Graph {
 
                 // Aggregate weights
                 for child_id in &all_child_node_ids {
-                    if let Some(child) = graph.get_node(child_id) {
+                    if let Some(child) = graph.get_node_by_id(child_id) {
                         agg_node.weight += child.weight;
                     } else {
                         error!("Child node not found: {}", child_id);
@@ -329,7 +329,7 @@ impl Graph {
     pub fn modify_graph_limit_partition_width(&mut self, max_width: i32) -> Result<(), String> {
         fn trim_node(node_id: &String, graph: &mut Graph, max_width: i32) {
             let node = {
-                let node = graph.get_node(node_id).unwrap();
+                let node = graph.get_node_by_id(node_id).unwrap();
                 node.clone()
             };
 
@@ -405,7 +405,7 @@ impl Graph {
 
                 let children: Vec<Node> = non_partition_child_node_ids
                     .iter()
-                    .map(|id| graph.get_node(id).unwrap().clone())
+                    .map(|id| graph.get_node_by_id(id).unwrap().clone())
                     .collect();
 
                 // Remove children beyond max_width
@@ -926,32 +926,7 @@ impl Layer {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_is_truthy() {
-        assert!(is_truthy("true"));
-        assert!(is_truthy("True"));
-        assert!(is_truthy("TRUE"));
-        assert!(is_truthy("y"));
-        assert!(is_truthy("Y"));
-        assert!(is_truthy("yes"));
-        assert!(is_truthy("Yes"));
-        assert!(is_truthy("YES"));
-        assert!(is_truthy(" true "));
-        assert!(is_truthy("\ntrue\n"));
-        assert!(is_truthy("  YES  "));
-
-        assert!(!is_truthy("false"));
-        assert!(!is_truthy("False"));
-        assert!(!is_truthy("FALSE"));
-        assert!(!is_truthy("n"));
-        assert!(!is_truthy("N"));
-        assert!(!is_truthy("no"));
-        assert!(!is_truthy("No"));
-        assert!(!is_truthy("NO"));
-        assert!(!is_truthy("  false  "));
-        assert!(!is_truthy("\nfalse\n"));
-        assert!(!is_truthy("  NO  "));
-    }
+    // is_truthy test moved to utils module
 
     fn create_test_graph() -> Graph {
         Graph {
@@ -1497,7 +1472,7 @@ mod tests {
         };
         
         // Create a graph with an invalid connection
-        let mut invalid_graph = Graph {
+        let invalid_graph = Graph {
             name: "Invalid Graph".to_string(),
             nodes: vec![
                 // Partition node
@@ -1554,7 +1529,7 @@ mod tests {
         }
         
         // Create a graph with missing node reference
-        let mut missing_node_graph = Graph {
+        let missing_node_graph = Graph {
             name: "Missing Node Graph".to_string(),
             nodes: vec![
                 Node {
