@@ -41,3 +41,4 @@ jobs:
           executable-name: layercake
           target: ${{ matrix.platform.target }}
           changes-file: "CHANGES.md"
+          archive-name: "layercake-${{ github.event.release.tag_name }}-${{ matrix.platform.os-name | lower }}"
