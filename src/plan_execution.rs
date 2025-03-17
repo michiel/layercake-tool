@@ -7,26 +7,33 @@ use std::sync::mpsc::channel;
 use tracing::{debug, error, info, warn};
 
 use anyhow::Result;
-use polars::prelude::*;
+use csv::StringRecord;
 
 /// Loads a data file from disk, supporting CSV and TSV formats
-fn load_file(file_path: &str) -> Result<DataFrame, anyhow::Error> {
+fn load_file(file_path: &str) -> Result<(Vec<String>, Vec<StringRecord>), anyhow::Error> {
     let extension = std::path::Path::new(file_path)
         .extension()
         .and_then(std::ffi::OsStr::to_str)
         .unwrap_or("");
 
-    let df = match extension {
-        "csv" => data_loader::load_csv(file_path),
-        "tsv" => data_loader::load_tsv(file_path),
+    let separator = match extension {
+        "csv" => b',',
+        "tsv" => b'\t',
         _ => {
             error!("Error: unsupported extension {}", extension);
             anyhow::bail!("Unsupported extension");
         }
+    };
+    
+    let headers = data_loader::get_headers_from_file(file_path, separator)?;
+    let records = match extension {
+        "csv" => data_loader::load_csv(file_path),
+        "tsv" => data_loader::load_tsv(file_path),
+        _ => unreachable!(), // We already checked extension above
     }?;
 
-    debug!("Loaded DataFrame:\n{}", df);
-    Ok(df)
+    debug!("Loaded {} records with headers: {:?}", records.len(), headers);
+    Ok((headers, records))
 }
 
 /// Creates a new graph with metadata from the plan
@@ -52,18 +59,17 @@ fn load_data_into_graph(graph: &mut Graph, plan: &Plan, plan_file_path: &Path) -
             profile.filetype
         );
         
-        let df = load_file(import_file_path.to_str().unwrap())?;
+        let (headers, records) = load_file(import_file_path.to_str().unwrap())?;
         
         match profile.filetype {
             ImportFileType::Nodes => {
-                let node_profile = data_loader::create_df_node_load_profile(&df);
+                let node_profile = data_loader::create_df_node_load_profile(&headers);
                 info!("{}", node_profile);
-                data_loader::verify_nodes_df(&df)?;
-                data_loader::verify_id_column_df(&df, &node_profile)?;
+                data_loader::verify_nodes_headers(&headers)?;
+                data_loader::verify_id_column(&records, node_profile.id_column)?;
 
-                for idx in 0..df.height() {
-                    let row = df.get_row(idx)?;
-                    match Node::from_row(&row, &node_profile) {
+                for record in &records {
+                    match Node::from_row(record, &node_profile) {
                         Ok(node) => graph.nodes.push(node),
                         Err(e) => return Err(anyhow::anyhow!("Error creating node: {}", e)),
                     };
@@ -71,11 +77,10 @@ fn load_data_into_graph(graph: &mut Graph, plan: &Plan, plan_file_path: &Path) -
             }
             ImportFileType::Edges => {
                 // TODO Add verification for edges
-                let edge_profile = data_loader::create_df_edge_load_profile(&df);
+                let edge_profile = data_loader::create_df_edge_load_profile(&headers);
                 info!("{}", edge_profile);
-                for idx in 0..df.height() {
-                    let row = df.get_row(idx)?;
-                    match Edge::from_row(&row, &edge_profile) {
+                for record in &records {
+                    match Edge::from_row(record, &edge_profile) {
                         Ok(edge) => graph.edges.push(edge),
                         Err(e) => return Err(anyhow::anyhow!("Error creating edge: {}", e)),
                     };
@@ -83,9 +88,8 @@ fn load_data_into_graph(graph: &mut Graph, plan: &Plan, plan_file_path: &Path) -
             }
             ImportFileType::Layers => {
                 // TODO Add verification for layers
-                for idx in 0..df.height() {
-                    let row = df.get_row(idx)?;
-                    match Layer::from_row(&row) {
+                for record in &records {
+                    match Layer::from_row(record) {
                         Ok(layer) => graph.layers.push(layer.clone()),
                         Err(e) => return Err(anyhow::anyhow!("Error creating layer: {}", e)),
                     };

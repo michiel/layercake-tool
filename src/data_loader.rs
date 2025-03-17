@@ -1,9 +1,10 @@
-use polars::prelude::*;
 use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-use std::sync::Arc;
+use std::path::Path;
+use anyhow::Result;
+use csv::StringRecord;
 
 pub struct DfNodeLoadProfile {
     pub id_column: usize,
@@ -85,10 +86,10 @@ impl Display for DfEdgeLoadProfile {
     }
 }
 
-pub fn create_df_node_load_profile(df: &DataFrame) -> DfNodeLoadProfile {
+pub fn create_df_node_load_profile(headers: &[String]) -> DfNodeLoadProfile {
     let mut profile = DfNodeLoadProfile::default();
-    for (i, field) in df.schema().iter_fields().enumerate() {
-        match field.name().as_str() {
+    for (i, field) in headers.iter().enumerate() {
+        match field.as_str() {
             "id" => profile.id_column = i,
             "label" => profile.label_column = i,
             "layer" => profile.layer_column = i,
@@ -102,10 +103,10 @@ pub fn create_df_node_load_profile(df: &DataFrame) -> DfNodeLoadProfile {
     profile
 }
 
-pub fn create_df_edge_load_profile(df: &DataFrame) -> DfEdgeLoadProfile {
+pub fn create_df_edge_load_profile(headers: &[String]) -> DfEdgeLoadProfile {
     let mut profile = DfEdgeLoadProfile::default();
-    for (i, field) in df.schema().iter_fields().enumerate() {
-        match field.name().as_str() {
+    for (i, field) in headers.iter().enumerate() {
+        match field.as_str() {
             "id" => profile.id_column = i,
             "source" => profile.source_column = i,
             "target" => profile.target_column = i,
@@ -119,46 +120,47 @@ pub fn create_df_edge_load_profile(df: &DataFrame) -> DfEdgeLoadProfile {
     profile
 }
 
-fn infer_schema_from_file(filename: &str, separator: u8) -> anyhow::Result<Schema> {
+pub fn get_headers_from_file(filename: &str, separator: u8) -> anyhow::Result<Vec<String>> {
     let file = File::open(filename)?;
     let reader = BufReader::new(file);
     let mut lines = reader.lines();
 
     if let Some(Ok(header)) = lines.next() {
-        let fields: Vec<Field> = header
+        let headers: Vec<String> = header
             .split(separator as char)
-            .map(|col_name| Field::new(PlSmallStr::from(col_name), DataType::String))
+            .map(|col_name| col_name.trim().to_string())
             .collect();
 
-        let schema = Schema::from_iter(fields);
-        Ok(schema)
+        Ok(headers)
     } else {
         Err(anyhow::anyhow!("Failed to read header from file"))
     }
 }
 
-pub fn load_tsv(filename: &str) -> anyhow::Result<DataFrame> {
-    let schema = Arc::new(infer_schema_from_file(filename, b'\t')?);
-    let path = std::path::Path::new(filename);
-    LazyCsvReader::new(path)
-        .with_has_header(true)
-        .with_separator(b'\t')
-        .with_dtype_overwrite(Some(schema))
-        .finish()?
-        .collect()
-        .map_err(Into::into)
+pub fn load_tsv(filename: &str) -> anyhow::Result<Vec<StringRecord>> {
+    let path = Path::new(filename);
+    let mut reader = csv::ReaderBuilder::new()
+        .delimiter(b'\t')
+        .has_headers(true)
+        .from_path(path)?;
+    
+    let records: Vec<StringRecord> = reader.records()
+        .collect::<Result<_, _>>()?;
+    
+    Ok(records)
 }
 
-pub fn load_csv(filename: &str) -> anyhow::Result<DataFrame> {
-    let schema = Arc::new(infer_schema_from_file(filename, b',')?);
-    let path = std::path::Path::new(filename);
-    LazyCsvReader::new(path)
-        .with_has_header(true)
-        .with_separator(b',')
-        .with_dtype_overwrite(Some(schema))
-        .finish()?
-        .collect()
-        .map_err(Into::into)
+pub fn load_csv(filename: &str) -> anyhow::Result<Vec<StringRecord>> {
+    let path = Path::new(filename);
+    let mut reader = csv::ReaderBuilder::new()
+        .delimiter(b',')
+        .has_headers(true)
+        .from_path(path)?;
+    
+    let records: Vec<StringRecord> = reader.records()
+        .collect::<Result<_, _>>()?;
+    
+    Ok(records)
 }
 
 fn is_valid_id(id: &str) -> bool {
@@ -170,41 +172,39 @@ fn is_valid_id(id: &str) -> bool {
         && trimmed.chars().all(|c| c.is_alphanumeric() || c == '_')
 }
 
-pub fn verify_nodes_df(df: &DataFrame) -> anyhow::Result<()> {
-    let columns: HashSet<String> = df
-        .get_column_names()
-        .into_iter()
-        .map(|s| s.to_string())
-        .collect();
+pub fn verify_nodes_headers(headers: &[String]) -> anyhow::Result<()> {
+    let columns: HashSet<&String> = headers.iter().collect();
     let required_columns: HashSet<&str> = ["id", "label", "layer", "is_partition", "belongs_to"]
         .iter()
         .cloned()
         .collect();
 
     for &col in &required_columns {
-        if !columns.contains(col) {
+        if !columns.contains(&col.to_string()) {
             return Err(anyhow::anyhow!("Missing required column '{}'", col));
         }
     }
     Ok(())
 }
 
-pub fn verify_id_column_df(
-    df: &DataFrame,
-    _node_profile: &DfNodeLoadProfile,
+pub fn verify_id_column(
+    records: &[StringRecord],
+    id_column_index: usize,
 ) -> anyhow::Result<()> {
     // Ensure IDs are unique and not missing
-    let id_series = df.column("id")?;
-    let id_values: Vec<&str> = id_series.str()?.into_iter().flatten().collect();
     let mut id_set = std::collections::HashSet::new();
     let mut duplicates = Vec::new();
     let mut missing_ids = Vec::new();
 
-    for id in &id_values {
-        if !is_valid_id(id) {
-            missing_ids.push(*id);
-        } else if !id_set.insert(id) {
-            duplicates.push(*id);
+    for record in records {
+        if let Some(id) = record.get(id_column_index) {
+            if !is_valid_id(id) {
+                missing_ids.push(id.to_string());
+            } else if !id_set.insert(id) {
+                duplicates.push(id.to_string());
+            }
+        } else {
+            missing_ids.push("<missing>".to_string());
         }
     }
 

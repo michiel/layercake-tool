@@ -1,5 +1,5 @@
 use indexmap::IndexMap;
-use polars::frame::row::Row;
+use csv::StringRecord;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -834,35 +834,33 @@ fn strip_quotes_and_whitespace(s: &str) -> &str {
 }
 
 fn get_stripped_value(
-    row: &Row,
+    record: &StringRecord,
     idx: usize,
     label: &str,
 ) -> Result<String, Box<dyn std::error::Error>> {
-    let value = row
-        .0
+    let value = record
         .get(idx)
-        .ok_or(format!("Missing {}", label))?
-        .to_string();
-    Ok(strip_quotes_and_whitespace(&value).to_string())
+        .ok_or(format!("Missing {}", label))?;
+    Ok(strip_quotes_and_whitespace(value).to_string())
 }
 
 impl Node {
     pub fn from_row(
-        row: &Row,
+        record: &StringRecord,
         node_profile: &DfNodeLoadProfile,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         Ok(Node {
-            id: get_stripped_value(row, node_profile.id_column, "id").unwrap_or("noId".to_string()),
-            label: get_stripped_value(row, node_profile.label_column, "label")?,
-            layer: get_stripped_value(row, node_profile.layer_column, "layer")?,
+            id: get_stripped_value(record, node_profile.id_column, "id").unwrap_or("noId".to_string()),
+            label: get_stripped_value(record, node_profile.label_column, "label")?,
+            layer: get_stripped_value(record, node_profile.layer_column, "layer")?,
             is_partition: is_truthy(&get_stripped_value(
-                row,
+                record,
                 node_profile.is_partition_column,
                 "is_partition",
             )?),
             belongs_to: {
                 let belongs_to =
-                    get_stripped_value(row, node_profile.belongs_to_column, "belongs_to")?;
+                    get_stripped_value(record, node_profile.belongs_to_column, "belongs_to")?;
                 if belongs_to.is_empty() {
                     None
                 } else if belongs_to.to_lowercase() == "null" {
@@ -871,53 +869,76 @@ impl Node {
                     Some(belongs_to)
                 }
             },
-            weight: get_stripped_value(row, node_profile.weight_column, "weight")
+            weight: get_stripped_value(record, node_profile.weight_column, "weight")
                 .and_then(|c| {
                     c.parse::<i32>()
                         .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
                 })
                 .unwrap_or(1),
-            comment: row
-                .0
-                .get(node_profile.comment_column)
-                .map(|c| c.to_string()),
+            comment: {
+                let comment = record
+                    .get(node_profile.comment_column)
+                    .map(|c| c.to_string());
+                
+                // For compatibility with previous implementation, 
+                // null string values were rendered as "null" string
+                if comment.is_none() {
+                    Some("null".to_string())
+                } else if comment.as_ref().map_or(false, |s| s.is_empty()) {
+                    Some("null".to_string())
+                } else {
+                    comment
+                }
+            },
         })
     }
 }
 
 impl Edge {
     pub fn from_row(
-        row: &Row,
+        record: &StringRecord,
         edge_profile: &DfEdgeLoadProfile,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         Ok(Edge {
-            id: get_stripped_value(row, edge_profile.id_column, "id")?, // default to noId
-            source: get_stripped_value(row, edge_profile.source_column, "source")?,
-            target: get_stripped_value(row, edge_profile.target_column, "target")?,
-            label: get_stripped_value(row, edge_profile.label_column, "label")?,
-            layer: get_stripped_value(row, edge_profile.layer_column, "layer")?,
-            weight: get_stripped_value(row, edge_profile.weight_column, "weight")
+            id: get_stripped_value(record, edge_profile.id_column, "id")?, // default to noId
+            source: get_stripped_value(record, edge_profile.source_column, "source")?,
+            target: get_stripped_value(record, edge_profile.target_column, "target")?,
+            label: get_stripped_value(record, edge_profile.label_column, "label")?,
+            layer: get_stripped_value(record, edge_profile.layer_column, "layer")?,
+            weight: get_stripped_value(record, edge_profile.weight_column, "weight")
                 .and_then(|c| {
                     c.parse::<i32>()
                         .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
                 })
                 .unwrap_or(1),
-            comment: row
-                .0
-                .get(edge_profile.comment_column)
-                .map(|c| c.to_string()),
+            comment: {
+                let comment = record
+                    .get(edge_profile.comment_column)
+                    .map(|c| c.to_string());
+                
+                // For compatibility with previous implementation, 
+                // string values were rendered with quotes
+                if comment.is_none() {
+                    Some("null".to_string())
+                } else if comment.as_ref().map_or(false, |s| s.is_empty()) {
+                    Some("null".to_string())
+                } else {
+                    // Quote the comment value to match previous implementation
+                    comment.map(|c| format!("\"{}\"", c))
+                }
+            },
         })
     }
 }
 
 impl Layer {
-    pub fn from_row(row: &Row) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn from_row(record: &StringRecord) -> Result<Self, Box<dyn std::error::Error>> {
         Ok(Self {
-            id: get_stripped_value(row, 0, "layer")?,
-            label: get_stripped_value(row, 1, "label")?,
-            background_color: get_stripped_value(row, 2, "background")?,
-            border_color: get_stripped_value(row, 3, "border_color")?,
-            text_color: get_stripped_value(row, 4, "text_color")?,
+            id: get_stripped_value(record, 0, "layer")?,
+            label: get_stripped_value(record, 1, "label")?,
+            background_color: get_stripped_value(record, 2, "background")?,
+            border_color: get_stripped_value(record, 3, "border_color")?,
+            text_color: get_stripped_value(record, 4, "text_color")?,
         })
     }
 }
