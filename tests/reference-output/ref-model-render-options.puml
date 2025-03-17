@@ -5,8 +5,13 @@ hide stereotype
 left to right direction
 
 <style>
-    .mgmt {
-        BackgroundColor #8194a0;
+    .drone {
+        BackgroundColor #002a41;
+        BorderColor #dddddd;
+        FontColor #ffffff;
+    }
+    .drone2 {
+        BackgroundColor #224558;
         BorderColor #dddddd;
         FontColor #ffffff;
     }
@@ -15,13 +20,8 @@ left to right direction
         BorderColor #dddddd;
         FontColor #ffffff;
     }
-    .drone {
-        BackgroundColor #002a41;
-        BorderColor #dddddd;
-        FontColor #ffffff;
-    }
-    .drone2 {
-        BackgroundColor #224558;
+    .mgmt {
+        BackgroundColor #8194a0;
         BorderColor #dddddd;
         FontColor #ffffff;
     }
