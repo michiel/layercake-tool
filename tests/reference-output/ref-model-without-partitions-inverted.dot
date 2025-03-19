@@ -12,14 +12,6 @@ digraph G {
     node [ shape="plaintext" style="filled, rounded" fontsize=12]
     edge [ fontname="Lato" color="#2B303A" fontsize=8]
 
-  node [style="filled, dashed" fillcolor="#8194a0" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
-    }
-  node [style="filled, dashed" fillcolor="#426070" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
-    }
-  node [style="filled, dashed" fillcolor="#002a41" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
-    }
-  node [style="filled, dashed" fillcolor="#224558" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
-    }
   node [style="filled, dashed" fillcolor="#222222" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
             n_drone_03_drone_09_24[label="link"];
             n_drone_03_drone_31_48[label="link"];
@@ -72,7 +64,15 @@ digraph G {
             n_drone_40_drone_33_47[label="link"];
             n_drone_40_drone_38_9[label="link"];
     }
+  node [style="filled, dashed" fillcolor="#002a41" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
+    }
+  node [style="filled, dashed" fillcolor="#224558" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
+    }
+  node [style="filled, dashed" fillcolor="#426070" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
+    }
   node [style="filled, dashed" fillcolor="#222222" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
+    }
+  node [style="filled, dashed" fillcolor="#8194a0" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
     }
 
 node [style="filled, rounded" fillcolor="#dddddd" fontcolor="#000000"];
