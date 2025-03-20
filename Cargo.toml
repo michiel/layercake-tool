@@ -37,3 +37,12 @@ async-graphql-axum = "6.0"
 axum = "0.6"
 tokio = { version = "1.36", features = ["full"] }
 
+sea-orm = { version = "0.12", features = ["runtime-tokio-native-tls", "sqlx-sqlite", "macros"] }
+sea-orm-migration = "0.12"
+sqlx-sqlite = "0.7"
+futures = "0.3"
+async-trait = "0.1"
+chrono = { version = "0.4", features = ["serde"] }
+
+
+

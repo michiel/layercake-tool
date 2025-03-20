@@ -1,21 +1,28 @@
-use crate::graph::{Graph, Node};
-use async_graphql::{
-    Context, EmptyMutation, EmptySubscription, InputObject, Object, Schema, SimpleObject,
-};
+use crate::db::{establish_connection, repository::ProjectRepository};
+use crate::graph::Graph;
+use crate::plan::Plan;
+use async_graphql::{Context, InputObject, Object, Schema, SimpleObject, ID};
 use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
-use axum::{extract::State, routing::get, Router, Server};
-use std::path::Path;
-use std::sync::{Arc, RwLock};
+use axum::{
+    extract::State, 
+    routing::get,
+    Router,
+    Server,
+};
+use std::net::TcpListener;
+use sea_orm::DatabaseConnection;
+use std::sync::Arc;
 
-use async_graphql::http::{playground_source, GraphQLPlaygroundConfig};
-use axum::response::{Html, IntoResponse};
-
-// Handler for the GraphQL playground
-async fn graphql_playground() -> impl IntoResponse {
-    Html(playground_source(GraphQLPlaygroundConfig::new("/graphql")))
+// GraphQL Types for your entities
+#[derive(SimpleObject)]
+struct GraphQLProject {
+    id: ID,
+    name: String,
+    description: Option<String>,
+    created_at: String,
+    updated_at: String,
 }
 
-// Make your graph types compatible with GraphQL
 #[derive(SimpleObject, Clone)]
 struct GraphQLNode {
     id: String,
@@ -47,10 +54,16 @@ struct GraphQLLayer {
     border_color: String,
 }
 
+// Input types for mutations
+#[derive(InputObject)]
+struct ProjectInput {
+    name: String,
+    description: Option<String>,
+}
+
 // State shared across the application
 struct AppState {
-    graph: Arc<RwLock<Graph>>,
-    persist_path: Option<String>,
+    db: DatabaseConnection,
 }
 
 // GraphQL Query Root
@@ -58,11 +71,59 @@ struct QueryRoot;
 
 #[Object]
 impl QueryRoot {
-    async fn nodes(&self, ctx: &Context<'_>) -> Vec<GraphQLNode> {
+    async fn projects(&self, ctx: &Context<'_>) -> async_graphql::Result<Vec<GraphQLProject>> {
         let state = ctx.data::<Arc<AppState>>().unwrap();
-        let graph = state.graph.read().unwrap();
+        let repo = ProjectRepository::new(state.db.clone());
 
-        graph
+        let projects = repo.list_projects().await?;
+
+        Ok(projects
+            .into_iter()
+            .map(|p| GraphQLProject {
+                id: ID(p.id.to_string()),
+                name: p.name,
+                description: p.description,
+                created_at: p.created_at.to_string(),
+                updated_at: p.updated_at.to_string(),
+            })
+            .collect())
+    }
+
+    async fn project(
+        &self,
+        ctx: &Context<'_>,
+        id: ID,
+    ) -> async_graphql::Result<Option<GraphQLProject>> {
+        let state = ctx.data::<Arc<AppState>>().unwrap();
+        let repo = ProjectRepository::new(state.db.clone());
+
+        let project_id = id.parse::<i32>()?;
+
+        match repo.get_project(project_id).await {
+            Ok((project, _, _)) => Ok(Some(GraphQLProject {
+                id: ID(project.id.to_string()),
+                name: project.name,
+                description: project.description,
+                created_at: project.created_at.to_string(),
+                updated_at: project.updated_at.to_string(),
+            })),
+            Err(_) => Ok(None),
+        }
+    }
+
+    async fn nodes(
+        &self,
+        ctx: &Context<'_>,
+        project_id: ID,
+    ) -> async_graphql::Result<Vec<GraphQLNode>> {
+        let state = ctx.data::<Arc<AppState>>().unwrap();
+        let repo = ProjectRepository::new(state.db.clone());
+
+        let pid = project_id.parse::<i32>()?;
+
+        let (_, _, graph) = repo.get_project(pid).await?;
+
+        Ok(graph
             .nodes
             .iter()
             .map(|n| GraphQLNode {
@@ -74,14 +135,22 @@ impl QueryRoot {
                 weight: n.weight,
                 comment: n.comment.clone(),
             })
-            .collect()
+            .collect())
     }
 
-    async fn edges(&self, ctx: &Context<'_>) -> Vec<GraphQLEdge> {
+    async fn edges(
+        &self,
+        ctx: &Context<'_>,
+        project_id: ID,
+    ) -> async_graphql::Result<Vec<GraphQLEdge>> {
         let state = ctx.data::<Arc<AppState>>().unwrap();
-        let graph = state.graph.read().unwrap();
+        let repo = ProjectRepository::new(state.db.clone());
 
-        graph
+        let pid = project_id.parse::<i32>()?;
+
+        let (_, _, graph) = repo.get_project(pid).await?;
+
+        Ok(graph
             .edges
             .iter()
             .map(|e| GraphQLEdge {
@@ -93,14 +162,22 @@ impl QueryRoot {
                 weight: e.weight,
                 comment: e.comment.clone(),
             })
-            .collect()
+            .collect())
     }
 
-    async fn layers(&self, ctx: &Context<'_>) -> Vec<GraphQLLayer> {
+    async fn layers(
+        &self,
+        ctx: &Context<'_>,
+        project_id: ID,
+    ) -> async_graphql::Result<Vec<GraphQLLayer>> {
         let state = ctx.data::<Arc<AppState>>().unwrap();
-        let graph = state.graph.read().unwrap();
+        let repo = ProjectRepository::new(state.db.clone());
 
-        graph
+        let pid = project_id.parse::<i32>()?;
+
+        let (_, _, graph) = repo.get_project(pid).await?;
+
+        Ok(graph
             .layers
             .iter()
             .map(|l| GraphQLLayer {
@@ -110,14 +187,72 @@ impl QueryRoot {
                 text_color: l.text_color.clone(),
                 border_color: l.border_color.clone(),
             })
-            .collect()
+            .collect())
+    }
+}
+
+// GraphQL Mutation Root
+struct MutationRoot;
+
+#[Object]
+impl MutationRoot {
+    async fn create_project(
+        &self,
+        ctx: &Context<'_>,
+        input: ProjectInput,
+        plan_file: String,
+    ) -> async_graphql::Result<ID> {
+        let state = ctx.data::<Arc<AppState>>().unwrap();
+        let repo = ProjectRepository::new(state.db.clone());
+
+        // Load plan from file
+        let plan_path = std::path::Path::new(&plan_file);
+        let plan_content = std::fs::read_to_string(plan_path)?;
+        let plan: Plan = serde_yaml::from_str(&plan_content)?;
+
+        // Create graph from plan
+        let mut graph = crate::graph_utils::create_graph_from_plan(&plan);
+        crate::graph_utils::load_data_into_graph(&mut graph, &plan, plan_path)?;
+
+        // Create project in database
+        let project_id = repo
+            .create_project(&input.name, input.description.as_deref(), &plan, &graph)
+            .await?;
+
+        Ok(ID(project_id.to_string()))
     }
 
-    // Add more query fields as needed
+    async fn update_graph(
+        &self,
+        ctx: &Context<'_>,
+        project_id: ID,
+        graph_data: String,
+    ) -> async_graphql::Result<bool> {
+        let state = ctx.data::<Arc<AppState>>().unwrap();
+        let repo = ProjectRepository::new(state.db.clone());
+
+        let pid = project_id.parse::<i32>()?;
+        let graph: Graph = serde_json::from_str(&graph_data)?;
+
+        repo.update_graph(pid, &graph).await?;
+
+        Ok(true)
+    }
+
+    async fn delete_project(&self, ctx: &Context<'_>, id: ID) -> async_graphql::Result<bool> {
+        let state = ctx.data::<Arc<AppState>>().unwrap();
+        let repo = ProjectRepository::new(state.db.clone());
+
+        let project_id = id.parse::<i32>()?;
+
+        repo.delete_project(project_id).await?;
+
+        Ok(true)
+    }
 }
 
 // Define a GraphQL schema
-type GraphQLSchema = Schema<QueryRoot, EmptyMutation, EmptySubscription>;
+type GraphQLSchema = Schema<QueryRoot, MutationRoot, async_graphql::EmptySubscription>;
 
 // Handler for GraphQL requests
 async fn graphql_handler(
@@ -127,48 +262,44 @@ async fn graphql_handler(
     schema.execute(req.into_inner()).await.into()
 }
 
-// Persistence functions
-fn load_graph(path: &str) -> Option<Graph> {
-    if Path::new(path).exists() {
-        match std::fs::read_to_string(path) {
-            Ok(json) => match serde_json::from_str(&json) {
-                Ok(graph) => return Some(graph),
-                Err(e) => tracing::error!("Failed to deserialize graph: {}", e),
-            },
-            Err(e) => tracing::error!("Failed to read graph file: {}", e),
-        }
-    }
-    None
-}
-
-fn save_graph(graph: &Graph, path: &str) -> Result<(), std::io::Error> {
-    let json = serde_json::to_string_pretty(graph)?;
-    std::fs::write(path, json)
+// Handler for the GraphQL playground
+async fn graphql_playground() -> impl axum::response::IntoResponse {
+    axum::response::Html(async_graphql::http::playground_source(
+        async_graphql::http::GraphQLPlaygroundConfig::new("/graphql"),
+    ))
 }
 
 // Main function to start the GraphQL server
-pub async fn serve_graph(graph: Graph, port: u16, persist: bool) -> Result<(), anyhow::Error> {
-    let persist_path = if persist {
-        Some("layercake_graph.json".to_string())
-    } else {
-        None
-    };
+pub async fn serve_graph(
+    plan: Plan,
+    graph: Graph,
+    port: u16,
+    db_path: &str,
+) -> Result<(), anyhow::Error> {
+    // Connect to database
+    let db = establish_connection(db_path).await?;
 
-    // Load persisted graph if it exists
-    let graph = if let Some(path) = &persist_path {
-        load_graph(path).unwrap_or(graph)
-    } else {
-        graph
-    };
+    // Create repository
+    let repo = ProjectRepository::new(db.clone());
+
+    // Create a default project if none exists
+    let projects = repo.list_projects().await?;
+    if projects.is_empty() {
+        repo.create_project(
+            "Default Project",
+            Some("Created on server start"),
+            &plan,
+            &graph,
+        )
+        .await?;
+        tracing::info!("Created default project");
+    }
 
     // Set up shared state
-    let state = Arc::new(AppState {
-        graph: Arc::new(RwLock::new(graph)),
-        persist_path,
-    });
+    let state = Arc::new(AppState { db });
 
     // Set up GraphQL schema
-    let schema = Schema::build(QueryRoot, EmptyMutation, EmptySubscription)
+    let schema = Schema::build(QueryRoot, MutationRoot, async_graphql::EmptySubscription)
         .data(state.clone())
         .finish();
 
@@ -183,86 +314,9 @@ pub async fn serve_graph(graph: Graph, port: u16, persist: bool) -> Result<(), a
         "GraphQL server running at http://localhost:{}/graphql",
         port
     );
-    let addr = format!("0.0.0.0:{}", port).parse()?;
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await?;
+    let listener = TcpListener::bind(format!("0.0.0.0:{}", port))?;
+    Server::from_tcp(listener)?.serve(app.into_make_service()).await?;
 
     Ok(())
 }
 
-// In src/graphql_server.rs, add these functions:
-
-// Create a MutationRoot to allow modifying the graph
-struct MutationRoot;
-
-#[Object]
-impl MutationRoot {
-    async fn persist_graph(&self, ctx: &Context<'_>) -> async_graphql::Result<bool> {
-        let state = ctx.data::<Arc<AppState>>().unwrap();
-
-        if let Some(path) = &state.persist_path {
-            let graph = state.graph.read().unwrap();
-            if let Err(e) = save_graph(&graph, path) {
-                tracing::error!("Failed to save graph: {}", e);
-                return Ok(false);
-            }
-            Ok(true)
-        } else {
-            Ok(false)
-        }
-    }
-
-    // Add mutations to modify the graph
-    async fn add_node(
-        &self,
-        ctx: &Context<'_>,
-        node: NodeInput,
-    ) -> async_graphql::Result<GraphQLNode> {
-        let state = ctx.data::<Arc<AppState>>().unwrap();
-        let mut graph = state.graph.write().unwrap();
-
-        let new_node = Node {
-            id: node.id,
-            label: node.label,
-            layer: node.layer,
-            is_partition: node.is_partition,
-            belongs_to: node.belongs_to,
-            weight: node.weight,
-            comment: node.comment,
-        };
-
-        graph.nodes.push(new_node.clone());
-
-        // Auto-persist if enabled
-        if let Some(path) = &state.persist_path {
-            if let Err(e) = save_graph(&graph, path) {
-                tracing::error!("Failed to save graph: {}", e);
-            }
-        }
-
-        Ok(GraphQLNode {
-            id: new_node.id,
-            label: new_node.label,
-            layer: new_node.layer,
-            is_partition: new_node.is_partition,
-            belongs_to: new_node.belongs_to,
-            weight: new_node.weight,
-            comment: new_node.comment,
-        })
-    }
-
-    // Implement similar mutations for edges and layers
-}
-
-// Add a NodeInput type for mutations
-#[derive(InputObject)]
-struct NodeInput {
-    id: String,
-    label: String,
-    layer: String,
-    is_partition: bool,
-    belongs_to: Option<String>,
-    weight: i32,
-    comment: Option<String>,
-}
