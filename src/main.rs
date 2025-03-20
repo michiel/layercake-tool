@@ -3,6 +3,7 @@ mod data_loader;
 mod export;
 mod generate_commands;
 mod graph;
+mod graphql_server;
 mod plan;
 mod plan_execution;
 
@@ -11,6 +12,8 @@ use clap::{Parser, Subcommand};
 use tracing::info;
 use tracing::Level;
 use tracing_subscriber::EnvFilter;
+
+use crate::plan::Plan;
 
 #[derive(Parser)]
 #[clap(author, version, about)]
@@ -36,6 +39,14 @@ enum Commands {
     Generate {
         #[clap(subcommand)]
         command: GenerateCommands,
+    },
+    Serve {
+        #[clap(short, long)]
+        plan: String,
+        #[clap(long, default_value = "3000")]
+        port: u16,
+        #[clap(long)]
+        persist: bool,
     },
 }
 
@@ -93,6 +104,26 @@ fn main() -> Result<()> {
                 generate_commands::generate_sample(sample, dir);
             }
         },
+        Commands::Serve {
+            plan,
+            port,
+            persist,
+        } => {
+            info!("Starting GraphQL server with plan: {}", plan);
+
+            // Load the graph from the plan
+            let plan_file_path = std::path::Path::new(&plan);
+            let path_content = std::fs::read_to_string(plan_file_path)?;
+            let plan: Plan = serde_yaml::from_str(&path_content)?;
+
+            // Create graph and load data
+            let mut graph = plan_execution::create_graph_from_plan(&plan);
+            plan_execution::load_data_into_graph(&mut graph, &plan, plan_file_path)?;
+
+            // Start the GraphQL server
+            let runtime = tokio::runtime::Runtime::new()?;
+            runtime.block_on(async { graphql_server::serve_graph(graph, port, persist).await })?;
+        }
     }
 
     Ok(())
