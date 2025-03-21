@@ -1,10 +1,11 @@
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@apollo/client';
-import { Card, Typography, Spin, Alert, Descriptions, List, Space, Button, Collapse, Tag, Tabs, Empty } from 'antd';
+import { Card, Typography, Spin, Alert, Descriptions, List, Space, Button, Collapse, Tag, Tabs } from 'antd';
 import { GET_PLAN } from '../graphql/queries';
 import { ImportProfile, ExportProfileItem } from '../types';
+import PlanVisualizer from './PlanVisualizer';
 
-const { Title, Text, Paragraph } = Typography;
+const { Title, Text } = Typography;
 const { Panel } = Collapse;
 
 const PlanDetail = () => {
@@ -120,24 +121,9 @@ const PlanDetail = () => {
     </Space>
   );
 
-  // Plan Visualization Tab Content - Placeholder
+  // Plan Visualization Tab Content
   const planVisualizationContent = (
-    <Card style={{ marginTop: 16 }}>
-      <Empty 
-        image={Empty.PRESENTED_IMAGE_SIMPLE}
-        description={
-          <Space direction="vertical" align="center">
-            <Text>Plan Visualization Placeholder</Text>
-            <Paragraph type="secondary">
-              This section will contain interactive visualizations for the plan structure, 
-              showing relationships between import and export configurations.
-            </Paragraph>
-          </Space>
-        }
-      >
-        <Button type="primary" disabled>Coming Soon</Button>
-      </Empty>
-    </Card>
+    <PlanVisualizer plan={plan} />
   );
 
   // Main render

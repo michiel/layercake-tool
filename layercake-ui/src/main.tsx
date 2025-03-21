@@ -5,6 +5,8 @@ import { ApolloProvider } from '@apollo/client'
 import { ConfigProvider } from 'antd'
 import App from './App.tsx'
 import { client } from './apollo'
+import './index.css'
+import '@xyflow/react/dist/style.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
