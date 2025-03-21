@@ -46,3 +46,4 @@ sqlx-sqlite = "0.7"
 futures = "0.3"
 async-trait = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
+tower-http = { version = "0.4.0", features = ["cors"], default-features = false }

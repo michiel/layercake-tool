@@ -8,7 +8,9 @@ use axum::{
     routing::get,
     Router,
     Server,
+    http::{Method, HeaderValue},
 };
+use tower_http::cors::CorsLayer;
 use std::net::TcpListener;
 use sea_orm::DatabaseConnection;
 use std::sync::Arc;
@@ -651,10 +653,26 @@ pub async fn serve_graph(
         .data(state.clone())
         .finish();
 
-    // Set up web server routes
+    // Configure CORS middleware
+    let cors = CorsLayer::new()
+        // Allow requests from specific origins for credentials
+        .allow_origin("http://localhost:5173".parse::<HeaderValue>().unwrap())
+        // Allow standard methods
+        .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+        // Allow specific headers instead of Any
+        .allow_headers([
+            axum::http::header::CONTENT_TYPE,
+            axum::http::header::ACCEPT,
+            axum::http::header::AUTHORIZATION,
+        ])
+        // Allow credentials
+        .allow_credentials(true);
+
+    // Set up web server routes with CORS
     let app = Router::new()
         .route("/", get(graphql_playground))
         .route("/graphql", get(graphql_handler).post(graphql_handler))
+        .layer(cors)
         .with_state(schema);
 
     // Start the server

@@ -4,3 +4,4 @@ out/
 **/out/
 .DS_Store
 Cargo.lock
+*db
