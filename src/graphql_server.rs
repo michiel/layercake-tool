@@ -44,6 +44,57 @@ impl Project {
         &self.updated_at
     }
     
+    async fn plan(&self, ctx: &Context<'_>) -> async_graphql::Result<Option<PlanData>> {
+        let state = ctx.data::<Arc<AppState>>().unwrap();
+        let repo = ProjectRepository::new(state.db.clone());
+        
+        let project_id = self.id.parse::<i32>()?;
+        
+        match repo.get_project(project_id).await {
+            Ok((_, plan, _)) => {
+                // Convert domain Plan to GraphQL PlanData
+                let meta = plan.meta.map(|m| PlanMeta {
+                    name: m.name,
+                });
+                
+                let import_profiles = plan.import.profiles.iter().map(|p| ImportProfile {
+                    filename: p.filename.clone(),
+                    filetype: format!("{:?}", p.filetype), // Convert enum to string
+                }).collect();
+                
+                let import = ImportConfig {
+                    profiles: import_profiles,
+                };
+                
+                let export_profiles = plan.export.profiles.iter().map(|p| ExportProfileItem {
+                    filename: p.filename.clone(),
+                    exporter: format!("{:?}", p.exporter), // Convert enum to string
+                    graph_config: p.graph_config.map(|gc| ExportProfileGraphConfig {
+                        generate_hierarchy: gc.generate_hierarchy,
+                        max_partition_depth: gc.max_partition_depth,
+                        max_partition_width: gc.max_partition_width,
+                        invert_graph: gc.invert_graph,
+                        node_label_max_length: gc.node_label_max_length.map(|v| v as i32),
+                        node_label_insert_newlines_at: gc.node_label_insert_newlines_at.map(|v| v as i32),
+                        edge_label_max_length: gc.edge_label_max_length.map(|v| v as i32),
+                        edge_label_insert_newlines_at: gc.edge_label_insert_newlines_at.map(|v| v as i32),
+                    }),
+                }).collect();
+                
+                let export = ExportProfile {
+                    profiles: export_profiles,
+                };
+                
+                Ok(Some(PlanData {
+                    meta,
+                    import,
+                    export,
+                }))
+            },
+            Err(_) => Ok(None),
+        }
+    }
+    
     async fn graph(&self, ctx: &Context<'_>) -> async_graphql::Result<Option<GraphData>> {
         let state = ctx.data::<Arc<AppState>>().unwrap();
         let repo = ProjectRepository::new(state.db.clone());
@@ -171,6 +222,68 @@ struct Layer {
     background_color: String,
     text_color: String,
     border_color: String,
+}
+
+// GraphQL types for Plan
+#[derive(SimpleObject)]
+struct PlanMeta {
+    name: Option<String>,
+}
+
+#[derive(SimpleObject)]
+struct ImportProfile {
+    filename: String,
+    filetype: String,
+}
+
+#[derive(SimpleObject)]
+struct ImportConfig {
+    profiles: Vec<ImportProfile>,
+}
+
+#[derive(SimpleObject)]
+struct ExportProfileGraphConfig {
+    generate_hierarchy: Option<bool>,
+    max_partition_depth: Option<i32>,
+    max_partition_width: Option<i32>,
+    invert_graph: Option<bool>,
+    node_label_max_length: Option<i32>,
+    node_label_insert_newlines_at: Option<i32>,
+    edge_label_max_length: Option<i32>,
+    edge_label_insert_newlines_at: Option<i32>,
+}
+
+#[derive(SimpleObject)]
+struct ExportProfileItem {
+    filename: String,
+    exporter: String,
+    graph_config: Option<ExportProfileGraphConfig>,
+}
+
+#[derive(SimpleObject)]
+struct ExportProfile {
+    profiles: Vec<ExportProfileItem>,
+}
+
+struct PlanData {
+    meta: Option<PlanMeta>,
+    import: ImportConfig,
+    export: ExportProfile,
+}
+
+#[Object]
+impl PlanData {
+    async fn meta(&self) -> &Option<PlanMeta> {
+        &self.meta
+    }
+    
+    async fn import(&self) -> &ImportConfig {
+        &self.import
+    }
+    
+    async fn export(&self) -> &ExportProfile {
+        &self.export
+    }
 }
 
 // Input types for mutations
@@ -359,6 +472,61 @@ impl QueryRoot {
                 border_color: l.border_color.clone(),
             })
             .collect())
+    }
+    
+    async fn plan(
+        &self,
+        ctx: &Context<'_>,
+        project_id: ID,
+    ) -> async_graphql::Result<Option<PlanData>> {
+        let state = ctx.data::<Arc<AppState>>().unwrap();
+        let repo = ProjectRepository::new(state.db.clone());
+
+        let pid = project_id.parse::<i32>()?;
+
+        match repo.get_project(pid).await {
+            Ok((_, plan, _)) => {
+                // Convert domain Plan to GraphQL PlanData
+                let meta = plan.meta.map(|m| PlanMeta {
+                    name: m.name,
+                });
+                
+                let import_profiles = plan.import.profiles.iter().map(|p| ImportProfile {
+                    filename: p.filename.clone(),
+                    filetype: format!("{:?}", p.filetype),
+                }).collect();
+                
+                let import = ImportConfig {
+                    profiles: import_profiles,
+                };
+                
+                let export_profiles = plan.export.profiles.iter().map(|p| ExportProfileItem {
+                    filename: p.filename.clone(),
+                    exporter: format!("{:?}", p.exporter),
+                    graph_config: p.graph_config.map(|gc| ExportProfileGraphConfig {
+                        generate_hierarchy: gc.generate_hierarchy,
+                        max_partition_depth: gc.max_partition_depth,
+                        max_partition_width: gc.max_partition_width,
+                        invert_graph: gc.invert_graph,
+                        node_label_max_length: gc.node_label_max_length.map(|v| v as i32),
+                        node_label_insert_newlines_at: gc.node_label_insert_newlines_at.map(|v| v as i32),
+                        edge_label_max_length: gc.edge_label_max_length.map(|v| v as i32),
+                        edge_label_insert_newlines_at: gc.edge_label_insert_newlines_at.map(|v| v as i32),
+                    }),
+                }).collect();
+                
+                let export = ExportProfile {
+                    profiles: export_profiles,
+                };
+                
+                Ok(Some(PlanData {
+                    meta,
+                    import,
+                    export,
+                }))
+            },
+            Err(_) => Ok(None),
+        }
     }
 }
 
