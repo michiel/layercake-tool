@@ -33,12 +33,12 @@ jobs:
         with:
           command: build
           target: ${{ matrix.platform.target }}
-          args: "--locked --release"
+          args: "--locked --release -p layercake-tool"
           strip: true
       - name: Publish artifacts and release
         uses: houseabsolute/actions-rust-release@v0
         with:
           executable-name: layercake
           target: ${{ matrix.platform.target }}
-          changes-file: "CHANGES.md"
+          changes-file: "layercake-tool/CHANGES.md"
           archive-name: "layercake-${{ github.event.release.tag_name }}-${{ matrix.platform.os-name }}"

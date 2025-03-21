@@ -1,48 +1,27 @@
-[package]
-name = "layercake-tool"
+[workspace]
+members = [
+  "layercake-tool",
+]
+resolver = "2"
+
+# The following is a workspace-level configuration
+# Individual crates can override these settings
+[workspace.package]
 version = "0.1.5"
 edition = "2021"
+authors = ["Michiel Kalkman <michiel@nosuchtype.com>"]
+description = "A tool for layer-based visualization of complex systems"
+license = "MIT"
+repository = "https://github.com/michiel/layercake-tool"
 
-[lib]
-name = "layercake"
-path = "src/lib.rs"
-
-[[bin]]
-name = "layercake"
-path = "src/main.rs"
-
-[dependencies]
-
-serde_yaml = "0.9"
-
-tracing = "0.1.41"
-tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
-tracing-tree = "0.2.5"
-include_dir = "0.6"
-
-clap = { version = "4.5", features = ["derive"] }
-
+# Dependencies shared across workspace members
+[workspace.dependencies]
 anyhow = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-toml = "0.5"
-handlebars = "4.5.0"
-regex = "1.11.1"
-notify = "8.0.0"
-csv = "1.3.1"
-indexmap = { version ="2", features = ["serde"] }
-
-async-graphql = "6.0"
-async-graphql-axum = "6.0"
-axum = "0.6"
+serde_yaml = "0.9"
 tokio = { version = "1.36", features = ["full"] }
-
-sea-orm = { version = "0.12", features = ["runtime-tokio-native-tls", "sqlx-sqlite", "macros"] }
-sea-orm-migration = "0.12"
-sqlx-sqlite = "0.7"
-futures = "0.3"
-async-trait = "0.1"
-chrono = { version = "0.4", features = ["serde"] }
-
-
-
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+clap = { version = "4.5", features = ["derive"] }
+handlebars = "4.5.0"
