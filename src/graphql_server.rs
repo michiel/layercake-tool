@@ -1,5 +1,5 @@
 use crate::db::{establish_connection, repository::ProjectRepository};
-use crate::graph::Graph;
+use crate::graph::Graph as DomainGraph;
 use crate::plan::Plan;
 use async_graphql::{Context, InputObject, Object, Schema, SimpleObject, ID};
 use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
@@ -14,8 +14,7 @@ use sea_orm::DatabaseConnection;
 use std::sync::Arc;
 
 // GraphQL Types for your entities
-#[derive(SimpleObject)]
-struct GraphQLProject {
+struct Project {
     id: ID,
     name: String,
     description: Option<String>,
@@ -23,8 +22,128 @@ struct GraphQLProject {
     updated_at: String,
 }
 
+#[Object]
+impl Project {
+    async fn id(&self) -> &ID {
+        &self.id
+    }
+    
+    async fn name(&self) -> &String {
+        &self.name
+    }
+    
+    async fn description(&self) -> &Option<String> {
+        &self.description
+    }
+    
+    async fn created_at(&self) -> &String {
+        &self.created_at
+    }
+    
+    async fn updated_at(&self) -> &String {
+        &self.updated_at
+    }
+    
+    async fn graph(&self, ctx: &Context<'_>) -> async_graphql::Result<Option<GraphData>> {
+        let state = ctx.data::<Arc<AppState>>().unwrap();
+        let repo = ProjectRepository::new(state.db.clone());
+        
+        let project_id = self.id.parse::<i32>()?;
+        
+        match repo.get_project(project_id).await {
+            Ok((project, _, graph_data)) => {
+                let nodes = graph_data.nodes.iter().map(|n| Node {
+                    id: n.id.clone(),
+                    label: n.label.clone(),
+                    layer: n.layer.clone(),
+                    is_partition: n.is_partition,
+                    belongs_to: n.belongs_to.clone(),
+                    weight: n.weight,
+                    comment: n.comment.clone(),
+                }).collect();
+                
+                let edges = graph_data.edges.iter().map(|e| Edge {
+                    id: e.id.clone(),
+                    source: e.source.clone(),
+                    target: e.target.clone(),
+                    label: e.label.clone(),
+                    layer: e.layer.clone(),
+                    weight: e.weight,
+                    comment: e.comment.clone(),
+                }).collect();
+                
+                let layers = graph_data.layers.iter().map(|l| Layer {
+                    id: l.id.clone(),
+                    label: l.label.clone(),
+                    background_color: l.background_color.clone(),
+                    text_color: l.text_color.clone(),
+                    border_color: l.border_color.clone(),
+                }).collect();
+                
+                Ok(Some(GraphData {
+                    id: ID(format!("graph-{}", project.id)),
+                    project_id: ID(project.id.to_string()),
+                    nodes,
+                    edges,
+                    layers,
+                }))
+            },
+            Err(_) => Ok(None),
+        }
+    }
+}
+
+struct GraphData {
+    id: ID,
+    project_id: ID,
+    nodes: Vec<Node>,
+    edges: Vec<Edge>,
+    layers: Vec<Layer>,
+}
+
+#[Object]
+impl GraphData {
+    async fn id(&self) -> &ID {
+        &self.id
+    }
+    
+    async fn project_id(&self) -> &ID {
+        &self.project_id
+    }
+    
+    async fn nodes(&self) -> &Vec<Node> {
+        &self.nodes
+    }
+    
+    async fn edges(&self) -> &Vec<Edge> {
+        &self.edges
+    }
+    
+    async fn layers(&self) -> &Vec<Layer> {
+        &self.layers
+    }
+    
+    async fn project(&self, ctx: &Context<'_>) -> async_graphql::Result<Option<Project>> {
+        let state = ctx.data::<Arc<AppState>>().unwrap();
+        let repo = ProjectRepository::new(state.db.clone());
+        
+        let project_id = self.project_id.parse::<i32>()?;
+        
+        match repo.get_project(project_id).await {
+            Ok((project, _, _)) => Ok(Some(Project {
+                id: ID(project.id.to_string()),
+                name: project.name,
+                description: project.description,
+                created_at: project.created_at.to_string(),
+                updated_at: project.updated_at.to_string(),
+            })),
+            Err(_) => Ok(None),
+        }
+    }
+}
+
 #[derive(SimpleObject, Clone)]
-struct GraphQLNode {
+struct Node {
     id: String,
     label: String,
     layer: String,
@@ -35,7 +154,7 @@ struct GraphQLNode {
 }
 
 #[derive(SimpleObject, Clone)]
-struct GraphQLEdge {
+struct Edge {
     id: String,
     source: String,
     target: String,
@@ -46,7 +165,7 @@ struct GraphQLEdge {
 }
 
 #[derive(SimpleObject, Clone)]
-struct GraphQLLayer {
+struct Layer {
     id: String,
     label: String,
     background_color: String,
@@ -71,7 +190,7 @@ struct QueryRoot;
 
 #[Object]
 impl QueryRoot {
-    async fn projects(&self, ctx: &Context<'_>) -> async_graphql::Result<Vec<GraphQLProject>> {
+    async fn projects(&self, ctx: &Context<'_>) -> async_graphql::Result<Vec<Project>> {
         let state = ctx.data::<Arc<AppState>>().unwrap();
         let repo = ProjectRepository::new(state.db.clone());
 
@@ -79,7 +198,7 @@ impl QueryRoot {
 
         Ok(projects
             .into_iter()
-            .map(|p| GraphQLProject {
+            .map(|p| Project {
                 id: ID(p.id.to_string()),
                 name: p.name,
                 description: p.description,
@@ -93,14 +212,14 @@ impl QueryRoot {
         &self,
         ctx: &Context<'_>,
         id: ID,
-    ) -> async_graphql::Result<Option<GraphQLProject>> {
+    ) -> async_graphql::Result<Option<Project>> {
         let state = ctx.data::<Arc<AppState>>().unwrap();
         let repo = ProjectRepository::new(state.db.clone());
 
         let project_id = id.parse::<i32>()?;
 
         match repo.get_project(project_id).await {
-            Ok((project, _, _)) => Ok(Some(GraphQLProject {
+            Ok((project, _, _)) => Ok(Some(Project {
                 id: ID(project.id.to_string()),
                 name: project.name,
                 description: project.description,
@@ -110,12 +229,64 @@ impl QueryRoot {
             Err(_) => Ok(None),
         }
     }
+    
+    async fn graph(
+        &self,
+        ctx: &Context<'_>,
+        project_id: ID,
+    ) -> async_graphql::Result<Option<GraphData>> {
+        let state = ctx.data::<Arc<AppState>>().unwrap();
+        let repo = ProjectRepository::new(state.db.clone());
+
+        let pid = project_id.parse::<i32>()?;
+
+        match repo.get_project(pid).await {
+            Ok((project, _, graph_data)) => {
+                let nodes = graph_data.nodes.iter().map(|n| Node {
+                    id: n.id.clone(),
+                    label: n.label.clone(),
+                    layer: n.layer.clone(),
+                    is_partition: n.is_partition,
+                    belongs_to: n.belongs_to.clone(),
+                    weight: n.weight,
+                    comment: n.comment.clone(),
+                }).collect();
+                
+                let edges = graph_data.edges.iter().map(|e| Edge {
+                    id: e.id.clone(),
+                    source: e.source.clone(),
+                    target: e.target.clone(),
+                    label: e.label.clone(),
+                    layer: e.layer.clone(),
+                    weight: e.weight,
+                    comment: e.comment.clone(),
+                }).collect();
+                
+                let layers = graph_data.layers.iter().map(|l| Layer {
+                    id: l.id.clone(),
+                    label: l.label.clone(),
+                    background_color: l.background_color.clone(),
+                    text_color: l.text_color.clone(),
+                    border_color: l.border_color.clone(),
+                }).collect();
+                
+                Ok(Some(GraphData {
+                    id: ID(format!("graph-{}", project.id)),
+                    project_id: ID(project.id.to_string()),
+                    nodes,
+                    edges,
+                    layers,
+                }))
+            },
+            Err(_) => Ok(None),
+        }
+    }
 
     async fn nodes(
         &self,
         ctx: &Context<'_>,
         project_id: ID,
-    ) -> async_graphql::Result<Vec<GraphQLNode>> {
+    ) -> async_graphql::Result<Vec<Node>> {
         let state = ctx.data::<Arc<AppState>>().unwrap();
         let repo = ProjectRepository::new(state.db.clone());
 
@@ -126,7 +297,7 @@ impl QueryRoot {
         Ok(graph
             .nodes
             .iter()
-            .map(|n| GraphQLNode {
+            .map(|n| Node {
                 id: n.id.clone(),
                 label: n.label.clone(),
                 layer: n.layer.clone(),
@@ -142,7 +313,7 @@ impl QueryRoot {
         &self,
         ctx: &Context<'_>,
         project_id: ID,
-    ) -> async_graphql::Result<Vec<GraphQLEdge>> {
+    ) -> async_graphql::Result<Vec<Edge>> {
         let state = ctx.data::<Arc<AppState>>().unwrap();
         let repo = ProjectRepository::new(state.db.clone());
 
@@ -153,7 +324,7 @@ impl QueryRoot {
         Ok(graph
             .edges
             .iter()
-            .map(|e| GraphQLEdge {
+            .map(|e| Edge {
                 id: e.id.clone(),
                 source: e.source.clone(),
                 target: e.target.clone(),
@@ -169,7 +340,7 @@ impl QueryRoot {
         &self,
         ctx: &Context<'_>,
         project_id: ID,
-    ) -> async_graphql::Result<Vec<GraphQLLayer>> {
+    ) -> async_graphql::Result<Vec<Layer>> {
         let state = ctx.data::<Arc<AppState>>().unwrap();
         let repo = ProjectRepository::new(state.db.clone());
 
@@ -180,7 +351,7 @@ impl QueryRoot {
         Ok(graph
             .layers
             .iter()
-            .map(|l| GraphQLLayer {
+            .map(|l| Layer {
                 id: l.id.clone(),
                 label: l.label.clone(),
                 background_color: l.background_color.clone(),
@@ -201,7 +372,7 @@ impl MutationRoot {
         ctx: &Context<'_>,
         input: ProjectInput,
         plan_file: String,
-    ) -> async_graphql::Result<ID> {
+    ) -> async_graphql::Result<Project> {
         let state = ctx.data::<Arc<AppState>>().unwrap();
         let repo = ProjectRepository::new(state.db.clone());
 
@@ -211,15 +382,24 @@ impl MutationRoot {
         let plan: Plan = serde_yaml::from_str(&plan_content)?;
 
         // Create graph from plan
-        let mut graph = crate::graph_utils::create_graph_from_plan(&plan);
-        crate::graph_utils::load_data_into_graph(&mut graph, &plan, plan_path)?;
+        let mut graph_data = crate::graph_utils::create_graph_from_plan(&plan);
+        crate::graph_utils::load_data_into_graph(&mut graph_data, &plan, plan_path)?;
 
         // Create project in database
         let project_id = repo
-            .create_project(&input.name, input.description.as_deref(), &plan, &graph)
+            .create_project(&input.name, input.description.as_deref(), &plan, &graph_data)
             .await?;
-
-        Ok(ID(project_id.to_string()))
+            
+        // Get the created project
+        let (project, _, _) = repo.get_project(project_id).await?;
+        
+        Ok(Project {
+            id: ID(project.id.to_string()),
+            name: project.name,
+            description: project.description,
+            created_at: project.created_at.to_string(),
+            updated_at: project.updated_at.to_string(),
+        })
     }
 
     async fn update_graph(
@@ -232,9 +412,9 @@ impl MutationRoot {
         let repo = ProjectRepository::new(state.db.clone());
 
         let pid = project_id.parse::<i32>()?;
-        let graph: Graph = serde_json::from_str(&graph_data)?;
+        let graph_data: DomainGraph = serde_json::from_str(&graph_data)?;
 
-        repo.update_graph(pid, &graph).await?;
+        repo.update_graph(pid, &graph_data).await?;
 
         Ok(true)
     }
@@ -272,7 +452,7 @@ async fn graphql_playground() -> impl axum::response::IntoResponse {
 // Main function to start the GraphQL server
 pub async fn serve_graph(
     plan: Plan,
-    graph: Graph,
+    graph: DomainGraph,
     port: u16,
     db_path: &str,
 ) -> Result<(), anyhow::Error> {

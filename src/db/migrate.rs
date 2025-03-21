@@ -1,6 +1,6 @@
 // src/db/migrate.rs
 use sea_orm_migration::prelude::*;
-use sea_orm::{DatabaseConnection, Statement};
+use sea_orm::DatabaseConnection;
 use anyhow::Result;
 
 pub struct Migrator;

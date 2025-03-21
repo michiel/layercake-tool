@@ -14,7 +14,6 @@ use clap::{Parser, Subcommand};
 use tracing::{info, error};
 use tracing::Level;
 use tracing_subscriber::EnvFilter;
-use std::path::Path;
 
 use crate::plan::Plan;
 

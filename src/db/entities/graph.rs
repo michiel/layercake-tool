@@ -1,7 +1,6 @@
 use super::project::Entity as ProjectEntity;
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Serialize, Deserialize)]
 #[sea_orm(table_name = "graph")]
