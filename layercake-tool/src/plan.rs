@@ -94,6 +94,7 @@ pub struct ExportProfileItem {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Copy)]
+#[derive(Default)]
 pub struct ExportProfileGraphConfig {
     pub generate_hierarchy: Option<bool>,
     pub max_partition_depth: Option<i32>,
@@ -138,20 +139,6 @@ pub enum ExportFileType {
     Custom(CustomExportProfile),
 }
 
-impl Default for ExportProfileGraphConfig {
-    fn default() -> Self {
-        Self {
-            generate_hierarchy: None,
-            max_partition_depth: None,
-            max_partition_width: None,
-            invert_graph: None,
-            node_label_max_length: None,
-            node_label_insert_newlines_at: None,
-            edge_label_insert_newlines_at: None,
-            edge_label_max_length: None,
-        }
-    }
-}
 
 impl Default for ExportProfileRenderConfig {
     fn default() -> Self {
@@ -182,10 +169,7 @@ pub struct GraphConfig {
 
 impl ExportProfileItem {
     pub fn get_graph_config(&self) -> GraphConfig {
-        let graph_config = match self.graph_config {
-            Some(config) => config,
-            None => ExportProfileGraphConfig::default(),
-        };
+        let graph_config = self.graph_config.unwrap_or_default();
 
         let generate_hierarchy = graph_config.generate_hierarchy.unwrap_or(false);
         let max_partition_depth = graph_config.max_partition_depth.unwrap_or(0);
@@ -208,10 +192,7 @@ impl ExportProfileItem {
         }
     }
     pub fn get_render_config(&self) -> RenderConfig {
-        let render_config = match self.render_config {
-            Some(config) => config,
-            None => ExportProfileRenderConfig::default(),
-        };
+        let render_config = self.render_config.unwrap_or_default();
         let orientation = render_config
             .orientation
             .unwrap_or(RenderConfigOrientation::TB);

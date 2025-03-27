@@ -66,9 +66,9 @@ pub fn render(graph: Graph, _render_config: RenderConfig) -> Result<String, Box<
     for node in nodes.clone() {
         let i = positions[&node.id];
         // row
-        matrix[i + offset][0 + 1] = json!(node.label);
+        matrix[i + offset][1] = json!(node.label);
         // column
-        matrix[0 + 1][i + offset] = json!(node.label);
+        matrix[1][i + offset] = json!(node.label);
     }
 
     edges.sort_by(|a, b| a.id.cmp(&b.id));
@@ -84,7 +84,7 @@ pub fn render(graph: Graph, _render_config: RenderConfig) -> Result<String, Box<
 
     for row in matrix {
         wtr.write_record(
-            &row.iter()
+            row.iter()
                 .map(|cell| match cell {
                     JsonValue::Null => String::new(),
                     _ => cell.to_string(),
