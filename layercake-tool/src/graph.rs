@@ -227,11 +227,11 @@ impl Graph {
         let mut current_length = 0;
         for word in text.split_whitespace() {
             if current_length + word.len() > max_length {
-                new_text.push_str("\n");
+                new_text.push('\n');
                 current_length = 0;
             }
             new_text.push_str(word);
-            new_text.push_str(" ");
+            new_text.push(' ');
             current_length += word.len() + 1;
         }
         new_text.trim().to_string()
@@ -258,7 +258,7 @@ impl Graph {
     pub fn modify_graph_limit_partition_depth(&mut self, depth: i32) -> Result<(), String> {
         fn trim_node(node_id: &String, graph: &mut Graph, current_depth: i32, max_depth: i32) {
             let node = graph.get_node_by_id(node_id).unwrap();
-            let children = graph.get_children(&node);
+            let children = graph.get_children(node);
 
             let all_child_node_ids: Vec<String> = children.iter().map(|n| n.id.clone()).collect();
 
@@ -528,7 +528,7 @@ impl Graph {
             let new_node = Node {
                 id: format!("n_{}_{}_{}", edge.source, edge.target, node_counter),
                 is_partition: false,
-                label: edge_label(&edge),
+                label: edge_label(edge),
                 layer: edge.layer.clone(),
                 belongs_to: Some("inverted_root".to_string()),
                 weight: edge.weight,
