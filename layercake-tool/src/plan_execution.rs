@@ -24,7 +24,7 @@ fn load_file(file_path: &str) -> Result<(Vec<String>, Vec<StringRecord>), anyhow
             anyhow::bail!("Unsupported extension");
         }
     };
-    
+
     let headers = data_loader::get_headers_from_file(file_path, separator)?;
     let records = match extension {
         "csv" => data_loader::load_csv(file_path),
@@ -32,12 +32,16 @@ fn load_file(file_path: &str) -> Result<(Vec<String>, Vec<StringRecord>), anyhow
         _ => unreachable!(), // We already checked extension above
     }?;
 
-    debug!("Loaded {} records with headers: {:?}", records.len(), headers);
+    debug!(
+        "Loaded {} records with headers: {:?}",
+        records.len(),
+        headers
+    );
     Ok((headers, records))
 }
 
 /// Creates a new graph with metadata from the plan
-fn create_graph_from_plan(plan: &Plan) -> Graph {
+pub fn create_graph_from_plan(plan: &Plan) -> Graph {
     let mut graph = Graph::default();
     graph.name = match &plan.meta {
         Some(meta) => match &meta.name {
@@ -50,7 +54,7 @@ fn create_graph_from_plan(plan: &Plan) -> Graph {
 }
 
 /// Loads data from import profiles into the graph
-fn load_data_into_graph(graph: &mut Graph, plan: &Plan, plan_file_path: &Path) -> Result<()> {
+pub fn load_data_into_graph(graph: &mut Graph, plan: &Plan, plan_file_path: &Path) -> Result<()> {
     for profile in &plan.import.profiles {
         let import_file_path = plan_file_path.parent().unwrap().join(&profile.filename);
         info!(
@@ -58,9 +62,9 @@ fn load_data_into_graph(graph: &mut Graph, plan: &Plan, plan_file_path: &Path) -
             import_file_path.display(),
             profile.filetype
         );
-        
+
         let (headers, records) = load_file(import_file_path.to_str().unwrap())?;
-        
+
         match profile.filetype {
             ImportFileType::Nodes => {
                 let node_profile = data_loader::create_df_node_load_profile(&headers);
@@ -109,7 +113,10 @@ fn load_data_into_graph(graph: &mut Graph, plan: &Plan, plan_file_path: &Path) -
 }
 
 /// Applies transformations to the graph based on the profile configuration
-fn apply_graph_transformations(graph: &mut Graph, graph_config: &crate::plan::GraphConfig) -> Result<()> {
+fn apply_graph_transformations(
+    graph: &mut Graph,
+    graph_config: &crate::plan::GraphConfig,
+) -> Result<()> {
     if graph_config.invert_graph {
         info!("Inverting graph (flipping nodes and edges)");
         warn!("Inverting graph is an experimental feature");
@@ -130,7 +137,7 @@ fn apply_graph_transformations(graph: &mut Graph, graph_config: &crate::plan::Gr
             }
         }
     }
-    
+
     if graph_config.max_partition_width > 0 {
         let max_partition_width = graph_config.max_partition_width;
         info!("Reducing graph partition width to {}", max_partition_width);
@@ -179,7 +186,7 @@ fn apply_graph_transformations(graph: &mut Graph, graph_config: &crate::plan::Gr
 
     // Aggregate any duplicate edges
     graph.aggregate_edges();
-    
+
     Ok(())
 }
 
@@ -189,7 +196,7 @@ fn export_graph(graph: &Graph, profile: &ExportProfileItem) -> Result<()> {
         "Starting export to file: {} using exporter {:?}",
         profile.filename, profile.exporter
     );
-    
+
     let render_config = profile.get_render_config();
 
     let result = match &profile.exporter {
@@ -211,12 +218,8 @@ fn export_graph(graph: &Graph, profile: &ExportProfileItem) -> Result<()> {
         ExportFileType::PlantUML => {
             crate::export::to_plantuml::render(graph.clone(), render_config)
         }
-        ExportFileType::Mermaid => {
-            crate::export::to_mermaid::render(graph.clone(), render_config)
-        }
-        ExportFileType::JSGraph => {
-            crate::export::to_jsgraph::render(graph.clone(), render_config)
-        }
+        ExportFileType::Mermaid => crate::export::to_mermaid::render(graph.clone(), render_config),
+        ExportFileType::JSGraph => crate::export::to_jsgraph::render(graph.clone(), render_config),
         ExportFileType::Custom(template_config) => {
             crate::export::to_custom::render(graph.clone(), render_config, template_config.clone())
         }
@@ -232,7 +235,7 @@ fn export_graph(graph: &Graph, profile: &ExportProfileItem) -> Result<()> {
             error!("Failed to export file {}: {}", profile.filename, e);
         }
     }
-    
+
     Ok(())
 }
 
@@ -240,7 +243,7 @@ fn export_graph(graph: &Graph, profile: &ExportProfileItem) -> Result<()> {
 fn run_plan(plan: Plan, plan_file_path: &Path) -> Result<()> {
     // Create the graph from the plan
     let mut graph = create_graph_from_plan(&plan);
-    
+
     // Load data into the graph
     load_data_into_graph(&mut graph, &plan, plan_file_path)?;
 
@@ -248,18 +251,18 @@ fn run_plan(plan: Plan, plan_file_path: &Path) -> Result<()> {
     match graph.verify_graph_integrity() {
         Ok(_) => {
             info!("Graph integrity verified : ok - rendering exports");
-            
+
             // Process each export profile
             for profile in &plan.export.profiles {
                 let mut graph_copy = graph.clone();
                 let graph_config = profile.get_graph_config();
-                
+
                 // Apply transformations to the graph
                 if let Err(e) = apply_graph_transformations(&mut graph_copy, &graph_config) {
                     error!("Failed to apply transformations: {}", e);
                     continue;
                 }
-                
+
                 // Verify graph integrity after transformations
                 if let Err(errors) = graph_copy.verify_graph_integrity() {
                     warn!("Identified {} graph integrity error(s)", errors.len());
@@ -267,7 +270,7 @@ fn run_plan(plan: Plan, plan_file_path: &Path) -> Result<()> {
                     error!("Failed to export file {}", profile.filename);
                     continue;
                 }
-                
+
                 // Export the graph
                 if let Err(e) = export_graph(&graph_copy, profile) {
                     error!("Failed to export graph: {}", e);
@@ -294,7 +297,7 @@ pub fn execute_plan(plan: String, watch: bool) -> Result<()> {
 
     debug!("Executing plan: {:?}", plan);
     run_plan(plan.clone(), plan_file_path)?;
-    
+
     if watch {
         watch_for_changes(plan, plan_file_path)?;
     }
@@ -336,3 +339,4 @@ fn watch_for_changes(plan: Plan, plan_file_path: &Path) -> Result<()> {
         }
     }
 }
+
