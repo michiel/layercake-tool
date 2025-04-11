@@ -1,11 +1,10 @@
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@apollo/client';
-import { Card, Typography, Spin, Alert, Tabs, Table, Space, Button, Collapse } from 'antd';
+import { Card, Typography, Spin, Alert, Tabs, Table, Space, Button } from 'antd';
 import { GET_GRAPH } from '../graphql/queries';
 import GraphVisualizer from './GraphVisualizer';
 
 const { Title } = Typography;
-const { Panel } = Collapse;
 
 const GraphDetail = () => {
   const { projectId } = useParams<{ projectId: string }>();
@@ -124,6 +123,59 @@ const GraphDetail = () => {
     },
   ];
 
+  // Graph Visualization Tab Content
+  const graphVisualizationContent = (
+    <GraphVisualizer graph={graph} />
+  );
+
+  // Graph Data Tables Tab Content
+  const graphDataContent = (
+    <Tabs
+      defaultActiveKey="nodes"
+      items={[
+        {
+          key: 'nodes',
+          label: `Nodes (${graph.nodes.length})`,
+          children: (
+            <Table 
+              dataSource={graph.nodes} 
+              columns={nodeColumns} 
+              rowKey="id"
+              pagination={{ pageSize: 10 }}
+              size="small"
+            />
+          ),
+        },
+        {
+          key: 'edges',
+          label: `Edges (${graph.edges.length})`,
+          children: (
+            <Table 
+              dataSource={graph.edges} 
+              columns={edgeColumns} 
+              rowKey="id"
+              pagination={{ pageSize: 10 }}
+              size="small"
+            />
+          ),
+        },
+        {
+          key: 'layers',
+          label: `Layers (${graph.layers.length})`,
+          children: (
+            <Table 
+              dataSource={graph.layers} 
+              columns={layerColumns} 
+              rowKey="id"
+              pagination={{ pageSize: 10 }}
+              size="small"
+            />
+          ),
+        },
+      ]}
+    />
+  );
+
   return (
     <Card>
       <Space direction="vertical" style={{ width: '100%' }} size="large">
@@ -134,53 +186,18 @@ const GraphDetail = () => {
           </Button>
         </Space>
 
-        <Collapse defaultActiveKey={['1']}>
-          <Panel header="Graph Visualization" key="1">
-            <GraphVisualizer graph={graph} />
-          </Panel>
-        </Collapse>
-
         <Tabs
-          defaultActiveKey="nodes"
+          defaultActiveKey="visualization"
           items={[
             {
-              key: 'nodes',
-              label: `Nodes (${graph.nodes.length})`,
-              children: (
-                <Table 
-                  dataSource={graph.nodes} 
-                  columns={nodeColumns} 
-                  rowKey="id"
-                  pagination={{ pageSize: 10 }}
-                  size="small"
-                />
-              ),
+              key: 'visualization',
+              label: 'Visualization',
+              children: graphVisualizationContent,
             },
             {
-              key: 'edges',
-              label: `Edges (${graph.edges.length})`,
-              children: (
-                <Table 
-                  dataSource={graph.edges} 
-                  columns={edgeColumns} 
-                  rowKey="id"
-                  pagination={{ pageSize: 10 }}
-                  size="small"
-                />
-              ),
-            },
-            {
-              key: 'layers',
-              label: `Layers (${graph.layers.length})`,
-              children: (
-                <Table 
-                  dataSource={graph.layers} 
-                  columns={layerColumns} 
-                  rowKey="id"
-                  pagination={{ pageSize: 10 }}
-                  size="small"
-                />
-              ),
+              key: 'data',
+              label: 'Data Tables',
+              children: graphDataContent,
             },
           ]}
         />
