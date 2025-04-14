@@ -295,6 +295,37 @@ struct ProjectInput {
     description: Option<String>,
 }
 
+#[derive(InputObject)]
+struct NodeInput {
+    id: Option<String>,      // Optional for create, required for update
+    label: String,
+    layer: String,
+    is_partition: bool,
+    belongs_to: Option<String>,
+    weight: Option<i32>,
+    comment: Option<String>,
+}
+
+#[derive(InputObject)]
+struct EdgeInput {
+    id: Option<String>,      // Optional for create, required for update
+    source: String,
+    target: String,
+    label: String,
+    layer: String,
+    weight: Option<i32>,
+    comment: Option<String>,
+}
+
+#[derive(InputObject)]
+struct LayerInput {
+    id: Option<String>,      // Optional for create, required for update
+    label: String,
+    background_color: String,
+    text_color: String,
+    border_color: String,
+}
+
 // State shared across the application
 struct AppState {
     db: DatabaseConnection,
@@ -597,6 +628,374 @@ impl MutationRoot {
 
         repo.delete_project(project_id).await?;
 
+        Ok(true)
+    }
+
+    // Node CRUD operations
+    async fn add_node(&self, ctx: &Context<'_>, project_id: ID, node: NodeInput) -> async_graphql::Result<Node> {
+        let state = ctx.data::<Arc<AppState>>().unwrap();
+        let repo = ProjectRepository::new(state.db.clone());
+        
+        let pid = project_id.parse::<i32>()?;
+        
+        // Fetch current graph
+        let (_, _, mut graph) = repo.get_project(pid).await?;
+        
+        // Create a new node
+        let new_node = crate::graph::Node {
+            id: node.id.unwrap_or_else(|| format!("n{}", chrono::Utc::now().timestamp_millis())),
+            label: node.label,
+            layer: node.layer,
+            is_partition: node.is_partition,
+            belongs_to: node.belongs_to,
+            weight: node.weight.unwrap_or(1),
+            comment: node.comment,
+        };
+        
+        // Add the node to the graph
+        graph.set_node(new_node.clone());
+        
+        // Validate the graph integrity
+        if let Err(errors) = graph.verify_graph_integrity() {
+            return Err(async_graphql::Error::new(format!("Graph integrity validation failed: {:?}", errors)));
+        }
+        
+        // Save the updated graph
+        repo.update_graph(pid, &graph).await?;
+        
+        // Convert domain Node to GraphQL Node
+        Ok(Node {
+            id: new_node.id,
+            label: new_node.label,
+            layer: new_node.layer,
+            is_partition: new_node.is_partition,
+            belongs_to: new_node.belongs_to,
+            weight: new_node.weight,
+            comment: new_node.comment,
+        })
+    }
+    
+    async fn update_node(&self, ctx: &Context<'_>, project_id: ID, node_id: String, node: NodeInput) -> async_graphql::Result<Node> {
+        let state = ctx.data::<Arc<AppState>>().unwrap();
+        let repo = ProjectRepository::new(state.db.clone());
+        
+        let pid = project_id.parse::<i32>()?;
+        
+        // Fetch current graph
+        let (_, _, mut graph) = repo.get_project(pid).await?;
+        
+        // Check if the node exists
+        if graph.get_node_by_id(&node_id).is_none() {
+            return Err(async_graphql::Error::new(format!("Node with id {} not found", node_id)));
+        }
+        
+        // Create updated node
+        let updated_node = crate::graph::Node {
+            id: node_id,
+            label: node.label,
+            layer: node.layer,
+            is_partition: node.is_partition,
+            belongs_to: node.belongs_to,
+            weight: node.weight.unwrap_or(1),
+            comment: node.comment,
+        };
+        
+        // Update the node
+        graph.set_node(updated_node.clone());
+        
+        // Validate the graph integrity
+        if let Err(errors) = graph.verify_graph_integrity() {
+            return Err(async_graphql::Error::new(format!("Graph integrity validation failed: {:?}", errors)));
+        }
+        
+        // Save the updated graph
+        repo.update_graph(pid, &graph).await?;
+        
+        // Convert domain Node to GraphQL Node
+        Ok(Node {
+            id: updated_node.id,
+            label: updated_node.label,
+            layer: updated_node.layer,
+            is_partition: updated_node.is_partition,
+            belongs_to: updated_node.belongs_to,
+            weight: updated_node.weight,
+            comment: updated_node.comment,
+        })
+    }
+    
+    async fn delete_node(&self, ctx: &Context<'_>, project_id: ID, node_id: String) -> async_graphql::Result<bool> {
+        let state = ctx.data::<Arc<AppState>>().unwrap();
+        let repo = ProjectRepository::new(state.db.clone());
+        
+        let pid = project_id.parse::<i32>()?;
+        
+        // Fetch current graph
+        let (_, _, mut graph) = repo.get_project(pid).await?;
+        
+        // Check if the node exists
+        if graph.get_node_by_id(&node_id).is_none() {
+            return Err(async_graphql::Error::new(format!("Node with id {} not found", node_id)));
+        }
+        
+        // Remove the node and related edges
+        graph.remove_node(node_id);
+        
+        // Validate the graph integrity
+        if let Err(errors) = graph.verify_graph_integrity() {
+            return Err(async_graphql::Error::new(format!("Graph integrity validation failed: {:?}", errors)));
+        }
+        
+        // Save the updated graph
+        repo.update_graph(pid, &graph).await?;
+        
+        Ok(true)
+    }
+    
+    // Edge CRUD operations
+    async fn add_edge(&self, ctx: &Context<'_>, project_id: ID, edge: EdgeInput) -> async_graphql::Result<Edge> {
+        let state = ctx.data::<Arc<AppState>>().unwrap();
+        let repo = ProjectRepository::new(state.db.clone());
+        
+        let pid = project_id.parse::<i32>()?;
+        
+        // Fetch current graph
+        let (_, _, mut graph) = repo.get_project(pid).await?;
+        
+        // Verify that source and target nodes exist
+        if graph.get_node_by_id(&edge.source).is_none() {
+            return Err(async_graphql::Error::new(format!("Source node with id {} not found", edge.source)));
+        }
+        
+        if graph.get_node_by_id(&edge.target).is_none() {
+            return Err(async_graphql::Error::new(format!("Target node with id {} not found", edge.target)));
+        }
+        
+        // Create a new edge
+        let new_edge = crate::graph::Edge {
+            id: edge.id.unwrap_or_else(|| format!("e{}", chrono::Utc::now().timestamp_millis())),
+            source: edge.source,
+            target: edge.target,
+            label: edge.label,
+            layer: edge.layer,
+            weight: edge.weight.unwrap_or(1),
+            comment: edge.comment,
+        };
+        
+        // Add the edge to the graph
+        graph.edges.push(new_edge.clone());
+        
+        // Validate the graph integrity
+        if let Err(errors) = graph.verify_graph_integrity() {
+            return Err(async_graphql::Error::new(format!("Graph integrity validation failed: {:?}", errors)));
+        }
+        
+        // Save the updated graph
+        repo.update_graph(pid, &graph).await?;
+        
+        // Convert domain Edge to GraphQL Edge
+        Ok(Edge {
+            id: new_edge.id,
+            source: new_edge.source,
+            target: new_edge.target,
+            label: new_edge.label,
+            layer: new_edge.layer,
+            weight: new_edge.weight,
+            comment: new_edge.comment,
+        })
+    }
+    
+    async fn update_edge(&self, ctx: &Context<'_>, project_id: ID, edge_id: String, edge: EdgeInput) -> async_graphql::Result<Edge> {
+        let state = ctx.data::<Arc<AppState>>().unwrap();
+        let repo = ProjectRepository::new(state.db.clone());
+        
+        let pid = project_id.parse::<i32>()?;
+        
+        // Fetch current graph
+        let (_, _, mut graph) = repo.get_project(pid).await?;
+        
+        // Find the edge index
+        let edge_index = graph.edges.iter().position(|e| e.id == edge_id)
+            .ok_or_else(|| async_graphql::Error::new(format!("Edge with id {} not found", edge_id)))?;
+        
+        // Verify that source and target nodes exist
+        if graph.get_node_by_id(&edge.source).is_none() {
+            return Err(async_graphql::Error::new(format!("Source node with id {} not found", edge.source)));
+        }
+        
+        if graph.get_node_by_id(&edge.target).is_none() {
+            return Err(async_graphql::Error::new(format!("Target node with id {} not found", edge.target)));
+        }
+        
+        // Create updated edge
+        let updated_edge = crate::graph::Edge {
+            id: edge_id,
+            source: edge.source,
+            target: edge.target,
+            label: edge.label,
+            layer: edge.layer,
+            weight: edge.weight.unwrap_or(1),
+            comment: edge.comment,
+        };
+        
+        // Update the edge
+        graph.edges[edge_index] = updated_edge.clone();
+        
+        // Validate the graph integrity
+        if let Err(errors) = graph.verify_graph_integrity() {
+            return Err(async_graphql::Error::new(format!("Graph integrity validation failed: {:?}", errors)));
+        }
+        
+        // Save the updated graph
+        repo.update_graph(pid, &graph).await?;
+        
+        // Convert domain Edge to GraphQL Edge
+        Ok(Edge {
+            id: updated_edge.id,
+            source: updated_edge.source,
+            target: updated_edge.target,
+            label: updated_edge.label,
+            layer: updated_edge.layer,
+            weight: updated_edge.weight,
+            comment: updated_edge.comment,
+        })
+    }
+    
+    async fn delete_edge(&self, ctx: &Context<'_>, project_id: ID, edge_id: String) -> async_graphql::Result<bool> {
+        let state = ctx.data::<Arc<AppState>>().unwrap();
+        let repo = ProjectRepository::new(state.db.clone());
+        
+        let pid = project_id.parse::<i32>()?;
+        
+        // Fetch current graph
+        let (_, _, mut graph) = repo.get_project(pid).await?;
+        
+        // Remove the edge
+        let initial_count = graph.edges.len();
+        graph.edges.retain(|e| e.id != edge_id);
+        
+        if graph.edges.len() == initial_count {
+            return Err(async_graphql::Error::new(format!("Edge with id {} not found", edge_id)));
+        }
+        
+        // Validate the graph integrity
+        if let Err(errors) = graph.verify_graph_integrity() {
+            return Err(async_graphql::Error::new(format!("Graph integrity validation failed: {:?}", errors)));
+        }
+        
+        // Save the updated graph
+        repo.update_graph(pid, &graph).await?;
+        
+        Ok(true)
+    }
+    
+    // Layer CRUD operations
+    async fn add_layer(&self, ctx: &Context<'_>, project_id: ID, layer: LayerInput) -> async_graphql::Result<Layer> {
+        let state = ctx.data::<Arc<AppState>>().unwrap();
+        let repo = ProjectRepository::new(state.db.clone());
+        
+        let pid = project_id.parse::<i32>()?;
+        
+        // Fetch current graph
+        let (_, _, mut graph) = repo.get_project(pid).await?;
+        
+        // Create a new layer
+        let new_layer = crate::graph::Layer {
+            id: layer.id.unwrap_or_else(|| format!("layer{}", chrono::Utc::now().timestamp_millis())),
+            label: layer.label,
+            background_color: layer.background_color,
+            text_color: layer.text_color,
+            border_color: layer.border_color,
+        };
+        
+        // Check if layer with same ID already exists
+        if graph.layers.iter().any(|l| l.id == new_layer.id) {
+            return Err(async_graphql::Error::new(format!("Layer with id {} already exists", new_layer.id)));
+        }
+        
+        // Add the layer to the graph
+        graph.layers.push(new_layer.clone());
+        
+        // Save the updated graph
+        repo.update_graph(pid, &graph).await?;
+        
+        // Convert domain Layer to GraphQL Layer
+        Ok(Layer {
+            id: new_layer.id,
+            label: new_layer.label,
+            background_color: new_layer.background_color,
+            text_color: new_layer.text_color,
+            border_color: new_layer.border_color,
+        })
+    }
+    
+    async fn update_layer(&self, ctx: &Context<'_>, project_id: ID, layer_id: String, layer: LayerInput) -> async_graphql::Result<Layer> {
+        let state = ctx.data::<Arc<AppState>>().unwrap();
+        let repo = ProjectRepository::new(state.db.clone());
+        
+        let pid = project_id.parse::<i32>()?;
+        
+        // Fetch current graph
+        let (_, _, mut graph) = repo.get_project(pid).await?;
+        
+        // Find the layer index
+        let layer_index = graph.layers.iter().position(|l| l.id == layer_id)
+            .ok_or_else(|| async_graphql::Error::new(format!("Layer with id {} not found", layer_id)))?;
+        
+        // Create updated layer
+        let updated_layer = crate::graph::Layer {
+            id: layer_id,
+            label: layer.label,
+            background_color: layer.background_color,
+            text_color: layer.text_color,
+            border_color: layer.border_color,
+        };
+        
+        // Update the layer
+        graph.layers[layer_index] = updated_layer.clone();
+        
+        // Save the updated graph
+        repo.update_graph(pid, &graph).await?;
+        
+        // Convert domain Layer to GraphQL Layer
+        Ok(Layer {
+            id: updated_layer.id,
+            label: updated_layer.label,
+            background_color: updated_layer.background_color,
+            text_color: updated_layer.text_color,
+            border_color: updated_layer.border_color,
+        })
+    }
+    
+    async fn delete_layer(&self, ctx: &Context<'_>, project_id: ID, layer_id: String) -> async_graphql::Result<bool> {
+        let state = ctx.data::<Arc<AppState>>().unwrap();
+        let repo = ProjectRepository::new(state.db.clone());
+        
+        let pid = project_id.parse::<i32>()?;
+        
+        // Fetch current graph
+        let (_, _, mut graph) = repo.get_project(pid).await?;
+        
+        // Check if any nodes or edges are using this layer
+        let used_by_nodes = graph.nodes.iter().any(|n| n.layer == layer_id);
+        let used_by_edges = graph.edges.iter().any(|e| e.layer == layer_id);
+        
+        if used_by_nodes || used_by_edges {
+            return Err(async_graphql::Error::new(
+                format!("Cannot delete layer {} as it is in use by nodes or edges", layer_id)
+            ));
+        }
+        
+        // Remove the layer
+        let initial_count = graph.layers.len();
+        graph.layers.retain(|l| l.id != layer_id);
+        
+        if graph.layers.len() == initial_count {
+            return Err(async_graphql::Error::new(format!("Layer with id {} not found", layer_id)));
+        }
+        
+        // Save the updated graph
+        repo.update_graph(pid, &graph).await?;
+        
         Ok(true)
     }
 }

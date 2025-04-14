@@ -3,7 +3,19 @@ import { useQuery, useMutation } from '@apollo/client';
 import { Card, Typography, Spin, Alert, Tabs, Space, Button, Modal, Form, Input, Select, Checkbox, message } from 'antd';
 import { ReactGrid, Column, Row, DropdownCell, DefaultCellTypes, TextCell, CellChange } from '@silevis/reactgrid';
 import '@silevis/reactgrid/styles.css';
-import { GET_GRAPH, UPDATE_GRAPH } from '../graphql/queries';
+import { 
+  GET_GRAPH, 
+  UPDATE_GRAPH,
+  ADD_NODE,
+  UPDATE_NODE,
+  DELETE_NODE,
+  ADD_EDGE,
+  UPDATE_EDGE,
+  DELETE_EDGE,
+  ADD_LAYER,
+  UPDATE_LAYER,
+  DELETE_LAYER
+} from '../graphql/queries';
 import GraphVisualizer from './GraphVisualizer';
 import { useState, useCallback } from 'react';
 
@@ -68,8 +80,8 @@ const GraphDetail = () => {
     skip: !projectId
   });
   
-  // Update graph mutation
-  const [updateGraph, { loading: updating }] = useMutation(UPDATE_GRAPH, {
+  // Graph update mutations
+  const [updateGraph, { loading: updatingGraph }] = useMutation(UPDATE_GRAPH, {
     onCompleted: () => {
       message.success('Graph updated successfully');
       refetch();
@@ -78,6 +90,104 @@ const GraphDetail = () => {
       message.error(`Failed to update graph: ${error.message}`);
     }
   });
+  
+  // Node mutations
+  const [addNodeMutation, { loading: addingNode }] = useMutation(ADD_NODE, {
+    onCompleted: () => {
+      message.success('Node added successfully');
+      refetch();
+    },
+    onError: (error) => {
+      message.error(`Failed to add node: ${error.message}`);
+    }
+  });
+  
+  const [updateNodeMutation, { loading: updatingNode }] = useMutation(UPDATE_NODE, {
+    onCompleted: () => {
+      message.success('Node updated successfully');
+      refetch();
+    },
+    onError: (error) => {
+      message.error(`Failed to update node: ${error.message}`);
+    }
+  });
+  
+  const [deleteNodeMutation, { loading: deletingNode }] = useMutation(DELETE_NODE, {
+    onCompleted: () => {
+      message.success('Node deleted successfully');
+      refetch();
+    },
+    onError: (error) => {
+      message.error(`Failed to delete node: ${error.message}`);
+    }
+  });
+  
+  // Edge mutations
+  const [addEdgeMutation, { loading: addingEdge }] = useMutation(ADD_EDGE, {
+    onCompleted: () => {
+      message.success('Edge added successfully');
+      refetch();
+    },
+    onError: (error) => {
+      message.error(`Failed to add edge: ${error.message}`);
+    }
+  });
+  
+  const [updateEdgeMutation, { loading: updatingEdge }] = useMutation(UPDATE_EDGE, {
+    onCompleted: () => {
+      message.success('Edge updated successfully');
+      refetch();
+    },
+    onError: (error) => {
+      message.error(`Failed to update edge: ${error.message}`);
+    }
+  });
+  
+  const [deleteEdgeMutation, { loading: deletingEdge }] = useMutation(DELETE_EDGE, {
+    onCompleted: () => {
+      message.success('Edge deleted successfully');
+      refetch();
+    },
+    onError: (error) => {
+      message.error(`Failed to delete edge: ${error.message}`);
+    }
+  });
+  
+  // Layer mutations
+  const [addLayerMutation, { loading: addingLayer }] = useMutation(ADD_LAYER, {
+    onCompleted: () => {
+      message.success('Layer added successfully');
+      refetch();
+    },
+    onError: (error) => {
+      message.error(`Failed to add layer: ${error.message}`);
+    }
+  });
+  
+  const [updateLayerMutation, { loading: updatingLayer }] = useMutation(UPDATE_LAYER, {
+    onCompleted: () => {
+      message.success('Layer updated successfully');
+      refetch();
+    },
+    onError: (error) => {
+      message.error(`Failed to update layer: ${error.message}`);
+    }
+  });
+  
+  const [deleteLayerMutation, { loading: deletingLayer }] = useMutation(DELETE_LAYER, {
+    onCompleted: () => {
+      message.success('Layer deleted successfully');
+      refetch();
+    },
+    onError: (error) => {
+      message.error(`Failed to delete layer: ${error.message}`);
+    }
+  });
+  
+  // Calculate combined loading state
+  const updating = updatingGraph || addingNode || updatingNode || deletingNode || 
+                  addingEdge || updatingEdge || deletingEdge || 
+                  addingLayer || updatingLayer || deletingLayer;
 
   // Keep local state of the graph data to handle changes
   const [graphData, setGraphData] = useState<GraphData | null>(null);
@@ -91,7 +201,7 @@ const GraphDetail = () => {
   if (error) return <Alert message="Error loading graph" description={error.message} type="error" showIcon />;
   if (!graphData) return <Alert message="Graph not found" type="warning" showIcon />;
 
-  // Function to save changes to the backend
+  // Function to save changes to the backend using bulk update
   const saveGraphChanges = () => {
     if (!graphData || !projectId) return;
     
@@ -104,142 +214,174 @@ const GraphDetail = () => {
     });
   };
 
-  // Functions to handle adding new items
+  // Functions to handle adding new items using specific mutations
   const addNode = (node: Omit<Node, 'id'>) => {
-    if (!graphData) return;
+    if (!projectId) return;
     
-    // Generate a unique ID (in production, this would be handled by the backend)
-    const newId = `n${Date.now()}`;
-    const newNode: Node = {
-      ...node,
-      id: newId,
-      isPartition: node.isPartition || false,
-      weight: node.weight || 0
-    };
-    
-    setGraphData({
-      ...graphData,
-      nodes: [...graphData.nodes, newNode]
+    // Call the addNode mutation
+    addNodeMutation({
+      variables: {
+        projectId,
+        node: {
+          label: node.label,
+          layer: node.layer,
+          isPartition: node.isPartition || false,
+          belongsTo: node.belongsTo,
+          weight: node.weight || 0,
+          comment: node.comment
+        }
+      }
     });
-    
-    return newNode;
   };
   
   const updateNode = (nodeId: string, updates: Partial<Node>) => {
-    if (!graphData) return;
+    if (!projectId) return;
     
-    const updatedNodes = graphData.nodes.map(node => 
-      node.id === nodeId ? { ...node, ...updates } : node
-    );
+    // Get current node data to merge with updates
+    const currentNode = graphData?.nodes.find(n => n.id === nodeId);
+    if (!currentNode) {
+      message.error(`Node with ID ${nodeId} not found`);
+      return;
+    }
     
-    setGraphData({
-      ...graphData,
-      nodes: updatedNodes
+    // Call the updateNode mutation with merged data
+    updateNodeMutation({
+      variables: {
+        projectId,
+        nodeId,
+        node: {
+          label: updates.label || currentNode.label,
+          layer: updates.layer || currentNode.layer,
+          isPartition: updates.isPartition !== undefined ? updates.isPartition : currentNode.isPartition,
+          belongsTo: updates.belongsTo !== undefined ? updates.belongsTo : currentNode.belongsTo,
+          weight: updates.weight !== undefined ? updates.weight : currentNode.weight,
+          comment: updates.comment !== undefined ? updates.comment : currentNode.comment
+        }
+      }
     });
   };
   
   const deleteNode = (nodeId: string) => {
-    if (!graphData) return;
+    if (!projectId) return;
     
-    // Also delete any edges connected to this node
-    const updatedEdges = graphData.edges.filter(
-      edge => edge.source !== nodeId && edge.target !== nodeId
-    );
-    
-    setGraphData({
-      ...graphData,
-      nodes: graphData.nodes.filter(node => node.id !== nodeId),
-      edges: updatedEdges
+    // Call the deleteNode mutation
+    deleteNodeMutation({
+      variables: {
+        projectId,
+        nodeId
+      }
     });
   };
   
   const addEdge = (edge: Omit<Edge, 'id'>) => {
-    if (!graphData) return;
+    if (!projectId) return;
     
-    // Generate a unique ID
-    const newId = `e${Date.now()}`;
-    const newEdge: Edge = {
-      ...edge,
-      id: newId,
-      weight: edge.weight || 0
-    };
-    
-    setGraphData({
-      ...graphData,
-      edges: [...graphData.edges, newEdge]
+    // Call the addEdge mutation
+    addEdgeMutation({
+      variables: {
+        projectId,
+        edge: {
+          source: edge.source,
+          target: edge.target,
+          label: edge.label,
+          layer: edge.layer,
+          weight: edge.weight || 0,
+          comment: edge.comment
+        }
+      }
     });
-    
-    return newEdge;
   };
   
   const updateEdge = (edgeId: string, updates: Partial<Edge>) => {
-    if (!graphData) return;
+    if (!projectId) return;
     
-    const updatedEdges = graphData.edges.map(edge => 
-      edge.id === edgeId ? { ...edge, ...updates } : edge
-    );
+    // Get current edge data to merge with updates
+    const currentEdge = graphData?.edges.find(e => e.id === edgeId);
+    if (!currentEdge) {
+      message.error(`Edge with ID ${edgeId} not found`);
+      return;
+    }
     
-    setGraphData({
-      ...graphData,
-      edges: updatedEdges
+    // Call the updateEdge mutation with merged data
+    updateEdgeMutation({
+      variables: {
+        projectId,
+        edgeId,
+        edge: {
+          source: updates.source || currentEdge.source,
+          target: updates.target || currentEdge.target,
+          label: updates.label || currentEdge.label,
+          layer: updates.layer || currentEdge.layer,
+          weight: updates.weight !== undefined ? updates.weight : currentEdge.weight,
+          comment: updates.comment !== undefined ? updates.comment : currentEdge.comment
+        }
+      }
     });
   };
   
   const deleteEdge = (edgeId: string) => {
-    if (!graphData) return;
+    if (!projectId) return;
     
-    setGraphData({
-      ...graphData,
-      edges: graphData.edges.filter(edge => edge.id !== edgeId)
+    // Call the deleteEdge mutation
+    deleteEdgeMutation({
+      variables: {
+        projectId,
+        edgeId
+      }
     });
   };
   
   const addLayer = (layer: Omit<Layer, 'id'>) => {
-    if (!graphData) return;
+    if (!projectId) return;
     
-    // Generate a unique ID
-    const newId = `l${Date.now()}`;
-    const newLayer: Layer = {
-      ...layer,
-      id: newId
-    };
-    
-    setGraphData({
-      ...graphData,
-      layers: [...graphData.layers, newLayer]
+    // Call the addLayer mutation
+    addLayerMutation({
+      variables: {
+        projectId,
+        layer: {
+          label: layer.label,
+          backgroundColor: layer.backgroundColor,
+          textColor: layer.textColor,
+          borderColor: layer.borderColor
+        }
+      }
     });
-    
-    return newLayer;
   };
   
   const updateLayer = (layerId: string, updates: Partial<Layer>) => {
-    if (!graphData) return;
+    if (!projectId) return;
     
-    const updatedLayers = graphData.layers.map(layer => 
-      layer.id === layerId ? { ...layer, ...updates } : layer
-    );
+    // Get current layer data to merge with updates
+    const currentLayer = graphData?.layers.find(l => l.id === layerId);
+    if (!currentLayer) {
+      message.error(`Layer with ID ${layerId} not found`);
+      return;
+    }
     
-    setGraphData({
-      ...graphData,
-      layers: updatedLayers
+    // Call the updateLayer mutation with merged data
+    updateLayerMutation({
+      variables: {
+        projectId,
+        layerId,
+        layer: {
+          label: updates.label || currentLayer.label,
+          backgroundColor: updates.backgroundColor || currentLayer.backgroundColor,
+          textColor: updates.textColor || currentLayer.textColor,
+          borderColor: updates.borderColor || currentLayer.borderColor
+        }
+      }
     });
   };
   
   const deleteLayer = (layerId: string) => {
-    if (!graphData) return;
+    if (!projectId) return;
     
-    // Check if any nodes or edges are using this layer
-    const nodesUsingLayer = graphData.nodes.some(node => node.layer === layerId);
-    const edgesUsingLayer = graphData.edges.some(edge => edge.layer === layerId);
-    
-    if (nodesUsingLayer || edgesUsingLayer) {
-      message.error('Cannot delete layer that is in use by nodes or edges');
-      return;
-    }
-    
-    setGraphData({
-      ...graphData,
-      layers: graphData.layers.filter(layer => layer.id !== layerId)
+    // With the backend integrity check, we don't need to check if the layer is in use
+    deleteLayerMutation({
+      variables: {
+        projectId,
+        layerId
+      }
     });
   };
 
@@ -480,105 +622,107 @@ const GraphDetail = () => {
   // Handler for cell changes
   const handleNodeChanges = (changes: CellChange[]) => {
     if (!graphData) return;
-
-    const updatedNodes = [...graphData.nodes];
     
     changes.forEach(change => {
       // Skip header row
       if (change.rowId === 'header') return;
       
       const nodeIndex = change.rowId as number;
-      const node = updatedNodes[nodeIndex];
+      const node = graphData.nodes[nodeIndex];
       const property = getNodeColumns()[change.columnId as number].columnId;
       
-      if (node && property) {
+      if (node && property && property !== 'actions') {
         const value = change.newCell.text;
+        const updates: Partial<Node> = {};
+        
         switch (property) {
           case 'label':
           case 'layer':
+            updates[property as keyof Node] = value;
+            break;
           case 'belongsTo':
-            (node as any)[property] = value;
+            updates.belongsTo = value || null;
             break;
           case 'isPartition':
-            node.isPartition = value === 'Yes';
+            updates.isPartition = value === 'Yes';
             break;
           case 'weight':
-            node.weight = Number(value) || 0;
+            updates.weight = Number(value) || 0;
             break;
         }
+        
+        // Call the update mutation directly
+        updateNode(node.id, updates);
       }
-    });
-    
-    setGraphData({
-      ...graphData,
-      nodes: updatedNodes
     });
   };
   
   const handleEdgeChanges = (changes: CellChange[]) => {
     if (!graphData) return;
-
-    const updatedEdges = [...graphData.edges];
     
     changes.forEach(change => {
       // Skip header row
       if (change.rowId === 'header') return;
       
       const edgeIndex = change.rowId as number;
-      const edge = updatedEdges[edgeIndex];
+      const edge = graphData.edges[edgeIndex];
       const property = getEdgeColumns()[change.columnId as number].columnId;
       
-      if (edge && property) {
+      if (edge && property && property !== 'actions') {
         const value = change.newCell.text;
+        const updates: Partial<Edge> = {};
+        
         switch (property) {
           case 'source':
           case 'target':
           case 'label':
           case 'layer':
-            (edge as any)[property] = value;
+            updates[property as keyof Edge] = value;
             break;
           case 'weight':
-            edge.weight = Number(value) || 0;
+            updates.weight = Number(value) || 0;
             break;
         }
+        
+        // Call the update mutation directly
+        updateEdge(edge.id, updates);
       }
-    });
-    
-    setGraphData({
-      ...graphData,
-      edges: updatedEdges
     });
   };
   
   const handleLayerChanges = (changes: CellChange[]) => {
     if (!graphData) return;
-
-    const updatedLayers = [...graphData.layers];
     
     changes.forEach(change => {
       // Skip header row
       if (change.rowId === 'header') return;
       
       const layerIndex = change.rowId as number;
-      const layer = updatedLayers[layerIndex];
+      const layer = graphData.layers[layerIndex];
       const property = getLayerColumns()[change.columnId as number].columnId;
       
-      if (layer && property) {
+      if (layer && property && property !== 'actions') {
         const value = change.newCell.text;
+        const updates: Partial<Layer> = {};
+        
         switch (property) {
           case 'label':
+            updates.label = value;
+            break;
           case 'backgroundColor':
+            updates.backgroundColor = value;
+            break;
           case 'textColor':
+            updates.textColor = value;
+            break;
           case 'borderColor':
-            (layer as any)[property] = value;
+            updates.borderColor = value;
             break;
         }
+        
+        // Call the update mutation directly
+        updateLayer(layer.id, updates);
       }
-    });
-    
-    setGraphData({
-      ...graphData,
-      layers: updatedLayers
     });
   };
   
@@ -694,7 +838,7 @@ const GraphDetail = () => {
             <div>
               <Space style={{ marginBottom: '1rem' }}>
                 <Button type="primary" onClick={() => showNodeModal()}>Add Node</Button>
-                <Button type="default" onClick={saveGraphChanges} loading={updating}>Save Changes</Button>
+                {updating && <Spin size="small" />}
               </Space>
               <div style={{ height: '400px', overflow: 'auto' }}>
                 <ReactGrid 
@@ -715,7 +859,7 @@ const GraphDetail = () => {
             <div>
               <Space style={{ marginBottom: '1rem' }}>
                 <Button type="primary" onClick={() => showEdgeModal()}>Add Edge</Button>
-                <Button type="default" onClick={saveGraphChanges} loading={updating}>Save Changes</Button>
+                {updating && <Spin size="small" />}
               </Space>
               <div style={{ height: '400px', overflow: 'auto' }}>
                 <ReactGrid 
@@ -736,7 +880,7 @@ const GraphDetail = () => {
             <div>
               <Space style={{ marginBottom: '1rem' }}>
                 <Button type="primary" onClick={() => showLayerModal()}>Add Layer</Button>
-                <Button type="default" onClick={saveGraphChanges} loading={updating}>Save Changes</Button>
+                {updating && <Spin size="small" />}
               </Space>
               <div style={{ height: '400px', overflow: 'auto' }}>
                 <ReactGrid 
