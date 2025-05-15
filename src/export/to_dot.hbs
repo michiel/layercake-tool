@@ -1,5 +1,9 @@
 digraph G {
     // layout="dot"; // circo, dot, fdp, neato, osage, sfdp, twopi
+    {{#if graph_name}}
+    label="{{graph_name}}";
+    {{/if}}
+    labelloc="t";
     rankdir="{{config.orientation}}";
     splines=true;
     overlap=false;
@@ -7,9 +11,11 @@ digraph G {
     // sep="+50,50"; // increase this to make the graph more spread out
     nodesep="0.3";
     ranksep="1.3";
-    labelloc="t";
     fontname="Lato";
     node [ shape="plaintext" style="filled, rounded" fontsize=12]
+    {{#if (eq config.orientation "LR")}}
+    node [ width=1.5, fixedsize=false ]
+    {{/if}}
     edge [ fontname="Lato" color="#2B303A" fontsize=8]
 
   {{#each layers as |layer|}}

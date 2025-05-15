@@ -20,21 +20,22 @@ pub mod renderer {
 
     /// Standard rendering function for template-based exports
     pub fn render_template(
-        graph: Graph, 
-        render_config: RenderConfig, 
-        template: &str
+        graph: Graph,
+        render_config: RenderConfig,
+        template: &str,
     ) -> Result<String, Box<dyn Error>> {
         let handlebars = crate::common::get_handlebars();
-        
+
         let context = create_standard_context(graph, render_config);
-        
+
         let res = handlebars.render_template(template, &context)?;
         Ok(res)
     }
-    
+
     /// Creates a standard context object used for most templates
     pub fn create_standard_context(graph: Graph, render_config: RenderConfig) -> Value {
         json!({
+            "graph_name": graph.name,
             "config": render_config,
             "hierarchy_nodes": graph.get_hierarchy_nodes(),
             "hierarchy_edges": graph.get_hierarchy_edges(),
@@ -45,3 +46,4 @@ pub mod renderer {
         })
     }
 }
+
