@@ -1,6 +1,9 @@
 @startuml
 
 hide stereotype
+{{#if graph_name}}
+title {{graph_name}}
+{{/if}}
 
 {{#if (stringeq config.orientation "LR") }}
 left to right direction
