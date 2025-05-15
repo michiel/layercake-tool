@@ -1,6 +1,7 @@
 @startuml
 
 hide stereotype
+title Reference Model
 
 left to right direction
 
