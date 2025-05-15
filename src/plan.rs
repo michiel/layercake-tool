@@ -6,6 +6,8 @@ use std::collections::HashMap;
 ///
 /// ```text
 /// Plan
+///   ├── meta: Option<Meta>
+///   │   └── name: Option<String>
 ///   ├── import: ImportConfig
 ///   │   └── profiles: Vec<ImportProfile>
 ///   │       ├── filename: String
