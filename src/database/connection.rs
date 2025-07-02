@@ -7,7 +7,7 @@ pub async fn establish_connection(database_url: &str) -> Result<DatabaseConnecti
 pub fn get_database_url(database_path: Option<&str>) -> String {
     match database_path {
         Some(path) if path == ":memory:" => "sqlite::memory:".to_string(),
-        Some(path) => format!("sqlite:{}", path),
-        None => "sqlite:layercake.db".to_string(),
+        Some(path) => format!("sqlite://{}?mode=rwc", path),
+        None => "sqlite://layercake.db?mode=rwc".to_string(),
     }
 }

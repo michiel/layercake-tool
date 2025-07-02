@@ -25,12 +25,44 @@ pub async fn start_server(port: u16, database_path: &str, cors_origin: Option<&s
 
     let app = app::create_app(db, cors_origin).await?;
     
+    // Log all HTTP routes
+    log_routes();
+    
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port)).await?;
     info!("Server running on http://0.0.0.0:{}", port);
     
     axum::serve(listener, app).await?;
     
     Ok(())
+}
+
+fn log_routes() {
+    info!("HTTP Routes:");
+    info!("  GET    /health");
+    info!("  GET    /docs                                   # Swagger UI");
+    info!("  GET    /api-docs/openapi.json                 # OpenAPI spec");
+    info!("  GET    /api/v1/projects");
+    info!("  POST   /api/v1/projects");
+    info!("  GET    /api/v1/projects/:id");
+    info!("  PUT    /api/v1/projects/:id");
+    info!("  DELETE /api/v1/projects/:id");
+    info!("  GET    /api/v1/projects/:id/plans");
+    info!("  POST   /api/v1/projects/:id/plans");
+    info!("  GET    /api/v1/projects/:id/plans/:plan_id");
+    info!("  PUT    /api/v1/projects/:id/plans/:plan_id");
+    info!("  DELETE /api/v1/projects/:id/plans/:plan_id");
+    info!("  POST   /api/v1/projects/:id/plans/:plan_id/execute");
+    info!("  GET    /api/v1/projects/:id/nodes");
+    info!("  POST   /api/v1/projects/:id/nodes");
+    info!("  DELETE /api/v1/projects/:id/nodes");
+    info!("  GET    /api/v1/projects/:id/edges");
+    info!("  POST   /api/v1/projects/:id/edges");
+    info!("  DELETE /api/v1/projects/:id/edges");
+    info!("  GET    /api/v1/projects/:id/layers");
+    info!("  POST   /api/v1/projects/:id/layers");
+    info!("  DELETE /api/v1/projects/:id/layers");
+    info!("  POST   /api/v1/projects/:id/import/csv");
+    info!("  GET    /api/v1/projects/:id/export/:format");
 }
 
 pub async fn migrate_database(database_path: &str, direction: MigrateDirection) -> Result<()> {

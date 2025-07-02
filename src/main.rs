@@ -50,6 +50,18 @@ enum Commands {
         #[clap(long)]
         cors_origin: Option<String>,
     },
+    Db {
+        #[clap(subcommand)]
+        command: DbCommands,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum DbCommands {
+    Init {
+        #[clap(short, long, default_value = "layercake.db")]
+        database: String,
+    },
     Migrate {
         #[clap(subcommand)]
         direction: server::MigrateDirection,
@@ -96,9 +108,15 @@ async fn main() -> Result<()> {
             info!("Starting server on port {}", port);
             server::start_server(port, &database, cors_origin.as_deref()).await?;
         }
-        Commands::Migrate { direction, database } => {
-            info!("Running database migration: {:?}", direction);
-            server::migrate_database(&database, direction).await?;
+        Commands::Db { command } => match command {
+            DbCommands::Init { database } => {
+                info!("Initializing database: {}", database);
+                server::migrate_database(&database, server::MigrateDirection::Up).await?;
+            }
+            DbCommands::Migrate { direction, database } => {
+                info!("Running database migration: {:?}", direction);
+                server::migrate_database(&database, direction).await?;
+            }
         }
     }
 

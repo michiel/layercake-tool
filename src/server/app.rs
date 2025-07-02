@@ -11,12 +11,34 @@ use tower::ServiceBuilder;
 use tower_http::cors::{Any, CorsLayer};
 use anyhow::Result;
 
+#[cfg(feature = "server")]
+use utoipa::OpenApi;
+#[cfg(feature = "server")]
+use utoipa_swagger_ui::SwaggerUi;
+
 use super::handlers::{health, projects, plans, graph_data};
 
 #[derive(Clone)]
 pub struct AppState {
     pub db: DatabaseConnection,
 }
+
+#[cfg(feature = "server")]
+#[derive(OpenApi)]
+#[openapi(
+    paths(
+        health::health_check,
+    ),
+    info(
+        title = "Layercake API",
+        version = "1.0.0",
+        description = "Graph visualization and transformation tool API"
+    ),
+    servers(
+        (url = "/", description = "Local server")
+    )
+)]
+struct ApiDoc;
 
 pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Result<Router> {
     let state = AppState { db };
@@ -38,6 +60,9 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
         
         // API v1 routes
         .nest("/api/v1", api_v1_routes())
+        
+        // OpenAPI documentation
+        .merge(SwaggerUi::new("/docs").url("/api-docs/openapi.json", ApiDoc::openapi()))
         
         // Add middleware
         .layer(ServiceBuilder::new().layer(cors))
