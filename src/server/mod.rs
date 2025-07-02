@@ -49,7 +49,7 @@ fn log_routes() {
     
     #[cfg(feature = "mcp")]
     {
-        info!("  /mcp                        - MCP WebSocket");
+        info!("  /mcp                        - MCP WebSocket & HTTP API");
     }
 }
 

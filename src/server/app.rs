@@ -126,10 +126,15 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
         app = app.route("/graphql", get(graphql_playground).post(graphql_handler));
     }
 
-    // Add MCP WebSocket route if feature is enabled
+    // Add MCP routes if feature is enabled
     #[cfg(feature = "mcp")]
     {
-        app = app.route("/mcp", get(mcp_websocket_handler));
+        app = app
+            .route("/mcp", get(mcp_discovery))          // Discovery endpoint for clients
+            .route("/mcp/ws", get(mcp_websocket_handler)) // WebSocket endpoint
+            .route("/mcp/rpc", post(mcp_http_handler))    // HTTP JSON-RPC endpoint
+            .route("/mcp/tools/list", get(mcp_tools_list))
+            .route("/mcp/tools/call", post(mcp_tools_call));
     }
 
     let app = app
@@ -276,4 +281,112 @@ async fn handle_mcp_socket(socket: WebSocket, db: sea_orm::DatabaseConnection) {
     }
 
     debug!("MCP WebSocket connection ended");
+}
+
+#[cfg(feature = "mcp")]
+async fn mcp_discovery(
+    State(_state): State<AppState>,
+) -> impl axum::response::IntoResponse {
+    use serde_json::json;
+    
+    let discovery_info = json!({
+        "name": "Layercake MCP Server",
+        "version": "0.1.7",
+        "description": "Graph visualization and transformation MCP server",
+        "protocol": {
+            "version": "2024-11-05",
+            "transports": [
+                {
+                    "type": "http",
+                    "uri": "/mcp/rpc",
+                    "method": "POST"
+                },
+                {
+                    "type": "websocket", 
+                    "uri": "/mcp/ws"
+                }
+            ]
+        },
+        "capabilities": {
+            "tools": {
+                "listChanged": true
+            },
+            "resources": {
+                "listChanged": true,
+                "subscribe": false
+            },
+            "prompts": {
+                "listChanged": true
+            }
+        },
+        "endpoints": {
+            "tools": "/mcp/tools/list",
+            "call": "/mcp/tools/call",
+            "rpc": "/mcp/rpc",
+            "websocket": "/mcp/ws"
+        }
+    });
+    
+    axum::response::Json(discovery_info)
+}
+
+#[cfg(feature = "mcp")]
+async fn mcp_http_handler(
+    State(state): State<AppState>,
+    axum::extract::Json(request): axum::extract::Json<crate::mcp::protocol::JsonRpcRequest>,
+) -> impl axum::response::IntoResponse {
+    use crate::mcp::handlers;
+    
+    let response = handlers::handle_request(request, &state.db).await;
+    axum::response::Json(response)
+}
+
+#[cfg(feature = "mcp")]
+async fn mcp_tools_list(
+    State(_state): State<AppState>,
+) -> impl axum::response::IntoResponse {
+    use crate::mcp::tools;
+    use serde_json::json;
+    
+    let mut all_tools = Vec::new();
+    all_tools.extend(tools::projects::get_project_tools());
+    all_tools.extend(tools::plans::get_plan_tools());
+    all_tools.extend(tools::graph_data::get_graph_data_tools());
+    
+    let response = json!({
+        "tools": all_tools
+    });
+    
+    axum::response::Json(response)
+}
+
+#[cfg(feature = "mcp")]
+async fn mcp_tools_call(
+    State(state): State<AppState>,
+    axum::extract::Json(payload): axum::extract::Json<serde_json::Value>,
+) -> impl axum::response::IntoResponse {
+    use crate::mcp::handlers;
+    use crate::mcp::protocol::{JsonRpcRequest, JsonRpcResponse, JsonRpcError};
+    use serde_json::json;
+    
+    // Extract tool name and arguments from the payload
+    let tool_name = payload.get("name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown");
+    
+    let arguments = payload.get("arguments").cloned();
+    
+    // Create a JSON-RPC request for the tool call
+    let request = JsonRpcRequest {
+        jsonrpc: "2.0".to_string(),
+        id: Some(json!(1)),
+        method: "tools/call".to_string(),
+        params: Some(json!({
+            "name": tool_name,
+            "arguments": arguments
+        })),
+    };
+    
+    let response = handlers::handle_request(request, &state.db).await;
+    axum::response::Json(response)
 }
