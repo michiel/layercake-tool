@@ -37,42 +37,19 @@ pub async fn start_server(port: u16, database_path: &str, cors_origin: Option<&s
 }
 
 fn log_routes() {
-    info!("HTTP Routes:");
-    info!("  GET    /health");
-    info!("  GET    /docs                                   # Swagger UI");
-    info!("  GET    /api-docs/openapi.json                 # OpenAPI spec");
-    info!("  GET    /api/v1/projects");
-    info!("  POST   /api/v1/projects");
-    info!("  GET    /api/v1/projects/:id");
-    info!("  PUT    /api/v1/projects/:id");
-    info!("  DELETE /api/v1/projects/:id");
-    info!("  GET    /api/v1/projects/:id/plans");
-    info!("  POST   /api/v1/projects/:id/plans");
-    info!("  GET    /api/v1/projects/:id/plans/:plan_id");
-    info!("  PUT    /api/v1/projects/:id/plans/:plan_id");
-    info!("  DELETE /api/v1/projects/:id/plans/:plan_id");
-    info!("  POST   /api/v1/projects/:id/plans/:plan_id/execute");
-    info!("  GET    /api/v1/projects/:id/nodes");
-    info!("  POST   /api/v1/projects/:id/nodes");
-    info!("  DELETE /api/v1/projects/:id/nodes");
-    info!("  GET    /api/v1/projects/:id/edges");
-    info!("  POST   /api/v1/projects/:id/edges");
-    info!("  DELETE /api/v1/projects/:id/edges");
-    info!("  GET    /api/v1/projects/:id/layers");
-    info!("  POST   /api/v1/projects/:id/layers");
-    info!("  DELETE /api/v1/projects/:id/layers");
-    info!("  POST   /api/v1/projects/:id/import/csv");
-    info!("  GET    /api/v1/projects/:id/export/:format");
+    info!("API Endpoints:");
+    info!("  /health                     - Health check");
+    info!("  /docs                       - Swagger UI documentation");  
+    info!("  /api/v1/*                   - REST API (projects, plans, graph data)");
     
     #[cfg(feature = "graphql")]
     {
-        info!("  GET    /graphql                                # GraphQL Playground");
-        info!("  POST   /graphql                                # GraphQL API");
+        info!("  /graphql                    - GraphQL API & Playground");
     }
     
     #[cfg(feature = "mcp")]
     {
-        info!("  GET    /mcp                                    # MCP WebSocket (upgrade)");
+        info!("  /mcp                        - MCP WebSocket");
     }
 }
 
