@@ -6,11 +6,16 @@ mod graph;
 mod plan;
 mod plan_execution;
 
+mod database;
+mod server;
+mod services;
+
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use tracing::info;
 use tracing::Level;
 use tracing_subscriber::EnvFilter;
+
 
 #[derive(Parser)]
 #[clap(author, version, about)]
@@ -37,6 +42,20 @@ enum Commands {
         #[clap(subcommand)]
         command: GenerateCommands,
     },
+    Serve {
+        #[clap(short, long, default_value = "3000")]
+        port: u16,
+        #[clap(short, long, default_value = "layercake.db")]
+        database: String,
+        #[clap(long)]
+        cors_origin: Option<String>,
+    },
+    Migrate {
+        #[clap(subcommand)]
+        direction: server::MigrateDirection,
+        #[clap(short, long, default_value = "layercake.db")]
+        database: String,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -45,31 +64,11 @@ enum GenerateCommands {
     Sample { sample: String, dir: String },
 }
 
-fn main() -> Result<()> {
+
+#[tokio::main]
+async fn main() -> Result<()> {
     let args = Cli::parse();
-
-    let log_level = match args
-        .log_level
-        .unwrap_or("info".to_string())
-        .to_lowercase()
-        .as_str()
-    {
-        "trace" => Level::TRACE,
-        "debug" => Level::DEBUG,
-        "info" => Level::INFO,
-        "warn" => Level::WARN,
-        "error" => Level::ERROR,
-        _ => Level::INFO,
-    };
-
-    // tracing_subscriber::fmt().with_max_level(log_level).init();
-    tracing_subscriber::fmt()
-        // .with_max_level(log_level)
-        .with_env_filter(
-            EnvFilter::new(format!("handlebars=off,{}", log_level)), // Exclude handlebars logs
-        )
-        .without_time() // This line removes the timestamp from the logging output
-        .init();
+    setup_logging(&args.log_level);
 
     match args.command {
         Commands::Run { plan, watch } => {
@@ -93,7 +92,38 @@ fn main() -> Result<()> {
                 generate_commands::generate_sample(sample, dir);
             }
         },
+        Commands::Serve { port, database, cors_origin } => {
+            info!("Starting server on port {}", port);
+            server::start_server(port, &database, cors_origin.as_deref()).await?;
+        }
+        Commands::Migrate { direction, database } => {
+            info!("Running database migration: {:?}", direction);
+            server::migrate_database(&database, direction).await?;
+        }
     }
 
     Ok(())
+}
+
+fn setup_logging(log_level: &Option<String>) {
+    let log_level = match log_level
+        .as_ref()
+        .unwrap_or(&"info".to_string())
+        .to_lowercase()
+        .as_str()
+    {
+        "trace" => Level::TRACE,
+        "debug" => Level::DEBUG,
+        "info" => Level::INFO,
+        "warn" => Level::WARN,
+        "error" => Level::ERROR,
+        _ => Level::INFO,
+    };
+
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            EnvFilter::new(format!("handlebars=off,{}", log_level)),
+        )
+        .without_time()
+        .init();
 }
