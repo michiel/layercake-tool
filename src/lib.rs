@@ -9,3 +9,9 @@ pub mod plan_execution;
 pub mod database;
 pub mod server;
 pub mod services;
+
+#[cfg(feature = "graphql")]
+pub mod graphql;
+
+#[cfg(feature = "mcp")]
+pub mod mcp;

@@ -16,11 +16,29 @@ use utoipa::OpenApi;
 #[cfg(feature = "server")]
 use utoipa_swagger_ui::SwaggerUi;
 
+#[cfg(feature = "graphql")]
+use std::sync::Arc;
+#[cfg(feature = "graphql")]
+use async_graphql::{Schema, Request, Response as GraphQLResponse};
+#[cfg(feature = "graphql")]
+use crate::graphql::{GraphQLContext, GraphQLSchema, queries::Query, mutations::Mutation};
+#[cfg(feature = "graphql")]
+use crate::services::{ImportService, ExportService, GraphService};
+
+#[cfg(feature = "mcp")]
+use crate::mcp::McpServer;
+#[cfg(feature = "mcp")]
+use axum::extract::ws::{WebSocket, WebSocketUpgrade};
+#[cfg(feature = "mcp")]
+use axum::response::Response;
+
 use super::handlers::{health, projects, plans, graph_data};
 
 #[derive(Clone)]
 pub struct AppState {
     pub db: DatabaseConnection,
+    #[cfg(feature = "graphql")]
+    pub graphql_schema: GraphQLSchema,
 }
 
 #[cfg(feature = "server")]
@@ -53,7 +71,33 @@ pub struct AppState {
 struct ApiDoc;
 
 pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Result<Router> {
-    let state = AppState { db };
+    #[cfg(feature = "graphql")]
+    let graphql_schema = {
+        let import_service = Arc::new(ImportService::new(db.clone()));
+        let export_service = Arc::new(ExportService::new(db.clone()));
+        let graph_service = Arc::new(GraphService::new(db.clone()));
+        
+        let graphql_context = GraphQLContext::new(
+            db.clone(),
+            import_service,
+            export_service,
+            graph_service,
+        );
+        
+        Schema::build(
+            Query,
+            Mutation,
+            async_graphql::EmptySubscription,
+        )
+        .data(graphql_context)
+        .finish()
+    };
+
+    let state = AppState {
+        db,
+        #[cfg(feature = "graphql")]
+        graphql_schema,
+    };
 
     let cors = match cors_origin {
         Some(origin) => CorsLayer::new()
@@ -66,7 +110,7 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
             .allow_headers(Any),
     };
 
-    let app = Router::new()
+    let mut app = Router::new()
         // Health check endpoint
         .route("/health", get(health::health_check))
         
@@ -74,8 +118,21 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
         .nest("/api/v1", api_v1_routes())
         
         // OpenAPI documentation
-        .merge(SwaggerUi::new("/docs").url("/api-docs/openapi.json", ApiDoc::openapi()))
-        
+        .merge(SwaggerUi::new("/docs").url("/api-docs/openapi.json", ApiDoc::openapi()));
+
+    // Add GraphQL routes if feature is enabled
+    #[cfg(feature = "graphql")]
+    {
+        app = app.route("/graphql", get(graphql_playground).post(graphql_handler));
+    }
+
+    // Add MCP WebSocket route if feature is enabled
+    #[cfg(feature = "mcp")]
+    {
+        app = app.route("/mcp", get(mcp_websocket_handler));
+    }
+
+    let app = app
         // Add middleware
         .layer(ServiceBuilder::new().layer(cors))
         .with_state(state);
@@ -115,4 +172,108 @@ fn api_v1_routes() -> Router<AppState> {
         
         .route("/projects/:id/import/csv", post(graph_data::import_csv))
         .route("/projects/:id/export/:format", get(graph_data::export_graph))
+}
+
+#[cfg(feature = "graphql")]
+async fn graphql_handler(
+    State(state): State<AppState>,
+    req: axum::extract::Json<Request>,
+) -> axum::response::Json<GraphQLResponse> {
+    let response = state.graphql_schema.execute(req.0).await;
+    axum::response::Json(response)
+}
+
+#[cfg(feature = "graphql")]
+async fn graphql_playground() -> impl axum::response::IntoResponse {
+    axum::response::Html(async_graphql::http::playground_source(
+        async_graphql::http::GraphQLPlaygroundConfig::new("/graphql"),
+    ))
+}
+
+#[cfg(feature = "mcp")]
+async fn mcp_websocket_handler(
+    ws: WebSocketUpgrade,
+    State(state): State<AppState>,
+) -> Response {
+    ws.on_upgrade(move |socket| handle_mcp_socket(socket, state.db))
+}
+
+#[cfg(feature = "mcp")]
+async fn handle_mcp_socket(socket: WebSocket, db: sea_orm::DatabaseConnection) {
+    use crate::mcp::protocol::{JsonRpcRequest, JsonRpcResponse};
+    use crate::mcp::handlers;
+    use futures_util::{SinkExt, StreamExt};
+    use tracing::{debug, error};
+
+    let (mut sender, mut receiver) = socket.split();
+
+    while let Some(msg) = receiver.next().await {
+        match msg {
+            Ok(axum::extract::ws::Message::Text(text)) => {
+                debug!("MCP received: {}", text);
+                
+                // Parse JSON-RPC request
+                match serde_json::from_str::<JsonRpcRequest>(&text) {
+                    Ok(request) => {
+                        // Handle the request
+                        let response = handlers::handle_request(request, &db).await;
+                        
+                        // Send response
+                        let response_text = serde_json::to_string(&response)
+                            .unwrap_or_else(|_| r#"{"jsonrpc":"2.0","id":null,"error":{"code":-32603,"message":"Internal error"}}"#.to_string());
+                        
+                        debug!("MCP sending: {}", response_text);
+                        
+                        if let Err(e) = sender.send(axum::extract::ws::Message::Text(response_text)).await {
+                            error!("Failed to send MCP response: {}", e);
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        error!("Failed to parse MCP JSON-RPC request: {}", e);
+                        
+                        // Send error response
+                        let error_response = JsonRpcResponse {
+                            jsonrpc: "2.0".to_string(),
+                            id: None,
+                            result: None,
+                            error: Some(crate::mcp::protocol::JsonRpcError {
+                                code: -32700,
+                                message: "Parse error".to_string(),
+                                data: Some(serde_json::Value::String(e.to_string())),
+                            }),
+                        };
+                        
+                        let response_text = serde_json::to_string(&error_response)
+                            .unwrap_or_else(|_| r#"{"jsonrpc":"2.0","id":null,"error":{"code":-32700,"message":"Parse error"}}"#.to_string());
+                        
+                        if let Err(e) = sender.send(axum::extract::ws::Message::Text(response_text)).await {
+                            error!("Failed to send MCP error response: {}", e);
+                            break;
+                        }
+                    }
+                }
+            }
+            Ok(axum::extract::ws::Message::Close(_)) => {
+                debug!("MCP WebSocket connection closed");
+                break;
+            }
+            Ok(axum::extract::ws::Message::Ping(data)) => {
+                debug!("MCP ping received, sending pong");
+                if let Err(e) = sender.send(axum::extract::ws::Message::Pong(data)).await {
+                    error!("Failed to send MCP pong: {}", e);
+                    break;
+                }
+            }
+            Ok(_) => {
+                // Ignore other message types
+            }
+            Err(e) => {
+                error!("MCP WebSocket error: {}", e);
+                break;
+            }
+        }
+    }
+
+    debug!("MCP WebSocket connection ended");
 }

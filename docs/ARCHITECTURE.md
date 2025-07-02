@@ -7,7 +7,8 @@ Layercake is a graph visualization and transformation tool that processes CSV da
 ## Current Architecture
 
 **Single Binary**: `layercake` with server functionality enabled by default
-**Commands**: `run`, `init`, `generate`, `serve`, `migrate`
+**Commands**: `run`, `init`, `generate`, `serve`, `db init`, `db migrate`
+**APIs**: REST (✅), GraphQL (✅), MCP (🚧)
 
 ### Core Components
 
@@ -292,10 +293,22 @@ src/
 3. ✅ CSV import/export via API endpoints
 4. ✅ Integration with existing export engine
 
-### 🚧 Phase 3: Advanced Features (PLANNED)
-1. ⏳ GraphQL API implementation
-2. ⏳ WebSocket real-time updates
-3. ⏳ MCP integration
+### ✅ Phase 3: Complete REST API (COMPLETED)
+1. ✅ CSV import/export functionality implemented
+2. ✅ Plan execution API with full transformation support
+3. ✅ Business logic services layer
+4. ✅ OpenAPI documentation with Swagger UI
+5. ✅ Database commands (`layercake db init`, `layercake db migrate`)
+
+### ✅ Phase 4: GraphQL API (COMPLETED)  
+1. ✅ GraphQL API implementation (100% complete - server integration resolved)
+2. ✅ Schema, types, queries, mutations fully implemented
+3. ✅ GraphQL Playground and introspection available
+
+### 🚧 Phase 5: MCP and Advanced Features (IN PROGRESS)
+1. 🔄 MCP (Model Context Protocol) integration
+2. ⏳ GraphQL subscriptions for real-time updates  
+3. ⏳ WebSocket real-time updates
 4. ⏳ Web-based graph editor
 
 ## Key Implementation Details
@@ -320,3 +333,340 @@ Full integration with existing export system supporting:
 - Transformation pipeline with graph integrity verification
 
 This architecture successfully evolved from CLI tool to full-featured server application while maintaining complete backward compatibility and leveraging the existing robust graph processing engine.
+
+## Phase 4: Multi-API Architecture (In Progress)
+
+### Unified Backend Design
+
+The next evolution adds GraphQL and MCP APIs while maintaining the existing REST API, all sharing a unified service layer:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     API Layer (Multiple Interfaces)            │
+├─────────────────┬─────────────────┬─────────────────────────────┤
+│   REST API      │   GraphQL API   │        MCP API              │
+│   (✅ Complete) │   (🚧 Progress) │     (🚧 Progress)           │
+│                 │                 │                             │
+│ • OpenAPI Docs  │ • Schema Types  │ • Tools/Functions           │
+│ • Swagger UI    │ • Resolvers     │ • Resources                 │
+│ • CRUD Ops      │ • Subscriptions │ • AI Integration            │
+└─────────────────┴─────────────────┴─────────────────────────────┘
+                              │
+┌─────────────────────────────────────────────────────────────────┐
+│               Unified Business Logic Layer                     │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
+│  │   Project   │  │    Plan     │  │     Graph Data          │  │
+│  │   Service   │  │   Service   │  │     Service             │  │
+│  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
+│                                                                 │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
+│  │   Import    │  │   Export    │  │   Transformation       │  │
+│  │   Service   │  │   Service   │  │     Service             │  │
+│  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+┌─────────────────────────────────────────────────────────────────┐
+│                     Data Layer                                 │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │              SeaORM Entities & Database                    ││
+│  └─────────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Feature Flags Architecture
+
+```toml
+[features]
+default = ["server", "rest"]
+cli = []
+server = ["rest", "dep:axum", "dep:tokio", ...]
+rest = ["server", "dep:utoipa", "dep:utoipa-swagger-ui"]
+graphql = ["server", "dep:async-graphql", "dep:async-graphql-axum"]
+mcp = ["server", "dep:mcp-sdk", "dep:tokio-tungstenite"]
+all-apis = ["rest", "graphql", "mcp"]
+```
+
+### Multi-API File Structure (Planned)
+
+```
+src/
+├── main.rs                 # Enhanced CLI + multi-API server entry
+├── lib.rs                  # Updated library exports
+├── server/                 # Server implementation (enhanced)
+│   ├── mod.rs
+│   ├── app.rs             # Multi-API app configuration
+│   └── handlers/          # REST handlers (existing)
+│       ├── mod.rs
+│       ├── projects.rs
+│       ├── plans.rs
+│       └── graph_data.rs
+├── graphql/               # GraphQL implementation (new)
+│   ├── mod.rs
+│   ├── schema.rs          # Combined GraphQL schema
+│   ├── types/             # GraphQL type definitions
+│   │   ├── mod.rs
+│   │   ├── project.rs
+│   │   ├── plan.rs
+│   │   ├── node.rs
+│   │   ├── edge.rs
+│   │   └── layer.rs
+│   ├── mutations/         # Mutation resolvers
+│   │   ├── mod.rs
+│   │   ├── projects.rs
+│   │   ├── plans.rs
+│   │   └── graph_data.rs
+│   ├── queries/           # Query resolvers
+│   │   ├── mod.rs
+│   │   ├── projects.rs
+│   │   ├── plans.rs
+│   │   └── graph_data.rs
+│   └── context.rs         # GraphQL context
+├── mcp/                   # MCP implementation (new)
+│   ├── mod.rs
+│   ├── server.rs          # MCP server
+│   ├── tools/             # MCP tool implementations
+│   │   ├── mod.rs
+│   │   ├── projects.rs
+│   │   ├── graph_data.rs
+│   │   └── transformations.rs
+│   ├── resources/         # MCP resource handlers
+│   │   ├── mod.rs
+│   │   ├── projects.rs
+│   │   └── graph_data.rs
+│   └── prompts/           # MCP prompt templates
+│       ├── mod.rs
+│       └── graph_analysis.rs
+├── services/              # Enhanced service layer (existing + enhanced)
+│   ├── mod.rs
+│   ├── project_service.rs # Enhanced with trait abstraction
+│   ├── plan_service.rs    # Enhanced with trait abstraction
+│   ├── import_service.rs  # Existing
+│   ├── export_service.rs  # Existing
+│   └── graph_service.rs   # Existing
+└── (existing modules...)   # All existing functionality preserved
+```
+
+### Cross-API Data Models
+
+Shared data structures with feature-specific derives:
+
+```rust
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "server", derive(ToSchema))]           // REST API
+#[cfg_attr(feature = "graphql", derive(SimpleObject))]     // GraphQL
+pub struct ProjectData {
+    pub id: i32,
+    pub name: String,
+    pub description: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+```
+
+### API Endpoints Summary
+
+#### REST API (✅ Implemented)
+- **Base**: `/api/v1/`
+- **Documentation**: `/docs` (Swagger UI), `/api-docs/openapi.json`
+- **Features**: Full CRUD, CSV import/export, plan execution
+
+#### GraphQL API (✅ Implemented)
+- **Endpoint**: `/graphql`
+- **Features**: Flexible queries, mutations, GraphQL Playground
+- **Tools**: GraphQL Playground, introspection, schema documentation
+
+#### MCP API (🚧 In Progress)  
+- **Endpoint**: `/mcp` (WebSocket upgrade)
+- **Protocol**: Model Context Protocol over WebSocket
+- **Features**: AI tool integration, resource access, prompt templates, graph analysis tools
+
+This multi-API architecture provides maximum flexibility for different use cases while maintaining consistency through a unified backend service layer.
+
+## GraphQL Implementation Progress
+
+### ✅ Completed GraphQL Features
+
+**Schema Design**: Complete type system with relationships
+```graphql
+type Project {
+  id: Int!
+  name: String!
+  description: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  # Relationships
+  plans: [Plan!]!
+  nodes: [Node!]!
+  edges: [Edge!]!
+  layers: [Layer!]!
+}
+
+type Plan {
+  id: Int!
+  projectId: Int!
+  name: String!
+  yamlContent: String!
+  dependencies: [Int!]
+  status: String!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  # Relationships
+  project: Project
+}
+# ... additional types for Node, Edge, Layer
+```
+
+**Query Operations**: Full read access to all entities
+- `projects` - List all projects
+- `project(id)` - Get specific project
+- `plans(projectId)` - Get plans for project
+- `nodes(projectId)` - Get nodes for project
+- `edges(projectId)` - Get edges for project
+- `layers(projectId)` - Get layers for project
+- `graphData(projectId)` - Get complete graph data
+- `searchNodes(projectId, query)` - Search nodes by label
+
+**Mutation Operations**: Full CRUD capabilities
+- Project mutations: `createProject`, `updateProject`, `deleteProject`
+- Plan mutations: `createPlan`, `updatePlan`, `deletePlan`, `executePlan`
+- Bulk operations: `createNodes`, `createEdges`, `createLayers`
+
+**Service Integration**: Unified backend with REST API
+- Shared GraphQL context with database connection
+- Service layer integration (ImportService, ExportService, GraphService)
+- Consistent data models across REST and GraphQL
+
+### ✅ Completed GraphQL Features
+
+**Server Integration**: ✅ Resolved axum version compatibility by implementing custom GraphQL handlers
+**Schema Builder**: ✅ Fixed GraphQL schema context injection using direct Schema::build approach  
+**Endpoint Setup**: ✅ Added `/graphql` endpoint with proper POST handler for GraphQL API
+**GraphQL Playground**: ✅ Added development UI at `/graphql` (GET request) with playground source
+**Service Integration**: ✅ Full integration with unified backend service layer
+
+### 🚧 Remaining GraphQL Tasks
+
+1. **Subscriptions**: Real-time updates for plan execution status
+2. **Testing**: End-to-end GraphQL query/mutation testing
+3. **Performance**: Query complexity analysis and rate limiting
+
+### GraphQL File Structure (Implemented)
+
+```
+src/graphql/
+├── mod.rs                    # ✅ Module exports
+├── schema.rs                 # ✅ Combined schema definition  
+├── context.rs                # ✅ GraphQL context
+├── types/                    # ✅ GraphQL type definitions
+│   ├── mod.rs               # ✅
+│   ├── project.rs           # ✅ Project type & resolvers
+│   ├── plan.rs              # ✅ Plan type & resolvers
+│   ├── node.rs              # ✅ Node type & resolvers
+│   ├── edge.rs              # ✅ Edge type & resolvers
+│   ├── layer.rs             # ✅ Layer type & resolvers
+│   └── scalars.rs           # ✅ DateTime, JSON scalars
+├── queries/                 # ✅ Query resolvers
+│   └── mod.rs               # ✅ All read operations
+├── mutations/               # ✅ Mutation resolvers
+│   └── mod.rs               # ✅ All write operations
+```
+
+The GraphQL implementation represents a significant architectural milestone, providing flexible querying capabilities that complement the existing REST API while maintaining data consistency through the shared service layer.
+
+## MCP Implementation Progress
+
+### 🚧 MCP (Model Context Protocol) Integration
+
+The MCP implementation will provide AI tool integration capabilities, allowing AI assistants and other tools to interact with graph data through a standardized protocol.
+
+### Planned MCP Features
+
+**MCP Tools**: Graph operations exposed as callable tools for AI assistants
+```json
+{
+  "name": "create_project",
+  "description": "Create a new graph project",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "name": {"type": "string"},
+      "description": {"type": "string"}
+    }
+  }
+}
+```
+
+**MCP Resources**: Graph data and metadata accessible as resources
+```json
+{
+  "uri": "layercake://project/123/graph",
+  "name": "Project Graph Data",
+  "description": "Complete graph structure for project 123",
+  "mimeType": "application/json"
+}
+```
+
+**MCP Prompts**: Pre-built analysis templates for graph insights
+```json
+{
+  "name": "analyze_graph_structure",
+  "description": "Analyze graph connectivity and structure",
+  "arguments": [
+    {"name": "project_id", "type": "number"}
+  ]
+}
+```
+
+### MCP Endpoint Design
+
+- **Endpoint**: `/mcp` (HTTP upgrade to WebSocket)
+- **Protocol**: Model Context Protocol v2024-11-05
+- **Transport**: WebSocket with JSON-RPC 2.0 messaging
+- **Authentication**: Optional API key or session-based
+
+### MCP Tools Design
+
+**Project Management Tools**:
+- `list_projects` - Get all available projects
+- `create_project` - Create new project
+- `get_project` - Get project details
+- `delete_project` - Remove project
+
+**Graph Data Tools**:
+- `import_csv` - Import graph data from CSV
+- `export_graph` - Export graph in various formats
+- `get_graph_data` - Retrieve nodes, edges, layers
+- `analyze_connectivity` - Analyze graph structure
+- `find_paths` - Find paths between nodes
+
+**Plan Execution Tools**:
+- `create_plan` - Create transformation plan
+- `execute_plan` - Run graph transformations
+- `get_plan_status` - Check execution status
+
+### MCP File Structure (Planned)
+
+```
+src/mcp/
+├── mod.rs                    # MCP module exports
+├── server.rs                 # MCP WebSocket server
+├── protocol.rs               # MCP protocol implementation
+├── tools/                    # MCP tool implementations
+│   ├── mod.rs
+│   ├── projects.rs          # Project management tools
+│   ├── graph_data.rs        # Graph data tools
+│   ├── plans.rs             # Plan execution tools
+│   └── analysis.rs          # Graph analysis tools
+├── resources/               # MCP resource handlers
+│   ├── mod.rs
+│   ├── projects.rs          # Project resources
+│   └── graph_data.rs        # Graph data resources
+├── prompts/                 # MCP prompt templates
+│   ├── mod.rs
+│   └── graph_analysis.rs    # Graph analysis prompts
+└── handlers/                # Request/response handlers
+    ├── mod.rs
+    ├── tools.rs
+    ├── resources.rs
+    └── prompts.rs
+```

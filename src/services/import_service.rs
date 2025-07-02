@@ -28,6 +28,21 @@ impl ImportService {
         Self { db }
     }
 
+    /// Import nodes from CSV content (convenience method for MCP)
+    pub async fn import_nodes_from_csv(&self, project_id: i32, csv_content: &str) -> Result<usize> {
+        self.import_nodes(project_id, csv_content).await
+    }
+
+    /// Import edges from CSV content (convenience method for MCP)
+    pub async fn import_edges_from_csv(&self, project_id: i32, csv_content: &str) -> Result<usize> {
+        self.import_edges(project_id, csv_content).await
+    }
+
+    /// Import layers from CSV content (convenience method for MCP)
+    pub async fn import_layers_from_csv(&self, project_id: i32, csv_content: &str) -> Result<usize> {
+        self.import_layers(project_id, csv_content).await
+    }
+
     pub async fn import_csv_data(&self, project_id: i32, data: CsvImportData) -> Result<ImportResult> {
         let mut result = ImportResult {
             nodes_imported: 0,

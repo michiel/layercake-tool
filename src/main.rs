@@ -10,6 +10,12 @@ mod database;
 mod server;
 mod services;
 
+#[cfg(feature = "graphql")]
+mod graphql;
+
+#[cfg(feature = "mcp")]
+mod mcp;
+
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use tracing::info;

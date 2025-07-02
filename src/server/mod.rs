@@ -63,6 +63,17 @@ fn log_routes() {
     info!("  DELETE /api/v1/projects/:id/layers");
     info!("  POST   /api/v1/projects/:id/import/csv");
     info!("  GET    /api/v1/projects/:id/export/:format");
+    
+    #[cfg(feature = "graphql")]
+    {
+        info!("  GET    /graphql                                # GraphQL Playground");
+        info!("  POST   /graphql                                # GraphQL API");
+    }
+    
+    #[cfg(feature = "mcp")]
+    {
+        info!("  GET    /mcp                                    # MCP WebSocket (upgrade)");
+    }
 }
 
 pub async fn migrate_database(database_path: &str, direction: MigrateDirection) -> Result<()> {
