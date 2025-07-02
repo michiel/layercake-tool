@@ -1,8 +1,26 @@
 # Layercake Server Architecture Plan
-*Date: 2025-07-02*
+*Date: 2025-07-02 | Updated: 2025-07-02*
 
 ## Overview
 Transform layercake from a CLI-only tool to a full-featured server application with web interface, database persistence, and multiple API endpoints. The server will manage projects containing DAGs of plans with graph data (nodes, edges, layers) as persistent entities.
+
+## ✅ Implementation Status
+
+### Phase 1: Core Server Infrastructure - COMPLETED ✅
+- ✅ Added server dependencies to Cargo.toml (now default features)
+- ✅ Created SeaORM entities and migrations for all graph data
+- ✅ Implemented `layercake serve` command (enabled by default)
+- ✅ Database initialization and migration system with in-memory support
+- ✅ Health check endpoint and basic Axum server setup
+
+### Phase 2: REST API Core - COMPLETED ✅
+- ✅ Project CRUD operations (`/api/v1/projects/*`)
+- ✅ Plan CRUD operations (`/api/v1/projects/{id}/plans/*`)
+- ✅ Graph data CRUD operations (nodes, edges, layers)
+- ✅ Plan execution API structure
+- ✅ CSV import/export endpoint stubs
+
+**Current Status**: Single binary `layercake` with server functionality enabled by default. CLI functionality fully preserved and operational.
 
 ## Phase 1: Core Server Infrastructure
 
@@ -259,25 +277,28 @@ GET    /ws                            - WebSocket for real-time updates
 
 ## Implementation Roadmap
 
-### Milestone 1: Basic Server + Database (Week 1-2)
-1. Add server dependencies to Cargo.toml
-2. Create SeaORM entities and migrations
-3. Implement basic `layercake serve` command
-4. Database initialization and migration system
-5. Health check endpoint
+### ✅ Milestone 1: Basic Server + Database - COMPLETED
+1. ✅ Add server dependencies to Cargo.toml
+2. ✅ Create SeaORM entities and migrations
+3. ✅ Implement basic `layercake serve` command
+4. ✅ Database initialization and migration system
+5. ✅ Health check endpoint
 
-### Milestone 2: REST API Core (Week 2-3)
-1. Project CRUD operations
-2. Plan CRUD operations
-3. CSV import functionality
-4. Basic export endpoints
-5. Plan execution API
+### ✅ Milestone 2: REST API Core - COMPLETED
+1. ✅ Project CRUD operations
+2. ✅ Plan CRUD operations
+3. ✅ CSV import functionality (stub)
+4. ✅ Basic export endpoints (stub)
+5. ✅ Plan execution API (stub)
 
-### Milestone 3: Graph Data Management (Week 3-4)
-1. Node/Edge/Layer CRUD operations
-2. Bulk operations for graph data
-3. Data validation and constraints
-4. Graph data export in multiple formats
+### 🚧 Milestone 3: Complete REST API Implementation - IN PROGRESS
+1. ✅ Node/Edge/Layer CRUD operations
+2. ✅ Bulk operations for graph data
+3. 🚧 CSV import functionality (implementing)
+4. 🚧 Graph data export integration (implementing)
+5. 🚧 Plan execution engine (implementing)
+6. 🚧 Business logic services layer
+7. 🚧 Enhanced error handling and validation
 
 ### Milestone 4: GraphQL Implementation (Week 4-5)
 1. GraphQL schema implementation
