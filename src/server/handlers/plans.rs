@@ -6,11 +6,15 @@ use axum::{
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "server")]
+use utoipa::ToSchema;
+
 use crate::database::entities::{plans, plans::Entity as Plans, projects::Entity as Projects};
 use crate::server::app::AppState;
 use crate::services::ExportService;
 
 #[derive(Serialize, Deserialize)]
+#[cfg_attr(feature = "server", derive(ToSchema))]
 pub struct CreatePlanRequest {
     pub name: String,
     pub yaml_content: String,
@@ -18,12 +22,25 @@ pub struct CreatePlanRequest {
 }
 
 #[derive(Serialize, Deserialize)]
+#[cfg_attr(feature = "server", derive(ToSchema))]
 pub struct UpdatePlanRequest {
     pub name: String,
     pub yaml_content: String,
     pub dependencies: Option<Vec<i32>>,
 }
 
+#[cfg(feature = "server")]
+#[utoipa::path(
+    get,
+    path = "/api/v1/projects/{project_id}/plans",
+    params(
+        ("project_id" = i32, Path, description = "Project ID")
+    ),
+    responses(
+        (status = 200, description = "List all plans for project", body = [plans::Model]),
+        (status = 404, description = "Project not found")
+    )
+)]
 pub async fn list_plans(
     State(state): State<AppState>,
     Path(project_id): Path<i32>,

@@ -28,6 +28,18 @@ pub struct AppState {
 #[openapi(
     paths(
         health::health_check,
+        projects::list_projects,
+        projects::create_project,
+        projects::get_project,
+        projects::update_project,
+        projects::delete_project,
+    ),
+    components(
+        schemas(
+            crate::database::entities::projects::Model,
+            crate::server::handlers::projects::CreateProjectRequest,
+            crate::server::handlers::projects::UpdateProjectRequest,
+        )
     ),
     info(
         title = "Layercake API",

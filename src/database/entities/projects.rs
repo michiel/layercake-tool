@@ -2,7 +2,11 @@ use sea_orm::entity::prelude::*;
 use sea_orm::{Set, ActiveValue};
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "server")]
+use utoipa::ToSchema;
+
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
+#[cfg_attr(feature = "server", derive(ToSchema))]
 #[sea_orm(table_name = "projects")]
 pub struct Model {
     #[sea_orm(primary_key)]

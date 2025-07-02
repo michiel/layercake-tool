@@ -7,21 +7,34 @@ use sea_orm::{ActiveModelTrait, EntityTrait, Set};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+#[cfg(feature = "server")]
+use utoipa::ToSchema;
+
 use crate::database::entities::{projects, projects::Entity as Projects};
 use crate::server::app::AppState;
 
 #[derive(Serialize, Deserialize)]
+#[cfg_attr(feature = "server", derive(ToSchema))]
 pub struct CreateProjectRequest {
     pub name: String,
     pub description: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]
+#[cfg_attr(feature = "server", derive(ToSchema))]
 pub struct UpdateProjectRequest {
     pub name: String,
     pub description: Option<String>,
 }
 
+#[cfg(feature = "server")]
+#[utoipa::path(
+    get,
+    path = "/api/v1/projects",
+    responses(
+        (status = 200, description = "List all projects", body = [crate::database::entities::projects::Model])
+    )
+)]
 pub async fn list_projects(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<projects::Model>>, StatusCode> {
@@ -33,6 +46,15 @@ pub async fn list_projects(
     Ok(Json(projects))
 }
 
+#[cfg(feature = "server")]
+#[utoipa::path(
+    post,
+    path = "/api/v1/projects",
+    request_body = crate::server::handlers::projects::CreateProjectRequest,
+    responses(
+        (status = 200, description = "Project created successfully", body = crate::database::entities::projects::Model)
+    )
+)]
 pub async fn create_project(
     State(state): State<AppState>,
     Json(payload): Json<CreateProjectRequest>,
@@ -51,6 +73,18 @@ pub async fn create_project(
     Ok(Json(project))
 }
 
+#[cfg(feature = "server")]
+#[utoipa::path(
+    get,
+    path = "/api/v1/projects/{id}",
+    params(
+        ("id" = i32, Path, description = "Project ID")
+    ),
+    responses(
+        (status = 200, description = "Project found", body = crate::database::entities::projects::Model),
+        (status = 404, description = "Project not found")
+    )
+)]
 pub async fn get_project(
     State(state): State<AppState>,
     Path(id): Path<i32>,
@@ -64,6 +98,19 @@ pub async fn get_project(
     Ok(Json(project))
 }
 
+#[cfg(feature = "server")]
+#[utoipa::path(
+    put,
+    path = "/api/v1/projects/{id}",
+    params(
+        ("id" = i32, Path, description = "Project ID")
+    ),
+    request_body = crate::server::handlers::projects::UpdateProjectRequest,
+    responses(
+        (status = 200, description = "Project updated successfully", body = crate::database::entities::projects::Model),
+        (status = 404, description = "Project not found")
+    )
+)]
 pub async fn update_project(
     State(state): State<AppState>,
     Path(id): Path<i32>,
@@ -87,6 +134,18 @@ pub async fn update_project(
     Ok(Json(project))
 }
 
+#[cfg(feature = "server")]
+#[utoipa::path(
+    delete,
+    path = "/api/v1/projects/{id}",
+    params(
+        ("id" = i32, Path, description = "Project ID")
+    ),
+    responses(
+        (status = 204, description = "Project deleted successfully"),
+        (status = 404, description = "Project not found")
+    )
+)]
 pub async fn delete_project(
     State(state): State<AppState>,
     Path(id): Path<i32>,
