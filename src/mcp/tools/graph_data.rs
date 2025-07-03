@@ -1,7 +1,7 @@
 //! Graph data management tools for MCP
 
 use axum_mcp::prelude::*;
-use crate::mcp_new::tools::{get_required_param, get_optional_param};
+use crate::mcp::tools::{get_required_param, get_optional_param};
 use crate::services::{ImportService, ExportService, GraphService};
 use sea_orm::DatabaseConnection;
 use serde_json::{json, Value};
@@ -123,8 +123,8 @@ pub async fn import_csv(
     });
 
     // Import nodes if provided
-    if let Some(csv_content) = nodes_csv {
-        match import_service.import_nodes_from_csv(project_id, &csv_content).await {
+    if let Some(csv_content) = nodes_csv.as_ref() {
+        match import_service.import_nodes_from_csv(project_id, csv_content).await {
             Ok(count) => {
                 results["imported"]["nodes"] = json!({
                     "count": count,
@@ -141,8 +141,8 @@ pub async fn import_csv(
     }
 
     // Import edges if provided
-    if let Some(csv_content) = edges_csv {
-        match import_service.import_edges_from_csv(project_id, &csv_content).await {
+    if let Some(csv_content) = edges_csv.as_ref() {
+        match import_service.import_edges_from_csv(project_id, csv_content).await {
             Ok(count) => {
                 results["imported"]["edges"] = json!({
                     "count": count,
@@ -159,8 +159,8 @@ pub async fn import_csv(
     }
 
     // Import layers if provided
-    if let Some(csv_content) = layers_csv {
-        match import_service.import_layers_from_csv(project_id, &csv_content).await {
+    if let Some(csv_content) = layers_csv.as_ref() {
+        match import_service.import_layers_from_csv(project_id, csv_content).await {
             Ok(count) => {
                 results["imported"]["layers"] = json!({
                     "count": count,

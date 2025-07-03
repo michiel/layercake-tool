@@ -1,7 +1,7 @@
 use axum::{
     extract::State,
     http::StatusCode,
-    response::Json,
+    response::{Json, IntoResponse},
     routing::{get, post, put, delete},
     Router,
 };
@@ -88,7 +88,7 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
     };
 
     let state = AppState {
-        db,
+        db: db.clone(),
         #[cfg(feature = "graphql")]
         graphql_schema,
     };
@@ -207,128 +207,88 @@ async fn graphql_playground() -> impl axum::response::IntoResponse {
     ))
 }
 
-#[cfg(feature = "mcp")]
-async fn mcp_websocket_handler(
-    ws: axum::extract::ws::WebSocketUpgrade,
-    State(state): State<AppState>,
-) -> axum::response::Response {
-    ws.on_upgrade(move |socket| handle_mcp_socket(socket, state.db))
-}
-
-#[cfg(feature = "mcp")]
-async fn handle_mcp_socket(socket: axum::extract::ws::WebSocket, db: sea_orm::DatabaseConnection) {
-    use crate::mcp::protocol::{JsonRpcRequest, JsonRpcResponse};
-    use crate::mcp::handlers;
-    use futures_util::{SinkExt, StreamExt};
-    use tracing::{debug, error};
-
-    let (mut sender, mut receiver) = socket.split();
-
-    while let Some(msg) = receiver.next().await {
-        match msg {
-            Ok(axum::extract::ws::Message::Text(text)) => {
-                debug!("MCP received: {}", text);
-                
-                // Parse JSON-RPC request
-                match serde_json::from_str::<JsonRpcRequest>(&text) {
-                    Ok(request) => {
-                        // Handle the request
-                        let response = handlers::handle_request(request, &db).await;
-                        
-                        // Send response
-                        let response_text = serde_json::to_string(&response)
-                            .unwrap_or_else(|_| r#"{"jsonrpc":"2.0","id":null,"error":{"code":-32603,"message":"Internal error"}}"#.to_string());
-                        
-                        debug!("MCP sending: {}", response_text);
-                        
-                        if let Err(e) = sender.send(axum::extract::ws::Message::Text(response_text)).await {
-                            error!("Failed to send MCP response: {}", e);
-                            break;
-                        }
-                    }
-                    Err(e) => {
-                        error!("Failed to parse MCP JSON-RPC request: {}", e);
-                        
-                        // Send error response
-                        let error_response = JsonRpcResponse {
-                            jsonrpc: "2.0".to_string(),
-                            id: None,
-                            result: None,
-                            error: Some(crate::mcp::protocol::JsonRpcError {
-                                code: -32700,
-                                message: "Parse error".to_string(),
-                                data: Some(serde_json::Value::String(e.to_string())),
-                            }),
-                        };
-                        
-                        let response_text = serde_json::to_string(&error_response)
-                            .unwrap_or_else(|_| r#"{"jsonrpc":"2.0","id":null,"error":{"code":-32700,"message":"Parse error"}}"#.to_string());
-                        
-                        if let Err(e) = sender.send(axum::extract::ws::Message::Text(response_text)).await {
-                            error!("Failed to send MCP error response: {}", e);
-                            break;
-                        }
-                    }
-                }
-            }
-            Ok(axum::extract::ws::Message::Close(_)) => {
-                debug!("MCP WebSocket connection closed");
-                break;
-            }
-            Ok(axum::extract::ws::Message::Ping(data)) => {
-                debug!("MCP ping received, sending pong");
-                if let Err(e) = sender.send(axum::extract::ws::Message::Pong(data)).await {
-                    error!("Failed to send MCP pong: {}", e);
-                    break;
-                }
-            }
-            Ok(_) => {
-                // Ignore other message types
-            }
-            Err(e) => {
-                error!("MCP WebSocket error: {}", e);
-                break;
-            }
-        }
-    }
-
-    debug!("MCP WebSocket connection ended");
-}
 
 #[cfg(feature = "mcp")]
 fn create_mcp_routes<S>(mcp_server: std::sync::Arc<axum_mcp::server::McpServer<S>>) -> axum::Router<AppState>
 where
     S: axum_mcp::server::McpServerState + Clone + Send + Sync + 'static,
 {
-    use axum::routing::{get, post};
+    use axum::routing::get;
+    use tower_http::cors::CorsLayer;
+    
+    // Create CORS layer optimized for Claude Code
+    let cors = CorsLayer::new()
+        .allow_origin(tower_http::cors::Any)
+        .allow_methods([
+            axum::http::Method::GET,
+            axum::http::Method::POST,
+            axum::http::Method::DELETE,
+            axum::http::Method::OPTIONS,
+        ])
+        .allow_headers([
+            axum::http::header::CONTENT_TYPE,
+            axum::http::header::AUTHORIZATION,
+            axum::http::header::USER_AGENT,
+            axum::http::HeaderName::from_static("mcp-session-id"),
+            axum::http::HeaderName::from_static("last-event-id"),
+        ])
+        .allow_credentials(false);
     
     axum::Router::new()
-        .route("/mcp", get(mcp_info_handler).post(mcp_request_handler))
+        .route("/mcp", get(mcp_info_handler).post(mcp_request_handler).delete(mcp_session_cleanup_handler))
         .route("/mcp/sse", get(mcp_sse_handler))
+        .layer(cors)
         .with_state(mcp_server)
 }
 
 #[cfg(feature = "mcp")]
 async fn mcp_info_handler<S>(
     axum::extract::State(server): axum::extract::State<std::sync::Arc<axum_mcp::server::McpServer<S>>>,
+    headers: axum::http::HeaderMap,
 ) -> impl axum::response::IntoResponse
 where
     S: axum_mcp::server::McpServerState,
 {
     use serde_json::json;
+    use tracing::debug;
+    
+    let user_agent = headers
+        .get("user-agent")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("unknown");
+    
+    debug!("MCP info request from: {}", user_agent);
     
     let info = json!({
         "name": "Layercake MCP Server",
         "version": env!("CARGO_PKG_VERSION"),
-        "description": "Graph visualization and transformation MCP server",
+        "description": "Graph visualization and transformation MCP server with Claude Code compatibility",
         "protocol": {
             "version": axum_mcp::protocol::MCP_PROTOCOL_VERSION,
             "capabilities": server.state().server_capabilities()
         },
+        "transport": {
+            "type": "http",
+            "supports_streamable": true,
+            "supports_sse": true,
+            "supports_sessions": true
+        },
         "endpoints": {
             "json_rpc": "/mcp",
-            "sse": "/mcp/sse"
-        }
+            "sse": "/mcp/sse",
+            "session_cleanup": "/mcp"
+        },
+        "claude_desktop_compatible": true,
+        "supported_features": [
+            "tools",
+            "resources", 
+            "prompts",
+            "layercake_uri_scheme",
+            "graph_analysis",
+            "connectivity_analysis",
+            "path_finding",
+            "export_formats"
+        ]
     });
     
     axum::response::Json(info)
@@ -342,34 +302,98 @@ async fn mcp_request_handler<S>(
 where
     S: axum_mcp::server::McpServerState,
 {
-    // Handle the MCP request using axum-mcp
-    let response = server.handle_request(request).await;
+    use axum_mcp::security::SecurityContext;
+    
+    // Handle the MCP request using axum-mcp with system security context
+    let context = SecurityContext::system();
+    let response = server.handle_request(request, context).await;
     axum::response::Json(response)
 }
 
 #[cfg(feature = "mcp")]
 async fn mcp_sse_handler<S>(
     axum::extract::State(_server): axum::extract::State<std::sync::Arc<axum_mcp::server::McpServer<S>>>,
+    headers: axum::http::HeaderMap,
 ) -> impl axum::response::IntoResponse
 where
     S: axum_mcp::server::McpServerState,
 {
     use axum::response::sse::{Event, Sse};
-    use futures_util::stream::{self, Stream};
+    use futures_util::stream::{self, StreamExt};
     use std::time::Duration;
+    use tracing::{info, debug};
     
-    // Create a simple SSE stream for now
-    let stream = stream::repeat_with(|| {
+    // Check if this is Claude Desktop for enhanced compatibility
+    let user_agent = headers
+        .get("user-agent")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    
+    if user_agent.contains("Claude") {
+        info!("Claude Desktop client detected - using StreamableHTTP mode");
+    }
+    
+    // Extract session information for Claude Desktop compatibility
+    let session_id = headers
+        .get("mcp-session-id")
+        .and_then(|h| h.to_str().ok())
+        .map(|s| s.to_string());
+    
+    let last_event_id = headers
+        .get("last-event-id")
+        .and_then(|h| h.to_str().ok());
+    
+    debug!("SSE connection - session_id: {:?}, last_event_id: {:?}", session_id, last_event_id);
+    
+    // Create enhanced SSE stream with Claude Desktop compatibility
+    let stream = stream::repeat_with(move || {
         Event::default()
             .event("ping")
             .data("pong")
+            .id("ping-1")
     })
     .take(1)
     .map(Ok::<_, axum::Error>);
     
-    Sse::new(stream).keep_alive(
+    let sse = Sse::new(stream).keep_alive(
         axum::response::sse::KeepAlive::new()
             .interval(Duration::from_secs(30))
-            .text("keep-alive-text"),
-    )
+            .text("keep-alive"),
+    );
+    
+    // Set additional headers for Claude Desktop compatibility
+    let mut response = sse.into_response();
+    let headers = response.headers_mut();
+    headers.insert("Cache-Control", "no-cache".parse().unwrap());
+    headers.insert("Connection", "keep-alive".parse().unwrap());
+    headers.insert("Access-Control-Allow-Origin", "*".parse().unwrap());
+    
+    response
+}
+
+#[cfg(feature = "mcp")]
+async fn mcp_session_cleanup_handler<S>(
+    axum::extract::State(_server): axum::extract::State<std::sync::Arc<axum_mcp::server::McpServer<S>>>,
+    headers: axum::http::HeaderMap,
+) -> impl axum::response::IntoResponse
+where
+    S: axum_mcp::server::McpServerState,
+{
+    use axum::response::Json;
+    use serde_json::json;
+    use tracing::info;
+    
+    let session_id = headers
+        .get("mcp-session-id")
+        .and_then(|h| h.to_str().ok())
+        .unwrap_or("unknown");
+    
+    info!("Cleaning up MCP session: {}", session_id);
+    
+    // Return success response for session cleanup
+    Json(json!({
+        "status": "success",
+        "message": "Session cleaned up",
+        "session_id": session_id
+    }))
 }

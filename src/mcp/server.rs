@@ -1,6 +1,7 @@
 //! Layercake MCP server implementation using axum-mcp
 
 use axum_mcp::prelude::*;
+use axum_mcp::server::{ResourceRegistry, PromptRegistry};
 use sea_orm::DatabaseConnection;
 use std::collections::HashMap;
 
@@ -70,10 +71,10 @@ impl McpServerState for LayercakeServerState {
         axum_mcp::protocol::ServerCapabilities {
             experimental: HashMap::new(),
             logging: None,
-            prompts: Some(axum_mcp::protocol::PromptsCapability {
+            prompts: Some(axum_mcp::protocol::messages::PromptsCapability {
                 list_changed: false,
             }),
-            resources: Some(axum_mcp::protocol::ResourcesCapability {
+            resources: Some(axum_mcp::protocol::messages::ResourcesCapability {
                 subscribe: true,
                 list_changed: false,
             }),

@@ -2,6 +2,7 @@
 //! Provides intelligent prompts for analyzing graph structure, connectivity, and patterns
 
 use axum_mcp::prelude::*;
+use axum_mcp::server::prompt::{Prompt, PromptCategory, PromptParameter, PromptMessage, PromptContent, MessageRole, GetPromptRequest, GetPromptResult, PromptRegistry};
 use std::collections::HashMap;
 
 /// Layercake prompt registry for graph analysis templates
@@ -55,18 +56,21 @@ Use the layercake:// URI scheme to access additional data:
                     description: "ID of the project to analyze".to_string(),
                     required: true,
                     schema: Some(serde_json::json!({"type": "integer", "minimum": 1})),
+                    default: None,
                 },
                 PromptParameter {
                     name: "node_count".to_string(),
                     description: "Number of nodes in the graph".to_string(),
                     required: true,
                     schema: Some(serde_json::json!({"type": "integer", "minimum": 0})),
+                    default: None,
                 },
                 PromptParameter {
                     name: "edge_count".to_string(),
                     description: "Number of edges in the graph".to_string(),
                     required: true,
                     schema: Some(serde_json::json!({"type": "integer", "minimum": 0})),
+                    default: None,
                 },
                 PromptParameter {
                     name: "layer_count".to_string(),
@@ -100,6 +104,7 @@ Use the layercake:// URI scheme to access additional data:
                         "type": "array",
                         "items": {"type": "string"}
                     })),
+                    default: None,
                 },
             ],
         );
@@ -137,18 +142,21 @@ Use the find_paths tool to get detailed path data:
                     description: "ID of the project containing the graph".to_string(),
                     required: true,
                     schema: Some(serde_json::json!({"type": "integer", "minimum": 1})),
+                    default: None,
                 },
                 PromptParameter {
                     name: "source_node".to_string(),
                     description: "ID of the source node".to_string(),
                     required: true,
                     schema: Some(serde_json::json!({"type": "string"})),
+                    default: None,
                 },
                 PromptParameter {
                     name: "target_node".to_string(),
                     description: "ID of the target node".to_string(),
                     required: true,
                     schema: Some(serde_json::json!({"type": "string"})),
+                    default: None,
                 },
                 PromptParameter {
                     name: "max_path_length".to_string(),
@@ -209,12 +217,14 @@ Access layer data using layercake resources:
                     description: "ID of the project containing the layered graph".to_string(),
                     required: true,
                     schema: Some(serde_json::json!({"type": "integer", "minimum": 1})),
+                    default: None,
                 },
                 PromptParameter {
                     name: "layer_count".to_string(),
                     description: "Number of layers in the graph".to_string(),
                     required: true,
                     schema: Some(serde_json::json!({"type": "integer", "minimum": 1})),
+                    default: None,
                 },
                 PromptParameter {
                     name: "analysis_focus".to_string(),
@@ -241,6 +251,7 @@ Access layer data using layercake resources:
                         "type": "array",
                         "items": {"type": "string"}
                     })),
+                    default: None,
                 },
             ],
         );
@@ -277,18 +288,21 @@ Use the analyze_connectivity tool to get detailed structural analysis before mak
                     description: "ID of the project to analyze for transformations".to_string(),
                     required: true,
                     schema: Some(serde_json::json!({"type": "integer", "minimum": 1})),
+                    default: None,
                 },
                 PromptParameter {
                     name: "node_count".to_string(),
                     description: "Current number of nodes".to_string(),
                     required: true,
                     schema: Some(serde_json::json!({"type": "integer", "minimum": 0})),
+                    default: None,
                 },
                 PromptParameter {
                     name: "edge_count".to_string(),
                     description: "Current number of edges".to_string(),
                     required: true,
                     schema: Some(serde_json::json!({"type": "integer", "minimum": 0})),
+                    default: None,
                 },
                 PromptParameter {
                     name: "layer_count".to_string(),
@@ -322,6 +336,7 @@ Use the analyze_connectivity tool to get detailed structural analysis before mak
                         "type": "array",
                         "items": {"type": "string"}
                     })),
+                    default: None,
                 },
             ],
         );
@@ -391,8 +406,8 @@ impl PromptRegistry for LayercakePromptRegistry {
     
     async fn get_prompt_with_args(&self, request: GetPromptRequest, _context: &SecurityContext) -> McpResult<GetPromptResult> {
         let prompt = self.prompts.get(&request.name)
-            .ok_or_else(|| McpError::PromptNotFound {
-                name: request.name.clone(),
+            .ok_or_else(|| McpError::Validation {
+                message: format!("Prompt '{}' not found", request.name),
             })?;
         
         let params = request.arguments.unwrap_or_default();
@@ -505,8 +520,8 @@ impl PromptRegistry for LayercakePromptRegistry {
     
     async fn validate_prompt_parameters(&self, name: &str, params: &HashMap<String, serde_json::Value>, _context: &SecurityContext) -> McpResult<()> {
         let prompt = self.prompts.get(name)
-            .ok_or_else(|| McpError::PromptNotFound {
-                name: name.to_string(),
+            .ok_or_else(|| McpError::Validation {
+                message: format!("Prompt '{}' not found", name),
             })?;
         
         for param in &prompt.parameters {

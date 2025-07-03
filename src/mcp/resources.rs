@@ -2,9 +2,11 @@
 //! Implements layercake:// URI scheme for accessing project data, plans, and graph exports
 
 use axum_mcp::prelude::*;
+use axum_mcp::server::resource::{Resource, ResourceContent, ResourceTemplate, ResourceSubscription, UriSchemeConfig, ResourceRegistry};
+use axum_mcp::protocol::ToolContent;
 use crate::services::GraphService;
 use sea_orm::DatabaseConnection;
-use serde_json::{json, Value};
+use serde_json::json;
 use std::collections::HashMap;
 
 /// Layercake resource registry implementing layercake:// URI scheme
@@ -113,14 +115,13 @@ impl LayercakeResourceRegistry {
                     "nodes": nodes.iter().map(|n| json!({
                         "id": n.node_id,
                         "label": n.label,
-                        "node_type": n.node_type,
-                        "layer_id": n.layer_id
+                        "layer_id": n.layer_id,
+                        "properties": n.properties
                     })).collect::<Vec<_>>(),
                     "edges": edges.iter().map(|e| json!({
                         "source": e.source_node_id,
                         "target": e.target_node_id,
-                        "edge_type": e.edge_type,
-                        "weight": e.weight
+                        "properties": e.properties
                     })).collect::<Vec<_>>()
                 });
                 (serde_json::to_string_pretty(&graph_data).unwrap(), "application/json")

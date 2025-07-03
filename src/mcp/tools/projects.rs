@@ -2,7 +2,7 @@
 
 use axum_mcp::prelude::*;
 use crate::database::entities::projects;
-use crate::mcp_new::tools::{get_required_param, get_optional_param};
+use crate::mcp::tools::{get_required_param, get_optional_param};
 use sea_orm::*;
 use serde_json::{json, Value};
 use std::collections::HashMap;
