@@ -5,6 +5,7 @@ mod generate_commands;
 mod graph;
 mod plan;
 mod plan_execution;
+mod update;
 
 mod database;
 mod server;
@@ -59,6 +60,26 @@ enum Commands {
     Db {
         #[clap(subcommand)]
         command: DbCommands,
+    },
+    Update {
+        /// Check for updates without installing
+        #[clap(short, long)]
+        check: bool,
+        /// Force update even if already up to date
+        #[clap(short, long)]
+        force: bool,
+        /// Include pre-release versions
+        #[clap(short, long)]
+        pre_release: bool,
+        /// Create backup before updating
+        #[clap(short, long)]
+        backup: bool,
+        /// Rollback to previous version
+        #[clap(short, long)]
+        rollback: bool,
+        /// Show what would be done without making changes
+        #[clap(long)]
+        dry_run: bool,
     },
 }
 
@@ -123,6 +144,20 @@ async fn main() -> Result<()> {
                 info!("Running database migration: {:?}", direction);
                 server::migrate_database(&database, direction).await?;
             }
+        }
+        Commands::Update { check, force, pre_release, backup, rollback, dry_run } => {
+            let update_cmd = update::command::UpdateCommand {
+                check_only: check,
+                force,
+                pre_release,
+                version: None,
+                install_dir: None,
+                backup,
+                rollback,
+                dry_run,
+                skip_verify: false,
+            };
+            update_cmd.execute().await?;
         }
     }
 
