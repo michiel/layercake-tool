@@ -6,7 +6,7 @@ use axum::{
     Router,
 };
 use sea_orm::DatabaseConnection;
-use serde_json::{json, Value};
+use serde_json::json;
 use tower::ServiceBuilder;
 use tower_http::cors::{Any, CorsLayer};
 use anyhow::Result;
@@ -25,12 +25,6 @@ use crate::graphql::{GraphQLContext, GraphQLSchema, queries::Query, mutations::M
 #[cfg(feature = "graphql")]
 use crate::services::{ImportService, ExportService, GraphService};
 
-#[cfg(feature = "mcp")]
-use crate::mcp::McpServer;
-#[cfg(feature = "mcp")]
-use axum::extract::ws::{WebSocket, WebSocketUpgrade};
-#[cfg(feature = "mcp")]
-use axum::response::Response;
 
 use super::handlers::{health, projects, plans, graph_data};
 
@@ -129,12 +123,28 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
     // Add MCP routes if feature is enabled
     #[cfg(feature = "mcp")]
     {
-        app = app
-            .route("/mcp", get(mcp_discovery))          // Discovery endpoint for clients
-            .route("/mcp/ws", get(mcp_websocket_handler)) // WebSocket endpoint
-            .route("/mcp/rpc", post(mcp_http_handler))    // HTTP JSON-RPC endpoint
-            .route("/mcp/tools/list", get(mcp_tools_list))
-            .route("/mcp/tools/call", post(mcp_tools_call));
+        use crate::mcp_new::{LayercakeServerState, LayercakeAuth};
+        use crate::mcp_new::server::LayercakeToolRegistry;
+        use axum_mcp::server::{McpServer, McpServerConfig};
+        use std::sync::Arc;
+        
+        // Create MCP server with axum-mcp
+        let mcp_config = McpServerConfig::default()
+            .with_metadata("layercake", serde_json::json!({
+                "description": "Graph visualization and transformation MCP server",
+                "version": env!("CARGO_PKG_VERSION")
+            }));
+            
+        let mcp_state = LayercakeServerState {
+            db: db.clone(),
+            tools: LayercakeToolRegistry::new(db.clone()),
+            auth: LayercakeAuth,
+        };
+        
+        let mcp_server = Arc::new(McpServer::new(mcp_config, mcp_state));
+        
+        // Add MCP routes using axum-mcp
+        app = app.merge(create_mcp_routes(mcp_server));
     }
 
     let app = app
@@ -197,14 +207,14 @@ async fn graphql_playground() -> impl axum::response::IntoResponse {
 
 #[cfg(feature = "mcp")]
 async fn mcp_websocket_handler(
-    ws: WebSocketUpgrade,
+    ws: axum::extract::ws::WebSocketUpgrade,
     State(state): State<AppState>,
-) -> Response {
+) -> axum::response::Response {
     ws.on_upgrade(move |socket| handle_mcp_socket(socket, state.db))
 }
 
 #[cfg(feature = "mcp")]
-async fn handle_mcp_socket(socket: WebSocket, db: sea_orm::DatabaseConnection) {
+async fn handle_mcp_socket(socket: axum::extract::ws::WebSocket, db: sea_orm::DatabaseConnection) {
     use crate::mcp::protocol::{JsonRpcRequest, JsonRpcResponse};
     use crate::mcp::handlers;
     use futures_util::{SinkExt, StreamExt};
@@ -284,109 +294,80 @@ async fn handle_mcp_socket(socket: WebSocket, db: sea_orm::DatabaseConnection) {
 }
 
 #[cfg(feature = "mcp")]
-async fn mcp_discovery(
-    State(_state): State<AppState>,
-) -> impl axum::response::IntoResponse {
+fn create_mcp_routes<S>(mcp_server: std::sync::Arc<axum_mcp::server::McpServer<S>>) -> axum::Router<AppState>
+where
+    S: axum_mcp::server::McpServerState + Clone + Send + Sync + 'static,
+{
+    use axum::routing::{get, post};
+    
+    axum::Router::new()
+        .route("/mcp", get(mcp_info_handler).post(mcp_request_handler))
+        .route("/mcp/sse", get(mcp_sse_handler))
+        .with_state(mcp_server)
+}
+
+#[cfg(feature = "mcp")]
+async fn mcp_info_handler<S>(
+    axum::extract::State(server): axum::extract::State<std::sync::Arc<axum_mcp::server::McpServer<S>>>,
+) -> impl axum::response::IntoResponse
+where
+    S: axum_mcp::server::McpServerState,
+{
     use serde_json::json;
     
-    let discovery_info = json!({
+    let info = json!({
         "name": "Layercake MCP Server",
-        "version": "0.1.7",
+        "version": env!("CARGO_PKG_VERSION"),
         "description": "Graph visualization and transformation MCP server",
         "protocol": {
-            "version": "2024-11-05",
-            "transports": [
-                {
-                    "type": "http",
-                    "uri": "/mcp/rpc",
-                    "method": "POST"
-                },
-                {
-                    "type": "websocket", 
-                    "uri": "/mcp/ws"
-                }
-            ]
-        },
-        "capabilities": {
-            "tools": {
-                "listChanged": true
-            },
-            "resources": {
-                "listChanged": true,
-                "subscribe": false
-            },
-            "prompts": {
-                "listChanged": true
-            }
+            "version": axum_mcp::protocol::MCP_PROTOCOL_VERSION,
+            "capabilities": server.state().server_capabilities()
         },
         "endpoints": {
-            "tools": "/mcp/tools/list",
-            "call": "/mcp/tools/call",
-            "rpc": "/mcp/rpc",
-            "websocket": "/mcp/ws"
+            "json_rpc": "/mcp",
+            "sse": "/mcp/sse"
         }
     });
     
-    axum::response::Json(discovery_info)
+    axum::response::Json(info)
 }
 
 #[cfg(feature = "mcp")]
-async fn mcp_http_handler(
-    State(state): State<AppState>,
-    axum::extract::Json(request): axum::extract::Json<crate::mcp::protocol::JsonRpcRequest>,
-) -> impl axum::response::IntoResponse {
-    use crate::mcp::handlers;
-    
-    let response = handlers::handle_request(request, &state.db).await;
+async fn mcp_request_handler<S>(
+    axum::extract::State(server): axum::extract::State<std::sync::Arc<axum_mcp::server::McpServer<S>>>,
+    axum::extract::Json(request): axum::extract::Json<axum_mcp::protocol::JsonRpcRequest>,
+) -> impl axum::response::IntoResponse
+where
+    S: axum_mcp::server::McpServerState,
+{
+    // Handle the MCP request using axum-mcp
+    let response = server.handle_request(request).await;
     axum::response::Json(response)
 }
 
 #[cfg(feature = "mcp")]
-async fn mcp_tools_list(
-    State(_state): State<AppState>,
-) -> impl axum::response::IntoResponse {
-    use crate::mcp::tools;
-    use serde_json::json;
+async fn mcp_sse_handler<S>(
+    axum::extract::State(_server): axum::extract::State<std::sync::Arc<axum_mcp::server::McpServer<S>>>,
+) -> impl axum::response::IntoResponse
+where
+    S: axum_mcp::server::McpServerState,
+{
+    use axum::response::sse::{Event, Sse};
+    use futures_util::stream::{self, Stream};
+    use std::time::Duration;
     
-    let mut all_tools = Vec::new();
-    all_tools.extend(tools::projects::get_project_tools());
-    all_tools.extend(tools::plans::get_plan_tools());
-    all_tools.extend(tools::graph_data::get_graph_data_tools());
+    // Create a simple SSE stream for now
+    let stream = stream::repeat_with(|| {
+        Event::default()
+            .event("ping")
+            .data("pong")
+    })
+    .take(1)
+    .map(Ok::<_, axum::Error>);
     
-    let response = json!({
-        "tools": all_tools
-    });
-    
-    axum::response::Json(response)
-}
-
-#[cfg(feature = "mcp")]
-async fn mcp_tools_call(
-    State(state): State<AppState>,
-    axum::extract::Json(payload): axum::extract::Json<serde_json::Value>,
-) -> impl axum::response::IntoResponse {
-    use crate::mcp::handlers;
-    use crate::mcp::protocol::{JsonRpcRequest, JsonRpcResponse, JsonRpcError};
-    use serde_json::json;
-    
-    // Extract tool name and arguments from the payload
-    let tool_name = payload.get("name")
-        .and_then(|v| v.as_str())
-        .unwrap_or("unknown");
-    
-    let arguments = payload.get("arguments").cloned();
-    
-    // Create a JSON-RPC request for the tool call
-    let request = JsonRpcRequest {
-        jsonrpc: "2.0".to_string(),
-        id: Some(json!(1)),
-        method: "tools/call".to_string(),
-        params: Some(json!({
-            "name": tool_name,
-            "arguments": arguments
-        })),
-    };
-    
-    let response = handlers::handle_request(request, &state.db).await;
-    axum::response::Json(response)
+    Sse::new(stream).keep_alive(
+        axum::response::sse::KeepAlive::new()
+            .interval(Duration::from_secs(30))
+            .text("keep-alive-text"),
+    )
 }
