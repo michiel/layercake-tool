@@ -16,9 +16,34 @@ _Project data flow, defined using this project. The data is available in the `sa
 
 ## Installation
 
+### One-Line Install (Recommended)
+
+The easiest way to install Layercake is using our install script:
+
+**Linux/macOS:**
+```bash
+# Install latest release directly from GitHub
+curl -fsSL https://raw.githubusercontent.com/michiel/layercake-tool/master/scripts/install.sh | bash
+```
+
+**Windows (PowerShell):**
+```powershell
+# Install latest release directly from GitHub
+irm https://raw.githubusercontent.com/michiel/layercake-tool/master/scripts/install.ps1 | iex
+```
+
+This script will:
+- ✅ Detect your platform and architecture automatically
+- ✅ Download the latest release from GitHub
+- ✅ Install to `~/.local/bin` (no sudo required)
+- ✅ Check if the install directory is in your PATH
+- ✅ Provide instructions to add it to PATH if needed
+
+### Manual Installation
+
 Download a release from the [releases page](https://github.com/michiel/layercake-tool/releases).
 
-### MacOS
+#### MacOS
 
 Remove the quarantine attribute from the binary,
 ```
