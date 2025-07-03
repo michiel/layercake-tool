@@ -17,7 +17,7 @@ impl ExportService {
 
     pub async fn export_graph(&self, project_id: i32, format: &str) -> Result<String> {
         let graph_service = GraphService::new(self.db.clone());
-        let graph = graph_service.build_graph_for_project(project_id).await?;
+        let graph = graph_service.build_graph_from_project(project_id).await?;
 
         let export_format = match format.to_lowercase().as_str() {
             "dot" => ExportFileType::DOT,
@@ -69,7 +69,7 @@ impl ExportService {
     pub async fn execute_plan_exports(&self, project_id: i32, plan_yaml: &str) -> Result<Vec<String>> {
         let plan: Plan = serde_yaml::from_str(plan_yaml)?;
         let graph_service = GraphService::new(self.db.clone());
-        let mut graph = graph_service.build_graph_for_project(project_id).await?;
+        let mut graph = graph_service.build_graph_from_project(project_id).await?;
 
         let mut outputs = Vec::new();
 

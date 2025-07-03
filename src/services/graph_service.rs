@@ -17,8 +17,35 @@ impl GraphService {
         Self { db }
     }
 
+    /// Get database nodes for a project
+    pub async fn get_nodes_for_project(&self, project_id: i32) -> Result<Vec<nodes::Model>> {
+        let db_nodes = Nodes::find()
+            .filter(nodes::Column::ProjectId.eq(project_id))
+            .all(&self.db)
+            .await?;
+        Ok(db_nodes)
+    }
+
+    /// Get database edges for a project  
+    pub async fn get_edges_for_project(&self, project_id: i32) -> Result<Vec<edges::Model>> {
+        let db_edges = Edges::find()
+            .filter(edges::Column::ProjectId.eq(project_id))
+            .all(&self.db)
+            .await?;
+        Ok(db_edges)
+    }
+
+    /// Get database layers for a project
+    pub async fn get_layers_for_project(&self, project_id: i32) -> Result<Vec<layers::Model>> {
+        let db_layers = Layers::find()
+            .filter(layers::Column::ProjectId.eq(project_id))
+            .all(&self.db)
+            .await?;
+        Ok(db_layers)
+    }
+
     /// Convert database entities to the existing Graph structure for use with export engine
-    pub async fn build_graph_for_project(&self, project_id: i32) -> Result<Graph> {
+    pub async fn build_graph_from_project(&self, project_id: i32) -> Result<Graph> {
         // Fetch all entities for the project
         let db_nodes = Nodes::find()
             .filter(nodes::Column::ProjectId.eq(project_id))

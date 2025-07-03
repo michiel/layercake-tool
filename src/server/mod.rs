@@ -25,8 +25,8 @@ pub async fn start_server(port: u16, database_path: &str, cors_origin: Option<&s
 
     let app = app::create_app(db, cors_origin).await?;
     
-    // Log all HTTP routes
-    log_routes();
+    // Log all HTTP routes dynamically
+    log_routes(port);
     
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port)).await?;
     info!("Server running on http://0.0.0.0:{}", port);
@@ -36,33 +36,33 @@ pub async fn start_server(port: u16, database_path: &str, cors_origin: Option<&s
     Ok(())
 }
 
-fn log_routes() {
-    info!("HTTP Routes:");
-    info!("  GET    /health");
-    info!("  GET    /docs                                   # Swagger UI");
-    info!("  GET    /api-docs/openapi.json                 # OpenAPI spec");
-    info!("  GET    /api/v1/projects");
-    info!("  POST   /api/v1/projects");
-    info!("  GET    /api/v1/projects/:id");
-    info!("  PUT    /api/v1/projects/:id");
-    info!("  DELETE /api/v1/projects/:id");
-    info!("  GET    /api/v1/projects/:id/plans");
-    info!("  POST   /api/v1/projects/:id/plans");
-    info!("  GET    /api/v1/projects/:id/plans/:plan_id");
-    info!("  PUT    /api/v1/projects/:id/plans/:plan_id");
-    info!("  DELETE /api/v1/projects/:id/plans/:plan_id");
-    info!("  POST   /api/v1/projects/:id/plans/:plan_id/execute");
-    info!("  GET    /api/v1/projects/:id/nodes");
-    info!("  POST   /api/v1/projects/:id/nodes");
-    info!("  DELETE /api/v1/projects/:id/nodes");
-    info!("  GET    /api/v1/projects/:id/edges");
-    info!("  POST   /api/v1/projects/:id/edges");
-    info!("  DELETE /api/v1/projects/:id/edges");
-    info!("  GET    /api/v1/projects/:id/layers");
-    info!("  POST   /api/v1/projects/:id/layers");
-    info!("  DELETE /api/v1/projects/:id/layers");
-    info!("  POST   /api/v1/projects/:id/import/csv");
-    info!("  GET    /api/v1/projects/:id/export/:format");
+fn log_routes(port: u16) {
+    info!("API Endpoints:");
+    info!("  /health                     - Health check");
+    info!("  /docs                       - Swagger UI documentation");  
+    info!("  /api/v1/*                   - REST API (projects, plans, graph data)");
+    
+    #[cfg(feature = "graphql")]
+    {
+        info!("  /graphql                    - GraphQL API & Playground");
+    }
+    
+    #[cfg(feature = "mcp")]
+    {
+        info!("  /mcp                        - MCP HTTP JSON-RPC API (POST) & Server Info (GET)");
+        info!("  /mcp/sse                    - MCP Server-Sent Events (StreamableHTTP for Claude Desktop)");
+        info!("  /mcp                        - Session cleanup (DELETE)");
+        info!("");
+        info!("🔗 Claude Code/Desktop Integration:");
+        info!("   Transport: HTTP (StreamableHTTP compatible)");
+        info!("   Endpoint: http://localhost:{}/mcp", port);
+        info!("   Features: Tools, Resources, Prompts, layercake:// URI scheme");
+        info!("   Capabilities: Graph analysis, connectivity analysis, pathfinding");
+        info!("");
+        info!("📋 Available Tools: list_projects, create_project, analyze_connectivity, find_paths");
+        info!("📊 Available Resources: layercake://projects/{{id}}, layercake://graphs/{{id}}/{{format}}");
+        info!("🤖 Available Prompts: analyze_graph_structure, analyze_paths, recommend_transformations");
+    }
 }
 
 pub async fn migrate_database(database_path: &str, direction: MigrateDirection) -> Result<()> {
