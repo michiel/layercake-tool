@@ -15,5 +15,3 @@ pub mod graphql;
 
 #[cfg(feature = "mcp")]
 pub mod mcp;
-#[cfg(feature = "mcp")]
-pub mod mcp_new;

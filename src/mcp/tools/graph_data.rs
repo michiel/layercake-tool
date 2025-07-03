@@ -1,11 +1,11 @@
 //! Graph data management tools for MCP
 
-use crate::mcp::protocol::Tool;
-use crate::mcp::tools::{get_required_param, get_optional_param};
+use axum_mcp::prelude::*;
+use crate::mcp_new::tools::{get_required_param, get_optional_param};
 use crate::services::{ImportService, ExportService, GraphService};
 use sea_orm::DatabaseConnection;
 use serde_json::{json, Value};
-use std::sync::Arc;
+use std::collections::HashMap;
 
 /// Get graph data management tools
 pub fn get_graph_data_tools() -> Vec<Tool> {
@@ -36,6 +36,7 @@ pub fn get_graph_data_tools() -> Vec<Tool> {
                 "required": ["project_id"],
                 "additionalProperties": false
             }),
+            metadata: HashMap::new(),
         },
         Tool {
             name: "export_graph".to_string(),
@@ -56,6 +57,7 @@ pub fn get_graph_data_tools() -> Vec<Tool> {
                 "required": ["project_id", "format"],
                 "additionalProperties": false
             }),
+            metadata: HashMap::new(),
         },
         Tool {
             name: "get_graph_data".to_string(),
@@ -83,6 +85,7 @@ pub fn get_graph_data_tools() -> Vec<Tool> {
                 "required": ["project_id"],
                 "additionalProperties": false
             }),
+            metadata: HashMap::new(),
         },
     ]
 }
@@ -91,10 +94,12 @@ pub fn get_graph_data_tools() -> Vec<Tool> {
 pub async fn import_csv(
     arguments: Option<Value>,
     db: &DatabaseConnection,
-) -> Result<Value, String> {
+) -> McpResult<ToolsCallResult> {
     let project_id = get_required_param(&arguments, "project_id")?
         .as_i64()
-        .ok_or("Project ID must be a number")? as i32;
+        .ok_or_else(|| McpError::Validation {
+            message: "Project ID must be a number".to_string(),
+        })? as i32;
 
     let nodes_csv = get_optional_param(&arguments, "nodes_csv")
         .and_then(|v| v.as_str().map(|s| s.to_string()));
@@ -106,7 +111,9 @@ pub async fn import_csv(
         .and_then(|v| v.as_str().map(|s| s.to_string()));
 
     if nodes_csv.is_none() && edges_csv.is_none() && layers_csv.is_none() {
-        return Err("At least one CSV type (nodes, edges, or layers) must be provided".to_string());
+        return Err(McpError::Validation {
+            message: "At least one CSV type (nodes, edges, or layers) must be provided".to_string(),
+        });
     }
 
     let import_service = ImportService::new(db.clone());
@@ -169,52 +176,76 @@ pub async fn import_csv(
         }
     }
 
-    Ok(results)
+    Ok(ToolsCallResult {
+        content: vec![ToolContent::Text {
+            text: serde_json::to_string_pretty(&results).unwrap(),
+        }],
+        is_error: false,
+        metadata: HashMap::new(),
+    })
 }
 
 /// Export graph data
 pub async fn export_graph(
     arguments: Option<Value>,
     db: &DatabaseConnection,
-) -> Result<Value, String> {
+) -> McpResult<ToolsCallResult> {
     let project_id = get_required_param(&arguments, "project_id")?
         .as_i64()
-        .ok_or("Project ID must be a number")? as i32;
+        .ok_or_else(|| McpError::Validation {
+            message: "Project ID must be a number".to_string(),
+        })? as i32;
 
     let format = get_required_param(&arguments, "format")?
         .as_str()
-        .ok_or("Format must be a string")?
+        .ok_or_else(|| McpError::Validation {
+            message: "Format must be a string".to_string(),
+        })?
         .to_string();
 
     let export_service = ExportService::new(db.clone());
     let graph_service = GraphService::new(db.clone());
 
     // Build graph from database
-    let graph = graph_service.build_graph_from_project(project_id)
+    let _graph = graph_service.build_graph_from_project(project_id)
         .await
-        .map_err(|e| format!("Failed to build graph: {}", e))?;
+        .map_err(|e| McpError::Internal {
+            message: format!("Failed to build graph: {}", e),
+        })?;
 
     // Export in requested format
     let exported_content = export_service.export_graph(project_id, &format)
         .await
-        .map_err(|e| format!("Export failed: {}", e))?;
+        .map_err(|e| McpError::Internal {
+            message: format!("Export failed: {}", e),
+        })?;
 
-    Ok(json!({
+    let result = json!({
         "project_id": project_id,
         "format": format,
         "content": exported_content,
         "message": format!("Graph exported successfully as {}", format)
-    }))
+    });
+
+    Ok(ToolsCallResult {
+        content: vec![ToolContent::Text {
+            text: serde_json::to_string_pretty(&result).unwrap(),
+        }],
+        is_error: false,
+        metadata: HashMap::new(),
+    })
 }
 
 /// Get graph data structure
 pub async fn get_graph_data(
     arguments: Option<Value>,
     db: &DatabaseConnection,
-) -> Result<Value, String> {
+) -> McpResult<ToolsCallResult> {
     let project_id = get_required_param(&arguments, "project_id")?
         .as_i64()
-        .ok_or("Project ID must be a number")? as i32;
+        .ok_or_else(|| McpError::Validation {
+            message: "Project ID must be a number".to_string(),
+        })? as i32;
 
     let include_nodes = get_optional_param(&arguments, "include_nodes")
         .and_then(|v| v.as_bool())
@@ -236,7 +267,9 @@ pub async fn get_graph_data(
     if include_nodes {
         let nodes = graph_service.get_nodes_for_project(project_id)
             .await
-            .map_err(|e| format!("Failed to get nodes: {}", e))?;
+            .map_err(|e| McpError::Internal {
+                message: format!("Failed to get nodes: {}", e),
+            })?;
         
         result["nodes"] = json!({
             "count": nodes.len(),
@@ -247,7 +280,9 @@ pub async fn get_graph_data(
     if include_edges {
         let edges = graph_service.get_edges_for_project(project_id)
             .await
-            .map_err(|e| format!("Failed to get edges: {}", e))?;
+            .map_err(|e| McpError::Internal {
+                message: format!("Failed to get edges: {}", e),
+            })?;
         
         result["edges"] = json!({
             "count": edges.len(),
@@ -258,7 +293,9 @@ pub async fn get_graph_data(
     if include_layers {
         let layers = graph_service.get_layers_for_project(project_id)
             .await
-            .map_err(|e| format!("Failed to get layers: {}", e))?;
+            .map_err(|e| McpError::Internal {
+                message: format!("Failed to get layers: {}", e),
+            })?;
         
         result["layers"] = json!({
             "count": layers.len(),
@@ -266,5 +303,11 @@ pub async fn get_graph_data(
         });
     }
 
-    Ok(result)
+    Ok(ToolsCallResult {
+        content: vec![ToolContent::Text {
+            text: serde_json::to_string_pretty(&result).unwrap(),
+        }],
+        is_error: false,
+        metadata: HashMap::new(),
+    })
 }

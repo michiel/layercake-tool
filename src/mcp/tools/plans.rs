@@ -1,10 +1,11 @@
 //! Plan management tools for MCP
 
-use crate::mcp::protocol::Tool;
-use crate::mcp::tools::{get_required_param, get_optional_param};
+use axum_mcp::prelude::*;
 use crate::database::entities::plans;
+use crate::mcp_new::tools::{get_required_param, get_optional_param};
 use sea_orm::*;
 use serde_json::{json, Value};
+use std::collections::HashMap;
 
 /// Get plan management tools
 pub fn get_plan_tools() -> Vec<Tool> {
@@ -38,6 +39,7 @@ pub fn get_plan_tools() -> Vec<Tool> {
                 "required": ["project_id", "name", "yaml_content"],
                 "additionalProperties": false
             }),
+            metadata: HashMap::new(),
         },
         Tool {
             name: "execute_plan".to_string(),
@@ -53,6 +55,7 @@ pub fn get_plan_tools() -> Vec<Tool> {
                 "required": ["plan_id"],
                 "additionalProperties": false
             }),
+            metadata: HashMap::new(),
         },
         Tool {
             name: "get_plan_status".to_string(),
@@ -68,6 +71,7 @@ pub fn get_plan_tools() -> Vec<Tool> {
                 "required": ["plan_id"],
                 "additionalProperties": false
             }),
+            metadata: HashMap::new(),
         },
     ]
 }
@@ -76,19 +80,25 @@ pub fn get_plan_tools() -> Vec<Tool> {
 pub async fn create_plan(
     arguments: Option<Value>,
     db: &DatabaseConnection,
-) -> Result<Value, String> {
+) -> McpResult<ToolsCallResult> {
     let project_id = get_required_param(&arguments, "project_id")?
         .as_i64()
-        .ok_or("Project ID must be a number")? as i32;
+        .ok_or_else(|| McpError::Validation {
+            message: "Project ID must be a number".to_string(),
+        })? as i32;
 
     let name = get_required_param(&arguments, "name")?
         .as_str()
-        .ok_or("Plan name must be a string")?
+        .ok_or_else(|| McpError::Validation {
+            message: "Plan name must be a string".to_string(),
+        })?
         .to_string();
 
     let yaml_content = get_required_param(&arguments, "yaml_content")?
         .as_str()
-        .ok_or("YAML content must be a string")?
+        .ok_or_else(|| McpError::Validation {
+            message: "YAML content must be a string".to_string(),
+        })?
         .to_string();
 
     let dependencies = get_optional_param(&arguments, "dependencies")
@@ -101,10 +111,14 @@ pub async fn create_plan(
 
     // Validate YAML content
     serde_yaml::from_str::<serde_yaml::Value>(&yaml_content)
-        .map_err(|e| format!("Invalid YAML content: {}", e))?;
+        .map_err(|e| McpError::Validation {
+            message: format!("Invalid YAML content: {}", e),
+        })?;
 
     let dependencies_json = serde_json::to_string(&dependencies)
-        .map_err(|e| format!("Failed to serialize dependencies: {}", e))?;
+        .map_err(|e| McpError::Internal {
+            message: format!("Failed to serialize dependencies: {}", e),
+        })?;
 
     let new_plan = plans::ActiveModel {
         project_id: Set(project_id),
@@ -120,9 +134,11 @@ pub async fn create_plan(
     let plan = plans::Entity::insert(new_plan)
         .exec_with_returning(db)
         .await
-        .map_err(|e| format!("Failed to create plan: {}", e))?;
+        .map_err(|e| McpError::Internal {
+            message: format!("Failed to create plan: {}", e),
+        })?;
 
-    Ok(json!({
+    let result = json!({
         "id": plan.id,
         "project_id": plan.project_id,
         "name": plan.name,
@@ -131,32 +147,55 @@ pub async fn create_plan(
         "created_at": plan.created_at,
         "updated_at": plan.updated_at,
         "message": "Plan created successfully"
-    }))
+    });
+
+    Ok(ToolsCallResult {
+        content: vec![ToolContent::Text {
+            text: serde_json::to_string_pretty(&result).unwrap(),
+        }],
+        is_error: false,
+        metadata: HashMap::new(),
+    })
 }
 
 /// Execute a plan (placeholder implementation)
 pub async fn execute_plan(
     arguments: Option<Value>,
     db: &DatabaseConnection,
-) -> Result<Value, String> {
+) -> McpResult<ToolsCallResult> {
     let plan_id = get_required_param(&arguments, "plan_id")?
         .as_i64()
-        .ok_or("Plan ID must be a number")? as i32;
+        .ok_or_else(|| McpError::Validation {
+            message: "Plan ID must be a number".to_string(),
+        })? as i32;
 
     // Find the plan
-    let mut plan = plans::Entity::find_by_id(plan_id)
+    let plan = plans::Entity::find_by_id(plan_id)
         .one(db)
         .await
-        .map_err(|e| format!("Database error: {}", e))?
-        .ok_or("Plan not found")?;
+        .map_err(|e| McpError::Internal {
+            message: format!("Database error: {}", e),
+        })?
+        .ok_or_else(|| McpError::ToolExecution {
+            tool: "execute_plan".to_string(),
+            message: format!("Plan with ID {} not found", plan_id),
+        })?;
 
     // Check if plan is already running or completed
     if plan.status == "running" {
-        return Ok(json!({
+        let result = json!({
             "plan_id": plan_id,
             "status": "running",
             "message": "Plan is already running"
-        }));
+        });
+
+        return Ok(ToolsCallResult {
+            content: vec![ToolContent::Text {
+                text: serde_json::to_string_pretty(&result).unwrap(),
+            }],
+            is_error: false,
+            metadata: HashMap::new(),
+        });
     }
 
     // Update status to running
@@ -167,7 +206,9 @@ pub async fn execute_plan(
     plans::Entity::update(plan_active)
         .exec(db)
         .await
-        .map_err(|e| format!("Failed to update plan status: {}", e))?;
+        .map_err(|e| McpError::Internal {
+            message: format!("Failed to update plan status: {}", e),
+        })?;
 
     // TODO: Implement actual plan execution using existing plan_execution module
     // For now, we'll simulate execution and mark as completed
@@ -182,36 +223,53 @@ pub async fn execute_plan(
     plans::Entity::update(plan_active)
         .exec(db)
         .await
-        .map_err(|e| format!("Failed to update plan status: {}", e))?;
+        .map_err(|e| McpError::Internal {
+            message: format!("Failed to update plan status: {}", e),
+        })?;
 
-    Ok(json!({
+    let result = json!({
         "plan_id": plan_id,
         "status": "completed",
         "message": "Plan executed successfully"
-    }))
+    });
+
+    Ok(ToolsCallResult {
+        content: vec![ToolContent::Text {
+            text: serde_json::to_string_pretty(&result).unwrap(),
+        }],
+        is_error: false,
+        metadata: HashMap::new(),
+    })
 }
 
 /// Get plan status
 pub async fn get_plan_status(
     arguments: Option<Value>,
     db: &DatabaseConnection,
-) -> Result<Value, String> {
+) -> McpResult<ToolsCallResult> {
     let plan_id = get_required_param(&arguments, "plan_id")?
         .as_i64()
-        .ok_or("Plan ID must be a number")? as i32;
+        .ok_or_else(|| McpError::Validation {
+            message: "Plan ID must be a number".to_string(),
+        })? as i32;
 
     let plan = plans::Entity::find_by_id(plan_id)
         .one(db)
         .await
-        .map_err(|e| format!("Database error: {}", e))?
-        .ok_or("Plan not found")?;
+        .map_err(|e| McpError::Internal {
+            message: format!("Database error: {}", e),
+        })?
+        .ok_or_else(|| McpError::ToolExecution {
+            tool: "get_plan_status".to_string(),
+            message: format!("Plan with ID {} not found", plan_id),
+        })?;
 
     let dependencies: Vec<i32> = plan.dependencies
         .as_ref()
         .and_then(|deps| serde_json::from_str(deps).ok())
         .unwrap_or_default();
 
-    Ok(json!({
+    let result = json!({
         "id": plan.id,
         "project_id": plan.project_id,
         "name": plan.name,
@@ -219,5 +277,13 @@ pub async fn get_plan_status(
         "dependencies": dependencies,
         "created_at": plan.created_at,
         "updated_at": plan.updated_at
-    }))
+    });
+
+    Ok(ToolsCallResult {
+        content: vec![ToolContent::Text {
+            text: serde_json::to_string_pretty(&result).unwrap(),
+        }],
+        is_error: false,
+        metadata: HashMap::new(),
+    })
 }

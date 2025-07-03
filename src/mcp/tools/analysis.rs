@@ -1,6 +1,6 @@
 //! Graph analysis tools for MCP
 
-use crate::mcp::protocol::Tool;
+use axum_mcp::prelude::*;
 use crate::mcp::tools::{get_required_param, get_optional_param};
 use crate::services::GraphService;
 use sea_orm::DatabaseConnection;
@@ -24,6 +24,7 @@ pub fn get_analysis_tools() -> Vec<Tool> {
                 "required": ["project_id"],
                 "additionalProperties": false
             }),
+            metadata: HashMap::new(),
         },
         Tool {
             name: "find_paths".to_string(),
@@ -51,6 +52,7 @@ pub fn get_analysis_tools() -> Vec<Tool> {
                 "required": ["project_id", "source_node", "target_node"],
                 "additionalProperties": false
             }),
+            metadata: HashMap::new(),
         },
     ]
 }
@@ -59,21 +61,27 @@ pub fn get_analysis_tools() -> Vec<Tool> {
 pub async fn analyze_connectivity(
     arguments: Option<Value>,
     db: &DatabaseConnection,
-) -> Result<Value, String> {
+) -> McpResult<ToolsCallResult> {
     let project_id = get_required_param(&arguments, "project_id")?
         .as_i64()
-        .ok_or("Project ID must be a number")? as i32;
+        .ok_or_else(|| McpError::Validation {
+            message: "Project ID must be a number".to_string(),
+        })? as i32;
 
     let graph_service = GraphService::new(db.clone());
     
     // Get nodes and edges
     let nodes = graph_service.get_nodes_for_project(project_id)
         .await
-        .map_err(|e| format!("Failed to get nodes: {}", e))?;
+        .map_err(|e| McpError::Internal {
+            message: format!("Failed to get nodes: {}", e),
+        })?;
         
     let edges = graph_service.get_edges_for_project(project_id)
         .await
-        .map_err(|e| format!("Failed to get edges: {}", e))?;
+        .map_err(|e| McpError::Internal {
+            message: format!("Failed to get edges: {}", e),
+        })?;
 
     // Build adjacency list for analysis
     let mut adjacency: HashMap<String, Vec<String>> = HashMap::new();
@@ -135,7 +143,7 @@ pub async fn analyze_connectivity(
     let max_edges = if total_nodes > 1 { total_nodes * (total_nodes - 1) } else { 0 };
     let density = if max_edges > 0 { total_edges as f64 / max_edges as f64 } else { 0.0 };
 
-    Ok(json!({
+    let result = json!({
         "project_id": project_id,
         "connectivity_analysis": {
             "basic_stats": {
@@ -164,26 +172,40 @@ pub async fn analyze_connectivity(
                 "avg_out_degree": if total_nodes > 0 { out_degree.values().sum::<i32>() as f64 / total_nodes as f64 } else { 0.0 }
             }
         }
-    }))
+    });
+
+    Ok(ToolsCallResult {
+        content: vec![ToolContent::Text {
+            text: serde_json::to_string_pretty(&result).unwrap(),
+        }],
+        is_error: false,
+        metadata: HashMap::new(),
+    })
 }
 
 /// Find paths between nodes
 pub async fn find_paths(
     arguments: Option<Value>,
     db: &DatabaseConnection,
-) -> Result<Value, String> {
+) -> McpResult<ToolsCallResult> {
     let project_id = get_required_param(&arguments, "project_id")?
         .as_i64()
-        .ok_or("Project ID must be a number")? as i32;
+        .ok_or_else(|| McpError::Validation {
+            message: "Project ID must be a number".to_string(),
+        })? as i32;
 
     let source_node = get_required_param(&arguments, "source_node")?
         .as_str()
-        .ok_or("Source node must be a string")?
+        .ok_or_else(|| McpError::Validation {
+            message: "Source node must be a string".to_string(),
+        })?
         .to_string();
 
     let target_node = get_required_param(&arguments, "target_node")?
         .as_str()
-        .ok_or("Target node must be a string")?
+        .ok_or_else(|| McpError::Validation {
+            message: "Target node must be a string".to_string(),
+        })?
         .to_string();
 
     let max_paths = get_optional_param(&arguments, "max_paths")
@@ -195,7 +217,9 @@ pub async fn find_paths(
     // Get edges to build adjacency list
     let edges = graph_service.get_edges_for_project(project_id)
         .await
-        .map_err(|e| format!("Failed to get edges: {}", e))?;
+        .map_err(|e| McpError::Internal {
+            message: format!("Failed to get edges: {}", e),
+        })?;
 
     // Build adjacency list
     let mut adjacency: HashMap<String, Vec<String>> = HashMap::new();
@@ -218,7 +242,7 @@ pub async fn find_paths(
         0.0
     };
 
-    Ok(json!({
+    let result = json!({
         "project_id": project_id,
         "source_node": source_node,
         "target_node": target_node,
@@ -232,7 +256,15 @@ pub async fn find_paths(
                 "reachable": !paths.is_empty()
             }
         }
-    }))
+    });
+
+    Ok(ToolsCallResult {
+        content: vec![ToolContent::Text {
+            text: serde_json::to_string_pretty(&result).unwrap(),
+        }],
+        is_error: false,
+        metadata: HashMap::new(),
+    })
 }
 
 /// Find connected components using DFS

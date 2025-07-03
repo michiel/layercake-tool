@@ -123,8 +123,8 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
     // Add MCP routes if feature is enabled
     #[cfg(feature = "mcp")]
     {
-        use crate::mcp_new::{LayercakeServerState, LayercakeAuth};
-        use crate::mcp_new::server::LayercakeToolRegistry;
+        use crate::mcp::{LayercakeServerState, LayercakeAuth};
+        use crate::mcp::server::LayercakeToolRegistry;
         use axum_mcp::server::{McpServer, McpServerConfig};
         use std::sync::Arc;
         
@@ -138,6 +138,8 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
         let mcp_state = LayercakeServerState {
             db: db.clone(),
             tools: LayercakeToolRegistry::new(db.clone()),
+            resources: crate::mcp::resources::LayercakeResourceRegistry::new(db.clone()),
+            prompts: crate::mcp::prompts::LayercakePromptRegistry::new(),
             auth: LayercakeAuth,
         };
         
