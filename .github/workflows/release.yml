@@ -9,16 +9,20 @@ jobs:
       matrix:
         platform:
           - os-name: linux-x86_64
-            runs-on: ubuntu-20.04
+            runs-on: ubuntu-24.04
             target: x86_64-unknown-linux-musl
+
+          - os-name: linux-aarch64
+            runs-on: ubuntu-24.04
+            target: aarch64-unknown-linux-musl
 
           - os-name: windows-x86_64
             runs-on: windows-latest
             target: x86_64-pc-windows-msvc
 
-          - os-name: macos-x86_64
-            runs-on: macOS-latest
-            target: x86_64-apple-darwin
+          # - os-name: macos-x86_64
+          #   runs-on: macOS-latest
+          #   target: x86_64-apple-darwin
 
           - os-name: macos-aarch64
             runs-on: macOS-latest
