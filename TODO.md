@@ -41,17 +41,60 @@
 - [ ] Add GraphQL subscriptions (real-time updates)
 - [ ] Test GraphQL functionality end-to-end
 
-### 🚧 Phase 5: MCP API Implementation - IN PROGRESS
+### ✅ Phase 5: MCP API Implementation - COMPLETED (Initial)
 
-#### MCP (Model Context Protocol) Implementation
-- [ ] Add MCP SDK dependencies with feature flags
-- [ ] Design MCP tools for graph operations
-- [ ] Implement MCP resource handlers
-- [ ] Add MCP server WebSocket support
-- [ ] Create MCP prompt templates for graph analysis
-- [ ] Integrate MCP with existing service layer
-- [ ] Add MCP endpoint to server (`/mcp`)
-- [ ] Test MCP functionality with AI clients
+#### MCP (Model Context Protocol) Implementation - First Version
+- [x] Add MCP SDK dependencies with feature flags
+- [x] Design MCP tools for graph operations
+- [x] Implement MCP server using axum-mcp framework
+- [x] Add MCP endpoints to server (`/mcp`, `/mcp/sse`)
+- [x] Test MCP functionality with server startup
+- [x] Migrate from custom MCP to axum-mcp framework
+
+### 🚧 Phase 6: MCP Implementation Reconciliation - EXECUTING
+
+**Plans**: 
+- [Reconciliation Analysis](docs/plans/2025-07-03-mcp-reconciliation-plan.md)  
+- [Implementation Plan](docs/plans/2025-07-03-mcp-implementation-plan.md) ⭐ **ACTIVE**
+
+#### Phase 1: Preparation & Backup (2-3 hours)
+- [ ] Create backup branches for both MCP implementations
+- [ ] Document current state and feature inventory
+- [ ] Create comprehensive migration checklist
+
+#### Phase 2: Core Framework Migration (6-8 hours)  
+- [ ] Replace src/mcp/ base with axum-mcp framework
+- [ ] Migrate and unify tool implementations from both versions
+- [ ] Update imports and server integration
+
+#### Phase 3: Layercake Integration (6-8 hours)
+- [ ] Configure layercake:// URI scheme for resources
+- [ ] Implement graph data resource providers
+- [ ] Create graph analysis prompt templates
+
+#### Phase 4: Advanced Analysis Tools (4-6 hours)
+- [ ] Port connectivity analysis algorithms
+- [ ] Port advanced graph analysis tools (path finding, statistics)
+
+#### Phase 5: Integration & Testing (4-6 hours)
+- [ ] Comprehensive testing and validation
+- [ ] Claude Desktop compatibility verification
+- [ ] Performance benchmarking
+
+#### Missing Features from Legacy Implementation
+- [x] ~~**Resources System**: URI-based resource access~~ ✅ **COMPLETED in axum-mcp**
+- [x] ~~**Prompts System**: Graph analysis prompts with dynamic content~~ ✅ **COMPLETED in axum-mcp**
+- [ ] **Advanced Analysis**: Connectivity analysis, path finding algorithms
+- [ ] **Graph Statistics**: Connected components, degree distribution
+- [ ] **WebSocket Support**: Native WebSocket transport compatibility (low priority)
+
+#### axum-mcp Framework Status ✅ **MAJOR PROGRESS**
+- [x] Create comprehensive roadmap for axum-mcp framework
+- [x] ~~Fix Axum integration compilation issues~~ ✅ **COMPLETED**
+- [x] ~~Implement ResourceRegistry trait~~ ✅ **COMPLETED** 
+- [x] ~~Implement PromptRegistry trait~~ ✅ **COMPLETED**
+
+**Framework Status Update**: axum-mcp is now ~90% complete with **all critical MCP features implemented**
 
 #### Unified Backend Enhancement
 - [ ] Enhance service layer abstraction for multi-API support
