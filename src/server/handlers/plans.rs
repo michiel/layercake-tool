@@ -25,8 +25,8 @@ pub struct CreatePlanRequest {
 #[derive(Serialize, Deserialize)]
 #[cfg_attr(feature = "server", derive(ToSchema))]
 pub struct UpdatePlanRequest {
-    pub name: String,
-    pub plan_content: String,
+    pub name: Option<String>,
+    pub plan_content: Option<String>,
     pub dependencies: Option<Vec<i32>>,
 }
 
@@ -127,16 +127,23 @@ pub async fn update_plan(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::NOT_FOUND)?;
 
-    let dependencies_json = match payload.dependencies {
-        Some(deps) => Some(serde_json::to_string(&deps).map_err(|_| StatusCode::BAD_REQUEST)?),
-        None => None,
-    };
-
     let mut plan: plans::ActiveModel = plan.into();
-    plan.name = Set(payload.name);
-    plan.plan_content = Set(payload.plan_content);
-    plan.plan_format = Set("json".to_string());
-    plan.dependencies = Set(dependencies_json);
+    
+    // Only update fields that are provided
+    if let Some(name) = payload.name {
+        plan.name = Set(name);
+    }
+    if let Some(plan_content) = payload.plan_content {
+        plan.plan_content = Set(plan_content);
+        plan.plan_format = Set("json".to_string());
+    }
+    if payload.dependencies.is_some() {
+        let dependencies_json = match payload.dependencies {
+            Some(deps) => Some(serde_json::to_string(&deps).map_err(|_| StatusCode::BAD_REQUEST)?),
+            None => None,
+        };
+        plan.dependencies = Set(dependencies_json);
+    }
     plan.updated_at = Set(Utc::now());
 
     let plan = plan

@@ -24,7 +24,7 @@ pub struct CreateProjectRequest {
 #[derive(Serialize, Deserialize)]
 #[cfg_attr(feature = "server", derive(ToSchema))]
 pub struct UpdateProjectRequest {
-    pub name: String,
+    pub name: Option<String>,
     pub description: Option<String>,
 }
 
@@ -130,8 +130,14 @@ pub async fn update_project(
         .ok_or(StatusCode::NOT_FOUND)?;
 
     let mut project: projects::ActiveModel = project.into();
-    project.name = Set(payload.name);
-    project.description = Set(payload.description);
+    
+    // Only update fields that are provided
+    if let Some(name) = payload.name {
+        project.name = Set(name);
+    }
+    if payload.description.is_some() {
+        project.description = Set(payload.description);
+    }
     project.updated_at = Set(Utc::now());
 
     let project = project
