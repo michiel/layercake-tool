@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Plus, Search, Edit, Trash2, FolderOpen, Calendar } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, Search, Edit, Trash2, FolderOpen, Calendar, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
@@ -8,6 +9,7 @@ import { useProjects, useCreateProject, useUpdateProject, useDeleteProject } fro
 import type { Project, CreateProjectRequest, UpdateProjectRequest } from '@/types/api';
 
 export function Projects() {
+  const navigate = useNavigate();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -163,9 +165,20 @@ export function Projects() {
                 </p>
               )}
               
-              <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
-                <Calendar className="w-4 h-4 mr-1" />
-                Created {formatDate(project.created_at)}
+              <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                <div className="flex items-center">
+                  <Calendar className="w-4 h-4 mr-1" />
+                  Created {formatDate(project.created_at)}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigate(`/projects/${project.id}/plans`)}
+                  className="text-primary-600 hover:text-primary-700"
+                >
+                  <FileText className="w-4 h-4 mr-1" />
+                  View Plans
+                </Button>
               </div>
             </div>
           ))}

@@ -71,8 +71,8 @@ export const plansApi = {
     return response.data;
   },
 
-  getById: async (projectId: number, planId: number): Promise<Plan> => {
-    const response = await api.get(`/projects/${projectId}/plans/${planId}`);
+  getById: async (planId: number): Promise<Plan> => {
+    const response = await api.get(`/plans/${planId}`);
     return response.data;
   },
 
@@ -81,17 +81,17 @@ export const plansApi = {
     return response.data;
   },
 
-  update: async (projectId: number, planId: number, data: UpdatePlanRequest): Promise<Plan> => {
-    const response = await api.put(`/projects/${projectId}/plans/${planId}`, data);
+  update: async (planId: number, data: UpdatePlanRequest): Promise<Plan> => {
+    const response = await api.put(`/plans/${planId}`, data);
     return response.data;
   },
 
-  delete: async (projectId: number, planId: number): Promise<void> => {
-    await api.delete(`/projects/${projectId}/plans/${planId}`);
+  delete: async (planId: number): Promise<void> => {
+    await api.delete(`/plans/${planId}`);
   },
 
-  execute: async (projectId: number, planId: number): Promise<ExecutePlanResponse> => {
-    const response = await api.post(`/projects/${projectId}/plans/${planId}/execute`);
+  execute: async (planId: number): Promise<ExecutePlanResponse> => {
+    const response = await api.post(`/plans/${planId}/execute`);
     return response.data;
   },
 };
