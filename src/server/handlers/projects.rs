@@ -6,6 +6,7 @@ use axum::{
 use sea_orm::{ActiveModelTrait, EntityTrait, Set};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use chrono::Utc;
 
 #[cfg(feature = "server")]
 use utoipa::ToSchema;
@@ -59,16 +60,22 @@ pub async fn create_project(
     State(state): State<AppState>,
     Json(payload): Json<CreateProjectRequest>,
 ) -> Result<Json<projects::Model>, StatusCode> {
+    let now = Utc::now();
     let project = projects::ActiveModel {
         name: Set(payload.name),
         description: Set(payload.description),
+        created_at: Set(now),
+        updated_at: Set(now),
         ..Default::default()
     };
 
     let project = project
         .insert(&state.db)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|err| {
+            eprintln!("Database error creating project: {}", err);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     Ok(Json(project))
 }
@@ -125,6 +132,7 @@ pub async fn update_project(
     let mut project: projects::ActiveModel = project.into();
     project.name = Set(payload.name);
     project.description = Set(payload.description);
+    project.updated_at = Set(Utc::now());
 
     let project = project
         .update(&state.db)

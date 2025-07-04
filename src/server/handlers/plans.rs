@@ -5,6 +5,7 @@ use axum::{
 };
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use serde::{Deserialize, Serialize};
+use chrono::Utc;
 
 #[cfg(feature = "server")]
 use utoipa::ToSchema;
@@ -78,6 +79,7 @@ pub async fn create_plan(
         None => None,
     };
 
+    let now = Utc::now();
     let plan = plans::ActiveModel {
         project_id: Set(project_id),
         name: Set(payload.name),
@@ -85,6 +87,9 @@ pub async fn create_plan(
         plan_format: Set("json".to_string()),
         plan_schema_version: Set("1.0.0".to_string()),
         dependencies: Set(dependencies_json),
+        status: Set("pending".to_string()),
+        created_at: Set(now),
+        updated_at: Set(now),
         ..Default::default()
     };
 
@@ -132,6 +137,7 @@ pub async fn update_plan(
     plan.plan_content = Set(payload.plan_content);
     plan.plan_format = Set("json".to_string());
     plan.dependencies = Set(dependencies_json);
+    plan.updated_at = Set(Utc::now());
 
     let plan = plan
         .update(&state.db)
