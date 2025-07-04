@@ -51,7 +51,7 @@ export function Dashboard() {
             Visualize and transform your graph data with powerful tools.
           </p>
         </div>
-        <Link to="/projects/new">
+        <Link to="/projects">
           <Button>
             <Plus className="w-4 h-4 mr-2" />
             New Project
@@ -123,9 +123,9 @@ export function Dashboard() {
                       </p>
                     </div>
                   </div>
-                  <Link to={`/projects/${project.id}`}>
+                  <Link to={`/projects/${project.id}/plans`}>
                     <Button variant="ghost" size="sm">
-                      View
+                      View Plans
                     </Button>
                   </Link>
                 </div>
@@ -137,7 +137,7 @@ export function Dashboard() {
               <p className="text-gray-500 dark:text-gray-400">
                 No projects yet. Create your first project to get started.
               </p>
-              <Link to="/projects/new" className="mt-4 inline-block">
+              <Link to="/projects" className="mt-4 inline-block">
                 <Button>
                   <Plus className="w-4 h-4 mr-2" />
                   Create Project
