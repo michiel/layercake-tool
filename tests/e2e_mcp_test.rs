@@ -187,7 +187,7 @@ steps:
     let plan_result = client.call_tool("create_plan", Some(json!({
         "project_id": project_id,
         "name": "E2E Test Plan",
-        "yaml_content": plan_yaml
+        "plan_content": plan_yaml
     }))).await?;
     
     let plan_id = plan_result["id"].as_i64().expect("Plan ID should be a number") as i32;

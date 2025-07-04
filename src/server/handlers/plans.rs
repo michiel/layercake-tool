@@ -17,7 +17,7 @@ use crate::services::ExportService;
 #[cfg_attr(feature = "server", derive(ToSchema))]
 pub struct CreatePlanRequest {
     pub name: String,
-    pub yaml_content: String,
+    pub plan_content: String,
     pub dependencies: Option<Vec<i32>>,
 }
 
@@ -25,7 +25,7 @@ pub struct CreatePlanRequest {
 #[cfg_attr(feature = "server", derive(ToSchema))]
 pub struct UpdatePlanRequest {
     pub name: String,
-    pub yaml_content: String,
+    pub plan_content: String,
     pub dependencies: Option<Vec<i32>>,
 }
 
@@ -81,7 +81,9 @@ pub async fn create_plan(
     let plan = plans::ActiveModel {
         project_id: Set(project_id),
         name: Set(payload.name),
-        yaml_content: Set(payload.yaml_content),
+        plan_content: Set(payload.plan_content),
+        plan_format: Set("json".to_string()),
+        plan_schema_version: Set("1.0.0".to_string()),
         dependencies: Set(dependencies_json),
         ..Default::default()
     };
@@ -127,7 +129,8 @@ pub async fn update_plan(
 
     let mut plan: plans::ActiveModel = plan.into();
     plan.name = Set(payload.name);
-    plan.yaml_content = Set(payload.yaml_content);
+    plan.plan_content = Set(payload.plan_content);
+    plan.plan_format = Set("json".to_string());
     plan.dependencies = Set(dependencies_json);
 
     let plan = plan
@@ -171,7 +174,7 @@ pub async fn execute_plan(
 
     let export_service = ExportService::new(state.db.clone());
 
-    match export_service.execute_plan_exports(project_id, &plan.yaml_content).await {
+    match export_service.execute_plan_exports(project_id, &plan.plan_content).await {
         Ok(outputs) => Ok(Json(serde_json::json!({
             "status": "completed",
             "plan_id": plan_id,

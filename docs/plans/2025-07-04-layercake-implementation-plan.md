@@ -79,99 +79,191 @@ Production Mode:
 
 ## Implementation Phases
 
-### Phase 1: Frontend Foundation (3 weeks)
-**Duration**: 2025-07-04 to 2025-07-25  
+### Phase 0: Foundation Fixes (1 week) 🚨
+**Duration**: 2025-07-04 to 2025-07-11  
+**Focus**: Address critical blockers and establish development foundation
+
+#### 0.1 Critical Bug Fixes (Days 1-2)
+- **Compilation Errors** (2h): Fix yaml_content → plan_content field name mismatches
+  - Update `src/server/handlers/plans.rs` plan creation and updates
+  - Update `src/mcp/tools/plans.rs` MCP tool implementations
+  - Fix `serde_json::Error::custom` API usage in entity models
+- **Database Schema Verification** (4h): Ensure migration consistency
+- **Basic Smoke Tests** (2h): Verify all APIs functional after fixes
+
+#### 0.2 Development Infrastructure (Days 3-4)
+- **Static File Serving** (8h): Implement tower-http::services::ServeDir integration
+- **Basic HTML Shell** (4h): Create embedded HTML serving endpoint
+- **Development Scripts** (6h): Create `./scripts/dev.sh` and tooling setup
+- **Testing Framework** (12h): Establish comprehensive unit/integration test structure
+
+#### 0.3 Frontend Project Bootstrap (Days 5-7)
+- **Frontend Project Structure** (8h): Create `frontend/` directory with package.json
+- **Vite Configuration** (6h): Implement development proxy and build setup
+- **Basic React App** (8h): Minimal React application with TypeScript
+- **API Integration Test** (4h): Verify frontend can communicate with backend
+
+**Milestone**: Development Foundation Complete (Backend functional, frontend scaffolded)
+
+### Phase 1: Frontend Foundation (4 weeks)
+**Duration**: 2025-07-11 to 2025-08-08  
 **Focus**: Create React frontend infrastructure and core editing capabilities
 
-#### 1.1 Development Infrastructure (Week 1)
-- **React Setup** (8h): Initialize React app with TypeScript and build system
-- **Module System** (8h): Configure dynamic module loading and code splitting
-- **Component Registry** (6h): Registry system for dynamically loaded components
-- **Dev Server Integration** (8h): Proxy setup for seamless frontend/backend development
-- **CDN Build System** (12h): GitHub Actions for building and deploying frontend assets
-- **Embedded HTML Serving** (6h): Backend serves HTML shell with CDN asset loading
+#### 1.1 Core Infrastructure (Week 1)
+- **Component Registry** (12h): Registry system for dynamically loaded components with error handling
+- **GraphQL Code Generation** (8h): Automated TypeScript type generation from GraphQL schema
+- **State Management Setup** (8h): Redux Toolkit + Apollo Client integration
+- **Development Workflow** (8h): Hot reload optimization and proxy refinement
+- **Error Handling System** (8h): Frontend error boundaries and user feedback
 
 #### 1.2 Plan Editor System (Week 2)
-- **Plan Editor Core** (8h): Base plan editor with mode switching capability
-- **YAML Editor** (8h): Rich text YAML editor with syntax highlighting (legacy support)
-- **ReactFlow Editor** (20h): Dynamically loaded visual plan editor using ReactFlow
-- **JSON Schema Validation** (8h): Implement JSON schema validation for plan content
-- **JSON Patch Editor** (16h): Incremental JSON editor using JSON Patch operations
-- **Plan Serialization** (12h): Convert between YAML/JSON and ReactFlow formats
+- **Plan Editor Core** (12h): Base plan editor with mode switching and validation
+- **YAML Editor** (10h): Monaco Editor with YAML syntax highlighting and validation
+- **JSON Schema Implementation** (12h): Formal JSON schema definitions and validation engine
+- **JSON Patch Editor** (20h): Incremental editor with conflict resolution and real-time sync
+- **Plan Serialization** (16h): Bidirectional conversion with error handling and validation
 
-#### 1.3 Data Management Interface (Week 3)
-- **GraphQL Client** (6h): Configure Apollo Client for GraphQL queries
-- **UI Components** (16h): Create project list, navigation and layout components
-- **Project Management** (12h): Build project CRUD interface with forms
-- **Spreadsheet Editor** (24h): Tabbed spreadsheet-like editor for layers, nodes, edges
-- **Data Grids** (32h): Editable grids for node/edge/layer data with validation
-- **Grid Validation** (8h): Real-time validation for spreadsheet data
+#### 1.3 Visual Plan Editor (Week 3)
+- **ReactFlow Integration** (24h): Dynamically loaded visual DAG editor with custom nodes
+- **Visual-Text Sync** (12h): Real-time synchronization between visual and text editors
+- **Template System** (8h): Visual template library for common plan patterns
+- **Export Preview** (8h): Live preview of plan execution results
 
-#### 1.4 Visualization & Integration (Week 3)
-- **Graph Visualization** (20h): Implement graph canvas with D3.js
-- **Isoflow Support** (12h): Dynamic loading support for Isoflow and other large editors
-- **Data Integration** (12h): Connect frontend to GraphQL backend
-- **SSE Updates** (8h): Implement SSE for live graph updates
-- **CSV Upload** (6h): File upload interface for importing CSV data
+#### 1.4 Data Management Interface (Week 4)
+- **UI Components Library** (16h): Reusable component library with consistent styling
+- **Project Management** (16h): Complete CRUD interface with validation and error handling
+- **Spreadsheet Editor** (32h): Excel-like interface with AG-Grid integration
+- **Data Import/Export** (12h): CSV upload/download with validation and bulk operations
+- **Real-time Collaboration** (16h): SSE-based live updates with conflict resolution
 
-**Milestone**: Frontend Foundation Complete (Working web application)
+**Milestone**: Frontend Foundation Complete (Working web application with all core editors)
 
-### Phase 2: Advanced Graph Features (3 weeks)
-**Duration**: 2025-07-21 to 2025-08-15  
+### Phase 2: Advanced Graph Features (4 weeks)
+**Duration**: 2025-08-08 to 2025-09-05  
 **Focus**: Implement graph versioning, transformations, and analysis
 
-#### Key Features
-- **Graph Versioning Schema** (12h): Database schema for graph versions and diffs
-- **Version Management UI** (16h): Interface for viewing and managing graph versions
-- **Graph Diff Engine** (20h): Algorithm for comparing graph versions
-- **Transformation Engine** (24h): Pipeline for graph transformations and filtering
-- **Subset Selection Tools** (14h): UI for selecting graph subsets and applying filters
-- **Analysis Algorithms** (18h): Connectivity analysis and path finding algorithms
-- **Metrics Dashboard** (12h): Dashboard showing graph statistics and analysis
-- **Database Performance** (16h): Optimize database queries for large graphs
+#### 2.1 Graph Visualization Engine (Week 1)
+- **D3.js Integration** (20h): High-performance graph rendering with virtualization
+- **Interactive Controls** (12h): Pan, zoom, selection, and manipulation tools
+- **Layout Algorithms** (16h): Multiple layout options (force, hierarchical, circular)
+- **Performance Optimization** (12h): Efficient rendering for 10,000+ nodes
+- **Graph Styling** (8h): Customizable node/edge styling and themes
 
-**Milestone**: Advanced Graph Features Complete
+#### 2.2 Version Control System (Week 2)
+- **Graph Versioning Schema** (16h): Database schema with git-like version tree
+- **Version Management UI** (20h): Interface for creating, viewing, and managing versions
+- **Graph Diff Engine** (24h): Advanced algorithms for comparing graph versions
+- **Merge Conflict Resolution** (12h): UI and algorithms for resolving version conflicts
+- **History Visualization** (8h): Visual representation of version history
 
-### Phase 3: Enhanced User Experience (2 weeks)
-**Duration**: 2025-08-11 to 2025-08-29  
-**Focus**: Polish UI and add productivity features
+#### 2.3 Graph Analysis & Transformation (Week 3)
+- **Transformation Engine** (32h): Extensible pipeline for graph transformations
+- **Analysis Algorithms** (24h): Connectivity, centrality, clustering, path finding
+- **Subset Selection Tools** (16h): Advanced filtering and selection interface
+- **Metrics Dashboard** (16h): Real-time analytics with interactive charts
+- **Custom Analysis Plugins** (8h): Plugin system for user-defined analysis
 
-#### Key Features
-- **Interactive Graph Editor** (20h): Drag-and-drop node positioning and visual editing
-- **Property Editing** (12h): Panels for editing node and edge properties
-- **Bulk Operations** (10h): Interface for bulk node/edge operations
-- **Export Preview** (8h): Preview exports before download
-- **Template Editor** (16h): Visual editor for custom export templates
-- **Collaboration Features** (14h): Project sharing and change notifications
-- **User Documentation** (12h): Comprehensive user guide and tutorials
+#### 2.4 Performance & Scalability (Week 4)
+- **Database Query Optimization** (20h): Indexed queries and connection pooling
+- **Graph Virtualization** (24h): Efficient rendering of large graphs with LOD
+- **Memory Management** (12h): Optimized data structures and garbage collection
+- **Background Processing** (12h): Async processing for long-running operations
+- **Performance Testing** (12h): Comprehensive benchmarking and load testing
 
-**Milestone**: Enhanced UX Complete
+**Milestone**: Advanced Graph Features Complete (Full graph analysis platform)
 
-### Phase 4: Performance & Scalability (2 weeks)
-**Duration**: 2025-08-25 to 2025-09-12  
-**Focus**: Optimize for large graphs and high-performance scenarios
+### Phase 3: Authentication & Security (2 weeks)
+**Duration**: 2025-09-05 to 2025-09-19  
+**Focus**: Implement authentication, authorization, and security hardening
 
-#### Key Features
-- **Query Optimization** (16h): Database query performance improvements
-- **Graph Virtualization** (20h): Virtual rendering for large graphs
-- **Memory Optimization** (14h): Memory usage optimization for large datasets
-- **Caching Layer** (12h): Implement caching for frequently accessed data
-- **Background Processing** (10h): Async processing for complex operations
-- **Resource Monitoring** (8h): System for monitoring resource usage
-- **Performance Testing** (12h): Benchmarks and performance test suite
-- **Deployment Guide** (6h): Production deployment documentation
+#### 3.1 Authentication System (Week 1)
+- **User Authentication** (20h): JWT-based auth with login/register/logout
+- **OAuth Integration** (12h): GitHub/Google OAuth providers
+- **Session Management** (8h): Secure session handling and token refresh
+- **Password Security** (8h): Secure password hashing and complexity requirements
+- **API Security Middleware** (12h): Authentication guards for all API endpoints
 
-**Milestone**: Performance Complete
+#### 3.2 Authorization & Security (Week 2)
+- **Role-Based Access Control** (16h): User roles and permission system
+- **Project-Level Permissions** (12h): Fine-grained access control per project
+- **Security Headers** (8h): CORS, CSP, and other security headers
+- **Input Validation** (12h): Comprehensive input sanitization and validation
+- **Security Audit** (8h): Penetration testing and vulnerability assessment
+- **Rate Limiting** (4h): API rate limiting and abuse prevention
 
-### Cross-Cutting Concerns
-**Duration**: Throughout all phases  
-**Focus**: Testing, CI/CD, and security
+**Milestone**: Secure Multi-User Platform Complete
 
-- **Testing Framework** (16h): Comprehensive test suite for all components
-- **CI/CD Pipeline** (12h): Automated testing and deployment pipeline
-- **Security Audit** (8h): Security review of all components
+### Phase 4: Enhanced User Experience (3 weeks)
+**Duration**: 2025-09-19 to 2025-10-10  
+**Focus**: Polish UI, collaboration features, and productivity tools
 
-**Final Milestone**: Implementation Complete
+#### 4.1 Interactive Editing (Week 1)
+- **Interactive Graph Editor** (24h): Drag-and-drop node positioning with constraints
+- **Property Editing Panels** (16h): Context-aware property editors with validation
+- **Bulk Operations Interface** (16h): Multi-select and bulk editing capabilities
+- **Undo/Redo System** (12h): Complete action history with branching support
+- **Keyboard Shortcuts** (8h): Comprehensive keyboard navigation and hotkeys
+
+#### 4.2 Collaboration Features (Week 2)
+- **Real-time Collaboration** (24h): Live cursor tracking and simultaneous editing
+- **Comment System** (16h): Threaded comments on nodes, edges, and plans
+- **Change Notifications** (12h): Real-time notifications for team members
+- **Project Sharing** (12h): Invite system with role-based access
+- **Activity Feed** (8h): Project activity timeline and change history
+
+#### 4.3 Export & Templates (Week 3)
+- **Export Preview System** (16h): Live preview of all export formats
+- **Template Editor** (20h): Visual editor for custom Handlebars templates
+- **Export Automation** (12h): Scheduled exports and webhook notifications
+- **Template Marketplace** (12h): Shared template library and rating system
+- **Documentation Generator** (12h): Auto-generated docs from graph structure
+
+**Milestone**: Production-Ready User Experience Complete
+
+### Phase 5: Production Operations (2 weeks)
+**Duration**: 2025-10-10 to 2025-10-24  
+**Focus**: Production deployment, monitoring, and operations
+
+#### 5.1 Deployment & Infrastructure (Week 1)
+- **Docker Containerization** (16h): Production-ready container images
+- **CI/CD Pipeline Enhancement** (16h): Full deployment automation with rollback
+- **Environment Configuration** (8h): Production, staging, development configs
+- **Database Migration Strategy** (8h): Zero-downtime migration procedures
+- **Health Checks & Monitoring** (12h): Comprehensive application monitoring
+
+#### 5.2 Operations & Maintenance (Week 2)  
+- **Backup & Recovery** (12h): Automated backup system with testing
+- **Performance Monitoring** (12h): Application performance monitoring (APM)
+- **Log Aggregation** (8h): Centralized logging and analysis
+- **Error Tracking** (8h): Error monitoring and alerting system
+- **Documentation** (16h): Operations runbooks and troubleshooting guides
+- **Load Testing** (4h): Production load testing and capacity planning
+
+**Milestone**: Production Operations Complete
+
+### Cross-Cutting Concerns (Throughout All Phases)
+**Focus**: Testing, quality assurance, and continuous improvement
+
+#### Testing Strategy
+- **Unit Testing** (40h): Comprehensive unit test coverage (>90%)
+- **Integration Testing** (32h): API and database integration tests
+- **E2E Testing** (24h): Frontend end-to-end test automation
+- **Performance Testing** (16h): Load testing and benchmarking
+- **Security Testing** (12h): Vulnerability scanning and penetration testing
+
+#### Quality Assurance
+- **Code Review Process** (Ongoing): Peer review for all changes
+- **Static Analysis** (8h): Automated code quality checks
+- **Documentation** (32h): API docs, user guides, and developer documentation
+- **Accessibility** (16h): WCAG compliance and accessibility testing
+
+#### CI/CD Enhancement
+- **Automated Testing** (16h): Test automation in CI/CD pipeline
+- **Deployment Automation** (12h): One-click deployment with rollback
+- **Frontend Asset Pipeline** (16h): CDN deployment and cache busting
+- **Release Management** (8h): Automated release notes and versioning
+
+**Final Milestone**: Complete Production-Ready Platform
 
 ## Detailed Technical Specifications
 
@@ -435,65 +527,175 @@ jobs:
 
 ## Implementation Timeline
 
-### Month 1: Frontend Foundation
-**Weeks 1-3**: Complete Phase 1 including React setup, plan editors, and data management
+### Phase 0: Foundation (Week 1)
+**Duration**: 2025-07-04 to 2025-07-11  
+**Key Deliverables**:
+- All compilation errors fixed
+- Backend APIs fully functional  
+- Development workflow established
+- Frontend project scaffolded
 
+### Phase 1: Frontend Foundation (Weeks 2-5)
+**Duration**: 2025-07-11 to 2025-08-08  
 **Key Deliverables**:
 - Working React application with modular architecture
-- Dual-mode plan editor (YAML/JSON text + ReactFlow visual)
+- Multi-mode plan editor (YAML, JSON Patch, ReactFlow visual)
 - Spreadsheet interface for bulk data editing
-- Development workflow with hot reload
-- CDN build and deployment pipeline
+- Real-time collaboration infrastructure
+- GraphQL type generation and error handling
 
-### Month 2: Advanced Features & Polish
-**Weeks 4-6**: Complete Phases 2-3 including graph features and UX enhancements
-
+### Phase 2: Advanced Graph Features (Weeks 6-9)
+**Duration**: 2025-08-08 to 2025-09-05  
 **Key Deliverables**:
-- Graph versioning and diff capabilities
-- Advanced analysis and transformation tools
+- High-performance graph visualization (10,000+ nodes)
+- Complete version control system with branching
+- Advanced analysis algorithms and metrics dashboard
+- Performance optimization and virtualization
+- Background processing infrastructure
+
+### Phase 3: Authentication & Security (Weeks 10-11)
+**Duration**: 2025-09-05 to 2025-09-19  
+**Key Deliverables**:
+- Multi-user authentication system
+- Role-based access control
+- Security hardening and audit
+- API security middleware
+- OAuth integration
+
+### Phase 4: Enhanced User Experience (Weeks 12-14)
+**Duration**: 2025-09-19 to 2025-10-10  
+**Key Deliverables**:
 - Interactive graph editing with drag-and-drop
-- Export preview and template editing
-- Collaboration features
+- Real-time collaboration with live cursors
+- Advanced export system with preview
+- Template marketplace and sharing
+- Comprehensive documentation system
 
-### Month 3: Performance & Production
-**Weeks 7-9**: Complete Phase 4 and final integration
-
+### Phase 5: Production Operations (Weeks 15-16)
+**Duration**: 2025-10-10 to 2025-10-24  
 **Key Deliverables**:
-- Performance optimizations for large graphs
-- Production deployment documentation
-- Comprehensive testing and security audit
-- Performance benchmarks and monitoring
-- Final integration and deployment
+- Production deployment automation
+- Monitoring and alerting systems
+- Backup and recovery procedures
+- Load testing and capacity planning
+- Operations documentation
 
-## Next Steps
+**Total Timeline**: 16 weeks (4 months) for complete production-ready system
 
-### Immediate Actions (Week 1)
-1. **Initialize Frontend Project**: Set up React app in `frontend/` directory
-2. **Configure Development Environment**: Implement dev server proxy and hot reload
-3. **Database Migration**: Deploy plan content JSON migration
-4. **Basic UI Framework**: Create foundational components and layout
+## Critical Success Factors
 
-### Short-term Goals (Month 1)
-1. **Complete Frontend Foundation**: Achieve working web application
-2. **Implement Plan Editors**: All three editing modes functional
-3. **Data Management**: Spreadsheet interface for bulk operations
-4. **Development Workflow**: Seamless frontend/backend development
+### 🚨 Immediate Blockers (Must Fix First)
+1. **Compilation Errors** - Fix yaml_content field references (2 hours)
+2. **Database Consistency** - Verify migration works correctly (2 hours)  
+3. **Backend Functionality** - Ensure all APIs work after fixes (4 hours)
 
-### Long-term Vision (Quarter 1)
-1. **Production Deployment**: Complete system with CDN optimization
-2. **Performance Targets**: Handle enterprise-scale graphs efficiently
-3. **User Adoption**: Comprehensive documentation and training
-4. **Community Engagement**: Open source contributions and feedback
+### 📋 Phase 0 Requirements (Week 1)
+1. **Fix All Compilation Issues** - Code builds and runs successfully
+2. **Establish Development Workflow** - Hot reload working for both frontend/backend
+3. **Basic Frontend Scaffold** - React app can communicate with backend APIs
+4. **Testing Infrastructure** - Unit and integration test framework established
+
+### 🎯 Success Metrics by Phase
+
+#### Phase 1 Success Criteria
+- [ ] React application loads and displays project data
+- [ ] Plan editor can switch between YAML, JSON, and visual modes
+- [ ] Spreadsheet editor can create/edit nodes, edges, and layers
+- [ ] Real-time updates work between multiple browser tabs
+- [ ] All major frontend components have >80% test coverage
+
+#### Phase 2 Success Criteria  
+- [ ] Graph visualization renders 10,000+ nodes with <2s load time
+- [ ] Version control can create branches and merge changes
+- [ ] Analysis algorithms complete within performance targets
+- [ ] Database queries execute in <100ms for typical operations
+- [ ] Memory usage stays under 500MB for large graphs
+
+#### Phase 3 Success Criteria
+- [ ] Multi-user authentication and authorization working
+- [ ] Security audit passes with no critical vulnerabilities
+- [ ] All API endpoints properly secured and validated
+- [ ] OAuth login flow completes successfully
+- [ ] Role-based permissions enforced correctly
+
+#### Phase 4 Success Criteria
+- [ ] Interactive editing supports undo/redo and collaborative cursors
+- [ ] Export preview generates accurate output for all formats
+- [ ] Template system allows custom export format creation
+- [ ] Documentation system auto-generates from graph structure
+- [ ] User experience testing shows <5 minute learning curve
+
+#### Phase 5 Success Criteria
+- [ ] Production deployment completes in <10 minutes
+- [ ] Monitoring alerts trigger correctly for all failure scenarios
+- [ ] Backup/recovery tested and documented
+- [ ] Load testing validates 100+ concurrent user capacity
+- [ ] Operations team trained and documentation complete
+
+### ⚠️ Risk Mitigation Updates
+
+#### Technical Risks
+- **Frontend Complexity Underestimation**: Extended Phase 1 from 3 to 4 weeks
+- **Performance Requirements**: Dedicated Phase 2 week for optimization
+- **Security Requirements**: Full Phase 3 dedicated to auth/security
+- **Production Readiness**: Added Phase 5 for operations
+
+#### Resource Risks
+- **Single Developer**: Tasks prioritized for sequential development
+- **Knowledge Transfer**: Comprehensive documentation throughout
+- **Technical Debt**: Regular refactoring built into each phase
+- **Scope Creep**: Strict phase gates and milestone approvals
+
+### 📊 Updated Effort Estimates
+
+| Phase | Original Estimate | Revised Estimate | Reason for Change |
+|-------|------------------|------------------|-------------------|
+| **Phase 0** | Not included | 1 week | Critical foundation work |
+| **Phase 1** | 3 weeks | 4 weeks | Underestimated frontend complexity |
+| **Phase 2** | 3 weeks | 4 weeks | Added performance requirements |
+| **Phase 3** | 2 weeks | 2 weeks | New security phase |
+| **Phase 4** | Combined with 3 | 3 weeks | Separated UX from security |
+| **Phase 5** | Not included | 2 weeks | Production operations |
+| **Testing** | Throughout | Explicit allocation | Dedicated testing effort |
+| **Total** | ~8 weeks | **16 weeks** | Realistic production timeline |
 
 ## Conclusion
 
-This implementation plan provides a comprehensive roadmap for completing the Layercake tool with a focus on:
+This **updated implementation plan** addresses critical gaps identified in the original plan and provides a realistic roadmap for completing the Layercake tool:
 
-- **Proven Architecture**: Following the successful ratchet/ratchet-ui pattern
-- **Modern Development**: React with TypeScript, modular loading, and hot reload
-- **Production Ready**: Single binary deployment with global CDN optimization
-- **User-Centric Design**: Intuitive interfaces for complex graph operations
-- **Performance Focus**: Optimized for large-scale enterprise usage
-- **Maintainable Code**: Clear separation of concerns and comprehensive testing
+### ✅ **Major Improvements Made**
 
-The plan balances ambitious feature goals with practical implementation constraints, ensuring delivery of a production-ready graph visualization and transformation tool that meets the design vision outlined in DESIGN.md.
+1. **Added Phase 0**: Critical foundation work to fix compilation errors and establish development workflow
+2. **Extended Timeline**: Realistic 16-week timeline vs. original 8-week underestimate  
+3. **Added Security Phase**: Dedicated authentication and authorization implementation
+4. **Enhanced Testing**: Explicit testing strategy with coverage requirements
+5. **Production Operations**: Complete deployment and monitoring infrastructure
+6. **Detailed Success Criteria**: Measurable goals for each phase with clear acceptance criteria
+
+### 🎯 **Key Success Factors**
+
+- **Immediate Action Required**: Fix compilation errors blocking all development (6 hours)
+- **Phased Approach**: Clear dependencies and milestones prevent scope creep
+- **Risk Mitigation**: Extended timelines account for complexity underestimation
+- **Production Focus**: Dedicated phases for security, operations, and monitoring
+- **Quality Assurance**: Testing and documentation throughout all phases
+
+### 📈 **Realistic Expectations**
+
+| Aspect | Original Plan | Updated Plan | 
+|--------|--------------|--------------|
+| **Timeline** | 8 weeks | 16 weeks |
+| **Phases** | 4 phases | 6 phases (including Phase 0 & 5) |
+| **Security** | Assumed | Dedicated 2-week phase |
+| **Testing** | Implicit | Explicit with coverage targets |
+| **Production** | Basic | Full operations infrastructure |
+| **Frontend Complexity** | Underestimated | Realistic 4-week allocation |
+
+### 🚀 **Next Steps Priority**
+
+1. **IMMEDIATE** (Today): Fix compilation errors to restore backend functionality
+2. **Week 1**: Complete Phase 0 foundation work  
+3. **Weeks 2-5**: Build complete frontend with all editing modes
+4. **Weeks 6-16**: Advanced features, security, and production readiness
+
+This plan now provides a **production-ready roadmap** that balances ambitious feature goals with practical implementation constraints, ensuring delivery of a complete graph visualization and transformation platform that meets enterprise requirements while maintaining the design vision outlined in DESIGN.md.

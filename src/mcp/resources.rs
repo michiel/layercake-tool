@@ -69,7 +69,7 @@ impl LayercakeResourceRegistry {
         let plan_data = json!({
             "plan_id": plan_id,
             "name": format!("Plan {}", plan_id),
-            "yaml_content": "# Transformation plan YAML would go here",
+            "plan_content": "# Transformation plan content would go here",
             "status": "draft",
             "created_at": "2025-07-03T00:00:00Z"
         });

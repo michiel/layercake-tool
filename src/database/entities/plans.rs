@@ -47,12 +47,21 @@ impl Model {
             "yaml" => {
                 // Convert YAML to JSON for backward compatibility
                 let yaml_value: serde_yaml::Value = serde_yaml::from_str(&self.plan_content)
-                    .map_err(|e| serde_json::Error::custom(format!("YAML parse error: {}", e)))?;
+                    .map_err(|e| serde_json::Error::io(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        format!("YAML parse error: {}", e)
+                    )))?;
                 let json_value = serde_json::to_value(yaml_value)
-                    .map_err(|e| serde_json::Error::custom(format!("YAML to JSON conversion error: {}", e)))?;
+                    .map_err(|e| serde_json::Error::io(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        format!("YAML to JSON conversion error: {}", e)
+                    )))?;
                 Ok(json_value)
             },
-            _ => Err(serde_json::Error::custom(format!("Unsupported plan format: {}", self.plan_format)))
+            _ => Err(serde_json::Error::io(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Unsupported plan format: {}", self.plan_format)
+            )))
         }
     }
 

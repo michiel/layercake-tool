@@ -24,9 +24,9 @@ pub fn get_plan_tools() -> Vec<Tool> {
                         "type": "string",
                         "description": "Name of the plan"
                     },
-                    "yaml_content": {
+                    "plan_content": {
                         "type": "string",
-                        "description": "YAML configuration for the plan"
+                        "description": "JSON or YAML configuration for the plan"
                     },
                     "dependencies": {
                         "type": "array",
@@ -36,7 +36,7 @@ pub fn get_plan_tools() -> Vec<Tool> {
                         "description": "List of plan IDs this plan depends on"
                     }
                 },
-                "required": ["project_id", "name", "yaml_content"],
+                "required": ["project_id", "name", "plan_content"],
                 "additionalProperties": false
             }),
             metadata: HashMap::new(),
@@ -94,10 +94,10 @@ pub async fn create_plan(
         })?
         .to_string();
 
-    let yaml_content = get_required_param(&arguments, "yaml_content")?
+    let plan_content = get_required_param(&arguments, "plan_content")?
         .as_str()
         .ok_or_else(|| McpError::Validation {
-            message: "YAML content must be a string".to_string(),
+            message: "Plan content must be a string".to_string(),
         })?
         .to_string();
 
@@ -109,11 +109,25 @@ pub async fn create_plan(
         }))
         .unwrap_or_default();
 
-    // Validate YAML content
-    serde_yaml::from_str::<serde_yaml::Value>(&yaml_content)
-        .map_err(|e| McpError::Validation {
-            message: format!("Invalid YAML content: {}", e),
-        })?;
+    // Validate content (try JSON first, then YAML for backward compatibility)
+    let (plan_format, validated_content) = if let Ok(_) = serde_json::from_str::<serde_json::Value>(&plan_content) {
+        ("json".to_string(), plan_content)
+    } else if let Ok(yaml_value) = serde_yaml::from_str::<serde_yaml::Value>(&plan_content) {
+        // Convert YAML to JSON
+        let json_value = serde_json::to_value(yaml_value)
+            .map_err(|e| McpError::Validation {
+                message: format!("Failed to convert YAML to JSON: {}", e),
+            })?;
+        let json_content = serde_json::to_string_pretty(&json_value)
+            .map_err(|e| McpError::Validation {
+                message: format!("Failed to serialize JSON: {}", e),
+            })?;
+        ("json".to_string(), json_content)
+    } else {
+        return Err(McpError::Validation {
+            message: "Invalid plan content: must be valid JSON or YAML".to_string(),
+        });
+    };
 
     let dependencies_json = serde_json::to_string(&dependencies)
         .map_err(|e| McpError::Internal {
@@ -123,7 +137,9 @@ pub async fn create_plan(
     let new_plan = plans::ActiveModel {
         project_id: Set(project_id),
         name: Set(name),
-        yaml_content: Set(yaml_content),
+        plan_content: Set(validated_content),
+        plan_format: Set(plan_format),
+        plan_schema_version: Set("1.0.0".to_string()),
         dependencies: Set(Some(dependencies_json)),
         status: Set("pending".to_string()),
         created_at: Set(chrono::Utc::now()),

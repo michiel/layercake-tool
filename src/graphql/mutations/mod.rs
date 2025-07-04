@@ -72,7 +72,9 @@ impl Mutation {
         let plan = plans::ActiveModel {
             project_id: Set(input.project_id),
             name: Set(input.name),
-            yaml_content: Set(input.yaml_content),
+            plan_content: Set(input.plan_content),
+            plan_format: Set(input.plan_format.unwrap_or_else(|| "json".to_string())),
+            plan_schema_version: Set("1.0.0".to_string()),
             dependencies: Set(dependencies_json),
             status: Set("pending".to_string()),
             ..Default::default()
@@ -97,7 +99,8 @@ impl Mutation {
 
         let mut plan: plans::ActiveModel = plan.into();
         plan.name = Set(input.name);
-        plan.yaml_content = Set(input.yaml_content);
+        plan.plan_content = Set(input.plan_content);
+        plan.plan_format = Set(input.plan_format.unwrap_or_else(|| "json".to_string()));
         plan.dependencies = Set(dependencies_json);
 
         let plan = plan.update(&context.db).await?;
