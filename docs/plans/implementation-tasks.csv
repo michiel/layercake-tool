@@ -1,0 +1,52 @@
+id,name,description,type,priority,status,estimated_hours,phase,depends_on,deliverable
+react-setup,React Development Setup,Initialize React app with TypeScript and build system,task,high,ready,8,phase-1,,React app scaffold
+module-system,Module System Setup,Configure dynamic module loading and code splitting,task,high,blocked,8,phase-1,react-setup,Module architecture
+component-registry,Component Registry,Registry system for dynamically loaded components,task,high,blocked,6,phase-1,module-system,Component registry
+graphql-client,GraphQL Client Setup,Configure Apollo Client or similar for GraphQL queries,task,high,blocked,6,phase-1,react-setup,GraphQL integration
+ui-components,Core UI Components,Create project list navigation and layout components,task,high,blocked,16,phase-1,react-setup,Basic UI framework
+project-mgmt,Project Management Interface,Build project CRUD interface with forms,task,medium,blocked,12,phase-1,ui-components,Project management UI
+plan-editor-core,Plan Editor Core,Base plan editor with mode switching capability,task,high,blocked,8,phase-1,ui-components,Plan editor foundation
+yaml-editor,YAML Editor,Rich text YAML editor with syntax highlighting and validation,task,high,blocked,8,phase-1,plan-editor-core,YAML editing interface
+reactflow-editor,ReactFlow Editor,Dynamically loaded visual plan editor using ReactFlow for DAG editing,task,high,blocked,20,phase-1,plan-editor-core component-registry,Visual plan editor
+plan-serialization,Plan Serialization,Convert between YAML and ReactFlow node formats,task,high,blocked,12,phase-1,yaml-editor reactflow-editor,Format conversion
+graph-viz,Graph Visualization,Implement graph canvas with D3.js or similar,task,high,blocked,20,phase-1,ui-components,Graph visualization component
+isoflow-support,Isoflow Support,Dynamic loading support for Isoflow and other large editors,task,medium,blocked,12,phase-1,component-registry,Editor plugin system
+data-integration,Data Integration,Connect frontend to GraphQL backend,task,high,blocked,12,phase-1,graphql-client graph-viz,Data flow integration
+sse-updates,Real-time Updates,Implement SSE for live graph updates,task,medium,blocked,8,phase-1,data-integration,Live update system
+csv-upload,CSV Upload,File upload interface for importing CSV data,task,low,blocked,6,phase-1,data-integration,File upload feature
+spreadsheet-editor,Spreadsheet Editor,Tabbed spreadsheet-like editor for layers nodes and edges,task,high,blocked,24,phase-1,data-integration component-registry,Spreadsheet interface
+data-grid-nodes,Nodes Data Grid,Editable grid for node data with validation,task,high,blocked,12,phase-1,spreadsheet-editor,Nodes grid editor
+data-grid-edges,Edges Data Grid,Editable grid for edge data with validation,task,high,blocked,12,phase-1,spreadsheet-editor,Edges grid editor
+data-grid-layers,Layers Data Grid,Editable grid for layer data with validation,task,high,blocked,8,phase-1,spreadsheet-editor,Layers grid editor
+grid-validation,Grid Validation,Real-time validation for spreadsheet data,task,medium,blocked,8,phase-1,data-grid-nodes data-grid-edges data-grid-layers,Data validation
+frontend-milestone,Frontend Foundation Complete,All basic frontend functionality working,milestone,critical,blocked,0,phase-1,project-mgmt plan-serialization graph-viz sse-updates grid-validation,Working frontend
+version-schema,Graph Versioning Schema,Database schema for graph versions and diffs,task,high,blocked,12,phase-2,frontend-milestone,Versioning data model
+version-ui,Version Management UI,Interface for viewing and managing graph versions,task,high,blocked,16,phase-2,version-schema,Version control UI
+graph-diff,Graph Diff Engine,Algorithm for comparing graph versions,task,high,blocked,20,phase-2,version-schema,Diff computation
+transformation-engine,Transformation Engine,Pipeline for graph transformations and filtering,task,high,blocked,24,phase-2,frontend-milestone,Transformation system
+subset-selection,Subset Selection Tools,UI for selecting graph subsets and applying filters,task,medium,blocked,14,phase-2,transformation-engine,Selection interface
+analysis-algorithms,Analysis Algorithms,Connectivity analysis and path finding algorithms,task,medium,blocked,18,phase-2,transformation-engine,Analysis tools
+metrics-dashboard,Metrics Dashboard,Dashboard showing graph statistics and analysis,task,medium,blocked,12,phase-2,analysis-algorithms,Analytics interface
+performance-db,Database Performance,Optimize database queries for large graphs,task,high,blocked,16,phase-2,version-schema,Query optimization
+graph-features-milestone,Advanced Graph Features Complete,All advanced graph functionality implemented,milestone,critical,blocked,0,phase-2,version-ui graph-diff subset-selection metrics-dashboard,Advanced features
+interactive-editor,Interactive Graph Editor,Drag-and-drop node positioning and visual editing,task,high,blocked,20,phase-3,graph-features-milestone,Interactive editor
+property-panels,Property Editing,Panels for editing node and edge properties,task,medium,blocked,12,phase-3,interactive-editor,Property editor
+bulk-operations,Bulk Operations,Interface for bulk node/edge operations,task,medium,blocked,10,phase-3,interactive-editor,Bulk operations UI
+export-preview,Export Preview,Preview exports before download,task,medium,blocked,8,phase-3,graph-features-milestone,Export preview
+template-editor,Template Editor,Visual editor for custom export templates,task,low,blocked,16,phase-3,export-preview,Template editing
+collaboration,Collaboration Features,Project sharing and change notifications,task,low,blocked,14,phase-3,graph-features-milestone,Collaboration system
+user-docs,User Documentation,Comprehensive user guide and tutorials,task,medium,blocked,12,phase-3,interactive-editor,Documentation
+ux-milestone,Enhanced UX Complete,All user experience improvements implemented,milestone,critical,blocked,0,phase-3,interactive-editor export-preview user-docs,Enhanced UX
+query-optimization,Query Optimization,Database query performance improvements,task,high,blocked,16,phase-4,ux-milestone,Query performance
+graph-virtualization,Graph Virtualization,Virtual rendering for large graphs,task,high,blocked,20,phase-4,ux-milestone,Virtualization system
+memory-optimization,Memory Optimization,Memory usage optimization for large datasets,task,high,blocked,14,phase-4,query-optimization,Memory efficiency
+caching-layer,Caching Layer,Implement caching for frequently accessed data,task,medium,blocked,12,phase-4,query-optimization,Caching system
+background-processing,Background Processing,Async processing for complex operations,task,medium,blocked,10,phase-4,memory-optimization,Background jobs
+monitoring,Resource Monitoring,System for monitoring resource usage,task,medium,blocked,8,phase-4,caching-layer,Monitoring dashboard
+performance-tests,Performance Testing,Benchmarks and performance test suite,task,high,blocked,12,phase-4,graph-virtualization memory-optimization,Performance benchmarks
+deployment-guide,Deployment Guide,Production deployment documentation,task,low,blocked,6,phase-4,monitoring,Deployment docs
+performance-milestone,Performance Complete,All performance optimizations implemented,milestone,critical,blocked,0,phase-4,performance-tests deployment-guide,Performance system
+testing-framework,Testing Framework,Comprehensive test suite for all components,task,high,ready,16,all-phases,,Test infrastructure
+ci-cd,CI/CD Pipeline,Automated testing and deployment pipeline,task,medium,blocked,12,all-phases,testing-framework,CI/CD system
+security-audit,Security Audit,Security review of all components,task,high,blocked,8,all-phases,performance-milestone,Security assessment
+final-milestone,Implementation Complete,All design goals fully implemented,milestone,critical,blocked,0,final,performance-milestone security-audit,Complete system

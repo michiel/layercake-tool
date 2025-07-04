@@ -1,0 +1,82 @@
+source,target,relationship,type,description
+react-setup,module-system,depends_on,dependency,Module system requires React app setup
+react-setup,graphql-client,depends_on,dependency,GraphQL client requires React app setup
+react-setup,ui-components,depends_on,dependency,UI components require React app setup
+module-system,component-registry,depends_on,dependency,Component registry requires module system
+component-registry,reactflow-editor,depends_on,dependency,ReactFlow editor requires component registry
+component-registry,isoflow-support,depends_on,dependency,Isoflow support requires component registry
+ui-components,project-mgmt,depends_on,dependency,Project management needs base UI components
+ui-components,plan-editor-core,depends_on,dependency,Plan editor core needs base UI components
+plan-editor-core,yaml-editor,depends_on,dependency,YAML editor requires plan editor core
+plan-editor-core,reactflow-editor,depends_on,dependency,ReactFlow editor requires plan editor core
+yaml-editor,plan-serialization,depends_on,dependency,Plan serialization requires YAML editor
+reactflow-editor,plan-serialization,depends_on,dependency,Plan serialization requires ReactFlow editor
+ui-components,graph-viz,depends_on,dependency,Graph visualization needs base UI components
+graphql-client,data-integration,depends_on,dependency,Data integration requires GraphQL client
+graph-viz,data-integration,depends_on,dependency,Data integration requires graph visualization
+data-integration,sse-updates,depends_on,dependency,SSE updates require data integration
+data-integration,csv-upload,depends_on,dependency,CSV upload requires data integration
+data-integration,spreadsheet-editor,depends_on,dependency,Spreadsheet editor requires data integration
+component-registry,spreadsheet-editor,depends_on,dependency,Spreadsheet editor requires component registry
+spreadsheet-editor,data-grid-nodes,depends_on,dependency,Nodes grid requires spreadsheet editor
+spreadsheet-editor,data-grid-edges,depends_on,dependency,Edges grid requires spreadsheet editor
+spreadsheet-editor,data-grid-layers,depends_on,dependency,Layers grid requires spreadsheet editor
+data-grid-nodes,grid-validation,depends_on,dependency,Grid validation requires nodes grid
+data-grid-edges,grid-validation,depends_on,dependency,Grid validation requires edges grid
+data-grid-layers,grid-validation,depends_on,dependency,Grid validation requires layers grid
+project-mgmt,frontend-milestone,depends_on,dependency,Frontend milestone requires project management
+plan-serialization,frontend-milestone,depends_on,dependency,Frontend milestone requires plan serialization
+grid-validation,frontend-milestone,depends_on,dependency,Frontend milestone requires grid validation
+graph-viz,frontend-milestone,depends_on,dependency,Frontend milestone requires graph visualization
+sse-updates,frontend-milestone,depends_on,dependency,Frontend milestone requires SSE updates
+
+frontend-milestone,version-schema,depends_on,dependency,Version schema requires frontend foundation
+version-schema,version-ui,depends_on,dependency,Version UI requires version schema
+version-schema,graph-diff,depends_on,dependency,Graph diff requires version schema
+frontend-milestone,transformation-engine,depends_on,dependency,Transformation engine requires frontend foundation
+transformation-engine,subset-selection,depends_on,dependency,Subset selection requires transformation engine
+transformation-engine,analysis-algorithms,depends_on,dependency,Analysis algorithms require transformation engine
+analysis-algorithms,metrics-dashboard,depends_on,dependency,Metrics dashboard requires analysis algorithms
+version-schema,performance-db,depends_on,dependency,Database performance requires version schema
+version-ui,graph-features-milestone,depends_on,dependency,Graph features milestone requires version UI
+graph-diff,graph-features-milestone,depends_on,dependency,Graph features milestone requires graph diff
+subset-selection,graph-features-milestone,depends_on,dependency,Graph features milestone requires subset selection
+metrics-dashboard,graph-features-milestone,depends_on,dependency,Graph features milestone requires metrics dashboard
+
+graph-features-milestone,interactive-editor,depends_on,dependency,Interactive editor requires advanced graph features
+interactive-editor,property-panels,depends_on,dependency,Property panels require interactive editor
+interactive-editor,bulk-operations,depends_on,dependency,Bulk operations require interactive editor
+graph-features-milestone,export-preview,depends_on,dependency,Export preview requires advanced graph features
+export-preview,template-editor,depends_on,dependency,Template editor requires export preview
+graph-features-milestone,collaboration,depends_on,dependency,Collaboration requires advanced graph features
+interactive-editor,user-docs,depends_on,dependency,User docs require interactive editor
+interactive-editor,ux-milestone,depends_on,dependency,UX milestone requires interactive editor
+export-preview,ux-milestone,depends_on,dependency,UX milestone requires export preview
+user-docs,ux-milestone,depends_on,dependency,UX milestone requires user documentation
+
+ux-milestone,query-optimization,depends_on,dependency,Query optimization requires UX completion
+ux-milestone,graph-virtualization,depends_on,dependency,Graph virtualization requires UX completion
+query-optimization,memory-optimization,depends_on,dependency,Memory optimization requires query optimization
+query-optimization,caching-layer,depends_on,dependency,Caching layer requires query optimization
+memory-optimization,background-processing,depends_on,dependency,Background processing requires memory optimization
+caching-layer,monitoring,depends_on,dependency,Monitoring requires caching layer
+graph-virtualization,performance-tests,depends_on,dependency,Performance tests require graph virtualization
+memory-optimization,performance-tests,depends_on,dependency,Performance tests require memory optimization
+monitoring,deployment-guide,depends_on,dependency,Deployment guide requires monitoring
+performance-tests,performance-milestone,depends_on,dependency,Performance milestone requires performance tests
+deployment-guide,performance-milestone,depends_on,dependency,Performance milestone requires deployment guide
+
+testing-framework,ci-cd,depends_on,dependency,CI/CD requires testing framework
+performance-milestone,security-audit,depends_on,dependency,Security audit requires performance milestone
+performance-milestone,final-milestone,depends_on,dependency,Final milestone requires performance milestone
+security-audit,final-milestone,depends_on,dependency,Final milestone requires security audit
+
+# Cross-phase dependencies
+testing-framework,react-setup,supports,support,Testing framework supports React setup
+testing-framework,version-schema,supports,support,Testing framework supports version schema
+testing-framework,interactive-editor,supports,support,Testing framework supports interactive editor
+testing-framework,query-optimization,supports,support,Testing framework supports query optimization
+ci-cd,frontend-milestone,supports,support,CI/CD supports frontend milestone
+ci-cd,graph-features-milestone,supports,support,CI/CD supports graph features milestone
+ci-cd,ux-milestone,supports,support,CI/CD supports UX milestone
+ci-cd,performance-milestone,supports,support,CI/CD supports performance milestone

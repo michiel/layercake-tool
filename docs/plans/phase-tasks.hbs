@@ -1,0 +1,28 @@
+# {{phase_name}}
+
+{{phase_description}}
+
+## Tasks
+
+{{#each nodes}}
+### {{name}}
+{{description}}
+
+- **Type**: {{type}}
+- **Priority**: {{priority}}
+- **Status**: {{status}}
+- **Estimated Hours**: {{estimated_hours}}
+- **Deliverable**: {{deliverable}}
+
+{{#if depends_on}}
+**Dependencies**: {{depends_on}}
+{{/if}}
+
+---
+{{/each}}
+
+## Dependencies
+
+{{#each edges}}
+- **{{source}}** → **{{target}}**: {{description}}
+{{/each}}
