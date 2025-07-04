@@ -1,16 +1,67 @@
-import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
-import { Plus, Folder, Calendar, MoreVertical } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/Card';
+import { useState } from 'react';
+import { Plus, Search, Edit, Trash2, FolderOpen, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { projectsApi } from '@/lib/api';
-import { formatDate } from '@/lib/utils';
+import { Input } from '@/components/ui/Input';
+import { Modal } from '@/components/ui/Modal';
+import { ProjectForm } from '@/components/projects/ProjectForm';
+import { useProjects, useCreateProject, useUpdateProject, useDeleteProject } from '@/hooks/useProjects';
+import type { Project, CreateProjectRequest, UpdateProjectRequest } from '@/types/api';
 
 export function Projects() {
-  const { data: projects, isLoading } = useQuery({
-    queryKey: ['projects'],
-    queryFn: projectsApi.getAll,
-  });
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [deletingProjectId, setDeletingProjectId] = useState<number | null>(null);
+
+  const { data: projects, isLoading, error } = useProjects();
+  const createProject = useCreateProject();
+  const updateProject = useUpdateProject();
+  const deleteProject = useDeleteProject();
+
+  const filteredProjects = projects?.filter(project =>
+    project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    project.description?.toLowerCase().includes(searchTerm.toLowerCase())
+  ) || [];
+
+  const handleCreateProject = async (data: CreateProjectRequest) => {
+    try {
+      await createProject.mutateAsync(data);
+      setIsCreateModalOpen(false);
+    } catch (error) {
+      console.error('Failed to create project:', error);
+    }
+  };
+
+  const handleUpdateProject = async (data: UpdateProjectRequest) => {
+    if (!editingProject) return;
+    
+    try {
+      await updateProject.mutateAsync({
+        id: editingProject.id,
+        data,
+      });
+      setEditingProject(null);
+    } catch (error) {
+      console.error('Failed to update project:', error);
+    }
+  };
+
+  const handleDeleteProject = async (id: number) => {
+    try {
+      await deleteProject.mutateAsync(id);
+      setDeletingProjectId(null);
+    } catch (error) {
+      console.error('Failed to delete project:', error);
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
 
   if (isLoading) {
     return (
@@ -20,86 +71,165 @@ export function Projects() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="text-center py-12">
+        <div className="text-red-600 mb-2">Failed to load projects</div>
+        <div className="text-sm text-gray-500">Please try refreshing the page</div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Projects
-        </h2>
-        <Link to="/projects/new">
-          <Button>
-            <Plus className="w-4 h-4 mr-2" />
-            New Project
-          </Button>
-        </Link>
+      {/* Header */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Projects</h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            Manage your layercake projects and plans
+          </p>
+        </div>
+        <Button
+          onClick={() => setIsCreateModalOpen(true)}
+          className="flex items-center gap-2"
+        >
+          <Plus className="w-4 h-4" />
+          New Project
+        </Button>
       </div>
 
-      {projects && projects.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {projects.map((project) => (
-            <Card key={project.id} className="hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center">
-                    <Folder className="w-8 h-8 text-primary-600 mr-3" />
-                    <div>
-                      <h3 className="font-semibold text-gray-900 dark:text-white">
-                        {project.name}
-                      </h3>
-                    </div>
-                  </div>
-                  <button className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-                    <MoreVertical className="w-4 h-4" />
-                  </button>
-                </div>
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+        <Input
+          placeholder="Search projects..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-10"
+        />
+      </div>
 
-                {project.description && (
-                  <p className="text-gray-600 dark:text-gray-400 mt-2 text-sm line-clamp-2">
-                    {project.description}
-                  </p>
-                )}
-
-                <div className="flex items-center mt-4 text-xs text-gray-500 dark:text-gray-400">
-                  <Calendar className="w-4 h-4 mr-1" />
-                  Created {formatDate(project.created_at)}
-                </div>
-
-                <div className="flex items-center justify-between mt-4">
-                  <div className="flex space-x-2">
-                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
-                      Active
-                    </span>
-                  </div>
-                  <Link to={`/projects/${project.id}`}>
-                    <Button variant="ghost" size="sm">
-                      View Details
-                    </Button>
-                  </Link>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+      {/* Projects Grid */}
+      {filteredProjects.length === 0 ? (
+        <div className="text-center py-12">
+          <FolderOpen className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <div className="text-gray-500 mb-2">
+            {searchTerm ? 'No projects found matching your search' : 'No projects yet'}
+          </div>
+          {!searchTerm && (
+            <Button
+              onClick={() => setIsCreateModalOpen(true)}
+              variant="secondary"
+            >
+              Create your first project
+            </Button>
+          )}
         </div>
       ) : (
-        <Card>
-          <CardContent className="p-12 text-center">
-            <Folder className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-              No projects yet
-            </h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">
-              Get started by creating your first project. Projects help you organize
-              your graph data and transformation plans.
-            </p>
-            <Link to="/projects/new">
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />
-                Create Your First Project
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {filteredProjects.map((project) => (
+            <div
+              key={project.id}
+              className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md transition-shadow"
+            >
+              <div className="flex justify-between items-start mb-3">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
+                  {project.name}
+                </h3>
+                <div className="flex gap-1 ml-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setEditingProject(project)}
+                    className="p-1 h-8 w-8"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setDeletingProjectId(project.id)}
+                    className="p-1 h-8 w-8 text-red-600 hover:text-red-700"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+              
+              {project.description && (
+                <p className="text-gray-600 dark:text-gray-400 text-sm mb-4 line-clamp-2">
+                  {project.description}
+                </p>
+              )}
+              
+              <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
+                <Calendar className="w-4 h-4 mr-1" />
+                Created {formatDate(project.created_at)}
+              </div>
+            </div>
+          ))}
+        </div>
       )}
+
+      {/* Create Project Modal */}
+      <Modal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        title="Create New Project"
+      >
+        <ProjectForm
+          onSubmit={(data) => handleCreateProject(data as CreateProjectRequest)}
+          onCancel={() => setIsCreateModalOpen(false)}
+          isLoading={createProject.isPending}
+        />
+      </Modal>
+
+      {/* Edit Project Modal */}
+      <Modal
+        isOpen={!!editingProject}
+        onClose={() => setEditingProject(null)}
+        title="Edit Project"
+      >
+        {editingProject && (
+          <ProjectForm
+            project={editingProject}
+            onSubmit={(data) => handleUpdateProject(data as UpdateProjectRequest)}
+            onCancel={() => setEditingProject(null)}
+            isLoading={updateProject.isPending}
+          />
+        )}
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={!!deletingProjectId}
+        onClose={() => setDeletingProjectId(null)}
+        title="Delete Project"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-gray-600 dark:text-gray-400">
+            Are you sure you want to delete this project? This action cannot be undone.
+          </p>
+          <div className="flex justify-end space-x-3">
+            <Button
+              variant="secondary"
+              onClick={() => setDeletingProjectId(null)}
+              disabled={deleteProject.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => deletingProjectId && handleDeleteProject(deletingProjectId)}
+              loading={deleteProject.isPending}
+            >
+              Delete Project
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
