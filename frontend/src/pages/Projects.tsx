@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Edit, Trash2, FolderOpen, Calendar, FileText } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, FolderOpen, Calendar, FileText, Network } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
@@ -170,15 +170,26 @@ export function Projects() {
                   <Calendar className="w-4 h-4 mr-1" />
                   Created {formatDate(project.created_at)}
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => navigate(`/projects/${project.id}/plans`)}
-                  className="text-primary-600 hover:text-primary-700"
-                >
-                  <FileText className="w-4 h-4 mr-1" />
-                  View Plans
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => navigate(`/projects/${project.id}/plans`)}
+                    className="text-primary-600 hover:text-primary-700"
+                  >
+                    <FileText className="w-4 h-4 mr-1" />
+                    Plans
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => navigate(`/projects/${project.id}/graph`)}
+                    className="text-green-600 hover:text-green-700"
+                  >
+                    <Network className="w-4 h-4 mr-1" />
+                    Graph
+                  </Button>
+                </div>
               </div>
             </div>
           ))}
