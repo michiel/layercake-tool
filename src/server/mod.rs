@@ -88,3 +88,21 @@ pub async fn migrate_database(database_path: &str, direction: MigrateDirection) 
     info!("Database migration completed");
     Ok(())
 }
+
+pub async fn seed_database(database_path: &str) -> Result<()> {
+    let database_url = get_database_url(Some(database_path));
+    let db = establish_connection(&database_url).await?;
+
+    // Run migrations first to ensure database is up to date
+    Migrator::up(&db, None).await?;
+    
+    info!("Seeding database with example data...");
+    
+    // Import the seed_data module
+    use crate::database::seed_data;
+    
+    seed_data::create_example_project(&db).await?;
+    
+    info!("Database seeding completed successfully!");
+    Ok(())
+}

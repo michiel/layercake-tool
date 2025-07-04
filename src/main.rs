@@ -95,6 +95,10 @@ enum DbCommands {
         #[clap(short, long, default_value = "layercake.db")]
         database: String,
     },
+    Seed {
+        #[clap(short, long, default_value = "layercake.db")]
+        database: String,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -143,6 +147,10 @@ async fn main() -> Result<()> {
             DbCommands::Migrate { direction, database } => {
                 info!("Running database migration: {:?}", direction);
                 server::migrate_database(&database, direction).await?;
+            }
+            DbCommands::Seed { database } => {
+                info!("Seeding database: {}", database);
+                server::seed_database(&database).await?;
             }
         }
         Commands::Update { check, force, pre_release, backup, rollback, dry_run } => {
