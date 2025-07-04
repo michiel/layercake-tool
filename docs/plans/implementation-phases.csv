@@ -1,7 +1,0 @@
-id,name,description,color,order,start_date,end_date,status
-phase-1,Frontend Foundation,Create React frontend infrastructure and basic UI,#3498db,1,2025-07-04,2025-07-25,ready
-phase-2,Advanced Graph Features,Implement graph versioning transformations and analysis,#e74c3c,2,2025-07-21,2025-08-15,blocked
-phase-3,Enhanced User Experience,Polish UI and add productivity features,#f39c12,3,2025-08-11,2025-08-29,blocked
-phase-4,Performance & Scalability,Optimize for large graphs and high-performance scenarios,#27ae60,4,2025-08-25,2025-09-12,blocked
-all-phases,Cross-cutting Concerns,Testing framework and CI/CD spanning all phases,#9b59b6,0,2025-07-04,2025-09-12,ready
-final,Final Integration,Complete system integration and final testing,#34495e,5,2025-09-05,2025-09-19,blocked

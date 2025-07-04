@@ -1,0 +1,136 @@
+@startuml Layercake Tool Architecture
+
+!define LIGHTBLUE #E6F3FF
+!define LIGHTGREEN #E6FFE6
+!define LIGHTYELLOW #FFFDE6
+!define LIGHTCORAL #FFE6E6
+!define LIGHTGRAY #F5F5F5
+
+title Layercake Tool - Data Flow Architecture
+
+package "Input Layer" LIGHTBLUE {
+    [nodes.csv] as nodes_csv
+    [edges.csv] as edges_csv
+    [layers.csv] as layers_csv
+    [plan.yaml] as plan_yaml
+}
+
+package "Data Loading" LIGHTGREEN {
+    component "Data Loader" as data_loader {
+        [CSV Parser]
+        [Column Mapping]
+        [Load Profiles]
+    }
+    
+    component "Plan Parser" as plan_parser {
+        [YAML Parser]
+        [Config Validation]
+    }
+}
+
+package "Internal Structures" LIGHTYELLOW {
+    rectangle "Node" as node 
+    
+    rectangle "Edge" as edge
+    
+    rectangle "Layer" as layer
+    
+    rectangle "Graph" as graph
+}
+
+package "Plan Configuration" LIGHTCORAL {
+    rectangle "Plan" as plan
+    
+    rectangle "ImportProfile" as import_profile
+    
+    rectangle "ExportProfileItem" as export_item
+    
+    rectangle "GraphConfig" as graph_config
+}
+
+package "Plan Execution Engine" LIGHTGRAY {
+    component "Plan Engine" as plan_engine {
+        [Graph Builder]
+        [Transformation Pipeline]
+        [Integrity Validator]
+    }
+    
+    component "Transformations" as transformations {
+        [Graph Inversion]
+        [Depth/Width Limiting]
+        [Label Truncation]
+        [Edge Aggregation]
+    }
+}
+
+package "Export Layer" LIGHTBLUE {
+    component "Renderers" as renderers {
+        [DOT Exporter]
+        [GML Exporter]
+        [JSON Exporter]
+        [PlantUML Exporter]
+        [Mermaid Exporter]
+        [CSV Exporter]
+        [Handlebars Templates]
+    }
+}
+
+package "Output Layer" LIGHTGREEN {
+    [graph.dot] as dot_output
+    [graph.gml] as gml_output
+    [graph.json] as json_output
+    [graph.puml] as puml_output
+    [graph.mmd] as mmd_output
+    [custom.html] as custom_output
+}
+
+' Input to Data Loading
+nodes_csv --> data_loader
+edges_csv --> data_loader
+layers_csv --> data_loader
+plan_yaml --> plan_parser
+
+' Data Loading to Internal Structures
+data_loader --> node
+data_loader --> edge
+data_loader --> layer
+node --> graph
+edge --> graph
+layer --> graph
+
+' Plan Configuration
+plan_parser --> plan
+plan --> import_profile
+plan --> export_item
+export_item --> graph_config
+
+' Plan Execution
+graph --> plan_engine
+plan --> plan_engine
+plan_engine --> transformations
+transformations --> graph : "Transformed Graph"
+
+' Export Layer
+graph --> renderers : "For each export profile"
+export_item --> renderers : "Configuration"
+
+' Output Generation
+renderers --> dot_output
+renderers --> gml_output
+renderers --> json_output
+renderers --> puml_output
+renderers --> mmd_output
+renderers --> custom_output
+
+' Data Flow Annotations
+note right of data_loader : "Configurable column mapping\nValidation & type conversion"
+note right of plan_engine : "Orchestrates pipeline\nApplies transformations\nper export profile"
+note right of transformations : "Graph inversion\nHierarchy manipulation\nLabel formatting"
+note right of renderers : "Template-based rendering\nStandardized context\nMultiple output formats"
+
+' Relationships
+import_profile -> data_loader : "configures"
+export_item -> transformations : "configures"
+graph_config -> transformations : "parameters"
+
+@enduml
