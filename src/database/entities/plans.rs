@@ -1,6 +1,7 @@
 use sea_orm::entity::prelude::*;
 use sea_orm::{Set, ActiveValue};
 use serde::{Deserialize, Serialize};
+use chrono::Utc;
 
 // Simplified to String for now - will improve to enum later
 pub type PlanStatus = String;

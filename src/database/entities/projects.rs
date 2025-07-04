@@ -1,6 +1,7 @@
 use sea_orm::entity::prelude::*;
 use sea_orm::{Set, ActiveValue};
 use serde::{Deserialize, Serialize};
+use chrono::Utc;
 
 #[cfg(feature = "server")]
 use utoipa::ToSchema;

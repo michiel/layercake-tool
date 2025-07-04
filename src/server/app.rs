@@ -9,6 +9,7 @@ use sea_orm::DatabaseConnection;
 use serde_json::json;
 use tower::ServiceBuilder;
 use tower_http::cors::{Any, CorsLayer};
+use tower_http::services::ServeDir;
 use anyhow::Result;
 
 #[cfg(feature = "server")]
@@ -149,6 +150,12 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
         app = app.merge(create_mcp_routes(mcp_server));
     }
 
+    // Add static file serving for frontend assets
+    app = app
+        .route("/", get(serve_frontend_html))
+        .nest_service("/static", ServeDir::new("frontend/dist"))
+        .fallback_service(ServeDir::new("frontend/dist"));
+
     let app = app
         // Add middleware
         .layer(ServiceBuilder::new().layer(cors))
@@ -207,6 +214,83 @@ async fn graphql_playground() -> impl axum::response::IntoResponse {
     ))
 }
 
+/// Serve the main frontend HTML shell
+async fn serve_frontend_html() -> impl IntoResponse {
+    let html = r#"<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Layercake</title>
+    <script>
+        window.LAYERCAKE_CONFIG = {
+            cdnBase: 'https://cdn.jsdelivr.net/gh/OWNER/REPO@main-build',
+            fallback: '/static',
+            apiBase: ''
+        };
+        
+        async function loadApp() {
+            try {
+                const versionResp = await fetch(`${window.LAYERCAKE_CONFIG.cdnBase}/version.json`);
+                const {version} = await versionResp.json();
+                
+                // Load CSS and JS with version-based cache busting
+                loadAsset('link', `${window.LAYERCAKE_CONFIG.cdnBase}/style.css?v=${version}`);
+                loadAsset('script', `${window.LAYERCAKE_CONFIG.cdnBase}/script.js?v=${version}`);
+            } catch (error) {
+                console.warn('CDN assets failed, falling back to local:', error);
+                // Fallback to local assets
+                loadAsset('link', '/static/style.css');
+                loadAsset('script', '/static/script.js');
+            }
+        }
+        
+        function loadAsset(type, src) {
+            if (type === 'link') {
+                const link = document.createElement('link');
+                link.rel = 'stylesheet';
+                link.href = src;
+                document.head.appendChild(link);
+            } else if (type === 'script') {
+                const script = document.createElement('script');
+                script.src = src;
+                script.defer = true;
+                document.head.appendChild(script);
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', loadApp);
+    </script>
+</head>
+<body>
+    <div id="root">
+        <div style="padding: 20px; text-align: center; font-family: system-ui, sans-serif;">
+            <h2>Loading Layercake...</h2>
+            <p>Graph visualization and transformation tool</p>
+            <div style="margin-top: 20px;">
+                <div class="loading-spinner" style="
+                    border: 3px solid #f3f3f3;
+                    border-top: 3px solid #3498db;
+                    border-radius: 50%;
+                    width: 30px;
+                    height: 30px;
+                    animation: spin 1s linear infinite;
+                    margin: 0 auto;
+                "></div>
+            </div>
+        </div>
+    </div>
+    <style>
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</body>
+</html>"#;
+    
+    axum::response::Html(html)
+}
 
 #[cfg(feature = "mcp")]
 fn create_mcp_routes<S>(mcp_server: std::sync::Arc<axum_mcp::server::McpServer<S>>) -> axum::Router<AppState>
