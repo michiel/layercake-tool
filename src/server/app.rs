@@ -27,7 +27,7 @@ use crate::graphql::{GraphQLContext, GraphQLSchema, queries::Query, mutations::M
 use crate::services::{ImportService, ExportService, GraphService};
 
 
-use super::handlers::{health, projects, plans, graph_data, plan_execution, graph_versioning};
+use super::handlers::{health, projects, plans, graph_data, plan_execution, graph_versioning, graph_analysis};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -214,6 +214,15 @@ fn api_v1_routes() -> Router<AppState> {
         .route("/projects/:id/snapshots/:snapshot_id/restore", post(graph_versioning::restore_from_snapshot))
         .route("/projects/:id/snapshots/:snapshot_id/data", get(graph_versioning::get_snapshot_data))
         .route("/projects/:id/changes", get(graph_versioning::get_changes))
+        
+        // Graph analysis routes
+        .route("/projects/:id/analysis/metrics", get(graph_analysis::get_graph_metrics))
+        .route("/projects/:id/analysis/nodes", get(graph_analysis::get_node_metrics))
+        .route("/projects/:id/analysis/path", get(graph_analysis::find_shortest_path))
+        .route("/projects/:id/analysis/connectivity", get(graph_analysis::analyze_connectivity))
+        .route("/projects/:id/analysis/communities", get(graph_analysis::detect_communities))
+        .route("/projects/:id/analysis/layers", get(graph_analysis::analyze_layers))
+        .route("/projects/:id/analysis/report", get(graph_analysis::get_analysis_report))
 }
 
 #[cfg(feature = "graphql")]
