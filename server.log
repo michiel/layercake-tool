@@ -1,0 +1,632 @@
+warning: unused import: `Stream`
+ --> external-modules/axum-mcp/src/server/handler.rs:9:34
+  |
+9 | use futures_util::stream::{self, Stream, StreamExt};
+  |                                  ^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused imports: `convert::Infallible` and `sync::Arc`
+  --> external-modules/axum-mcp/src/server/handler.rs:11:33
+   |
+11 | use std::{collections::HashMap, convert::Infallible, sync::Arc, time::Duration};
+   |                                 ^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^
+
+warning: unused import: `tokio::sync::RwLock`
+  --> external-modules/axum-mcp/src/server/handler.rs:12:5
+   |
+12 | use tokio::sync::RwLock;
+   |     ^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `JsonRpcResponse`, `McpError`, and `McpResult`
+  --> external-modules/axum-mcp/src/server/handler.rs:18:13
+   |
+18 |     error::{McpError, McpResult},
+   |             ^^^^^^^^  ^^^^^^^^^
+19 |     protocol::{JsonRpcRequest, JsonRpcResponse},
+   |                                ^^^^^^^^^^^^^^^
+
+warning: unused import: `ToolContent`
+  --> external-modules/axum-mcp/src/server/registry.rs:10:22
+   |
+10 |     protocol::{Tool, ToolContent, ToolsCallResult},
+   |                      ^^^^^^^^^^^
+
+warning: unused import: `async_trait::async_trait`
+ --> external-modules/axum-mcp/src/server/service.rs:3:5
+  |
+3 | use async_trait::async_trait;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `warn`
+ --> external-modules/axum-mcp/src/server/service.rs:6:35
+  |
+6 | use tracing::{debug, error, info, warn};
+  |                                   ^^^^
+
+warning: unused import: `McpAuth`
+  --> external-modules/axum-mcp/src/server/service.rs:15:33
+   |
+15 |     security::{SecurityContext, McpAuth},
+   |                                 ^^^^^^^
+
+warning: unused import: `sync::Arc`
+  --> external-modules/axum-mcp/src/server/mod.rs:30:33
+   |
+30 | use std::{collections::HashMap, sync::Arc};
+   |                                 ^^^^^^^^^
+
+warning: unused imports: `BatchRequest`, `BatchResult`, `ClientCapabilities`, `JsonRpcRequest`, `JsonRpcResponse`, `McpCapabilities`, `Tool`, `ToolsCallResult`, and `ToolsListResult`
+  --> external-modules/axum-mcp/src/server/mod.rs:35:9
+   |
+35 |         ClientCapabilities, InitializeParams, InitializeResult, McpCapabilities, 
+   |         ^^^^^^^^^^^^^^^^^^                                      ^^^^^^^^^^^^^^^
+36 |         ServerCapabilities, ServerInfo, Tool, ToolsCallResult, ToolsListResult,
+   |                                         ^^^^  ^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^
+37 |         BatchRequest, BatchResult, JsonRpcRequest, JsonRpcResponse,
+   |         ^^^^^^^^^^^^  ^^^^^^^^^^^  ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^
+
+warning: unused variable: `headers`
+  --> external-modules/axum-mcp/src/server/handler.rs:97:5
+   |
+97 |     headers: HeaderMap,
+   |     ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_headers`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `session_id`
+   --> external-modules/axum-mcp/src/transport/streamable_http.rs:253:46
+    |
+253 |     pub async fn subscribe_to_session(&self, session_id: &str) -> impl futures_util::Stream<Item = McpEvent> {
+    |                                              ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_session_id`
+
+warning: unused variable: `tools`
+   --> external-modules/axum-mcp/src/server/registry.rs:141:13
+    |
+141 |         let tools = self.list_tools(context).await?;
+    |             ^^^^^ help: if this is intentional, prefix it with an underscore: `_tools`
+
+warning: unused variable: `context`
+   --> external-modules/axum-mcp/src/server/mod.rs:126:9
+    |
+126 |         context: &SecurityContext,
+    |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_context`
+
+warning: unused variable: `params`
+   --> external-modules/axum-mcp/src/server/mod.rs:125:9
+    |
+125 |         params: Option<serde_json::Value>,
+    |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_params`
+
+warning: field `subscriptions` is never read
+   --> external-modules/axum-mcp/src/server/resource.rs:313:5
+    |
+309 | pub struct InMemoryResourceRegistry {
+    |            ------------------------ field in this struct
+...
+313 |     subscriptions: HashMap<String, ResourceSubscription>,
+    |     ^^^^^^^^^^^^^
+    |
+    = note: `InMemoryResourceRegistry` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+    = note: `#[warn(dead_code)]` on by default
+
+warning: `axum-mcp` (lib) generated 16 warnings (run `cargo fix --lib -p axum-mcp` to apply 10 suggestions)
+warning: unused imports: `ActiveValue` and `Set`
+ --> src/database/entities/projects.rs:2:15
+  |
+2 | use sea_orm::{Set, ActiveValue};
+  |               ^^^  ^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `chrono::Utc`
+ --> src/database/entities/projects.rs:4:5
+  |
+4 | use chrono::Utc;
+  |     ^^^^^^^^^^^
+
+warning: unused imports: `ActiveValue` and `Set`
+ --> src/database/entities/plans.rs:2:15
+  |
+2 | use sea_orm::{Set, ActiveValue};
+  |               ^^^  ^^^^^^^^^^^
+
+warning: unused import: `chrono::Utc`
+ --> src/database/entities/plans.rs:4:5
+  |
+4 | use chrono::Utc;
+  |     ^^^^^^^^^^^
+
+warning: ambiguous glob re-exports
+  --> src/database/entities/mod.rs:13:9
+   |
+13 | pub use projects::*;
+   |         ^^^^^^^^^^^ the name `Column` in the type namespace is first re-exported here
+...
+20 | pub use execution_outputs::*;
+   |         -------------------- but the name `Column` in the type namespace is also re-exported here
+   |
+   = note: `#[warn(ambiguous_glob_reexports)]` on by default
+
+warning: ambiguous glob re-exports
+  --> src/database/entities/mod.rs:13:9
+   |
+13 | pub use projects::*;
+   |         ^^^^^^^^^^^ the name `ColumnIter` in the type namespace is first re-exported here
+...
+20 | pub use execution_outputs::*;
+   |         -------------------- but the name `ColumnIter` in the type namespace is also re-exported here
+
+warning: ambiguous glob re-exports
+  --> src/database/entities/mod.rs:13:9
+   |
+13 | pub use projects::*;
+   |         ^^^^^^^^^^^ the name `Entity` in the type namespace is first re-exported here
+...
+20 | pub use execution_outputs::*;
+   |         -------------------- but the name `Entity` in the type namespace is also re-exported here
+
+warning: ambiguous glob re-exports
+  --> src/database/entities/mod.rs:13:9
+   |
+13 | pub use projects::*;
+   |         ^^^^^^^^^^^ the name `Entity` in the value namespace is first re-exported here
+...
+20 | pub use execution_outputs::*;
+   |         -------------------- but the name `Entity` in the value namespace is also re-exported here
+
+warning: ambiguous glob re-exports
+  --> src/database/entities/mod.rs:13:9
+   |
+13 | pub use projects::*;
+   |         ^^^^^^^^^^^ the name `PrimaryKey` in the type namespace is first re-exported here
+...
+20 | pub use execution_outputs::*;
+   |         -------------------- but the name `PrimaryKey` in the type namespace is also re-exported here
+
+warning: ambiguous glob re-exports
+  --> src/database/entities/mod.rs:13:9
+   |
+13 | pub use projects::*;
+   |         ^^^^^^^^^^^ the name `PrimaryKeyIter` in the type namespace is first re-exported here
+...
+20 | pub use execution_outputs::*;
+   |         -------------------- but the name `PrimaryKeyIter` in the type namespace is also re-exported here
+
+warning: ambiguous glob re-exports
+  --> src/database/entities/mod.rs:13:9
+   |
+13 | pub use projects::*;
+   |         ^^^^^^^^^^^ the name `ActiveModel` in the type namespace is first re-exported here
+...
+20 | pub use execution_outputs::*;
+   |         -------------------- but the name `ActiveModel` in the type namespace is also re-exported here
+
+warning: ambiguous glob re-exports
+  --> src/database/entities/mod.rs:13:9
+   |
+13 | pub use projects::*;
+   |         ^^^^^^^^^^^ the name `Model` in the type namespace is first re-exported here
+...
+20 | pub use execution_outputs::*;
+   |         -------------------- but the name `Model` in the type namespace is also re-exported here
+
+warning: ambiguous glob re-exports
+  --> src/database/entities/mod.rs:13:9
+   |
+13 | pub use projects::*;
+   |         ^^^^^^^^^^^ the name `Relation` in the type namespace is first re-exported here
+...
+20 | pub use execution_outputs::*;
+   |         -------------------- but the name `Relation` in the type namespace is also re-exported here
+
+warning: ambiguous glob re-exports
+  --> src/database/entities/mod.rs:13:9
+   |
+13 | pub use projects::*;
+   |         ^^^^^^^^^^^ the name `RelationIter` in the type namespace is first re-exported here
+...
+20 | pub use execution_outputs::*;
+   |         -------------------- but the name `RelationIter` in the type namespace is also re-exported here
+
+warning: unused import: `projects::*`
+  --> src/database/entities/mod.rs:13:9
+   |
+13 | pub use projects::*;
+   |         ^^^^^^^^^^^
+
+warning: unused import: `nodes::*`
+  --> src/database/entities/mod.rs:15:9
+   |
+15 | pub use nodes::*;
+   |         ^^^^^^^^
+
+warning: unused import: `edges::*`
+  --> src/database/entities/mod.rs:16:9
+   |
+16 | pub use edges::*;
+   |         ^^^^^^^^
+
+warning: unused import: `layers::*`
+  --> src/database/entities/mod.rs:17:9
+   |
+17 | pub use layers::*;
+   |         ^^^^^^^^^
+
+warning: unused imports: `Json`, `extract::State`, and `http::StatusCode`
+ --> src/server/app.rs:2:5
+  |
+2 |     extract::State,
+  |     ^^^^^^^^^^^^^^
+3 |     http::StatusCode,
+  |     ^^^^^^^^^^^^^^^^
+4 |     response::{Json, IntoResponse},
+  |                ^^^^
+
+warning: unused import: `utoipa::OpenApi`
+ --> src/server/handlers/health.rs:5:5
+  |
+5 | use utoipa::OpenApi;
+  |     ^^^^^^^^^^^^^^^
+
+warning: unused import: `serde_json::Value`
+ --> src/server/handlers/projects.rs:8:5
+  |
+8 | use serde_json::Value;
+  |     ^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `execution_logs`, `execution_outputs`, and `plan_executions`
+  --> src/server/handlers/plan_execution.rs:13:33
+   |
+13 | use crate::database::entities::{plan_executions, execution_logs, execution_outputs};
+   |                                 ^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^
+
+warning: unused import: `PathResult`
+  --> src/server/handlers/graph_analysis.rs:11:54
+   |
+11 |     GraphAnalysisService, GraphMetrics, NodeMetrics, PathResult,
+   |                                                      ^^^^^^^^^^
+
+warning: unused imports: `edges::Entity as Edges`, `layers::Entity as Layers`, and `nodes::Entity as Nodes`
+  --> src/services/import_service.rs:10:5
+   |
+10 |     nodes::Entity as Nodes,
+   |     ^^^^^^^^^^^^^^^^^^^^^^
+11 |     edges::Entity as Edges,
+   |     ^^^^^^^^^^^^^^^^^^^^^^
+12 |     layers::Entity as Layers,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::collections::HashMap`
+ --> src/services/graph_versioning_service.rs:1:5
+  |
+1 | use std::collections::HashMap;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `error`
+ --> src/services/graph_versioning_service.rs:5:21
+  |
+5 | use tracing::{info, error, debug};
+  |                     ^^^^^
+
+warning: unused import: `debug`
+ --> src/services/graph_analysis_service.rs:4:21
+  |
+4 | use tracing::{info, debug};
+  |                     ^^^^^
+
+warning: unused variable: `project_id`
+  --> src/server/handlers/plan_execution.rs:99:11
+   |
+99 |     Path((project_id, plan_id, execution_id)): Path<(i32, i32, String)>,
+   |           ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_project_id`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `plan_id`
+  --> src/server/handlers/plan_execution.rs:99:23
+   |
+99 |     Path((project_id, plan_id, execution_id)): Path<(i32, i32, String)>,
+   |                       ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_plan_id`
+
+warning: unused variable: `project_id`
+   --> src/server/handlers/plan_execution.rs:130:11
+    |
+130 |     Path((project_id, plan_id, execution_id)): Path<(i32, i32, String)>,
+    |           ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_project_id`
+
+warning: unused variable: `plan_id`
+   --> src/server/handlers/plan_execution.rs:130:23
+    |
+130 |     Path((project_id, plan_id, execution_id)): Path<(i32, i32, String)>,
+    |                       ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_plan_id`
+
+warning: unused variable: `project_id`
+   --> src/server/handlers/plan_execution.rs:158:11
+    |
+158 |     Path((project_id, plan_id, execution_id)): Path<(i32, i32, String)>,
+    |           ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_project_id`
+
+warning: unused variable: `plan_id`
+   --> src/server/handlers/plan_execution.rs:158:23
+    |
+158 |     Path((project_id, plan_id, execution_id)): Path<(i32, i32, String)>,
+    |                       ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_plan_id`
+
+warning: unused variable: `project_id`
+   --> src/server/handlers/plan_execution.rs:191:11
+    |
+191 |     Path((project_id, plan_id, execution_id)): Path<(i32, i32, String)>,
+    |           ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_project_id`
+
+warning: unused variable: `plan_id`
+   --> src/server/handlers/plan_execution.rs:191:23
+    |
+191 |     Path((project_id, plan_id, execution_id)): Path<(i32, i32, String)>,
+    |                       ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_plan_id`
+
+warning: unused variable: `project_id`
+   --> src/server/handlers/plan_execution.rs:208:11
+    |
+208 |     Path((project_id, plan_id)): Path<(i32, i32)>,
+    |           ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_project_id`
+
+warning: unused variable: `project_id`
+   --> src/server/handlers/plan_execution.rs:241:11
+    |
+241 |     Path((project_id, plan_id, execution_id)): Path<(i32, i32, String)>,
+    |           ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_project_id`
+
+warning: unused variable: `plan_id`
+   --> src/server/handlers/plan_execution.rs:241:23
+    |
+241 |     Path((project_id, plan_id, execution_id)): Path<(i32, i32, String)>,
+    |                       ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_plan_id`
+
+warning: unused variable: `options`
+   --> src/server/handlers/graph_analysis.rs:131:11
+    |
+131 |     Query(options): Query<AnalysisOptions>,
+    |           ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_options`
+
+warning: unused variable: `graph_service`
+  --> src/mcp/resources.rs:37:13
+   |
+37 |         let graph_service = GraphService::new(self.db.clone());
+   |             ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_graph_service`
+
+warning: unused variable: `nodes`
+   --> src/services/graph_analysis_service.rs:817:9
+    |
+817 |         nodes: &[nodes::Model],
+    |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_nodes`
+
+warning: fields `plan_id` and `status` are never read
+  --> src/services/async_plan_execution.rs:73:5
+   |
+72 | struct ExecutionHandle {
+   |        --------------- fields in this struct
+73 |     plan_id: i32,
+   |     ^^^^^^^
+74 |     status: ExecutionStatus,
+   |     ^^^^^^
+   |
+   = note: `#[warn(dead_code)]` on by default
+
+warning: `layercake-tool` (lib) generated 42 warnings (run `cargo fix --lib -p layercake-tool` to apply 17 suggestions)
+warning: unused import: `plans::*`
+  --> src/database/entities/mod.rs:14:9
+   |
+14 | pub use plans::*;
+   |         ^^^^^^^^
+
+warning: unused import: `plan_executions::*`
+  --> src/database/entities/mod.rs:18:9
+   |
+18 | pub use plan_executions::*;
+   |         ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `execution_logs::*`
+  --> src/database/entities/mod.rs:19:9
+   |
+19 | pub use execution_logs::*;
+   |         ^^^^^^^^^^^^^^^^^
+
+warning: unused import: `execution_outputs::*`
+  --> src/database/entities/mod.rs:20:9
+   |
+20 | pub use execution_outputs::*;
+   |         ^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `connection::*`
+ --> src/database/mod.rs:6:9
+  |
+6 | pub use connection::*;
+  |         ^^^^^^^^^^^^^
+
+warning: unused import: `entities::*`
+ --> src/database/mod.rs:7:9
+  |
+7 | pub use entities::*;
+  |         ^^^^^^^^^^^
+
+warning: value assigned to `downloaded` is never read
+  --> src/update/updater.rs:97:17
+   |
+97 |         let mut downloaded = 0u64;
+   |                 ^^^^^^^^^^
+   |
+   = help: maybe it is overwritten before being read?
+   = note: `#[warn(unused_assignments)]` on by default
+
+warning: methods `get_node` and `get_max_hierarchy_depth` are never used
+  --> src/graph.rs:65:12
+   |
+18 | impl Graph {
+   | ---------- methods in this implementation
+...
+65 |     pub fn get_node(&self, id: &str) -> Option<&Node> {
+   |            ^^^^^^^^
+...
+69 |     pub fn get_max_hierarchy_depth(&self) -> i32 {
+   |            ^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` on by default
+
+warning: variant `PermissionError` is never constructed
+  --> src/update/mod.rs:28:5
+   |
+14 | pub enum UpdateError {
+   |          ----------- variant in this enum
+...
+28 |     PermissionError(String),
+   |     ^^^^^^^^^^^^^^^
+   |
+   = note: `UpdateError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: struct `UpdateProgress` is never constructed
+  --> src/update/mod.rs:79:12
+   |
+79 | pub struct UpdateProgress {
+   |            ^^^^^^^^^^^^^^
+   |
+   = note: `UpdateProgress` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: enum `UpdateStage` is never used
+  --> src/update/mod.rs:89:10
+   |
+89 | pub enum UpdateStage {
+   |          ^^^^^^^^^^^
+   |
+   = note: `UpdateStage` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: enum `UpdateChannel` is never used
+   --> src/update/mod.rs:101:10
+    |
+101 | pub enum UpdateChannel {
+    |          ^^^^^^^^^^^^^
+    |
+    = note: `UpdateChannel` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: associated function `calculate_sha256` is never used
+  --> src/update/binary.rs:31:14
+   |
+10 | impl DefaultBinaryManager {
+   | ------------------------- associated function in this implementation
+...
+31 |     async fn calculate_sha256(path: &PathBuf) -> Result<String, UpdateError> {
+   |              ^^^^^^^^^^^^^^^^
+
+warning: fields `version`, `install_dir`, and `skip_verify` are never read
+  --> src/update/command.rs:14:9
+   |
+10 | pub struct UpdateCommand {
+   |            ------------- fields in this struct
+...
+14 |     pub version: Option<String>,
+   |         ^^^^^^^
+15 |     pub install_dir: Option<PathBuf>,
+   |         ^^^^^^^^^^^
+...
+19 |     pub skip_verify: bool,
+   |         ^^^^^^^^^^^
+
+warning: method `with_api_base` is never used
+  --> src/update/github.rs:23:12
+   |
+14 | impl GitHubVersionManager {
+   | ------------------------- method in this implementation
+...
+23 |     pub fn with_api_base(mut self, api_base: String) -> Self {
+   |            ^^^^^^^^^^^^^
+
+warning: method `with_temp_dir` is never used
+  --> src/update/updater.rs:34:12
+   |
+19 | impl DefaultUpdater {
+   | ------------------- method in this implementation
+...
+34 |     pub fn with_temp_dir(mut self, temp_dir: PathBuf) -> Self {
+   |            ^^^^^^^^^^^^^
+
+warning: function `setup_database` is never used
+ --> src/database/connection.rs:9:14
+  |
+9 | pub async fn setup_database(db: &DatabaseConnection) -> Result<(), DbErr> {
+  |              ^^^^^^^^^^^^^^
+
+warning: field `algorithm` is never read
+  --> src/server/handlers/graph_analysis.rs:26:9
+   |
+23 | pub struct AnalysisOptions {
+   |            --------------- field in this struct
+...
+26 |     pub algorithm: Option<String>,
+   |         ^^^^^^^^^
+   |
+   = note: `AnalysisOptions` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: fields `plan_id` and `status` are never read
+  --> src/services/async_plan_execution.rs:73:5
+   |
+72 | struct ExecutionHandle {
+   |        --------------- fields in this struct
+73 |     plan_id: i32,
+   |     ^^^^^^^
+74 |     status: ExecutionStatus,
+   |     ^^^^^^
+
+warning: methods `record_change` and `create_auto_snapshot_if_needed` are never used
+   --> src/services/graph_versioning_service.rs:194:18
+    |
+19  | impl GraphVersioningService {
+    | --------------------------- methods in this implementation
+...
+194 |     pub async fn record_change(
+    |                  ^^^^^^^^^^^^^
+...
+440 |     pub async fn create_auto_snapshot_if_needed(
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: field `db` is never read
+  --> src/mcp/server.rs:11:9
+   |
+10 | pub struct LayercakeServerState {
+   |            -------------------- field in this struct
+11 |     pub db: DatabaseConnection,
+   |         ^^
+   |
+   = note: `LayercakeServerState` has a derived impl for the trait `Clone`, but this is intentionally ignored during dead code analysis
+
+warning: `layercake-tool` (bin "layercake") generated 52 warnings (31 duplicates) (run `cargo fix --bin "layercake"` to apply 6 suggestions)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.25s
+     Running `target/debug/layercake serve --port 3000`
+[32m INFO[0m [2mlayercake[0m[2m:[0m Starting server on port 3000
+[32m INFO[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"PRAGMA foreign_keys = ON; …" [3mdb.statement[0m[2m=[0m"\n\nPRAGMA foreign_keys = ON;\n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m115.099µs [3melapsed_secs[0m[2m=[0m0.000115099
+[32m INFO[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE TABLE IF NOT …" [3mdb.statement[0m[2m=[0m"\n\nCREATE TABLE IF NOT EXISTS \"seaql_migrations\" (\n  \"version\" text NOT NULL PRIMARY KEY,\n  \"applied_at\" bigint NOT NULL\n)\n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m784.026µs [3melapsed_secs[0m[2m=[0m0.000784026
+[32m INFO[0m [2msea_orm_migration::migrator[0m[2m:[0m Applying all pending migrations
+[32m INFO[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE TABLE IF NOT …" [3mdb.statement[0m[2m=[0m"\n\nCREATE TABLE IF NOT EXISTS \"seaql_migrations\" (\n  \"version\" text NOT NULL PRIMARY KEY,\n  \"applied_at\" bigint NOT NULL\n)\n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m57.554µs [3melapsed_secs[0m[2m=[0m5.7554e-5
+[32m INFO[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE TABLE IF NOT …" [3mdb.statement[0m[2m=[0m"\n\nCREATE TABLE IF NOT EXISTS \"seaql_migrations\" (\n  \"version\" text NOT NULL PRIMARY KEY,\n  \"applied_at\" bigint NOT NULL\n)\n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m45.741µs [3melapsed_secs[0m[2m=[0m4.5741e-5
+[32m INFO[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE TABLE IF NOT …" [3mdb.statement[0m[2m=[0m"\n\nCREATE TABLE IF NOT EXISTS \"seaql_migrations\" (\n  \"version\" text NOT NULL PRIMARY KEY,\n  \"applied_at\" bigint NOT NULL\n)\n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m37.198µs [3melapsed_secs[0m[2m=[0m3.7198e-5
+[32m INFO[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"SELECT \"version\", \"applied_at\" FROM …" [3mdb.statement[0m[2m=[0m"\n\nSELECT\n  \"version\",\n  \"applied_at\"\nFROM\n  \"seaql_migrations\"\nORDER BY\n  \"version\" ASC\n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m4 [3melapsed[0m[2m=[0m182.761µs [3melapsed_secs[0m[2m=[0m0.000182761
+[32m INFO[0m [2msea_orm_migration::migrator[0m[2m:[0m No pending migrations
+[32m INFO[0m [2mlayercake::server[0m[2m:[0m Database migrations completed
+[32m INFO[0m [2mlayercake::server[0m[2m:[0m API Endpoints:
+[32m INFO[0m [2mlayercake::server[0m[2m:[0m   /health                     - Health check
+[32m INFO[0m [2mlayercake::server[0m[2m:[0m   /docs                       - Swagger UI documentation
+[32m INFO[0m [2mlayercake::server[0m[2m:[0m   /api/v1/*                   - REST API (projects, plans, graph data)
+[32m INFO[0m [2mlayercake::server[0m[2m:[0m   /mcp                        - MCP HTTP JSON-RPC API (POST) & Server Info (GET)
+[32m INFO[0m [2mlayercake::server[0m[2m:[0m   /mcp/sse                    - MCP Server-Sent Events (StreamableHTTP for Claude Desktop)
+[32m INFO[0m [2mlayercake::server[0m[2m:[0m   /mcp                        - Session cleanup (DELETE)
+[32m INFO[0m [2mlayercake::server[0m[2m:[0m 
+[32m INFO[0m [2mlayercake::server[0m[2m:[0m 🔗 Claude Code/Desktop Integration:
+[32m INFO[0m [2mlayercake::server[0m[2m:[0m    Transport: HTTP (StreamableHTTP compatible)
+[32m INFO[0m [2mlayercake::server[0m[2m:[0m    Endpoint: http://localhost:3000/mcp
+[32m INFO[0m [2mlayercake::server[0m[2m:[0m    Features: Tools, Resources, Prompts, layercake:// URI scheme
+[32m INFO[0m [2mlayercake::server[0m[2m:[0m    Capabilities: Graph analysis, connectivity analysis, pathfinding
+[32m INFO[0m [2mlayercake::server[0m[2m:[0m 
+[32m INFO[0m [2mlayercake::server[0m[2m:[0m 📋 Available Tools: list_projects, create_project, analyze_connectivity, find_paths
+[32m INFO[0m [2mlayercake::server[0m[2m:[0m 📊 Available Resources: layercake://projects/{id}, layercake://graphs/{id}/{format}
+[32m INFO[0m [2mlayercake::server[0m[2m:[0m 🤖 Available Prompts: analyze_graph_structure, analyze_paths, recommend_transformations
+[32m INFO[0m [2mlayercake::server[0m[2m:[0m Server running on http://0.0.0.0:3000
+[32m INFO[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"SELECT \"projects\".\"id\", \"projects\".\"name\", \"projects\".\"description\", …" [3mdb.statement[0m[2m=[0m"\n\nSELECT\n  \"projects\".\"id\",\n  \"projects\".\"name\",\n  \"projects\".\"description\",\n  \"projects\".\"created_at\",\n  \"projects\".\"updated_at\"\nFROM\n  \"projects\"\n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m1 [3melapsed[0m[2m=[0m322.959µs [3melapsed_secs[0m[2m=[0m0.000322959

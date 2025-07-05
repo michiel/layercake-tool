@@ -33,7 +33,15 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    assetsDir: 'static',
+    assetsDir: '',
     sourcemap: true,
+    rollupOptions: {
+      output: {
+        entryFileNames: 'script.js',
+        assetFileNames: (assetInfo) => {
+          return assetInfo.name?.endsWith('.css') ? 'style.css' : '[name].[ext]';
+        },
+      },
+    },
   },
 })
