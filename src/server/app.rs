@@ -27,7 +27,7 @@ use crate::graphql::{GraphQLContext, GraphQLSchema, queries::Query, mutations::M
 use crate::services::{ImportService, ExportService, GraphService};
 
 
-use super::handlers::{health, projects, plans, graph_data};
+use super::handlers::{health, projects, plans, graph_data, plan_execution};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -180,6 +180,15 @@ fn api_v1_routes() -> Router<AppState> {
         .route("/projects/:id/plans/:plan_id", put(plans::update_plan))
         .route("/projects/:id/plans/:plan_id", delete(plans::delete_plan))
         .route("/projects/:id/plans/:plan_id/execute", post(plans::execute_plan))
+        
+        // Plan execution routes
+        .route("/projects/:id/plans/:plan_id/execute-async", post(plan_execution::execute_plan_async))
+        .route("/projects/:id/plans/:plan_id/executions", get(plan_execution::list_plan_executions))
+        .route("/projects/:id/plans/:plan_id/executions/:execution_id", get(plan_execution::get_execution_status))
+        .route("/projects/:id/plans/:plan_id/executions/:execution_id", delete(plan_execution::cancel_execution))
+        .route("/projects/:id/plans/:plan_id/executions/:execution_id/logs", get(plan_execution::get_execution_logs))
+        .route("/projects/:id/plans/:plan_id/executions/:execution_id/outputs", get(plan_execution::get_execution_outputs))
+        .route("/projects/:id/plans/:plan_id/executions/:execution_id/progress", get(plan_execution::stream_execution_progress))
         
         // Graph data routes
         .route("/projects/:id/nodes", get(graph_data::list_nodes))

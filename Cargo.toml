@@ -24,6 +24,7 @@ server = [
     "dep:uuid",
     "dep:utoipa",
     "dep:utoipa-swagger-ui",
+    "dep:tokio-stream",
 ]
 graphql = [
     "server",
@@ -76,6 +77,7 @@ chrono = { version = "0.4", features = ["serde"], optional = true }
 uuid = { version = "1.0", features = ["v4"], optional = true }
 utoipa = { version = "4.0", features = ["axum_extras"], optional = true }
 utoipa-swagger-ui = { version = "6.0", features = ["axum"], optional = true }
+tokio-stream = { version = "0.1", features = ["sync"], optional = true }
 
 # GraphQL dependencies (optional)
 async-graphql = { version = "7.0", features = ["chrono", "uuid"], optional = true }
