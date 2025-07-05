@@ -9,7 +9,9 @@
     "build:production": "tsc -b && vite build --mode production",
     "lint": "eslint .",
     "preview": "vite preview",
-    "type-check": "tsc -b --noEmit"
+    "type-check": "tsc -b --noEmit",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.81.5",
@@ -26,6 +28,10 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.29.0",
+    "@storybook/addon-a11y": "^9.0.15",
+    "@storybook/addon-docs": "^9.0.15",
+    "@storybook/addon-onboarding": "^9.0.15",
+    "@storybook/react-vite": "^9.0.15",
     "@types/node": "^24.0.10",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
@@ -34,8 +40,10 @@
     "eslint": "^9.29.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
+    "eslint-plugin-storybook": "^9.0.15",
     "globals": "^16.2.0",
     "postcss": "^8.5.6",
+    "storybook": "^9.0.15",
     "tailwindcss": "^3.4.17",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.34.1",
