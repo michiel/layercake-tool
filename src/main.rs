@@ -5,6 +5,7 @@ mod generate_commands;
 mod graph;
 mod plan;
 mod plan_execution;
+mod transformations;
 mod update;
 
 mod database;

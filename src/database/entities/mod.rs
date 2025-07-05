@@ -9,6 +9,9 @@ pub mod execution_outputs;
 pub mod graph_snapshots;
 pub mod graph_versions;
 pub mod snapshot_data;
+pub mod graphs;
+pub mod transformation_pipelines;
+pub mod transformation_rules;
 
 pub use projects::*;
 pub use plans::*;
