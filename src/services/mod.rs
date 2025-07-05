@@ -5,6 +5,7 @@ pub mod async_plan_execution;
 pub mod graph_versioning_service;
 pub mod graph_analysis_service;
 pub mod transformation_service;
+pub mod graph_io_service;
 
 pub use graph_service::*;
 pub use import_service::*;
@@ -13,3 +14,4 @@ pub use graph_versioning_service::*;
 pub use graph_analysis_service::*;
 pub use async_plan_execution::*;
 pub use transformation_service::*;
+pub use graph_io_service::*;

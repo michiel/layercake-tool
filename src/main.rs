@@ -3,6 +3,7 @@ mod data_loader;
 mod export;
 mod generate_commands;
 mod graph;
+mod graph_io;
 mod plan;
 mod plan_execution;
 mod transformations;
