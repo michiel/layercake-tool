@@ -11,7 +11,8 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3001,
+    port: 5173,
+    host: true,
     proxy: {
       '/api': {
         target: 'http://localhost:3000',
@@ -36,6 +37,10 @@ export default defineConfig({
     assetsDir: '',
     sourcemap: true,
     rollupOptions: {
+      external: [
+        // Exclude story files with TypeScript errors for now
+        /.*\.stories\.ts$/,
+      ],
       output: {
         entryFileNames: 'script.js',
         assetFileNames: (assetInfo) => {

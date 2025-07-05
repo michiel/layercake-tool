@@ -24,6 +24,7 @@ function App() {
           <Route path="/" element={<AppLayout />}>
             <Route index element={<Dashboard />} />
             <Route path="projects" element={<Projects />} />
+            <Route path="projects/:projectId" element={<Projects />} />
             <Route path="projects/:projectId/plans" element={<Plans />} />
             <Route path="projects/:projectId/graph" element={<Graph />} />
             <Route path="plans" element={<div className="p-6">Plans - Coming Soon</div>} />
