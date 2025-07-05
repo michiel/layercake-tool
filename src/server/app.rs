@@ -27,7 +27,7 @@ use crate::graphql::{GraphQLContext, GraphQLSchema, queries::Query, mutations::M
 use crate::services::{ImportService, ExportService, GraphService};
 
 
-use super::handlers::{health, projects, plans, graph_data, plan_execution};
+use super::handlers::{health, projects, plans, graph_data, plan_execution, graph_versioning};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -205,6 +205,15 @@ fn api_v1_routes() -> Router<AppState> {
         
         .route("/projects/:id/import/csv", post(graph_data::import_csv))
         .route("/projects/:id/export/:format", get(graph_data::export_graph))
+        
+        // Graph versioning routes
+        .route("/projects/:id/snapshots", get(graph_versioning::list_snapshots))
+        .route("/projects/:id/snapshots", post(graph_versioning::create_snapshot))
+        .route("/projects/:id/snapshots/:snapshot_id", get(graph_versioning::get_snapshot))
+        .route("/projects/:id/snapshots/:snapshot_id", delete(graph_versioning::delete_snapshot))
+        .route("/projects/:id/snapshots/:snapshot_id/restore", post(graph_versioning::restore_from_snapshot))
+        .route("/projects/:id/snapshots/:snapshot_id/data", get(graph_versioning::get_snapshot_data))
+        .route("/projects/:id/changes", get(graph_versioning::get_changes))
 }
 
 #[cfg(feature = "graphql")]

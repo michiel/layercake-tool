@@ -6,6 +6,9 @@ pub mod layers;
 pub mod plan_executions;
 pub mod execution_logs;
 pub mod execution_outputs;
+pub mod graph_snapshots;
+pub mod graph_versions;
+pub mod snapshot_data;
 
 pub use projects::*;
 pub use plans::*;
