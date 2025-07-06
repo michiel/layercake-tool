@@ -77,11 +77,18 @@ This document defines the DAG (Directed Acyclic Graph) structure for Layercake e
         "type": "import",
         "label": "Import Graph Data",
         "config": {
-          "sources": {
-            "nodes": "architecture/nodes.csv",
-            "edges": "architecture/edges.csv", 
-            "layers": "architecture/layers.csv"
-          }
+          "imports": [
+            {
+              "id": "arch_csv",
+              "type": "csv_files",
+              "sources": {
+                "nodes": "architecture/nodes.csv",
+                "edges": "architecture/edges.csv", 
+                "layers": "architecture/layers.csv"
+              }
+            }
+          ],
+          "merge_strategy": "append"
         },
         "render_context": {
           "graph_name": "Architecture Overview",
@@ -533,7 +540,218 @@ EXPORT: Generate output using input graph + resolved render context
 - Execution completes when all terminal nodes finish
 ```
 
-### 6. **Export Node Configuration**
+### 6. **Import Node Configuration**
+```
+Import nodes support multiple data sources that can be combined into a single graph scope:
+
+Import Types:
+- csv_files: CSV files from filesystem (nodes.csv, edges.csv, layers.csv)
+- csv_upload: Uploaded CSV files via web interface
+- gml_file: GML (Graph Modeling Language) file from filesystem
+- gml_upload: Uploaded GML file via web interface
+- graphml_file: GraphML file from filesystem
+- graphml_upload: Uploaded GraphML file via web interface
+- json_file: JSON graph data from filesystem
+- json_upload: Uploaded JSON graph data via web interface
+- http_endpoint: Dynamic data from HTTP/REST API
+- database_query: Direct database query results
+- git_repository: Graph data from Git repository
+
+Merge Strategies:
+- append: Add all imported data to existing graph
+- merge: Smart merge based on node/edge IDs (updates existing, adds new)
+- replace: Replace entire graph with imported data
+- union: Combine graphs with conflict resolution
+
+Config Structure:
+{
+  "imports": [
+    {
+      "id": "unique_import_id",
+      "type": "import_type",
+      "sources": { /* type-specific configuration */ },
+      "filters": { /* optional data filtering */ },
+      "transformations": { /* optional data transformations */ }
+    }
+  ],
+  "merge_strategy": "append|merge|replace|union",
+  "conflict_resolution": "keep_first|keep_last|merge_properties"
+}
+
+Example Configurations:
+
+// Multiple CSV Files
+{
+  "imports": [
+    {
+      "id": "base_architecture",
+      "type": "csv_files",
+      "sources": {
+        "nodes": "data/nodes.csv",
+        "edges": "data/edges.csv",
+        "layers": "data/layers.csv"
+      }
+    },
+    {
+      "id": "additional_services",
+      "type": "csv_files",
+      "sources": {
+        "nodes": "services/nodes.csv",
+        "edges": "services/edges.csv"
+      }
+    }
+  ],
+  "merge_strategy": "append"
+}
+
+// Mixed Import Sources
+{
+  "imports": [
+    {
+      "id": "base_gml",
+      "type": "gml_file",
+      "sources": {
+        "file": "architecture/base.gml"
+      }
+    },
+    {
+      "id": "service_registry",
+      "type": "http_endpoint",
+      "sources": {
+        "url": "https://api.company.com/services/graph",
+        "method": "GET",
+        "headers": {
+          "Authorization": "Bearer ${SERVICE_TOKEN}"
+        },
+        "format": "json"
+      }
+    },
+    {
+      "id": "uploaded_data",
+      "type": "csv_upload",
+      "sources": {
+        "upload_id": "upload_123",
+        "files": ["nodes.csv", "edges.csv"]
+      }
+    }
+  ],
+  "merge_strategy": "merge",
+  "conflict_resolution": "keep_last"
+}
+
+// HTTP Endpoint Import
+{
+  "imports": [
+    {
+      "id": "microservices_graph",
+      "type": "http_endpoint",
+      "sources": {
+        "url": "https://discovery.service.com/graph",
+        "method": "GET",
+        "headers": {
+          "Authorization": "Bearer ${API_KEY}",
+          "Content-Type": "application/json"
+        },
+        "format": "layercake_json",
+        "refresh_interval": "5m"
+      },
+      "filters": {
+        "node_types": ["service", "database"],
+        "exclude_layers": ["deprecated"]
+      }
+    }
+  ],
+  "merge_strategy": "replace"
+}
+
+// File Upload with Transformations
+{
+  "imports": [
+    {
+      "id": "user_upload",
+      "type": "gml_upload",
+      "sources": {
+        "upload_id": "upload_456",
+        "filename": "network_topology.gml"
+      },
+      "transformations": {
+        "node_id_prefix": "imported_",
+        "default_layer": "external",
+        "weight_scaling": 0.8
+      }
+    }
+  ],
+  "merge_strategy": "append"
+}
+
+// Database Query Import
+{
+  "imports": [
+    {
+      "id": "service_dependencies",
+      "type": "database_query",
+      "sources": {
+        "connection": "service_catalog",
+        "queries": {
+          "nodes": "SELECT id, name as label, type as layer FROM services WHERE active = true",
+          "edges": "SELECT CONCAT(source_id, '_', target_id) as id, source_id as source, target_id as target, weight FROM dependencies"
+        }
+      }
+    }
+  ],
+  "merge_strategy": "merge"
+}
+```
+
+### 7. **Graph Scope Merging**
+```
+When multiple imports are configured, the system merges graph data according to the specified strategy:
+
+Merge Strategies:
+1. append: All imported data is added to the graph scope
+   - Nodes: All nodes from all imports are included
+   - Edges: All edges from all imports are included
+   - Layers: All layers from all imports are included
+   - No deduplication or conflict resolution
+
+2. merge: Smart merging based on element IDs
+   - Nodes: Merge by node ID, later imports override earlier ones
+   - Edges: Merge by edge ID, update properties for existing edges
+   - Layers: Merge by layer ID, combine properties
+   - Conflict resolution strategy determines property handling
+
+3. replace: Each import replaces the entire graph
+   - Only the last import's data is retained
+   - Useful for scenarios where imports represent complete graph states
+
+4. union: Combine graphs with advanced conflict resolution
+   - Nodes: Union of all nodes, resolve conflicts by strategy
+   - Edges: Union of all edges, handle duplicate connections
+   - Layers: Union of all layers, merge properties
+
+Conflict Resolution:
+- keep_first: Retain values from first import when conflicts occur
+- keep_last: Use values from last import when conflicts occur
+- merge_properties: Attempt to merge object properties intelligently
+
+Example Merge Scenarios:
+// Append strategy - no conflicts
+Import 1: nodes=[A, B], edges=[A->B]
+Import 2: nodes=[C, D], edges=[C->D]
+Result: nodes=[A, B, C, D], edges=[A->B, C->D]
+
+// Merge strategy - ID conflicts resolved
+Import 1: nodes=[{id: "A", weight: 1}], edges=[A->B]
+Import 2: nodes=[{id: "A", weight: 2}], edges=[A->C]
+Result: nodes=[{id: "A", weight: 2}], edges=[A->B, A->C]
+
+// Union strategy - smart merging
+Import 1: nodes=[{id: "A", props: {x: 1, y: 2}}]
+Import 2: nodes=[{id: "A", props: {y: 3, z: 4}}]
+Result: nodes=[{id: "A", props: {x: 1, y: 3, z: 4}}]
+```
+
+### 8. **Export Node Configuration**
 ```
 Built-in Exporters (no template parameter):
 - format: "plantuml" - Uses internal PlantUML generation logic
