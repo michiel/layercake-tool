@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { GraphVisualization } from './GraphVisualization';
 import { mockGraphDatasets } from '../../stories/mockData';
+import { enhancedGraphData } from '@/stories/sampleData/enhancedGraphData';
 
 // Mock function for actions
 const fn = () => () => {};
@@ -58,17 +59,17 @@ const meta: Meta<typeof GraphVisualization> = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-// Basic visualization
+// Basic visualization with Reference Model
 export const Default: Story = {
   args: {
-    nodes: mockGraphDatasets.default.nodes,
-    edges: mockGraphDatasets.default.edges,
-    layers: mockGraphDatasets.default.layers,
+    nodes: enhancedGraphData.refModel.nodes,
+    edges: enhancedGraphData.refModel.edges,
+    layers: enhancedGraphData.refModel.layers,
   },
   parameters: {
     docs: {
       description: {
-        story: 'Default graph visualization with sample microservices architecture.',
+        story: 'Default graph visualization with hierarchical reference model showing management and drone networks.',
       },
     },
   },
@@ -77,9 +78,9 @@ export const Default: Story = {
 // Small graph for quick testing
 export const SmallGraph: Story = {
   args: {
-    nodes: mockGraphDatasets.small.nodes,
-    edges: mockGraphDatasets.small.edges,
-    layers: mockGraphDatasets.small.layers,
+    nodes: enhancedGraphData.small.nodes,
+    edges: enhancedGraphData.small.edges,
+    layers: enhancedGraphData.small.layers,
     width: 600,
     height: 400,
   },
@@ -92,19 +93,19 @@ export const SmallGraph: Story = {
   },
 };
 
-// Medium size for performance testing
-export const MediumGraph: Story = {
+// Distributed Monolith Architecture
+export const DistributedMonolith: Story = {
   args: {
-    nodes: mockGraphDatasets.medium.nodes,
-    edges: mockGraphDatasets.medium.edges,
-    layers: mockGraphDatasets.medium.layers,
+    nodes: enhancedGraphData.distributedMonolith.nodes,
+    edges: enhancedGraphData.distributedMonolith.edges,
+    layers: enhancedGraphData.distributedMonolith.layers,
     width: 1000,
     height: 700,
   },
   parameters: {
     docs: {
       description: {
-        story: 'Medium-sized graph with 30 nodes and 45 edges for performance testing.',
+        story: 'Distributed monolith architecture with API gateway, lambdas, containers, and databases.',
       },
     },
   },
@@ -113,16 +114,16 @@ export const MediumGraph: Story = {
 // Large graph for stress testing
 export const LargeGraph: Story = {
   args: {
-    nodes: mockGraphDatasets.large.nodes,
-    edges: mockGraphDatasets.large.edges,
-    layers: mockGraphDatasets.large.layers,
+    nodes: enhancedGraphData.large.nodes,
+    edges: enhancedGraphData.large.edges,
+    layers: enhancedGraphData.large.layers,
     width: 1200,
     height: 800,
   },
   parameters: {
     docs: {
       description: {
-        story: 'Large graph with 150 nodes and 300 edges for stress testing and performance evaluation.',
+        story: 'Large graph with 100 nodes and 150 edges for stress testing and performance evaluation.',
       },
     },
   },
@@ -131,9 +132,9 @@ export const LargeGraph: Story = {
 // Empty state
 export const EmptyGraph: Story = {
   args: {
-    nodes: mockGraphDatasets.empty.nodes,
-    edges: mockGraphDatasets.empty.edges,
-    layers: mockGraphDatasets.empty.layers,
+    nodes: enhancedGraphData.empty.nodes,
+    edges: enhancedGraphData.empty.edges,
+    layers: enhancedGraphData.empty.layers,
   },
   parameters: {
     docs: {

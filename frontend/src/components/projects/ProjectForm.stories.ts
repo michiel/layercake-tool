@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { ProjectForm } from './ProjectForm';
 import type { Project } from '@/types/api';
+import { sampleProjects } from '@/stories/sampleData/enhancedGraphData';
 
 // Mock function for actions
 const fn = () => () => {};
@@ -44,13 +45,13 @@ const meta: Meta<typeof ProjectForm> = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-// Sample project data
+// Sample project data from enhanced sample data
 const sampleProject: Project = {
   id: '1',
-  name: 'Layercake Microservices',
-  description: 'A comprehensive microservices architecture example showcasing distributed system patterns.',
-  created_at: '2025-01-15T10:30:00Z',
-  updated_at: '2025-01-15T10:30:00Z',
+  name: sampleProjects[0].name,
+  description: sampleProjects[0].description,
+  created_at: sampleProjects[0].created_at,
+  updated_at: sampleProjects[0].updated_at,
 };
 
 // Create new project

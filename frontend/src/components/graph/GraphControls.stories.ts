@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { useState } from 'react';
 import { GraphControls, GraphStats, GraphToolbar } from './GraphControls';
+import { enhancedGraphData, sampleProjects } from '@/stories/sampleData/enhancedGraphData';
 
 // Mock function for actions
 const fn = () => () => {};
@@ -183,26 +184,26 @@ export const StatsComponent: Story = {
       <h3 className="text-lg font-semibold text-center">Graph Statistics</h3>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {/* Small graph */}
+        {/* Reference Model */}
         <GraphStats
-          nodeCount={6}
-          edgeCount={8}
-          layerCount={2}
+          nodeCount={enhancedGraphData.refModel.nodeCount}
+          edgeCount={enhancedGraphData.refModel.edgeCount}
+          layerCount={enhancedGraphData.refModel.layerCount}
         />
         
-        {/* Medium graph */}
+        {/* Distributed Monolith */}
         <GraphStats
-          nodeCount={42}
-          edgeCount={67}
-          layerCount={4}
+          nodeCount={enhancedGraphData.distributedMonolith.nodeCount}
+          edgeCount={enhancedGraphData.distributedMonolith.edgeCount}
+          layerCount={enhancedGraphData.distributedMonolith.layerCount}
         />
         
         {/* Large graph with selection */}
         <GraphStats
-          nodeCount={156}
-          edgeCount={298}
-          layerCount={5}
-          selectedNode="api-gateway"
+          nodeCount={enhancedGraphData.large.nodeCount}
+          edgeCount={enhancedGraphData.large.edgeCount}
+          layerCount={enhancedGraphData.large.layerCount}
+          selectedNode="api_gateway_instance"
         />
       </div>
     </div>
@@ -291,10 +292,7 @@ export const CompleteControlSuite: Story = {
     const [selectedNode, setSelectedNode] = useState<string | null>(null);
     const [layout, setLayout] = useState('force');
 
-    const nodes = [
-      'api-gateway', 'user-service', 'product-service', 'order-service',
-      'payment-service', 'notification-service', 'database', 'cache'
-    ];
+    const nodes = enhancedGraphData.refModel.nodes.map(node => node.id);
 
     return (
       <div className="space-y-8 p-6 bg-gray-50 rounded-lg">
@@ -318,9 +316,9 @@ export const CompleteControlSuite: Story = {
           <div className="space-y-4">
             <h4 className="font-medium text-gray-900">Statistics</h4>
             <GraphStats
-              nodeCount={147}
-              edgeCount={298}
-              layerCount={6}
+              nodeCount={enhancedGraphData.distributedMonolith.nodeCount}
+              edgeCount={enhancedGraphData.distributedMonolith.edgeCount}
+              layerCount={enhancedGraphData.distributedMonolith.layerCount}
               selectedNode={selectedNode}
             />
             
@@ -404,10 +402,10 @@ export const MobileControls: Story = {
         <div>
           <h4 className="font-medium mb-2 text-sm">Mobile Statistics</h4>
           <GraphStats
-            nodeCount={42}
-            edgeCount={67}
-            layerCount={4}
-            selectedNode="mobile-node"
+            nodeCount={enhancedGraphData.refModel.nodeCount}
+            edgeCount={enhancedGraphData.refModel.edgeCount}
+            layerCount={enhancedGraphData.refModel.layerCount}
+            selectedNode="root"
           />
         </div>
 
@@ -491,10 +489,30 @@ export const ControlStates: Story = {
 export const PerformanceScenarios: Story = {
   render: () => {
     const scenarios = [
-      { name: 'Small Graph', nodes: 12, edges: 18, layers: 2 },
-      { name: 'Medium Graph', nodes: 87, edges: 156, layers: 4 },
-      { name: 'Large Graph', nodes: 543, edges: 1247, layers: 8 },
-      { name: 'Huge Graph', nodes: 2156, edges: 5892, layers: 12 },
+      { 
+        name: 'Small Graph', 
+        nodes: enhancedGraphData.small.nodeCount, 
+        edges: enhancedGraphData.small.edgeCount, 
+        layers: enhancedGraphData.small.layerCount 
+      },
+      { 
+        name: 'Reference Model', 
+        nodes: enhancedGraphData.refModel.nodeCount, 
+        edges: enhancedGraphData.refModel.edgeCount, 
+        layers: enhancedGraphData.refModel.layerCount 
+      },
+      { 
+        name: 'Distributed Monolith', 
+        nodes: enhancedGraphData.distributedMonolith.nodeCount, 
+        edges: enhancedGraphData.distributedMonolith.edgeCount, 
+        layers: enhancedGraphData.distributedMonolith.layerCount 
+      },
+      { 
+        name: 'Large Graph', 
+        nodes: enhancedGraphData.large.nodeCount, 
+        edges: enhancedGraphData.large.edgeCount, 
+        layers: enhancedGraphData.large.layerCount 
+      },
     ];
 
     return (

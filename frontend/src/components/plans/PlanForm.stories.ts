@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { PlanForm } from './PlanForm';
 import type { Plan } from '@/types/api';
+import { samplePlans } from '@/stories/sampleData/enhancedGraphData';
 
 // Mock function for actions
 const fn = () => () => {};
@@ -44,71 +45,23 @@ const meta: Meta<typeof PlanForm> = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-// Sample plan data
+// Sample plan data from enhanced sample data
 const sampleJsonPlan: Plan = {
   id: '1',
-  name: 'Microservices Analysis Plan',
-  plan_content: JSON.stringify({
-    version: '1.0',
-    name: 'Microservices Analysis',
-    description: 'Analyze microservices architecture and generate reports',
-    steps: [
-      {
-        id: 'load_data',
-        type: 'import',
-        source: 'services.csv',
-        target: 'nodes'
-      },
-      {
-        id: 'analyze_connectivity',
-        type: 'analysis',
-        input: 'nodes',
-        algorithms: ['centrality', 'clustering']
-      }
-    ],
-    exports: [
-      {
-        type: 'report',
-        format: 'html',
-        destination: 'analysis_report.html'
-      }
-    ]
-  }, null, 2),
+  name: samplePlans[0].name,
+  plan_content: samplePlans[0].content,
   plan_format: 'json',
-  created_at: '2025-01-15T10:30:00Z',
-  updated_at: '2025-01-15T10:30:00Z',
+  created_at: samplePlans[0].created_at,
+  updated_at: samplePlans[0].updated_at,
 };
 
 const sampleYamlPlan: Plan = {
   id: '2',
-  name: 'Data Pipeline Plan',
-  plan_content: `version: '1.0'
-name: Data Processing Pipeline
-description: ETL pipeline for processing graph data
-steps:
-  - id: extract
-    type: import
-    source: raw_data.csv
-    target: staging
-  - id: transform
-    type: transformation
-    input: staging
-    operations:
-      - type: filter
-        condition: 'status == "active"'
-      - type: aggregate
-        groupBy: ['category']
-  - id: load
-    type: export
-    input: transformed
-    destination: processed_data.csv
-exports:
-  - type: visualization
-    format: svg
-    destination: graph_view.svg`,
+  name: samplePlans[1].name,
+  plan_content: samplePlans[1].content,
   plan_format: 'yaml',
-  created_at: '2025-01-15T10:30:00Z',
-  updated_at: '2025-01-15T10:30:00Z',
+  created_at: samplePlans[1].created_at,
+  updated_at: samplePlans[1].updated_at,
 };
 
 // Create new plan
