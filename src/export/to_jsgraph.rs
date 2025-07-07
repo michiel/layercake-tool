@@ -1,5 +1,5 @@
 use crate::graph::Graph;
-use crate::plan::RenderConfig;
+use crate::plan::legacy_plan::RenderConfig;
 use serde::Serialize;
 use serde_json::json;
 use std::collections::HashMap;

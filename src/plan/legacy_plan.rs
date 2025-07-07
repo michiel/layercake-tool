@@ -37,42 +37,42 @@ use std::collections::HashMap;
 // Import configuration
 //
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
 pub struct Meta {
     pub name: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
 pub struct Plan {
     pub meta: Option<Meta>,
     pub import: ImportConfig,
     pub export: ExportProfile,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 pub struct ImportConfig {
     pub profiles: Vec<ImportProfile>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum FileImportProfile {
     CSV(CSVImportParams),
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct CSVImportParams {
     pub skiprows: Option<usize>,
     pub separator: Option<char>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum ImportFileType {
     Edges,
     Nodes,
     Layers,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct ImportProfile {
     pub filename: String,
     pub filetype: ImportFileType,
@@ -82,12 +82,12 @@ pub struct ImportProfile {
 // Export configuration
 //
 
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 pub struct ExportProfile {
     pub profiles: Vec<ExportProfileItem>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct ExportProfileItem {
     pub filename: String,
     pub exporter: ExportFileType,
@@ -95,7 +95,7 @@ pub struct ExportProfileItem {
     pub graph_config: Option<ExportProfileGraphConfig>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Copy)]
+#[derive(Serialize, Deserialize, Clone, Debug, Copy, PartialEq)]
 pub struct ExportProfileGraphConfig {
     pub generate_hierarchy: Option<bool>,
     pub max_partition_depth: Option<i32>,
@@ -107,25 +107,25 @@ pub struct ExportProfileGraphConfig {
     pub edge_label_insert_newlines_at: Option<usize>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Copy)]
+#[derive(Serialize, Deserialize, Clone, Debug, Copy, PartialEq)]
 pub struct ExportProfileRenderConfig {
     pub contain_nodes: Option<bool>,
     pub orientation: Option<RenderConfigOrientation>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Copy)]
+#[derive(Serialize, Deserialize, Clone, Debug, Copy, PartialEq)]
 pub enum RenderConfigOrientation {
     LR,
     TB,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct CustomExportProfile {
     pub template: String,
     pub partials: Option<HashMap<String, String>>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum ExportFileType {
     GML,
     DOT,
@@ -164,13 +164,13 @@ impl Default for ExportProfileRenderConfig {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Copy)]
+#[derive(Serialize, Deserialize, Clone, Debug, Copy, PartialEq)]
 pub struct RenderConfig {
     pub contain_nodes: bool,
     pub orientation: RenderConfigOrientation,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Copy)]
+#[derive(Serialize, Deserialize, Clone, Debug, Copy, PartialEq)]
 pub struct GraphConfig {
     pub generate_hierarchy: bool,
     pub max_partition_depth: i32,

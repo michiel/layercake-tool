@@ -1,4 +1,4 @@
-use crate::plan::RenderConfig;
+use crate::plan::legacy_plan::RenderConfig;
 use crate::{graph::Graph, plan::CustomExportProfile};
 use std::error::Error;
 use std::fs;

@@ -3,7 +3,7 @@ use sea_orm::DatabaseConnection;
 
 use crate::export::{to_dot, to_gml, to_json, to_mermaid, to_plantuml, to_csv_nodes, to_csv_edges};
 use crate::graph::Graph;
-use crate::plan::{Plan, ExportFileType, RenderConfig, RenderConfigOrientation};
+use crate::plan::legacy_plan::{Plan, ExportFileType, RenderConfig, RenderConfigOrientation};
 use crate::services::GraphService;
 
 pub struct ExportService {

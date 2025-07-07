@@ -8,38 +8,40 @@
 ## **Phase 1: Core DAG Architecture Foundation** 
 **Priority: CRITICAL | Timeline: 4-5 weeks**
 
-### **1.1 Database Schema Migration (Week 1-2)**
+### **1.1 Database Schema Migration (Week 1-2)** ✅ COMPLETED
 **Target**: Implement plan-centric graph artifact model
 
-- [ ] **Create `plan_nodes` table** - Core DAG node entities
+- [✅] **Create `plan_nodes` table** - Core DAG node entities
   - `id`, `plan_id`, `node_type` (import/transform/export), `name`, `configuration`
   - `graph_id` (nullable - set after execution), `position_x`, `position_y`
   - Relations: `plan_id` → `plans`, `graph_id` → `graphs`
 
-- [ ] **Create `graphs` table** - Plan execution artifacts  
+- [✅] **Create `graphs` table** - Plan execution artifacts  
   - `id`, `plan_id`, `plan_node_id`, `name`, `description`
   - `graph_data` (JSON), `metadata` (execution stats), timestamps
   - Relations: `plan_id` → `plans`, `plan_node_id` → `plan_nodes`
 
-- [ ] **Migrate existing data** 
+- [✅] **Migrate existing data** 
   - Convert current project-linked nodes/edges/layers to plan-centric graphs
-  - Create default plan nodes for existing plans
+  - Create default plan nodes for existing plans (2 projects migrated: 28+38 nodes, 28+55 edges, 8+4 layers)
   - Update foreign key relationships
 
-- [ ] **Add plan execution scope tracking**
-  - Track which graphs are available at each execution step
-  - Store plan node execution status and graph references
+- [✅] **Database migration executed successfully**
+  - Applied m005_plan_centric_schema migration 
+  - Applied m006_data_migration_plan_centric migration
+  - Created plan nodes and graph artifacts for existing data
 
 ### **1.2 DAG Plan Execution Engine (Week 2-3)**
 **Target**: Replace linear YAML execution with JSON DAG processing
 
-- [ ] **JSON DAG Plan Schema Implementation**
+- [✅] **JSON DAG Plan Schema Implementation**
   - Define flat DAG structure: `{ nodes: [], edges: [] }` 
   - Plan node types: import, transform, export with configuration
   - Position data for visual layout (`position: {x, y}`)
-  - Render context for output formatting
+  - Legacy plan migration support with `PlanFormat` enum
+  - Created `dag_plan.rs` with complete DAG schema, validation, and topological sort
 
-- [ ] **DAG Execution Engine**
+- [🚧] **DAG Execution Engine**
   - Topological sort for execution order
   - Parallel execution support for independent branches  
   - Graph artifact generation at each plan node

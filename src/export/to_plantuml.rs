@@ -1,5 +1,5 @@
 use crate::graph::Graph;
-use crate::plan::RenderConfig;
+use crate::plan::legacy_plan::RenderConfig;
 use std::error::Error;
 
 /// Renders a graph to PlantUML format

@@ -1,6 +1,6 @@
 use crate::data_loader;
 use crate::graph::{Edge, Graph, Layer, Node};
-use crate::plan::{ExportFileType, ExportProfileItem, ImportFileType, Plan};
+use crate::plan::legacy_plan::{ExportFileType, ExportProfileItem, ImportFileType, Plan};
 use notify::{Config, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::path::Path;
 use std::sync::mpsc::channel;

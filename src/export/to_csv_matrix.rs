@@ -1,5 +1,5 @@
 use crate::graph::Graph;
-use crate::plan::RenderConfig;
+use crate::plan::legacy_plan::RenderConfig;
 use csv::WriterBuilder;
 use serde_json::json;
 use serde_json::Value as JsonValue;

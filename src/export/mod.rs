@@ -14,7 +14,7 @@ pub mod to_plantuml;
 /// This helps eliminate duplication across export modules
 pub mod renderer {
     use crate::graph::Graph;
-    use crate::plan::RenderConfig;
+    use crate::plan::legacy_plan::RenderConfig;
     use serde_json::{json, Value};
     use std::error::Error;
 

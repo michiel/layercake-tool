@@ -1,5 +1,5 @@
 use crate::graph::Graph;
-use crate::plan::RenderConfig;
+use crate::plan::legacy_plan::RenderConfig;
 use std::error::Error;
 
 pub fn render(graph: Graph, render_config: RenderConfig) -> Result<String, Box<dyn Error>> {
