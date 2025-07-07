@@ -25,11 +25,22 @@ The current system has a single graph endpoint per project (`/api/v1/project/1/g
 
 ### **Target Architecture**
 
-The target architecture supports three API interfaces with a unified backend:
+The target architecture supports three API interfaces with a unified backend that exposes **all functionality** through both GraphQL and MCP:
 
-1. **GraphQL API** (Primary for frontend)
-2. **REST API** (Resource access and external integrations)
-3. **MCP API** (AI Agent interactions)
+1. **GraphQL API** (Primary for frontend) - Complete CRUD operations, real-time subscriptions
+2. **REST API** (Resource access and external integrations) - Lightweight access layer
+3. **MCP API** (AI Agent interactions) - Complete functionality mirror of GraphQL
+
+### **Unified Backend Principle**
+
+**All core functionality must be accessible through both GraphQL and MCP APIs:**
+- **Project Management**: Create, read, update, delete projects
+- **Plan Management**: CRUD operations, validation, execution control
+- **Graph Operations**: Data inspection, transformation, export
+- **Execution Monitoring**: Status tracking, logging, output management
+- **Real-time Updates**: Subscription-based live updates (GraphQL) and polling (MCP)
+
+**No business logic in API layers** - all operations go through shared service layer.
 
 ### **Migration Path**
 
@@ -1503,27 +1514,249 @@ const useSelectiveSubscription = (planNodeId: string, elementTypes: ('nodes' | '
 - Render context: Cache for 30 seconds (can change during execution)
 ```
 
+## Unified Backend Architecture
+
+### **Service Layer Design**
+
+All functionality is implemented in a unified service layer that both GraphQL and MCP APIs consume. **No business logic exists in the API layers themselves.**
+
+```rust
+// Unified service layer interfaces
+trait ProjectService {
+    async fn create_project(&self, data: CreateProjectRequest) -> Result<Project>;
+    async fn get_project(&self, id: ProjectId) -> Result<Project>;
+    async fn update_project(&self, id: ProjectId, data: UpdateProjectRequest) -> Result<Project>;
+    async fn delete_project(&self, id: ProjectId) -> Result<()>;
+    async fn list_projects(&self, filters: ProjectFilters) -> Result<Vec<Project>>;
+}
+
+trait PlanService {
+    async fn create_plan(&self, data: CreatePlanRequest) -> Result<Plan>;
+    async fn get_plan(&self, id: PlanId) -> Result<Plan>;
+    async fn update_plan(&self, id: PlanId, data: UpdatePlanRequest) -> Result<Plan>;
+    async fn delete_plan(&self, id: PlanId) -> Result<()>;
+    async fn validate_plan(&self, plan_data: PlanContent) -> Result<ValidationResult>;
+    async fn execute_plan(&self, id: PlanId, mode: ExecutionMode) -> Result<ExecutionId>;
+}
+
+trait GraphService {
+    async fn get_graph_at_plan_node(&self, plan_id: PlanId, plan_node_id: String) -> Result<GraphObject>;
+    async fn list_graphs_for_plan(&self, plan_id: PlanId) -> Result<Vec<GraphObject>>;
+    async fn get_graph_data(&self, graph_id: GraphId) -> Result<GraphData>;
+    async fn export_graph(&self, graph_id: GraphId, format: ExportFormat) -> Result<ExportResult>;
+}
+
+trait ExecutionService {
+    async fn get_execution_status(&self, execution_id: ExecutionId) -> Result<ExecutionStatus>;
+    async fn cancel_execution(&self, execution_id: ExecutionId) -> Result<()>;
+    async fn get_execution_logs(&self, execution_id: ExecutionId) -> Result<Vec<LogEntry>>;
+    async fn get_execution_outputs(&self, execution_id: ExecutionId) -> Result<Vec<OutputFile>>;
+    async fn subscribe_to_execution(&self, execution_id: ExecutionId) -> impl Stream<Item = ExecutionUpdate>;
+}
+```
+
+### **GraphQL API - Complete Functionality**
+
+**Query Operations:**
+```graphql
+type Query {
+  # Project Management
+  project(id: ID!): Project
+  projects(filter: ProjectFilter): [Project!]!
+  
+  # Plan Management  
+  plan(id: ID!): Plan
+  plans(projectId: ID, filter: PlanFilter): [Plan!]!
+  validatePlan(planData: JSON!): ValidationResult!
+  
+  # Graph Operations
+  graph(id: ID!): GraphObject
+  graphAtPlanNode(planId: ID!, planNodeId: String!): GraphObject
+  graphsForPlan(planId: ID!): [GraphObject!]!
+  
+  # Execution Monitoring
+  execution(id: ID!): ExecutionState
+  executionsForPlan(planId: ID!, status: ExecutionStatus): [ExecutionState!]!
+}
+
+type Mutation {
+  # Project Management
+  createProject(input: CreateProjectInput!): Project!
+  updateProject(id: ID!, input: UpdateProjectInput!): Project!
+  deleteProject(id: ID!): Boolean!
+  
+  # Plan Management
+  createPlan(input: CreatePlanInput!): Plan!
+  updatePlan(id: ID!, input: UpdatePlanInput!): Plan!
+  deletePlan(id: ID!): Boolean!
+  executePlan(id: ID!, mode: ExecutionMode): ExecutionState!
+  
+  # Execution Control
+  cancelExecution(id: ID!): Boolean!
+  
+  # Graph Operations  
+  exportGraph(id: ID!, format: ExportFormat!): ExportResult!
+}
+
+type Subscription {
+  # Real-time execution monitoring
+  executionUpdates(executionId: ID!): ExecutionUpdate!
+  planExecutions(planId: ID!): ExecutionState!
+  
+  # Real-time collaboration (future)
+  graphDataChanges(planNodeId: ID!): GraphDataChange!
+}
+```
+
 ## MCP API Integration
 
-### **MCP Tool Categories**
+### **MCP Tool Categories - Complete Functionality Mirror**
 
-**Plan Execution:**
-- `execute_plan(plan_id, mode="full|partial|incremental")` 
-- `execute_plan_node(plan_id, plan_node_id)`
-- `get_execution_status(execution_id)`
-- `cancel_execution(execution_id)`
-
-**Plan Debugging:**
-- `get_execution_trace(execution_id)`
-- `get_plan_node_output(execution_id, plan_node_id)` 
-- `get_error_details(execution_id, plan_node_id)`
-- `validate_plan(plan_id)`
+**Project Management:**
+- `create_project(name, description)` → Creates new project
+- `get_project(project_id)` → Retrieves project details
+- `update_project(project_id, updates)` → Updates project metadata
+- `delete_project(project_id)` → Removes project and all data
+- `list_projects(filters?)` → Lists all projects with optional filtering
 
 **Plan Management:**
-- `create_plan(plan_data)`
-- `update_plan(plan_id, changes)`
-- `get_plan(plan_id)`
-- `list_plans()`
+- `create_plan(project_id, plan_data)` → Creates new plan in project
+- `get_plan(plan_id)` → Retrieves plan details and DAG structure
+- `update_plan(plan_id, changes)` → Updates plan configuration
+- `delete_plan(plan_id)` → Removes plan and associated data
+- `list_plans(project_id?, filters?)` → Lists plans with filtering
+- `validate_plan(plan_data)` → Validates DAG structure and configuration
+
+**Plan Execution:**
+- `execute_plan(plan_id, mode="full|partial|incremental")` → Starts plan execution
+- `execute_plan_node(plan_id, plan_node_id)` → Executes specific DAG node
+- `get_execution_status(execution_id)` → Current execution state and progress
+- `cancel_execution(execution_id)` → Stops running execution
+- `list_executions(plan_id?, status?)` → Lists executions with filtering
+
+**Graph Operations:**
+- `get_graph_at_plan_node(plan_id, plan_node_id)` → Graph data at specific DAG node
+- `get_graph_data(graph_id)` → Complete graph object with nodes/edges/layers
+- `list_graphs_for_plan(plan_id)` → All graphs generated by plan
+- `export_graph(graph_id, format)` → Export graph in specified format
+- `get_graph_metadata(graph_id)` → Graph statistics and metadata
+
+**Execution Monitoring & Debugging:**
+- `get_execution_trace(execution_id)` → Complete execution path and timing
+- `get_plan_node_output(execution_id, plan_node_id)` → Output from specific node
+- `get_execution_logs(execution_id, level?)` → Filtered execution logs
+- `get_execution_outputs(execution_id)` → All generated files and artifacts
+- `get_error_details(execution_id, plan_node_id?)` → Detailed error information
+
+**Real-time Monitoring (Polling-based for MCP):**
+- `poll_execution_updates(execution_id, since_timestamp?)` → Recent execution changes
+- `poll_plan_executions(plan_id, since_timestamp?)` → Recent plan activity
+
+### **API Implementation Architecture**
+
+```rust
+// Unified backend serving all APIs
+pub struct LayercakeBackend {
+    project_service: Arc<dyn ProjectService>,
+    plan_service: Arc<dyn PlanService>,
+    graph_service: Arc<dyn GraphService>,
+    execution_service: Arc<dyn ExecutionService>,
+}
+
+// GraphQL resolvers delegate to services
+impl GraphQLResolvers {
+    async fn create_project(&self, input: CreateProjectInput) -> Result<Project> {
+        self.backend.project_service.create_project(input.into()).await
+    }
+    
+    async fn execute_plan(&self, id: ID, mode: ExecutionMode) -> Result<ExecutionState> {
+        self.backend.plan_service.execute_plan(id.into(), mode).await
+    }
+}
+
+// MCP tools delegate to same services
+impl MCPTools {
+    async fn create_project(&self, name: String, description: Option<String>) -> Result<serde_json::Value> {
+        let request = CreateProjectRequest { name, description };
+        let project = self.backend.project_service.create_project(request).await?;
+        Ok(serde_json::to_value(project)?)
+    }
+    
+    async fn execute_plan(&self, plan_id: String, mode: String) -> Result<serde_json::Value> {
+        let execution_mode = ExecutionMode::from_str(&mode)?;
+        let execution = self.backend.plan_service.execute_plan(plan_id.into(), execution_mode).await?;
+        Ok(serde_json::to_value(execution)?)
+    }
+}
+```
+
+### **Functionality Parity Matrix**
+
+| **Feature Category** | **GraphQL** | **MCP** | **Implementation** |
+|---------------------|-------------|---------|-------------------|
+| **Project CRUD** | ✅ Mutations/Queries | ✅ Tools | Shared ProjectService |
+| **Plan CRUD** | ✅ Mutations/Queries | ✅ Tools | Shared PlanService |
+| **Plan Validation** | ✅ Query | ✅ Tool | Shared validation logic |
+| **Plan Execution** | ✅ Mutation | ✅ Tool | Shared ExecutionService |
+| **Execution Control** | ✅ Mutation | ✅ Tool | Shared ExecutionService |
+| **Graph Inspection** | ✅ Queries | ✅ Tools | Shared GraphService |
+| **Graph Export** | ✅ Mutation | ✅ Tool | Shared export logic |
+| **Real-time Updates** | ✅ Subscriptions | ✅ Polling | Different transport, same data |
+| **Error Handling** | ✅ GraphQL errors | ✅ MCP errors | Shared error types |
+| **Debugging** | ✅ Queries | ✅ Tools | Shared logging/tracing |
+
+### **No API-Specific Business Logic**
+
+**Prohibited Patterns:**
+```rust
+// ❌ WRONG - Business logic in GraphQL resolver
+impl GraphQLResolvers {
+    async fn validate_plan(&self, plan_data: JSON) -> Result<ValidationResult> {
+        // DON'T implement validation logic here
+        if plan_data.nodes.is_empty() { return Err("No nodes"); }
+        // ...
+    }
+}
+
+// ❌ WRONG - Business logic in MCP tool
+impl MCPTools {
+    async fn validate_plan(&self, plan_data: String) -> Result<Value> {
+        // DON'T implement validation logic here
+        let parsed = serde_json::from_str(&plan_data)?;
+        // ...
+    }
+}
+```
+
+**Correct Patterns:**
+```rust
+// ✅ CORRECT - Business logic in service layer
+impl PlanService {
+    async fn validate_plan(&self, plan_data: PlanContent) -> Result<ValidationResult> {
+        // All validation logic here
+        self.validator.validate_dag_structure(&plan_data.dag)?;
+        self.validator.validate_node_references(&plan_data)?;
+        // ...
+    }
+}
+
+// ✅ CORRECT - GraphQL delegates to service
+impl GraphQLResolvers {
+    async fn validate_plan(&self, plan_data: JSON) -> Result<ValidationResult> {
+        let content = PlanContent::from_json(plan_data)?;
+        self.backend.plan_service.validate_plan(content).await
+    }
+}
+
+// ✅ CORRECT - MCP delegates to service
+impl MCPTools {
+    async fn validate_plan(&self, plan_data: String) -> Result<Value> {
+        let content = PlanContent::from_json_str(&plan_data)?;
+        let result = self.backend.plan_service.validate_plan(content).await?;
+        Ok(serde_json::to_value(result)?)
+    }
+}
+```
 
 ### **Error Handling and Debugging**
 
