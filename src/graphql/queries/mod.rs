@@ -1,9 +1,9 @@
 use async_graphql::*;
 use sea_orm::{EntityTrait, ColumnTrait, QueryFilter};
 
-use crate::database::entities::{projects, plans, nodes, edges, layers};
+use crate::database::entities::{projects, plans, nodes, edges, layers, plan_nodes, graphs};
 use crate::graphql::context::GraphQLContext;
-use crate::graphql::types::{Project, Plan, Node, Edge, Layer};
+use crate::graphql::types::{Project, Plan, Node, Edge, Layer, PlanNode, DagPlan, DagEdge, GraphArtifact, GraphStatistics};
 
 pub struct Query;
 
@@ -104,6 +104,71 @@ impl Query {
             .await?;
         
         Ok(nodes.into_iter().map(Node::from).collect())
+    }
+
+    /// Get DAG structure for a plan
+    async fn plan_dag(&self, ctx: &Context<'_>, plan_id: i32) -> Result<Option<DagPlan>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        
+        // Get all plan nodes for this plan
+        let plan_nodes = plan_nodes::Entity::find()
+            .filter(plan_nodes::Column::PlanId.eq(plan_id))
+            .all(&context.db)
+            .await?;
+        
+        if plan_nodes.is_empty() {
+            return Ok(None);
+        }
+        
+        let nodes: Vec<PlanNode> = plan_nodes.into_iter().map(PlanNode::from).collect();
+        
+        // For now, return empty edges - will be implemented when we add plan edges table
+        let edges: Vec<DagEdge> = vec![];
+        
+        Ok(Some(DagPlan { nodes, edges }))
+    }
+
+    /// Get all plan nodes for a plan
+    async fn plan_nodes(&self, ctx: &Context<'_>, plan_id: i32) -> Result<Vec<PlanNode>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let plan_nodes = plan_nodes::Entity::find()
+            .filter(plan_nodes::Column::PlanId.eq(plan_id))
+            .all(&context.db)
+            .await?;
+        
+        Ok(plan_nodes.into_iter().map(PlanNode::from).collect())
+    }
+
+    /// Get a specific plan node
+    async fn plan_node(&self, ctx: &Context<'_>, id: String) -> Result<Option<PlanNode>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let plan_node = plan_nodes::Entity::find_by_id(id)
+            .one(&context.db)
+            .await?;
+        
+        Ok(plan_node.map(PlanNode::from))
+    }
+
+    /// Get graph artifact at a specific plan node
+    async fn graph_artifact(&self, ctx: &Context<'_>, plan_node_id: String) -> Result<Option<GraphArtifact>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let graph = graphs::Entity::find()
+            .filter(graphs::Column::PlanNodeId.eq(plan_node_id))
+            .one(&context.db)
+            .await?;
+        
+        Ok(graph.map(GraphArtifact::from))
+    }
+
+    /// Get all graph artifacts for a plan
+    async fn graph_artifacts(&self, ctx: &Context<'_>, plan_id: i32) -> Result<Vec<GraphArtifact>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let graphs = graphs::Entity::find()
+            .filter(graphs::Column::PlanId.eq(plan_id))
+            .all(&context.db)
+            .await?;
+        
+        Ok(graphs.into_iter().map(GraphArtifact::from).collect())
     }
 }
 

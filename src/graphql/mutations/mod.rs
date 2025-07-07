@@ -1,13 +1,15 @@
 use async_graphql::*;
 use sea_orm::{ActiveModelTrait, EntityTrait, Set};
+use uuid::Uuid;
 
-use crate::database::entities::{projects, plans, nodes, edges, layers};
+use crate::database::entities::{projects, plans, nodes, edges, layers, plan_nodes};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::{
-    Project, Plan, Node, Edge, Layer,
+    Project, Plan, Node, Edge, Layer, PlanNode,
     CreateProjectInput, UpdateProjectInput,
     CreatePlanInput, UpdatePlanInput,
     CreateNodeInput, CreateEdgeInput, CreateLayerInput,
+    CreatePlanNodeInput, UpdatePlanNodeInput,
 };
 
 pub struct Mutation;
@@ -216,6 +218,74 @@ impl Mutation {
         }
 
         Ok(results)
+    }
+
+    /// Create a new plan node
+    async fn create_plan_node(&self, ctx: &Context<'_>, input: CreatePlanNodeInput) -> Result<PlanNode> {
+        let context = ctx.data::<GraphQLContext>()?;
+        
+        let plan_node = plan_nodes::ActiveModel {
+            id: Set(Uuid::new_v4().to_string()),
+            plan_id: Set(input.plan_id),
+            node_type: Set(input.node_type),
+            name: Set(input.name),
+            description: Set(input.description),
+            configuration: Set(input.configuration),
+            graph_id: Set(None),
+            position_x: Set(input.position_x),
+            position_y: Set(input.position_y),
+            ..Default::default()
+        };
+
+        let plan_node = plan_node.insert(&context.db).await?;
+        Ok(PlanNode::from(plan_node))
+    }
+
+    /// Update an existing plan node
+    async fn update_plan_node(&self, ctx: &Context<'_>, id: String, input: UpdatePlanNodeInput) -> Result<PlanNode> {
+        let context = ctx.data::<GraphQLContext>()?;
+        
+        let plan_node = plan_nodes::Entity::find_by_id(id)
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Plan node not found"))?;
+
+        let mut plan_node: plan_nodes::ActiveModel = plan_node.into();
+        
+        if let Some(name) = input.name {
+            plan_node.name = Set(name);
+        }
+        if let Some(description) = input.description {
+            plan_node.description = Set(description);
+        }
+        if let Some(configuration) = input.configuration {
+            plan_node.configuration = Set(configuration);
+        }
+        if let Some(position_x) = input.position_x {
+            plan_node.position_x = Set(Some(position_x));
+        }
+        if let Some(position_y) = input.position_y {
+            plan_node.position_y = Set(Some(position_y));
+        }
+
+        let plan_node = plan_node.update(&context.db).await?;
+        Ok(PlanNode::from(plan_node))
+    }
+
+    /// Delete a plan node
+    async fn delete_plan_node(&self, ctx: &Context<'_>, id: String) -> Result<bool> {
+        let context = ctx.data::<GraphQLContext>()?;
+        
+        let plan_node = plan_nodes::Entity::find_by_id(id)
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Plan node not found"))?;
+
+        plan_nodes::Entity::delete_by_id(plan_node.id)
+            .exec(&context.db)
+            .await?;
+
+        Ok(true)
     }
 }
 
