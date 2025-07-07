@@ -1558,10 +1558,62 @@ The Layercake database schema is designed to support hierarchical project organi
 
 ```mermaid
 erDiagram
-    projects -> plans : "has many" # each plan is an editable JSON object containing a DAG with nodes[] and edges[], with nodes being transformation, import, export, etc
-    plans -> graphs : "has many" # each graph is a snapshopt of a graph after import or transformation in the workflow. a graph JSON object contains nodes, edges, layers and form the central Layercake data structure that gets transformed and fed to exporters
-    plans -> plan_executions : "logs"
-    plan -> execution_outputs : "generates"
+    projects ||--o{ plans : "contains"
+    plans ||--o{ graphs : "generates"
+    plans ||--o{ plan_executions : "tracks"
+    plans ||--o{ execution_outputs : "produces"
+    
+    projects {
+        int id PK
+        string name
+        string description
+        datetime created_at
+        datetime updated_at
+    }
+    
+    plans {
+        int id PK
+        int project_id FK
+        string name
+        json plan_content "DAG definition"
+        string plan_schema_version
+        string plan_format "json|yaml"
+        json dependencies
+        string status
+        datetime created_at
+        datetime updated_at
+    }
+    
+    graphs {
+        string id PK
+        int plan_id FK
+        string plan_node_id "DAG node reference"
+        json graph_data "nodes[], edges[], layers[]"
+        datetime created_at
+    }
+    
+    plan_executions {
+        int id PK
+        int plan_id FK
+        string execution_id
+        string status "queued|running|completed|failed|cancelled"
+        float progress
+        datetime started_at
+        datetime completed_at
+        string error
+    }
+    
+    execution_outputs {
+        int id PK
+        int plan_id FK
+        string execution_id
+        string plan_node_id
+        string file_name
+        string file_type "gml|dot|plantuml|csv|json|yaml|html|svg|png|pdf"
+        string file_path
+        int file_size
+        datetime created_at
+    }
 ```
 
 ### **Core Project Structure**
