@@ -518,8 +518,10 @@ interface GraphInspectionCapabilities {
 ```typescript
 // Navigation hierarchy
 ProjectOverview -> PlanSelector -> WorkflowViewer -> GraphVisualization
+                                     ↓                ↓
+                                PlanNodeInspector -> GraphDataGrid
                                      ↓
-                                PlanNodeInspector -> GraphVisualization
+                                GraphVisualization
 ```
 
 ### **Updated GraphVisualization Component**
@@ -559,6 +561,364 @@ interface GraphVisualizationProps {
   onNavigateToProject?: () => void;
   onNavigateToPlan?: () => void;
   onNavigateToPlanNode?: (planNodeId: string) => void;
+}
+```
+
+### **GraphDataGrid Component**
+
+The GraphDataGrid provides a spreadsheet-like interface for viewing and editing graph data (nodes, edges, layers) at any point in the execution DAG.
+
+```typescript
+interface GraphDataGridProps {
+  // Data source
+  graphObject: GraphObject;
+  
+  // Context
+  projectId: string;
+  planId: string;
+  planNodeId: string;
+  executionId?: string;
+  
+  // Edit configuration
+  editMode: 'transformation' | 'in-place' | 'read-only';
+  allowedOperations: {
+    addNodes: boolean;
+    editNodes: boolean;
+    deleteNodes: boolean;
+    addEdges: boolean;
+    editEdges: boolean;
+    deleteEdges: boolean;
+    addLayers: boolean;
+    editLayers: boolean;
+    deleteLayers: boolean;
+  };
+  
+  // Grid configuration
+  defaultTab: 'nodes' | 'edges' | 'layers';
+  enableVirtualization: boolean;
+  pageSize?: number;
+  
+  // Callbacks
+  onDataChange: (changes: GraphDataChanges) => void;
+  onValidationError: (errors: ValidationError[]) => void;
+  onCommitChanges: (strategy: EditStrategy) => void;
+  onDiscardChanges: () => void;
+  
+  // Integration
+  syncWithVisualization: boolean;
+  onNodeSelect: (nodeIds: string[]) => void;
+  onEdgeSelect: (edgeIds: string[]) => void;
+}
+
+interface GraphDataChanges {
+  nodes: {
+    added: GraphNode[];
+    updated: { id: string; changes: Partial<GraphNode> }[];
+    deleted: string[];
+  };
+  edges: {
+    added: GraphEdge[];
+    updated: { id: string; changes: Partial<GraphEdge> }[];
+    deleted: string[];
+  };
+  layers: {
+    added: GraphLayer[];
+    updated: { id: string; changes: Partial<GraphLayer> }[];
+    deleted: string[];
+  };
+}
+
+enum EditStrategy {
+  TRANSFORMATION_NODE = 'transformation',
+  IN_PLACE_UPDATE = 'in-place',
+  DRAFT_CHANGES = 'draft'
+}
+```
+
+### **Edit Handling Strategies**
+
+#### **1. Transformation Node Strategy (Recommended)**
+
+**Approach**: Create a new transformation plan node that applies the edits as a formal transformation operation.
+
+**Benefits:**
+- **Audit Trail**: Complete history of all changes with timestamps and user info
+- **Reversibility**: Can easily undo/redo changes by modifying the DAG
+- **Consistency**: Follows the established DAG execution model
+- **Collaboration**: Multiple users can see pending changes as DAG nodes
+- **Validation**: Transformations can be validated before execution
+- **Performance**: Efficient caching and incremental execution
+
+**Implementation:**
+```json
+{
+  "id": "edit_transform_{{timestamp}}",
+  "type": "transform",
+  "label": "Manual Edits - {{datetime}}",
+  "config": {
+    "operation": "manual_edit",
+    "changes": {
+      "nodes": {
+        "added": [...],
+        "updated": [...],
+        "deleted": [...]
+      },
+      "edges": {
+        "added": [...],
+        "updated": [...],
+        "deleted": [...]
+      },
+      "layers": {
+        "added": [...],
+        "updated": [...],
+        "deleted": [...]
+      }
+    },
+    "metadata": {
+      "edited_by": "user_id",
+      "edited_at": "2025-01-15T10:30:00Z",
+      "edit_source": "data_grid",
+      "validation_status": "passed"
+    }
+  },
+  "render_context": {
+    "edit_summary": "Added 5 nodes, updated 3 edges, deleted 1 layer"
+  }
+}
+```
+
+**GraphQL Mutations:**
+```graphql
+mutation CreateEditTransformation($planId: ID!, $planNodeId: ID!, $changes: GraphDataChanges!) {
+  createEditTransformation(
+    planId: $planId
+    afterPlanNode: $planNodeId
+    changes: $changes
+  ) {
+    id
+    label
+    config
+    validationErrors {
+      type
+      message
+      affectedElements
+    }
+  }
+}
+
+mutation ExecuteEditTransformation($planId: ID!, $transformationId: ID!) {
+  executeEditTransformation(planId: $planId, transformationId: $transformationId) {
+    executionId
+    status
+    resultingGraphId
+  }
+}
+```
+
+#### **2. In-Place Update Strategy**
+
+**Approach**: Directly modify the graph object and create a new version.
+
+**Benefits:**
+- **Simplicity**: Direct updates without DAG complexity
+- **Speed**: Immediate changes without execution overhead
+- **Familiar UX**: Traditional spreadsheet editing experience
+
+**Drawbacks:**
+- **Limited Audit Trail**: Only version history, not operation history
+- **Harder Collaboration**: Concurrent edits are more complex
+- **Validation Complexity**: Need to validate entire graph state
+- **Cache Invalidation**: Requires careful cache management
+
+**Implementation:**
+```graphql
+mutation UpdateGraphObject($graphId: ID!, $changes: GraphDataChanges!) {
+  updateGraphObject(graphId: $graphId, changes: $changes) {
+    newGraphObject {
+      id
+      hash
+      nodes { id, label, layer }
+      edges { id, source, target }
+      layers { id, name, color }
+    }
+    validationErrors {
+      type
+      message
+      affectedElements
+    }
+    changesSummary {
+      nodesAdded
+      nodesUpdated
+      nodesDeleted
+      edgesAdded
+      edgesUpdated
+      edgesDeleted
+    }
+  }
+}
+```
+
+#### **3. Draft Changes Strategy (Hybrid)**
+
+**Approach**: Buffer changes locally and allow users to choose application strategy.
+
+**Benefits:**
+- **Flexibility**: Users can preview changes before committing
+- **Safety**: No immediate impact on execution state
+- **Choice**: Can choose between transformation or in-place on commit
+
+**Implementation:**
+```typescript
+interface DraftChanges {
+  id: string;
+  planNodeId: string;
+  changes: GraphDataChanges;
+  createdAt: DateTime;
+  lastModified: DateTime;
+  
+  // Preview capabilities
+  previewGraph: GraphObject;
+  validationStatus: 'pending' | 'valid' | 'invalid';
+  validationErrors: ValidationError[];
+  
+  // Commit options
+  availableStrategies: EditStrategy[];
+  recommendedStrategy: EditStrategy;
+}
+
+// Local state management
+const useDraftChanges = (planNodeId: string) => {
+  const [draftChanges, setDraftChanges] = useState<DraftChanges | null>(null);
+  
+  const commitChanges = async (strategy: EditStrategy) => {
+    switch (strategy) {
+      case EditStrategy.TRANSFORMATION_NODE:
+        return await createEditTransformation(draftChanges);
+      case EditStrategy.IN_PLACE_UPDATE:
+        return await updateGraphObject(draftChanges);
+    }
+  };
+  
+  return { draftChanges, setDraftChanges, commitChanges };
+};
+```
+
+### **Recommended Approach**
+
+**Primary**: **Transformation Node Strategy** for the following reasons:
+
+1. **Consistency with Architecture**: Aligns with the DAG-based execution model
+2. **Auditability**: Full change history with operational semantics
+3. **Collaboration**: Clear visibility of pending changes in the DAG
+4. **Rollback Capability**: Can easily undo changes by removing transformation nodes
+5. **Validation Integration**: Changes are validated as part of plan execution
+6. **Performance**: Leverages existing caching and execution infrastructure
+
+**Secondary**: **Draft Changes Strategy** for user experience:
+- Allow users to make multiple edits before committing
+- Provide real-time validation feedback
+- Show preview of changes before applying
+- Offer choice between transformation and in-place on commit
+
+**Implementation Priority:**
+1. **Phase 1**: Transformation node strategy with basic data grid
+2. **Phase 2**: Draft changes with preview capabilities
+3. **Phase 3**: Advanced features (bulk operations, import/export, templates)
+
+### **Data Grid Technical Specifications**
+
+**Grid Library**: Recommend **AG-Grid** or **TanStack Table** for:
+- High performance virtualization (10,000+ rows)
+- Excel-like editing experience
+- Built-in validation and data types
+- Customizable column definitions
+- Copy/paste from Excel
+- Undo/redo functionality
+
+**Column Definitions:**
+
+**Nodes Tab:**
+```typescript
+const nodeColumns = [
+  { field: 'id', headerName: 'ID', editable: false, pinned: 'left' },
+  { field: 'label', headerName: 'Label', editable: true, required: true },
+  { field: 'layer', headerName: 'Layer', editable: true, cellEditor: 'layerSelect' },
+  { field: 'x', headerName: 'X Position', editable: true, type: 'number' },
+  { field: 'y', headerName: 'Y Position', editable: true, type: 'number' },
+  { field: 'weight', headerName: 'Weight', editable: true, type: 'number' },
+  { field: 'comment', headerName: 'Comment', editable: true, type: 'text' },
+  { field: 'metadata', headerName: 'Metadata', editable: true, type: 'json' }
+];
+```
+
+**Edges Tab:**
+```typescript
+const edgeColumns = [
+  { field: 'id', headerName: 'ID', editable: false, pinned: 'left' },
+  { field: 'source', headerName: 'Source Node', editable: true, cellEditor: 'nodeSelect' },
+  { field: 'target', headerName: 'Target Node', editable: true, cellEditor: 'nodeSelect' },
+  { field: 'label', headerName: 'Label', editable: true },
+  { field: 'layer', headerName: 'Layer', editable: true, cellEditor: 'layerSelect' },
+  { field: 'weight', headerName: 'Weight', editable: true, type: 'number' },
+  { field: 'comment', headerName: 'Comment', editable: true, type: 'text' }
+];
+```
+
+**Layers Tab:**
+```typescript
+const layerColumns = [
+  { field: 'id', headerName: 'ID', editable: false, pinned: 'left' },
+  { field: 'name', headerName: 'Name', editable: true, required: true },
+  { field: 'color', headerName: 'Color', editable: true, cellEditor: 'colorPicker' },
+  { field: 'description', headerName: 'Description', editable: true },
+  { field: 'visible', headerName: 'Visible', editable: true, type: 'boolean' },
+  { field: 'order', headerName: 'Display Order', editable: true, type: 'number' }
+];
+```
+
+**Validation Rules:**
+```typescript
+const validationRules = {
+  nodes: {
+    id: { required: true, unique: true, pattern: /^[a-zA-Z0-9_-]+$/ },
+    label: { required: true, maxLength: 100 },
+    layer: { required: true, mustExistInLayers: true },
+    x: { type: 'number', min: 0 },
+    y: { type: 'number', min: 0 },
+    weight: { type: 'number', min: 0 }
+  },
+  edges: {
+    id: { required: true, unique: true },
+    source: { required: true, mustExistInNodes: true },
+    target: { required: true, mustExistInNodes: true, notEqual: 'source' },
+    layer: { mustExistInLayers: true },
+    weight: { type: 'number', min: 0 }
+  },
+  layers: {
+    id: { required: true, unique: true, pattern: /^[a-zA-Z0-9_-]+$/ },
+    name: { required: true, maxLength: 50 },
+    color: { required: true, pattern: /^#[0-9A-Fa-f]{6}$/ }
+  }
+};
+```
+
+### **Integration with Graph Visualization**
+
+**Bidirectional Sync:**
+```typescript
+interface GraphVisualizationSync {
+  // Data grid changes update visualization
+  onDataGridChange: (changes: GraphDataChanges) => void;
+  
+  // Visualization selections update data grid
+  onVisualizationSelect: (selection: { nodes: string[], edges: string[] }) => void;
+  
+  // Highlight corresponding elements
+  highlightInVisualization: (ids: string[], type: 'nodes' | 'edges') => void;
+  highlightInDataGrid: (ids: string[], type: 'nodes' | 'edges') => void;
+  
+  // Sync viewport and focus
+  focusOnElement: (id: string, type: 'node' | 'edge') => void;
 }
 ```
 
@@ -699,13 +1059,17 @@ interface GraphVisualizationProps {
 1. ReactFlow integration with flat DAG visualization
 2. Implement hierarchical navigation components
 3. Update GraphVisualization for multi-context support
-4. Add graph inspection capabilities at every DAG node
+4. **Implement GraphDataGrid component with transformation node strategy**
+5. Add graph inspection capabilities at every DAG plan node
+6. **Integrate bidirectional sync between visualization and data grid**
 
 ### **Phase 4: Advanced Features (6-8 weeks)**
 1. JSON Patch support for collaborative editing
 2. Parallel execution engine with dependency resolution
-3. Performance optimization for large DAGs (1000+ nodes)
-4. Advanced transformation operations (merge, split, aggregate)
+3. **Implement draft changes strategy with preview capabilities**
+4. **Advanced data grid features (bulk operations, import/export, templates)**
+5. Performance optimization for large DAGs (1000+ nodes)
+6. Advanced transformation operations (merge, split, aggregate)
 
 ### **Phase 5: Production Readiness (2-3 weeks)**
 1. Optimize caching strategies based on usage patterns
@@ -718,11 +1082,13 @@ interface GraphVisualizationProps {
 This design supports the evolution from simple linear pipelines to complex multi-branch workflows while maintaining strong typing, efficient data access patterns, and comprehensive graph inspection capabilities at every level of the execution hierarchy.
 
 **Key Advantages:**
-1. **Hierarchical Navigation**: Full drilling capability from project to individual node graphs
+1. **Hierarchical Navigation**: Full drilling capability from project to individual plan node graphs
 2. **Real-time Monitoring**: Live execution updates with graph inspection
 3. **Flexible API Architecture**: Gradual migration from REST to GraphQL with MCP integration
 4. **Efficient Data Management**: Graph object referencing eliminates duplication
 5. **Developer Experience**: Visual editing with JSON-first approach and strong typing
-6. **Scalability**: Performance optimizations for large graphs and complex workflows
+6. **Dual Interface Design**: Both graph visualization and spreadsheet editing for different use cases
+7. **Transformation-based Editing**: Audit trail and reversible changes through DAG transformations
+8. **Scalability**: Performance optimizations for large graphs and complex workflows
 
 The flat DAG structure provides a robust foundation for complex graph transformation workflows with strong GraphQL integration, enabling powerful querying, real-time collaboration, and visual editing capabilities.
