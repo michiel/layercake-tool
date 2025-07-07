@@ -45,6 +45,48 @@ export const GRAPH_ARTIFACT_FRAGMENT = gql`
 `;
 
 // Queries
+export const GET_PROJECT = gql`
+  query GetProject($id: Int!) {
+    project(id: $id) {
+      id
+      name
+      description
+      created_at
+      updated_at
+    }
+  }
+`;
+
+export const GET_PLAN = gql`
+  query GetPlan($id: Int!) {
+    plan(id: $id) {
+      id
+      name
+      description
+      project_id
+      plan_content
+      plan_format
+      plan_schema_version
+      status
+      created_at
+      updated_at
+    }
+  }
+`;
+
+export const GET_PLANS_FOR_PROJECT = gql`
+  query GetPlansForProject($projectId: Int!) {
+    plans(project_id: $projectId) {
+      id
+      name
+      description
+      status
+      created_at
+      updated_at
+    }
+  }
+`;
+
 export const GET_PLAN_DAG = gql`
   query GetPlanDag($planId: Int!) {
     plan_dag(plan_id: $planId) {

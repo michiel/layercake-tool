@@ -134,10 +134,10 @@ export const PlanView: React.FC<PlanViewProps> = ({
     }
 
     return (
-      <div className="space-y-4">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+      <div className="h-full flex flex-col space-y-4">
+        <div className="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-4 min-h-0">
           <div className="lg:col-span-3">
-            <Card className="h-96">
+            <Card className="h-full">
               <DagEditor
                 planId={planId}
                 dagPlan={dagPlan}
@@ -170,7 +170,7 @@ export const PlanView: React.FC<PlanViewProps> = ({
     }
 
     return (
-      <Card className="p-4">
+      <Card className="p-4 h-full overflow-auto">
         <PlanForm
           plan={plan}
           onSubmit={handlePlanFormSubmit}
@@ -193,10 +193,12 @@ export const PlanView: React.FC<PlanViewProps> = ({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="h-full flex flex-col p-6 space-y-4">
       {renderPlanMetadata()}
       {renderEditModeSelector()}
-      {renderContent()}
+      <div className="flex-1 min-h-0">
+        {renderContent()}
+      </div>
 
       {/* Plan Form Modal */}
       {showPlanForm && plan && (
