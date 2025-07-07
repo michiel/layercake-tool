@@ -922,6 +922,523 @@ interface GraphVisualizationSync {
 }
 ```
 
+## Real-Time Collaborative Editing
+
+### **Multi-Browser Synchronization Architecture**
+
+The system supports real-time collaborative editing across multiple browser sessions using GraphQL subscriptions and React live updating, enabling teams to work together on graph data simultaneously.
+
+### **Collaboration Model**
+
+#### **1. Operational Transformation for Conflict Resolution**
+
+**Approach**: Use Operational Transformation (OT) principles adapted for graph data structures.
+
+```typescript
+interface GraphOperation {
+  id: string;
+  type: 'add_node' | 'update_node' | 'delete_node' | 'add_edge' | 'update_edge' | 'delete_edge' | 'add_layer' | 'update_layer' | 'delete_layer';
+  planNodeId: string;
+  elementId: string;
+  data: any;
+  userId: string;
+  timestamp: DateTime;
+  clientId: string;
+  sequenceNumber: number;
+}
+
+interface GraphOperationResult {
+  operation: GraphOperation;
+  transformedOperation?: GraphOperation;
+  conflict?: ConflictResolution;
+  applied: boolean;
+}
+
+enum ConflictResolution {
+  MERGE = 'merge',           // Combine changes intelligently
+  LAST_WRITE_WINS = 'lww',  // Most recent change wins
+  USER_RESOLVE = 'manual',   // Require manual conflict resolution
+  FIRST_WRITE_WINS = 'fww'  // First change wins, reject later changes
+}
+```
+
+#### **2. GraphQL Subscription Schema**
+
+```graphql
+# Real-time subscriptions for collaborative editing
+subscription GraphDataChanges($planNodeId: ID!, $userId: ID!) {
+  graphDataChanged(planNodeId: $planNodeId, excludeUser: $userId) {
+    operation {
+      id
+      type
+      planNodeId
+      elementId
+      data
+      userId
+      timestamp
+      clientId
+      sequenceNumber
+    }
+    conflict {
+      type
+      description
+      conflictingOperations {
+        id
+        userId
+        timestamp
+      }
+    }
+    resultingChange {
+      nodes {
+        added { id, label, layer, x, y }
+        updated { id, changes }
+        deleted
+      }
+      edges {
+        added { id, source, target, label }
+        updated { id, changes }
+        deleted
+      }
+      layers {
+        added { id, name, color }
+        updated { id, changes }
+        deleted
+      }
+    }
+  }
+}
+
+# User presence tracking
+subscription UserPresence($planNodeId: ID!) {
+  userPresenceChanged(planNodeId: $planNodeId) {
+    userId
+    userName
+    status: ONLINE | OFFLINE | EDITING
+    currentElement {
+      type: 'node' | 'edge' | 'layer'
+      id: string
+    }
+    cursorPosition {
+      x: number
+      y: number
+    }
+    lastActivity: DateTime
+  }
+}
+
+# Draft changes sharing
+subscription DraftChanges($planNodeId: ID!, $userId: ID!) {
+  draftChangesShared(planNodeId: $planNodeId, excludeUser: $userId) {
+    userId
+    userName
+    draftId
+    changes {
+      nodes { added, updated, deleted }
+      edges { added, updated, deleted }
+      layers { added, updated, deleted }
+    }
+    previewEnabled: boolean
+    expiresAt: DateTime
+  }
+}
+```
+
+#### **3. React Live Updating Implementation**
+
+**Collaborative Data Grid Hook:**
+```typescript
+interface CollaborativeEditingState {
+  // Current editing state
+  localChanges: GraphDataChanges;
+  remoteChanges: GraphDataChanges[];
+  conflictedChanges: ConflictedChange[];
+  
+  // User presence
+  activeUsers: CollaborativeUser[];
+  userCursors: Record<string, CursorPosition>;
+  
+  // Draft sharing
+  sharedDrafts: Record<string, DraftChanges>;
+  
+  // Synchronization
+  isConnected: boolean;
+  lastSyncTimestamp: DateTime;
+  pendingOperations: GraphOperation[];
+}
+
+interface CollaborativeUser {
+  id: string;
+  name: string;
+  color: string;
+  status: 'online' | 'offline' | 'editing';
+  currentElement?: { type: 'node' | 'edge' | 'layer'; id: string };
+  lastActivity: DateTime;
+}
+
+interface CursorPosition {
+  userId: string;
+  x: number;
+  y: number;
+  elementId?: string;
+  elementType?: 'node' | 'edge' | 'layer';
+}
+
+const useCollaborativeEditing = (planNodeId: string) => {
+  const [state, setState] = useState<CollaborativeEditingState>({
+    localChanges: { nodes: { added: [], updated: [], deleted: [] }, edges: { added: [], updated: [], deleted: [] }, layers: { added: [], updated: [], deleted: [] } },
+    remoteChanges: [],
+    conflictedChanges: [],
+    activeUsers: [],
+    userCursors: {},
+    sharedDrafts: {},
+    isConnected: false,
+    lastSyncTimestamp: new Date(),
+    pendingOperations: []
+  });
+
+  // Subscribe to real-time changes
+  const { data: changeData } = useSubscription(GRAPH_DATA_CHANGES_SUBSCRIPTION, {
+    variables: { planNodeId, userId: currentUser.id }
+  });
+
+  // Subscribe to user presence
+  const { data: presenceData } = useSubscription(USER_PRESENCE_SUBSCRIPTION, {
+    variables: { planNodeId }
+  });
+
+  // Subscribe to draft changes
+  const { data: draftData } = useSubscription(DRAFT_CHANGES_SUBSCRIPTION, {
+    variables: { planNodeId, userId: currentUser.id }
+  });
+
+  // Apply remote changes with conflict resolution
+  const applyRemoteChange = useCallback((operation: GraphOperation) => {
+    setState(prev => {
+      const transformedOp = transformOperation(operation, prev.localChanges);
+      const newState = applyOperation(prev, transformedOp);
+      
+      if (transformedOp.conflict) {
+        newState.conflictedChanges.push({
+          localOperation: prev.pendingOperations.find(op => op.elementId === operation.elementId),
+          remoteOperation: operation,
+          resolution: transformedOp.conflict
+        });
+      }
+      
+      return newState;
+    });
+  }, []);
+
+  // Send local changes to server
+  const sendLocalChange = useCallback(async (operation: GraphOperation) => {
+    setState(prev => ({
+      ...prev,
+      pendingOperations: [...prev.pendingOperations, operation]
+    }));
+
+    try {
+      await sendGraphOperation({ variables: { operation } });
+    } catch (error) {
+      // Handle network errors, retry logic
+      setState(prev => ({
+        ...prev,
+        pendingOperations: prev.pendingOperations.filter(op => op.id !== operation.id)
+      }));
+    }
+  }, []);
+
+  return {
+    state,
+    sendLocalChange,
+    resolveConflict: (conflictId: string, resolution: ConflictResolution) => {
+      // Implement conflict resolution logic
+    },
+    updateUserPresence: (elementId?: string, elementType?: string) => {
+      // Update current user's presence
+    }
+  };
+};
+```
+
+**Collaborative GraphDataGrid Component:**
+```typescript
+const CollaborativeGraphDataGrid: React.FC<GraphDataGridProps> = (props) => {
+  const { state, sendLocalChange, resolveConflict, updateUserPresence } = useCollaborativeEditing(props.planNodeId);
+  const [gridApi, setGridApi] = useState<GridApi | null>(null);
+
+  // Apply remote changes to grid
+  useEffect(() => {
+    if (gridApi && state.remoteChanges.length > 0) {
+      state.remoteChanges.forEach(change => {
+        // Apply changes to AG-Grid
+        const transaction: RowDataTransaction = {
+          add: change.nodes.added,
+          update: change.nodes.updated.map(u => ({ ...u.changes, id: u.id })),
+          remove: change.nodes.deleted.map(id => ({ id }))
+        };
+        gridApi.applyTransaction(transaction);
+      });
+    }
+  }, [gridApi, state.remoteChanges]);
+
+  // Show user cursors and presence
+  const renderUserPresence = () => (
+    <div className="collaborative-presence">
+      {state.activeUsers.map(user => (
+        <div key={user.id} className="user-indicator" style={{ borderColor: user.color }}>
+          <span className="user-name">{user.name}</span>
+          {user.status === 'editing' && user.currentElement && (
+            <span className="editing-indicator">
+              Editing {user.currentElement.type} {user.currentElement.id}
+            </span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+
+  // Handle local edits
+  const onCellValueChanged = useCallback((params: CellValueChangedEvent) => {
+    const operation: GraphOperation = {
+      id: generateId(),
+      type: 'update_node',
+      planNodeId: props.planNodeId,
+      elementId: params.data.id,
+      data: { [params.colDef.field!]: params.newValue },
+      userId: currentUser.id,
+      timestamp: new Date(),
+      clientId: clientId,
+      sequenceNumber: getNextSequenceNumber()
+    };
+    
+    sendLocalChange(operation);
+    updateUserPresence(params.data.id, 'node');
+  }, [props.planNodeId, sendLocalChange, updateUserPresence]);
+
+  // Conflict resolution UI
+  const renderConflictResolution = () => (
+    <div className="conflict-resolution-panel">
+      {state.conflictedChanges.map(conflict => (
+        <ConflictResolutionDialog
+          key={conflict.localOperation?.id}
+          conflict={conflict}
+          onResolve={(resolution) => resolveConflict(conflict.localOperation!.id, resolution)}
+        />
+      ))}
+    </div>
+  );
+
+  return (
+    <div className="collaborative-data-grid">
+      {renderUserPresence()}
+      <AGGridReact
+        rowData={mergeChanges(props.graphObject, state.localChanges, state.remoteChanges)}
+        onGridReady={(params) => setGridApi(params.api)}
+        onCellValueChanged={onCellValueChanged}
+        // ... other AG-Grid props
+      />
+      {renderConflictResolution()}
+      <DraftChangesPanel sharedDrafts={state.sharedDrafts} />
+    </div>
+  );
+};
+```
+
+#### **4. Operational Transformation Logic**
+
+```typescript
+const transformOperation = (remoteOp: GraphOperation, localChanges: GraphDataChanges): GraphOperationResult => {
+  // Check for conflicts
+  const hasConflict = checkForConflict(remoteOp, localChanges);
+  
+  if (!hasConflict) {
+    return { operation: remoteOp, applied: true };
+  }
+
+  // Apply transformation rules based on operation types
+  switch (remoteOp.type) {
+    case 'update_node':
+      return transformNodeUpdate(remoteOp, localChanges);
+    case 'delete_node':
+      return transformNodeDeletion(remoteOp, localChanges);
+    case 'add_edge':
+      return transformEdgeAddition(remoteOp, localChanges);
+    // ... other transformation rules
+  }
+};
+
+const transformNodeUpdate = (remoteOp: GraphOperation, localChanges: GraphDataChanges): GraphOperationResult => {
+  const localUpdate = localChanges.nodes.updated.find(u => u.id === remoteOp.elementId);
+  
+  if (localUpdate) {
+    // Both local and remote updated the same node
+    const mergedData = mergeNodeData(localUpdate.changes, remoteOp.data);
+    return {
+      operation: { ...remoteOp, data: mergedData },
+      conflict: ConflictResolution.MERGE,
+      applied: true
+    };
+  }
+  
+  return { operation: remoteOp, applied: true };
+};
+
+const mergeNodeData = (localData: any, remoteData: any): any => {
+  // Intelligent merging of node properties
+  const merged = { ...localData };
+  
+  Object.keys(remoteData).forEach(key => {
+    if (key === 'x' || key === 'y') {
+      // For position changes, use most recent
+      merged[key] = remoteData[key];
+    } else if (key === 'label' && localData.label !== remoteData.label) {
+      // For label conflicts, concatenate or ask user
+      merged[key] = `${localData.label} | ${remoteData.label}`;
+      merged._conflict = true;
+    } else if (!localData.hasOwnProperty(key)) {
+      // Add new properties
+      merged[key] = remoteData[key];
+    }
+  });
+  
+  return merged;
+};
+```
+
+#### **5. Conflict Resolution UI Components**
+
+```typescript
+interface ConflictResolutionDialogProps {
+  conflict: ConflictedChange;
+  onResolve: (resolution: ConflictResolution) => void;
+}
+
+const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> = ({ conflict, onResolve }) => {
+  return (
+    <Dialog open={true} className="conflict-dialog">
+      <DialogTitle>Editing Conflict Detected</DialogTitle>
+      <DialogContent>
+        <div className="conflict-details">
+          <p>Both you and {conflict.remoteOperation.userId} edited the same element:</p>
+          
+          <div className="conflict-comparison">
+            <div className="local-change">
+              <h4>Your Changes:</h4>
+              <pre>{JSON.stringify(conflict.localOperation?.data, null, 2)}</pre>
+            </div>
+            <div className="remote-change">
+              <h4>Their Changes:</h4>
+              <pre>{JSON.stringify(conflict.remoteOperation.data, null, 2)}</pre>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => onResolve(ConflictResolution.MERGE)}>
+          Merge Changes
+        </Button>
+        <Button onClick={() => onResolve(ConflictResolution.LAST_WRITE_WINS)}>
+          Use Their Version
+        </Button>
+        <Button onClick={() => onResolve(ConflictResolution.FIRST_WRITE_WINS)}>
+          Keep My Version
+        </Button>
+        <Button onClick={() => onResolve(ConflictResolution.USER_RESOLVE)}>
+          Resolve Manually
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
+const DraftChangesPanel: React.FC<{ sharedDrafts: Record<string, DraftChanges> }> = ({ sharedDrafts }) => {
+  return (
+    <div className="draft-changes-panel">
+      <h3>Shared Drafts</h3>
+      {Object.values(sharedDrafts).map(draft => (
+        <div key={draft.id} className="draft-item">
+          <div className="draft-header">
+            <span className="user-name">{draft.userId}</span>
+            <span className="draft-summary">{generateDraftSummary(draft.changes)}</span>
+          </div>
+          {draft.previewEnabled && (
+            <DraftPreview changes={draft.changes} />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+};
+```
+
+#### **6. Performance Optimizations**
+
+**Debounced Updates:**
+```typescript
+const useDebouncedCollaboration = (planNodeId: string, debounceMs = 300) => {
+  const [pendingChanges, setPendingChanges] = useState<GraphOperation[]>([]);
+  
+  const debouncedSend = useMemo(
+    () => debounce((operations: GraphOperation[]) => {
+      // Batch operations for efficiency
+      sendBatchOperations(operations);
+      setPendingChanges([]);
+    }, debounceMs),
+    [debounceMs]
+  );
+
+  const queueOperation = useCallback((operation: GraphOperation) => {
+    setPendingChanges(prev => [...prev, operation]);
+    debouncedSend([...pendingChanges, operation]);
+  }, [pendingChanges, debouncedSend]);
+
+  return { queueOperation, pendingChanges };
+};
+```
+
+**Selective Subscriptions:**
+```typescript
+const useSelectiveSubscription = (planNodeId: string, elementTypes: ('nodes' | 'edges' | 'layers')[]) => {
+  return useSubscription(GRAPH_DATA_CHANGES_SUBSCRIPTION, {
+    variables: { 
+      planNodeId, 
+      userId: currentUser.id,
+      elementTypes // Only subscribe to relevant element types
+    },
+    shouldResubscribe: false // Prevent unnecessary resubscriptions
+  });
+};
+```
+
+### **Implementation Strategy**
+
+#### **Phase 1: Basic Real-time Sync (2-3 weeks)**
+1. Implement GraphQL subscriptions for graph data changes
+2. Basic operational transformation for simple conflicts
+3. Real-time updates in GraphDataGrid
+4. User presence indicators
+
+#### **Phase 2: Advanced Collaboration (3-4 weeks)**
+1. Sophisticated conflict resolution UI
+2. Draft changes sharing and preview
+3. Operational transformation for complex scenarios
+4. Performance optimizations (debouncing, batching)
+
+#### **Phase 3: Production Features (2-3 weeks)**
+1. Offline support with conflict resolution on reconnect
+2. Change history and rollback capabilities
+3. User permissions and edit locking
+4. Collaborative transformation nodes (multiple users contributing to single transformation)
+
+### **Collaboration Benefits**
+
+1. **Real-time Awareness**: Users see each other's changes immediately
+2. **Conflict Prevention**: Visual indicators of who is editing what
+3. **Intelligent Merging**: Automatic conflict resolution where possible
+4. **Audit Trail**: Complete history of who changed what and when
+5. **Scalable Architecture**: Supports teams of any size working on complex graphs
+6. **Consistent UX**: Same collaboration patterns across visualization and data grid
+
 ### **React Frontend Architecture**
 
 - React frontend with TypeScript for type safety and modern development experience
@@ -1071,7 +1588,24 @@ interface GraphVisualizationSync {
 5. Performance optimization for large DAGs (1000+ nodes)
 6. Advanced transformation operations (merge, split, aggregate)
 
-### **Phase 5: Production Readiness (2-3 weeks)**
+### **Phase 5: Real-time Collaboration (7-10 weeks)**
+1. **Basic Real-time Sync (2-3 weeks)**:
+   - GraphQL subscriptions for graph data changes
+   - Basic operational transformation for simple conflicts
+   - Real-time updates in GraphDataGrid and GraphVisualization
+   - User presence indicators
+2. **Advanced Collaboration (3-4 weeks)**:
+   - Sophisticated conflict resolution UI
+   - Draft changes sharing and preview
+   - Operational transformation for complex scenarios
+   - Performance optimizations (debouncing, batching)
+3. **Production Collaboration Features (2-3 weeks)**:
+   - Offline support with conflict resolution on reconnect
+   - Change history and rollback capabilities
+   - User permissions and edit locking
+   - Collaborative transformation nodes
+
+### **Phase 6: Production Readiness (2-3 weeks)**
 1. Optimize caching strategies based on usage patterns
 2. Complete MCP API implementation
 3. Deprecate legacy endpoints
@@ -1089,6 +1623,8 @@ This design supports the evolution from simple linear pipelines to complex multi
 5. **Developer Experience**: Visual editing with JSON-first approach and strong typing
 6. **Dual Interface Design**: Both graph visualization and spreadsheet editing for different use cases
 7. **Transformation-based Editing**: Audit trail and reversible changes through DAG transformations
-8. **Scalability**: Performance optimizations for large graphs and complex workflows
+8. **Real-time Collaboration**: Multi-browser synchronization with operational transformation
+9. **Intelligent Conflict Resolution**: Automatic merging with user-guided resolution for complex conflicts
+10. **Scalability**: Performance optimizations for large graphs and complex workflows
 
 The flat DAG structure provides a robust foundation for complex graph transformation workflows with strong GraphQL integration, enabling powerful querying, real-time collaboration, and visual editing capabilities.
