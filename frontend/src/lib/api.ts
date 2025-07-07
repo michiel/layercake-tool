@@ -98,19 +98,64 @@ export const plansApi = {
 
 // Graph data API
 export const graphDataApi = {
+  // Nodes
   getNodes: async (projectId: number): Promise<Node[]> => {
     const response = await api.get(`/projects/${projectId}/nodes`);
     return response.data;
   },
 
+  createNode: async (projectId: number, data: Partial<Node>): Promise<Node> => {
+    const response = await api.post(`/projects/${projectId}/nodes`, data);
+    return response.data;
+  },
+
+  updateNode: async (projectId: number, nodeId: string, data: Partial<Node>): Promise<Node> => {
+    const response = await api.put(`/projects/${projectId}/nodes/${nodeId}`, data);
+    return response.data;
+  },
+
+  deleteNode: async (projectId: number, nodeId: string): Promise<void> => {
+    await api.delete(`/projects/${projectId}/nodes/${nodeId}`);
+  },
+
+  // Edges
   getEdges: async (projectId: number): Promise<Edge[]> => {
     const response = await api.get(`/projects/${projectId}/edges`);
     return response.data;
   },
 
+  createEdge: async (projectId: number, data: Partial<Edge>): Promise<Edge> => {
+    const response = await api.post(`/projects/${projectId}/edges`, data);
+    return response.data;
+  },
+
+  updateEdge: async (projectId: number, edgeId: string, data: Partial<Edge>): Promise<Edge> => {
+    const response = await api.put(`/projects/${projectId}/edges/${edgeId}`, data);
+    return response.data;
+  },
+
+  deleteEdge: async (projectId: number, edgeId: string): Promise<void> => {
+    await api.delete(`/projects/${projectId}/edges/${edgeId}`);
+  },
+
+  // Layers
   getLayers: async (projectId: number): Promise<Layer[]> => {
     const response = await api.get(`/projects/${projectId}/layers`);
     return response.data;
+  },
+
+  createLayer: async (projectId: number, data: Partial<Layer>): Promise<Layer> => {
+    const response = await api.post(`/projects/${projectId}/layers`, data);
+    return response.data;
+  },
+
+  updateLayer: async (projectId: number, layerId: string, data: Partial<Layer>): Promise<Layer> => {
+    const response = await api.put(`/projects/${projectId}/layers/${layerId}`, data);
+    return response.data;
+  },
+
+  deleteLayer: async (projectId: number, layerId: string): Promise<void> => {
+    await api.delete(`/projects/${projectId}/layers/${layerId}`);
   },
 };
 

@@ -1,12 +1,14 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ApolloProvider, ApolloClient, InMemoryCache, createHttpLink } from '@apollo/client';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Dashboard } from '@/pages/Dashboard';
 import { Projects } from '@/pages/Projects';
 import { Plans } from '@/pages/Plans';
 import { Graph } from '@/pages/Graph';
+import { PlanPage } from '@/components/plans/PlanPage';
 
-// Create a client
+// Create TanStack Query client
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -16,24 +18,40 @@ const queryClient = new QueryClient({
   },
 });
 
+// Create Apollo Client
+const httpLink = createHttpLink({
+  uri: '/graphql',
+});
+
+const apolloClient = new ApolloClient({
+  link: httpLink,
+  cache: new InMemoryCache(),
+});
+
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <Router>
-        <Routes>
-          <Route path="/" element={<AppLayout />}>
-            <Route index element={<Dashboard />} />
-            <Route path="projects" element={<Projects />} />
-            <Route path="projects/:projectId" element={<Projects />} />
-            <Route path="projects/:projectId/plans" element={<Plans />} />
-            <Route path="projects/:projectId/graph" element={<Graph />} />
-            <Route path="plans" element={<div className="p-6">Plans - Coming Soon</div>} />
-            <Route path="graphs" element={<div className="p-6">Graphs - Coming Soon</div>} />
-            <Route path="analytics" element={<div className="p-6">Analytics - Coming Soon</div>} />
-          </Route>
-        </Routes>
-      </Router>
-    </QueryClientProvider>
+    <ApolloProvider client={apolloClient}>
+      <QueryClientProvider client={queryClient}>
+        <Router>
+          <Routes>
+            {/* Plan editor with custom layout (no sidebar) */}
+            <Route path="/projects/:projectId/plans/:planId" element={<PlanPage />} />
+            
+            {/* All other routes use the standard app layout */}
+            <Route path="/" element={<AppLayout />}>
+              <Route index element={<Dashboard />} />
+              <Route path="projects" element={<Projects />} />
+              <Route path="projects/:projectId" element={<Projects />} />
+              <Route path="projects/:projectId/plans" element={<Plans />} />
+              <Route path="projects/:projectId/graph" element={<Graph />} />
+              <Route path="plans" element={<div className="p-6">Plans - Coming Soon</div>} />
+              <Route path="graphs" element={<div className="p-6">Graphs - Coming Soon</div>} />
+              <Route path="analytics" element={<div className="p-6">Analytics - Coming Soon</div>} />
+            </Route>
+          </Routes>
+        </Router>
+      </QueryClientProvider>
+    </ApolloProvider>
   );
 }
 

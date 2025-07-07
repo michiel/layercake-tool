@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
 import { useQuery } from '@apollo/client';
-import { ReactFlow, Node, Edge, Background, BackgroundVariant } from '@xyflow/react';
+import { ReactFlow, Background, BackgroundVariant, type Node, type Edge } from '@xyflow/react';
 import { GET_PLAN_DAG } from '../../graphql/dag';
-import { DagPlan } from '../../types/dag';
+import type { DagPlan } from '../../types/dag';
 import { Loading } from '../ui/Loading';
 
 interface DagPreviewProps {

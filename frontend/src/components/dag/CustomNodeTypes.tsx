@@ -1,6 +1,6 @@
 import React from 'react';
-import { Handle, Position, Node } from '@xyflow/react';
-import { PlanNode } from '../../types/dag';
+import { Handle, Position } from '@xyflow/react';
+import type { PlanNode } from '../../types/dag';
 
 interface CustomNodeProps {
   data: {

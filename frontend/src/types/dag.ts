@@ -2,16 +2,16 @@
 
 export interface PlanNode {
   id: string;
-  plan_id: number;
-  node_type: string;
+  planId: number;
+  nodeType: string;
   name: string;
   description?: string | null;
   configuration: string; // JSON configuration
-  graph_id?: string | null;
-  position_x?: number | null;
-  position_y?: number | null;
-  created_at: string;
-  updated_at: string;
+  graphId?: string | null;
+  positionX?: number | null;
+  positionY?: number | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface DagEdge {
@@ -26,14 +26,14 @@ export interface DagPlan {
 
 export interface GraphArtifact {
   id: string;
-  plan_id: number;
-  plan_node_id: string;
+  planId: number;
+  planNodeId: string;
   name: string;
   description?: string | null;
-  graph_data: string; // JSON graph data
+  graphData: string; // JSON graph data
   metadata?: string | null; // JSON metadata
-  created_at: string;
-  updated_at: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface GraphStatistics {
@@ -71,21 +71,21 @@ export interface GraphDiff {
 
 // Input types for mutations
 export interface CreatePlanNodeInput {
-  plan_id: number;
-  node_type: string;
+  planId: number;
+  nodeType: string;
   name: string;
   description?: string | null;
   configuration: string;
-  position_x?: number | null;
-  position_y?: number | null;
+  positionX?: number | null;
+  positionY?: number | null;
 }
 
 export interface UpdatePlanNodeInput {
   name?: string;
   description?: string | null;
   configuration?: string;
-  position_x?: number | null;
-  position_y?: number | null;
+  positionX?: number | null;
+  positionY?: number | null;
 }
 
 // Node type definitions

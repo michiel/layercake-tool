@@ -51,3 +51,10 @@ pub struct CreateNodeInput {
     pub layer_id: Option<String>,
     pub properties: Option<JSON>,
 }
+
+#[derive(InputObject)]
+pub struct UpdateNodeInput {
+    pub label: Option<String>,
+    pub layer_id: Option<String>,
+    pub properties: Option<JSON>,
+}

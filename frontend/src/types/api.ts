@@ -1,46 +1,46 @@
-// Core API types for Layercake
+// Core API types for Layercake (GraphQL compatible)
 export interface Project {
   id: number;
   name: string;
   description?: string;
-  created_at: string;
-  updated_at: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Plan {
   id: number;
-  project_id: number;
+  projectId: number;
   name: string;
-  plan_content: string;
-  plan_format: 'json' | 'yaml';
-  plan_schema_version: string;
+  planContent: string;
+  planFormat: 'json' | 'yaml';
+  planSchemaVersion: string;
   dependencies?: number[];
   status: 'pending' | 'running' | 'completed' | 'failed';
-  created_at: string;
-  updated_at: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Node {
   id: number;
-  project_id: number;
-  node_id: string;
+  projectId: number;
+  nodeId: string;
   label: string;
-  layer_id?: string;
+  layerId?: string;
   properties?: Record<string, any>;
 }
 
 export interface Edge {
   id: number;
-  project_id: number;
-  source_node_id: string;
-  target_node_id: string;
+  projectId: number;
+  sourceNodeId: string;
+  targetNodeId: string;
   properties?: Record<string, any>;
 }
 
 export interface Layer {
   id: number;
-  project_id: number;
-  layer_id: string;
+  projectId: number;
+  layerId: string;
   name: string;
   color?: string;
   properties?: Record<string, any>;
@@ -58,23 +58,23 @@ export interface UpdateProjectRequest {
 
 export interface CreatePlanRequest {
   name: string;
-  plan_content: string;
+  planContent: string;
   dependencies?: number[];
 }
 
 export interface UpdatePlanRequest {
   name?: string;
-  plan_content?: string;
+  planContent?: string;
   dependencies?: number[];
 }
 
 export interface ExecutePlanRequest {
-  plan_id: number;
+  planId: number;
 }
 
 export interface ExecutePlanResponse {
   status: string;
-  plan_id: number;
+  planId: number;
   message?: string;
 }
 

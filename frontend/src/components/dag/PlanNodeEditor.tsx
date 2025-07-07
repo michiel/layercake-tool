@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { PlanNode } from '../../types/dag';
+import type { PlanNode } from '../../types/dag';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';

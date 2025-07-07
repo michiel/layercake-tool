@@ -4,16 +4,16 @@ import { gql } from '@apollo/client';
 export const PLAN_NODE_FRAGMENT = gql`
   fragment PlanNodeFragment on PlanNode {
     id
-    plan_id
-    node_type
+    planId
+    nodeType
     name
     description
     configuration
-    graph_id
-    position_x
-    position_y
-    created_at
-    updated_at
+    graphId
+    positionX
+    positionY
+    createdAt
+    updatedAt
   }
 `;
 
@@ -33,14 +33,47 @@ export const DAG_PLAN_FRAGMENT = gql`
 export const GRAPH_ARTIFACT_FRAGMENT = gql`
   fragment GraphArtifactFragment on GraphArtifact {
     id
-    plan_id
-    plan_node_id
+    planId
+    planNodeId
     name
     description
-    graph_data
+    graphData
     metadata
-    created_at
-    updated_at
+    createdAt
+    updatedAt
+  }
+`;
+
+// Graph data fragments
+export const NODE_FRAGMENT = gql`
+  fragment NodeFragment on Node {
+    id
+    projectId
+    nodeId
+    label
+    layerId
+    properties
+  }
+`;
+
+export const EDGE_FRAGMENT = gql`
+  fragment EdgeFragment on Edge {
+    id
+    projectId
+    sourceNodeId
+    targetNodeId
+    properties
+  }
+`;
+
+export const LAYER_FRAGMENT = gql`
+  fragment LayerFragment on Layer {
+    id
+    projectId
+    layerId
+    name
+    color
+    properties
   }
 `;
 
@@ -51,8 +84,8 @@ export const GET_PROJECT = gql`
       id
       name
       description
-      created_at
-      updated_at
+      createdAt
+      updatedAt
     }
   }
 `;
@@ -62,34 +95,32 @@ export const GET_PLAN = gql`
     plan(id: $id) {
       id
       name
-      description
-      project_id
-      plan_content
-      plan_format
-      plan_schema_version
+      projectId
+      planContent
+      planFormat
+      planSchemaVersion
       status
-      created_at
-      updated_at
+      createdAt
+      updatedAt
     }
   }
 `;
 
 export const GET_PLANS_FOR_PROJECT = gql`
   query GetPlansForProject($projectId: Int!) {
-    plans(project_id: $projectId) {
+    plans(projectId: $projectId) {
       id
       name
-      description
       status
-      created_at
-      updated_at
+      createdAt
+      updatedAt
     }
   }
 `;
 
 export const GET_PLAN_DAG = gql`
   query GetPlanDag($planId: Int!) {
-    plan_dag(plan_id: $planId) {
+    planDag(planId: $planId) {
       ...DagPlanFragment
     }
   }
@@ -98,7 +129,7 @@ export const GET_PLAN_DAG = gql`
 
 export const GET_PLAN_NODES = gql`
   query GetPlanNodes($planId: Int!) {
-    plan_nodes(plan_id: $planId) {
+    planNodes(planId: $planId) {
       ...PlanNodeFragment
     }
   }
@@ -107,7 +138,7 @@ export const GET_PLAN_NODES = gql`
 
 export const GET_PLAN_NODE = gql`
   query GetPlanNode($id: String!) {
-    plan_node(id: $id) {
+    planNode(id: $id) {
       ...PlanNodeFragment
     }
   }
@@ -116,7 +147,7 @@ export const GET_PLAN_NODE = gql`
 
 export const GET_GRAPH_ARTIFACT = gql`
   query GetGraphArtifact($planNodeId: String!) {
-    graph_artifact(plan_node_id: $planNodeId) {
+    graphArtifact(planNodeId: $planNodeId) {
       ...GraphArtifactFragment
     }
   }
@@ -125,11 +156,58 @@ export const GET_GRAPH_ARTIFACT = gql`
 
 export const GET_GRAPH_ARTIFACTS = gql`
   query GetGraphArtifacts($planId: Int!) {
-    graph_artifacts(plan_id: $planId) {
+    graphArtifacts(planId: $planId) {
       ...GraphArtifactFragment
     }
   }
   ${GRAPH_ARTIFACT_FRAGMENT}
+`;
+
+// Graph data queries
+export const GET_NODES = gql`
+  query GetNodes($projectId: Int!) {
+    nodes(projectId: $projectId) {
+      ...NodeFragment
+    }
+  }
+  ${NODE_FRAGMENT}
+`;
+
+export const GET_EDGES = gql`
+  query GetEdges($projectId: Int!) {
+    edges(projectId: $projectId) {
+      ...EdgeFragment
+    }
+  }
+  ${EDGE_FRAGMENT}
+`;
+
+export const GET_LAYERS = gql`
+  query GetLayers($projectId: Int!) {
+    layers(projectId: $projectId) {
+      ...LayerFragment
+    }
+  }
+  ${LAYER_FRAGMENT}
+`;
+
+export const GET_GRAPH_DATA = gql`
+  query GetGraphData($projectId: Int!) {
+    graphData(projectId: $projectId) {
+      nodes {
+        ...NodeFragment
+      }
+      edges {
+        ...EdgeFragment
+      }
+      layers {
+        ...LayerFragment
+      }
+    }
+  }
+  ${NODE_FRAGMENT}
+  ${EDGE_FRAGMENT}
+  ${LAYER_FRAGMENT}
 `;
 
 // Mutations
@@ -153,7 +231,80 @@ export const UPDATE_PLAN_NODE = gql`
 
 export const DELETE_PLAN_NODE = gql`
   mutation DeletePlanNode($id: String!) {
-    delete_plan_node(id: $id)
+    delete_planNode(id: $id)
+  }
+`;
+
+// Graph data mutations
+export const CREATE_NODE = gql`
+  mutation CreateNode($projectId: Int!, $input: CreateNodeInput!) {
+    create_node(project_id: $projectId, input: $input) {
+      ...NodeFragment
+    }
+  }
+  ${NODE_FRAGMENT}
+`;
+
+export const UPDATE_NODE = gql`
+  mutation UpdateNode($nodeId: String!, $input: UpdateNodeInput!) {
+    update_node(node_id: $nodeId, input: $input) {
+      ...NodeFragment
+    }
+  }
+  ${NODE_FRAGMENT}
+`;
+
+export const DELETE_NODE = gql`
+  mutation DeleteNode($nodeId: String!) {
+    delete_node(node_id: $nodeId)
+  }
+`;
+
+export const CREATE_EDGE = gql`
+  mutation CreateEdge($projectId: Int!, $input: CreateEdgeInput!) {
+    create_edge(project_id: $projectId, input: $input) {
+      ...EdgeFragment
+    }
+  }
+  ${EDGE_FRAGMENT}
+`;
+
+export const UPDATE_EDGE = gql`
+  mutation UpdateEdge($edgeId: Int!, $input: UpdateEdgeInput!) {
+    update_edge(edge_id: $edgeId, input: $input) {
+      ...EdgeFragment
+    }
+  }
+  ${EDGE_FRAGMENT}
+`;
+
+export const DELETE_EDGE = gql`
+  mutation DeleteEdge($edgeId: Int!) {
+    delete_edge(edge_id: $edgeId)
+  }
+`;
+
+export const CREATE_LAYER = gql`
+  mutation CreateLayer($projectId: Int!, $input: CreateLayerInput!) {
+    create_layer(project_id: $projectId, input: $input) {
+      ...LayerFragment
+    }
+  }
+  ${LAYER_FRAGMENT}
+`;
+
+export const UPDATE_LAYER = gql`
+  mutation UpdateLayer($layerId: String!, $input: UpdateLayerInput!) {
+    update_layer(layer_id: $layerId, input: $input) {
+      ...LayerFragment
+    }
+  }
+  ${LAYER_FRAGMENT}
+`;
+
+export const DELETE_LAYER = gql`
+  mutation DeleteLayer($layerId: String!) {
+    delete_layer(layer_id: $layerId)
   }
 `;
 
@@ -174,6 +325,45 @@ export interface UpdatePlanNodeInput {
   configuration?: string;
   position_x?: number | null;
   position_y?: number | null;
+}
+
+// Graph data input types
+export interface CreateNodeInput {
+  node_id: string;
+  label: string;
+  layer_id?: string | null;
+  properties?: any;
+}
+
+export interface UpdateNodeInput {
+  label?: string;
+  layer_id?: string | null;
+  properties?: any;
+}
+
+export interface CreateEdgeInput {
+  source_node_id: string;
+  target_node_id: string;
+  properties?: any;
+}
+
+export interface UpdateEdgeInput {
+  source_node_id?: string;
+  target_node_id?: string;
+  properties?: any;
+}
+
+export interface CreateLayerInput {
+  layer_id: string;
+  name: string;
+  color?: string | null;
+  properties?: any;
+}
+
+export interface UpdateLayerInput {
+  name?: string;
+  color?: string | null;
+  properties?: any;
 }
 
 // Query result types

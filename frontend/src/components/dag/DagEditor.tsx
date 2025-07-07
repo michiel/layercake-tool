@@ -1,8 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ReactFlow,
-  Node,
-  Edge,
   addEdge,
   useNodesState,
   useEdgesState,
@@ -10,25 +8,25 @@ import {
   MiniMap,
   Background,
   BackgroundVariant,
-  Connection,
-  NodeChange,
-  EdgeChange,
-  applyNodeChanges,
-  applyEdgeChanges,
   ReactFlowProvider,
-  Panel,
+  useReactFlow,
+  type Node,
+  type Edge,
+  type Connection,
+  type NodeChange,
+  type EdgeChange,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { PlanNode, DagPlan } from '../../types/dag';
+import type { PlanNode, DagPlan } from '../../types/dag';
 import { PlanNodeEditor } from './PlanNodeEditor';
 import { CustomNodeTypes } from './CustomNodeTypes';
-import { NodeToolbar } from './NodeToolbar';
 
 interface DagEditorProps {
   planId: number;
   dagPlan?: DagPlan;
   onDagChange?: (dag: DagPlan) => void;
   readonly?: boolean;
+  onNodeAdd?: (nodeType: string, position: { x: number; y: number }) => void;
 }
 
 const nodeTypes = {
@@ -44,6 +42,7 @@ export const DagEditor: React.FC<DagEditorProps> = ({
   dagPlan,
   onDagChange,
   readonly = false,
+  onNodeAdd,
 }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -55,10 +54,10 @@ export const DagEditor: React.FC<DagEditorProps> = ({
     if (dagPlan) {
       const reactFlowNodes: Node[] = dagPlan.nodes.map((planNode) => ({
         id: planNode.id,
-        type: planNode.node_type,
+        type: planNode.nodeType,
         position: {
-          x: planNode.position_x || 0,
-          y: planNode.position_y || 0,
+          x: planNode.positionX || 0,
+          y: planNode.positionY || 0,
         },
         data: {
           label: planNode.name,
@@ -156,40 +155,56 @@ export const DagEditor: React.FC<DagEditorProps> = ({
     [nodes, setNodes, onDagChange, dagPlan]
   );
 
-  const handleAddNode = useCallback(
-    (nodeType: string) => {
+  const handleDrop = useCallback(
+    (event: React.DragEvent) => {
+      event.preventDefault();
+      
       if (readonly) return;
       
-      const newNode: Node = {
-        id: `node-${Date.now()}`,
-        type: nodeType,
-        position: {
-          x: Math.random() * 400,
-          y: Math.random() * 400,
-        },
-        data: {
-          label: `New ${nodeType} Node`,
-          description: '',
-          configuration: '{}',
-          planNode: {
-            id: `node-${Date.now()}`,
-            plan_id: planId,
-            node_type: nodeType,
-            name: `New ${nodeType} Node`,
+      const nodeType = event.dataTransfer.getData('application/reactflow');
+      const rect = (event.target as HTMLElement).getBoundingClientRect();
+      const position = {
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top,
+      };
+      
+      if (onNodeAdd) {
+        onNodeAdd(nodeType, position);
+      } else {
+        // Fallback: create node directly
+        const newNode: Node = {
+          id: `node-${Date.now()}`,
+          type: nodeType,
+          position,
+          data: {
+            label: `New ${nodeType} Node`,
             description: '',
             configuration: '{}',
-            position_x: Math.random() * 400,
-            position_y: Math.random() * 400,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
+            planNode: {
+              id: `node-${Date.now()}`,
+              planId: planId,
+              nodeType: nodeType,
+              name: `New ${nodeType} Node`,
+              description: '',
+              configuration: '{}',
+              positionX: position.x,
+              positionY: position.y,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            },
           },
-        },
-      };
+        };
 
-      setNodes((nds) => [...nds, newNode]);
+        setNodes((nds) => [...nds, newNode]);
+      }
     },
-    [planId, setNodes, readonly]
+    [planId, setNodes, readonly, onNodeAdd]
   );
+
+  const handleDragOver = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  }, []);
 
   const handleDeleteNode = useCallback(
     (nodeId: string) => {
@@ -204,28 +219,28 @@ export const DagEditor: React.FC<DagEditorProps> = ({
   return (
     <div className="h-full w-full">
       <ReactFlowProvider>
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          onNodeClick={onNodeClick}
-          onNodeDragStop={onNodeDragStop}
-          nodeTypes={nodeTypes}
-          fitView
-          attributionPosition="bottom-left"
+        <div 
+          className="h-full w-full"
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
         >
-          <Controls />
-          <MiniMap />
-          <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
-          
-          {!readonly && (
-            <Panel position="top-left">
-              <NodeToolbar onAddNode={handleAddNode} />
-            </Panel>
-          )}
-        </ReactFlow>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onNodeClick={onNodeClick}
+            onNodeDragStop={onNodeDragStop}
+            nodeTypes={nodeTypes}
+            fitView
+            attributionPosition="bottom-left"
+          >
+            <Controls />
+            <MiniMap />
+            <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
+          </ReactFlow>
+        </div>
 
         {selectedNode && (
           <PlanNodeEditor

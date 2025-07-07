@@ -48,3 +48,10 @@ pub struct CreateEdgeInput {
     pub target_node_id: String,
     pub properties: Option<JSON>,
 }
+
+#[derive(InputObject)]
+pub struct UpdateEdgeInput {
+    pub source_node_id: Option<String>,
+    pub target_node_id: Option<String>,
+    pub properties: Option<JSON>,
+}

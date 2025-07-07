@@ -20,7 +20,7 @@ use utoipa_swagger_ui::SwaggerUi;
 #[cfg(feature = "graphql")]
 use std::sync::Arc;
 #[cfg(feature = "graphql")]
-use async_graphql::{Schema, Request, Response as GraphQLResponse};
+use async_graphql::{Schema, Request as GraphQLRequest, Response as GraphQLResponse};
 #[cfg(feature = "graphql")]
 use crate::graphql::{GraphQLContext, GraphQLSchema, queries::Query, mutations::Mutation};
 #[cfg(feature = "graphql")]
@@ -250,7 +250,7 @@ fn api_v1_routes() -> Router<AppState> {
 #[cfg(feature = "graphql")]
 async fn graphql_handler(
     State(state): State<AppState>,
-    req: axum::extract::Json<Request>,
+    req: axum::extract::Json<GraphQLRequest>,
 ) -> axum::response::Json<GraphQLResponse> {
     let response = state.graphql_schema.execute(req.0).await;
     axum::response::Json(response)

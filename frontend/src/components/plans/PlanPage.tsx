@@ -2,6 +2,7 @@ import React from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@apollo/client';
 import { GET_PLAN } from '../../graphql/dag';
+import { PlanLayout } from '../layout/PlanLayout';
 import { PlanView } from './PlanView';
 import { Loading } from '../ui/Loading';
 import { ErrorMessage } from '../ui/ErrorMessage';
@@ -25,28 +26,32 @@ export const PlanPage: React.FC = () => {
 
   if (planLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loading size="lg" />
-      </div>
+      <PlanLayout>
+        <div className="flex items-center justify-center h-64">
+          <Loading size="lg" />
+        </div>
+      </PlanLayout>
     );
   }
 
   if (planError || !planData?.plan) {
     return (
-      <ErrorMessage
-        title="Plan not found"
-        message={planError?.message || 'The requested plan could not be found'}
-      />
+      <PlanLayout>
+        <ErrorMessage
+          title="Plan not found"
+          message={planError?.message || 'The requested plan could not be found'}
+        />
+      </PlanLayout>
     );
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <PlanLayout>
       <PlanView
         planId={planIdNum}
         projectId={projectIdNum}
         plan={planData.plan}
       />
-    </div>
+    </PlanLayout>
   );
 };

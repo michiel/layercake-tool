@@ -1,27 +1,32 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import { 
-  ColumnDef, 
   getCoreRowModel, 
   useReactTable, 
   flexRender,
   getFilteredRowModel,
   getPaginationRowModel,
+  type ColumnDef,
 } from '@tanstack/react-table';
 import { Plus, Download, Upload, Save, X, Check, Eye, EyeOff, RefreshCw } from 'lucide-react';
-import { GET_GRAPH_ARTIFACT, CREATE_PLAN_NODE } from '../../graphql/dag';
-import { GraphArtifact } from '../../types/dag';
+import { 
+  GET_GRAPH_DATA, 
+  CREATE_NODE, UPDATE_NODE, DELETE_NODE,
+  CREATE_EDGE, UPDATE_EDGE, DELETE_EDGE,
+  CREATE_LAYER, UPDATE_LAYER, DELETE_LAYER,
+  type CreateNodeInput, type UpdateNodeInput,
+  type CreateEdgeInput, type UpdateEdgeInput,
+  type CreateLayerInput, type UpdateLayerInput,
+} from '../../graphql/dag';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Loading } from '../ui/Loading';
 import { ErrorMessage } from '../ui/ErrorMessage';
-import { useGraphSync, GraphVisualizationRef } from '../../hooks/useGraphSync';
+import { useGraphSync, type GraphVisualizationRef } from '../../hooks/useGraphSync';
 
 interface GraphDataGridProps {
   projectId: number;
-  planId: number;
-  planNodeId: string;
   editMode?: 'transformation' | 'in-place' | 'read-only';
   syncWithVisualization?: boolean;
   onDataChange?: (changes: GraphDataChanges) => void;
@@ -58,40 +63,35 @@ interface GraphDataChanges {
 }
 
 interface GraphNode {
-  id: string;
+  id: number;
+  project_id: number;
+  node_id: string;
   label: string;
-  layer: string;
-  x?: number;
-  y?: number;
-  weight?: number;
-  properties?: Record<string, any>;
+  layer_id?: string | null;
+  properties?: any;
 }
 
 interface GraphEdge {
-  id: string;
-  source: string;
-  target: string;
-  label?: string;
-  layer?: string;
-  weight?: number;
-  properties?: Record<string, any>;
+  id: number;
+  project_id: number;
+  source_node_id: string;
+  target_node_id: string;
+  properties?: any;
 }
 
 interface GraphLayer {
-  id: string;
+  id: number;
+  project_id: number;
+  layer_id: string;
   name: string;
-  color: string;
-  description?: string;
-  visible?: boolean;
-  order?: number;
+  color?: string | null;
+  properties?: any;
 }
 
 type TabType = 'nodes' | 'edges' | 'layers';
 
 export const GraphDataGrid: React.FC<GraphDataGridProps> = ({
   projectId,
-  planId,
-  planNodeId,
   editMode = 'transformation',
   syncWithVisualization = true,
   onDataChange,
@@ -102,19 +102,6 @@ export const GraphDataGrid: React.FC<GraphDataGridProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('nodes');
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
-
-  const handleRowSelection = useCallback((rowIds: string[]) => {
-    setSelectedRows(rowIds);
-    
-    // Sync selection with visualization
-    if (activeTab === 'nodes' && onNodeSelect) {
-      onNodeSelect(rowIds);
-      highlightInVisualization(rowIds, []);
-    } else if (activeTab === 'edges' && onEdgeSelect) {
-      onEdgeSelect(rowIds);
-      highlightInVisualization([], rowIds);
-    }
-  }, [activeTab, onNodeSelect, onEdgeSelect, highlightInVisualization]);
   const [pendingChanges, setPendingChanges] = useState<GraphDataChanges>({
     nodes: { added: [], updated: [], deleted: [] },
     edges: { added: [], updated: [], deleted: [] },
@@ -140,32 +127,48 @@ export const GraphDataGrid: React.FC<GraphDataGridProps> = ({
   });
 
   // Fetch graph data
-  const { data, loading, error, refetch } = useQuery(GET_GRAPH_ARTIFACT, {
-    variables: { planNodeId },
+  const { data, loading, error, refetch } = useQuery(GET_GRAPH_DATA, {
+    variables: { projectId },
   });
 
-  const [createTransformationNode] = useMutation(CREATE_PLAN_NODE);
+  // GraphQL mutations
+  const [createNode] = useMutation(CREATE_NODE);
+  const [updateNode] = useMutation(UPDATE_NODE);
+  const [deleteNode] = useMutation(DELETE_NODE);
+  const [createEdge] = useMutation(CREATE_EDGE);
+  const [updateEdge] = useMutation(UPDATE_EDGE);
+  const [deleteEdge] = useMutation(DELETE_EDGE);
+  const [createLayer] = useMutation(CREATE_LAYER);
+  const [updateLayer] = useMutation(UPDATE_LAYER);
+  const [deleteLayer] = useMutation(DELETE_LAYER);
 
   const graphData = useMemo(() => {
-    if (!data?.graph_artifact?.graph_data) return null;
-    
-    try {
-      return JSON.parse(data.graph_artifact.graph_data);
-    } catch (error) {
-      console.error('Failed to parse graph data:', error);
-      return null;
-    }
+    if (!data?.graph_data) return null;
+    return data.graph_data;
   }, [data]);
+
+  const handleRowSelection = useCallback((rowIds: string[]) => {
+    setSelectedRows(rowIds);
+    
+    // Sync selection with visualization
+    if (activeTab === 'nodes' && onNodeSelect) {
+      onNodeSelect(rowIds);
+      highlightInVisualization(rowIds, []);
+    } else if (activeTab === 'edges' && onEdgeSelect) {
+      onEdgeSelect(rowIds);
+      highlightInVisualization([], rowIds);
+    }
+  }, [activeTab, onNodeSelect, onEdgeSelect, highlightInVisualization]);
 
   // Validation functions
   const validateNodeData = useCallback((node: GraphNode): ValidationError[] => {
     const errors: ValidationError[] = [];
     
-    if (!node.id || node.id.trim() === '') {
+    if (!node.node_id || node.node_id.trim() === '') {
       errors.push({
         type: 'node',
-        id: node.id,
-        field: 'id',
+        id: node.node_id,
+        field: 'node_id',
         message: 'Node ID cannot be empty',
         severity: 'error'
       });
@@ -174,30 +177,10 @@ export const GraphDataGrid: React.FC<GraphDataGridProps> = ({
     if (!node.label || node.label.trim() === '') {
       errors.push({
         type: 'node',
-        id: node.id,
+        id: node.node_id,
         field: 'label',
         message: 'Node label cannot be empty',
         severity: 'error'
-      });
-    }
-    
-    if (!node.layer || node.layer.trim() === '') {
-      errors.push({
-        type: 'node',
-        id: node.id,
-        field: 'layer',
-        message: 'Node must be assigned to a layer',
-        severity: 'error'
-      });
-    }
-    
-    if (node.weight !== undefined && (node.weight < 0 || node.weight > 1000)) {
-      errors.push({
-        type: 'node',
-        id: node.id,
-        field: 'weight',
-        message: 'Node weight must be between 0 and 1000',
-        severity: 'warning'
       });
     }
     
@@ -207,53 +190,33 @@ export const GraphDataGrid: React.FC<GraphDataGridProps> = ({
   const validateEdgeData = useCallback((edge: GraphEdge): ValidationError[] => {
     const errors: ValidationError[] = [];
     
-    if (!edge.id || edge.id.trim() === '') {
+    if (!edge.source_node_id || edge.source_node_id.trim() === '') {
       errors.push({
         type: 'edge',
-        id: edge.id,
-        field: 'id',
-        message: 'Edge ID cannot be empty',
-        severity: 'error'
-      });
-    }
-    
-    if (!edge.source || edge.source.trim() === '') {
-      errors.push({
-        type: 'edge',
-        id: edge.id,
-        field: 'source',
+        id: edge.id.toString(),
+        field: 'source_node_id',
         message: 'Edge source cannot be empty',
         severity: 'error'
       });
     }
     
-    if (!edge.target || edge.target.trim() === '') {
+    if (!edge.target_node_id || edge.target_node_id.trim() === '') {
       errors.push({
         type: 'edge',
-        id: edge.id,
-        field: 'target',
+        id: edge.id.toString(),
+        field: 'target_node_id',
         message: 'Edge target cannot be empty',
         severity: 'error'
       });
     }
     
-    if (edge.source === edge.target) {
+    if (edge.source_node_id === edge.target_node_id) {
       errors.push({
         type: 'edge',
-        id: edge.id,
-        field: 'target',
+        id: edge.id.toString(),
+        field: 'target_node_id',
         message: 'Edge cannot connect a node to itself',
         severity: 'error'
-      });
-    }
-    
-    if (edge.weight !== undefined && (edge.weight < 0 || edge.weight > 1000)) {
-      errors.push({
-        type: 'edge',
-        id: edge.id,
-        field: 'weight',
-        message: 'Edge weight must be between 0 and 1000',
-        severity: 'warning'
       });
     }
     
@@ -263,11 +226,11 @@ export const GraphDataGrid: React.FC<GraphDataGridProps> = ({
   const validateLayerData = useCallback((layer: GraphLayer): ValidationError[] => {
     const errors: ValidationError[] = [];
     
-    if (!layer.id || layer.id.trim() === '') {
+    if (!layer.layer_id || layer.layer_id.trim() === '') {
       errors.push({
         type: 'layer',
-        id: layer.id,
-        field: 'id',
+        id: layer.layer_id,
+        field: 'layer_id',
         message: 'Layer ID cannot be empty',
         severity: 'error'
       });
@@ -276,17 +239,17 @@ export const GraphDataGrid: React.FC<GraphDataGridProps> = ({
     if (!layer.name || layer.name.trim() === '') {
       errors.push({
         type: 'layer',
-        id: layer.id,
+        id: layer.layer_id,
         field: 'name',
         message: 'Layer name cannot be empty',
         severity: 'error'
       });
     }
     
-    if (!layer.color || !layer.color.match(/^#[0-9A-F]{6}$/i)) {
+    if (layer.color && !layer.color.match(/^#[0-9A-F]{6}$/i)) {
       errors.push({
         type: 'layer',
-        id: layer.id,
+        id: layer.layer_id,
         field: 'color',
         message: 'Layer color must be a valid hex color (e.g., #FF0000)',
         severity: 'error'
@@ -374,8 +337,8 @@ export const GraphDataGrid: React.FC<GraphDataGridProps> = ({
   // Node columns configuration
   const nodeColumns = useMemo<ColumnDef<GraphNode>[]>(() => [
     {
-      accessorKey: 'id',
-      header: 'ID',
+      accessorKey: 'node_id',
+      header: 'Node ID',
       enableSorting: true,
       cell: ({ getValue }) => (
         <span className="font-mono text-sm">{getValue() as string}</span>
@@ -385,7 +348,7 @@ export const GraphDataGrid: React.FC<GraphDataGridProps> = ({
       accessorKey: 'label',
       header: 'Label',
       enableSorting: true,
-      cell: ({ getValue, row, column }) => {
+      cell: ({ getValue, row }) => {
         const value = getValue() as string;
         if (editMode === 'read-only') {
           return <span>{value}</span>;
@@ -393,81 +356,26 @@ export const GraphDataGrid: React.FC<GraphDataGridProps> = ({
         return (
           <EditableCell
             value={value}
-            onChange={(newValue) => handleCellEdit(row.original.id, 'label', newValue)}
-            errors={getCellErrors(row.original.id, 'label')}
+            onChange={(newValue) => handleCellEdit(row.original.node_id, 'label', newValue)}
+            errors={getCellErrors(row.original.node_id, 'label')}
           />
         );
       },
     },
     {
-      accessorKey: 'layer',
+      accessorKey: 'layer_id',
       header: 'Layer',
       enableSorting: true,
       cell: ({ getValue, row }) => {
         const value = getValue() as string;
         if (editMode === 'read-only') {
-          return <span>{value}</span>;
+          return <span>{value || ''}</span>;
         }
         return (
           <EditableCell
-            value={value}
-            onChange={(newValue) => handleCellEdit(row.original.id, 'layer', newValue)}
-            errors={getCellErrors(row.original.id, 'layer')}
-          />
-        );
-      },
-    },
-    {
-      accessorKey: 'x',
-      header: 'X',
-      enableSorting: true,
-      cell: ({ getValue, row }) => {
-        const value = getValue() as number;
-        if (editMode === 'read-only') {
-          return <span>{value || 0}</span>;
-        }
-        return (
-          <EditableCell
-            value={value?.toString() || '0'}
-            type="number"
-            onChange={(newValue) => handleCellEdit(row.original.id, 'x', parseFloat(newValue) || 0)}
-            errors={getCellErrors(row.original.id, 'x')}
-          />
-        );
-      },
-    },
-    {
-      accessorKey: 'y',
-      header: 'Y',
-      enableSorting: true,
-      cell: ({ getValue, row }) => {
-        const value = getValue() as number;
-        if (editMode === 'read-only') {
-          return <span>{value || 0}</span>;
-        }
-        return (
-          <EditableCell
-            value={value?.toString() || '0'}
-            type="number"
-            onChange={(newValue) => handleCellEdit(row.original.id, 'y', parseFloat(newValue) || 0)}
-          />
-        );
-      },
-    },
-    {
-      accessorKey: 'weight',
-      header: 'Weight',
-      enableSorting: true,
-      cell: ({ getValue, row }) => {
-        const value = getValue() as number;
-        if (editMode === 'read-only') {
-          return <span>{value || 0}</span>;
-        }
-        return (
-          <EditableCell
-            value={value?.toString() || '0'}
-            type="number"
-            onChange={(newValue) => handleCellEdit(row.original.id, 'weight', parseFloat(newValue) || 0)}
+            value={value || ''}
+            onChange={(newValue) => handleCellEdit(row.original.node_id, 'layer_id', newValue)}
+            errors={getCellErrors(row.original.node_id, 'layer_id')}
           />
         );
       },
@@ -481,11 +389,11 @@ export const GraphDataGrid: React.FC<GraphDataGridProps> = ({
       header: 'ID',
       enableSorting: true,
       cell: ({ getValue }) => (
-        <span className="font-mono text-sm">{getValue() as string}</span>
+        <span className="font-mono text-sm">{getValue() as number}</span>
       ),
     },
     {
-      accessorKey: 'source',
+      accessorKey: 'source_node_id',
       header: 'Source',
       enableSorting: true,
       cell: ({ getValue, row }) => {
@@ -496,13 +404,13 @@ export const GraphDataGrid: React.FC<GraphDataGridProps> = ({
         return (
           <EditableCell
             value={value}
-            onChange={(newValue) => handleCellEdit(row.original.id, 'source', newValue)}
+            onChange={(newValue) => handleCellEdit(row.original.id.toString(), 'source_node_id', newValue)}
           />
         );
       },
     },
     {
-      accessorKey: 'target',
+      accessorKey: 'target_node_id',
       header: 'Target',
       enableSorting: true,
       cell: ({ getValue, row }) => {
@@ -513,42 +421,7 @@ export const GraphDataGrid: React.FC<GraphDataGridProps> = ({
         return (
           <EditableCell
             value={value}
-            onChange={(newValue) => handleCellEdit(row.original.id, 'target', newValue)}
-          />
-        );
-      },
-    },
-    {
-      accessorKey: 'label',
-      header: 'Label',
-      enableSorting: true,
-      cell: ({ getValue, row }) => {
-        const value = getValue() as string;
-        if (editMode === 'read-only') {
-          return <span>{value || ''}</span>;
-        }
-        return (
-          <EditableCell
-            value={value || ''}
-            onChange={(newValue) => handleCellEdit(row.original.id, 'label', newValue)}
-          />
-        );
-      },
-    },
-    {
-      accessorKey: 'weight',
-      header: 'Weight',
-      enableSorting: true,
-      cell: ({ getValue, row }) => {
-        const value = getValue() as number;
-        if (editMode === 'read-only') {
-          return <span>{value || 0}</span>;
-        }
-        return (
-          <EditableCell
-            value={value?.toString() || '0'}
-            type="number"
-            onChange={(newValue) => handleCellEdit(row.original.id, 'weight', parseFloat(newValue) || 0)}
+            onChange={(newValue) => handleCellEdit(row.original.id.toString(), 'target_node_id', newValue)}
           />
         );
       },
@@ -558,8 +431,8 @@ export const GraphDataGrid: React.FC<GraphDataGridProps> = ({
   // Layer columns configuration
   const layerColumns = useMemo<ColumnDef<GraphLayer>[]>(() => [
     {
-      accessorKey: 'id',
-      header: 'ID',
+      accessorKey: 'layer_id',
+      header: 'Layer ID',
       enableSorting: true,
       cell: ({ getValue }) => (
         <span className="font-mono text-sm">{getValue() as string}</span>
@@ -577,7 +450,7 @@ export const GraphDataGrid: React.FC<GraphDataGridProps> = ({
         return (
           <EditableCell
             value={value}
-            onChange={(newValue) => handleCellEdit(row.original.id, 'name', newValue)}
+            onChange={(newValue) => handleCellEdit(row.original.layer_id, 'name', newValue)}
           />
         );
       },
@@ -592,53 +465,17 @@ export const GraphDataGrid: React.FC<GraphDataGridProps> = ({
           <div className="flex items-center space-x-2">
             <div 
               className="w-4 h-4 rounded border border-gray-300"
-              style={{ backgroundColor: value }}
+              style={{ backgroundColor: value || '#6366f1' }}
             />
             {editMode === 'read-only' ? (
-              <span className="font-mono text-sm">{value}</span>
+              <span className="font-mono text-sm">{value || '#6366f1'}</span>
             ) : (
               <EditableCell
-                value={value}
-                onChange={(newValue) => handleCellEdit(row.original.id, 'color', newValue)}
+                value={value || '#6366f1'}
+                onChange={(newValue) => handleCellEdit(row.original.layer_id, 'color', newValue)}
               />
             )}
           </div>
-        );
-      },
-    },
-    {
-      accessorKey: 'description',
-      header: 'Description',
-      enableSorting: true,
-      cell: ({ getValue, row }) => {
-        const value = getValue() as string;
-        if (editMode === 'read-only') {
-          return <span>{value || ''}</span>;
-        }
-        return (
-          <EditableCell
-            value={value || ''}
-            onChange={(newValue) => handleCellEdit(row.original.id, 'description', newValue)}
-          />
-        );
-      },
-    },
-    {
-      accessorKey: 'visible',
-      header: 'Visible',
-      enableSorting: true,
-      cell: ({ getValue, row }) => {
-        const value = getValue() as boolean;
-        if (editMode === 'read-only') {
-          return value ? <Eye className="w-4 h-4 text-green-600" /> : <EyeOff className="w-4 h-4 text-gray-400" />;
-        }
-        return (
-          <button
-            onClick={() => handleCellEdit(row.original.id, 'visible', !value)}
-            className="p-1 rounded hover:bg-gray-100"
-          >
-            {value ? <Eye className="w-4 h-4 text-green-600" /> : <EyeOff className="w-4 h-4 text-gray-400" />}
-          </button>
         );
       },
     },

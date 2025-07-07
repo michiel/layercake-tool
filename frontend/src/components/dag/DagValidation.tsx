@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { DagPlan, GraphValidationResult } from '../../types/dag';
+import type { DagPlan, GraphValidationResult } from '../../types/dag';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Loading } from '../ui/Loading';

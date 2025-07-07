@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
-import { Plan, DagPlan } from '../../types/dag';
+import type { Plan } from '../../types/api';
+import type { DagPlan } from '../../types/dag';
 import { GET_PLAN_DAG, UPDATE_PLAN_NODE } from '../../graphql/dag';
 import { DagEditor } from '../dag/DagEditor';
 import { DagValidation } from '../dag/DagValidation';
+import { NodePalette } from '../dag/NodePalette';
 import { PlanNodeGraphInspector } from '../graph/PlanNodeGraphInspector';
+import { GraphDataGrid } from '../graph/GraphDataGrid';
 import { PlanForm } from './PlanForm';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
@@ -135,26 +138,28 @@ export const PlanView: React.FC<PlanViewProps> = ({
     }
 
     return (
-      <div className="h-full flex flex-col space-y-4">
-        <div className="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-4 min-h-0">
-          <div className="lg:col-span-3">
-            <Card className="h-full">
-              <DagEditor
-                planId={planId}
-                dagPlan={dagPlan}
-                onDagChange={handleDagChange}
-                readonly={false}
-              />
-            </Card>
-          </div>
-          <div className="lg:col-span-1">
-            {dagPlan && (
+      <div className="h-full flex">
+        {/* Main graph editor area */}
+        <div className="flex-1 min-w-0">
+          <DagEditor
+            planId={planId}
+            dagPlan={dagPlan}
+            onDagChange={handleDagChange}
+            readonly={false}
+          />
+        </div>
+        
+        {/* Right sidebar with node palette and validation */}
+        <div className="w-64 flex flex-col">
+          <NodePalette />
+          {dagPlan && (
+            <div className="bg-white border-l border-gray-200 p-4">
               <DagValidation
                 dagPlan={dagPlan}
                 autoValidate={true}
               />
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -182,41 +187,20 @@ export const PlanView: React.FC<PlanViewProps> = ({
   };
 
   const renderGridEditor = () => {
-    if (!dagPlan?.nodes?.length) {
-      return (
-        <Card className="p-8 text-center">
-          <p className="text-gray-500">No plan nodes available for data grid editing.</p>
-          <p className="text-sm text-gray-400 mt-2">Create plan nodes first using the DAG editor.</p>
-        </Card>
-      );
-    }
-
-    // For demo purposes, use the first transform or output node that has a graph
-    const nodeWithGraph = dagPlan.nodes.find(node => 
-      (node.node_type === 'transform' || node.node_type === 'output') && 
-      node.graph_id
-    );
-
-    if (!nodeWithGraph) {
-      return (
-        <Card className="p-8 text-center">
-          <p className="text-gray-500">No graph data available for editing.</p>
-          <p className="text-sm text-gray-400 mt-2">Execute the plan first to generate graph artifacts.</p>
-        </Card>
-      );
-    }
-
     return (
-      <div className="h-full">
-        <PlanNodeGraphInspector
-          projectId={projectId}
-          planId={planId}
-          planNodeId={nodeWithGraph.id}
-          planNodeName={nodeWithGraph.name}
-          planNodeType={nodeWithGraph.node_type}
-          editMode="transformation"
-          syncWithVisualization={true}
-        />
+      <div className="h-full flex flex-col space-y-4">
+        <div className="flex-1 min-h-0">
+          <GraphDataGrid
+            projectId={projectId}
+            planId={planId}
+            planNodeId={`plan-${planId}`}
+            editMode="transformation"
+            syncWithVisualization={true}
+            onDataChange={(changes) => {
+              console.log('Graph data changes:', changes);
+            }}
+          />
+        </div>
       </div>
     );
   };

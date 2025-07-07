@@ -107,6 +107,19 @@ start_backend() {
     done
 }
 
+seed_database() {
+    echo -e "${BLUE}🌱 Seeding development database with sample data...${NC}"
+    
+    # Seed the database with example projects and plans
+    cargo run -- db seed --database "$DB_PATH"
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✅ Database seeded successfully${NC}"
+    else
+        echo -e "${YELLOW}⚠️  Database seeding failed, continuing anyway${NC}"
+    fi
+}
+
 setup_frontend() {
     echo -e "${BLUE}🎨 Setting up frontend development...${NC}"
     
@@ -308,11 +321,13 @@ show_development_info() {
     echo -e "  • CORS configured for cross-origin requests"
     echo -e "  • API proxy from frontend to backend"
     echo -e "  • Development database with migrations"
+    echo -e "  • Automatic database seeding with sample data"
     echo
     echo -e "${YELLOW}💡 Tips:${NC}"
     echo -e "  • Backend logs appear in this terminal"
     echo -e "  • Frontend changes auto-reload in browser"
-    echo -e "  • Database is reset on each restart"
+    echo -e "  • Database is reset and reseeded on each restart"
+    echo -e "  • Sample projects and plans are available immediately"
     echo -e "  • Press Ctrl+C to stop all services"
     echo
 }
@@ -323,6 +338,7 @@ main() {
     check_dependencies
     setup_database
     start_backend
+    seed_database
     setup_frontend
     start_frontend
     show_development_info

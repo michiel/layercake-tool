@@ -3,7 +3,7 @@ import { Database, Eye, Grid, BarChart3 } from 'lucide-react';
 import { GraphDataGrid } from './GraphDataGrid';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
-import { GraphVisualizationRef } from '../../hooks/useGraphSync';
+import type { GraphVisualizationRef } from '../../hooks/useGraphSync';
 
 interface PlanNodeGraphInspectorProps {
   projectId: number;

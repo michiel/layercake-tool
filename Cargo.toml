@@ -12,7 +12,7 @@ name = "layercake"
 path = "src/main.rs"
 
 [features]
-default = ["server", "mcp"]
+default = ["server", "mcp", "graphql"]
 cli = []
 server = [
     "dep:axum",

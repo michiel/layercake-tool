@@ -1,5 +1,5 @@
 use async_graphql::*;
-use sea_orm::{ActiveModelTrait, EntityTrait, Set};
+use sea_orm::{ActiveModelTrait, EntityTrait, Set, QueryFilter, ColumnTrait};
 use uuid::Uuid;
 
 use crate::database::entities::{projects, plans, nodes, edges, layers, plan_nodes};
@@ -8,7 +8,8 @@ use crate::graphql::types::{
     Project, Plan, Node, Edge, Layer, PlanNode,
     CreateProjectInput, UpdateProjectInput,
     CreatePlanInput, UpdatePlanInput,
-    CreateNodeInput, CreateEdgeInput, CreateLayerInput,
+    CreateNodeInput, UpdateNodeInput, CreateEdgeInput, UpdateEdgeInput, 
+    CreateLayerInput, UpdateLayerInput,
     CreatePlanNodeInput, UpdatePlanNodeInput,
 };
 
@@ -143,6 +144,71 @@ impl Mutation {
         })
     }
 
+    /// Create a single node
+    async fn create_node(&self, ctx: &Context<'_>, project_id: i32, input: CreateNodeInput) -> Result<Node> {
+        let context = ctx.data::<GraphQLContext>()?;
+        
+        let properties_json = input.properties
+            .map(|props| serde_json::to_string(&props))
+            .transpose()?;
+        
+        let node = nodes::ActiveModel {
+            project_id: Set(project_id),
+            node_id: Set(input.node_id),
+            label: Set(input.label),
+            layer_id: Set(input.layer_id),
+            properties: Set(properties_json),
+            ..Default::default()
+        };
+
+        let node = node.insert(&context.db).await?;
+        Ok(Node::from(node))
+    }
+
+    /// Update a node
+    async fn update_node(&self, ctx: &Context<'_>, node_id: String, input: UpdateNodeInput) -> Result<Node> {
+        let context = ctx.data::<GraphQLContext>()?;
+        
+        let node = nodes::Entity::find()
+            .filter(nodes::Column::NodeId.eq(node_id))
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Node not found"))?;
+
+        let mut node: nodes::ActiveModel = node.into();
+        
+        if let Some(label) = input.label {
+            node.label = Set(label);
+        }
+        if let Some(layer_id) = input.layer_id {
+            node.layer_id = Set(Some(layer_id));
+        }
+        if let Some(properties) = input.properties {
+            let properties_json = serde_json::to_string(&properties)?;
+            node.properties = Set(Some(properties_json));
+        }
+
+        let node = node.update(&context.db).await?;
+        Ok(Node::from(node))
+    }
+
+    /// Delete a node
+    async fn delete_node(&self, ctx: &Context<'_>, node_id: String) -> Result<bool> {
+        let context = ctx.data::<GraphQLContext>()?;
+        
+        let node = nodes::Entity::find()
+            .filter(nodes::Column::NodeId.eq(node_id))
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Node not found"))?;
+
+        nodes::Entity::delete_by_id(node.id)
+            .exec(&context.db)
+            .await?;
+
+        Ok(true)
+    }
+
     /// Create multiple nodes
     async fn create_nodes(&self, ctx: &Context<'_>, project_id: i32, nodes: Vec<CreateNodeInput>) -> Result<Vec<Node>> {
         let context = ctx.data::<GraphQLContext>()?;
@@ -169,6 +235,68 @@ impl Mutation {
         Ok(results)
     }
 
+    /// Create a single edge
+    async fn create_edge(&self, ctx: &Context<'_>, project_id: i32, input: CreateEdgeInput) -> Result<Edge> {
+        let context = ctx.data::<GraphQLContext>()?;
+        
+        let properties_json = input.properties
+            .map(|props| serde_json::to_string(&props))
+            .transpose()?;
+        
+        let edge = edges::ActiveModel {
+            project_id: Set(project_id),
+            source_node_id: Set(input.source_node_id),
+            target_node_id: Set(input.target_node_id),
+            properties: Set(properties_json),
+            ..Default::default()
+        };
+
+        let edge = edge.insert(&context.db).await?;
+        Ok(Edge::from(edge))
+    }
+
+    /// Update an edge
+    async fn update_edge(&self, ctx: &Context<'_>, edge_id: i32, input: UpdateEdgeInput) -> Result<Edge> {
+        let context = ctx.data::<GraphQLContext>()?;
+        
+        let edge = edges::Entity::find_by_id(edge_id)
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Edge not found"))?;
+
+        let mut edge: edges::ActiveModel = edge.into();
+        
+        if let Some(source_node_id) = input.source_node_id {
+            edge.source_node_id = Set(source_node_id);
+        }
+        if let Some(target_node_id) = input.target_node_id {
+            edge.target_node_id = Set(target_node_id);
+        }
+        if let Some(properties) = input.properties {
+            let properties_json = serde_json::to_string(&properties)?;
+            edge.properties = Set(Some(properties_json));
+        }
+
+        let edge = edge.update(&context.db).await?;
+        Ok(Edge::from(edge))
+    }
+
+    /// Delete an edge
+    async fn delete_edge(&self, ctx: &Context<'_>, edge_id: i32) -> Result<bool> {
+        let context = ctx.data::<GraphQLContext>()?;
+        
+        let edge = edges::Entity::find_by_id(edge_id)
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Edge not found"))?;
+
+        edges::Entity::delete_by_id(edge.id)
+            .exec(&context.db)
+            .await?;
+
+        Ok(true)
+    }
+
     /// Create multiple edges
     async fn create_edges(&self, ctx: &Context<'_>, project_id: i32, edges: Vec<CreateEdgeInput>) -> Result<Vec<Edge>> {
         let context = ctx.data::<GraphQLContext>()?;
@@ -192,6 +320,71 @@ impl Mutation {
         }
 
         Ok(results)
+    }
+
+    /// Create a single layer
+    async fn create_layer(&self, ctx: &Context<'_>, project_id: i32, input: CreateLayerInput) -> Result<Layer> {
+        let context = ctx.data::<GraphQLContext>()?;
+        
+        let properties_json = input.properties
+            .map(|props| serde_json::to_string(&props))
+            .transpose()?;
+        
+        let layer = layers::ActiveModel {
+            project_id: Set(project_id),
+            layer_id: Set(input.layer_id),
+            name: Set(input.name),
+            color: Set(input.color),
+            properties: Set(properties_json),
+            ..Default::default()
+        };
+
+        let layer = layer.insert(&context.db).await?;
+        Ok(Layer::from(layer))
+    }
+
+    /// Update a layer
+    async fn update_layer(&self, ctx: &Context<'_>, layer_id: String, input: UpdateLayerInput) -> Result<Layer> {
+        let context = ctx.data::<GraphQLContext>()?;
+        
+        let layer = layers::Entity::find()
+            .filter(layers::Column::LayerId.eq(layer_id))
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Layer not found"))?;
+
+        let mut layer: layers::ActiveModel = layer.into();
+        
+        if let Some(name) = input.name {
+            layer.name = Set(name);
+        }
+        if let Some(color) = input.color {
+            layer.color = Set(Some(color));
+        }
+        if let Some(properties) = input.properties {
+            let properties_json = serde_json::to_string(&properties)?;
+            layer.properties = Set(Some(properties_json));
+        }
+
+        let layer = layer.update(&context.db).await?;
+        Ok(Layer::from(layer))
+    }
+
+    /// Delete a layer
+    async fn delete_layer(&self, ctx: &Context<'_>, layer_id: String) -> Result<bool> {
+        let context = ctx.data::<GraphQLContext>()?;
+        
+        let layer = layers::Entity::find()
+            .filter(layers::Column::LayerId.eq(layer_id))
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Layer not found"))?;
+
+        layers::Entity::delete_by_id(layer.id)
+            .exec(&context.db)
+            .await?;
+
+        Ok(true)
     }
 
     /// Create multiple layers
@@ -256,7 +449,7 @@ impl Mutation {
             plan_node.name = Set(name);
         }
         if let Some(description) = input.description {
-            plan_node.description = Set(description);
+            plan_node.description = Set(Some(description));
         }
         if let Some(configuration) = input.configuration {
             plan_node.configuration = Set(configuration);

@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { Plus, Search, Edit, Trash2, Play, FileText, ArrowLeft } from 'lucide-react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Plus, Search, Edit, Trash2, Play, FileText, ArrowLeft, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
@@ -11,6 +11,7 @@ import type { Plan, CreatePlanRequest, UpdatePlanRequest } from '@/types/api';
 
 export function Plans() {
   const { projectId } = useParams<{ projectId: string }>();
+  const navigate = useNavigate();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -70,6 +71,10 @@ export function Plans() {
     } catch (error) {
       console.error('Failed to execute plan:', error);
     }
+  };
+
+  const handleViewPlan = (planId: number) => {
+    navigate(`/projects/${projectId}/plans/${planId}`);
   };
 
   const formatDate = (dateString: string) => {
@@ -186,7 +191,8 @@ export function Plans() {
           {filteredPlans.map((plan) => (
             <div
               key={plan.id}
-              className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md transition-shadow"
+              className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md transition-shadow cursor-pointer"
+              onClick={() => handleViewPlan(plan.id)}
             >
               <div className="flex justify-between items-start mb-3">
                 <div className="flex-1">
@@ -202,7 +208,16 @@ export function Plans() {
                     </span>
                   </div>
                 </div>
-                <div className="flex gap-1 ml-2">
+                <div className="flex gap-1 ml-2" onClick={(e) => e.stopPropagation()}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleViewPlan(plan.id)}
+                    className="p-1 h-8 w-8 text-blue-600 hover:text-blue-700"
+                    title="View plan"
+                  >
+                    <Eye className="w-4 h-4" />
+                  </Button>
                   <Button
                     variant="ghost"
                     size="sm"

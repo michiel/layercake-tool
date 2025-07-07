@@ -51,3 +51,10 @@ pub struct CreateLayerInput {
     pub color: Option<String>,
     pub properties: Option<JSON>,
 }
+
+#[derive(InputObject)]
+pub struct UpdateLayerInput {
+    pub name: Option<String>,
+    pub color: Option<String>,
+    pub properties: Option<JSON>,
+}
