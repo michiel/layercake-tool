@@ -71,6 +71,63 @@ impl TransformationValidator {
             super::TransformationType::GraphCluster(op) => {
                 self.validate_graph_cluster_op(op, graph, &mut errors, &mut warnings);
             },
+            
+            // Advanced operations - basic validation for now
+            super::TransformationType::NodeCluster(_op) => {
+                // Basic validation - ensure graph has nodes
+                if graph.nodes.is_empty() {
+                    errors.push("Cannot cluster nodes: graph has no nodes".to_string());
+                }
+            },
+            super::TransformationType::EdgeWeightNormalize(_op) => {
+                // Basic validation - ensure graph has edges
+                if graph.edges.is_empty() {
+                    warnings.push("Edge weight normalization: graph has no edges".to_string());
+                }
+            },
+            super::TransformationType::LayerMerge(op) => {
+                // Validate source layers exist
+                for layer_id in &op.source_layers {
+                    if !graph.layers.iter().any(|l| l.id == *layer_id) {
+                        errors.push(format!("Layer merge: source layer '{}' does not exist", layer_id));
+                    }
+                }
+            },
+            super::TransformationType::GraphAnalyze(_op) => {
+                // Always valid - can analyze any graph
+            },
+            super::TransformationType::GraphLayout(_op) => {
+                // Basic validation - ensure graph has nodes
+                if graph.nodes.is_empty() {
+                    warnings.push("Graph layout: graph has no nodes to layout".to_string());
+                }
+            },
+            super::TransformationType::SubgraphExtract(_op) => {
+                // Basic validation - ensure graph has content
+                if graph.nodes.is_empty() {
+                    errors.push("Subgraph extraction: source graph has no nodes".to_string());
+                }
+            },
+            super::TransformationType::PathFinding(_op) => {
+                // Basic validation - ensure graph has edges for path finding
+                if graph.edges.is_empty() {
+                    errors.push("Path finding: graph has no edges".to_string());
+                }
+            },
+            super::TransformationType::CentralityCalculation(_op) => {
+                // Basic validation - ensure graph has nodes and edges
+                if graph.nodes.is_empty() {
+                    errors.push("Centrality calculation: graph has no nodes".to_string());
+                } else if graph.edges.is_empty() {
+                    warnings.push("Centrality calculation: graph has no edges".to_string());
+                }
+            },
+            super::TransformationType::CommunityDetection(_op) => {
+                // Basic validation - ensure graph has edges for community detection
+                if graph.edges.is_empty() {
+                    errors.push("Community detection: graph has no edges".to_string());
+                }
+            },
         }
         
         if errors.is_empty() {
@@ -192,6 +249,63 @@ impl TransformationValidator {
             },
             super::TransformationType::GraphCluster(op) => {
                 self.validate_graph_cluster_op(op, graph, &mut errors, &mut warnings);
+            },
+            
+            // Advanced operations - basic validation for now
+            super::TransformationType::NodeCluster(_op) => {
+                // Basic validation - ensure graph has nodes
+                if graph.nodes.is_empty() {
+                    errors.push("Cannot cluster nodes: graph has no nodes".to_string());
+                }
+            },
+            super::TransformationType::EdgeWeightNormalize(_op) => {
+                // Basic validation - ensure graph has edges
+                if graph.edges.is_empty() {
+                    warnings.push("Edge weight normalization: graph has no edges".to_string());
+                }
+            },
+            super::TransformationType::LayerMerge(op) => {
+                // Validate source layers exist
+                for layer_id in &op.source_layers {
+                    if !graph.layers.iter().any(|l| l.id == *layer_id) {
+                        errors.push(format!("Layer merge: source layer '{}' does not exist", layer_id));
+                    }
+                }
+            },
+            super::TransformationType::GraphAnalyze(_op) => {
+                // Always valid - can analyze any graph
+            },
+            super::TransformationType::GraphLayout(_op) => {
+                // Basic validation - ensure graph has nodes
+                if graph.nodes.is_empty() {
+                    warnings.push("Graph layout: graph has no nodes to layout".to_string());
+                }
+            },
+            super::TransformationType::SubgraphExtract(_op) => {
+                // Basic validation - ensure graph has content
+                if graph.nodes.is_empty() {
+                    errors.push("Subgraph extraction: source graph has no nodes".to_string());
+                }
+            },
+            super::TransformationType::PathFinding(_op) => {
+                // Basic validation - ensure graph has edges for path finding
+                if graph.edges.is_empty() {
+                    errors.push("Path finding: graph has no edges".to_string());
+                }
+            },
+            super::TransformationType::CentralityCalculation(_op) => {
+                // Basic validation - ensure graph has nodes and edges
+                if graph.nodes.is_empty() {
+                    errors.push("Centrality calculation: graph has no nodes".to_string());
+                } else if graph.edges.is_empty() {
+                    warnings.push("Centrality calculation: graph has no edges".to_string());
+                }
+            },
+            super::TransformationType::CommunityDetection(_op) => {
+                // Basic validation - ensure graph has edges for community detection
+                if graph.edges.is_empty() {
+                    errors.push("Community detection: graph has no edges".to_string());
+                }
             },
         }
         

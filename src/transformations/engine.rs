@@ -238,6 +238,37 @@ impl TransformationEngine {
             TransformationType::GraphCluster(op) => {
                 self.operations.cluster_graph(graph, op)
             },
+            
+            // Advanced operations
+            TransformationType::NodeCluster(op) => {
+                self.operations.cluster_nodes(graph, op)
+            },
+            TransformationType::EdgeWeightNormalize(op) => {
+                self.operations.normalize_edge_weights(graph, op)
+            },
+            TransformationType::LayerMerge(op) => {
+                self.operations.merge_layers(graph, op)
+            },
+            TransformationType::GraphAnalyze(op) => {
+                self.operations.analyze_graph(graph, op)
+            },
+            TransformationType::GraphLayout(op) => {
+                self.operations.layout_graph(graph, op)
+            },
+            TransformationType::SubgraphExtract(op) => {
+                self.operations.extract_subgraph(graph, op)
+            },
+            TransformationType::CentralityCalculation(op) => {
+                self.operations.calculate_centrality(graph, op)
+            },
+            
+            // Placeholder implementations for future operations
+            TransformationType::PathFinding(_op) => {
+                Err(anyhow!("Path finding operation not yet implemented"))
+            },
+            TransformationType::CommunityDetection(_op) => {
+                Err(anyhow!("Community detection operation not yet implemented"))
+            },
         }
     }
     

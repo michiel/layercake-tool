@@ -27,23 +27,34 @@ pub enum TransformationType {
     NodeTransform(NodeTransformOp),
     NodeCreate(NodeCreateOp),
     NodeDelete(NodeDeleteOp),
+    NodeCluster(NodeClusterOp),
     
     /// Edge operations
     EdgeFilter(EdgeFilterOp),
     EdgeTransform(EdgeTransformOp),
     EdgeCreate(EdgeCreateOp),
     EdgeDelete(EdgeDeleteOp),
+    EdgeWeightNormalize(EdgeWeightNormalizeOp),
     
     /// Layer operations
     LayerFilter(LayerFilterOp),
     LayerTransform(LayerTransformOp),
     LayerCreate(LayerCreateOp),
     LayerDelete(LayerDeleteOp),
+    LayerMerge(LayerMergeOp),
     
     /// Graph operations
     GraphMerge(GraphMergeOp),
     GraphSplit(GraphSplitOp),
     GraphCluster(GraphClusterOp),
+    GraphAnalyze(GraphAnalyzeOp),
+    GraphLayout(GraphLayoutOp),
+    
+    /// Advanced operations
+    SubgraphExtract(SubgraphExtractOp),
+    PathFinding(PathFindingOp),
+    CentralityCalculation(CentralityCalculationOp),
+    CommunityDetection(CommunityDetectionOp),
 }
 
 /// Node filtering operations
@@ -176,6 +187,179 @@ pub enum ClusteringAlgorithm {
     Modularity,
     KMeans,
     Hierarchical,
+    Louvain,
+    LabelPropagation,
+}
+
+/// Node clustering operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NodeClusterOp {
+    pub algorithm: ClusteringAlgorithm,
+    pub parameters: HashMap<String, f64>,
+    pub create_cluster_layers: bool,
+    pub min_cluster_size: Option<usize>,
+}
+
+/// Edge weight normalization operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EdgeWeightNormalizeOp {
+    pub method: NormalizationMethod,
+    pub range: Option<(f64, f64)>,
+    pub preserve_zero: bool,
+}
+
+/// Layer merging operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LayerMergeOp {
+    pub source_layers: Vec<String>,
+    pub target_layer: String,
+    pub merge_strategy: LayerMergeStrategy,
+}
+
+/// Graph analysis operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GraphAnalyzeOp {
+    pub metrics: Vec<GraphMetric>,
+    pub store_results: bool,
+    pub output_format: AnalysisOutputFormat,
+}
+
+/// Graph layout operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GraphLayoutOp {
+    pub algorithm: LayoutAlgorithm,
+    pub parameters: HashMap<String, f64>,
+    pub iterations: Option<usize>,
+    pub update_positions: bool,
+}
+
+/// Subgraph extraction operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubgraphExtractOp {
+    pub criteria: ExtractionCriteria,
+    pub preserve_structure: bool,
+    pub include_boundary_edges: bool,
+}
+
+/// Path finding operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PathFindingOp {
+    pub algorithm: PathAlgorithm,
+    pub source: String,
+    pub target: Option<String>,
+    pub max_depth: Option<usize>,
+    pub create_path_edges: bool,
+}
+
+/// Centrality calculation operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CentralityCalculationOp {
+    pub measures: Vec<CentralityMeasure>,
+    pub normalize: bool,
+    pub store_as_node_property: bool,
+}
+
+/// Community detection operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CommunityDetectionOp {
+    pub algorithm: CommunityAlgorithm,
+    pub resolution: Option<f64>,
+    pub create_community_layers: bool,
+    pub min_community_size: Option<usize>,
+}
+
+/// Normalization methods for edge weights
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum NormalizationMethod {
+    MinMax,
+    ZScore,
+    Robust,
+    UnitVector,
+}
+
+/// Layer merge strategies
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum LayerMergeStrategy {
+    Union,
+    Intersection,
+    FirstWins,
+    LastWins,
+}
+
+/// Graph metrics for analysis
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum GraphMetric {
+    NodeCount,
+    EdgeCount,
+    Density,
+    AverageClusteringCoefficient,
+    AverageShortestPath,
+    Diameter,
+    ConnectedComponents,
+    StronglyConnectedComponents,
+}
+
+/// Analysis output formats
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum AnalysisOutputFormat {
+    NodeProperties,
+    SeparateGraph,
+    Report,
+    Json,
+}
+
+/// Layout algorithms
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum LayoutAlgorithm {
+    ForceDirected,
+    Circular,
+    Hierarchical,
+    Grid,
+    Random,
+    Fruchterman,
+    Kamada,
+}
+
+/// Extraction criteria for subgraphs
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ExtractionCriteria {
+    NodeList(Vec<String>),
+    LayerList(Vec<String>),
+    NodeProperty(String, String),
+    NeighborhoodRadius(String, usize),
+    ConnectedComponent(String),
+}
+
+/// Path finding algorithms
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum PathAlgorithm {
+    Dijkstra,
+    BellmanFord,
+    FloydWarshall,
+    AStar,
+    BFS,
+    DFS,
+}
+
+/// Centrality measures
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum CentralityMeasure {
+    Degree,
+    Betweenness,
+    Closeness,
+    Eigenvector,
+    PageRank,
+    Katz,
+}
+
+/// Community detection algorithms
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum CommunityAlgorithm {
+    Louvain,
+    LabelPropagation,
+    WalkTrap,
+    EdgeBetweenness,
+    Modularity,
 }
 
 /// A single transformation rule
