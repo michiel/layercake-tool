@@ -9,7 +9,7 @@ pub use legacy_plan::*;
 use serde::{Deserialize, Serialize};
 
 /// Plan format enumeration to support both legacy YAML and new DAG JSON formats
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "format_version")]
 pub enum PlanFormat {
     #[serde(rename = "legacy")]

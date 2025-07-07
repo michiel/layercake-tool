@@ -2,6 +2,13 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 
+use crate::transformations::{
+    TransformationType, 
+    NodeClusterOp, EdgeWeightNormalizeOp, LayerMergeOp,
+    GraphAnalyzeOp, GraphLayoutOp, SubgraphExtractOp,
+    CentralityCalculationOp, PathFindingOp, CommunityDetectionOp
+};
+
 /// Position data for visual layout in DAG editor
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct NodePosition {
@@ -12,6 +19,47 @@ pub struct NodePosition {
 impl Default for NodePosition {
     fn default() -> Self {
         Self { x: 0.0, y: 0.0 }
+    }
+}
+
+/// Advanced transformation operations for DAG plan nodes
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "operation_type")]
+pub enum AdvancedTransformOperation {
+    #[serde(rename = "node_cluster")]
+    NodeCluster(NodeClusterOp),
+    #[serde(rename = "edge_weight_normalize")]  
+    EdgeWeightNormalize(EdgeWeightNormalizeOp),
+    #[serde(rename = "layer_merge")]
+    LayerMerge(LayerMergeOp),
+    #[serde(rename = "graph_analyze")]
+    GraphAnalyze(GraphAnalyzeOp),
+    #[serde(rename = "graph_layout")]
+    GraphLayout(GraphLayoutOp),
+    #[serde(rename = "subgraph_extract")]
+    SubgraphExtract(SubgraphExtractOp),
+    #[serde(rename = "centrality_calculation")]
+    CentralityCalculation(CentralityCalculationOp),
+    #[serde(rename = "path_finding")]
+    PathFinding(PathFindingOp),
+    #[serde(rename = "community_detection")]
+    CommunityDetection(CommunityDetectionOp),
+}
+
+impl AdvancedTransformOperation {
+    /// Convert to the transformation system's TransformationType
+    pub fn to_transformation_type(&self) -> TransformationType {
+        match self {
+            AdvancedTransformOperation::NodeCluster(op) => TransformationType::NodeCluster(op.clone()),
+            AdvancedTransformOperation::EdgeWeightNormalize(op) => TransformationType::EdgeWeightNormalize(op.clone()),
+            AdvancedTransformOperation::LayerMerge(op) => TransformationType::LayerMerge(op.clone()),
+            AdvancedTransformOperation::GraphAnalyze(op) => TransformationType::GraphAnalyze(op.clone()),
+            AdvancedTransformOperation::GraphLayout(op) => TransformationType::GraphLayout(op.clone()),
+            AdvancedTransformOperation::SubgraphExtract(op) => TransformationType::SubgraphExtract(op.clone()),
+            AdvancedTransformOperation::CentralityCalculation(op) => TransformationType::CentralityCalculation(op.clone()),
+            AdvancedTransformOperation::PathFinding(op) => TransformationType::PathFinding(op.clone()),
+            AdvancedTransformOperation::CommunityDetection(op) => TransformationType::CommunityDetection(op.clone()),
+        }
     }
 }
 
@@ -38,9 +86,13 @@ pub struct ImportNodeConfig {
 }
 
 /// Configuration for transformation plan nodes  
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransformNodeConfig {
-    /// Transformation type: "filter", "map", "merge", "split", etc.
+    /// Transformation type: supports both legacy types and advanced operations
+    /// Legacy: "filter", "map", "merge", "split"  
+    /// Advanced: "node_cluster", "edge_weight_normalize", "layer_merge", 
+    ///          "graph_analyze", "graph_layout", "subgraph_extract",
+    ///          "centrality_calculation", "path_finding", "community_detection"
     pub transform_type: String,
     /// Transformation parameters
     pub parameters: HashMap<String, serde_json::Value>,
@@ -48,6 +100,8 @@ pub struct TransformNodeConfig {
     pub script: Option<String>,
     /// Script language: "javascript", "python", etc.
     pub script_language: Option<String>,
+    /// Advanced transformation operation (structured configuration)
+    pub advanced_operation: Option<AdvancedTransformOperation>,
 }
 
 /// Configuration for export plan nodes
@@ -64,7 +118,7 @@ pub struct ExportNodeConfig {
 }
 
 /// Plan node configuration (union type)
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "config")]
 pub enum PlanNodeConfig {
     #[serde(rename = "import")]
@@ -76,7 +130,7 @@ pub enum PlanNodeConfig {
 }
 
 /// A single node in the DAG plan
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DagPlanNode {
     /// Unique identifier for the node
     pub id: String,
@@ -202,7 +256,7 @@ impl Default for ExecutionContext {
 }
 
 /// Complete DAG-based plan definition
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DagPlan {
     /// Plan metadata
     pub name: String,

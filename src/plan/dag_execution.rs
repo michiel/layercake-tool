@@ -9,6 +9,7 @@ use sea_orm::DatabaseConnection;
 use crate::graph::Graph;
 use super::dag_plan::*;
 use crate::services::{GraphService, ImportService, ExportService};
+use crate::transformations::{TransformationEngine, TransformationType};
 
 /// Execution status for individual plan nodes
 #[derive(Debug, Clone, PartialEq)]
@@ -119,6 +120,7 @@ pub struct DagExecutionEngine {
     graph_service: Arc<GraphService>,
     import_service: Arc<ImportService>,
     export_service: Arc<ExportService>,
+    transformation_engine: TransformationEngine,
     execution_states: Arc<RwLock<HashMap<String, DagExecutionState>>>,
 }
 
@@ -134,6 +136,7 @@ impl DagExecutionEngine {
             graph_service,
             import_service,
             export_service,
+            transformation_engine: TransformationEngine::new(),
             execution_states: Arc::new(RwLock::new(HashMap::new())),
         }
     }
@@ -346,21 +349,33 @@ impl DagExecutionEngine {
         }
 
         // Apply transformation based on type
-        let output_graph = match config.transform_type.as_str() {
-            "filter" => {
-                // Apply filtering transformation
-                self.apply_filter_transform(&input_graphs[0], &config.parameters).await?
-            }
-            "merge" => {
-                // Merge multiple input graphs
-                self.apply_merge_transform(&input_graphs, &config.parameters).await?
-            }
-            "map" => {
-                // Apply field mapping transformation
-                self.apply_map_transform(&input_graphs[0], &config.parameters).await?
-            }
-            _ => {
-                return Err(anyhow!("Unsupported transform type: {}", config.transform_type));
+        let output_graph = if let Some(advanced_op) = &config.advanced_operation {
+            // Use advanced transformation system
+            self.apply_advanced_transform(&input_graphs[0], advanced_op).await?
+        } else {
+            // Use legacy transformation types
+            match config.transform_type.as_str() {
+                "filter" => {
+                    // Apply filtering transformation
+                    self.apply_filter_transform(&input_graphs[0], &config.parameters).await?
+                }
+                "merge" => {
+                    // Merge multiple input graphs
+                    self.apply_merge_transform(&input_graphs, &config.parameters).await?
+                }
+                "map" => {
+                    // Apply field mapping transformation
+                    self.apply_map_transform(&input_graphs[0], &config.parameters).await?
+                }
+                // Support advanced operations via string-based config for backward compatibility
+                "node_cluster" | "edge_weight_normalize" | "layer_merge" | 
+                "graph_analyze" | "graph_layout" | "subgraph_extract" |
+                "centrality_calculation" | "path_finding" | "community_detection" => {
+                    self.apply_advanced_transform_by_type(&input_graphs[0], &config.transform_type, &config.parameters).await?
+                }
+                _ => {
+                    return Err(anyhow!("Unsupported transform type: {}", config.transform_type));
+                }
             }
         };
 
@@ -545,6 +560,136 @@ impl DagExecutionEngine {
     pub async fn list_executions(&self) -> Vec<DagExecutionState> {
         let states = self.execution_states.read().await;
         states.values().cloned().collect()
+    }
+
+    /// Apply advanced transformation using structured operation
+    async fn apply_advanced_transform(
+        &self,
+        input_graph: &Graph,
+        advanced_op: &AdvancedTransformOperation,
+    ) -> Result<Graph> {
+        debug!("Applying advanced transformation: {:?}", advanced_op);
+        
+        let transformation_type = advanced_op.to_transformation_type();
+        let result = self.transformation_engine.execute_transformation(
+            input_graph.clone(),
+            transformation_type,
+        ).await?;
+        
+        if result.success {
+            result.transformed_graph
+                .ok_or_else(|| anyhow!("Transformation succeeded but no graph returned"))
+        } else {
+            Err(anyhow!("Transformation failed: {}", 
+                result.error.unwrap_or_else(|| "Unknown error".to_string())))
+        }
+    }
+
+    /// Apply advanced transformation by type string with parameters
+    async fn apply_advanced_transform_by_type(
+        &self,
+        input_graph: &Graph,
+        transform_type: &str,
+        parameters: &HashMap<String, serde_json::Value>,
+    ) -> Result<Graph> {
+        debug!("Applying advanced transformation by type: {} with parameters: {:?}", 
+               transform_type, parameters);
+        
+        // Convert string-based configuration to structured transformation
+        let transformation_type = match transform_type {
+            "node_cluster" => {
+                // Parse parameters into NodeClusterOp
+                let algorithm = parameters.get("algorithm")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("connected_components");
+                
+                let op = crate::transformations::NodeClusterOp {
+                    algorithm: match algorithm {
+                        "louvain" => crate::transformations::ClusteringAlgorithm::Louvain,
+                        "label_propagation" => crate::transformations::ClusteringAlgorithm::LabelPropagation,
+                        _ => crate::transformations::ClusteringAlgorithm::ConnectedComponents,
+                    },
+                    parameters: parameters.iter()
+                        .filter_map(|(k, v)| v.as_f64().map(|f| (k.clone(), f)))
+                        .collect(),
+                    create_cluster_layers: parameters.get("create_cluster_layers")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false),
+                    min_cluster_size: parameters.get("min_cluster_size")
+                        .and_then(|v| v.as_u64())
+                        .map(|v| v as usize),
+                };
+                TransformationType::NodeCluster(op)
+            }
+            "edge_weight_normalize" => {
+                let method = parameters.get("method")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("minmax");
+                
+                let op = crate::transformations::EdgeWeightNormalizeOp {
+                    method: match method {
+                        "zscore" => crate::transformations::NormalizationMethod::ZScore,
+                        "robust" => crate::transformations::NormalizationMethod::Robust,
+                        "unit_vector" => crate::transformations::NormalizationMethod::UnitVector,
+                        _ => crate::transformations::NormalizationMethod::MinMax,
+                    },
+                    range: parameters.get("range")
+                        .and_then(|v| v.as_array())
+                        .and_then(|arr| {
+                            if arr.len() == 2 {
+                                let min = arr[0].as_f64()?;
+                                let max = arr[1].as_f64()?;
+                                Some((min, max))
+                            } else {
+                                None
+                            }
+                        }),
+                    preserve_zero: parameters.get("preserve_zero")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false),
+                };
+                TransformationType::EdgeWeightNormalize(op)
+            }
+            "graph_analyze" => {
+                let metrics = parameters.get("metrics")
+                    .and_then(|v| v.as_array())
+                    .map(|arr| arr.iter()
+                        .filter_map(|v| v.as_str())
+                        .map(|s| match s {
+                            "density" => crate::transformations::GraphMetric::Density,
+                            "clustering_coefficient" => crate::transformations::GraphMetric::AverageClusteringCoefficient,
+                            "connected_components" => crate::transformations::GraphMetric::ConnectedComponents,
+                            _ => crate::transformations::GraphMetric::NodeCount,
+                        })
+                        .collect())
+                    .unwrap_or_else(|| vec![crate::transformations::GraphMetric::NodeCount]);
+                
+                let op = crate::transformations::GraphAnalyzeOp {
+                    metrics,
+                    store_results: parameters.get("store_results")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(true),
+                    output_format: crate::transformations::AnalysisOutputFormat::NodeProperties,
+                };
+                TransformationType::GraphAnalyze(op)
+            }
+            _ => {
+                return Err(anyhow!("Unsupported advanced transform type: {}", transform_type));
+            }
+        };
+        
+        let result = self.transformation_engine.execute_transformation(
+            input_graph.clone(),
+            transformation_type,
+        ).await?;
+        
+        if result.success {
+            result.transformed_graph
+                .ok_or_else(|| anyhow!("Transformation succeeded but no graph returned"))
+        } else {
+            Err(anyhow!("Transformation failed: {}", 
+                result.error.unwrap_or_else(|| "Unknown error".to_string())))
+        }
     }
 }
 
