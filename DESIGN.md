@@ -21,7 +21,7 @@
 
 ### **Current Architecture Issues**
 
-The current system has a single graph endpoint per project (`/api/v1/project/1/graph`) which doesn't support the hierarchical navigation required for project → plan → workflow → node inspection.
+The current system has a single graph endpoint per project (`/api/v1/project/1/graph`) which doesn't support the hierarchical navigation required for project → plan → workflow → plan node inspection.
 
 ### **Target Architecture**
 
@@ -55,7 +55,7 @@ The target architecture supports three API interfaces with a unified backend:
 - **Timeline**: 6-8 weeks
 - **Goal**: Complete feature set with graph inspection
 - **Actions**:
-  - Implement graph inspection at every DAG node
+  - Implement graph inspection at every DAG plan node
   - Add MCP API for AI agent interactions
   - Implement advanced caching strategies
   - Add performance optimizations for large graphs
@@ -78,7 +78,7 @@ GET /api/v1/project/{project_id}/plans                             # All plans i
 GET /api/v1/project/{project_id}/plan/{plan_id}                    # Specific plan DAG
 GET /api/v1/project/{project_id}/plan/{plan_id}/executions         # Plan executions
 GET /api/v1/project/{project_id}/plan/{plan_id}/execution/{execution_id}  # Execution state
-GET /api/v1/project/{project_id}/plan/{plan_id}/node/{node_id}/graph      # Graph at node
+GET /api/v1/project/{project_id}/plan/{plan_id}/plan-node/{plan_node_id}/graph      # Graph at plan node
 ```
 
 **Flat REST Endpoints (Phase 3-4):**
@@ -88,7 +88,7 @@ GET /api/v1/projects/{project_id}              # Single project
 GET /api/v1/plans/{plan_id}                    # Single plan
 GET /api/v1/executions/{execution_id}          # Single execution
 GET /api/v1/graphs/{graph_id}                  # Single graph object
-GET /api/v1/nodes/{node_id}/graph              # Graph at specific node
+GET /api/v1/plan-nodes/{plan_node_id}/graph              # Graph at specific plan node
 ```
 
 **GraphQL Endpoint (All Phases):**
@@ -323,8 +323,8 @@ type Plan {
   name: String!
   dag: ExecutionDAG!
   executions: [ExecutionState!]!
-  # Get graph at any node in the DAG
-  graphAtNode(nodeId: ID!, executionId: ID): GraphObject
+  # Get graph at any plan node in the DAG
+  graphAtPlanNode(planNodeId: ID!, executionId: ID): GraphObject
   # Get all inspectable points in the plan
   inspectionPoints(executionId: ID): [GraphInspectionPoint!]!
 }
@@ -334,27 +334,49 @@ type ExecutionState {
   plan: Plan!
   status: ExecutionStatus!
   graphObjects: [GraphObject!]!
-  nodeScopes: [GraphScope!]!
-  currentNode: ID
+  planNodeScopes: [GraphScope!]!
+  currentPlanNode: ID
   # Get all available graphs for inspection
   inspectableGraphs: [GraphInspectionPoint!]!
   # Navigation breadcrumbs
-  executionPath: [ExecutionPathNode!]!
+  executionPath: [ExecutionPathPlanNode!]!
 }
 
 type GraphInspectionPoint {
-  nodeId: ID!
-  nodeName: String!
-  nodeType: NodeType!
+  planNodeId: ID!
+  planNodeName: String!
+  planNodeType: PlanNodeType!
   graphRef: ID!
   graphObject: GraphObject!
   renderContext: JSON!
   canInspect: Boolean!
-  executionStatus: NodeExecutionStatus!
+  executionStatus: PlanNodeExecutionStatus!
   lastUpdated: DateTime
 }
 
-enum NodeExecutionStatus {
+type ExecutionPathPlanNode {
+  planNodeId: ID!
+  planNodeName: String!
+  status: PlanNodeExecutionStatus!
+  startedAt: DateTime
+  completedAt: DateTime
+  graphRef: ID
+}
+
+type GraphScope {
+  id: ID!
+  planNodeId: ID!
+  graphRef: ID!
+  renderContext: JSON!
+}
+
+enum PlanNodeType {
+  IMPORT
+  TRANSFORM
+  EXPORT
+}
+
+enum PlanNodeExecutionStatus {
   PENDING
   RUNNING
   COMPLETED
@@ -385,7 +407,7 @@ query GetProject($projectId: ID!) {
       activeExecutions: executions(status: [RUNNING, PENDING]) {
         id
         status
-        currentNode
+        currentPlanNode
         startedAt
       }
     }
@@ -393,15 +415,15 @@ query GetProject($projectId: ID!) {
 }
 ```
 
-**Graph at Specific Node:**
+**Graph at Specific Plan Node:**
 ```graphql
-query GetGraphAtNode($projectId: ID!, $planId: ID!, $nodeId: ID!, $executionId: ID) {
+query GetGraphAtPlanNode($projectId: ID!, $planId: ID!, $planNodeId: ID!, $executionId: ID) {
   project(id: $projectId) {
     plan(id: $planId) {
-      graphAtNode(nodeId: $nodeId, executionId: $executionId) {
+      graphAtPlanNode(planNodeId: $planNodeId, executionId: $executionId) {
         id
         hash
-        createdByNode
+        createdByPlanNode
         nodes {
           id
           label
@@ -444,14 +466,14 @@ subscription ExecutionUpdates($executionId: ID!) {
   executionStateChanged(executionId: $executionId) {
     id
     status
-    currentNode
-    nodeScopes {
-      nodeId
+    currentPlanNode
+    planNodeScopes {
+      planNodeId
       graphRef
       renderContext
     }
     errors {
-      nodeId
+      planNodeId
       message
       timestamp
     }
@@ -497,7 +519,7 @@ interface GraphInspectionCapabilities {
 // Navigation hierarchy
 ProjectOverview -> PlanSelector -> WorkflowViewer -> GraphVisualization
                                      ↓
-                                NodeInspector -> GraphVisualization
+                                PlanNodeInspector -> GraphVisualization
 ```
 
 ### **Updated GraphVisualization Component**
@@ -510,7 +532,7 @@ interface GraphVisualizationProps {
   layers: GraphLayer[];
   
   // New props for hierarchical context
-  context: 'project' | 'plan' | 'workflow' | 'node-inspection';
+  context: 'project' | 'plan' | 'workflow' | 'plan-node-inspection';
   dataSource: {
     type: 'rest' | 'graphql';
     endpoint?: string;
@@ -521,12 +543,12 @@ interface GraphVisualizationProps {
   // Navigation context
   projectId: string;
   planId?: string;
-  nodeId?: string;
+  planNodeId?: string;
   executionId?: string;
   
   // Inspection capabilities
-  enableNodeInspection?: boolean;
-  onNodeInspect?: (nodeId: string) => void;
+  enablePlanNodeInspection?: boolean;
+  onPlanNodeInspect?: (planNodeId: string) => void;
   
   // DAG-specific props
   showExecutionPath?: boolean;
@@ -536,7 +558,7 @@ interface GraphVisualizationProps {
   // Navigation callbacks
   onNavigateToProject?: () => void;
   onNavigateToPlan?: () => void;
-  onNavigateToNode?: (nodeId: string) => void;
+  onNavigateToPlanNode?: (planNodeId: string) => void;
 }
 ```
 
@@ -557,9 +579,9 @@ interface GraphVisualizationProps {
 /projects/{project_id}                          # Project overview
 /projects/{project_id}/plans                    # Plan list
 /projects/{project_id}/plans/{plan_id}         # Plan DAG workflow
-/projects/{project_id}/plans/{plan_id}/nodes/{node_id}  # Graph at node
+/projects/{project_id}/plans/{plan_id}/plan-nodes/{plan_node_id}  # Graph at plan node
 /projects/{project_id}/plans/{plan_id}/executions/{execution_id}  # Live execution
-/projects/{project_id}/plans/{plan_id}/executions/{execution_id}/nodes/{node_id}  # Graph at node in execution
+/projects/{project_id}/plans/{plan_id}/executions/{execution_id}/plan-nodes/{plan_node_id}  # Graph at plan node in execution
 ```
 
 ## Data Editing Interfaces
@@ -610,14 +632,14 @@ interface GraphVisualizationProps {
 
 **Plan Execution:**
 - `execute_plan(plan_id, mode="full|partial|incremental")` 
-- `execute_node(plan_id, node_id)`
+- `execute_plan_node(plan_id, plan_node_id)`
 - `get_execution_status(execution_id)`
 - `cancel_execution(execution_id)`
 
 **Plan Debugging:**
 - `get_execution_trace(execution_id)`
-- `get_node_output(execution_id, node_id)` 
-- `get_error_details(execution_id, node_id)`
+- `get_plan_node_output(execution_id, plan_node_id)` 
+- `get_error_details(execution_id, plan_node_id)`
 - `validate_plan(plan_id)`
 
 **Plan Management:**
@@ -631,7 +653,7 @@ interface GraphVisualizationProps {
 ```json
 {
   "execution_id": "exec_123",
-  "node_id": "filter_active", 
+  "plan_node_id": "filter_active", 
   "error_type": "transformation_error",
   "message": "Filter expression 'status == active' failed: unknown field 'status'",
   "timestamp": "2025-01-15T10:30:15Z",
