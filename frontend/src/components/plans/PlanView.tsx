@@ -4,6 +4,7 @@ import { Plan, DagPlan } from '../../types/dag';
 import { GET_PLAN_DAG, UPDATE_PLAN_NODE } from '../../graphql/dag';
 import { DagEditor } from '../dag/DagEditor';
 import { DagValidation } from '../dag/DagValidation';
+import { PlanNodeGraphInspector } from '../graph/PlanNodeGraphInspector';
 import { PlanForm } from './PlanForm';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
@@ -17,7 +18,7 @@ interface PlanViewProps {
   onPlanUpdate?: (plan: Plan) => void;
 }
 
-type EditMode = 'dag' | 'json' | 'yaml';
+type EditMode = 'dag' | 'grid' | 'json' | 'yaml';
 
 export const PlanView: React.FC<PlanViewProps> = ({
   planId,
@@ -73,7 +74,7 @@ export const PlanView: React.FC<PlanViewProps> = ({
     <div className="flex items-center space-x-2 mb-4">
       <span className="text-sm font-medium text-gray-700">Edit Mode:</span>
       <div className="flex rounded-md shadow-sm">
-        {(['dag', 'json', 'yaml'] as EditMode[]).map((mode) => (
+        {(['dag', 'grid', 'json', 'yaml'] as EditMode[]).map((mode) => (
           <button
             key={mode}
             onClick={() => setEditMode(mode)}
@@ -87,7 +88,7 @@ export const PlanView: React.FC<PlanViewProps> = ({
               }
             `}
           >
-            {mode === 'dag' ? 'Visual DAG' : mode.toUpperCase()}
+            {mode === 'dag' ? 'Visual DAG' : mode === 'grid' ? 'Data Grid' : mode.toUpperCase()}
           </button>
         ))}
       </div>
@@ -180,10 +181,52 @@ export const PlanView: React.FC<PlanViewProps> = ({
     );
   };
 
+  const renderGridEditor = () => {
+    if (!dagPlan?.nodes?.length) {
+      return (
+        <Card className="p-8 text-center">
+          <p className="text-gray-500">No plan nodes available for data grid editing.</p>
+          <p className="text-sm text-gray-400 mt-2">Create plan nodes first using the DAG editor.</p>
+        </Card>
+      );
+    }
+
+    // For demo purposes, use the first transform or output node that has a graph
+    const nodeWithGraph = dagPlan.nodes.find(node => 
+      (node.node_type === 'transform' || node.node_type === 'output') && 
+      node.graph_id
+    );
+
+    if (!nodeWithGraph) {
+      return (
+        <Card className="p-8 text-center">
+          <p className="text-gray-500">No graph data available for editing.</p>
+          <p className="text-sm text-gray-400 mt-2">Execute the plan first to generate graph artifacts.</p>
+        </Card>
+      );
+    }
+
+    return (
+      <div className="h-full">
+        <PlanNodeGraphInspector
+          projectId={projectId}
+          planId={planId}
+          planNodeId={nodeWithGraph.id}
+          planNodeName={nodeWithGraph.name}
+          planNodeType={nodeWithGraph.node_type}
+          editMode="transformation"
+          syncWithVisualization={true}
+        />
+      </div>
+    );
+  };
+
   const renderContent = () => {
     switch (editMode) {
       case 'dag':
         return renderDagEditor();
+      case 'grid':
+        return renderGridEditor();
       case 'json':
       case 'yaml':
         return renderLegacyEditor();

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import { 
   ColumnDef, 
@@ -8,7 +8,7 @@ import {
   getFilteredRowModel,
   getPaginationRowModel,
 } from '@tanstack/react-table';
-import { Plus, Download, Upload, Save, X, Check, Eye, EyeOff } from 'lucide-react';
+import { Plus, Download, Upload, Save, X, Check, Eye, EyeOff, RefreshCw } from 'lucide-react';
 import { GET_GRAPH_ARTIFACT, CREATE_PLAN_NODE } from '../../graphql/dag';
 import { GraphArtifact } from '../../types/dag';
 import { Card } from '../ui/Card';
@@ -16,6 +16,7 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Loading } from '../ui/Loading';
 import { ErrorMessage } from '../ui/ErrorMessage';
+import { useGraphSync, GraphVisualizationRef } from '../../hooks/useGraphSync';
 
 interface GraphDataGridProps {
   projectId: number;
@@ -26,6 +27,16 @@ interface GraphDataGridProps {
   onDataChange?: (changes: GraphDataChanges) => void;
   onNodeSelect?: (nodeIds: string[]) => void;
   onEdgeSelect?: (edgeIds: string[]) => void;
+  onValidationError?: (errors: ValidationError[]) => void;
+  visualizationRef?: GraphVisualizationRef;
+}
+
+interface ValidationError {
+  type: 'node' | 'edge' | 'layer';
+  id: string;
+  field: string;
+  message: string;
+  severity: 'error' | 'warning';
 }
 
 interface GraphDataChanges {
@@ -86,15 +97,47 @@ export const GraphDataGrid: React.FC<GraphDataGridProps> = ({
   onDataChange,
   onNodeSelect,
   onEdgeSelect,
+  onValidationError,
+  visualizationRef,
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('nodes');
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
+
+  const handleRowSelection = useCallback((rowIds: string[]) => {
+    setSelectedRows(rowIds);
+    
+    // Sync selection with visualization
+    if (activeTab === 'nodes' && onNodeSelect) {
+      onNodeSelect(rowIds);
+      highlightInVisualization(rowIds, []);
+    } else if (activeTab === 'edges' && onEdgeSelect) {
+      onEdgeSelect(rowIds);
+      highlightInVisualization([], rowIds);
+    }
+  }, [activeTab, onNodeSelect, onEdgeSelect, highlightInVisualization]);
   const [pendingChanges, setPendingChanges] = useState<GraphDataChanges>({
     nodes: { added: [], updated: [], deleted: [] },
     edges: { added: [], updated: [], deleted: [] },
     layers: { added: [], updated: [], deleted: [] },
   });
   const [isEditing, setIsEditing] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
+
+  // Initialize graph sync hook
+  const {
+    registerVisualization,
+    unregisterVisualization,
+    syncToVisualization,
+    highlightInVisualization,
+    focusInVisualization,
+    refreshVisualization,
+    isVisualizationConnected,
+  } = useGraphSync({
+    syncWithVisualization,
+    onSyncError: (error) => {
+      console.error('Graph visualization sync error:', error);
+    },
+  });
 
   // Fetch graph data
   const { data, loading, error, refetch } = useQuery(GET_GRAPH_ARTIFACT, {
@@ -113,6 +156,220 @@ export const GraphDataGrid: React.FC<GraphDataGridProps> = ({
       return null;
     }
   }, [data]);
+
+  // Validation functions
+  const validateNodeData = useCallback((node: GraphNode): ValidationError[] => {
+    const errors: ValidationError[] = [];
+    
+    if (!node.id || node.id.trim() === '') {
+      errors.push({
+        type: 'node',
+        id: node.id,
+        field: 'id',
+        message: 'Node ID cannot be empty',
+        severity: 'error'
+      });
+    }
+    
+    if (!node.label || node.label.trim() === '') {
+      errors.push({
+        type: 'node',
+        id: node.id,
+        field: 'label',
+        message: 'Node label cannot be empty',
+        severity: 'error'
+      });
+    }
+    
+    if (!node.layer || node.layer.trim() === '') {
+      errors.push({
+        type: 'node',
+        id: node.id,
+        field: 'layer',
+        message: 'Node must be assigned to a layer',
+        severity: 'error'
+      });
+    }
+    
+    if (node.weight !== undefined && (node.weight < 0 || node.weight > 1000)) {
+      errors.push({
+        type: 'node',
+        id: node.id,
+        field: 'weight',
+        message: 'Node weight must be between 0 and 1000',
+        severity: 'warning'
+      });
+    }
+    
+    return errors;
+  }, []);
+
+  const validateEdgeData = useCallback((edge: GraphEdge): ValidationError[] => {
+    const errors: ValidationError[] = [];
+    
+    if (!edge.id || edge.id.trim() === '') {
+      errors.push({
+        type: 'edge',
+        id: edge.id,
+        field: 'id',
+        message: 'Edge ID cannot be empty',
+        severity: 'error'
+      });
+    }
+    
+    if (!edge.source || edge.source.trim() === '') {
+      errors.push({
+        type: 'edge',
+        id: edge.id,
+        field: 'source',
+        message: 'Edge source cannot be empty',
+        severity: 'error'
+      });
+    }
+    
+    if (!edge.target || edge.target.trim() === '') {
+      errors.push({
+        type: 'edge',
+        id: edge.id,
+        field: 'target',
+        message: 'Edge target cannot be empty',
+        severity: 'error'
+      });
+    }
+    
+    if (edge.source === edge.target) {
+      errors.push({
+        type: 'edge',
+        id: edge.id,
+        field: 'target',
+        message: 'Edge cannot connect a node to itself',
+        severity: 'error'
+      });
+    }
+    
+    if (edge.weight !== undefined && (edge.weight < 0 || edge.weight > 1000)) {
+      errors.push({
+        type: 'edge',
+        id: edge.id,
+        field: 'weight',
+        message: 'Edge weight must be between 0 and 1000',
+        severity: 'warning'
+      });
+    }
+    
+    return errors;
+  }, []);
+
+  const validateLayerData = useCallback((layer: GraphLayer): ValidationError[] => {
+    const errors: ValidationError[] = [];
+    
+    if (!layer.id || layer.id.trim() === '') {
+      errors.push({
+        type: 'layer',
+        id: layer.id,
+        field: 'id',
+        message: 'Layer ID cannot be empty',
+        severity: 'error'
+      });
+    }
+    
+    if (!layer.name || layer.name.trim() === '') {
+      errors.push({
+        type: 'layer',
+        id: layer.id,
+        field: 'name',
+        message: 'Layer name cannot be empty',
+        severity: 'error'
+      });
+    }
+    
+    if (!layer.color || !layer.color.match(/^#[0-9A-F]{6}$/i)) {
+      errors.push({
+        type: 'layer',
+        id: layer.id,
+        field: 'color',
+        message: 'Layer color must be a valid hex color (e.g., #FF0000)',
+        severity: 'error'
+      });
+    }
+    
+    return errors;
+  }, []);
+
+  const validateAllData = useCallback(() => {
+    if (!graphData) return;
+    
+    const allErrors: ValidationError[] = [];
+    
+    // Validate nodes
+    (graphData.nodes || []).forEach((node: GraphNode) => {
+      allErrors.push(...validateNodeData(node));
+    });
+    
+    // Validate edges
+    (graphData.edges || []).forEach((edge: GraphEdge) => {
+      allErrors.push(...validateEdgeData(edge));
+    });
+    
+    // Validate layers
+    (graphData.layers || []).forEach((layer: GraphLayer) => {
+      allErrors.push(...validateLayerData(layer));
+    });
+    
+    // Check for orphaned edges (edges pointing to non-existent nodes)
+    const nodeIds = new Set((graphData.nodes || []).map((n: GraphNode) => n.id));
+    (graphData.edges || []).forEach((edge: GraphEdge) => {
+      if (!nodeIds.has(edge.source)) {
+        allErrors.push({
+          type: 'edge',
+          id: edge.id,
+          field: 'source',
+          message: `Source node '${edge.source}' does not exist`,
+          severity: 'error'
+        });
+      }
+      if (!nodeIds.has(edge.target)) {
+        allErrors.push({
+          type: 'edge',
+          id: edge.id,
+          field: 'target',
+          message: `Target node '${edge.target}' does not exist`,
+          severity: 'error'
+        });
+      }
+    });
+    
+    setValidationErrors(allErrors);
+    if (onValidationError) {
+      onValidationError(allErrors);
+    }
+  }, [graphData, validateNodeData, validateEdgeData, validateLayerData, onValidationError]);
+
+  // Register visualization ref
+  useEffect(() => {
+    if (visualizationRef) {
+      registerVisualization(visualizationRef);
+    }
+    return () => {
+      unregisterVisualization();
+    };
+  }, [visualizationRef, registerVisualization, unregisterVisualization]);
+
+  // Sync data to visualization when graph data changes
+  useEffect(() => {
+    if (graphData && syncWithVisualization) {
+      syncToVisualization({
+        nodes: graphData.nodes || [],
+        edges: graphData.edges || [],
+        layers: graphData.layers || [],
+      });
+    }
+  }, [graphData, syncWithVisualization, syncToVisualization]);
+
+  // Run validation when data changes
+  useEffect(() => {
+    validateAllData();
+  }, [validateAllData]);
 
   // Node columns configuration
   const nodeColumns = useMemo<ColumnDef<GraphNode>[]>(() => [
@@ -137,6 +394,7 @@ export const GraphDataGrid: React.FC<GraphDataGridProps> = ({
           <EditableCell
             value={value}
             onChange={(newValue) => handleCellEdit(row.original.id, 'label', newValue)}
+            errors={getCellErrors(row.original.id, 'label')}
           />
         );
       },
@@ -154,6 +412,7 @@ export const GraphDataGrid: React.FC<GraphDataGridProps> = ({
           <EditableCell
             value={value}
             onChange={(newValue) => handleCellEdit(row.original.id, 'layer', newValue)}
+            errors={getCellErrors(row.original.id, 'layer')}
           />
         );
       },
@@ -172,6 +431,7 @@ export const GraphDataGrid: React.FC<GraphDataGridProps> = ({
             value={value?.toString() || '0'}
             type="number"
             onChange={(newValue) => handleCellEdit(row.original.id, 'x', parseFloat(newValue) || 0)}
+            errors={getCellErrors(row.original.id, 'x')}
           />
         );
       },
@@ -425,6 +685,10 @@ export const GraphDataGrid: React.FC<GraphDataGridProps> = ({
     },
   });
 
+  const getCellErrors = useCallback((id: string, field: string): ValidationError[] => {
+    return validationErrors.filter(error => error.id === id && error.field === field);
+  }, [validationErrors]);
+
   const handleCellEdit = useCallback((id: string, field: string, value: any) => {
     if (editMode === 'read-only') return;
     
@@ -464,13 +728,41 @@ export const GraphDataGrid: React.FC<GraphDataGridProps> = ({
       return newChanges;
     });
 
+    // Re-validate after changes
+    setTimeout(() => {
+      validateAllData();
+    }, 0);
+
     if (onDataChange) {
       onDataChange(pendingChanges);
     }
-  }, [activeTab, editMode, pendingChanges, onDataChange]);
+  }, [activeTab, editMode, pendingChanges, onDataChange, validateAllData]);
+
+  const getValidationSummary = () => {
+    const errorCount = validationErrors.filter(e => e.severity === 'error').length;
+    const warningCount = validationErrors.filter(e => e.severity === 'warning').length;
+    
+    if (errorCount === 0 && warningCount === 0) return null;
+    
+    const parts = [];
+    if (errorCount > 0) parts.push(`${errorCount} error${errorCount !== 1 ? 's' : ''}`);
+    if (warningCount > 0) parts.push(`${warningCount} warning${warningCount !== 1 ? 's' : ''}`);
+    
+    return parts.join(', ');
+  };
+
+  const canCommitChanges = () => {
+    const hasErrors = validationErrors.some(e => e.severity === 'error');
+    return !hasErrors && isEditing;
+  };
 
   const handleCommitChanges = async () => {
     if (editMode !== 'transformation') return;
+    
+    if (!canCommitChanges()) {
+      alert('Cannot commit changes: there are validation errors that must be fixed first.');
+      return;
+    }
     
     try {
       // Create transformation node with changes
@@ -499,6 +791,7 @@ export const GraphDataGrid: React.FC<GraphDataGridProps> = ({
         layers: { added: [], updated: [], deleted: [] },
       });
       setIsEditing(false);
+      setValidationErrors([]);
       
       // Refetch data
       refetch();
@@ -587,6 +880,15 @@ export const GraphDataGrid: React.FC<GraphDataGridProps> = ({
               </span>
             )}
             
+            {getValidationSummary() && (
+              <span className={`text-sm ${validationErrors.some(e => e.severity === 'error') 
+                ? 'text-red-600 dark:text-red-400' 
+                : 'text-yellow-600 dark:text-yellow-400'
+              }`}>
+                {getValidationSummary()}
+              </span>
+            )}
+            
             {editMode !== 'read-only' && isEditing && (
               <>
                 <Button
@@ -601,13 +903,29 @@ export const GraphDataGrid: React.FC<GraphDataGridProps> = ({
                 <Button
                   size="sm"
                   onClick={handleCommitChanges}
-                  className="bg-blue-600 hover:bg-blue-700"
+                  disabled={!canCommitChanges()}
+                  className={canCommitChanges() 
+                    ? "bg-blue-600 hover:bg-blue-700" 
+                    : "bg-gray-400 cursor-not-allowed"
+                  }
+                  title={!canCommitChanges() ? "Fix validation errors before committing" : ""}
                 >
                   <Check className="w-4 h-4 mr-1" />
                   Commit Changes
                 </Button>
               </>
             )}
+            
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={refreshVisualization}
+              disabled={!isVisualizationConnected}
+              title={isVisualizationConnected ? "Refresh visualization" : "No visualization connected"}
+            >
+              <RefreshCw className="w-4 h-4 mr-1" />
+              Sync
+            </Button>
             
             <Button variant="outline" size="sm">
               <Download className="w-4 h-4 mr-1" />
@@ -696,15 +1014,20 @@ interface EditableCellProps {
   value: string;
   type?: 'text' | 'number';
   onChange: (value: string) => void;
+  errors?: ValidationError[];
 }
 
 const EditableCell: React.FC<EditableCellProps> = ({ 
   value, 
   type = 'text', 
-  onChange 
+  onChange,
+  errors = []
 }) => {
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState(value);
+
+  const hasErrors = errors.some(e => e.severity === 'error');
+  const hasWarnings = errors.some(e => e.severity === 'warning');
 
   const handleSave = () => {
     onChange(editValue);
@@ -716,29 +1039,80 @@ const EditableCell: React.FC<EditableCellProps> = ({
     setEditing(false);
   };
 
+  const getCellClassName = () => {
+    let className = "cursor-pointer rounded px-1 py-0.5 block w-full ";
+    if (hasErrors) {
+      className += "bg-red-50 hover:bg-red-100 border border-red-300 dark:bg-red-900/20 dark:hover:bg-red-900/30 dark:border-red-700";
+    } else if (hasWarnings) {
+      className += "bg-yellow-50 hover:bg-yellow-100 border border-yellow-300 dark:bg-yellow-900/20 dark:hover:bg-yellow-900/30 dark:border-yellow-700";
+    } else {
+      className += "hover:bg-gray-100 dark:hover:bg-gray-700";
+    }
+    return className;
+  };
+
+  const getInputClassName = () => {
+    let className = "w-full min-w-0 ";
+    if (hasErrors) {
+      className += "border-red-500 focus:border-red-500 focus:ring-red-500";
+    } else if (hasWarnings) {
+      className += "border-yellow-500 focus:border-yellow-500 focus:ring-yellow-500";
+    }
+    return className;
+  };
+
   if (editing) {
     return (
-      <Input
-        type={type}
-        value={editValue}
-        onChange={(e) => setEditValue(e.target.value)}
-        onBlur={handleSave}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') handleSave();
-          if (e.key === 'Escape') handleCancel();
-        }}
-        className="w-full min-w-0"
-        autoFocus
-      />
+      <div className="relative">
+        <Input
+          type={type}
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onBlur={handleSave}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleSave();
+            if (e.key === 'Escape') handleCancel();
+          }}
+          className={getInputClassName()}
+          autoFocus
+        />
+        {errors.length > 0 && (
+          <div className="absolute z-10 mt-1 p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded shadow-lg text-xs">
+            {errors.map((error, index) => (
+              <div 
+                key={index}
+                className={`${error.severity === 'error' ? 'text-red-600' : 'text-yellow-600'}`}
+              >
+                {error.message}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     );
   }
 
   return (
-    <span 
-      onClick={() => setEditing(true)}
-      className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-1 py-0.5 block w-full"
-    >
-      {value || <span className="text-gray-400 italic">Click to edit</span>}
-    </span>
+    <div className="relative group">
+      <span 
+        onClick={() => setEditing(true)}
+        className={getCellClassName()}
+        title={errors.length > 0 ? errors.map(e => e.message).join(', ') : ''}
+      >
+        {value || <span className="text-gray-400 italic">Click to edit</span>}
+      </span>
+      {errors.length > 0 && (
+        <div className="absolute left-0 top-full z-10 mt-1 p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded shadow-lg text-xs opacity-0 group-hover:opacity-100 transition-opacity">
+          {errors.map((error, index) => (
+            <div 
+              key={index}
+              className={`${error.severity === 'error' ? 'text-red-600' : 'text-yellow-600'}`}
+            >
+              {error.message}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 };

@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Database, Eye, Grid, BarChart3 } from 'lucide-react';
 import { GraphDataGrid } from './GraphDataGrid';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
+import { GraphVisualizationRef } from '../../hooks/useGraphSync';
 
 interface PlanNodeGraphInspectorProps {
   projectId: number;
@@ -32,6 +33,7 @@ export const PlanNodeGraphInspector: React.FC<PlanNodeGraphInspectorProps> = ({
   onEdgeSelect,
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const visualizationRef = useRef<GraphVisualizationRef | null>(null);
 
   const getNodeTypeIcon = (nodeType: string) => {
     switch (nodeType) {
@@ -101,6 +103,7 @@ export const PlanNodeGraphInspector: React.FC<PlanNodeGraphInspectorProps> = ({
             onDataChange={onDataChange}
             onNodeSelect={onNodeSelect}
             onEdgeSelect={onEdgeSelect}
+            visualizationRef={visualizationRef.current || undefined}
           />
         );
       case 'visualization':
