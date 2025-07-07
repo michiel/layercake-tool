@@ -1758,6 +1758,716 @@ impl MCPTools {
 }
 ```
 
+## End-to-End User Scenario
+
+### **Complete Workflow: From Project Creation to Multi-Format Export**
+
+This scenario demonstrates the full Layercake workflow, showcasing the integration between all major components: project management, plan editing, graph transformation, data grid editing, and multi-format export.
+
+#### **Scenario Overview**
+A user creates a new architecture analysis project, imports CSV data, performs graph transformations, edits data through the grid interface, and exports to multiple formats (PlantUML and GML) with different rendering configurations.
+
+### **Step 1: Project Creation and Initial Setup**
+
+**User Action**: Creates new project through GraphQL interface
+```graphql
+mutation CreateProject {
+  createProject(input: {
+    name: "Enterprise Architecture Analysis"
+    description: "Analysis of microservices architecture dependencies"
+  }) {
+    id
+    name
+    createdAt
+  }
+}
+```
+
+**Backend Processing**:
+- ProjectService creates new project entry in database
+- Returns project with generated ID (e.g., "proj_001")
+
+**Technical Implementation**:
+```rust
+// Service layer handles business logic
+impl ProjectService {
+    async fn create_project(&self, data: CreateProjectRequest) -> Result<Project> {
+        let project = Project {
+            id: ProjectId::generate(),
+            name: data.name,
+            description: data.description,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+        self.repository.insert_project(&project).await?;
+        Ok(project)
+    }
+}
+```
+
+### **Step 2: Plan Creation with DAG Structure**
+
+**User Action**: Creates new plan using ReactFlow-based plan editor
+```graphql
+mutation CreatePlan {
+  createPlan(input: {
+    projectId: "proj_001"
+    name: "Architecture Dependency Analysis"
+    planContent: {
+      version: "2.0"
+      metadata: {
+        name: "Architecture Dependency Analysis"
+        description: "Import and analyze service dependencies"
+      }
+      dag: {
+        nodes: []  # Initially empty - will be populated through UI
+        edges: []
+      }
+    }
+  }) {
+    id
+    name
+    dag {
+      nodes { id type label }
+      edges { id source target }
+    }
+  }
+}
+```
+
+**Technical Reference**: Plan content follows the [Flat DAG Plan Schema](#flat-dag-plan-schema) defined earlier in the document.
+
+### **Step 3: File Upload and Import Node Creation**
+
+**File Upload Support**: The design supports file uploads through multipart form data endpoints:
+
+```typescript
+// Frontend file upload component
+interface FileUploadProps {
+  onUpload: (files: FileList) => Promise<UploadResult>;
+  acceptedTypes: string[];
+  maxSize: number;
+}
+
+// Upload result contains file references for import configuration
+interface UploadResult {
+  files: UploadedFile[];
+}
+
+interface UploadedFile {
+  id: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+  path: string; // Server-side storage path
+}
+```
+
+**REST Endpoint for File Upload**:
+```
+POST /api/v1/projects/{project_id}/files
+Content-Type: multipart/form-data
+
+# Returns file references that can be used in import node configuration
+```
+
+**User Action**: Uploads CSV files through web interface and creates import node
+
+1. **File Upload**: User uploads three CSV files:
+   - `services.csv` - Service definitions
+   - `dependencies.csv` - Service dependencies  
+   - `layers.csv` - Architectural layer definitions
+
+2. **Import Node Creation**: Plan editor creates import node with uploaded file references
+
+**Updated Plan DAG**:
+```json
+{
+  "dag": {
+    "nodes": [
+      {
+        "id": "import_services",
+        "type": "import",
+        "label": "Import Architecture Data",
+        "config": {
+          "imports": [
+            {
+              "id": "arch_csv",
+              "type": "csv_upload",
+              "sources": {
+                "nodes": "upload_001", // File ID from upload
+                "edges": "upload_002", 
+                "layers": "upload_003"
+              }
+            }
+          ],
+          "merge_strategy": "append"
+        },
+        "position": { "x": 100, "y": 100 }
+      }
+    ],
+    "edges": []
+  }
+}
+```
+
+**Backend Processing**:
+- Import node references uploaded files by ID
+- Files stored in project-specific directory structure
+- Plan updated with new DAG structure containing import node
+
+### **Step 4: Plan Execution and Graph Generation**
+
+**User Action**: Executes plan to process import node
+```graphql
+mutation ExecutePlan {
+  executePlan(id: "plan_001", mode: INCREMENTAL) {
+    id
+    status
+    progress
+  }
+}
+```
+
+**Backend Processing**:
+1. **Execution Service** creates new execution record
+2. **DAG Engine** processes import node:
+   - Reads uploaded CSV files
+   - Parses and validates data structure
+   - Creates graph object with nodes[], edges[], layers[]
+   - Stores graph in database with reference to plan node
+
+**Generated Graph Object**:
+```json
+{
+  "id": "graph_001",
+  "plan_id": "plan_001", 
+  "plan_node_id": "import_services",
+  "graph_data": {
+    "nodes": [
+      {
+        "id": "api_gateway",
+        "label": "API Gateway",
+        "layer": "infrastructure",
+        "x": 100, "y": 200,
+        "properties": { "type": "service", "status": "active" }
+      },
+      {
+        "id": "user_service", 
+        "label": "User Service",
+        "layer": "business_logic",
+        "x": 200, "y": 300,
+        "properties": { "type": "microservice", "team": "platform" }
+      }
+    ],
+    "edges": [
+      {
+        "id": "edge_001",
+        "source": "api_gateway",
+        "target": "user_service", 
+        "label": "routes to",
+        "properties": { "protocol": "https", "weight": 5 }
+      }
+    ],
+    "layers": [
+      {
+        "id": "infrastructure",
+        "name": "Infrastructure Layer",
+        "color": "#3b82f6",
+        "description": "Core infrastructure components"
+      },
+      {
+        "id": "business_logic", 
+        "name": "Business Logic Layer",
+        "color": "#10b981",
+        "description": "Application business logic services"
+      }
+    ]
+  },
+  "created_at": "2025-01-15T10:30:00Z"
+}
+```
+
+**Technical Reference**: Graph data structure follows the [Graph Data Structure](#graph-data-structure) schema defined in the database section.
+
+### **Step 5: Data Grid Editing**
+
+**User Action**: Opens GraphDataGrid component to inspect and edit imported data
+
+**Component Invocation**:
+```typescript
+<GraphDataGrid
+  graphObject={graphAtPlanNode} // From GraphQL query
+  projectId="proj_001"
+  planId="plan_001" 
+  planNodeId="import_services"
+  editMode="transformation" // Uses transformation node strategy
+  allowedOperations={{
+    addNodes: false,    // Import data is readonly
+    editNodes: true,    // Allow label/property edits
+    deleteNodes: false,
+    addEdges: false,
+    editEdges: true,
+    deleteEdges: false,
+    addLayers: false,
+    editLayers: true,
+    deleteLayers: false
+  }}
+  onDataChange={handleDataGridChanges}
+  onCommitChanges={handleCommitTransformation}
+/>
+```
+
+**User Edits**:
+1. Updates "User Service" label to "User Management Service" 
+2. Modifies edge label from "routes to" to "authenticates via"
+3. Updates layer color for better visualization
+
+**Data Grid Change Tracking**:
+```typescript
+interface GraphDataChanges {
+  nodes: {
+    updated: [
+      { 
+        id: "user_service", 
+        changes: { label: "User Management Service" } 
+      }
+    ]
+  },
+  edges: {
+    updated: [
+      { 
+        id: "edge_001", 
+        changes: { label: "authenticates via" } 
+      }
+    ]
+  },
+  layers: {
+    updated: [
+      { 
+        id: "business_logic", 
+        changes: { color: "#059669" } 
+      }
+    ]
+  }
+}
+```
+
+**Commit Strategy**: Following the [Transformation Node Strategy](#transformation-node-strategy), changes create a new transformation plan node:
+
+```json
+{
+  "id": "transform_labels_001",
+  "type": "transform", 
+  "label": "Update Labels - 2025-01-15 10:45",
+  "config": {
+    "operation": "manual_edit",
+    "changes": {
+      // GraphDataChanges object from above
+    },
+    "metadata": {
+      "edited_by": "user_123",
+      "edited_at": "2025-01-15T10:45:00Z",
+      "edit_source": "data_grid"
+    }
+  },
+  "position": { "x": 300, "y": 100 }
+}
+```
+
+### **Step 6: Transformation Node Addition**
+
+**User Action**: Uses ReactFlow plan editor to:
+1. Add transformation node to DAG
+2. Connect it to the import node  
+3. Configure depth limitation transformation
+
+**Plan Editor Interface**:
+```typescript
+// ReactFlow-based plan editor with transformation node palette
+<PlanEditor
+  plan={currentPlan}
+  onNodeAdd={handleAddNode}
+  onNodeConnect={handleNodeConnection}
+  onNodeConfigure={handleNodeConfiguration}
+>
+  <NodePalette>
+    <NodeType type="import" label="Import Data" />
+    <NodeType type="transform" label="Transform" />
+    <NodeType type="export" label="Export" />
+  </NodePalette>
+</PlanEditor>
+```
+
+**Transformation Configuration Popup**:
+```typescript
+// Popup for configuring transformation properties
+<TransformationConfigModal
+  isOpen={showTransformConfig}
+  nodeId="transform_depth_001"
+  onSave={handleSaveTransformation}
+>
+  <TransformationSelector 
+    selectedType="depth_limit"
+    onChange={setTransformationType}
+  />
+  <DepthLimitConfig
+    maxDepth={3}
+    startNodes={["api_gateway"]} // Optional root nodes
+    direction="outbound" // inbound|outbound|both
+    onChange={setDepthConfig}
+  />
+</TransformationConfigModal>
+```
+
+**Resulting DAG Update**:
+```json
+{
+  "dag": {
+    "nodes": [
+      {
+        "id": "import_services",
+        // ... existing import node
+      },
+      {
+        "id": "transform_labels_001", 
+        // ... label edit transformation (created from data grid)
+      },
+      {
+        "id": "transform_depth_001",
+        "type": "transform",
+        "label": "Limit Depth to 3",
+        "config": {
+          "operation": "depth_limit",
+          "max_depth": 3,
+          "start_nodes": ["api_gateway"],
+          "direction": "outbound"
+        },
+        "position": { "x": 500, "y": 100 }
+      }
+    ],
+    "edges": [
+      {
+        "id": "edge_import_to_labels",
+        "source": "import_services",
+        "target": "transform_labels_001",
+        "type": "data_flow"
+      },
+      {
+        "id": "edge_labels_to_depth", 
+        "source": "transform_labels_001",
+        "target": "transform_depth_001",
+        "type": "data_flow"
+      }
+    ]
+  }
+}
+```
+
+### **Step 7: Export Node Configuration**
+
+**User Action**: Adds multiple export nodes with different configurations
+
+1. **PlantUML Export Node 1**:
+```json
+{
+  "id": "export_plantuml_001",
+  "type": "export",
+  "label": "PlantUML - Standard",
+  "config": {
+    "format": "plantuml",
+    "output": "architecture_standard.puml",
+    "template_params": {
+      "direction": "top_to_bottom",
+      "skin": "corporate",
+      "show_layers": true,
+      "include_properties": false
+    }
+  },
+  "position": { "x": 700, "y": 50 }
+}
+```
+
+2. **PlantUML Export Node 2** (Duplicated and Modified):
+```json
+{
+  "id": "export_plantuml_002", 
+  "type": "export",
+  "label": "PlantUML - Detailed",
+  "config": {
+    "format": "plantuml",
+    "output": "architecture_detailed.puml",
+    "template_params": {
+      "direction": "left_to_right",
+      "skin": "detailed", 
+      "show_layers": true,
+      "include_properties": true,
+      "show_edge_labels": true
+    }
+  },
+  "position": { "x": 700, "y": 150 }
+}
+```
+
+3. **GML Export Node**:
+```json
+{
+  "id": "export_gml_001",
+  "type": "export", 
+  "label": "GML Export",
+  "config": {
+    "format": "gml",
+    "output": "architecture_data.gml",
+    "include_positions": true,
+    "include_metadata": true
+  },
+  "position": { "x": 700, "y": 250 }
+}
+```
+
+**DAG Connections**: All export nodes connect to the depth transformation node:
+```json
+{
+  "edges": [
+    // ... existing edges
+    {
+      "id": "edge_depth_to_plantuml1",
+      "source": "transform_depth_001",
+      "target": "export_plantuml_001", 
+      "type": "data_flow"
+    },
+    {
+      "id": "edge_depth_to_plantuml2",
+      "source": "transform_depth_001",
+      "target": "export_plantuml_002",
+      "type": "data_flow" 
+    },
+    {
+      "id": "edge_depth_to_gml",
+      "source": "transform_depth_001", 
+      "target": "export_gml_001",
+      "type": "data_flow"
+    }
+  ]
+}
+```
+
+### **Step 8: Plan Execution and Output Generation**
+
+**User Action**: Executes complete plan with all transformations and exports
+
+**Execution Flow**:
+```graphql
+mutation ExecutePlan {
+  executePlan(id: "plan_001", mode: FULL) {
+    id
+    status
+    progress
+    planNodeScopes {
+      planNodeId
+      graphRef
+    }
+  }
+}
+
+# Monitor execution progress
+subscription ExecutionUpdates {
+  executionUpdates(executionId: "exec_002") {
+    id
+    status
+    currentPlanNode
+    progress
+    planNodeScopes {
+      planNodeId
+      status
+      graphRef
+    }
+  }
+}
+```
+
+**Backend Execution Process**:
+
+1. **Import Node Execution** (`import_services`):
+   - Reads uploaded CSV files
+   - Creates `graph_001` with imported data
+
+2. **Label Transformation** (`transform_labels_001`):
+   - Takes `graph_001` as input
+   - Applies label changes from data grid edits
+   - Creates `graph_002` with updated labels
+
+3. **Depth Transformation** (`transform_depth_001`):
+   - Takes `graph_002` as input  
+   - Applies depth limitation algorithm
+   - Creates `graph_003` with filtered nodes/edges
+
+4. **Export Node Executions** (Parallel):
+   - **PlantUML Standard**: Generates `architecture_standard.puml`
+   - **PlantUML Detailed**: Generates `architecture_detailed.puml` 
+   - **GML Export**: Generates `architecture_data.gml`
+
+**Generated Output Files**:
+
+**architecture_standard.puml**:
+```plantuml
+@startuml Architecture Standard
+!theme corporate
+
+package "Infrastructure Layer" as infra {
+  [API Gateway] as api
+}
+
+package "Business Logic Layer" as business {
+  [User Management Service] as user
+}
+
+api --> user : authenticates via
+
+@enduml
+```
+
+**architecture_detailed.puml**:
+```plantuml
+@startuml Architecture Detailed
+!theme detailed
+left to right direction
+
+package "Infrastructure Layer" as infra {
+  [API Gateway] as api
+  note right of api
+    type: service
+    status: active
+  end note
+}
+
+package "Business Logic Layer" as business {
+  [User Management Service] as user
+  note right of user
+    type: microservice
+    team: platform
+  end note
+}
+
+api --> user : authenticates via
+note on link : protocol: https, weight: 5
+
+@enduml
+```
+
+**architecture_data.gml**:
+```gml
+graph [
+  directed 1
+  
+  node [
+    id "api_gateway"
+    label "API Gateway"
+    layer "infrastructure"
+    x 100
+    y 200
+    type "service"
+    status "active"
+  ]
+  
+  node [
+    id "user_service" 
+    label "User Management Service"
+    layer "business_logic"
+    x 200
+    y 300
+    type "microservice"
+    team "platform"
+  ]
+  
+  edge [
+    source "api_gateway"
+    target "user_service"
+    label "authenticates via"
+    protocol "https"
+    weight 5
+  ]
+]
+```
+
+**Execution Results**:
+```json
+{
+  "execution_id": "exec_002",
+  "status": "completed",
+  "progress": 100,
+  "plan_node_scopes": [
+    {
+      "plan_node_id": "import_services",
+      "graph_ref": "graph_001",
+      "status": "completed"
+    },
+    {
+      "plan_node_id": "transform_labels_001", 
+      "graph_ref": "graph_002",
+      "status": "completed"
+    },
+    {
+      "plan_node_id": "transform_depth_001",
+      "graph_ref": "graph_003", 
+      "status": "completed"
+    }
+  ],
+  "execution_outputs": [
+    {
+      "plan_node_id": "export_plantuml_001",
+      "file_name": "architecture_standard.puml",
+      "file_type": "plantuml",
+      "file_path": "/outputs/proj_001/exec_002/architecture_standard.puml",
+      "file_size": 245
+    },
+    {
+      "plan_node_id": "export_plantuml_002", 
+      "file_name": "architecture_detailed.puml",
+      "file_type": "plantuml",
+      "file_path": "/outputs/proj_001/exec_002/architecture_detailed.puml",
+      "file_size": 412
+    },
+    {
+      "plan_node_id": "export_gml_001",
+      "file_name": "architecture_data.gml", 
+      "file_type": "gml",
+      "file_path": "/outputs/proj_001/exec_002/architecture_data.gml",
+      "file_size": 521
+    }
+  ]
+}
+```
+
+### **Technical Integration Points**
+
+This scenario demonstrates integration between all major Layercake components:
+
+1. **Unified Backend Architecture**: All operations use shared service layer (ProjectService, PlanService, GraphService, ExecutionService)
+
+2. **Database Schema**: Leverages simplified schema with plan-centric artifact generation
+
+3. **GraphQL API**: Complete CRUD operations and real-time execution monitoring
+
+4. **File Upload Support**: Multipart form data handling for CSV import
+
+5. **ReactFlow Plan Editor**: Visual DAG editing with node configuration popups
+
+6. **GraphDataGrid**: Spreadsheet-like editing with transformation node strategy
+
+7. **Multi-format Export**: PlantUML and GML generation with configurable templates
+
+8. **Real-time Monitoring**: GraphQL subscriptions for execution progress tracking
+
+**Key Architecture Benefits Demonstrated**:
+- **Plan-centric workflow** with graphs as execution artifacts
+- **Immutable execution** with graph snapshots at each DAG node  
+- **Transformation-based editing** preserving complete audit trail
+- **Multi-format export** with template customization
+- **Real-time collaboration** readiness through unified data model
+
+This end-to-end scenario validates the complete Layercake architecture and demonstrates how all components work together to provide a comprehensive graph analysis and visualization platform.
+
 ### **Error Handling and Debugging**
 
 ```json
