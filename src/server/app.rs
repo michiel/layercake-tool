@@ -27,7 +27,7 @@ use crate::graphql::{GraphQLContext, GraphQLSchema, queries::Query, mutations::M
 use crate::services::{ImportService, ExportService, GraphService};
 
 
-use super::handlers::{health, projects, plans, graph_data, plan_execution, graph_analysis};
+use super::handlers::{health, projects, plans, plan_nodes, graph_data, plan_execution, graph_analysis};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -46,12 +46,26 @@ pub struct AppState {
         projects::get_project,
         projects::update_project,
         projects::delete_project,
+        plan_nodes::list_plan_nodes,
+        plan_nodes::get_plan_node,
+        plan_nodes::get_plan_node_graph,
+        plan_nodes::get_execution_graphs,
+        plan_nodes::get_plan_dag,
+        plan_nodes::get_plan_node_graph_stats,
+        plan_nodes::validate_plan_node_graph,
     ),
     components(
         schemas(
             crate::database::entities::projects::Model,
+            crate::database::entities::plan_nodes::Model,
             crate::server::handlers::projects::CreateProjectRequest,
             crate::server::handlers::projects::UpdateProjectRequest,
+            crate::server::handlers::plan_nodes::CreatePlanNodeRequest,
+            crate::server::handlers::plan_nodes::UpdatePlanNodeRequest,
+            crate::server::handlers::plan_nodes::PlanNodeResponse,
+            crate::services::GraphStatistics,
+            crate::services::GraphValidationResult,
+            crate::services::GraphDiff,
         )
     ),
     info(
@@ -180,6 +194,21 @@ fn api_v1_routes() -> Router<AppState> {
         .route("/projects/:id/plans/:plan_id", put(plans::update_plan))
         .route("/projects/:id/plans/:plan_id", delete(plans::delete_plan))
         .route("/projects/:id/plans/:plan_id/execute", post(plans::execute_plan))
+        
+        // Plan node routes (hierarchical DAG endpoints)
+        .route("/projects/:project_id/plans/:plan_id/plan-nodes", get(plan_nodes::list_plan_nodes))
+        .route("/projects/:project_id/plans/:plan_id/plan-nodes", post(plan_nodes::create_plan_node))
+        .route("/projects/:project_id/plans/:plan_id/plan-nodes/:node_id", get(plan_nodes::get_plan_node))
+        .route("/projects/:project_id/plans/:plan_id/plan-nodes/:node_id", put(plan_nodes::update_plan_node))
+        .route("/projects/:project_id/plans/:plan_id/plan-nodes/:node_id", delete(plan_nodes::delete_plan_node))
+        .route("/projects/:project_id/plans/:plan_id/plan-nodes/:node_id/graph", get(plan_nodes::get_plan_node_graph))
+        .route("/projects/:project_id/plans/:plan_id/plan-nodes/:node_id/graph/stats", get(plan_nodes::get_plan_node_graph_stats))
+        .route("/projects/:project_id/plans/:plan_id/plan-nodes/:node_id/graph/validate", get(plan_nodes::validate_plan_node_graph))
+        .route("/projects/:project_id/plans/:plan_id/execution/:exec_id/graphs", get(plan_nodes::get_execution_graphs))
+        .route("/projects/:project_id/plans/:plan_id/graphs/compare", post(plan_nodes::compare_graphs))
+        
+        // DAG plan routes
+        .route("/plans/:plan_id/dag", get(plan_nodes::get_plan_dag))
         
         // Plan execution routes
         .route("/projects/:id/plans/:plan_id/execute-async", post(plan_execution::execute_plan_async))

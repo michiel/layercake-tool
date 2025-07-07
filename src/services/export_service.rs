@@ -96,4 +96,53 @@ impl ExportService {
 
         Ok(outputs)
     }
+
+    /// Export graph as JSON to file
+    pub async fn export_as_json(&self, graph: &Graph, output_path: &str) -> Result<()> {
+        let render_config = RenderConfig {
+            contain_nodes: true,
+            orientation: RenderConfigOrientation::TB,
+        };
+        
+        let content = to_json::render(graph.clone(), render_config)
+            .map_err(|e| anyhow::anyhow!("JSON export failed: {}", e))?;
+        
+        tokio::fs::write(output_path, content).await
+            .map_err(|e| anyhow::anyhow!("Failed to write JSON file: {}", e))?;
+        
+        Ok(())
+    }
+
+    /// Export graph as CSV to file
+    pub async fn export_as_csv(&self, graph: &Graph, output_path: &str) -> Result<()> {
+        let render_config = RenderConfig {
+            contain_nodes: true,
+            orientation: RenderConfigOrientation::TB,
+        };
+        
+        // Export nodes as CSV (default CSV export)
+        let content = to_csv_nodes::render(graph.clone(), render_config)
+            .map_err(|e| anyhow::anyhow!("CSV export failed: {}", e))?;
+        
+        tokio::fs::write(output_path, content).await
+            .map_err(|e| anyhow::anyhow!("Failed to write CSV file: {}", e))?;
+        
+        Ok(())
+    }
+
+    /// Export graph as DOT to file
+    pub async fn export_as_dot(&self, graph: &Graph, output_path: &str) -> Result<()> {
+        let render_config = RenderConfig {
+            contain_nodes: true,
+            orientation: RenderConfigOrientation::TB,
+        };
+        
+        let content = to_dot::render(graph.clone(), render_config)
+            .map_err(|e| anyhow::anyhow!("DOT export failed: {}", e))?;
+        
+        tokio::fs::write(output_path, content).await
+            .map_err(|e| anyhow::anyhow!("Failed to write DOT file: {}", e))?;
+        
+        Ok(())
+    }
 }

@@ -1,7 +1,11 @@
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "server")]
+use utoipa::ToSchema;
+
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
+#[cfg_attr(feature = "server", derive(ToSchema))]
 #[sea_orm(table_name = "plan_nodes")]
 pub struct Model {
     #[sea_orm(primary_key)]

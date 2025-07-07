@@ -1,7 +1,9 @@
 pub mod dag_plan;
+pub mod dag_execution;
 pub mod legacy_plan;
 
 pub use dag_plan::*;
+pub use dag_execution::*;
 pub use legacy_plan::*;
 
 use serde::{Deserialize, Serialize};
