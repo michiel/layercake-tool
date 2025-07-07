@@ -1,5 +1,5 @@
 use axum::{
-    extract::State,
+    extract::{State, Request},
     http::StatusCode,
     response::{Json, IntoResponse},
     routing::{get, post, put, delete},
@@ -152,9 +152,9 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
 
     // Add static file serving for frontend assets
     app = app
-        .route("/", get(serve_frontend_html))
         .nest_service("/static", ServeDir::new("frontend/dist"))
-        .fallback_service(ServeDir::new("frontend/dist"));
+        .route("/", get(serve_frontend_html))
+        .fallback(serve_spa_fallback);
 
     let app = app
         // Add middleware
@@ -317,6 +317,25 @@ async fn serve_frontend_html() -> impl IntoResponse {
 </html>"#;
     
     axum::response::Html(html)
+}
+
+/// SPA fallback handler for client-side routing
+async fn serve_spa_fallback(req: Request) -> impl IntoResponse {
+    let path = req.uri().path();
+    
+    // Check if this is an API request
+    if path.starts_with("/api/") || 
+       path.starts_with("/health") || 
+       path.starts_with("/docs") || 
+       path.starts_with("/graphql") || 
+       path.starts_with("/mcp") {
+        // For API routes, return 404
+        (StatusCode::NOT_FOUND, "Not Found").into_response()
+    } else {
+        // For all other routes (client-side routes), serve the main HTML
+        // Static files should be handled by nest_service before reaching this fallback
+        serve_frontend_html().await.into_response()
+    }
 }
 
 #[cfg(feature = "mcp")]

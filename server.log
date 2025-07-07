@@ -111,13 +111,73 @@ warning: field `subscriptions` is never read
     = note: `#[warn(dead_code)]` on by default
 
 warning: `axum-mcp` (lib) generated 16 warnings (run `cargo fix --lib -p axum-mcp` to apply 10 suggestions)
+warning: unused import: `std::fs::File`
+ --> src/graph_io/csv_io.rs:6:5
+  |
+6 | use std::fs::File;
+  |     ^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `warn`
+ --> src/graph_io/csv_io.rs:8:22
+  |
+8 | use tracing::{debug, warn};
+  |                      ^^^^
+
+warning: unused imports: `FieldMappings` and `MergeMode`
+  --> src/graph_io/csv_io.rs:11:71
+   |
+11 | use super::{ImportOptions, ExportOptions, ImportResult, ExportResult, MergeMode, FieldMappings};
+   |                                                                       ^^^^^^^^^  ^^^^^^^^^^^^^
+
+warning: unused import: `anyhow`
+ --> src/graph_io/json_io.rs:3:22
+  |
+3 | use anyhow::{Result, anyhow};
+  |                      ^^^^^^
+
+warning: unused import: `warn`
+ --> src/graph_io/json_io.rs:7:22
+  |
+7 | use tracing::{debug, warn};
+  |                      ^^^^
+
+warning: unused imports: `Edge`, `Layer`, and `Node`
+ --> src/graph_io/json_io.rs:9:27
+  |
+9 | use crate::graph::{Graph, Node, Edge, Layer};
+  |                           ^^^^  ^^^^  ^^^^^
+
+warning: unused import: `MergeMode`
+  --> src/graph_io/json_io.rs:10:71
+   |
+10 | use super::{ImportOptions, ExportOptions, ImportResult, ExportResult, MergeMode};
+   |                                                                       ^^^^^^^^^
+
+warning: unused import: `anyhow`
+ --> src/graph_io/dot_io.rs:3:22
+  |
+3 | use anyhow::{Result, anyhow};
+  |                      ^^^^^^
+
+warning: unused import: `HashMap`
+ --> src/transformations/operations.rs:5:24
+  |
+5 | use std::collections::{HashMap, HashSet};
+  |                        ^^^^^^^
+
+warning: unused import: `anyhow::Result`
+  --> src/transformations/mod.rs:15:5
+   |
+15 | use anyhow::Result;
+   |     ^^^^^^^^^^^^^^
+
 warning: unused imports: `ActiveValue` and `Set`
  --> src/database/entities/projects.rs:2:15
   |
 2 | use sea_orm::{Set, ActiveValue};
   |               ^^^  ^^^^^^^^^^^
-  |
-  = note: `#[warn(unused_imports)]` on by default
 
 warning: unused import: `chrono::Utc`
  --> src/database/entities/projects.rs:4:5
@@ -138,128 +198,127 @@ warning: unused import: `chrono::Utc`
   |     ^^^^^^^^^^^
 
 warning: ambiguous glob re-exports
-  --> src/database/entities/mod.rs:13:9
+  --> src/database/entities/mod.rs:16:9
    |
-13 | pub use projects::*;
+16 | pub use projects::*;
    |         ^^^^^^^^^^^ the name `Column` in the type namespace is first re-exported here
 ...
-20 | pub use execution_outputs::*;
+23 | pub use execution_outputs::*;
    |         -------------------- but the name `Column` in the type namespace is also re-exported here
    |
    = note: `#[warn(ambiguous_glob_reexports)]` on by default
 
 warning: ambiguous glob re-exports
-  --> src/database/entities/mod.rs:13:9
+  --> src/database/entities/mod.rs:16:9
    |
-13 | pub use projects::*;
+16 | pub use projects::*;
    |         ^^^^^^^^^^^ the name `ColumnIter` in the type namespace is first re-exported here
 ...
-20 | pub use execution_outputs::*;
+23 | pub use execution_outputs::*;
    |         -------------------- but the name `ColumnIter` in the type namespace is also re-exported here
 
 warning: ambiguous glob re-exports
-  --> src/database/entities/mod.rs:13:9
+  --> src/database/entities/mod.rs:16:9
    |
-13 | pub use projects::*;
+16 | pub use projects::*;
    |         ^^^^^^^^^^^ the name `Entity` in the type namespace is first re-exported here
 ...
-20 | pub use execution_outputs::*;
+23 | pub use execution_outputs::*;
    |         -------------------- but the name `Entity` in the type namespace is also re-exported here
 
 warning: ambiguous glob re-exports
-  --> src/database/entities/mod.rs:13:9
+  --> src/database/entities/mod.rs:16:9
    |
-13 | pub use projects::*;
+16 | pub use projects::*;
    |         ^^^^^^^^^^^ the name `Entity` in the value namespace is first re-exported here
 ...
-20 | pub use execution_outputs::*;
+23 | pub use execution_outputs::*;
    |         -------------------- but the name `Entity` in the value namespace is also re-exported here
 
 warning: ambiguous glob re-exports
-  --> src/database/entities/mod.rs:13:9
+  --> src/database/entities/mod.rs:16:9
    |
-13 | pub use projects::*;
+16 | pub use projects::*;
    |         ^^^^^^^^^^^ the name `PrimaryKey` in the type namespace is first re-exported here
 ...
-20 | pub use execution_outputs::*;
+23 | pub use execution_outputs::*;
    |         -------------------- but the name `PrimaryKey` in the type namespace is also re-exported here
 
 warning: ambiguous glob re-exports
-  --> src/database/entities/mod.rs:13:9
+  --> src/database/entities/mod.rs:16:9
    |
-13 | pub use projects::*;
+16 | pub use projects::*;
    |         ^^^^^^^^^^^ the name `PrimaryKeyIter` in the type namespace is first re-exported here
 ...
-20 | pub use execution_outputs::*;
+23 | pub use execution_outputs::*;
    |         -------------------- but the name `PrimaryKeyIter` in the type namespace is also re-exported here
 
 warning: ambiguous glob re-exports
-  --> src/database/entities/mod.rs:13:9
+  --> src/database/entities/mod.rs:16:9
    |
-13 | pub use projects::*;
+16 | pub use projects::*;
    |         ^^^^^^^^^^^ the name `ActiveModel` in the type namespace is first re-exported here
 ...
-20 | pub use execution_outputs::*;
+23 | pub use execution_outputs::*;
    |         -------------------- but the name `ActiveModel` in the type namespace is also re-exported here
 
 warning: ambiguous glob re-exports
-  --> src/database/entities/mod.rs:13:9
+  --> src/database/entities/mod.rs:16:9
    |
-13 | pub use projects::*;
+16 | pub use projects::*;
    |         ^^^^^^^^^^^ the name `Model` in the type namespace is first re-exported here
 ...
-20 | pub use execution_outputs::*;
+23 | pub use execution_outputs::*;
    |         -------------------- but the name `Model` in the type namespace is also re-exported here
 
 warning: ambiguous glob re-exports
-  --> src/database/entities/mod.rs:13:9
+  --> src/database/entities/mod.rs:16:9
    |
-13 | pub use projects::*;
+16 | pub use projects::*;
    |         ^^^^^^^^^^^ the name `Relation` in the type namespace is first re-exported here
 ...
-20 | pub use execution_outputs::*;
+23 | pub use execution_outputs::*;
    |         -------------------- but the name `Relation` in the type namespace is also re-exported here
 
 warning: ambiguous glob re-exports
-  --> src/database/entities/mod.rs:13:9
+  --> src/database/entities/mod.rs:16:9
    |
-13 | pub use projects::*;
+16 | pub use projects::*;
    |         ^^^^^^^^^^^ the name `RelationIter` in the type namespace is first re-exported here
 ...
-20 | pub use execution_outputs::*;
+23 | pub use execution_outputs::*;
    |         -------------------- but the name `RelationIter` in the type namespace is also re-exported here
 
 warning: unused import: `projects::*`
-  --> src/database/entities/mod.rs:13:9
+  --> src/database/entities/mod.rs:16:9
    |
-13 | pub use projects::*;
+16 | pub use projects::*;
    |         ^^^^^^^^^^^
 
 warning: unused import: `nodes::*`
-  --> src/database/entities/mod.rs:15:9
+  --> src/database/entities/mod.rs:18:9
    |
-15 | pub use nodes::*;
+18 | pub use nodes::*;
    |         ^^^^^^^^
 
 warning: unused import: `edges::*`
-  --> src/database/entities/mod.rs:16:9
+  --> src/database/entities/mod.rs:19:9
    |
-16 | pub use edges::*;
+19 | pub use edges::*;
    |         ^^^^^^^^
 
 warning: unused import: `layers::*`
-  --> src/database/entities/mod.rs:17:9
+  --> src/database/entities/mod.rs:20:9
    |
-17 | pub use layers::*;
+20 | pub use layers::*;
    |         ^^^^^^^^^
 
-warning: unused imports: `Json`, `extract::State`, and `http::StatusCode`
- --> src/server/app.rs:2:5
+warning: unused imports: `Json` and `State`
+ --> src/server/app.rs:2:15
   |
-2 |     extract::State,
-  |     ^^^^^^^^^^^^^^
+2 |     extract::{State, Request},
+  |               ^^^^^
 3 |     http::StatusCode,
-  |     ^^^^^^^^^^^^^^^^
 4 |     response::{Json, IntoResponse},
   |                ^^^^
 
@@ -314,6 +373,18 @@ warning: unused import: `debug`
   |
 4 | use tracing::{info, debug};
   |                     ^^^^^
+
+warning: unused import: `QueryOrder`
+ --> src/services/transformation_service.rs:4:100
+  |
+4 | use sea_orm::{DatabaseConnection, EntityTrait, PaginatorTrait, Set, ActiveModelTrait, QueryFilter, QueryOrder, ColumnTrait};
+  |                                                                                                    ^^^^^^^^^^
+
+warning: unused import: `error`
+ --> src/services/graph_io_service.rs:8:28
+  |
+8 | use tracing::{debug, info, error};
+  |                            ^^^^^
 
 warning: unused variable: `project_id`
   --> src/server/handlers/plan_execution.rs:99:11
@@ -389,11 +460,208 @@ warning: unused variable: `options`
 131 |     Query(options): Query<AnalysisOptions>,
     |           ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_options`
 
+warning: variable does not need to be mutable
+   --> src/services/transformation_service.rs:281:13
+    |
+281 |         let mut pipeline = TransformationPipeline::new("Test Pipeline".to_string());
+    |             ----^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` on by default
+
 warning: unused variable: `graph_service`
   --> src/mcp/resources.rs:37:13
    |
 37 |         let graph_service = GraphService::new(self.db.clone());
    |             ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_graph_service`
+
+warning: unused import: `PaginatorTrait`
+ --> src/services/transformation_service.rs:4:48
+  |
+4 | use sea_orm::{DatabaseConnection, EntityTrait, PaginatorTrait, Set, ActiveModelTrait, QueryFilter, QueryOrder, ColumnTrait};
+  |                                                ^^^^^^^^^^^^^^
+
+warning: value assigned to `nodes_imported` is never read
+  --> src/graph_io/csv_io.rs:19:13
+   |
+19 |     let mut nodes_imported = 0;
+   |             ^^^^^^^^^^^^^^
+   |
+   = help: maybe it is overwritten before being read?
+   = note: `#[warn(unused_assignments)]` on by default
+
+warning: variable does not need to be mutable
+  --> src/graph_io/csv_io.rs:88:9
+   |
+88 |     let mut warnings = Vec::new();
+   |         ----^^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: unused variable: `options`
+   --> src/graph_io/csv_io.rs:246:55
+    |
+246 | fn export_nodes_csv(nodes: &[Node], file_path: &Path, options: &ExportOptions) -> Result<()> {
+    |                                                       ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_options`
+
+warning: unused variable: `options`
+   --> src/graph_io/csv_io.rs:272:55
+    |
+272 | fn export_edges_csv(edges: &[Edge], file_path: &Path, options: &ExportOptions) -> Result<()> {
+    |                                                       ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_options`
+
+warning: unused variable: `options`
+   --> src/graph_io/csv_io.rs:298:58
+    |
+298 | fn export_layers_csv(layers: &[Layer], file_path: &Path, options: &ExportOptions) -> Result<()> {
+    |                                                          ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_options`
+
+warning: unused variable: `headers`
+   --> src/graph_io/csv_io.rs:446:5
+    |
+446 |     headers: &csv::StringRecord,
+    |     ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_headers`
+
+warning: unused variable: `headers`
+   --> src/graph_io/csv_io.rs:488:5
+    |
+488 |     headers: &csv::StringRecord,
+    |     ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_headers`
+
+warning: unused variable: `headers`
+   --> src/graph_io/csv_io.rs:532:5
+    |
+532 |     headers: &csv::StringRecord,
+    |     ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_headers`
+
+warning: variable does not need to be mutable
+   --> src/graph_io/csv_io.rs:560:9
+    |
+560 |     let mut layer_ids: std::collections::HashSet<String> = nodes
+    |         ----^^^^^^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: unused variable: `options`
+  --> src/graph_io/json_io.rs:13:38
+   |
+13 | pub fn import_json(file_path: &Path, options: &ImportOptions) -> Result<(Graph, ImportResult)> {
+   |                                      ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_options`
+
+warning: unused variable: `options`
+  --> src/graph_io/json_io.rs:32:43
+   |
+32 | pub fn import_layercake(file_path: &Path, options: &ImportOptions) -> Result<(Graph, ImportResult)> {
+   |                                           ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_options`
+
+warning: unused variable: `options`
+  --> src/graph_io/graphml_io.rs:11:41
+   |
+11 | pub fn import_graphml(file_path: &Path, options: &ImportOptions) -> Result<(Graph, ImportResult)> {
+   |                                         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_options`
+
+warning: unused variable: `graph`
+  --> src/graph_io/graphml_io.rs:21:23
+   |
+21 | pub fn export_graphml(graph: &Graph, file_path: &Path, options: &ExportOptions) -> Result<ExportResult> {
+   |                       ^^^^^ help: if this is intentional, prefix it with an underscore: `_graph`
+
+warning: unused variable: `options`
+  --> src/graph_io/graphml_io.rs:21:56
+   |
+21 | pub fn export_graphml(graph: &Graph, file_path: &Path, options: &ExportOptions) -> Result<ExportResult> {
+   |                                                        ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_options`
+
+warning: unused variable: `options`
+  --> src/graph_io/gexf_io.rs:11:38
+   |
+11 | pub fn import_gexf(file_path: &Path, options: &ImportOptions) -> Result<(Graph, ImportResult)> {
+   |                                      ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_options`
+
+warning: unused variable: `graph`
+  --> src/graph_io/gexf_io.rs:21:20
+   |
+21 | pub fn export_gexf(graph: &Graph, file_path: &Path, options: &ExportOptions) -> Result<ExportResult> {
+   |                    ^^^^^ help: if this is intentional, prefix it with an underscore: `_graph`
+
+warning: unused variable: `options`
+  --> src/graph_io/gexf_io.rs:21:53
+   |
+21 | pub fn export_gexf(graph: &Graph, file_path: &Path, options: &ExportOptions) -> Result<ExportResult> {
+   |                                                     ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_options`
+
+warning: unused variable: `options`
+  --> src/graph_io/dot_io.rs:90:5
+   |
+90 |     options: &ExportOptions,
+   |     ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_options`
+
+warning: unused variable: `options`
+   --> src/graph_io/dot_io.rs:139:5
+    |
+139 |     options: &ExportOptions,
+    |     ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_options`
+
+warning: unused variable: `options`
+   --> src/graph_io/dot_io.rs:192:57
+    |
+192 | fn write_edges(dot_content: &mut String, graph: &Graph, options: &ExportOptions) -> Result<()> {
+    |                                                         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_options`
+
+warning: variable does not need to be mutable
+   --> src/graph_io/dot_io.rs:348:9
+    |
+348 |     let mut layer_ids: std::collections::HashSet<String> = nodes
+    |         ----^^^^^^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/graph_io/mod.rs:154:17
+    |
+154 |             Ok((mut graph, mut import_result)) => {
+    |                 ----^^^^^
+    |                 |
+    |                 help: remove this `mut`
+
+warning: unused variable: `op`
+   --> src/transformations/engine.rs:232:44
+    |
+232 |             TransformationType::GraphMerge(op) => {
+    |                                            ^^ help: if this is intentional, prefix it with an underscore: `_op`
+
+warning: unused variable: `op`
+   --> src/transformations/operations.rs:398:45
+    |
+398 |     pub fn split_graph(&self, graph: Graph, op: &GraphSplitOp) -> Result<(Graph, TransformationStatistics)> {
+    |                                             ^^ help: if this is intentional, prefix it with an underscore: `_op`
+
+warning: unused variable: `op`
+   --> src/transformations/operations.rs:405:47
+    |
+405 |     pub fn cluster_graph(&self, graph: Graph, op: &GraphClusterOp) -> Result<(Graph, TransformationStatistics)> {
+    |                                               ^^ help: if this is intentional, prefix it with an underscore: `_op`
+
+warning: variable does not need to be mutable
+   --> src/transformations/rules.rs:202:13
+    |
+202 |         let mut field_mappings = HashMap::new();
+    |             ----^^^^^^^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: unused variable: `graph`
+   --> src/transformations/validation.rs:146:51
+    |
+146 |     fn validate_condition(&self, condition: &str, graph: &Graph) -> Result<()> {
+    |                                                   ^^^^^ help: if this is intentional, prefix it with an underscore: `_graph`
+
+warning: unused variable: `errors`
+   --> src/transformations/validation.rs:180:86
+    |
+180 |     fn validate_node_transform_op(&self, op: &super::NodeTransformOp, graph: &Graph, errors: &mut Vec<String>, warnings: &mut Vec<String>) {
+    |                                                                                      ^^^^^^ help: if this is intentional, prefix it with an underscore: `_errors`
 
 warning: unused variable: `nodes`
    --> src/services/graph_analysis_service.rs:817:9
@@ -413,29 +681,50 @@ warning: fields `plan_id` and `status` are never read
    |
    = note: `#[warn(dead_code)]` on by default
 
-warning: `layercake-tool` (lib) generated 42 warnings (run `cargo fix --lib -p layercake-tool` to apply 17 suggestions)
-warning: unused import: `plans::*`
-  --> src/database/entities/mod.rs:14:9
+warning: field `engine` is never read
+  --> src/services/transformation_service.rs:91:5
    |
-14 | pub use plans::*;
+89 | pub struct TransformationService {
+   |            --------------------- field in this struct
+90 |     db: DatabaseConnection,
+91 |     engine: TransformationEngine,
+   |     ^^^^^^
+
+warning: `layercake-tool` (lib) generated 85 warnings (run `cargo fix --lib -p layercake-tool` to apply 35 suggestions)
+warning: unused import: `operations::TransformationOperations`
+  --> src/transformations/mod.rs:12:9
+   |
+12 | pub use operations::TransformationOperations;
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `validation::TransformationValidator`
+  --> src/transformations/mod.rs:13:9
+   |
+13 | pub use validation::TransformationValidator;
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `plans::*`
+  --> src/database/entities/mod.rs:17:9
+   |
+17 | pub use plans::*;
    |         ^^^^^^^^
 
 warning: unused import: `plan_executions::*`
-  --> src/database/entities/mod.rs:18:9
+  --> src/database/entities/mod.rs:21:9
    |
-18 | pub use plan_executions::*;
+21 | pub use plan_executions::*;
    |         ^^^^^^^^^^^^^^^^^^
 
 warning: unused import: `execution_logs::*`
-  --> src/database/entities/mod.rs:19:9
+  --> src/database/entities/mod.rs:22:9
    |
-19 | pub use execution_logs::*;
+22 | pub use execution_logs::*;
    |         ^^^^^^^^^^^^^^^^^
 
 warning: unused import: `execution_outputs::*`
-  --> src/database/entities/mod.rs:20:9
+  --> src/database/entities/mod.rs:23:9
    |
-20 | pub use execution_outputs::*;
+23 | pub use execution_outputs::*;
    |         ^^^^^^^^^^^^^^^^^^^^
 
 warning: unused import: `connection::*`
@@ -450,6 +739,18 @@ warning: unused import: `entities::*`
 7 | pub use entities::*;
   |         ^^^^^^^^^^^
 
+warning: unused import: `transformation_service::*`
+  --> src/services/mod.rs:16:9
+   |
+16 | pub use transformation_service::*;
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `graph_io_service::*`
+  --> src/services/mod.rs:17:9
+   |
+17 | pub use graph_io_service::*;
+   |         ^^^^^^^^^^^^^^^^^^^
+
 warning: value assigned to `downloaded` is never read
   --> src/update/updater.rs:97:17
    |
@@ -458,6 +759,14 @@ warning: value assigned to `downloaded` is never read
    |
    = help: maybe it is overwritten before being read?
    = note: `#[warn(unused_assignments)]` on by default
+
+warning: value assigned to `nodes_imported` is never read
+  --> src/graph_io/csv_io.rs:19:13
+   |
+19 |     let mut nodes_imported = 0;
+   |             ^^^^^^^^^^^^^^
+   |
+   = help: maybe it is overwritten before being read?
 
 warning: methods `get_node` and `get_max_hierarchy_depth` are never used
   --> src/graph.rs:65:12
@@ -472,6 +781,633 @@ warning: methods `get_node` and `get_max_hierarchy_depth` are never used
    |            ^^^^^^^^^^^^^^^^^^^^^^^
    |
    = note: `#[warn(dead_code)]` on by default
+
+warning: struct `GraphIO` is never constructed
+   --> src/graph_io/mod.rs:132:12
+    |
+132 | pub struct GraphIO;
+    |            ^^^^^^^
+
+warning: associated functions `import_from_file`, `export_to_file`, `detect_format`, `get_extensions`, `default_import_options`, and `default_export_options` are never used
+   --> src/graph_io/mod.rs:136:12
+    |
+134 | impl GraphIO {
+    | ------------ associated functions in this implementation
+135 |     /// Import a graph from a file
+136 |     pub fn import_from_file<P: AsRef<Path>>(
+    |            ^^^^^^^^^^^^^^^^
+...
+188 |     pub fn export_to_file<P: AsRef<Path>>(
+    |            ^^^^^^^^^^^^^^
+...
+230 |     pub fn detect_format<P: AsRef<Path>>(file_path: P) -> Option<GraphFormat> {
+    |            ^^^^^^^^^^^^^
+...
+246 |     pub fn get_extensions(format: GraphFormat) -> Vec<&'static str> {
+    |            ^^^^^^^^^^^^^^
+...
+258 |     pub fn default_import_options(format: GraphFormat) -> ImportOptions {
+    |            ^^^^^^^^^^^^^^^^^^^^^^
+...
+270 |     pub fn default_export_options(format: GraphFormat) -> ExportOptions {
+    |            ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `import_csv` is never used
+  --> src/graph_io/csv_io.rs:14:8
+   |
+14 | pub fn import_csv(base_path: &Path, options: &ImportOptions) -> Result<(Graph, ImportResult)> {
+   |        ^^^^^^^^^^
+
+warning: function `export_csv` is never used
+  --> src/graph_io/csv_io.rs:85:8
+   |
+85 | pub fn export_csv(graph: &Graph, base_path: &Path, options: &ExportOptions) -> Result<ExportResult> {
+   |        ^^^^^^^^^^
+
+warning: function `resolve_csv_paths` is never used
+   --> src/graph_io/csv_io.rs:128:4
+    |
+128 | fn resolve_csv_paths(base_path: &Path) -> Result<(PathBuf, PathBuf, PathBuf)> {
+    |    ^^^^^^^^^^^^^^^^^
+
+warning: function `import_nodes_csv` is never used
+   --> src/graph_io/csv_io.rs:174:4
+    |
+174 | fn import_nodes_csv(file_path: &Path, options: &ImportOptions) -> Result<(Vec<Node>, Vec<String>)> {
+    |    ^^^^^^^^^^^^^^^^
+
+warning: function `import_edges_csv` is never used
+   --> src/graph_io/csv_io.rs:198:4
+    |
+198 | fn import_edges_csv(file_path: &Path, options: &ImportOptions) -> Result<(Vec<Edge>, Vec<String>)> {
+    |    ^^^^^^^^^^^^^^^^
+
+warning: function `import_layers_csv` is never used
+   --> src/graph_io/csv_io.rs:222:4
+    |
+222 | fn import_layers_csv(file_path: &Path, options: &ImportOptions) -> Result<(Vec<Layer>, Vec<String>)> {
+    |    ^^^^^^^^^^^^^^^^^
+
+warning: function `export_nodes_csv` is never used
+   --> src/graph_io/csv_io.rs:246:4
+    |
+246 | fn export_nodes_csv(nodes: &[Node], file_path: &Path, options: &ExportOptions) -> Result<()> {
+    |    ^^^^^^^^^^^^^^^^
+
+warning: function `export_edges_csv` is never used
+   --> src/graph_io/csv_io.rs:272:4
+    |
+272 | fn export_edges_csv(edges: &[Edge], file_path: &Path, options: &ExportOptions) -> Result<()> {
+    |    ^^^^^^^^^^^^^^^^
+
+warning: function `export_layers_csv` is never used
+   --> src/graph_io/csv_io.rs:298:4
+    |
+298 | fn export_layers_csv(layers: &[Layer], file_path: &Path, options: &ExportOptions) -> Result<()> {
+    |    ^^^^^^^^^^^^^^^^^
+
+warning: function `build_node_field_mapping` is never used
+   --> src/graph_io/csv_io.rs:322:4
+    |
+322 | fn build_node_field_mapping(headers: &csv::StringRecord, options: &ImportOptions) -> HashMap<String, usize> {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `build_edge_field_mapping` is never used
+   --> src/graph_io/csv_io.rs:363:4
+    |
+363 | fn build_edge_field_mapping(headers: &csv::StringRecord, options: &ImportOptions) -> HashMap<String, usize> {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `build_layer_field_mapping` is never used
+   --> src/graph_io/csv_io.rs:404:4
+    |
+404 | fn build_layer_field_mapping(headers: &csv::StringRecord, options: &ImportOptions) -> HashMap<String, usize> {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `parse_node_record` is never used
+   --> src/graph_io/csv_io.rs:443:4
+    |
+443 | fn parse_node_record(
+    |    ^^^^^^^^^^^^^^^^^
+
+warning: function `parse_edge_record` is never used
+   --> src/graph_io/csv_io.rs:485:4
+    |
+485 | fn parse_edge_record(
+    |    ^^^^^^^^^^^^^^^^^
+
+warning: function `parse_layer_record` is never used
+   --> src/graph_io/csv_io.rs:529:4
+    |
+529 | fn parse_layer_record(
+    |    ^^^^^^^^^^^^^^^^^^
+
+warning: function `auto_generate_layers` is never used
+   --> src/graph_io/csv_io.rs:559:4
+    |
+559 | fn auto_generate_layers(nodes: &[Node]) -> Vec<Layer> {
+    |    ^^^^^^^^^^^^^^^^^^^^
+
+warning: function `import_json` is never used
+  --> src/graph_io/json_io.rs:13:8
+   |
+13 | pub fn import_json(file_path: &Path, options: &ImportOptions) -> Result<(Graph, ImportResult)> {
+   |        ^^^^^^^^^^^
+
+warning: function `import_layercake` is never used
+  --> src/graph_io/json_io.rs:32:8
+   |
+32 | pub fn import_layercake(file_path: &Path, options: &ImportOptions) -> Result<(Graph, ImportResult)> {
+   |        ^^^^^^^^^^^^^^^^
+
+warning: function `export_json` is never used
+  --> src/graph_io/json_io.rs:59:8
+   |
+59 | pub fn export_json(graph: &Graph, file_path: &Path, options: &ExportOptions) -> Result<ExportResult> {
+   |        ^^^^^^^^^^^
+
+warning: function `export_layercake` is never used
+  --> src/graph_io/json_io.rs:82:8
+   |
+82 | pub fn export_layercake(graph: &Graph, file_path: &Path, options: &ExportOptions) -> Result<ExportResult> {
+   |        ^^^^^^^^^^^^^^^^
+
+warning: function `import_graphml` is never used
+  --> src/graph_io/graphml_io.rs:11:8
+   |
+11 | pub fn import_graphml(file_path: &Path, options: &ImportOptions) -> Result<(Graph, ImportResult)> {
+   |        ^^^^^^^^^^^^^^
+
+warning: function `export_graphml` is never used
+  --> src/graph_io/graphml_io.rs:21:8
+   |
+21 | pub fn export_graphml(graph: &Graph, file_path: &Path, options: &ExportOptions) -> Result<ExportResult> {
+   |        ^^^^^^^^^^^^^^
+
+warning: function `import_gexf` is never used
+  --> src/graph_io/gexf_io.rs:11:8
+   |
+11 | pub fn import_gexf(file_path: &Path, options: &ImportOptions) -> Result<(Graph, ImportResult)> {
+   |        ^^^^^^^^^^^
+
+warning: function `export_gexf` is never used
+  --> src/graph_io/gexf_io.rs:21:8
+   |
+21 | pub fn export_gexf(graph: &Graph, file_path: &Path, options: &ExportOptions) -> Result<ExportResult> {
+   |        ^^^^^^^^^^^
+
+warning: function `export_dot` is never used
+  --> src/graph_io/dot_io.rs:13:8
+   |
+13 | pub fn export_dot(graph: &Graph, file_path: &Path, options: &ExportOptions) -> Result<ExportResult> {
+   |        ^^^^^^^^^^
+
+warning: function `import_dot` is never used
+  --> src/graph_io/dot_io.rs:50:8
+   |
+50 | pub fn import_dot(file_path: &Path, options: &ImportOptions) -> Result<(Graph, ImportResult)> {
+   |        ^^^^^^^^^^
+
+warning: function `write_layer_subgraphs` is never used
+  --> src/graph_io/dot_io.rs:87:4
+   |
+87 | fn write_layer_subgraphs(
+   |    ^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `write_nodes_direct` is never used
+   --> src/graph_io/dot_io.rs:136:4
+    |
+136 | fn write_nodes_direct(
+    |    ^^^^^^^^^^^^^^^^^^
+
+warning: function `write_node` is never used
+   --> src/graph_io/dot_io.rs:149:4
+    |
+149 | fn write_node(dot_content: &mut String, node: &Node, layer: Option<&Layer>) -> Result<()> {
+    |    ^^^^^^^^^^
+
+warning: function `write_edges` is never used
+   --> src/graph_io/dot_io.rs:192:4
+    |
+192 | fn write_edges(dot_content: &mut String, graph: &Graph, options: &ExportOptions) -> Result<()> {
+    |    ^^^^^^^^^^^
+
+warning: function `parse_dot_content` is never used
+   --> src/graph_io/dot_io.rs:236:4
+    |
+236 | fn parse_dot_content(content: &str) -> Result<(Vec<Node>, Vec<Edge>, Vec<String>)> {
+    |    ^^^^^^^^^^^^^^^^^
+
+warning: function `parse_dot_node` is never used
+   --> src/graph_io/dot_io.rs:281:4
+    |
+281 | fn parse_dot_node(line: &str, counter: &mut usize) -> Option<Node> {
+    |    ^^^^^^^^^^^^^^
+
+warning: function `parse_dot_edge` is never used
+   --> src/graph_io/dot_io.rs:315:4
+    |
+315 | fn parse_dot_edge(line: &str, counter: &mut usize) -> Option<Edge> {
+    |    ^^^^^^^^^^^^^^
+
+warning: function `auto_generate_layers_from_nodes` is never used
+   --> src/graph_io/dot_io.rs:347:4
+    |
+347 | fn auto_generate_layers_from_nodes(nodes: &[Node]) -> Vec<Layer> {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `escape_dot_string` is never used
+   --> src/graph_io/dot_io.rs:365:4
+    |
+365 | fn escape_dot_string(s: &str) -> String {
+    |    ^^^^^^^^^^^^^^^^^
+
+warning: function `escape_dot_id` is never used
+   --> src/graph_io/dot_io.rs:374:4
+    |
+374 | fn escape_dot_id(s: &str) -> String {
+    |    ^^^^^^^^^^^^^
+
+warning: function `convert_color_to_dot` is never used
+   --> src/graph_io/dot_io.rs:384:4
+    |
+384 | fn convert_color_to_dot(color: &str) -> String {
+    |    ^^^^^^^^^^^^^^^^^^^^
+
+warning: function `detect_format_from_content` is never used
+ --> src/graph_io/formats.rs:7:8
+  |
+7 | pub fn detect_format_from_content(content: &str) -> Option<GraphFormat> {
+  |        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `validate_format_compatibility` is never used
+  --> src/graph_io/formats.rs:51:8
+   |
+51 | pub fn validate_format_compatibility(file_path: &Path, format: GraphFormat) -> bool {
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `get_mime_type` is never used
+  --> src/graph_io/formats.rs:62:8
+   |
+62 | pub fn get_mime_type(format: GraphFormat) -> &'static str {
+   |        ^^^^^^^^^^^^^
+
+warning: function `supports_hierarchy` is never used
+  --> src/graph_io/formats.rs:73:8
+   |
+73 | pub fn supports_hierarchy(format: GraphFormat) -> bool {
+   |        ^^^^^^^^^^^^^^^^^^
+
+warning: function `supports_layers` is never used
+  --> src/graph_io/formats.rs:82:8
+   |
+82 | pub fn supports_layers(format: GraphFormat) -> bool {
+   |        ^^^^^^^^^^^^^^^
+
+warning: function `get_format_description` is never used
+  --> src/graph_io/formats.rs:92:8
+   |
+92 | pub fn get_format_description(format: GraphFormat) -> &'static str {
+   |        ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `TransformationResult` is never constructed
+   --> src/transformations/mod.rs:205:12
+    |
+205 | pub struct TransformationResult {
+    |            ^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `TransformationResult` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: struct `ValidationResult` is never constructed
+   --> src/transformations/mod.rs:231:12
+    |
+231 | pub struct ValidationResult {
+    |            ^^^^^^^^^^^^^^^^
+    |
+    = note: `ValidationResult` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: methods `add_rule`, `remove_rule`, and `enabled_rules` are never used
+   --> src/transformations/mod.rs:251:12
+    |
+237 | impl TransformationPipeline {
+    | --------------------------- methods in this implementation
+...
+251 |     pub fn add_rule(&mut self, rule: TransformationRule) {
+    |            ^^^^^^^^
+...
+256 |     pub fn remove_rule(&mut self, rule_id: &str) {
+    |            ^^^^^^^^^^^
+...
+261 |     pub fn enabled_rules(&self) -> Vec<&TransformationRule> {
+    |            ^^^^^^^^^^^^^
+
+warning: associated items `new` and `add_condition` are never used
+   --> src/transformations/mod.rs:268:12
+    |
+266 | impl TransformationRule {
+    | ----------------------- associated items in this implementation
+267 |     /// Create a new transformation rule
+268 |     pub fn new(name: String, operation: TransformationType) -> Self {
+    |            ^^^
+...
+280 |     pub fn add_condition(&mut self, condition: String) {
+    |            ^^^^^^^^^^^^^
+
+warning: fields `validator`, `operations`, and `dry_run` are never read
+  --> src/transformations/engine.rs:20:5
+   |
+19 | pub struct TransformationEngine {
+   |            -------------------- fields in this struct
+20 |     validator: TransformationValidator,
+   |     ^^^^^^^^^
+21 |     operations: TransformationOperations,
+   |     ^^^^^^^^^^
+22 |     dry_run: bool,
+   |     ^^^^^^^
+
+warning: multiple methods are never used
+   --> src/transformations/engine.rs:36:12
+    |
+25  | impl TransformationEngine {
+    | ------------------------- methods in this implementation
+...
+36  |     pub fn set_dry_run(&mut self, dry_run: bool) {
+    |            ^^^^^^^^^^^
+...
+41  |     pub fn execute_pipeline(
+    |            ^^^^^^^^^^^^^^^^
+...
+87  |     pub fn execute_rule(
+    |            ^^^^^^^^^^^^
+...
+142 |     fn check_conditions(&self, rule: &TransformationRule, graph: &Graph) -> Result<bool> {
+    |        ^^^^^^^^^^^^^^^^
+...
+158 |     fn evaluate_condition(&self, condition: &str, graph: &Graph) -> Result<bool> {
+    |        ^^^^^^^^^^^^^^^^^^
+...
+190 |     fn apply_operation(
+    |        ^^^^^^^^^^^^^^^
+...
+245 |     pub fn create_rollback(&self, result: &TransformationResult) -> Option<Graph> {
+    |            ^^^^^^^^^^^^^^^
+
+warning: multiple methods are never used
+   --> src/transformations/operations.rs:29:12
+    |
+22  | impl TransformationOperations {
+    | ----------------------------- methods in this implementation
+...
+29  |     pub fn filter_nodes(&self, mut graph: Graph, op: &NodeFilterOp) -> Result<(Graph, TransformationStatistics)> {
+    |            ^^^^^^^^^^^^
+...
+62  |     pub fn transform_nodes(&self, mut graph: Graph, op: &NodeTransformOp) -> Result<(Graph, TransformationStatistics)> {
+    |            ^^^^^^^^^^^^^^^
+...
+95  |     pub fn create_nodes(&self, mut graph: Graph, op: &NodeCreateOp) -> Result<(Graph, TransformationStatistics)> {
+    |            ^^^^^^^^^^^^
+...
+127 |     pub fn delete_nodes(&self, mut graph: Graph, op: &NodeDeleteOp) -> Result<(Graph, TransformationStatistics)> {
+    |            ^^^^^^^^^^^^
+...
+159 |     pub fn filter_edges(&self, mut graph: Graph, op: &EdgeFilterOp) -> Result<(Graph, TransformationStatistics)> {
+    |            ^^^^^^^^^^^^
+...
+183 |     pub fn transform_edges(&self, mut graph: Graph, op: &EdgeTransformOp) -> Result<(Graph, TransformationStatistics)> {
+    |            ^^^^^^^^^^^^^^^
+...
+216 |     pub fn create_edges(&self, mut graph: Graph, op: &EdgeCreateOp) -> Result<(Graph, TransformationStatistics)> {
+    |            ^^^^^^^^^^^^
+...
+259 |     pub fn delete_edges(&self, mut graph: Graph, op: &EdgeDeleteOp) -> Result<(Graph, TransformationStatistics)> {
+    |            ^^^^^^^^^^^^
+...
+277 |     pub fn filter_layers(&self, mut graph: Graph, op: &LayerFilterOp) -> Result<(Graph, TransformationStatistics)> {
+    |            ^^^^^^^^^^^^^
+...
+292 |     pub fn transform_layers(&self, mut graph: Graph, op: &LayerTransformOp) -> Result<(Graph, TransformationStatistics)> {
+    |            ^^^^^^^^^^^^^^^^
+...
+325 |     pub fn create_layers(&self, mut graph: Graph, op: &LayerCreateOp) -> Result<(Graph, TransformationStatistics)> {
+    |            ^^^^^^^^^^^^^
+...
+356 |     pub fn delete_layers(&self, mut graph: Graph, op: &LayerDeleteOp) -> Result<(Graph, TransformationStatistics)> {
+    |            ^^^^^^^^^^^^^
+...
+398 |     pub fn split_graph(&self, graph: Graph, op: &GraphSplitOp) -> Result<(Graph, TransformationStatistics)> {
+    |            ^^^^^^^^^^^
+...
+405 |     pub fn cluster_graph(&self, graph: Graph, op: &GraphClusterOp) -> Result<(Graph, TransformationStatistics)> {
+    |            ^^^^^^^^^^^^^
+...
+413 |     fn evaluate_node_condition(&self, condition: &str, node: &Node) -> Result<bool> {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^
+...
+434 |     fn evaluate_edge_condition(&self, condition: &str, edge: &Edge) -> Result<bool> {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^
+...
+455 |     fn evaluate_layer_condition(&self, condition: &str, layer: &Layer) -> Result<bool> {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+474 |     fn matches_pattern(&self, text: &str, pattern: &str) -> bool {
+    |        ^^^^^^^^^^^^^^^
+...
+488 |     fn get_node_field_value(&self, node: &Node, field: &str) -> Option<String> {
+    |        ^^^^^^^^^^^^^^^^^^^^
+...
+497 |     fn set_node_field_value(&self, node: &mut Node, field: &str, value: &str) {
+    |        ^^^^^^^^^^^^^^^^^^^^
+...
+506 |     fn get_edge_field_value(&self, edge: &Edge, field: &str) -> Option<String> {
+    |        ^^^^^^^^^^^^^^^^^^^^
+...
+516 |     fn set_edge_field_value(&self, edge: &mut Edge, field: &str, value: &str) {
+    |        ^^^^^^^^^^^^^^^^^^^^
+...
+526 |     fn get_layer_field_value(&self, layer: &Layer, field: &str) -> Option<String> {
+    |        ^^^^^^^^^^^^^^^^^^^^^
+...
+539 |     fn set_layer_field_value(&self, layer: &mut Layer, field: &str, value: &str) {
+    |        ^^^^^^^^^^^^^^^^^^^^^
+...
+552 |     fn evaluate_node_formula(&self, formula: &str, node: &Node) -> Result<String> {
+    |        ^^^^^^^^^^^^^^^^^^^^^
+...
+571 |     fn evaluate_edge_weight_formula(&self, formula: &str, _edge: &Edge) -> Result<f64> {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+581 |     fn generate_color_from_scheme(&self, scheme: &str, layer: &Layer) -> Option<String> {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `TransformationRuleTemplates` is never constructed
+  --> src/transformations/rules.rs:16:12
+   |
+16 | pub struct TransformationRuleTemplates;
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: multiple associated functions are never used
+   --> src/transformations/rules.rs:20:12
+    |
+18  | impl TransformationRuleTemplates {
+    | -------------------------------- associated functions in this implementation
+19  |     /// Create a rule to filter nodes by layer
+20  |     pub fn filter_nodes_by_layer(layer_id: &str) -> TransformationRule {
+    |            ^^^^^^^^^^^^^^^^^^^^^
+...
+33  |     pub fn filter_nodes_by_label_pattern(pattern: &str) -> TransformationRule {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+46  |     pub fn remove_isolated_nodes() -> TransformationRule {
+    |            ^^^^^^^^^^^^^^^^^^^^^
+...
+59  |     pub fn normalize_node_labels_uppercase() -> TransformationRule {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+75  |     pub fn add_node_id_prefix(prefix: &str) -> TransformationRule {
+    |            ^^^^^^^^^^^^^^^^^^
+...
+91  |     pub fn create_hub_node(hub_id: &str, hub_label: &str, layer_id: &str) -> TransformationRule {
+    |            ^^^^^^^^^^^^^^^
+...
+115 |     pub fn connect_layer_to_hub(layer_pattern: &str, hub_id: &str) -> TransformationRule {
+    |            ^^^^^^^^^^^^^^^^^^^^
+...
+139 |     pub fn remove_weak_edges(threshold: f64) -> TransformationRule {
+    |            ^^^^^^^^^^^^^^^^^
+...
+151 |     pub fn set_edge_weights_by_similarity() -> TransformationRule {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+167 |     pub fn filter_edges_by_type(edge_type: &str) -> TransformationRule {
+    |            ^^^^^^^^^^^^^^^^^^^^
+...
+180 |     pub fn create_layer_from_node_property(property: &str, layer_name: &str) -> TransformationRule {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+201 |     pub fn apply_layer_color_scheme(scheme: &str) -> TransformationRule {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+216 |     pub fn cluster_by_modularity() -> TransformationRule {
+    |            ^^^^^^^^^^^^^^^^^^^^^
+...
+232 |     pub fn cluster_by_connected_components() -> TransformationRule {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `TransformationPatterns` is never constructed
+   --> src/transformations/rules.rs:246:12
+    |
+246 | pub struct TransformationPatterns;
+    |            ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: associated functions `data_cleaning_pipeline`, `hierarchical_analysis_pipeline`, `network_simplification_pipeline`, and `visual_enhancement_pipeline` are never used
+   --> src/transformations/rules.rs:250:12
+    |
+248 | impl TransformationPatterns {
+    | --------------------------- associated functions in this implementation
+249 |     /// Create a pipeline for cleaning and normalizing graph data
+250 |     pub fn data_cleaning_pipeline() -> Vec<TransformationRule> {
+    |            ^^^^^^^^^^^^^^^^^^^^^^
+...
+259 |     pub fn hierarchical_analysis_pipeline() -> Vec<TransformationRule> {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+268 |     pub fn network_simplification_pipeline() -> Vec<TransformationRule> {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+277 |     pub fn visual_enhancement_pipeline() -> Vec<TransformationRule> {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `TransformationRuleBuilder` is never constructed
+   --> src/transformations/rules.rs:287:12
+    |
+287 | pub struct TransformationRuleBuilder {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: associated items `new`, `description`, `condition`, `build_node_filter`, `build_edge_filter`, and `build_node_transform` are never used
+   --> src/transformations/rules.rs:294:12
+    |
+293 | impl TransformationRuleBuilder {
+    | ------------------------------ associated items in this implementation
+294 |     pub fn new(name: &str) -> Self {
+    |            ^^^
+...
+302 |     pub fn description(mut self, description: &str) -> Self {
+    |            ^^^^^^^^^^^
+...
+307 |     pub fn condition(mut self, condition: &str) -> Self {
+    |            ^^^^^^^^^
+...
+312 |     pub fn build_node_filter(self, condition: &str, keep_connected: bool) -> TransformationRule {
+    |            ^^^^^^^^^^^^^^^^^
+...
+324 |     pub fn build_edge_filter(self, condition: &str, validate_nodes: bool) -> TransformationRule {
+    |            ^^^^^^^^^^^^^^^^^
+...
+336 |     pub fn build_node_transform(self, field_mappings: HashMap<String, String>) -> TransformationRule {
+    |            ^^^^^^^^^^^^^^^^^^^^
+
+warning: multiple methods are never used
+   --> src/transformations/validation.rs:21:12
+    |
+15  | impl TransformationValidator {
+    | ---------------------------- methods in this implementation
+...
+21  |     pub fn validate_pipeline(&self, pipeline: &TransformationPipeline, graph: &Graph) -> Result<ValidationResult> {
+    |            ^^^^^^^^^^^^^^^^^
+...
+64  |     pub fn validate_rule(&self, rule: &TransformationRule, graph: &Graph) -> Result<ValidationResult> {
+    |            ^^^^^^^^^^^^^
+...
+146 |     fn validate_condition(&self, condition: &str, graph: &Graph) -> Result<()> {
+    |        ^^^^^^^^^^^^^^^^^^
+...
+170 |     fn validate_node_filter_op(&self, op: &super::NodeFilterOp, graph: &Graph, errors: &mut Vec<String>, warnings: &mut Vec<String>) {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^
+...
+180 |     fn validate_node_transform_op(&self, op: &super::NodeTransformOp, graph: &Graph, errors: &mut Vec<String>, warnings: &mut Vec<String>) {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+197 |     fn validate_node_create_op(&self, op: &super::NodeCreateOp, _graph: &Graph, errors: &mut Vec<String>, warnings: &mut Vec<String>) {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^
+...
+211 |     fn validate_node_delete_op(&self, op: &super::NodeDeleteOp, graph: &Graph, errors: &mut Vec<String>, warnings: &mut Vec<String>) {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^
+...
+227 |     fn validate_edge_filter_op(&self, op: &super::EdgeFilterOp, graph: &Graph, errors: &mut Vec<String>, warnings: &mut Vec<String>) {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^
+...
+237 |     fn validate_edge_transform_op(&self, op: &super::EdgeTransformOp, graph: &Graph, _errors: &mut Vec<String>, warnings: &mut Vec<String...
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+247 |     fn validate_edge_create_op(&self, op: &super::EdgeCreateOp, graph: &Graph, errors: &mut Vec<String>, warnings: &mut Vec<String>) {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^
+...
+265 |     fn validate_edge_delete_op(&self, op: &super::EdgeDeleteOp, graph: &Graph, errors: &mut Vec<String>, warnings: &mut Vec<String>) {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^
+...
+277 |     fn validate_layer_filter_op(&self, op: &super::LayerFilterOp, graph: &Graph, errors: &mut Vec<String>, warnings: &mut Vec<String>) {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+287 |     fn validate_layer_transform_op(&self, op: &super::LayerTransformOp, graph: &Graph, _errors: &mut Vec<String>, warnings: &mut Vec<Stri...
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+297 |     fn validate_layer_create_op(&self, op: &super::LayerCreateOp, _graph: &Graph, errors: &mut Vec<String>, _warnings: &mut Vec<String>) {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+307 |     fn validate_layer_delete_op(&self, op: &super::LayerDeleteOp, graph: &Graph, errors: &mut Vec<String>, warnings: &mut Vec<String>) {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+325 |     fn validate_graph_split_op(&self, op: &super::GraphSplitOp, graph: &Graph, errors: &mut Vec<String>, warnings: &mut Vec<String>) {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^
+...
+335 |     fn validate_graph_cluster_op(&self, op: &super::GraphClusterOp, graph: &Graph, _errors: &mut Vec<String>, warnings: &mut Vec<String>) {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+356 |     fn check_rule_conflicts(&self, rules: &[TransformationRule], warnings: &mut Vec<String>) {
+    |        ^^^^^^^^^^^^^^^^^^^^
+...
+387 |     fn validate_execution_order(&self, rules: &[TransformationRule], warnings: &mut Vec<String>) {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^
 
 warning: variant `PermissionError` is never constructed
   --> src/update/mod.rs:28:5
@@ -588,6 +1524,89 @@ warning: methods `record_change` and `create_auto_snapshot_if_needed` are never 
 440 |     pub async fn create_auto_snapshot_if_needed(
     |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+warning: struct `TransformationService` is never constructed
+  --> src/services/transformation_service.rs:89:12
+   |
+89 | pub struct TransformationService {
+   |            ^^^^^^^^^^^^^^^^^^^^^
+
+warning: multiple associated items are never used
+   --> src/services/transformation_service.rs:95:12
+    |
+94  | impl TransformationService {
+    | -------------------------- associated items in this implementation
+95  |     pub fn new(db: DatabaseConnection) -> Self {
+    |            ^^^
+...
+103 |     pub async fn create_pipeline(&self, req: CreatePipelineRequest) -> Result<transformation_pipelines::Model> {
+    |                  ^^^^^^^^^^^^^^^
+...
+133 |     pub async fn list_pipelines(&self) -> Result<Vec<transformation_pipelines::Model>> {
+    |                  ^^^^^^^^^^^^^^
+...
+145 |     pub async fn get_pipeline(&self, id: &str) -> Result<Option<transformation_pipelines::Model>> {
+    |                  ^^^^^^^^^^^^
+...
+156 |     pub async fn update_pipeline(&self, id: &str, req: UpdatePipelineRequest) -> Result<transformation_pipelines::Model> {
+    |                  ^^^^^^^^^^^^^^^
+...
+199 |     pub async fn delete_pipeline(&self, id: &str) -> Result<()> {
+    |                  ^^^^^^^^^^^^^^^
+...
+218 |     pub async fn add_rule_to_pipeline(&self, pipeline_id: &str, req: CreateRuleRequest) -> Result<transformation_rules::Model> {
+    |                  ^^^^^^^^^^^^^^^^^^^^
+...
+254 |     pub async fn get_pipeline_rules(&self, pipeline_id: &str) -> Result<Vec<transformation_rules::Model>> {
+    |                  ^^^^^^^^^^^^^^^^^^
+...
+267 |     pub async fn execute_pipeline(&self, req: ExecutePipelineRequest) -> Result<PipelineExecutionResult> {
+    |                  ^^^^^^^^^^^^^^^^
+...
+329 |     pub async fn execute_rule(&self, req: ExecuteRuleRequest) -> Result<RuleExecutionResult> {
+    |                  ^^^^^^^^^^^^
+...
+379 |     pub async fn get_graph_statistics(&self, graph_id: &str) -> Result<HashMap<String, serde_json::Value>> {
+    |                  ^^^^^^^^^^^^^^^^^^^^
+...
+415 |     fn aggregate_statistics(&self, results: &[TransformationResult]) -> TransformationStatistics {
+    |        ^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `GraphIOService` is never constructed
+  --> src/services/graph_io_service.rs:65:12
+   |
+65 | pub struct GraphIOService {
+   |            ^^^^^^^^^^^^^^
+
+warning: associated items `new`, `import_from_data`, `export_graph`, `get_supported_formats`, `validate_import_file`, and `get_temp_file_path` are never used
+   --> src/services/graph_io_service.rs:72:12
+    |
+70  | impl GraphIOService {
+    | ------------------- associated items in this implementation
+71  |     /// Create a new graph I/O service
+72  |     pub fn new(db: DatabaseConnection) -> Result<Self> {
+    |            ^^^
+...
+79  |     pub async fn import_from_data(
+    |                  ^^^^^^^^^^^^^^^^
+...
+157 |     pub async fn export_graph(
+    |                  ^^^^^^^^^^^^
+...
+224 |     pub fn get_supported_formats(&self) -> Vec<FormatInfo> {
+    |            ^^^^^^^^^^^^^^^^^^^^^
+...
+276 |     pub fn validate_import_file(&self, filename: &str, content: &[u8]) -> Result<GraphFormat> {
+    |            ^^^^^^^^^^^^^^^^^^^^
+...
+294 |     pub fn get_temp_file_path(&self, filename: &str) -> PathBuf {
+    |            ^^^^^^^^^^^^^^^^^^
+
+warning: function `format_name` is never used
+   --> src/services/graph_io_service.rs:300:4
+    |
+300 | fn format_name(format: GraphFormat) -> &'static str {
+    |    ^^^^^^^^^^^
+
 warning: field `db` is never read
   --> src/mcp/server.rs:11:9
    |
@@ -598,17 +1617,17 @@ warning: field `db` is never read
    |
    = note: `LayercakeServerState` has a derived impl for the trait `Clone`, but this is intentionally ignored during dead code analysis
 
-warning: `layercake-tool` (bin "layercake") generated 52 warnings (31 duplicates) (run `cargo fix --bin "layercake"` to apply 6 suggestions)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.25s
+warning: `layercake-tool` (bin "layercake") generated 162 warnings (72 duplicates) (run `cargo fix --bin "layercake"` to apply 10 suggestions)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.16s
      Running `target/debug/layercake serve --port 3000`
 [32m INFO[0m [2mlayercake[0m[2m:[0m Starting server on port 3000
-[32m INFO[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"PRAGMA foreign_keys = ON; …" [3mdb.statement[0m[2m=[0m"\n\nPRAGMA foreign_keys = ON;\n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m115.099µs [3melapsed_secs[0m[2m=[0m0.000115099
-[32m INFO[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE TABLE IF NOT …" [3mdb.statement[0m[2m=[0m"\n\nCREATE TABLE IF NOT EXISTS \"seaql_migrations\" (\n  \"version\" text NOT NULL PRIMARY KEY,\n  \"applied_at\" bigint NOT NULL\n)\n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m784.026µs [3melapsed_secs[0m[2m=[0m0.000784026
+[32m INFO[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"PRAGMA foreign_keys = ON; …" [3mdb.statement[0m[2m=[0m"\n\nPRAGMA foreign_keys = ON;\n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m75.783µs [3melapsed_secs[0m[2m=[0m7.5783e-5
+[32m INFO[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE TABLE IF NOT …" [3mdb.statement[0m[2m=[0m"\n\nCREATE TABLE IF NOT EXISTS \"seaql_migrations\" (\n  \"version\" text NOT NULL PRIMARY KEY,\n  \"applied_at\" bigint NOT NULL\n)\n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m534.178µs [3melapsed_secs[0m[2m=[0m0.000534178
 [32m INFO[0m [2msea_orm_migration::migrator[0m[2m:[0m Applying all pending migrations
-[32m INFO[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE TABLE IF NOT …" [3mdb.statement[0m[2m=[0m"\n\nCREATE TABLE IF NOT EXISTS \"seaql_migrations\" (\n  \"version\" text NOT NULL PRIMARY KEY,\n  \"applied_at\" bigint NOT NULL\n)\n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m57.554µs [3melapsed_secs[0m[2m=[0m5.7554e-5
-[32m INFO[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE TABLE IF NOT …" [3mdb.statement[0m[2m=[0m"\n\nCREATE TABLE IF NOT EXISTS \"seaql_migrations\" (\n  \"version\" text NOT NULL PRIMARY KEY,\n  \"applied_at\" bigint NOT NULL\n)\n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m45.741µs [3melapsed_secs[0m[2m=[0m4.5741e-5
-[32m INFO[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE TABLE IF NOT …" [3mdb.statement[0m[2m=[0m"\n\nCREATE TABLE IF NOT EXISTS \"seaql_migrations\" (\n  \"version\" text NOT NULL PRIMARY KEY,\n  \"applied_at\" bigint NOT NULL\n)\n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m37.198µs [3melapsed_secs[0m[2m=[0m3.7198e-5
-[32m INFO[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"SELECT \"version\", \"applied_at\" FROM …" [3mdb.statement[0m[2m=[0m"\n\nSELECT\n  \"version\",\n  \"applied_at\"\nFROM\n  \"seaql_migrations\"\nORDER BY\n  \"version\" ASC\n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m4 [3melapsed[0m[2m=[0m182.761µs [3melapsed_secs[0m[2m=[0m0.000182761
+[32m INFO[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE TABLE IF NOT …" [3mdb.statement[0m[2m=[0m"\n\nCREATE TABLE IF NOT EXISTS \"seaql_migrations\" (\n  \"version\" text NOT NULL PRIMARY KEY,\n  \"applied_at\" bigint NOT NULL\n)\n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m56.633µs [3melapsed_secs[0m[2m=[0m5.6633e-5
+[32m INFO[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE TABLE IF NOT …" [3mdb.statement[0m[2m=[0m"\n\nCREATE TABLE IF NOT EXISTS \"seaql_migrations\" (\n  \"version\" text NOT NULL PRIMARY KEY,\n  \"applied_at\" bigint NOT NULL\n)\n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m33.037µs [3melapsed_secs[0m[2m=[0m3.3037e-5
+[32m INFO[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"CREATE TABLE IF NOT …" [3mdb.statement[0m[2m=[0m"\n\nCREATE TABLE IF NOT EXISTS \"seaql_migrations\" (\n  \"version\" text NOT NULL PRIMARY KEY,\n  \"applied_at\" bigint NOT NULL\n)\n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m0 [3melapsed[0m[2m=[0m38.63µs [3melapsed_secs[0m[2m=[0m3.863e-5
+[32m INFO[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"SELECT \"version\", \"applied_at\" FROM …" [3mdb.statement[0m[2m=[0m"\n\nSELECT\n  \"version\",\n  \"applied_at\"\nFROM\n  \"seaql_migrations\"\nORDER BY\n  \"version\" ASC\n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m4 [3melapsed[0m[2m=[0m102.597µs [3melapsed_secs[0m[2m=[0m0.000102597
 [32m INFO[0m [2msea_orm_migration::migrator[0m[2m:[0m No pending migrations
 [32m INFO[0m [2mlayercake::server[0m[2m:[0m Database migrations completed
 [32m INFO[0m [2mlayercake::server[0m[2m:[0m API Endpoints:
@@ -628,5 +1647,4 @@ warning: `layercake-tool` (bin "layercake") generated 52 warnings (31 duplicates
 [32m INFO[0m [2mlayercake::server[0m[2m:[0m 📋 Available Tools: list_projects, create_project, analyze_connectivity, find_paths
 [32m INFO[0m [2mlayercake::server[0m[2m:[0m 📊 Available Resources: layercake://projects/{id}, layercake://graphs/{id}/{format}
 [32m INFO[0m [2mlayercake::server[0m[2m:[0m 🤖 Available Prompts: analyze_graph_structure, analyze_paths, recommend_transformations
-[32m INFO[0m [2mlayercake::server[0m[2m:[0m Server running on http://0.0.0.0:3000
-[32m INFO[0m [2msqlx::query[0m[2m:[0m [3msummary[0m[2m=[0m"SELECT \"projects\".\"id\", \"projects\".\"name\", \"projects\".\"description\", …" [3mdb.statement[0m[2m=[0m"\n\nSELECT\n  \"projects\".\"id\",\n  \"projects\".\"name\",\n  \"projects\".\"description\",\n  \"projects\".\"created_at\",\n  \"projects\".\"updated_at\"\nFROM\n  \"projects\"\n" [3mrows_affected[0m[2m=[0m0 [3mrows_returned[0m[2m=[0m1 [3melapsed[0m[2m=[0m322.959µs [3melapsed_secs[0m[2m=[0m0.000322959
+Error: Address already in use (os error 98)
