@@ -1,0 +1,57 @@
+name: Update Visual Regression Baselines
+
+on:
+  workflow_dispatch:
+    inputs:
+      update_snapshots:
+        description: 'Update visual regression snapshots'
+        required: true
+        default: 'true'
+        type: boolean
+
+jobs:
+  update-snapshots:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.update_snapshots == 'true'
+    defaults:
+      run:
+        working-directory: ./frontend
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Install Playwright browsers
+      run: npx playwright install --with-deps
+    
+    - name: Build Storybook
+      run: npm run build-storybook
+    
+    - name: Update Visual Regression Snapshots
+      run: |
+        # Start Storybook server in background
+        npx http-server storybook-static --port 6006 --silent &
+        # Wait for server to start
+        npx wait-on http://localhost:6006
+        # Update snapshots
+        npx playwright test tests/storybook-visual-regression.spec.ts --update-snapshots
+    
+    - name: Commit updated snapshots
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add tests/storybook-visual-regression.spec.ts-snapshots/
+        git diff --staged --quiet || git commit -m "Update visual regression snapshots"
+        git push

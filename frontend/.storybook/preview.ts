@@ -12,7 +12,9 @@ const preview: Preview = {
     },
     docs: {
       autodocs: 'tag',
+      toc: true,
     },
+    layout: 'centered',
     backgrounds: {
       default: 'light',
       values: [
@@ -23,6 +25,10 @@ const preview: Preview = {
         {
           name: 'dark',
           value: '#1f2937',
+        },
+        {
+          name: 'gray',
+          value: '#f3f4f6',
         },
       ],
     },
@@ -52,8 +58,8 @@ const preview: Preview = {
         desktop: {
           name: 'Desktop',
           styles: {
-            width: '1024px',
-            height: '768px',
+            width: '1440px',
+            height: '900px',
           },
         },
       },
@@ -71,6 +77,21 @@ const preview: Preview = {
             enabled: true,
           },
         ],
+      },
+    },
+  },
+  globalTypes: {
+    theme: {
+      name: 'Theme',
+      description: 'Global theme for components',
+      defaultValue: 'light',
+      toolbar: {
+        icon: 'circlehollow',
+        items: [
+          { value: 'light', icon: 'circlehollow', title: 'Light' },
+          { value: 'dark', icon: 'circle', title: 'Dark' },
+        ],
+        showName: true,
       },
     },
   },

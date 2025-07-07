@@ -1,0 +1,172 @@
+name: Frontend CI/CD
+
+on:
+  push:
+    branches: [ main, master, develop ]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-ci.yml'
+  pull_request:
+    branches: [ main, master, develop ]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-ci.yml'
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run linter
+      run: npm run lint
+    
+    - name: Run type check
+      run: npm run type-check
+    
+    - name: Build frontend
+      run: npm run build
+    
+    - name: Install Playwright browsers
+      run: npx playwright install --with-deps
+    
+    - name: Run Playwright tests
+      run: npm run test
+    
+    - name: Upload Playwright results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: playwright-results
+        path: frontend/test-results/
+        retention-days: 7
+
+  storybook-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Install Playwright browsers
+      run: npx playwright install --with-deps
+    
+    - name: Build Storybook
+      run: npm run build-storybook
+    
+    - name: Run Storybook tests
+      run: npm run test-storybook:ci
+    
+    - name: Upload Storybook build
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: storybook-build
+        path: frontend/storybook-static/
+        retention-days: 7
+
+  visual-regression:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Install Playwright browsers
+      run: npx playwright install --with-deps
+    
+    - name: Build Storybook
+      run: npm run build-storybook
+    
+    - name: Run Visual Regression Tests
+      run: |
+        # Start Storybook server in background
+        npx http-server storybook-static --port 6006 --silent &
+        # Wait for server to start
+        npx wait-on http://localhost:6006
+        # Run visual regression tests
+        npx playwright test tests/storybook-visual-regression.spec.ts
+    
+    - name: Upload visual regression results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: visual-regression-results
+        path: |
+          frontend/test-results/
+          frontend/tests/storybook-visual-regression.spec.ts-snapshots/
+        retention-days: 7
+
+  deploy-storybook:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    needs: [build-and-test, storybook-tests, visual-regression]
+    defaults:
+      run:
+        working-directory: ./frontend
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Build Storybook
+      run: npm run build-storybook
+    
+    - name: Deploy to GitHub Pages
+      if: github.repository_owner == 'michiel' # Replace with actual owner
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./frontend/storybook-static
+        destination_dir: storybook
