@@ -134,12 +134,14 @@ impl GraphIOService {
         
         let graph_model = graphs::ActiveModel {
             id: Set(graph_id.clone()),
-            project_id: Set(request.project_id),
+            plan_id: Set(request.project_id), // Using project_id as plan_id for now - needs proper plan integration
+            plan_node_id: Set("import_node".to_string()), // Placeholder - needs proper plan node integration
             name: Set(graph.name.clone()),
             description: Set(Some(format!("Imported from {} ({})", filename, format_name(format)))),
             graph_data: Set(graph_data),
-            created_at: Set(chrono::Utc::now().naive_utc()),
-            updated_at: Set(chrono::Utc::now().naive_utc()),
+            metadata: Set(None),
+            created_at: Set(chrono::Utc::now()),
+            updated_at: Set(chrono::Utc::now()),
         };
         
         graph_model.insert(&self.db).await?;
@@ -169,7 +171,7 @@ impl GraphIOService {
         // For now, get the latest graph for the project
         // TODO: Support selecting specific graph versions
         let graph_record = graphs::Entity::find()
-            .filter(graphs::Column::ProjectId.eq(request.project_id))
+            .filter(graphs::Column::PlanId.eq(request.project_id))
             .one(&self.db)
             .await?
             .ok_or_else(|| anyhow::anyhow!("No graph found for project"))?;

@@ -241,6 +241,58 @@ impl TransformationEngine {
         }
     }
     
+    /// Validate a transformation without executing it
+    pub fn validate_transformation(&self, graph: &Graph, transformation: &TransformationType) -> Result<()> {
+        debug!("Validating transformation: {:?}", transformation);
+        
+        // Use the validator to check if the transformation is valid
+        self.validator.validate_transformation(graph, transformation)
+    }
+    
+    /// Execute a single transformation on a graph
+    pub async fn execute_transformation(&self, graph: Graph, transformation: TransformationType) -> Result<TransformationResult> {
+        let start_time = Instant::now();
+        info!("Executing transformation: {:?}", transformation);
+        
+        // Validate first
+        if let Err(e) = self.validate_transformation(&graph, &transformation) {
+            return Ok(TransformationResult {
+                success: false,
+                rule_id: "single_transformation".to_string(),
+                original_graph: Some(graph.clone()),
+                transformed_graph: Some(graph),
+                error: Some(format!("Validation failed: {}", e)),
+                statistics: TransformationStatistics::default(),
+            });
+        }
+        
+        // Execute the transformation
+        match self.apply_operation(&transformation, graph.clone()) {
+            Ok((transformed_graph, mut stats)) => {
+                stats.execution_time_ms = start_time.elapsed().as_millis() as u64;
+                
+                Ok(TransformationResult {
+                    success: true,
+                    rule_id: "single_transformation".to_string(),
+                    original_graph: Some(graph),
+                    transformed_graph: Some(transformed_graph),
+                    error: None,
+                    statistics: stats,
+                })
+            },
+            Err(e) => {
+                Ok(TransformationResult {
+                    success: false,
+                    rule_id: "single_transformation".to_string(),
+                    original_graph: Some(graph.clone()),
+                    transformed_graph: Some(graph),
+                    error: Some(e.to_string()),
+                    statistics: TransformationStatistics::default(),
+                })
+            }
+        }
+    }
+    
     /// Create a rollback operation for a given transformation
     pub fn create_rollback(&self, result: &TransformationResult) -> Option<Graph> {
         result.original_graph.clone()

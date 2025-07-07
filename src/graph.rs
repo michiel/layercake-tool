@@ -16,6 +16,16 @@ pub struct Graph {
 }
 
 impl Graph {
+    /// Convert Graph to JSON
+    pub fn to_json(&self) -> Result<serde_json::Value, serde_json::Error> {
+        serde_json::to_value(self)
+    }
+
+    /// Create Graph from JSON
+    pub fn from_json(json: &serde_json::Value) -> Result<Self, serde_json::Error> {
+        serde_json::from_value(json.clone())
+    }
+
     pub fn get_layer_map(&self) -> IndexMap<String, Layer> {
         let layers: IndexMap<String, Layer> = self
             .layers

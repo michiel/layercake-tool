@@ -17,6 +17,69 @@ impl TransformationValidator {
         Self {}
     }
     
+    /// Validate a single transformation type without a rule wrapper
+    pub fn validate_transformation(&self, graph: &Graph, transformation: &super::TransformationType) -> Result<()> {
+        let mut errors = Vec::new();
+        let mut warnings = Vec::new();
+        
+        debug!("Validating transformation: {:?}", transformation);
+        
+        // Validate operation-specific constraints
+        match transformation {
+            super::TransformationType::NodeFilter(op) => {
+                self.validate_node_filter_op(op, graph, &mut errors, &mut warnings);
+            },
+            super::TransformationType::NodeTransform(op) => {
+                self.validate_node_transform_op(op, graph, &mut errors, &mut warnings);
+            },
+            super::TransformationType::NodeCreate(op) => {
+                self.validate_node_create_op(op, graph, &mut errors, &mut warnings);
+            },
+            super::TransformationType::NodeDelete(op) => {
+                self.validate_node_delete_op(op, graph, &mut errors, &mut warnings);
+            },
+            super::TransformationType::EdgeFilter(op) => {
+                self.validate_edge_filter_op(op, graph, &mut errors, &mut warnings);
+            },
+            super::TransformationType::EdgeTransform(op) => {
+                self.validate_edge_transform_op(op, graph, &mut errors, &mut warnings);
+            },
+            super::TransformationType::EdgeCreate(op) => {
+                self.validate_edge_create_op(op, graph, &mut errors, &mut warnings);
+            },
+            super::TransformationType::EdgeDelete(op) => {
+                self.validate_edge_delete_op(op, graph, &mut errors, &mut warnings);
+            },
+            super::TransformationType::LayerFilter(op) => {
+                self.validate_layer_filter_op(op, graph, &mut errors, &mut warnings);
+            },
+            super::TransformationType::LayerTransform(op) => {
+                self.validate_layer_transform_op(op, graph, &mut errors, &mut warnings);
+            },
+            super::TransformationType::LayerCreate(op) => {
+                self.validate_layer_create_op(op, graph, &mut errors, &mut warnings);
+            },
+            super::TransformationType::LayerDelete(op) => {
+                self.validate_layer_delete_op(op, graph, &mut errors, &mut warnings);
+            },
+            super::TransformationType::GraphMerge(op) => {
+                self.validate_graph_merge_op(op, graph, &mut errors, &mut warnings);
+            },
+            super::TransformationType::GraphSplit(op) => {
+                self.validate_graph_split_op(op, graph, &mut errors, &mut warnings);
+            },
+            super::TransformationType::GraphCluster(op) => {
+                self.validate_graph_cluster_op(op, graph, &mut errors, &mut warnings);
+            },
+        }
+        
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!("Validation failed: {}", errors.join(", ")))
+        }
+    }
+    
     /// Validate an entire transformation pipeline
     pub fn validate_pipeline(&self, pipeline: &TransformationPipeline, graph: &Graph) -> Result<ValidationResult> {
         let mut errors = Vec::new();
@@ -321,6 +384,25 @@ impl TransformationValidator {
     }
     
     // Graph operation validators
+    
+    fn validate_graph_merge_op(&self, op: &super::GraphMergeOp, graph: &Graph, _errors: &mut Vec<String>, warnings: &mut Vec<String>) {
+        if graph.nodes.is_empty() {
+            warnings.push("Graph is empty - merge operation may not be meaningful".to_string());
+        }
+        
+        // Check merge strategy validity
+        match op.merge_strategy {
+            super::MergeStrategy::Union => {
+                // Union merge is always valid
+            },
+            super::MergeStrategy::Intersection => {
+                warnings.push("Intersection merge requires another graph - cannot validate without target graph".to_string());
+            },
+            super::MergeStrategy::LeftJoin | super::MergeStrategy::RightJoin => {
+                warnings.push("Join merge requires another graph - cannot validate without target graph".to_string());
+            },
+        }
+    }
     
     fn validate_graph_split_op(&self, op: &super::GraphSplitOp, graph: &Graph, errors: &mut Vec<String>, warnings: &mut Vec<String>) {
         if op.split_criteria.trim().is_empty() {

@@ -1,91 +1,73 @@
-//! Service layer for graph transformations
+//! Service layer for graph transformations using plan-centric model
 
 use anyhow::Result;
-use sea_orm::{DatabaseConnection, EntityTrait, PaginatorTrait, Set, ActiveModelTrait, QueryFilter, QueryOrder, ColumnTrait};
+use sea_orm::{DatabaseConnection, EntityTrait, ActiveModelTrait, QueryFilter, ColumnTrait};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tracing::{debug, info, error};
 use uuid::Uuid;
 
-use crate::database::entities::{graphs, transformation_pipelines, transformation_rules};
+use crate::database::entities::{graphs, plans, plan_nodes};
 use crate::graph::Graph;
 use crate::transformations::{
     TransformationEngine, 
-    TransformationPipeline, 
-    TransformationRule,
     TransformationType,
     TransformationResult,
     TransformationStatistics,
 };
 
-/// API request/response types for transformations
+/// API request/response types for transformations in plan-centric model
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreatePipelineRequest {
+pub struct CreateTransformationNodeRequest {
     pub name: String,
     pub description: Option<String>,
-    pub validation_enabled: Option<bool>,
-    pub rollback_enabled: Option<bool>,
+    pub transformation_type: TransformationType,
+    pub input_graph_id: String,
+    pub position_x: Option<f64>,
+    pub position_y: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdatePipelineRequest {
+pub struct UpdateTransformationNodeRequest {
     pub name: Option<String>,
     pub description: Option<String>,
-    pub validation_enabled: Option<bool>,
-    pub rollback_enabled: Option<bool>,
+    pub transformation_type: Option<TransformationType>,
+    pub position_x: Option<f64>,
+    pub position_y: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateRuleRequest {
+pub struct TransformationNodeResponse {
+    pub id: String,
+    pub plan_id: i32,
     pub name: String,
     pub description: Option<String>,
-    pub operation: TransformationType,
-    pub enabled: Option<bool>,
-    pub conditions: Option<Vec<String>>,
+    pub transformation_type: TransformationType,
+    pub input_graph_id: Option<String>,
+    pub output_graph_id: Option<String>,
+    pub position_x: Option<f64>,
+    pub position_y: Option<f64>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateRuleRequest {
-    pub name: Option<String>,
-    pub description: Option<String>,
-    pub operation: Option<TransformationType>,
-    pub enabled: Option<bool>,
-    pub conditions: Option<Vec<String>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExecutePipelineRequest {
-    pub graph_id: String,
+pub struct ExecuteTransformationRequest {
     pub dry_run: Option<bool>,
+    pub validate_only: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExecuteRuleRequest {
-    pub graph_id: String,
-    pub rule_id: String,
-    pub dry_run: Option<bool>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PipelineExecutionResult {
+pub struct ExecuteTransformationResponse {
     pub success: bool,
-    pub results: Vec<RuleExecutionResult>,
-    pub total_statistics: TransformationStatistics,
-    pub execution_time_ms: u64,
-    pub error: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RuleExecutionResult {
-    pub rule_id: String,
-    pub rule_name: String,
-    pub success: bool,
+    pub output_graph_id: Option<String>,
     pub statistics: TransformationStatistics,
-    pub error: Option<String>,
+    pub warnings: Vec<String>,
+    pub errors: Vec<String>,
 }
 
-/// Transformation service for managing pipelines and executing transformations
+/// Service for managing graph transformations through plan nodes
 pub struct TransformationService {
     db: DatabaseConnection,
     engine: TransformationEngine,
@@ -98,336 +80,300 @@ impl TransformationService {
             engine: TransformationEngine::new(),
         }
     }
-    
-    /// Create a new transformation pipeline
-    pub async fn create_pipeline(&self, req: CreatePipelineRequest) -> Result<transformation_pipelines::Model> {
-        debug!("Creating transformation pipeline: {}", req.name);
-        
-        let pipeline = TransformationPipeline {
-            id: Uuid::new_v4().to_string(),
-            name: req.name.clone(),
-            description: req.description.clone(),
-            rules: Vec::new(),
-            validation_enabled: req.validation_enabled.unwrap_or(true),
-            rollback_enabled: req.rollback_enabled.unwrap_or(true),
-        };
-        
-        let pipeline_data = serde_json::to_string(&pipeline)?;
-        
-        let active_model = transformation_pipelines::ActiveModel {
-            id: Set(pipeline.id.clone()),
-            name: Set(req.name),
-            description: Set(req.description),
-            pipeline_data: Set(pipeline_data),
-            enabled: Set(true),
-            created_at: Set(chrono::Utc::now().naive_utc()),
-            updated_at: Set(chrono::Utc::now().naive_utc()),
-        };
-        
-        let result = active_model.insert(&self.db).await?;
-        info!("Created transformation pipeline: {}", result.id);
-        Ok(result)
-    }
-    
-    /// Get all transformation pipelines
-    pub async fn list_pipelines(&self) -> Result<Vec<transformation_pipelines::Model>> {
-        debug!("Listing transformation pipelines");
-        
-        let pipelines = transformation_pipelines::Entity::find()
-            .all(&self.db)
-            .await?;
-        
-        debug!("Found {} transformation pipelines", pipelines.len());
-        Ok(pipelines)
-    }
-    
-    /// Get a transformation pipeline by ID
-    pub async fn get_pipeline(&self, id: &str) -> Result<Option<transformation_pipelines::Model>> {
-        debug!("Getting transformation pipeline: {}", id);
-        
-        let pipeline = transformation_pipelines::Entity::find_by_id(id)
-            .one(&self.db)
-            .await?;
-        
-        Ok(pipeline)
-    }
-    
-    /// Update a transformation pipeline
-    pub async fn update_pipeline(&self, id: &str, req: UpdatePipelineRequest) -> Result<transformation_pipelines::Model> {
-        debug!("Updating transformation pipeline: {}", id);
-        
-        let pipeline = transformation_pipelines::Entity::find_by_id(id)
+
+    /// Create a new transformation node in a plan
+    pub async fn create_transformation_node(
+        &self,
+        plan_id: i32,
+        req: CreateTransformationNodeRequest,
+    ) -> Result<TransformationNodeResponse> {
+        debug!("Creating transformation node for plan {}", plan_id);
+
+        // Validate that the plan exists
+        let plan = plans::Entity::find_by_id(plan_id)
             .one(&self.db)
             .await?
-            .ok_or_else(|| anyhow::anyhow!("Pipeline not found"))?;
+            .ok_or_else(|| anyhow::anyhow!("Plan not found"))?;
+
+        // Validate that the input graph exists
+        let input_graph = graphs::Entity::find_by_id(&req.input_graph_id)
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Input graph not found"))?;
+
+        // Create transformation node
+        let node_id = Uuid::new_v4().to_string();
+        let configuration = serde_json::to_string(&req.transformation_type)?;
         
-        let mut active_model = transformation_pipelines::ActiveModel {
-            id: Set(id.to_string()),
-            updated_at: Set(chrono::Utc::now().naive_utc()),
-            ..Default::default()
+        let active_model = plan_nodes::ActiveModel {
+            id: sea_orm::Set(node_id.clone()),
+            plan_id: sea_orm::Set(plan_id),
+            node_type: sea_orm::Set("transformation".to_string()),
+            name: sea_orm::Set(req.name.clone()),
+            description: sea_orm::Set(req.description.clone()),
+            configuration: sea_orm::Set(configuration),
+            graph_id: sea_orm::Set(None), // Will be set after execution
+            position_x: sea_orm::Set(req.position_x),
+            position_y: sea_orm::Set(req.position_y),
+            created_at: sea_orm::Set(chrono::Utc::now()),
+            updated_at: sea_orm::Set(chrono::Utc::now()),
         };
+
+        let node = active_model.insert(&self.db).await?;
         
-        if let Some(name) = req.name {
-            active_model.name = Set(name);
-        }
-        
-        if let Some(description) = req.description {
-            active_model.description = Set(Some(description));
-        }
-        
-        // Update pipeline data if validation/rollback settings changed
-        if req.validation_enabled.is_some() || req.rollback_enabled.is_some() {
-            let mut pipeline_obj: TransformationPipeline = serde_json::from_str(&pipeline.pipeline_data)?;
-            
-            if let Some(validation) = req.validation_enabled {
-                pipeline_obj.validation_enabled = validation;
-            }
-            
-            if let Some(rollback) = req.rollback_enabled {
-                pipeline_obj.rollback_enabled = rollback;
-            }
-            
-            active_model.pipeline_data = Set(serde_json::to_string(&pipeline_obj)?);
-        }
-        
-        let result = active_model.update(&self.db).await?;
-        info!("Updated transformation pipeline: {}", result.id);
-        Ok(result)
+        info!("Created transformation node {} for plan {}", node_id, plan_id);
+
+        Ok(TransformationNodeResponse {
+            id: node.id,
+            plan_id: node.plan_id,
+            name: node.name,
+            description: node.description,
+            transformation_type: req.transformation_type,
+            input_graph_id: Some(req.input_graph_id),
+            output_graph_id: node.graph_id,
+            position_x: node.position_x,
+            position_y: node.position_y,
+            created_at: node.created_at,
+            updated_at: node.updated_at,
+        })
     }
-    
-    /// Delete a transformation pipeline
-    pub async fn delete_pipeline(&self, id: &str) -> Result<()> {
-        debug!("Deleting transformation pipeline: {}", id);
+
+    /// Update a transformation node
+    pub async fn update_transformation_node(
+        &self,
+        node_id: &str,
+        req: UpdateTransformationNodeRequest,
+    ) -> Result<TransformationNodeResponse> {
+        debug!("Updating transformation node {}", node_id);
+
+        let node = plan_nodes::Entity::find_by_id(node_id)
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Transformation node not found"))?;
+
+        if node.node_type != "transformation" {
+            return Err(anyhow::anyhow!("Node is not a transformation node"));
+        }
+
+        let mut active_model = plan_nodes::ActiveModel {
+            id: sea_orm::Set(node.id.clone()),
+            plan_id: sea_orm::Set(node.plan_id),
+            node_type: sea_orm::Set(node.node_type.clone()),
+            name: sea_orm::Set(req.name.unwrap_or(node.name.clone())),
+            description: sea_orm::Set(req.description.or(node.description.clone())),
+            configuration: sea_orm::Set(node.configuration.clone()), // Update if transformation_type changed
+            graph_id: sea_orm::Set(node.graph_id.clone()),
+            position_x: sea_orm::Set(req.position_x.or(node.position_x)),
+            position_y: sea_orm::Set(req.position_y.or(node.position_y)),
+            created_at: sea_orm::Set(node.created_at),
+            updated_at: sea_orm::Set(chrono::Utc::now()),
+        };
+
+        // Update configuration if transformation_type changed
+        if let Some(transformation_type) = req.transformation_type {
+            let configuration = serde_json::to_string(&transformation_type)?;
+            active_model.configuration = sea_orm::Set(configuration);
+        }
+
+        let updated_node = active_model.update(&self.db).await?;
         
-        // Delete associated rules first
-        transformation_rules::Entity::delete_many()
-            .filter(transformation_rules::Column::PipelineId.eq(id))
+        // Parse the transformation type from configuration
+        let transformation_type: TransformationType = serde_json::from_str(&updated_node.configuration)?;
+
+        info!("Updated transformation node {}", node_id);
+
+        Ok(TransformationNodeResponse {
+            id: updated_node.id,
+            plan_id: updated_node.plan_id,
+            name: updated_node.name,
+            description: updated_node.description,
+            transformation_type,
+            input_graph_id: None, // Would need to track this separately
+            output_graph_id: updated_node.graph_id,
+            position_x: updated_node.position_x,
+            position_y: updated_node.position_y,
+            created_at: updated_node.created_at,
+            updated_at: updated_node.updated_at,
+        })
+    }
+
+    /// Execute a transformation node
+    pub async fn execute_transformation_node(
+        &self,
+        node_id: &str,
+        input_graph_id: &str,
+        req: ExecuteTransformationRequest,
+    ) -> Result<ExecuteTransformationResponse> {
+        debug!("Executing transformation node {} with input graph {}", node_id, input_graph_id);
+
+        let node = plan_nodes::Entity::find_by_id(node_id)
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Transformation node not found"))?;
+
+        if node.node_type != "transformation" {
+            return Err(anyhow::anyhow!("Node is not a transformation node"));
+        }
+
+        // Load input graph
+        let input_graph_entity = graphs::Entity::find_by_id(input_graph_id)
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Input graph not found"))?;
+
+        let input_graph_data = input_graph_entity.get_graph_data_json()?;
+        let input_graph = Graph::from_json(&input_graph_data)?;
+
+        // Parse transformation configuration
+        let transformation_type: TransformationType = serde_json::from_str(&node.configuration)?;
+
+        if req.validate_only.unwrap_or(false) {
+            // Just validate the transformation without executing
+            match self.engine.validate_transformation(&input_graph, &transformation_type) {
+                Ok(_) => {
+                    return Ok(ExecuteTransformationResponse {
+                        success: true,
+                        output_graph_id: None,
+                        statistics: TransformationStatistics::default(),
+                        warnings: vec![],
+                        errors: vec![],
+                    });
+                }
+                Err(e) => {
+                    return Ok(ExecuteTransformationResponse {
+                        success: false,
+                        output_graph_id: None,
+                        statistics: TransformationStatistics::default(),
+                        warnings: vec![],
+                        errors: vec![e.to_string()],
+                    });
+                }
+            }
+        }
+
+        // Execute transformation
+        let result = self.engine.execute_transformation(input_graph, transformation_type).await?;
+
+        if req.dry_run.unwrap_or(false) {
+            // Return results without persisting
+            return Ok(ExecuteTransformationResponse {
+                success: result.success,
+                output_graph_id: None,
+                statistics: result.statistics,
+                warnings: vec![], // TransformationResult doesn't have warnings field
+                errors: result.error.map(|e| vec![e]).unwrap_or_else(Vec::new),
+            });
+        }
+
+        // Create output graph
+        let output_graph_id = Uuid::new_v4().to_string();
+        let transformed_graph = result.transformed_graph.as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No transformed graph in result"))?;
+        let output_graph_data = transformed_graph.to_json()?;
+        
+        let graph_active_model = graphs::ActiveModel {
+            id: sea_orm::Set(output_graph_id.clone()),
+            plan_id: sea_orm::Set(node.plan_id),
+            plan_node_id: sea_orm::Set(node.id.clone()),
+            name: sea_orm::Set(format!("{} - Output", node.name)),
+            description: sea_orm::Set(Some(format!("Output graph from transformation node {}", node.id))),
+            graph_data: sea_orm::Set(serde_json::to_string(&output_graph_data)?),
+            metadata: sea_orm::Set(Some(serde_json::to_string(&result.statistics)?)),
+            created_at: sea_orm::Set(chrono::Utc::now()),
+            updated_at: sea_orm::Set(chrono::Utc::now()),
+        };
+
+        graph_active_model.insert(&self.db).await?;
+
+        // Update the transformation node to reference the output graph
+        let mut node_active_model = plan_nodes::ActiveModel {
+            id: sea_orm::Set(node.id.clone()),
+            plan_id: sea_orm::Set(node.plan_id),
+            node_type: sea_orm::Set(node.node_type.clone()),
+            name: sea_orm::Set(node.name.clone()),
+            description: sea_orm::Set(node.description.clone()),
+            configuration: sea_orm::Set(node.configuration.clone()),
+            graph_id: sea_orm::Set(Some(output_graph_id.clone())),
+            position_x: sea_orm::Set(node.position_x),
+            position_y: sea_orm::Set(node.position_y),
+            created_at: sea_orm::Set(node.created_at),
+            updated_at: sea_orm::Set(chrono::Utc::now()),
+        };
+
+        node_active_model.update(&self.db).await?;
+
+        info!("Executed transformation node {} -> output graph {}", node_id, output_graph_id);
+
+        Ok(ExecuteTransformationResponse {
+            success: result.success,
+            output_graph_id: Some(output_graph_id),
+            statistics: result.statistics,
+            warnings: vec![], // TransformationResult doesn't have warnings field
+            errors: result.error.map(|e| vec![e]).unwrap_or_else(Vec::new),
+        })
+    }
+
+    /// Get transformation nodes for a plan
+    pub async fn get_transformation_nodes(
+        &self,
+        plan_id: i32,
+    ) -> Result<Vec<TransformationNodeResponse>> {
+        debug!("Getting transformation nodes for plan {}", plan_id);
+
+        let nodes = plan_nodes::Entity::find()
+            .filter(plan_nodes::Column::PlanId.eq(plan_id))
+            .filter(plan_nodes::Column::NodeType.eq("transformation"))
+            .all(&self.db)
+            .await?;
+
+        let mut responses = Vec::new();
+        for node in nodes {
+            let transformation_type: TransformationType = serde_json::from_str(&node.configuration)?;
+            
+            responses.push(TransformationNodeResponse {
+                id: node.id,
+                plan_id: node.plan_id,
+                name: node.name,
+                description: node.description,
+                transformation_type,
+                input_graph_id: None, // Would need to track this separately
+                output_graph_id: node.graph_id,
+                position_x: node.position_x,
+                position_y: node.position_y,
+                created_at: node.created_at,
+                updated_at: node.updated_at,
+            });
+        }
+
+        Ok(responses)
+    }
+
+    /// Delete a transformation node
+    pub async fn delete_transformation_node(&self, node_id: &str) -> Result<()> {
+        debug!("Deleting transformation node {}", node_id);
+
+        let node = plan_nodes::Entity::find_by_id(node_id)
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Transformation node not found"))?;
+
+        if node.node_type != "transformation" {
+            return Err(anyhow::anyhow!("Node is not a transformation node"));
+        }
+
+        // Delete associated output graph if it exists
+        if let Some(graph_id) = &node.graph_id {
+            graphs::Entity::delete_by_id(graph_id)
+                .exec(&self.db)
+                .await?;
+        }
+
+        // Delete the transformation node
+        plan_nodes::Entity::delete_by_id(node_id)
             .exec(&self.db)
             .await?;
-        
-        // Delete pipeline
-        transformation_pipelines::Entity::delete_by_id(id)
-            .exec(&self.db)
-            .await?;
-        
-        info!("Deleted transformation pipeline: {}", id);
+
+        info!("Deleted transformation node {}", node_id);
         Ok(())
-    }
-    
-    /// Add a rule to a pipeline
-    pub async fn add_rule_to_pipeline(&self, pipeline_id: &str, req: CreateRuleRequest) -> Result<transformation_rules::Model> {
-        debug!("Adding rule to pipeline {}: {}", pipeline_id, req.name);
-        
-        // Verify pipeline exists
-        let _pipeline = self.get_pipeline(pipeline_id).await?
-            .ok_or_else(|| anyhow::anyhow!("Pipeline not found"))?;
-        
-        let rule = TransformationRule {
-            id: Uuid::new_v4().to_string(),
-            name: req.name.clone(),
-            description: req.description.clone(),
-            operation: req.operation,
-            enabled: req.enabled.unwrap_or(true),
-            conditions: req.conditions.unwrap_or_default(),
-        };
-        
-        let rule_data = serde_json::to_string(&rule)?;
-        
-        let active_model = transformation_rules::ActiveModel {
-            id: Set(rule.id.clone()),
-            pipeline_id: Set(pipeline_id.to_string()),
-            name: Set(req.name),
-            description: Set(req.description),
-            rule_data: Set(rule_data),
-            enabled: Set(rule.enabled),
-            order_index: Set(0), // Will be updated by reorder if needed
-            created_at: Set(chrono::Utc::now().naive_utc()),
-            updated_at: Set(chrono::Utc::now().naive_utc()),
-        };
-        
-        let result = active_model.insert(&self.db).await?;
-        info!("Added rule to pipeline: {}", result.id);
-        Ok(result)
-    }
-    
-    /// Get rules for a pipeline
-    pub async fn get_pipeline_rules(&self, pipeline_id: &str) -> Result<Vec<transformation_rules::Model>> {
-        debug!("Getting rules for pipeline: {}", pipeline_id);
-        
-        let rules = transformation_rules::Entity::find()
-            .filter(transformation_rules::Column::PipelineId.eq(pipeline_id))
-            .all(&self.db)
-            .await?;
-        
-        debug!("Found {} rules for pipeline {}", rules.len(), pipeline_id);
-        Ok(rules)
-    }
-    
-    /// Execute a transformation pipeline on a graph
-    pub async fn execute_pipeline(&self, req: ExecutePipelineRequest) -> Result<PipelineExecutionResult> {
-        let start_time = std::time::Instant::now();
-        info!("Executing transformation pipeline on graph: {}", req.graph_id);
-        
-        // Get the graph
-        let graph_entity = graphs::Entity::find_by_id(&req.graph_id)
-            .one(&self.db)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Graph not found"))?;
-        
-        let graph: Graph = serde_json::from_str(&graph_entity.graph_data)?;
-        
-        // Get the pipeline (assuming we have the pipeline ID from somewhere)
-        // For now, we'll create a simple pipeline for demonstration
-        let mut pipeline = TransformationPipeline::new("Test Pipeline".to_string());
-        
-        // Set dry run mode if requested
-        let mut engine = TransformationEngine::new();
-        engine.set_dry_run(req.dry_run.unwrap_or(false));
-        
-        match engine.execute_pipeline(&pipeline, graph) {
-            Ok(results) => {
-                let execution_time = start_time.elapsed().as_millis() as u64;
-                
-                let rule_results: Vec<RuleExecutionResult> = results.iter().map(|r| {
-                    RuleExecutionResult {
-                        rule_id: r.rule_id.clone(),
-                        rule_name: "Rule".to_string(), // Would get from actual rule
-                        success: r.success,
-                        statistics: r.statistics.clone(),
-                        error: r.error.clone(),
-                    }
-                }).collect();
-                
-                let success = results.iter().all(|r| r.success);
-                let total_stats = self.aggregate_statistics(&results);
-                
-                info!("Pipeline execution completed successfully in {}ms", execution_time);
-                
-                Ok(PipelineExecutionResult {
-                    success,
-                    results: rule_results,
-                    total_statistics: total_stats,
-                    execution_time_ms: execution_time,
-                    error: None,
-                })
-            },
-            Err(e) => {
-                error!("Pipeline execution failed: {}", e);
-                
-                Ok(PipelineExecutionResult {
-                    success: false,
-                    results: Vec::new(),
-                    total_statistics: TransformationStatistics::default(),
-                    execution_time_ms: start_time.elapsed().as_millis() as u64,
-                    error: Some(e.to_string()),
-                })
-            }
-        }
-    }
-    
-    /// Execute a single transformation rule on a graph
-    pub async fn execute_rule(&self, req: ExecuteRuleRequest) -> Result<RuleExecutionResult> {
-        info!("Executing transformation rule {} on graph: {}", req.rule_id, req.graph_id);
-        
-        // Get the graph
-        let graph_entity = graphs::Entity::find_by_id(&req.graph_id)
-            .one(&self.db)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Graph not found"))?;
-        
-        let graph: Graph = serde_json::from_str(&graph_entity.graph_data)?;
-        
-        // Get the rule
-        let rule_entity = transformation_rules::Entity::find_by_id(&req.rule_id)
-            .one(&self.db)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Rule not found"))?;
-        
-        let rule: TransformationRule = serde_json::from_str(&rule_entity.rule_data)?;
-        
-        // Set dry run mode if requested
-        let mut engine = TransformationEngine::new();
-        engine.set_dry_run(req.dry_run.unwrap_or(false));
-        
-        match engine.execute_rule(&rule, graph) {
-            Ok(result) => {
-                info!("Rule execution completed: {}", result.success);
-                
-                Ok(RuleExecutionResult {
-                    rule_id: req.rule_id,
-                    rule_name: rule.name,
-                    success: result.success,
-                    statistics: result.statistics,
-                    error: result.error,
-                })
-            },
-            Err(e) => {
-                error!("Rule execution failed: {}", e);
-                
-                Ok(RuleExecutionResult {
-                    rule_id: req.rule_id,
-                    rule_name: rule.name,
-                    success: false,
-                    statistics: TransformationStatistics::default(),
-                    error: Some(e.to_string()),
-                })
-            }
-        }
-    }
-    
-    /// Get transformation statistics for a graph
-    pub async fn get_graph_statistics(&self, graph_id: &str) -> Result<HashMap<String, serde_json::Value>> {
-        debug!("Getting statistics for graph: {}", graph_id);
-        
-        let graph_entity = graphs::Entity::find_by_id(graph_id)
-            .one(&self.db)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Graph not found"))?;
-        
-        let graph: Graph = serde_json::from_str(&graph_entity.graph_data)?;
-        
-        let mut stats = HashMap::new();
-        stats.insert("node_count".to_string(), serde_json::Value::from(graph.nodes.len()));
-        stats.insert("edge_count".to_string(), serde_json::Value::from(graph.edges.len()));
-        stats.insert("layer_count".to_string(), serde_json::Value::from(graph.layers.len()));
-        
-        // Calculate basic graph metrics
-        let isolated_nodes = graph.nodes.iter()
-            .filter(|node| !graph.edges.iter().any(|edge| edge.source == node.id || edge.target == node.id))
-            .count();
-        
-        stats.insert("isolated_nodes".to_string(), serde_json::Value::from(isolated_nodes));
-        
-        // Calculate average degree
-        let total_degree: usize = graph.nodes.iter()
-            .map(|node| graph.edges.iter()
-                .filter(|edge| edge.source == node.id || edge.target == node.id)
-                .count())
-            .sum();
-        
-        let avg_degree = if graph.nodes.is_empty() { 0.0 } else { total_degree as f64 / graph.nodes.len() as f64 };
-        stats.insert("average_degree".to_string(), serde_json::Value::from(avg_degree));
-        
-        Ok(stats)
-    }
-    
-    /// Helper method to aggregate transformation statistics
-    fn aggregate_statistics(&self, results: &[TransformationResult]) -> TransformationStatistics {
-        let mut total = TransformationStatistics::default();
-        
-        for result in results {
-            total.nodes_added += result.statistics.nodes_added;
-            total.nodes_removed += result.statistics.nodes_removed;
-            total.nodes_modified += result.statistics.nodes_modified;
-            total.edges_added += result.statistics.edges_added;
-            total.edges_removed += result.statistics.edges_removed;
-            total.edges_modified += result.statistics.edges_modified;
-            total.layers_added += result.statistics.layers_added;
-            total.layers_removed += result.statistics.layers_removed;
-            total.layers_modified += result.statistics.layers_modified;
-            total.execution_time_ms += result.statistics.execution_time_ms;
-        }
-        
-        total
     }
 }
