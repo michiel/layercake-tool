@@ -12,6 +12,9 @@ pub use engine::TransformationEngine;
 pub use operations::TransformationOperations;
 pub use validation::TransformationValidator;
 
+// The types are automatically available since they are defined in this module
+// Only re-export from sub-modules if needed
+
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -181,7 +184,7 @@ pub enum ConflictResolution {
 }
 
 /// Clustering algorithms
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ClusteringAlgorithm {
     ConnectedComponents,
     Modularity,

@@ -348,30 +348,41 @@ mod tests {
             nodes: vec![
                 Node {
                     id: "node1".to_string(),
-                    label: Some("Node 1".to_string()),
-                    layer_id: Some("layer1".to_string()),
-                    ..Default::default()
+                    label: "Node 1".to_string(),
+                    layer: "layer1".to_string(),
+                    is_partition: false,
+                    belongs_to: None,
+                    weight: 1,
+                    comment: None,
                 },
                 Node {
                     id: "node2".to_string(),
-                    label: Some("Node 2".to_string()),
-                    layer_id: Some("layer1".to_string()),
-                    ..Default::default()
+                    label: "Node 2".to_string(),
+                    layer: "layer1".to_string(),
+                    is_partition: false,
+                    belongs_to: None,
+                    weight: 1,
+                    comment: None,
                 },
             ],
             edges: vec![
                 Edge {
                     id: "edge1".to_string(),
-                    source_id: "node1".to_string(),
-                    target_id: "node2".to_string(),
-                    ..Default::default()
+                    source: "node1".to_string(),
+                    target: "node2".to_string(),
+                    label: "Edge 1".to_string(),
+                    layer: "layer1".to_string(),
+                    weight: 1,
+                    comment: None,
                 }
             ],
             layers: vec![
                 Layer {
                     id: "layer1".to_string(),
-                    name: "Layer 1".to_string(),
-                    ..Default::default()
+                    label: "Layer 1".to_string(),
+                    background_color: "FFFFFF".to_string(),
+                    text_color: "000000".to_string(),
+                    border_color: "000000".to_string(),
                 }
             ],
         }
