@@ -2756,3 +2756,207 @@ This design supports the evolution from simple linear pipelines to complex multi
 10. **Scalability**: Performance optimizations for large graphs and complex workflows
 
 The flat DAG structure provides a robust foundation for complex graph transformation workflows with strong GraphQL integration, enabling powerful querying, real-time collaboration, and visual editing capabilities.
+
+## Implementation Status and Remaining Inconsistencies
+
+### **Current Implementation Status (Phase 2.1 Complete)**
+
+As of the latest implementation, the following components have been successfully delivered:
+
+**✅ Completed:**
+- Core DAG architecture foundation with plan-centric workflow
+- Database schema with plan_nodes and graphs tables
+- GraphQL backend with DAG queries and mutations
+- ReactFlow-based visual DAG editor with custom node types
+- Plan view integration supporting visual and legacy editing modes
+- DAG validation with cycle detection and connectivity analysis
+- Comprehensive TypeScript type definitions
+
+**🔄 In Progress:**
+- Hierarchical navigation system (Phase 2.2)
+- Graph data grid interface (Phase 2.3)
+
+### **Clarified Architecture Specifications**
+
+Based on implementation feedback, the following architectural details have been clarified:
+
+**ID Management Strategy:**
+- **Graph IDs**: UUIDs (e.g., `550e8400-e29b-41d4-a716-446655440000`)
+- **Plan IDs**: UUIDs (e.g., `6ba7b810-9dad-11d1-80b4-00c04fd430c8`)
+- **Layercake Graph NodeIds/EdgeIds/LayerIds**: Unique strings (e.g., `"api_gateway"`, `"user_service"`)
+- **Plan Graph NodeIds/EdgeIds**: Auto-incrementing integers for ReactFlow compatibility (e.g., `1`, `2`, `3`)
+
+**Real-time Collaboration Scope:**
+- Collaboration subscriptions are project-scoped rather than plan-node-scoped
+- GraphQL subscription pattern: `projectCollaborationChanged(projectId: ID!)`
+- All plan and graph changes within a project broadcast to subscribers
+- User presence tracking at project level with drill-down to current plan/node context
+
+### **Remaining Inconsistencies and Implementation Gaps**
+
+#### **1. Critical Schema Inconsistencies**
+
+**Plan Schema Version Alignment**
+- **Issue**: Documentation shows DAG schema `"version": "2.0"` but database default is `"1.0.0"`
+- **Impact**: Migration path unclear, version validation inconsistent
+- **Resolution Required**: Standardize on semantic versioning (recommend `"2.0.0"` for new DAG format)
+
+**Node Type Enum Standardization**
+- **Issue**: GraphQL schema defines `IMPORT|TRANSFORM|EXPORT` but implementation uses `input|transform|output|merge|split`
+- **Current State**: Type system mismatch between schema definition and frontend components
+- **Resolution Required**: Align enum values across all layers (GraphQL, TypeScript, React components)
+
+**Database Foreign Key Relationships**
+- **Issue**: `graphs.plan_node_id` references plan nodes but no explicit foreign key constraint defined
+- **Security Risk**: Potential data integrity issues with orphaned references
+- **Resolution Required**: Add proper foreign key constraints and cascade deletion rules
+
+#### **2. Missing Core Functionality**
+
+**GraphQL Mutation Gaps**
+```graphql
+# Missing mutations identified:
+mutation CancelExecution($executionId: ID!) { ... }
+mutation RestartExecution($executionId: ID!) { ... }
+mutation ExportGraph($graphId: ID!, $format: ExportFormat!) { ... }
+mutation BatchUpdatePlanNodes($updates: [PlanNodeUpdate!]!) { ... }
+```
+
+**File Upload Integration**
+- **Gap**: Detailed specifications exist but no REST endpoints implemented
+- **Required Endpoints**:
+  ```
+  POST /api/v1/projects/{project_id}/files   # Multipart upload
+  GET  /api/v1/projects/{project_id}/files   # List uploaded files
+  DELETE /api/v1/files/{file_id}             # Clean up uploads
+  ```
+
+**MCP API Implementation**
+- **Gap**: Comprehensive tool specifications defined but no actual MCP server implementation
+- **Required Tools**: 47 MCP tools documented but 0 implemented
+- **Priority**: Phase 3 requirement for AI agent integration
+
+#### **3. Service Layer Architecture Violations**
+
+**Business Logic in API Layers**
+```typescript
+// ❌ Current problematic pattern in GraphQL resolvers:
+async fn validate_plan(&self, plan_data: JSON) -> Result<ValidationResult> {
+    // Validation logic mixed into resolver
+    if plan_data.nodes.is_empty() { return Err("No nodes"); }
+}
+
+// ✅ Required refactoring to service layer:
+async fn validate_plan(&self, plan_data: JSON) -> Result<ValidationResult> {
+    let content = PlanContent::from_json(plan_data)?;
+    self.backend.plan_service.validate_plan(content).await
+}
+```
+
+**Inconsistent Error Handling**
+- **Issue**: No standardized error format across GraphQL and REST APIs
+- **Current State**: Mixed error response patterns
+- **Resolution Required**: Define unified error schema:
+```graphql
+interface LayercakeError {
+  code: String!
+  message: String!
+  details: JSON
+  timestamp: DateTime!
+  requestId: String!
+}
+```
+
+#### **4. Performance and Scalability Gaps**
+
+**Large Graph Optimization**
+- **Claim**: Documentation states "10,000+ nodes" support
+- **Reality**: No virtualization, pagination, or optimization implemented
+- **Required**: Implement virtualization in both ReactFlow and data grid components
+
+**Caching Strategy Implementation**
+- **Gap**: Detailed caching specifications documented but no cache invalidation logic
+- **Missing Components**:
+  - Redis/in-memory cache layer
+  - Cache invalidation on plan/graph updates
+  - GraphQL query caching strategy
+
+#### **5. Security and Authentication Architecture**
+
+**Authentication System**
+- **Gap**: No user authentication or authorization system documented or implemented
+- **Security Risk**: Collaboration features require user identification but no auth layer exists
+- **Required**: Define authentication architecture:
+  - JWT-based authentication
+  - Role-based access control (RBAC)
+  - Project-level permissions
+
+**API Security**
+- **Gap**: No rate limiting, input validation, or security headers documented
+- **Required**: Implement standard API security measures
+
+#### **6. Real-time Collaboration Implementation Gaps**
+
+**Operational Transformation**
+- **Status**: Extensively documented but only basic GraphQL subscriptions implemented
+- **Missing**: Conflict resolution UI, draft changes, operational transformation logic
+- **Complexity**: Advanced collaboration moved to Phase 5 (7-10 weeks additional effort)
+
+**User Presence System**
+- **Gap**: User presence tracking documented but no implementation
+- **Required**: Real-time user activity tracking and cursor position sharing
+
+#### **7. Database Migration Strategy**
+
+**Legacy Table Coexistence**
+- **Issue**: Old `nodes`, `edges`, `layers` tables still present alongside new DAG-centric schema
+- **Confusion**: Unclear whether to migrate data or maintain dual schema
+- **Resolution Required**: Define clear migration path or document coexistence strategy
+
+**Data Consistency**
+- **Gap**: No foreign key constraints between `plans` and `plan_nodes` tables
+- **Risk**: Potential data integrity issues during concurrent operations
+
+### **Implementation Priorities for Phase 2.2-2.3**
+
+#### **High Priority (Phase 2.2) - 2-3 weeks**
+1. **Resolve Node Type Standardization**: Align enums across all layers
+2. **Implement Missing GraphQL Mutations**: Core execution control and export
+3. **Add Foreign Key Constraints**: Ensure data integrity
+4. **Complete Service Layer Refactoring**: Remove business logic from resolvers
+5. **Implement File Upload Endpoints**: Enable import node functionality
+
+#### **Medium Priority (Phase 2.3) - 3-4 weeks**
+1. **Add Authentication Architecture**: User system and RBAC
+2. **Implement Unified Error Handling**: Standardized error responses
+3. **Add Basic Performance Optimizations**: Pagination and query limits
+4. **Complete Database Migration**: Remove or document legacy tables
+5. **Implement Basic MCP Tools**: Foundation for AI integration
+
+#### **Low Priority (Phase 3+) - Future phases**
+1. **Advanced Collaboration Features**: Operational transformation and conflict resolution
+2. **Comprehensive Caching Strategy**: Redis integration and cache invalidation
+3. **Performance Optimizations**: Virtualization for large graphs
+4. **Full MCP API**: Complete tool set for AI agents
+
+### **Architecture Validation Summary**
+
+**✅ Architecturally Sound:**
+- Plan-centric workflow design
+- DAG-based execution model
+- GraphQL-first frontend interface
+- Immutable graph artifacts
+- Transformation-based editing
+
+**⚠️ Requires Attention:**
+- Service layer consistency
+- Database relationship integrity
+- Performance optimization strategy
+- Security architecture definition
+
+**🔄 Implementation Details:**
+- The core architecture is proven effective through Phase 2.1 delivery
+- Remaining issues are primarily implementation refinements rather than architectural flaws
+- Focus should be on completing missing functionality rather than redesigning existing patterns
+
+The Layercake architecture successfully demonstrates the transition from linear plan execution to DAG-based graph transformation workflows. The identified inconsistencies represent normal implementation refinement rather than fundamental design issues.
