@@ -1558,24 +1558,10 @@ The Layercake database schema is designed to support hierarchical project organi
 
 ```mermaid
 erDiagram
-    projects ||--o{ plans : "contains"
-    projects ||--o{ nodes : "owns"
-    projects ||--o{ edges : "owns"
-    projects ||--o{ layers : "owns"
-    projects ||--o{ graphs : "contains"
-    projects ||--o{ graph_snapshots : "manages"
-    projects ||--o{ graph_versions : "tracks"
-    
-    plans ||--o{ plan_executions : "executes"
-    plan_executions ||--o{ execution_logs : "logs"
-    plan_executions ||--o{ execution_outputs : "generates"
-    
-    layers ||--o{ nodes : "categorizes"
-    
-    graph_snapshots ||--o{ graph_versions : "contains"
-    graph_snapshots ||--o{ snapshot_data : "stores"
-    
-    transformation_pipelines ||--o{ transformation_rules : "defines"
+    projects -> plans : "has many" # each plan is an editable JSON object containing a DAG with nodes[] and edges[], with nodes being transformation, import, export, etc
+    plans -> graphs : "has many" # each graph is a snapshopt of a graph after import or transformation in the workflow. a graph JSON object contains nodes, edges, layers and form the central Layercake data structure that gets transformed and fed to exporters
+    plans -> plan_executions : "logs"
+    plan -> execution_outputs : "generates"
 ```
 
 ### **Core Project Structure**
@@ -1591,31 +1577,13 @@ erDiagram
 - Key fields: `name`, `plan_content` (JSON), `plan_schema_version`, `plan_format`, `dependencies`, `status`
 - Purpose: Stores execution workflows as JSON DAG structures
 
-**graphs** - Generated graph data objects
+**graphs** - Generated graph data artifacts
 - Primary key: `id` (string) 
-- Foreign key: `project_id` → projects.id
-- Key fields: `name`, `graph_data` (JSON)
-- Purpose: Immutable graph objects referenced by plan executions
-
-### **Graph Data Components**
-
-**nodes** - Graph vertices with properties
-- Primary key: `id` (integer)
-- Foreign keys: `project_id` → projects.id, `layer_id` → layers.layer_id
-- Key fields: `node_id` (business identifier), `label`, `properties` (JSON)
-- Purpose: Stores individual graph nodes with flexible metadata
-
-**edges** - Graph connections between nodes
-- Primary key: `id` (integer)
-- Foreign key: `project_id` → projects.id
-- Key fields: `source_node_id`, `target_node_id`, `properties` (JSON)
-- Purpose: Represents relationships between nodes with weighted connections
-
-**layers** - Visual and logical groupings
-- Primary key: `id` (integer)
-- Foreign key: `project_id` → projects.id
-- Key fields: `layer_id` (business identifier), `name`, `color`, `properties` (JSON)
-- Purpose: Categorizes nodes for visualization and logical organization
+- Foreign key: `plan_id` → plans.id
+- Key fields: `plan_node_id`, `graph_data` (JSON), `created_at`
+- Purpose: Immutable graph snapshots generated at each DAG plan node execution
+- Structure: Complete JSON objects containing `nodes[]`, `edges[]`, and `layers[]` arrays
+- Usage: Referenced for graph inspection at specific points in the plan execution workflow
 
 ### **Execution and Monitoring**
 
@@ -1625,84 +1593,87 @@ erDiagram
 - Key fields: `execution_id` (business identifier), `status`, `progress`, `started_at`, `completed_at`, `error`
 - Purpose: Tracks individual plan execution runs with status and progress
 
-**execution_logs** - Detailed execution logging
+**execution_outputs** - Generated artifacts and exports
 - Primary key: `id` (integer)
-- Foreign key: `execution_id` → plan_executions.execution_id
-- Key fields: `level`, `message`, `details`, `timestamp`
-- Purpose: Comprehensive logging for debugging and monitoring
-
-**execution_outputs** - Generated artifacts
-- Primary key: `id` (integer)
-- Foreign key: `execution_id` → plan_executions.execution_id
-- Key fields: `file_name`, `file_type`, `file_path`, `file_size`
-- Purpose: Tracks all generated files and their metadata
-
-### **Version Control and Snapshots**
-
-**graph_snapshots** - Point-in-time captures
-- Primary key: `id` (integer)
-- Foreign key: `project_id` → projects.id
-- Key fields: `name`, `version`, `is_automatic`, `created_by`, entity counts
-- Purpose: Creates named checkpoints of graph state
-
-**graph_versions** - Granular change tracking
-- Primary key: `id` (integer)
-- Foreign keys: `project_id` → projects.id, `snapshot_id` → graph_snapshots.id
-- Key fields: `change_type`, `entity_type`, `entity_id`, `old_data`, `new_data`, `changed_at`, `changed_by`
-- Purpose: Tracks every individual change for audit trail and rollback
-
-**snapshot_data** - Snapshot entity storage
-- Primary key: `id` (integer)
-- Foreign key: `snapshot_id` → graph_snapshots.id
-- Key fields: `entity_type`, `entity_id`, `entity_data` (JSON)
-- Purpose: Stores complete entity data at snapshot time
-
-### **Data Transformation**
-
-**transformation_pipelines** - Reusable transformation workflows
-- Primary key: `id` (string)
-- Key fields: `name`, `pipeline_data` (JSON), `enabled`
-- Purpose: Defines reusable data transformation sequences
-
-**transformation_rules** - Individual transformation operations
-- Primary key: `id` (string)
-- Foreign key: `pipeline_id` → transformation_pipelines.id
-- Key fields: `name`, `rule_data` (JSON), `enabled`, `order_index`
-- Purpose: Atomic transformation operations within pipelines
+- Foreign key: `plan_id` → plans.id
+- Key fields: `execution_id`, `plan_node_id`, `file_name`, `file_type`, `file_path`, `file_size`
+- Purpose: Tracks all generated files and export artifacts from plan execution
 
 ### **Key Design Principles**
 
-1. **Hierarchical Organization**: Projects contain all related entities with strong foreign key relationships
-2. **JSON Flexibility**: Extensive use of JSON fields for flexible metadata and configuration storage
-3. **Audit Trail**: Comprehensive tracking of changes, executions, and user actions
-4. **Version Control**: Full history preservation with point-in-time snapshots and granular change tracking
-5. **Performance Optimization**: Efficient indexing on foreign keys and frequently queried fields
-6. **Data Integrity**: Strong referential integrity with cascading deletes where appropriate
+1. **Plan-Centric Workflow**: Plans are the primary orchestration mechanism containing DAG definitions
+2. **Graph as Artifacts**: Graphs are generated outputs from plan execution, not source data
+3. **JSON-First Storage**: Complete graph objects stored as self-contained JSON structures
+4. **Immutable Execution**: Each plan node execution creates immutable graph snapshots
+5. **Simple Schema**: Minimal entities focused on core workflow (projects → plans → graphs)
+6. **Performance Optimization**: JSON storage with efficient indexing on plan relationships
 
 ### **Indexing Strategy**
 
 ```sql
 -- Core foreign key indexes (automatically created by SeaORM)
 CREATE INDEX idx_plans_project_id ON plans(project_id);
-CREATE INDEX idx_nodes_project_id ON nodes(project_id);
-CREATE INDEX idx_edges_project_id ON edges(project_id);
-CREATE INDEX idx_layers_project_id ON layers(project_id);
+CREATE INDEX idx_graphs_plan_id ON graphs(plan_id);
 
 -- Execution tracking indexes
 CREATE INDEX idx_plan_executions_plan_id ON plan_executions(plan_id);
 CREATE INDEX idx_plan_executions_status ON plan_executions(status);
-CREATE INDEX idx_execution_logs_execution_id ON execution_logs(execution_id);
-CREATE INDEX idx_execution_outputs_execution_id ON execution_outputs(execution_id);
+CREATE INDEX idx_execution_outputs_plan_id ON execution_outputs(plan_id);
 
--- Version control indexes
-CREATE INDEX idx_graph_versions_project_id ON graph_versions(project_id);
-CREATE INDEX idx_graph_versions_snapshot_id ON graph_versions(snapshot_id);
-CREATE INDEX idx_graph_versions_entity ON graph_versions(entity_type, entity_id);
+-- Graph lookup and inspection indexes
+CREATE INDEX idx_graphs_plan_node ON graphs(plan_id, plan_node_id);
+CREATE INDEX idx_execution_outputs_plan_node ON execution_outputs(plan_id, plan_node_id);
 
 -- Business identifier lookups
-CREATE UNIQUE INDEX idx_nodes_business_id ON nodes(project_id, node_id);
-CREATE UNIQUE INDEX idx_layers_business_id ON layers(project_id, layer_id);
 CREATE INDEX idx_execution_business_id ON plan_executions(execution_id);
+```
+
+### **Graph Data Structure**
+
+The `graph_data` JSON field in each graph record contains the complete Layercake graph structure:
+
+```json
+{
+  "nodes": [
+    {
+      "id": "node_1",
+      "label": "API Gateway",
+      "layer": "infrastructure",
+      "x": 100,
+      "y": 200,
+      "weight": 5,
+      "properties": {
+        "type": "service",
+        "status": "active"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_1",
+      "source": "node_1", 
+      "target": "node_2",
+      "label": "connects to",
+      "layer": "infrastructure",
+      "weight": 1,
+      "properties": {
+        "protocol": "https"
+      }
+    }
+  ],
+  "layers": [
+    {
+      "id": "infrastructure",
+      "name": "Infrastructure Layer",
+      "color": "#3b82f6",
+      "description": "Core infrastructure components",
+      "properties": {
+        "order": 1,
+        "visible": true
+      }
+    }
+  ]
+}
 ```
 
 ### **Data Migration and Compatibility**
@@ -1710,7 +1681,7 @@ CREATE INDEX idx_execution_business_id ON plan_executions(execution_id);
 - **YAML to JSON Migration**: Automatic conversion of legacy YAML plans to JSON format during import
 - **Schema Versioning**: `plan_schema_version` field tracks plan format evolution
 - **Backward Compatibility**: Support for multiple plan schema versions during transition
-- **Data Validation**: SeaORM model validation ensures data integrity across all entities
+- **JSON Validation**: Graph data structure validation ensures consistent node/edge/layer format
 
 ## Deployment Model
 
