@@ -1147,14 +1147,397 @@ Caching Strategy:
 }
 ```
 
+## Hierarchical Navigation and Graph Inspection
+
+### **Navigation Hierarchy**
+
+The system supports hierarchical navigation from project level down to individual graph inspection:
+
+```
+Project → Plan → Workflow (DAG) → Node Inspection → Graph Visualization
+```
+
+### **API Endpoint Structure**
+
+**Hierarchical REST Endpoints:**
+```
+GET /api/v1/project/{project_id}                                    # Project metadata
+GET /api/v1/project/{project_id}/plans                             # All plans in project
+GET /api/v1/project/{project_id}/plan/{plan_id}                    # Specific plan DAG
+GET /api/v1/project/{project_id}/plan/{plan_id}/executions         # Plan executions
+GET /api/v1/project/{project_id}/plan/{plan_id}/execution/{execution_id}  # Execution state
+GET /api/v1/project/{project_id}/plan/{plan_id}/node/{node_id}/graph      # Graph at node
+GET /api/v1/project/{project_id}/plan/{plan_id}/node/{node_id}/graph?execution={execution_id}  # Graph at node in execution
+```
+
+### **GraphQL Schema Extensions**
+
+```graphql
+type Project {
+  id: ID!
+  name: String!
+  description: String
+  plans: [Plan!]!
+  activeExecutions: [ExecutionState!]!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Plan {
+  id: ID!
+  project: Project!
+  name: String!
+  dag: ExecutionDAG!
+  executions: [ExecutionState!]!
+  # Get graph at any node in the DAG
+  graphAtNode(nodeId: ID!, executionId: ID): GraphObject
+  # Get all inspectable points in the plan
+  inspectionPoints(executionId: ID): [GraphInspectionPoint!]!
+}
+
+type ExecutionState {
+  id: ID!
+  plan: Plan!
+  status: ExecutionStatus!
+  graphObjects: [GraphObject!]!
+  nodeScopes: [GraphScope!]!
+  currentNode: ID
+  # Get all available graphs for inspection
+  inspectableGraphs: [GraphInspectionPoint!]!
+  # Navigation breadcrumbs
+  executionPath: [ExecutionPathNode!]!
+}
+
+type GraphInspectionPoint {
+  nodeId: ID!
+  nodeName: String!
+  nodeType: NodeType!
+  graphRef: ID!
+  graphObject: GraphObject!
+  renderContext: JSON!
+  canInspect: Boolean!
+  executionStatus: NodeExecutionStatus!
+  lastUpdated: DateTime
+}
+
+type ExecutionPathNode {
+  nodeId: ID!
+  nodeName: String!
+  status: NodeExecutionStatus!
+  startedAt: DateTime
+  completedAt: DateTime
+  graphRef: ID
+}
+
+enum NodeExecutionStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+```
+
+### **GraphQL Queries for Hierarchical Navigation**
+
+**Project Overview:**
+```graphql
+query GetProject($projectId: ID!) {
+  project(id: $projectId) {
+    id
+    name
+    description
+    plans {
+      id
+      name
+      dag {
+        nodes {
+          id
+          type
+          label
+        }
+      }
+      activeExecutions: executions(status: [RUNNING, PENDING]) {
+        id
+        status
+        currentNode
+        startedAt
+      }
+    }
+  }
+}
+```
+
+**Plan Workflow with Execution State:**
+```graphql
+query GetPlanWorkflow($projectId: ID!, $planId: ID!, $executionId: ID) {
+  project(id: $projectId) {
+    plan(id: $planId) {
+      id
+      name
+      dag {
+        nodes {
+          id
+          type
+          label
+          position
+          config
+        }
+        edges {
+          id
+          source
+          target
+          type
+        }
+      }
+      execution(id: $executionId) {
+        id
+        status
+        currentNode
+        executionPath {
+          nodeId
+          nodeName
+          status
+          startedAt
+          completedAt
+        }
+        inspectableGraphs {
+          nodeId
+          nodeName
+          nodeType
+          canInspect
+          graphRef
+          executionStatus
+          lastUpdated
+        }
+      }
+    }
+  }
+}
+```
+
+**Graph at Specific Node:**
+```graphql
+query GetGraphAtNode($projectId: ID!, $planId: ID!, $nodeId: ID!, $executionId: ID) {
+  project(id: $projectId) {
+    plan(id: $planId) {
+      graphAtNode(nodeId: $nodeId, executionId: $executionId) {
+        id
+        hash
+        createdByNode
+        parentGraph
+        nodes {
+          id
+          label
+          layer
+          x
+          y
+          weight
+          degree
+          inDegree
+          outDegree
+        }
+        edges {
+          id
+          source
+          target
+          weight
+          layer
+        }
+        layers {
+          id
+          name
+          color
+          description
+        }
+        metadata {
+          nodeCount
+          edgeCount
+          layerCount
+          transformation
+          createdAt
+        }
+      }
+      # Also get the render context for this node
+      execution(id: $executionId) {
+        nodeScopes(nodeId: $nodeId) {
+          renderContext
+        }
+      }
+    }
+  }
+}
+```
+
+### **URL Structure and Routing**
+
+**Frontend Routes:**
+```
+/projects                                        # Project list
+/projects/{project_id}                          # Project overview
+/projects/{project_id}/plans                    # Plan list
+/projects/{project_id}/plans/{plan_id}         # Plan DAG workflow
+/projects/{project_id}/plans/{plan_id}/nodes/{node_id}  # Graph at node
+/projects/{project_id}/plans/{plan_id}/executions/{execution_id}  # Live execution
+/projects/{project_id}/plans/{plan_id}/executions/{execution_id}/nodes/{node_id}  # Graph at node in execution
+```
+
+### **Component Architecture**
+
+**Navigation Hierarchy Components:**
+```typescript
+// Navigation hierarchy
+ProjectOverview -> PlanSelector -> WorkflowViewer -> GraphVisualization
+                                      ↓
+                                 NodeInspector -> GraphVisualization
+```
+
+**Updated GraphVisualization Props:**
+```typescript
+interface GraphVisualizationProps {
+  // Current props
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  layers: GraphLayer[];
+  
+  // New props for hierarchical context
+  context: 'project' | 'plan' | 'workflow' | 'node-inspection';
+  dataSource: {
+    type: 'rest' | 'graphql';
+    endpoint?: string;
+    query?: string;
+    variables?: Record<string, any>;
+  };
+  
+  // Navigation context
+  projectId: string;
+  planId?: string;
+  nodeId?: string;
+  executionId?: string;
+  
+  // Inspection capabilities
+  enableNodeInspection?: boolean;
+  onNodeInspect?: (nodeId: string) => void;
+  
+  // DAG-specific props
+  showExecutionPath?: boolean;
+  highlightActiveNodes?: boolean;
+  executionState?: ExecutionState;
+  
+  // Navigation callbacks
+  onNavigateToProject?: () => void;
+  onNavigateToPlan?: () => void;
+  onNavigateToNode?: (nodeId: string) => void;
+}
+```
+
+### **Graph Inspection Specifications**
+
+**Inspection Points Definition:**
+```
+1. Import Nodes: Always inspectable - show imported graph data
+2. Transform Nodes: Inspectable after execution - show transformed graph
+3. Export Nodes: Inspectable during/after execution - show final graph used for export
+4. Failed Nodes: Always inspectable - show input graph for debugging
+```
+
+**Inspection Capabilities:**
+```typescript
+interface GraphInspectionCapabilities {
+  // What can be inspected
+  canViewGraph: boolean;          // Graph visualization available
+  canViewMetadata: boolean;       // Graph metadata available
+  canViewRenderContext: boolean;  // Render context available
+  canViewTransformations: boolean; // Applied transformations
+  canViewErrors: boolean;         // Error information if failed
+  
+  // Interactive capabilities
+  canEditGraph: boolean;          // Graph data can be modified
+  canReExecute: boolean;          // Node can be re-executed
+  canExportGraph: boolean;        // Graph can be exported separately
+  
+  // Data availability
+  graphDataSize: number;          // Size of graph data
+  lastUpdated: DateTime;          // When graph was last updated
+  cacheStatus: 'fresh' | 'stale' | 'loading';
+}
+```
+
+### **Live Execution Monitoring**
+
+**Real-time Updates:**
+```typescript
+// GraphQL Subscription for live execution updates
+subscription ExecutionUpdates($executionId: ID!) {
+  executionStateChanged(executionId: $executionId) {
+    id
+    status
+    currentNode
+    nodeScopes {
+      nodeId
+      graphRef
+      renderContext
+    }
+    errors {
+      nodeId
+      message
+      timestamp
+    }
+  }
+}
+```
+
+**Execution State Integration:**
+```typescript
+interface ExecutionAwareGraphVisualization {
+  // Show execution progress on DAG
+  showExecutionProgress: boolean;
+  
+  // Highlight current execution path
+  executionPath: string[];
+  currentNode?: string;
+  
+  // Node status overlay
+  nodeStatuses: Record<string, NodeExecutionStatus>;
+  
+  // Real-time graph updates
+  enableLiveUpdates: boolean;
+  updateInterval?: number;
+}
+```
+
+### **Data Flow Architecture**
+
+**Hierarchical Data Flow:**
+```
+1. ProjectOverview → GraphQL → Project + Plans metadata
+2. PlanSelector → GraphQL → Plan DAG structure
+3. WorkflowViewer → GraphQL → Execution state + inspectable graphs
+4. NodeInspector → GraphQL → Specific node graph + render context
+5. GraphVisualization → Render with full context
+```
+
+**Caching Strategy:**
+```
+- Project metadata: Cache for 5 minutes
+- Plan DAG structure: Cache for 1 hour (invalidate on plan changes)
+- Execution state: Cache for 10 seconds (real-time updates)
+- Graph objects: Cache by hash indefinitely (immutable)
+- Render context: Cache for 30 seconds (can change during execution)
+```
+
 ## Conclusion
 
-The flat DAG structure provides a robust foundation for complex graph transformation workflows with strong GraphQL integration. The JSON-first approach enables powerful querying, real-time collaboration, and visual editing. Key implementation priorities are:
+The flat DAG structure provides a robust foundation for complex graph transformation workflows with strong GraphQL integration. The JSON-first approach enables powerful querying, real-time collaboration, and visual editing. 
 
-1. **Core DAG engine** with execution path resolution
-2. **Render context flow** with conflict resolution 
-3. **GraphQL schema** with efficient querying
-4. **Visual editor** with ReactFlow integration
-5. **Parallel execution** with dependency management
+**Enhanced Key Implementation Priorities:**
 
-This design supports the evolution from simple linear pipelines to complex multi-branch workflows while maintaining strong typing and efficient data access patterns.
+1. **Core DAG engine** with execution path resolution and graph inspection
+2. **Hierarchical navigation** supporting project → plan → workflow → graph drilling
+3. **Render context flow** with conflict resolution 
+4. **GraphQL schema** with efficient querying and real-time subscriptions
+5. **Visual editor** with ReactFlow integration and execution monitoring
+6. **Parallel execution** with dependency management and live inspection
+7. **Graph inspection system** with multi-level drilling and real-time updates
+
+This design supports the evolution from simple linear pipelines to complex multi-branch workflows while maintaining strong typing, efficient data access patterns, and comprehensive graph inspection capabilities at every level of the execution hierarchy.
