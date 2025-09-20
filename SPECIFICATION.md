@@ -4,15 +4,20 @@
 
 The overall goal is to change this pipeline graph transformation and creation tool to an interactive application that can be used to create and edit a graph visually, spawn child graphs from a parent graph, with changes higher up in the hierarchy propagating downwards. Multiple instances of the layercake tool can run at the same time and synchronise changes in real time, updating the user interface in real time. A desktop instance can connect to a server instance (any instance to any instance).
 
+Building this as a distributed and collaborative graph editing platform is an explicit goal. Backwards compatibility with the existing software is not a priority.
+
+Agentic AI with tooling exposed via Model Context Protocol for agentic collaboration is a key goal.
+
 ### Layercake plans and graphs
 
  - All aspected of the layercake process from ingestion to transformation to renderings are stored as a DAG. This is the layercake plan. If an upstream node (e.g. representing ingestion of a CSV as a nodeset) changes, all downstream nodes are updated
  - Graph data can be imported from CSVs (the existing layercake source format), REST endpoints, SQL querie (react component name : PlanVisualEditor)
- - The layercake plan can be edited (visually using react-flow / xflow, component name PlanGraphEditor), with the inputs, graph hierarchy and exports of different graphs in the hierarchy all represented and editable from the same interface
+ - The layercake plan can be edited (visually using react-flow / xflow, component name PlanVisualEditor), with the inputs, graph hierarchy and exports of different graphs in the hierarchy all represented and editable from the same interface
  - Graphs can be edited using the spreadsheet editor component that has three tabs for nodes, edges, layers (react component name : GraphSpreadsheetEditor) OR using another instance of react-flow / xflow for graph editing (react component name : GraphVisualEditor)
  - Changes to Graphs are tracked and shared as CRDT objects and stored in a database table (Project -> Changes)
- - Each Project has a Plan DAG
- - Plans contains graph metadata and the relationships between graph copies. Plans do not contain actual graph data (e.g. nodes, edges), graph data is in the Graph table. Plan DAG steps can be (but are not limited to) nodes that are InputNode (from file, etc), MergeNode (from inputs and/or graphs, output graph), CopyNode (from graph, output graph), OutputNode (from graph, output rendertarget). The Plan DAG is generally editing in PlanVisualEditor, with popup items to edit node attributes (example: InputNode editor will have a selectable type for File that allows for selecting file location and data type (nodes, layers, edges)) and node metadata (example: node label)
+ - Each Project has a Plan DAG. The Plan DAG is a JSON object that is an attribute of the Project table
+ - Plans contains graph metadata and the relationships between graph copies. Plans do not contain actual graph data (e.g. nodes, edges), graph data is in the Graph table. Plan DAG steps can be (but are not limited to) nodes that are InputNode (from file, etc), MergeNode (from InputNode and/or GraphNode, output GraphNode), CopyNode (from GraphNode, output GraphNode), OutputNode (from GraphNode, output OutputNode (render target)), GraphNode (which are references and metadata for a graph instance), TransformNode (from graph, output graph) that contain the existing graph transformation options in the current YAML. The Plan DAG is generally editing in PlanVisualEditor, with popup items to edit node attributes (example: InputNode editor will have a selectable type for File that allows for selecting file location and data type (nodes, layers, edges)) and node metadata (example: node label)
+ - A key function is that edits to graphs (via GraphVisualEditor or GraphSpreadsheetEditor) are tracked and reproducible, so re-applying inputs and re-running the DAG, will re-run the edits (if they are still applicable, removing them from tracking otherwise)
 
 ```yaml
 plan:
@@ -68,6 +73,7 @@ plan:
   - axum for http server
   - tokio for async
   - for GraphQL : async-graphql with async-graphql-axum
+  - for MCP : https://github.com/michiel/axum-mcp
   - tower
   - for database management : sea-orm
   - for REST APIs (if present) utoipa with utoipa-swagger-ui
@@ -82,6 +88,7 @@ plan:
   - Visualisations with
     - https://github.com/vasturiano/3d-force-graph
     - https://github.com/markmanx/isoflow
+
 
 ## Code
 
@@ -99,15 +106,16 @@ plan:
 
 ## Requirements
 
-### Single binary
+### Artefacts
 
- - The entire project and all its functionality is distributed as a single binary.
- - The single binary will have different defaults depending on its use (desktop app, cli, deployed in container)
+ - The entire project (minus desktop) and all its functionality is distributed as a single binary
+ - The desktop binaries are built after the main standalone binary
+ - The binaries will have different defaults depending on its use (desktop app, cli, deployed in container)
 
 ### CLI usage
 
  - All main functionality is exposed via clap.rs commands and subcommands
- - There is a CLI command to self-update from github (layercake update)
+ - There is a CLI command to self-update from github (layercake update) - this uses the existing capability to do this
  - There is a CLI command to start a server (layercake serve) that starts the axum web server with GraphQL API and serves up the web frontend. the server has sane defaults, but has an option for running with a config file (layercake serve --config=config.yaml)
 
 ### Desktop usage
@@ -136,5 +144,16 @@ plan:
  - In server mode layercake can run as a multi-user system, with Users belonging to Groups. All Projects belong to a Group, with Users being able to access all resources in the Group scope (Projects, Graphs, Users, etc). An RBAC system will be implemented later that will limit what Users can do (e.g. only 'admin' role can change other users)
  - In server mode, authentication to a Group can be configured for federation to e.g. a Google organization, a Keycloak realm, etc using appropriate protocols
 
+### Agentic AI
+
+ - All functionality must be exposed as tools via MCP. An agent must be able to access all functionality available to a human user
+ - In single user mode via stdio MCP does not use authentication
+ - In single user mode via http (streamable) MCP does not use authentication during development, but this will be the default for production
+ - The first agent integrations will be using Claude Code and Claude Desktop
+
 ### Exports
+
+ - Existing mermaid, plantuml, gml, json, etc targets will remain. They will be configurable OutputNodes from a GraphNode
+ - An OutputNode will have existing RenderOptions editable in its node popup editor
+ - Interactive visualisations (e.g. Isoflow and force 3d graph) will be available as stubs for now, not active
 

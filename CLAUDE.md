@@ -3,6 +3,7 @@
 ## Instructions
 
 - docs/ARCHITECTURE.md contains the architecture, TODO.md contains the roadmap and priorities
+- adr/ directory contains architecture decision records
 - After all changes, ensure that the code compiles without errors and that all tests pass
 - There are cargo tools available for analysis, testing, coverage reporting, dependency review, etc. use them as required and request installation of tools if they are not available
 - The target platforms are Linux, macOS, and Windows. Ensure that the code is cross-platform compatible. Uses hybrid TLS: rustls for HTTP client operations, OpenSSL limited to git2 for HTTPS Git repository access
