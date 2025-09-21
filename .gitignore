@@ -3,3 +3,11 @@ out/
 .DS_Store
 *.db
 tmp/
+
+# Development logs
+backend.log
+frontend.log
+
+# Development environment files
+frontend/.env.development.local
+frontend/.env.local
