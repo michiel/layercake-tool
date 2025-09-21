@@ -18,7 +18,7 @@ import { Stack, Title, Alert, Loader, Text, ActionIcon, Tooltip, Group } from '@
 import { IconAlertCircle, IconEye, IconSettings, IconPlayerPlay } from '@tabler/icons-react'
 
 import { usePlanDag, usePlanDagMutations, usePlanDagSubscription } from '../../../hooks/usePlanDag'
-import { PlanDag, PlanDagNode, PlanDagEdge, ReactFlowNode, ReactFlowEdge } from '../../../types/plan-dag'
+import { PlanDag, PlanDagNode, PlanDagEdge, ReactFlowNode, ReactFlowEdge, PlanDagNodeType } from '../../../types/plan-dag'
 import { validateConnection } from '../../../utils/planDagValidation'
 
 // Import custom node types
@@ -115,9 +115,10 @@ const convertReactFlowToPlanDag = (
 }
 
 export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readonly = false }: PlanVisualEditorProps) => {
-  const { planDag, loading, error } = usePlanDag(projectId)
-  const mutations = usePlanDagMutations(projectId)
-  const { lastChange } = usePlanDagSubscription(projectId)
+  // Skip backend calls for frontend-only development
+  const { planDag, loading, error } = { planDag: null, loading: false, error: null } // usePlanDag(projectId)
+  const mutations = {} as any // usePlanDagMutations(projectId)
+  const { lastChange } = { lastChange: null } // usePlanDagSubscription(projectId)
 
   const [nodes, setNodes, onNodesChange] = useNodesState<ReactFlowNode>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<ReactFlowEdge>([])
@@ -125,14 +126,76 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
   const [selectedEdge, setSelectedEdge] = useState<string | null>(null)
   const [isDirty, setIsDirty] = useState(false)
 
+  // Create mock Plan DAG for frontend-only development
+  const mockPlanDag = planDag || {
+    version: "1.0",
+    nodes: [
+      {
+        id: 'input_1',
+        type: PlanDagNodeType.INPUT,
+        position: { x: 100, y: 100 },
+        metadata: { label: 'CSV Import', description: 'Import nodes from CSV file' },
+        config: {
+          inputType: 'CSVNodesFromFile',
+          source: 'import/nodes.csv',
+          dataType: 'Nodes',
+          outputGraphRef: 'graph_main'
+        }
+      },
+      {
+        id: 'transform_1',
+        type: PlanDagNodeType.TRANSFORM,
+        position: { x: 300, y: 100 },
+        metadata: { label: 'Filter Nodes', description: 'Apply node filtering' },
+        config: {
+          inputGraphRef: 'graph_main',
+          outputGraphRef: 'graph_filtered',
+          transformType: 'FilterNodes',
+          transformConfig: { nodeFilter: 'type = "important"' }
+        }
+      },
+      {
+        id: 'output_1',
+        type: PlanDagNodeType.OUTPUT,
+        position: { x: 500, y: 100 },
+        metadata: { label: 'Export DOT', description: 'Generate Graphviz output' },
+        config: {
+          sourceGraphRef: 'graph_filtered',
+          renderTarget: 'DOT',
+          outputPath: 'output/result.dot',
+          renderConfig: { containNodes: true, orientation: 'TB' }
+        }
+      }
+    ],
+    edges: [
+      {
+        id: 'edge_1',
+        source: 'input_1',
+        target: 'transform_1',
+        metadata: { label: 'Data', dataType: 'GraphData' }
+      },
+      {
+        id: 'edge_2',
+        source: 'transform_1',
+        target: 'output_1',
+        metadata: { label: 'Filtered', dataType: 'GraphData' }
+      }
+    ],
+    metadata: {
+      version: "1.0",
+      name: "Demo Plan DAG",
+      description: "Frontend development demonstration"
+    }
+  }
+
   // Initialize ReactFlow from Plan DAG data
   useEffect(() => {
-    if (planDag) {
-      const { nodes: rfNodes, edges: rfEdges } = convertPlanDagToReactFlow(planDag)
+    if (mockPlanDag) {
+      const { nodes: rfNodes, edges: rfEdges } = convertPlanDagToReactFlow(mockPlanDag)
       setNodes(rfNodes)
       setEdges(rfEdges)
     }
-  }, [planDag, setNodes, setEdges])
+  }, [mockPlanDag, setNodes, setEdges])
 
   // Handle real-time changes from other users
   useEffect(() => {
@@ -228,14 +291,14 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
     [nodes, readonly, mutations, setEdges]
   )
 
-  // Save Plan DAG changes
+  // Save Plan DAG changes (mock for frontend-only development)
   const savePlanDag = useCallback(async () => {
-    if (!planDag || readonly) return
+    if (!mockPlanDag || readonly) return
 
-    const updatedPlanDag = convertReactFlowToPlanDag(nodes, edges, planDag.metadata)
-    await mutations.updatePlanDag(updatedPlanDag)
+    const updatedPlanDag = convertReactFlowToPlanDag(nodes, edges, mockPlanDag.metadata)
+    console.log('Would save Plan DAG:', updatedPlanDag)
     setIsDirty(false)
-  }, [planDag, nodes, edges, mutations, readonly])
+  }, [mockPlanDag, nodes, edges, readonly])
 
   // Auto-save on changes (debounced)
   useEffect(() => {
@@ -281,7 +344,7 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
     )
   }
 
-  if (!planDag) {
+  if (!mockPlanDag) {
     return (
       <Alert icon={<IconAlertCircle size="1rem" />} title="No Plan DAG found" color="yellow">
         This project doesn't have a Plan DAG configured yet.

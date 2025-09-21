@@ -25,6 +25,7 @@ function App() {
   // Mock health check query - will be replaced with actual schema
   const { loading, error } = useQuery(HEALTH_CHECK, {
     errorPolicy: 'ignore', // Ignore errors for now since backend isn't ready
+    skip: true, // Skip the query entirely for frontend-only development
   })
 
   const renderCurrentView = () => {
