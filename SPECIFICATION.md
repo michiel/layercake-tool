@@ -76,7 +76,6 @@ plan:
   - for MCP : https://github.com/michiel/axum-mcp
   - tower
   - for database management : sea-orm
-  - for REST APIs (if present) utoipa with utoipa-swagger-ui
   - for logging and tracing : tracing, tracing-subscriber, tracing-tree
   - clap.rs for command line parameters and arguments
 - Frontend / Typescript
@@ -131,18 +130,31 @@ plan:
 
  - GraphQL and MCP (Model Context Protocol) tools share a common backend. GraphQL implementation and MCP implementation live in separate crates and hook into the axum server
  - The common backend can contain functionality that is only exposed via GraphQL OR MCP, it does not have to be both. The MCP API is expected to be richer and allow for deeper interactions
- 
+ - GraphQL subscriptions MUST be implemented for real-time collaboration, enabling multiple users to see changes instantly
+ - All communication between frontend and backend uses GraphQL only (no REST API)
+ - Offline operation support with operation queuing and automatic retry on reconnection
+
 ### Distributed synchronisation
 
  - TASK : research what a fast, efficient, mature, well-maintained CRDT library is and make a recommendation for a CRDT library
+ - All graph changes MUST be tracked as CRDT objects with vector clocks for causality tracking
+ - Changes are applied using operational transform to resolve conflicts automatically
  - Import objects can be synchronised by bulk copy and overwriting
  - Instances do not auto-discover. Currently only instances that have been configured to connect will synchronise, or single user instances that have authenticated to a multi-user instance
+ - Real-time synchronization between instances using GraphQL subscriptions
+ - Automatic conflict detection and resolution using CRDT merge semantics
+ - Change history tracking for reproducibility and rollback capability
 
 ### Authentication
 
  - In single user mode there is a default user with a profile that can be set up to authenticate against a remote instance of layercake server
  - In server mode layercake can run as a multi-user system, with Users belonging to Groups. All Projects belong to a Group, with Users being able to access all resources in the Group scope (Projects, Graphs, Users, etc). An RBAC system will be implemented later that will limit what Users can do (e.g. only 'admin' role can change other users)
  - In server mode, authentication to a Group can be configured for federation to e.g. a Google organization, a Keycloak realm, etc using appropriate protocols
+ - JWT-based authentication with refresh token support
+ - Session management with automatic token refresh
+ - GraphQL context includes authenticated user information for authorization
+ - Role-based access control (RBAC) with predefined roles: admin, editor, viewer
+ - Group-level permissions with inheritance to projects and graphs
 
 ### Agentic AI
 
@@ -156,4 +168,93 @@ plan:
  - Existing mermaid, plantuml, gml, json, etc targets will remain. They will be configurable OutputNodes from a GraphNode
  - An OutputNode will have existing RenderOptions editable in its node popup editor
  - Interactive visualisations (e.g. Isoflow and force 3d graph) will be available as stubs for now, not active
+
+## Performance and Scalability Requirements
+
+### Real-time Collaboration Performance
+ - GraphQL subscriptions must handle up to 100 concurrent users per project
+ - Change propagation latency must be under 200ms for local networks
+ - CRDT operations must complete within 50ms for typical graph sizes (1000 nodes)
+ - Memory usage must remain under 1GB for projects with up to 10,000 nodes
+
+### Database Performance
+ - SQLite must handle up to 1M graph nodes with sub-second query times
+ - PostgreSQL support for enterprise deployments with larger datasets
+ - Database migrations must be versioned and automatically applied
+ - Connection pooling for multi-user deployments
+
+### Frontend Performance
+ - Initial application load time under 3 seconds
+ - Graph rendering performance: 60fps for graphs up to 1000 nodes
+ - React component optimization with memo and useMemo for large graphs
+ - Virtual scrolling for large node/edge lists in spreadsheet view
+
+## Advanced Features and Extensions
+
+### Enhanced Real-time Collaboration
+ - Presence indicators showing active users and their cursor positions
+ - Collaborative cursors in visual editors (PlanVisualEditor, GraphVisualEditor)
+ - Real-time typing indicators in text fields
+ - Conflict-free collaborative editing using operational transform
+ - Undo/redo functionality that works across collaborative sessions
+
+### Data Import and Integration
+ - Support for additional data sources: JSON, XML, SQL databases, REST APIs
+ - Scheduled data imports with change detection
+ - Data validation and transformation pipelines
+ - Import preview and rollback functionality
+ - Bulk import operations with progress tracking
+
+### Advanced Visualization
+ - 3D graph visualization using three.js and 3d-force-graph
+ - Isoflow diagram generation for system architecture views
+ - Custom layout algorithms for different graph types
+ - Interactive filtering and search within visualizations
+ - Export visualizations as SVG, PNG, PDF formats
+
+### Developer Experience
+ - Hot reload for development environments
+ - Comprehensive logging with structured output (JSON) for production
+ - Metrics collection for performance monitoring
+ - Error tracking and crash reporting
+ - API documentation auto-generation from GraphQL schema
+
+## Security Requirements
+
+### Data Protection
+ - Encryption at rest for sensitive graph data
+ - Encryption in transit for all API communications (TLS 1.3)
+ - Input validation and sanitization for all user inputs
+ - Protection against GraphQL query complexity attacks
+ - Rate limiting for API endpoints
+
+### Access Control
+ - Multi-factor authentication support
+ - Session timeout and concurrent session limits
+ - Audit logging for all data modifications
+ - IP allowlisting for enterprise deployments
+ - Data export restrictions based on user roles
+
+## Deployment and Operations
+
+### Container Support
+ - Docker containerization with multi-stage builds
+ - Kubernetes deployment manifests
+ - Environment-specific configuration management
+ - Health check endpoints for load balancers
+ - Graceful shutdown handling
+
+### Monitoring and Observability
+ - Prometheus metrics export
+ - Distributed tracing with OpenTelemetry
+ - Structured logging compatible with ELK stack
+ - Application performance monitoring (APM) integration
+ - Database query performance monitoring
+
+### Backup and Recovery
+ - Automated database backups with retention policies
+ - Point-in-time recovery capabilities
+ - Disaster recovery procedures documentation
+ - Data migration tools between different storage backends
+ - Configuration backup and restore functionality
 
