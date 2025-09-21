@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
 import ReactFlow, {
   Background,
   Controls,
@@ -47,6 +47,68 @@ const nodeTypes = {
   MergeNode,
   CopyNode,
   OutputNode,
+}
+
+// Static mock Plan DAG for frontend-only development - prevents recreation issues
+const staticMockPlanDag: PlanDag = {
+  version: "1.0",
+  nodes: [
+    {
+      id: 'input_1',
+      type: PlanDagNodeType.INPUT,
+      position: { x: 100, y: 100 },
+      metadata: { label: 'CSV Import', description: 'Import nodes from CSV file' },
+      config: {
+        inputType: 'CSVNodesFromFile',
+        source: 'import/nodes.csv',
+        dataType: 'Nodes',
+        outputGraphRef: 'graph_main'
+      }
+    },
+    {
+      id: 'transform_1',
+      type: PlanDagNodeType.TRANSFORM,
+      position: { x: 300, y: 100 },
+      metadata: { label: 'Filter Nodes', description: 'Apply node filtering' },
+      config: {
+        inputGraphRef: 'graph_main',
+        outputGraphRef: 'graph_filtered',
+        transformType: 'FilterNodes',
+        transformConfig: { nodeFilter: 'type = "important"' }
+      }
+    },
+    {
+      id: 'output_1',
+      type: PlanDagNodeType.OUTPUT,
+      position: { x: 500, y: 100 },
+      metadata: { label: 'Export DOT', description: 'Generate Graphviz output' },
+      config: {
+        sourceGraphRef: 'graph_filtered',
+        renderTarget: 'DOT',
+        outputPath: 'output/result.dot',
+        renderConfig: { containNodes: true, orientation: 'TB' }
+      }
+    }
+  ],
+  edges: [
+    {
+      id: 'edge_1',
+      source: 'input_1',
+      target: 'transform_1',
+      metadata: { label: 'Data', dataType: 'GraphData' }
+    },
+    {
+      id: 'edge_2',
+      source: 'transform_1',
+      target: 'output_1',
+      metadata: { label: 'Filtered', dataType: 'GraphData' }
+    }
+  ],
+  metadata: {
+    version: "1.0",
+    name: "Demo Plan DAG",
+    description: "Frontend development demonstration"
+  }
 }
 
 // Convert Plan DAG to ReactFlow format
@@ -115,90 +177,27 @@ const convertReactFlowToPlanDag = (
 }
 
 export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readonly = false }: PlanVisualEditorProps) => {
-  // Memoize nodeTypes to prevent recreation warnings
-  const memoizedNodeTypes = useMemo(() => nodeTypes, [])
 
   // Skip backend calls for frontend-only development
   const { planDag, loading, error } = { planDag: null, loading: false, error: null } // usePlanDag(projectId)
   const mutations = {} as any // usePlanDagMutations(projectId)
   const { lastChange } = { lastChange: null } // usePlanDagSubscription(projectId)
 
-  const [nodes, setNodes, onNodesChange] = useNodesState<ReactFlowNode>([])
-  const [edges, setEdges, onEdgesChange] = useEdgesState<ReactFlowEdge>([])
   const [selectedNode, setSelectedNode] = useState<string | null>(null)
   const [selectedEdge, setSelectedEdge] = useState<string | null>(null)
   const [isDirty, setIsDirty] = useState(false)
+  const initializedRef = useRef(false)
 
-  // Create mock Plan DAG for frontend-only development - memoized to prevent recreations
-  const mockPlanDag = useMemo(() => planDag || {
-    version: "1.0",
-    nodes: [
-      {
-        id: 'input_1',
-        type: PlanDagNodeType.INPUT,
-        position: { x: 100, y: 100 },
-        metadata: { label: 'CSV Import', description: 'Import nodes from CSV file' },
-        config: {
-          inputType: 'CSVNodesFromFile',
-          source: 'import/nodes.csv',
-          dataType: 'Nodes',
-          outputGraphRef: 'graph_main'
-        }
-      },
-      {
-        id: 'transform_1',
-        type: PlanDagNodeType.TRANSFORM,
-        position: { x: 300, y: 100 },
-        metadata: { label: 'Filter Nodes', description: 'Apply node filtering' },
-        config: {
-          inputGraphRef: 'graph_main',
-          outputGraphRef: 'graph_filtered',
-          transformType: 'FilterNodes',
-          transformConfig: { nodeFilter: 'type = "important"' }
-        }
-      },
-      {
-        id: 'output_1',
-        type: PlanDagNodeType.OUTPUT,
-        position: { x: 500, y: 100 },
-        metadata: { label: 'Export DOT', description: 'Generate Graphviz output' },
-        config: {
-          sourceGraphRef: 'graph_filtered',
-          renderTarget: 'DOT',
-          outputPath: 'output/result.dot',
-          renderConfig: { containNodes: true, orientation: 'TB' }
-        }
-      }
-    ],
-    edges: [
-      {
-        id: 'edge_1',
-        source: 'input_1',
-        target: 'transform_1',
-        metadata: { label: 'Data', dataType: 'GraphData' }
-      },
-      {
-        id: 'edge_2',
-        source: 'transform_1',
-        target: 'output_1',
-        metadata: { label: 'Filtered', dataType: 'GraphData' }
-      }
-    ],
-    metadata: {
-      version: "1.0",
-      name: "Demo Plan DAG",
-      description: "Frontend development demonstration"
-    }
-  }, [planDag])
+  // Use static mock Plan DAG for frontend-only development
+  const mockPlanDag = planDag || staticMockPlanDag
 
-  // Initialize ReactFlow from Plan DAG data
-  useEffect(() => {
-    if (mockPlanDag) {
-      const { nodes: rfNodes, edges: rfEdges } = convertPlanDagToReactFlow(mockPlanDag)
-      setNodes(rfNodes)
-      setEdges(rfEdges)
-    }
-  }, [mockPlanDag]) // Removed setNodes/setEdges from deps to prevent infinite loop
+  // Initialize ReactFlow data once from static mock data
+  const initialReactFlowData = useMemo(() => {
+    return convertPlanDagToReactFlow(staticMockPlanDag)
+  }, []) // No dependencies - always use static data
+
+  const [nodes, setNodes, onNodesChange] = useNodesState<ReactFlowNode>(initialReactFlowData.nodes)
+  const [edges, setEdges, onEdgesChange] = useEdgesState<ReactFlowEdge>(initialReactFlowData.edges)
 
   // Handle real-time changes from other users
   useEffect(() => {
@@ -390,7 +389,7 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
           onNodesChange={handleNodesChange}
           onEdgesChange={handleEdgesChange}
           onConnect={onConnect}
-          nodeTypes={memoizedNodeTypes}
+          nodeTypes={nodeTypes}
           connectionMode={ConnectionMode.Loose}
           fitView
           attributionPosition="top-right"
