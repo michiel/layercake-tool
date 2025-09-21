@@ -54,3 +54,20 @@ impl Related<super::layers::Entity> for Entity {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
+
+impl ActiveModel {
+    pub fn new() -> Self {
+        Self {
+            id: ActiveValue::NotSet,
+            name: ActiveValue::NotSet,
+            description: ActiveValue::NotSet,
+            created_at: Set(chrono::Utc::now()),
+            updated_at: Set(chrono::Utc::now()),
+        }
+    }
+
+    pub fn set_updated_at(mut self) -> Self {
+        self.updated_at = Set(chrono::Utc::now());
+        self
+    }
+}

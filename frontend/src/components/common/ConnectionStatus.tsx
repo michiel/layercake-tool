@@ -4,21 +4,22 @@ import { IconWifi, IconWifiOff, IconLoader } from '@tabler/icons-react'
 import { useQuery } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 
-// Mock health check - will be replaced with actual schema
+// Health check query to verify backend connectivity
 const HEALTH_CHECK = gql`
   query HealthCheck {
-    health {
-      status
+    projects {
+      id
+      name
     }
   }
 `
 
 export const ConnectionStatus: React.FC = () => {
-  // Disabled for frontend-only development
-  const { loading, error } = { loading: false, error: null } // useQuery(HEALTH_CHECK, {
-  //   pollInterval: 5000, // Poll every 5 seconds
-  //   errorPolicy: 'ignore', // Don't crash on connection errors
-  // })
+  // Health check query with polling to monitor backend connectivity
+  const { loading, error } = useQuery(HEALTH_CHECK, {
+    pollInterval: 5000, // Poll every 5 seconds
+    errorPolicy: 'all', // Show partial data even with errors
+  })
 
   const getStatusConfig = () => {
     if (loading) {

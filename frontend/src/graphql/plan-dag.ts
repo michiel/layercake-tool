@@ -3,41 +3,37 @@ import { gql } from '@apollo/client'
 // Plan DAG Queries
 export const GET_PLAN_DAG = gql`
   query GetPlanDag($projectId: Int!) {
-    project(id: $projectId) {
-      id
-      name
-      planDag {
-        version
-        nodes {
-          id
-          type
-          position {
-            x
-            y
-          }
-          metadata {
-            label
-            description
-          }
-          config
-        }
-        edges {
-          id
-          source
-          target
-          metadata {
-            label
-            dataType
-          }
+    getPlanDag(projectId: $projectId) {
+      version
+      nodes {
+        id
+        nodeType
+        position {
+          x
+          y
         }
         metadata {
-          version
-          name
+          label
           description
-          created
-          lastModified
-          author
         }
+        config
+      }
+      edges {
+        id
+        source
+        target
+        metadata {
+          label
+          dataType
+        }
+      }
+      metadata {
+        version
+        name
+        description
+        created
+        lastModified
+        author
       }
     }
   }
@@ -73,7 +69,7 @@ export const UPDATE_PLAN_DAG = gql`
         version
         nodes {
           id
-          type
+          nodeType
           position {
             x
             y
@@ -217,7 +213,7 @@ export const PLAN_DAG_CHANGED_SUBSCRIPTION = gql`
         ... on PlanDagNodeChange {
           node {
             id
-            type
+            nodeType
             position {
               x
               y

@@ -26,7 +26,7 @@ export const usePlanDag = (projectId: number) => {
     notifyOnNetworkStatusChange: true,
   })
 
-  const planDag = useMemo(() => data?.project?.planDag, [data])
+  const planDag = useMemo(() => data?.getPlanDag, [data])
 
   return {
     planDag,
@@ -64,11 +64,7 @@ export const usePlanDagMutations = (projectId: number) => {
           query: GET_PLAN_DAG,
           variables: { projectId },
           data: {
-            project: {
-              __typename: 'Project',
-              id: projectId,
-              planDag: data.updatePlanDag.planDag,
-            },
+            getPlanDag: data.updatePlanDag.planDag,
           },
         })
       }
@@ -94,17 +90,14 @@ export const usePlanDagMutations = (projectId: number) => {
           variables: { projectId },
         })
 
-        if (existing?.project?.planDag) {
+        if (existing?.getPlanDag) {
           cache.writeQuery({
             query: GET_PLAN_DAG,
             variables: { projectId },
             data: {
-              project: {
-                ...existing.project,
-                planDag: {
-                  ...existing.project.planDag,
-                  nodes: [...existing.project.planDag.nodes, data.addPlanDagNode.node],
-                },
+              getPlanDag: {
+                ...existing.getPlanDag,
+                nodes: [...existing.getPlanDag.nodes, data.addPlanDagNode.node],
               },
             },
           })
@@ -144,7 +137,7 @@ export const usePlanDagMutations = (projectId: number) => {
           variables: { projectId },
         })
 
-        if (existing?.project?.planDag) {
+        if (existing?.getPlanDag) {
           cache.writeQuery({
             query: GET_PLAN_DAG,
             variables: { projectId },
@@ -152,11 +145,11 @@ export const usePlanDagMutations = (projectId: number) => {
               project: {
                 ...existing.project,
                 planDag: {
-                  ...existing.project.planDag,
-                  nodes: existing.project.planDag.nodes.filter(
+                  ...existing.getPlanDag,
+                  nodes: existing.getPlanDag.nodes.filter(
                     (node: any) => node.id !== variables.nodeId
                   ),
-                  edges: existing.project.planDag.edges.filter(
+                  edges: existing.getPlanDag.edges.filter(
                     (edge: any) => edge.source !== variables.nodeId && edge.target !== variables.nodeId
                   ),
                 },
@@ -187,7 +180,7 @@ export const usePlanDagMutations = (projectId: number) => {
           variables: { projectId },
         })
 
-        if (existing?.project?.planDag) {
+        if (existing?.getPlanDag) {
           cache.writeQuery({
             query: GET_PLAN_DAG,
             variables: { projectId },
@@ -195,8 +188,8 @@ export const usePlanDagMutations = (projectId: number) => {
               project: {
                 ...existing.project,
                 planDag: {
-                  ...existing.project.planDag,
-                  edges: [...existing.project.planDag.edges, data.addPlanDagEdge.edge],
+                  ...existing.getPlanDag,
+                  edges: [...existing.getPlanDag.edges, data.addPlanDagEdge.edge],
                 },
               },
             },
@@ -222,7 +215,7 @@ export const usePlanDagMutations = (projectId: number) => {
           variables: { projectId },
         })
 
-        if (existing?.project?.planDag) {
+        if (existing?.getPlanDag) {
           cache.writeQuery({
             query: GET_PLAN_DAG,
             variables: { projectId },
@@ -230,8 +223,8 @@ export const usePlanDagMutations = (projectId: number) => {
               project: {
                 ...existing.project,
                 planDag: {
-                  ...existing.project.planDag,
-                  edges: existing.project.planDag.edges.filter(
+                  ...existing.getPlanDag,
+                  edges: existing.getPlanDag.edges.filter(
                     (edge: any) => edge.id !== variables.edgeId
                   ),
                 },

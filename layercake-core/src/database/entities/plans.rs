@@ -15,6 +15,7 @@ pub struct Model {
     pub yaml_content: String,
     pub dependencies: Option<String>, // JSON array of plan IDs
     pub status: PlanStatus,
+    pub plan_dag_json: Option<String>, // Plan DAG JSON representation
     pub created_at: ChronoDateTimeUtc,
     pub updated_at: ChronoDateTimeUtc,
 }
