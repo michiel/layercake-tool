@@ -1,0 +1,97 @@
+[package]
+name = "layercake-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "layercake"
+path = "src/lib.rs"
+
+[[bin]]
+name = "layercake"
+path = "src/main.rs"
+
+[features]
+default = ["server", "mcp"]
+cli = []
+server = [
+    "dep:axum",
+    "dep:tower",
+    "dep:tower-http",
+    "dep:sea-orm",
+    "dep:sea-orm-migration",
+    "dep:chrono",
+    "dep:uuid",
+    "dep:utoipa",
+    "dep:utoipa-swagger-ui",
+]
+graphql = [
+    "server",
+    "dep:async-graphql",
+    "dep:async-graphql-axum",
+]
+mcp = [
+    "server",
+    "dep:axum-mcp",
+    "dep:tokio-tungstenite",
+    "dep:futures-util",
+    "dep:url",
+]
+all-apis = ["server", "graphql", "mcp"]
+
+[dependencies]
+# Core dependencies
+serde_yaml = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing-tree = { workspace = true }
+include_dir = { workspace = true }
+clap = { workspace = true }
+anyhow = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+handlebars = { workspace = true }
+regex = { workspace = true }
+notify = { workspace = true }
+csv = { workspace = true }
+indexmap = { workspace = true }
+
+# Update command dependencies
+reqwest = { workspace = true }
+semver = { workspace = true }
+sha2 = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+colored = { workspace = true }
+tokio = { workspace = true }
+
+# Server dependencies (optional)
+axum = { workspace = true, optional = true }
+tower = { workspace = true, optional = true }
+tower-http = { workspace = true, optional = true }
+sea-orm = { workspace = true, optional = true }
+sea-orm-migration = { workspace = true, optional = true }
+chrono = { workspace = true, optional = true }
+uuid = { workspace = true, optional = true }
+utoipa = { workspace = true, optional = true }
+utoipa-swagger-ui = { workspace = true, optional = true }
+
+# GraphQL dependencies (optional)
+async-graphql = { workspace = true, optional = true }
+async-graphql-axum = { workspace = true, optional = true }
+
+# MCP dependencies (optional)
+axum-mcp = { workspace = true, optional = true }
+tokio-tungstenite = { workspace = true, optional = true }
+futures-util = { workspace = true, optional = true }
+url = { workspace = true, optional = true }
+
+[dev-dependencies]
+# Test dependencies for E2E tests
+tokio-test = "0.4"
+futures-util = { workspace = true }
+tokio-tungstenite = { workspace = true }

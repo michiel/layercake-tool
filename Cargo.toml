@@ -1,45 +1,18 @@
-[package]
-name = "layercake-tool"
+[workspace]
+members = [
+    "layercake-core",
+    "src-tauri",
+]
+resolver = "2"
+
+[workspace.package]
 version = "0.1.7"
 edition = "2021"
+authors = ["Layercake Contributors"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/michiel/layercake-tool"
 
-[lib]
-name = "layercake"
-path = "src/lib.rs"
-
-[[bin]]
-name = "layercake"
-path = "src/main.rs"
-
-[features]
-default = ["server", "mcp"]
-cli = []
-server = [
-    "dep:axum",
-    "dep:tower",
-    "dep:tower-http",
-    "dep:sea-orm",
-    "dep:sea-orm-migration",
-    "dep:chrono",
-    "dep:uuid",
-    "dep:utoipa",
-    "dep:utoipa-swagger-ui",
-]
-graphql = [
-    "server",
-    "dep:async-graphql",
-    "dep:async-graphql-axum",
-]
-mcp = [
-    "server",
-    "dep:axum-mcp",
-    "dep:tokio-tungstenite",
-    "dep:futures-util",
-    "dep:url",
-]
-all-apis = ["server", "graphql", "mcp"]
-
-[dependencies]
+[workspace.dependencies]
 # Core dependencies
 serde_yaml = "0.9"
 tracing = "0.1.41"
@@ -66,30 +39,28 @@ thiserror = "1.0"
 colored = "2.0"
 tokio = { version = "1.0", features = ["full"] }
 
-# Server dependencies (optional)
-axum = { version = "0.7.9", features = ["ws"], optional = true }
-tower = { version = "0.4", optional = true }
-tower-http = { version = "0.5", features = ["cors", "fs"], optional = true }
-sea-orm = { version = "0.12", features = ["sqlx-sqlite", "runtime-tokio-rustls", "macros"], optional = true }
-sea-orm-migration = { version = "0.12", optional = true }
-chrono = { version = "0.4", features = ["serde"], optional = true }
-uuid = { version = "1.0", features = ["v4"], optional = true }
-utoipa = { version = "4.0", features = ["axum_extras"], optional = true }
-utoipa-swagger-ui = { version = "6.0", features = ["axum"], optional = true }
+# Server dependencies
+axum = { version = "0.7.9", features = ["ws"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "fs"] }
+sea-orm = { version = "0.12", features = ["sqlx-sqlite", "runtime-tokio-rustls", "macros"] }
+sea-orm-migration = "0.12"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.0", features = ["v4"] }
+utoipa = { version = "4.0", features = ["axum_extras"] }
+utoipa-swagger-ui = { version = "6.0", features = ["axum"] }
 
-# GraphQL dependencies (optional)
-async-graphql = { version = "7.0", features = ["chrono", "uuid"], optional = true }
-async-graphql-axum = { version = "7.0", optional = true }
+# GraphQL dependencies
+async-graphql = { version = "7.0", features = ["chrono", "uuid"] }
+async-graphql-axum = "7.0"
 
-# MCP dependencies (optional)  
-axum-mcp = { path = "external-modules/axum-mcp", optional = true }
-tokio-tungstenite = { version = "0.21", features = ["rustls-tls-webpki-roots"], optional = true }
-futures-util = { version = "0.3", optional = true }
-url = { version = "2.0", optional = true }
-
-[dev-dependencies]
-# Test dependencies for E2E tests
-tokio-test = "0.4"
-futures-util = "0.3"
+# MCP dependencies
+axum-mcp = { path = "external-modules/axum-mcp" }
 tokio-tungstenite = { version = "0.21", features = ["rustls-tls-webpki-roots"] }
+futures-util = "0.3"
+url = "2.0"
+
+# Tauri dependencies
+tauri = { version = "2.0", features = [] }
+tauri-build = { version = "2.0", features = [] }
 
