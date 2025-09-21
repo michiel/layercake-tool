@@ -13,9 +13,9 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-BACKEND_PORT=8080
-FRONTEND_PORT=1420
-BACKEND_DIR="layercake-core"
+BACKEND_PORT=3001
+FRONTEND_PORT=1422
+BACKEND_DIR="."
 FRONTEND_DIR="frontend"
 LOG_LEVEL="${LOG_LEVEL:-info}"
 
@@ -91,18 +91,16 @@ print_status "Log level: $LOG_LEVEL"
 # Initialize database if it doesn't exist
 if [[ ! -f "layercake.db" ]]; then
     print_status "Initializing database..."
-    cd "$BACKEND_DIR"
-    cargo run -- db init
-    cd ..
+    cargo run --bin layercake -- db init
     print_success "Database initialized"
 fi
 
 # Start backend server
 print_status "Starting backend server..."
 cd "$BACKEND_DIR"
-cargo run -- serve --port $BACKEND_PORT --log-level $LOG_LEVEL --cors-origin "http://localhost:$FRONTEND_PORT" > ../backend.log 2>&1 &
+cargo run --bin layercake --features graphql -- serve --port $BACKEND_PORT --log-level $LOG_LEVEL --cors-origin "http://localhost:$FRONTEND_PORT" > backend.log 2>&1 &
 BACKEND_PID=$!
-cd ..
+cd .
 
 # Wait a moment for backend to start
 sleep 3
@@ -129,7 +127,7 @@ fi
 # Update environment file for backend connection
 echo "VITE_API_BASE_URL=http://localhost:$BACKEND_PORT" > .env.development.local
 
-npm run dev > ../frontend.log 2>&1 &
+npm run dev -- --port $FRONTEND_PORT > ../frontend.log 2>&1 &
 FRONTEND_PID=$!
 cd ..
 

@@ -9,7 +9,7 @@ import { createClient } from 'graphql-ws'
 
 // GraphQL endpoints - configurable for different environments
 const getGraphQLEndpoints = () => {
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'
 
   return {
     httpUrl: `${baseUrl}/graphql`,
