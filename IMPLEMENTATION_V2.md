@@ -2,9 +2,9 @@
 
 ## Executive Summary
 
-This implementation plan provides a **realistic and technically feasible** roadmap for transforming layercake into an interactive graph editing platform. Based on comprehensive analysis of the existing codebase, this approach builds incrementally on the robust foundation already in place (~70% complete) rather than attempting a complete rewrite.
+This implementation plan provides a **realistic and technically feasible** roadmap for transforming layercake into an interactive graph editing platform with **Plan DAG architecture**. Based on comprehensive analysis of the existing codebase, this approach builds incrementally on the robust foundation already in place (~70% complete) while implementing the critical Plan DAG with LayercakeGraph objects.
 
-**Key Strategic Decision**: Build visual editors over the existing YAML-based system, extending rather than replacing the proven architecture.
+**Key Strategic Decision**: Evolve from YAML plans to Plan DAG with LayercakeGraph objects, enabling graph projections via copy→transform→graph pipelines while maintaining backward compatibility.
 
 ### Current State Assessment
 
@@ -25,6 +25,7 @@ This implementation plan provides a **realistic and technically feasible** roadm
 - **MCP Tools**: 14 implemented tools across 4 categories
 - **Export Formats**: 8 different output formats supported
 - **CLI Commands**: 6 main commands with subcommands
+- **⚠️ CRITICAL EVOLUTION NEEDED**: Transform plans table from YAML storage to Plan DAG with LayercakeGraph objects
 
 ### Recommended Implementation Strategy
 
@@ -36,11 +37,12 @@ This implementation plan provides a **realistic and technically feasible** roadm
 
 ### System Design Principles
 
-1. **Incremental Enhancement**: Build on existing 70% complete foundation
-2. **Visual Layer Addition**: Add ReactFlow editors over current YAML system
-3. **Backward Compatibility**: Maintain all existing functionality
-4. **Modular Development**: Ship working features in 3-month cycles
-5. **Performance First**: Optimize for large graphs (10K+ nodes)
+1. **Plan DAG Evolution**: Transform YAML plans to Plan DAG with LayercakeGraph objects as first-class entities
+2. **Graph Projection Architecture**: Enable copy→transform→graph pipelines for graph variants
+3. **Separation of Concerns**: Plan DAG contains metadata; Graph table contains actual nodes/edges
+4. **Incremental Enhancement**: Build on existing 70% complete foundation
+5. **Backward Compatibility**: Maintain YAML import/export during transition
+6. **Performance First**: Optimize for large graphs (10K+ nodes) and complex DAGs
 
 ### High-Level Architecture
 
@@ -118,7 +120,7 @@ This implementation plan provides a **realistic and technically feasible** roadm
 
 ## Database Schema Extensions
 
-### Current Schema (Already Implemented)
+### Current Schema (Requires Evolution)
 
 ```sql
 -- ✅ EXISTING TABLES
@@ -130,11 +132,12 @@ CREATE TABLE projects (
     updated_at TIMESTAMP
 );
 
+-- 🚧 EXISTING - NEEDS EVOLUTION TO PLAN DAG
 CREATE TABLE plans (
     id INTEGER PRIMARY KEY,
     project_id INTEGER REFERENCES projects(id),
     name TEXT NOT NULL,
-    yaml_content TEXT NOT NULL,
+    yaml_content TEXT NOT NULL,  -- ⚠️ EVOLVE TO plan_dag_json
     dependencies TEXT, -- JSON array of plan IDs
     status TEXT,
     created_at TIMESTAMP,
@@ -170,7 +173,182 @@ CREATE TABLE layers (
 );
 ```
 
-### Phase 1 Extensions (Project Hierarchy)
+## 🚨 CRITICAL: Plan DAG Architecture
+
+### Plan DAG vs Current YAML System
+
+**Current System (YAML Plans)**:
+- Plans stored as YAML text in `plans.yaml_content`
+- Direct execution of YAML transformation steps
+- No graph object separation
+- Limited reusability and composition
+
+**Target System (Plan DAG)**:
+- Plans stored as JSON DAG in `projects.plan_dag_json`
+- LayercakeGraph objects as first-class DAG nodes
+- Copy→Transform→Graph pipelines for projections
+- Full separation: Plan DAG (metadata) + Graph table (data)
+
+### Plan DAG Node Types
+
+```rust
+// Plan DAG Node Architecture
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum PlanDagNode {
+    InputNode {
+        id: String,
+        label: String,
+        input_type: InputType,
+        config: InputConfig,
+        position: Position,
+    },
+    GraphNode {
+        id: String,
+        label: String,
+        graph_id: i32,  // References graphs table
+        metadata: GraphMetadata,
+        position: Position,
+    },
+    CopyNode {
+        id: String,
+        label: String,
+        source_graph_id: String,  // Source GraphNode ID
+        target_graph_id: String,  // Target GraphNode ID
+        copy_config: CopyConfig,
+        position: Position,
+    },
+    TransformNode {
+        id: String,
+        label: String,
+        source_graph_id: String,
+        target_graph_id: String,
+        transform_config: TransformConfig, // Existing YAML transform options
+        position: Position,
+    },
+    MergeNode {
+        id: String,
+        label: String,
+        source_graph_ids: Vec<String>,
+        target_graph_id: String,
+        merge_config: MergeConfig,
+        position: Position,
+    },
+    OutputNode {
+        id: String,
+        label: String,
+        source_graph_id: String,
+        export_format: String, // "GML", "PlantUML", etc.
+        export_config: ExportConfig,
+        filename: String,
+        position: Position,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum InputType {
+    CSVNodesFromFile { file_path: String },
+    CSVEdgesFromFile { file_path: String },
+    CSVLayersFromFile { file_path: String },
+    RestEndpoint { url: String, auth: Option<String> },
+    SqlQuery { connection: String, query: String },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlanDag {
+    pub nodes: Vec<PlanDagNode>,
+    pub edges: Vec<PlanDagEdge>,
+    pub metadata: PlanDagMetadata,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlanDagEdge {
+    pub id: String,
+    pub source: String,  // Source node ID
+    pub target: String,  // Target node ID
+    pub edge_type: PlanDagEdgeType,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum PlanDagEdgeType {
+    DataFlow,      // Data flows from source to target
+    Dependency,    // Target depends on source completion
+    Transformation, // Source transforms into target
+}
+```
+
+### LayercakeGraph Objects in Plan DAG
+
+```rust
+// LayercakeGraph represents graph instances within Plan DAG
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LayercakeGraph {
+    pub id: i32,
+    pub project_id: i32,
+    pub graph_name: String,
+    pub parent_graph_id: Option<i32>,  // For graph hierarchy
+    pub generation: i32,               // 0=root, 1=child, 2=grandchild
+    pub graph_type: LayercakeGraphType,
+    pub metadata: GraphMetadata,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum LayercakeGraphType {
+    Root,          // Original imported graph
+    Copy,          // Exact copy of another graph
+    Transform,     // Result of transformation
+    Merge,         // Result of merging multiple graphs
+    Scenario,      // User-created scenario/projection
+}
+
+// Example Plan DAG with LayercakeGraph projections:
+// InputNode(CSV) → GraphNode(graph1: "Current State")
+//                     ↓
+//                  CopyNode → GraphNode(graph2: "Scenario A")
+//                     ↓
+//                  TransformNode → GraphNode(graph3: "Scenario A Optimized")
+//                     ↓
+//                  OutputNode(PlantUML)
+```
+
+### Database Schema Evolution
+
+```sql
+-- 🚧 EVOLVE EXISTING PROJECTS TABLE
+ALTER TABLE projects ADD COLUMN plan_dag_json TEXT; -- JSON Plan DAG
+
+-- 🚧 NEW: LayercakeGraph instances (separate from Plan DAG)
+CREATE TABLE layercake_graphs (
+    id INTEGER PRIMARY KEY,
+    project_id INTEGER REFERENCES projects(id),
+    graph_name TEXT NOT NULL,
+    parent_graph_id INTEGER REFERENCES layercake_graphs(id),
+    generation INTEGER DEFAULT 0,
+    graph_type TEXT NOT NULL, -- 'root', 'copy', 'transform', 'merge', 'scenario'
+    metadata TEXT,            -- JSON metadata
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 🚧 EVOLVE: Link nodes/edges/layers to LayercakeGraph instances
+ALTER TABLE nodes ADD COLUMN layercake_graph_id INTEGER REFERENCES layercake_graphs(id);
+ALTER TABLE edges ADD COLUMN layercake_graph_id INTEGER REFERENCES layercake_graphs(id);
+ALTER TABLE layers ADD COLUMN layercake_graph_id INTEGER REFERENCES layercake_graphs(id);
+
+-- 🚧 NEW: Track edit operations for reproducibility
+CREATE TABLE graph_edit_operations (
+    id INTEGER PRIMARY KEY,
+    layercake_graph_id INTEGER REFERENCES layercake_graphs(id),
+    operation_type TEXT NOT NULL, -- 'create_node', 'update_node', 'delete_node', etc.
+    operation_data TEXT NOT NULL, -- JSON operation details
+    applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_reproducible BOOLEAN DEFAULT TRUE,
+    user_session_id TEXT
+);
+```
+
+### Phase 1 Extensions (Plan DAG Migration)
 
 ```sql
 -- 🚧 NEW COLUMNS TO ADD
@@ -263,103 +441,491 @@ frontend/
 - GraphQL queries/mutations work correctly
 - No breaking changes to existing backend
 
-#### Month 3-4: Plan Visual Editor
+#### Month 3-4: Plan DAG Visual Editor
 
-**ReactFlow Plan Editor Implementation**
+**ReactFlow Plan DAG Editor Implementation**
 ```typescript
-// PlanVisualEditor Component Architecture
-interface PlanNode {
+// Plan DAG Visual Editor Component Architecture
+interface PlanDagNode {
   id: string;
-  type: 'input' | 'transform' | 'output';
+  type: 'input' | 'graph' | 'copy' | 'transform' | 'merge' | 'output';
   position: { x: number; y: number };
   data: {
     label: string;
-    config: PlanNodeConfig;
+    config: PlanDagNodeConfig;
     status: 'pending' | 'running' | 'completed' | 'error';
+    // For GraphNodes: reference to LayercakeGraph
+    layercakeGraphId?: number;
+    graphMetadata?: GraphMetadata;
   };
 }
 
-interface PlanEdge {
+interface PlanDagEdge {
   id: string;
   source: string;
   target: string;
-  type: 'default' | 'dependency';
+  type: 'dataflow' | 'dependency' | 'transformation';
 }
 
-// Custom Node Types
-const nodeTypes = {
-  inputNode: InputNodeComponent,      // CSV files, REST endpoints, SQL
+// Custom Node Types for Plan DAG
+const planDagNodeTypes = {
+  inputNode: InputNodeComponent,        // CSV files, REST endpoints, SQL
+  graphNode: GraphNodeComponent,        // LayercakeGraph references
+  copyNode: CopyNodeComponent,          // Graph copying operations
   transformNode: TransformNodeComponent, // Graph transformations
-  outputNode: OutputNodeComponent,    // Export formats
-  graphNode: GraphNodeComponent,      // Graph references
+  mergeNode: MergeNodeComponent,        // Graph merging operations
+  outputNode: OutputNodeComponent,      // Export formats
+};
+
+// GraphNode component for LayercakeGraph objects
+const GraphNodeComponent: React.FC<NodeProps> = ({ data, id }) => {
+  const { layercakeGraphId, graphMetadata, label } = data;
+  const [graphStats, setGraphStats] = useState<GraphStats | null>(null);
+
+  // Load graph statistics
+  useEffect(() => {
+    if (layercakeGraphId) {
+      loadGraphStats(layercakeGraphId).then(setGraphStats);
+    }
+  }, [layercakeGraphId]);
+
+  const handleEditGraph = () => {
+    // Open GraphVisualEditor or GraphSpreadsheetEditor
+    openGraphEditor(layercakeGraphId);
+  };
+
+  return (
+    <div className="plan-dag-graph-node">
+      <Handle type="target" position={Position.Top} />
+
+      <div className="node-header">
+        <LayersIcon size={16} />
+        <span className="node-type">LayercakeGraph</span>
+      </div>
+
+      <div className="node-content">
+        <h4>{label}</h4>
+        {graphStats && (
+          <div className="graph-stats">
+            <span>{graphStats.nodeCount} nodes</span>
+            <span>{graphStats.edgeCount} edges</span>
+            <span>{graphStats.layerCount} layers</span>
+          </div>
+        )}
+        {graphMetadata?.parentGraphId && (
+          <div className="graph-hierarchy">
+            <span>Child of Graph {graphMetadata.parentGraphId}</span>
+          </div>
+        )}
+      </div>
+
+      <div className="node-actions">
+        <Button size="xs" onClick={handleEditGraph}>
+          Edit Graph
+        </Button>
+      </div>
+
+      <Handle type="source" position={Position.Bottom} />
+    </div>
+  );
+};
+
+// Copy→Transform→Graph Pipeline Example
+const createCopyTransformPipeline = async (
+  sourceGraphId: number,
+  transformConfig: TransformConfig
+) => {
+  // 1. Create target LayercakeGraph for copy
+  const copyGraph = await createLayercakeGraph({
+    projectId,
+    graphName: `${sourceGraph.name} - Copy`,
+    parentGraphId: sourceGraphId,
+    graphType: 'copy',
+  });
+
+  // 2. Create target LayercakeGraph for transform result
+  const transformGraph = await createLayercakeGraph({
+    projectId,
+    graphName: `${sourceGraph.name} - Transformed`,
+    parentGraphId: copyGraph.id,
+    graphType: 'transform',
+  });
+
+  // 3. Add Plan DAG nodes
+  const copyNode: PlanDagNode = {
+    id: generateId(),
+    type: 'copy',
+    position: { x: 200, y: 100 },
+    data: {
+      label: 'Copy Graph',
+      config: { sourceGraphId, targetGraphId: copyGraph.id },
+      status: 'pending',
+    },
+  };
+
+  const transformNode: PlanDagNode = {
+    id: generateId(),
+    type: 'transform',
+    position: { x: 400, y: 100 },
+    data: {
+      label: 'Transform Graph',
+      config: {
+        sourceGraphId: copyGraph.id,
+        targetGraphId: transformGraph.id,
+        transformConfig,
+      },
+      status: 'pending',
+    },
+  };
+
+  const graphNode: PlanDagNode = {
+    id: generateId(),
+    type: 'graph',
+    position: { x: 600, y: 100 },
+    data: {
+      label: transformGraph.graphName,
+      layercakeGraphId: transformGraph.id,
+      graphMetadata: {
+        parentGraphId: copyGraph.id,
+        generation: transformGraph.generation,
+      },
+      status: 'pending',
+    },
+  };
+
+  return [copyNode, transformNode, graphNode];
 };
 ```
 
-**YAML Integration**
+**Plan DAG JSON Integration**
 ```typescript
-// Real-time YAML synchronization
-const usePlanYAMLSync = (planId: string) => {
-  const [yamlContent, setYamlContent] = useState<string>('');
-  const [flowElements, setFlowElements] = useState<(PlanNode | PlanEdge)[]>([]);
+// Real-time Plan DAG JSON synchronization
+const usePlanDagSync = (projectId: string) => {
+  const [planDagJson, setPlanDagJson] = useState<string>('');
+  const [flowElements, setFlowElements] = useState<(PlanDagNode | PlanDagEdge)[]>([]);
+  const [layercakeGraphs, setLayercakeGraphs] = useState<LayercakeGraph[]>([]);
 
-  // Convert ReactFlow elements to YAML
-  const elementsToYAML = useCallback((elements: (PlanNode | PlanEdge)[]) => {
-    // Use existing plan.rs structures
-    return convertToYAML(elements);
+  // Convert ReactFlow elements to Plan DAG JSON
+  const elementsToPlanDag = useCallback((elements: (PlanDagNode | PlanDagEdge)[]) => {
+    const nodes = elements.filter(el => 'type' in el) as PlanDagNode[];
+    const edges = elements.filter(el => 'source' in el) as PlanDagEdge[];
+
+    const planDag: PlanDag = {
+      nodes: nodes.map(convertReactFlowNodeToPlanDagNode),
+      edges: edges.map(convertReactFlowEdgeToPlanDagEdge),
+      metadata: {
+        version: '1.0',
+        created_at: new Date().toISOString(),
+        layercake_graphs: layercakeGraphs,
+      },
+    };
+
+    return JSON.stringify(planDag, null, 2);
+  }, [layercakeGraphs]);
+
+  // Convert Plan DAG JSON to ReactFlow elements
+  const planDagToElements = useCallback((planDagJson: string) => {
+    const planDag: PlanDag = JSON.parse(planDagJson);
+
+    const nodes = planDag.nodes.map(convertPlanDagNodeToReactFlow);
+    const edges = planDag.edges.map(convertPlanDagEdgeToReactFlow);
+
+    setLayercakeGraphs(planDag.metadata.layercake_graphs || []);
+
+    return [...nodes, ...edges];
   }, []);
 
-  // Convert YAML to ReactFlow elements
-  const yamlToElements = useCallback((yaml: string) => {
-    // Parse using existing YAML structures
-    return parseYAMLToPlan(yaml);
+  // YAML backward compatibility export
+  const exportToYAML = useCallback((planDag: PlanDag) => {
+    // Convert Plan DAG to legacy YAML format for CLI compatibility
+    return convertPlanDagToYAML(planDag);
   }, []);
+
+  // YAML import with Plan DAG conversion
+  const importFromYAML = useCallback((yamlContent: string) => {
+    // Convert legacy YAML to Plan DAG structure
+    return convertYAMLToPlanDag(yamlContent);
+  }, []);
+};
+
+// LayercakeGraph management hooks
+const useLayercakeGraphs = (projectId: string) => {
+  const [graphs, setGraphs] = useState<LayercakeGraph[]>([]);
+
+  const createGraph = useCallback(async (config: CreateGraphConfig) => {
+    const newGraph = await graphService.createLayercakeGraph({
+      projectId,
+      ...config,
+    });
+    setGraphs(prev => [...prev, newGraph]);
+    return newGraph;
+  }, [projectId]);
+
+  const copyGraph = useCallback(async (sourceGraphId: number, targetName: string) => {
+    // 1. Create new LayercakeGraph instance
+    const targetGraph = await createGraph({
+      graphName: targetName,
+      parentGraphId: sourceGraphId,
+      graphType: 'copy',
+    });
+
+    // 2. Copy all nodes, edges, layers to new graph
+    await graphService.copyGraphData(sourceGraphId, targetGraph.id);
+
+    return targetGraph;
+  }, [createGraph]);
+
+  const transformGraph = useCallback(async (
+    sourceGraphId: number,
+    transformConfig: TransformConfig,
+    targetName: string
+  ) => {
+    // 1. Create new LayercakeGraph for transform result
+    const targetGraph = await createGraph({
+      graphName: targetName,
+      parentGraphId: sourceGraphId,
+      graphType: 'transform',
+    });
+
+    // 2. Apply transformation using existing transform engine
+    await graphService.applyTransformation(sourceGraphId, targetGraph.id, transformConfig);
+
+    return targetGraph;
+  }, [createGraph]);
+
+  return { graphs, createGraph, copyGraph, transformGraph };
 };
 ```
 
 **Key Deliverables**
-- ✅ Complete Plan Visual Editor with ReactFlow
-- ✅ All existing YAML plan features supported visually
-- ✅ Real-time YAML preview and synchronization
-- ✅ Drag-drop plan construction interface
-- ✅ Node configuration popup editors
+- ✅ Complete Plan DAG Visual Editor with ReactFlow
+- ✅ All 6 Plan DAG node types implemented (Input, Graph, Copy, Transform, Merge, Output)
+- ✅ LayercakeGraph objects as first-class DAG nodes
+- ✅ Copy→Transform→Graph pipeline creation
+- ✅ Plan DAG JSON storage with YAML backward compatibility
+- ✅ Node configuration popup editors for each node type
+- ✅ Graph hierarchy visualization within Plan DAG
 
 **Success Criteria**
-- Visual editor generates valid YAML plans
-- All existing plan execution functionality works
-- Plan editor responsive with complex plans (20+ nodes)
-- Visual editor integrates seamlessly with existing CLI
+- Plan DAG editor creates valid JSON DAG structures
+- LayercakeGraph objects properly reference graph data
+- Copy→Transform pipelines execute correctly
+- Plan DAG supports complex graphs (50+ nodes, 10+ LayercakeGraphs)
+- YAML export maintains CLI compatibility
+- Graph projections and scenarios work as designed
 
-### Phase 2: Graph Hierarchy & Collaboration (Months 5-8)
+### Phase 2: LayercakeGraph Implementation & Collaboration (Months 5-8)
 
-#### Month 5-6: Project Hierarchy Implementation
+#### Month 5-6: LayercakeGraph Service Implementation
 
-**Database Schema Extensions**
+**LayercakeGraph Backend Implementation**
 ```rust
-// Extended Project Entity
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
-#[sea_orm(table_name = "projects")]
-pub struct Model {
-    #[sea_orm(primary_key)]
-    pub id: i32,
-    pub name: String,
-    pub description: Option<String>,
-    pub parent_project_id: Option<i32>,  // 🚧 NEW
-    pub hierarchy_level: i32,            // 🚧 NEW
-    pub is_scenario: bool,               // 🚧 NEW
-    pub created_at: ChronoDateTimeUtc,
-    pub updated_at: ChronoDateTimeUtc,
+// LayercakeGraph service for managing graph instances
+pub struct LayercakeGraphService {
+    db: DatabaseConnection,
 }
 
-// New Relations
-impl Relation {
-    #[sea_orm(
-        belongs_to = "Entity",
-        from = "Column::ParentProjectId",
-        to = "Column::Id"
-    )]
-    ParentProject,
-    #[sea_orm(has_many = "Entity")]
-    ChildProjects,
+impl LayercakeGraphService {
+    pub async fn create_layercake_graph(&self, config: CreateGraphConfig) -> Result<LayercakeGraph> {
+        let graph = layercake_graphs::ActiveModel {
+            project_id: Set(config.project_id),
+            graph_name: Set(config.graph_name),
+            parent_graph_id: Set(config.parent_graph_id),
+            generation: Set(config.generation.unwrap_or(0)),
+            graph_type: Set(config.graph_type.to_string()),
+            metadata: Set(serde_json::to_string(&config.metadata)?),
+            ..Default::default()
+        };
+
+        let result = graph.insert(&self.db).await?;
+        Ok(result)
+    }
+
+    pub async fn copy_graph_data(&self, source_graph_id: i32, target_graph_id: i32) -> Result<()> {
+        // Copy nodes
+        let source_nodes = Node::find()
+            .filter(node::Column::LayercakeGraphId.eq(source_graph_id))
+            .all(&self.db)
+            .await?;
+
+        for node in source_nodes {
+            let new_node = node::ActiveModel {
+                id: NotSet,
+                layercake_graph_id: Set(target_graph_id),
+                project_id: Set(node.project_id),
+                node_id: Set(node.node_id),
+                label: Set(node.label),
+                layer_id: Set(node.layer_id),
+                properties: Set(node.properties),
+            };
+            new_node.insert(&self.db).await?;
+        }
+
+        // Copy edges
+        let source_edges = Edge::find()
+            .filter(edge::Column::LayercakeGraphId.eq(source_graph_id))
+            .all(&self.db)
+            .await?;
+
+        for edge in source_edges {
+            let new_edge = edge::ActiveModel {
+                id: NotSet,
+                layercake_graph_id: Set(target_graph_id),
+                project_id: Set(edge.project_id),
+                edge_id: Set(edge.edge_id),
+                source_node_id: Set(edge.source_node_id),
+                target_node_id: Set(edge.target_node_id),
+                label: Set(edge.label),
+                properties: Set(edge.properties),
+            };
+            new_edge.insert(&self.db).await?;
+        }
+
+        // Copy layers
+        let source_layers = Layer::find()
+            .filter(layer::Column::LayercakeGraphId.eq(source_graph_id))
+            .all(&self.db)
+            .await?;
+
+        for layer in source_layers {
+            let new_layer = layer::ActiveModel {
+                id: NotSet,
+                layercake_graph_id: Set(target_graph_id),
+                project_id: Set(layer.project_id),
+                layer_id: Set(layer.layer_id),
+                name: Set(layer.name),
+                color: Set(layer.color),
+                properties: Set(layer.properties),
+            };
+            new_layer.insert(&self.db).await?;
+        }
+
+        Ok(())
+    }
+
+    pub async fn apply_transformation(&self,
+        source_graph_id: i32,
+        target_graph_id: i32,
+        transform_config: TransformConfig
+    ) -> Result<()> {
+        // 1. First copy the source graph data
+        self.copy_graph_data(source_graph_id, target_graph_id).await?;
+
+        // 2. Apply transformation using existing transform engine
+        let transform_engine = TransformEngine::new(&self.db);
+        transform_engine.apply_to_graph(target_graph_id, transform_config).await?;
+
+        // 3. Record transformation operation for reproducibility
+        self.record_graph_operation(target_graph_id, GraphOperation::Transform {
+            source_graph_id,
+            transform_config: transform_config.clone(),
+        }).await?;
+
+        Ok(())
+    }
+
+    pub async fn get_graph_hierarchy(&self, root_graph_id: i32) -> Result<GraphHierarchy> {
+        // Build complete graph hierarchy tree
+        let mut hierarchy = GraphHierarchy::new();
+
+        fn collect_children(graph_id: i32, db: &DatabaseConnection) -> Vec<LayercakeGraph> {
+            LayercakeGraph::find()
+                .filter(layercake_graphs::Column::ParentGraphId.eq(graph_id))
+                .all(db)
+                .await
+                .unwrap_or_default()
+        }
+
+        hierarchy.build_tree(root_graph_id, &self.db).await?;
+        Ok(hierarchy)
+    }
+}
+```
+
+**Plan DAG Execution Engine**
+```rust
+// Plan DAG execution engine
+pub struct PlanDagExecutor {
+    db: DatabaseConnection,
+    graph_service: LayercakeGraphService,
+}
+
+impl PlanDagExecutor {
+    pub async fn execute_plan_dag(&self, project_id: i32) -> Result<ExecutionResult> {
+        // 1. Load Plan DAG from project
+        let project = Project::find_by_id(project_id)
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| anyhow!("Project not found"))?;
+
+        let plan_dag: PlanDag = serde_json::from_str(
+            &project.plan_dag_json.unwrap_or_default()
+        )?;
+
+        // 2. Topological sort of DAG nodes
+        let execution_order = self.topological_sort(&plan_dag)?;
+
+        // 3. Execute nodes in order
+        for node_id in execution_order {
+            let node = plan_dag.nodes.iter()
+                .find(|n| n.id() == node_id)
+                .ok_or_else(|| anyhow!("Node not found: {}", node_id))?;
+
+            self.execute_node(node, &plan_dag).await?;
+        }
+
+        Ok(ExecutionResult::Success)
+    }
+
+    async fn execute_node(&self, node: &PlanDagNode, plan_dag: &PlanDag) -> Result<()> {
+        match node {
+            PlanDagNode::InputNode { id, input_type, config, .. } => {
+                self.execute_input_node(id, input_type, config).await
+            },
+            PlanDagNode::CopyNode { source_graph_id, target_graph_id, .. } => {
+                let source_id = self.resolve_graph_node_id(source_graph_id, plan_dag)?;
+                let target_id = self.resolve_graph_node_id(target_graph_id, plan_dag)?;
+                self.graph_service.copy_graph_data(source_id, target_id).await
+            },
+            PlanDagNode::TransformNode { source_graph_id, target_graph_id, transform_config, .. } => {
+                let source_id = self.resolve_graph_node_id(source_graph_id, plan_dag)?;
+                let target_id = self.resolve_graph_node_id(target_graph_id, plan_dag)?;
+                self.graph_service.apply_transformation(source_id, target_id, transform_config.clone()).await
+            },
+            PlanDagNode::OutputNode { source_graph_id, export_format, export_config, filename, .. } => {
+                let graph_id = self.resolve_graph_node_id(source_graph_id, plan_dag)?;
+                self.execute_export(graph_id, export_format, export_config, filename).await
+            },
+            PlanDagNode::GraphNode { .. } => {
+                // GraphNodes are references, no execution needed
+                Ok(())
+            },
+            PlanDagNode::MergeNode { source_graph_ids, target_graph_id, merge_config, .. } => {
+                let source_ids: Result<Vec<i32>> = source_graph_ids.iter()
+                    .map(|id| self.resolve_graph_node_id(id, plan_dag))
+                    .collect();
+                let target_id = self.resolve_graph_node_id(target_graph_id, plan_dag)?;
+                self.execute_merge(source_ids?, target_id, merge_config).await
+            },
+        }
+    }
+
+    fn resolve_graph_node_id(&self, node_id: &str, plan_dag: &PlanDag) -> Result<i32> {
+        // Find GraphNode in Plan DAG and return its layercake_graph_id
+        plan_dag.nodes.iter()
+            .find_map(|node| {
+                if let PlanDagNode::GraphNode { id, graph_id, .. } = node {
+                    if id == node_id {
+                        Some(*graph_id)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            .ok_or_else(|| anyhow!("GraphNode not found: {}", node_id))
+    }
 }
 ```
 
@@ -417,17 +983,19 @@ type PropagationResult {
 ```
 
 **Key Deliverables**
-- ✅ Database schema supports project hierarchy
-- ✅ Project copying and scenario creation
-- ✅ Change propagation from parent to children
-- ✅ GraphQL API extended for hierarchy operations
-- ✅ Frontend hierarchy visualization
+- ✅ LayercakeGraph entity and service implementation
+- ✅ Graph copying and transformation pipelines
+- ✅ Plan DAG execution engine
+- ✅ Graph hierarchy management within Plan DAG
+- ✅ Edit operation tracking for reproducibility
+- ✅ GraphQL API for LayercakeGraph operations
 
 **Success Criteria**
-- Parent/child relationships work correctly
-- Scenario creation copies all graph data
-- Change propagation respects user preferences
-- Hierarchy visible and manageable in UI
+- LayercakeGraph instances properly separate from Plan DAG metadata
+- Copy→Transform→Graph pipelines execute correctly
+- Graph data copying preserves all nodes, edges, layers
+- Plan DAG execution follows topological order
+- Edit operations tracked for reproducibility
 
 #### Month 7-8: Graph Visual Editor
 
