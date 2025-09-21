@@ -180,8 +180,20 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
 
   // Skip backend calls for frontend-only development
   const { planDag, loading, error } = { planDag: null, loading: false, error: null } // usePlanDag(projectId)
-  const mutations = {} as any // usePlanDagMutations(projectId)
   const { lastChange } = { lastChange: null } // usePlanDagSubscription(projectId)
+
+  // Mock mutations for frontend-only development
+  const mutations = {
+    moveNode: (nodeId: string, position: { x: number; y: number }) => {
+      console.log('Mock moveNode:', nodeId, position)
+    },
+    addEdge: (edge: any) => {
+      console.log('Mock addEdge:', edge)
+    },
+    deleteEdge: (edgeId: string) => {
+      console.log('Mock deleteEdge:', edgeId)
+    }
+  }
 
   const [selectedNode, setSelectedNode] = useState<string | null>(null)
   const [selectedEdge, setSelectedEdge] = useState<string | null>(null)
