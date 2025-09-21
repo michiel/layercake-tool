@@ -22,7 +22,7 @@ const { httpUrl, wsUrl } = getGraphQLEndpoints()
 // HTTP Link for queries and mutations
 const httpLink = createHttpLink({
   uri: httpUrl,
-  credentials: 'include', // Include cookies for authentication
+  credentials: 'omit', // Don't include credentials for cross-origin development
 })
 
 // WebSocket Link for subscriptions (real-time collaboration)
@@ -30,9 +30,8 @@ const wsLink = new GraphQLWsLink(
   createClient({
     url: wsUrl,
     connectionParams: () => {
-      // Add authentication token if available
-      const token = localStorage.getItem('auth_token')
-      return token ? { authorization: `Bearer ${token}` } : {}
+      // No authentication in development mode
+      return {}
     },
     shouldRetry: () => {
       // Retry connection on network errors
@@ -56,12 +55,10 @@ const errorLink = onError((errorResponse) => {
   if (networkError) {
     console.error(`[Network error]: ${networkError}`)
 
-    // Handle authentication errors
-    if ('statusCode' in networkError && (networkError as any).statusCode === 401) {
-      // Clear auth token and redirect to login
-      localStorage.removeItem('auth_token')
-      // Could dispatch a logout action here
-    }
+    // Handle authentication errors (disabled in development)
+    // if ('statusCode' in networkError && (networkError as any).statusCode === 401) {
+    //   localStorage.removeItem('auth_token')
+    // }
   }
 })
 
