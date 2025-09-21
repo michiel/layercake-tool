@@ -192,75 +192,160 @@ CREATE TABLE layers (
 ### Plan DAG Node Types
 
 ```rust
-// Improved Plan DAG Node Architecture
+// Improved Plan DAG Node Architecture - Consistent and Clear Design
+// All nodes share common fields: id, label, position, metadata
+// Each node type has specific configuration in the config field
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlanDagNodeBase {
+    pub id: String,
+    pub label: String,
+    pub position: Position,
+    pub metadata: NodeMetadata,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NodeMetadata {
+    pub description: Option<String>,
+    pub tags: Vec<String>,
+    pub ui_state: UIState, // Collapsed, expanded, selected, etc.
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PlanDagNode {
-    InputNode {
-        id: String,
-        label: String,
-        input_type: InputType,
-        config: InputConfig,
-        position: Position,
+    /// InputNode: Loads data from external sources into the pipeline
+    /// Produces: GraphData for downstream consumption
+    Input {
+        #[serde(flatten)]
+        base: PlanDagNodeBase,
+        config: InputNodeConfig,
     },
 
-    // GraphNode represents a persisted LayercakeGraph (storage)
-    GraphNode {
-        id: String,
-        label: String,
-        layercake_graph_id: Option<i32>, // None until graph is created/persisted
-        graph_metadata: GraphMetadata,
-        position: Position,
+    /// StorageNode: Persists graph data as a LayercakeGraph entity
+    /// Consumes: GraphData from upstream nodes
+    /// Produces: Reference to persisted LayercakeGraph
+    Storage {
+        #[serde(flatten)]
+        base: PlanDagNodeBase,
+        config: StorageNodeConfig,
+        layercake_graph_id: Option<i32>, // None until graph is persisted
     },
 
-    // CopyNode creates a copy operation (data flows through, no persistence)
-    CopyNode {
-        id: String,
-        label: String,
-        copy_config: CopyConfig,
-        position: Position,
-        // Input: Graph data from connection
-        // Output: Copied graph data (flows to next node)
+    /// ProcessNode: Applies operations to flowing data without persistence
+    /// Consumes: GraphData from upstream nodes
+    /// Produces: Modified GraphData for downstream consumption
+    Process {
+        #[serde(flatten)]
+        base: PlanDagNodeBase,
+        config: ProcessNodeConfig,
     },
 
-    // TransformNode applies transformations to flowing data
-    TransformNode {
-        id: String,
-        label: String,
-        transform_config: TransformConfig, // Existing YAML transform options
-        position: Position,
-        // Input: Graph data from CopyNode or another TransformNode
-        // Output: Transformed graph data (flows to next node)
-    },
-
-    // MergeNode combines multiple graph data streams
-    MergeNode {
-        id: String,
-        label: String,
-        merge_config: MergeConfig,
-        position: Position,
-        // Input: Multiple graph data streams
-        // Output: Merged graph data (flows to next node)
-    },
-
-    // OutputNode exports from a persisted GraphNode
-    OutputNode {
-        id: String,
-        label: String,
-        export_format: String, // "GML", "PlantUML", etc.
-        export_config: ExportConfig,
-        filename: String,
-        position: Position,
-        // Input: Must connect to GraphNode (references persisted graph)
+    /// OutputNode: Exports data to external formats/destinations
+    /// Consumes: GraphData or references to LayercakeGraph
+    /// Produces: External files/data
+    Output {
+        #[serde(flatten)]
+        base: PlanDagNodeBase,
+        config: OutputNodeConfig,
     },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum InputType {
-    CSVNodesFromFile { file_path: String },
-    CSVEdgesFromFile { file_path: String },
-    CSVLayersFromFile { file_path: String },
-    RestEndpoint { url: String, auth: Option<String> },
-    SqlQuery { connection: String, query: String },
+pub struct InputNodeConfig {
+    pub source_type: InputSourceType,
+    pub validation_rules: Vec<ValidationRule>,
+    pub import_options: ImportOptions,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StorageNodeConfig {
+    pub graph_name: String,
+    pub graph_type: LayercakeGraphType,
+    pub parent_graph_id: Option<i32>,
+    pub auto_persist: bool, // Whether to persist immediately or wait for explicit trigger
+    pub retention_policy: RetentionPolicy,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProcessNodeConfig {
+    pub operation_type: ProcessOperationType,
+    pub parameters: serde_json::Value, // Operation-specific parameters
+    pub error_handling: ErrorHandlingStrategy,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OutputNodeConfig {
+    pub export_format: ExportFormat,
+    pub destination: ExportDestination,
+    pub template_options: Option<TemplateOptions>,
+    pub post_processing: Vec<PostProcessStep>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ProcessOperationType {
+    Copy {
+        deep_copy: bool,
+        filter_criteria: Option<FilterCriteria>,
+    },
+    Transform {
+        transformations: Vec<TransformationRule>,
+        preserve_original: bool,
+    },
+    Merge {
+        merge_strategy: MergeStrategy,
+        conflict_resolution: ConflictResolution,
+    },
+    Filter {
+        criteria: FilterCriteria,
+        include_edges: bool,
+    },
+    Aggregate {
+        grouping_fields: Vec<String>,
+        aggregation_functions: Vec<AggregationFunction>,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum InputSourceType {
+    /// File-based data sources
+    File {
+        path: String,
+        format: FileFormat,
+        encoding: Option<String>,
+    },
+    /// HTTP/REST API endpoints
+    RestApi {
+        url: String,
+        method: HttpMethod,
+        headers: HashMap<String, String>,
+        auth: Option<AuthConfig>,
+        pagination: Option<PaginationConfig>,
+    },
+    /// Database connections
+    Database {
+        connection_string: String,
+        query: String,
+        parameters: HashMap<String, serde_json::Value>,
+    },
+    /// Stream/message queue sources
+    Stream {
+        endpoint: String,
+        protocol: StreamProtocol,
+        subscription_config: StreamConfig,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum FileFormat {
+    CsvNodes,
+    CsvEdges,
+    CsvLayers,
+    Json,
+    Xml,
+    Yaml,
+    Parquet,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -268,6 +353,38 @@ pub struct PlanDag {
     pub nodes: Vec<PlanDagNode>,
     pub edges: Vec<PlanDagEdge>,
     pub metadata: PlanDagMetadata,
+    pub execution_config: ExecutionConfig,
+    pub validation_state: ValidationState,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlanDagMetadata {
+    pub version: String,
+    pub schema_version: u32, // For backward compatibility
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub created_by: String,
+    pub description: Option<String>,
+    pub tags: Vec<String>,
+    pub execution_statistics: Option<ExecutionStatistics>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExecutionConfig {
+    pub max_parallel_nodes: usize,
+    pub timeout_per_node: Duration,
+    pub retry_policy: RetryPolicy,
+    pub error_handling_strategy: GlobalErrorHandlingStrategy,
+    pub resource_limits: ResourceLimits,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ValidationState {
+    pub is_valid: bool,
+    pub last_validated: DateTime<Utc>,
+    pub validation_errors: Vec<ValidationError>,
+    pub warnings: Vec<ValidationWarning>,
+    pub dependency_cycles: Vec<DependencyCycle>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -275,15 +392,72 @@ pub struct PlanDagEdge {
     pub id: String,
     pub source: String,  // Source node ID
     pub target: String,  // Target node ID
-    pub edge_type: PlanDagEdgeType,
+    pub connection_type: ConnectionType,
+    pub metadata: EdgeMetadata,
+    pub validation_rules: Vec<ConnectionValidationRule>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum PlanDagEdgeType {
-    GraphReference,    // GraphNode → other nodes (references persisted graph)
-    DataFlow,         // Copy/Transform data flowing through pipeline
-    Export,           // GraphNode → OutputNode (for export operations)
-    Input,            // InputNode → GraphNode (initial data loading)
+pub struct EdgeMetadata {
+    pub label: Option<String>,
+    pub description: Option<String>,
+    pub data_schema: Option<DataSchema>, // Expected data structure flowing through
+    pub performance_hints: PerformanceHints,
+}
+
+/// ConnectionType defines the nature of data flow between nodes
+/// Each type has specific validation rules and execution semantics
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ConnectionType {
+    /// StreamingData: Real-time data flow from producer to consumer
+    /// Used for: Input → Process, Process → Process, Process → Storage
+    /// Data: GraphData flows through the connection
+    StreamingData {
+        data_type: DataType,
+        batch_size: Option<usize>,
+        buffer_config: BufferConfig,
+    },
+
+    /// StorageReference: Reference to persisted LayercakeGraph
+    /// Used for: Storage → Process, Storage → Output
+    /// Data: Graph ID reference, actual data loaded on demand
+    StorageReference {
+        lazy_loading: bool,
+        cache_policy: CachePolicy,
+    },
+
+    /// ControlFlow: Execution dependency without data transfer
+    /// Used for: Ensuring execution order without data flow
+    /// Data: No data transfer, pure dependency
+    ControlFlow {
+        wait_for_completion: bool,
+        timeout: Option<Duration>,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum DataType {
+    GraphData,      // Complete graph with nodes, edges, layers
+    NodeSet,        // Subset of nodes
+    EdgeSet,        // Subset of edges
+    LayerData,      // Layer definitions
+    Metadata,       // Graph metadata only
+    ValidationResult, // Validation/analysis results
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConnectionValidationRule {
+    pub rule_type: ValidationRuleType,
+    pub error_action: ValidationErrorAction,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ValidationRuleType {
+    RequiredDataType(DataType),
+    MaxDataSize(usize),
+    SchemaCompatibility(String),
+    NodeTypeCompatibility { source_type: String, target_type: String },
 }
 ```
 
@@ -291,110 +465,564 @@ pub enum PlanDagEdgeType {
 
 ```rust
 // LayercakeGraph represents graph instances within Plan DAG
+// Enhanced with clear hierarchy constraints and validation rules
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LayercakeGraph {
     pub id: i32,
     pub project_id: i32,
     pub graph_name: String,
-    pub parent_graph_id: Option<i32>,  // For graph hierarchy
-    pub generation: i32,               // 0=root, 1=child, 2=grandchild
+
+    // HIERARCHY CONSTRAINTS:
+    // - parent_graph_id: Must reference an existing LayercakeGraph in same project
+    // - generation: Auto-calculated as parent.generation + 1
+    // - Max hierarchy depth: 10 levels (configurable)
+    // - Circular references: Prevented by validation
+    // - Deletion cascade: Children deleted when parent is deleted
+    pub parent_graph_id: Option<i32>,
+    pub generation: u8,  // Changed from i32 to u8, max 255 levels
+
+    // GRAPH TYPE CONSTRAINTS:
+    // - Root: parent_graph_id must be None, generation must be 0
+    // - Copy: Must have parent, preserves all data from parent at creation time
+    // - Transform: Must have parent, applies transformations to parent data
+    // - Merge: Must reference multiple sources in metadata.source_graph_ids
+    // - Scenario: User-created projection, can have any parent
     pub graph_type: LayercakeGraphType,
-    pub metadata: GraphMetadata,
+
+    pub metadata: LayercakeGraphMetadata,
+    pub validation_state: GraphValidationState,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+
+    // COMPUTED FIELDS (not stored, calculated on load):
+    // - child_count: Number of direct children
+    // - descendant_count: Total descendants in hierarchy
+    // - data_size: Approximate size of graph data
+    // - last_modified_descendant: Most recent update in hierarchy
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum LayercakeGraphType {
-    Root,          // Original imported graph
-    Copy,          // Exact copy of another graph
-    Transform,     // Result of transformation
-    Merge,         // Result of merging multiple graphs
-    Scenario,      // User-created scenario/projection
+pub struct LayercakeGraphMetadata {
+    pub description: Option<String>,
+    pub tags: Vec<String>,
+
+    // LINEAGE TRACKING:
+    // - For Copy: records exact parent state at copy time
+    // - For Transform: records transformation rules applied
+    // - For Merge: records all source graphs and merge strategy
+    pub lineage: GraphLineage,
+
+    // HIERARCHY NAVIGATION:
+    pub hierarchy_path: Vec<String>, // Path from root: ["root", "level1", "level2"]
+    pub sibling_names: Vec<String>,  // Names of graphs at same hierarchy level
+
+    // STATISTICS (cached for performance):
+    pub node_count: usize,
+    pub edge_count: usize,
+    pub layer_count: usize,
+    pub last_statistics_update: DateTime<Utc>,
 }
 
-// Example Plan DAG workflows:
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum GraphLineage {
+    Root {
+        import_source: ImportSource,
+        import_timestamp: DateTime<Utc>,
+    },
+    Copy {
+        source_graph_id: i32,
+        source_snapshot_hash: String, // Hash of source data at copy time
+        copy_timestamp: DateTime<Utc>,
+    },
+    Transform {
+        source_graph_id: i32,
+        transformation_rules: Vec<TransformationRule>,
+        transform_timestamp: DateTime<Utc>,
+    },
+    Merge {
+        source_graph_ids: Vec<i32>,
+        merge_strategy: MergeStrategy,
+        merge_timestamp: DateTime<Utc>,
+    },
+    Scenario {
+        base_graph_id: i32,
+        scenario_changes: Vec<ScenarioChange>,
+        created_by: String,
+        scenario_timestamp: DateTime<Utc>,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GraphValidationState {
+    pub is_valid: bool,
+    pub last_validated: DateTime<Utc>,
+    pub hierarchy_errors: Vec<HierarchyValidationError>,
+    pub data_integrity_errors: Vec<DataIntegrityError>,
+    pub constraint_violations: Vec<ConstraintViolation>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum HierarchyValidationError {
+    CircularReference { cycle_path: Vec<i32> },
+    InvalidParentReference { parent_id: i32, reason: String },
+    ExceededMaxDepth { current_depth: u8, max_depth: u8 },
+    OrphanedGraph { missing_parent_id: i32 },
+    GenerationMismatch { expected: u8, actual: u8 },
+}
+
+// HIERARCHY MANAGEMENT HELPER METHODS:
+impl LayercakeGraph {
+    /// Validates hierarchy constraints before creation/update
+    pub fn validate_hierarchy_constraints(
+        &self,
+        existing_graphs: &[LayercakeGraph]
+    ) -> Result<(), Vec<HierarchyValidationError>> {
+        let mut errors = Vec::new();
+
+        // Check circular references
+        if let Some(cycle) = self.detect_circular_reference(existing_graphs) {
+            errors.push(HierarchyValidationError::CircularReference { cycle_path: cycle });
+        }
+
+        // Validate parent reference
+        if let Some(parent_id) = self.parent_graph_id {
+            if !existing_graphs.iter().any(|g| g.id == parent_id) {
+                errors.push(HierarchyValidationError::InvalidParentReference {
+                    parent_id,
+                    reason: "Parent graph does not exist".to_string(),
+                });
+            }
+        }
+
+        // Check max depth
+        if self.generation > MAX_HIERARCHY_DEPTH {
+            errors.push(HierarchyValidationError::ExceededMaxDepth {
+                current_depth: self.generation,
+                max_depth: MAX_HIERARCHY_DEPTH,
+            });
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+
+    /// Gets all ancestors up to root
+    pub fn get_ancestry_chain(&self, all_graphs: &[LayercakeGraph]) -> Vec<LayercakeGraph> {
+        let mut chain = Vec::new();
+        let mut current_id = self.parent_graph_id;
+
+        while let Some(parent_id) = current_id {
+            if let Some(parent) = all_graphs.iter().find(|g| g.id == parent_id) {
+                chain.push(parent.clone());
+                current_id = parent.parent_graph_id;
+            } else {
+                break; // Invalid hierarchy, stop traversal
+            }
+        }
+
+        chain.reverse(); // Root first
+        chain
+    }
+
+    /// Gets all direct children
+    pub fn get_children(&self, all_graphs: &[LayercakeGraph]) -> Vec<LayercakeGraph> {
+        all_graphs
+            .iter()
+            .filter(|g| g.parent_graph_id == Some(self.id))
+            .cloned()
+            .collect()
+    }
+}
+
+const MAX_HIERARCHY_DEPTH: u8 = 10;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum LayercakeGraphType {
+    /// Root: Original imported graph, no parent allowed
+    /// Constraints: parent_graph_id = None, generation = 0
+    Root,
+
+    /// Copy: Exact duplicate of parent graph at specific point in time
+    /// Constraints: Must have parent, preserves parent structure exactly
+    Copy,
+
+    /// Transform: Result of applying transformations to parent graph
+    /// Constraints: Must have parent, transformation rules stored in lineage
+    Transform,
+
+    /// Merge: Result of combining multiple source graphs
+    /// Constraints: Multiple sources referenced in lineage.source_graph_ids
+    Merge,
+
+    /// Scenario: User-created projection or "what-if" analysis
+    /// Constraints: Can have any parent, changes tracked in lineage
+    Scenario,
+}
+
+// Example Plan DAG workflows with clear hierarchy:
 
 // 1. Simple Copy with Transform:
-// InputNode → GraphNode("Base") → CopyNode → TransformNode → GraphNode("Transformed")
+// Input(CSV) → Storage("Base", Root, gen=0) → Process(Copy) → Process(Transform) → Storage("Transformed", Transform, gen=1, parent=Base)
 
-// 2. Multiple Independent Copies:
-//                                     ┌→ CopyNode → TransformNode → GraphNode("Scenario A")
-// InputNode → GraphNode("Base Data") ─┤
-//                                     └→ CopyNode → GraphNode("Exact Copy")
+// 2. Multiple Independent Scenarios:
+//                                         ┌→ Process(Copy) → Process(Transform) → Storage("Scenario A", Scenario, gen=1, parent=Base)
+// Input(CSV) → Storage("Base", Root, gen=0) ─┤
+//                                         └→ Process(Copy) → Storage("Exact Copy", Copy, gen=1, parent=Base)
 
-// 3. Complex Pipeline:
-// InputNode → GraphNode("Raw") → CopyNode → TransformNode → TransformNode → GraphNode("Processed")
-//                           ↘
-//                             CopyNode → TransformNode → GraphNode("Summary")
+// 3. Complex Multi-Generation Pipeline:
+// Input(CSV) → Storage("Raw", Root, gen=0) → Process(Copy) → Process(Transform) → Storage("Processed", Transform, gen=1, parent=Raw)
+//                     ↓                                                                ↓
+//              Process(Filter) → Storage("Filtered", Transform, gen=1, parent=Raw)   Process(Aggregate) → Storage("Summary", Transform, gen=2, parent=Processed)
+
+// 4. Merge Workflow:
+// Storage("Dataset A", Root, gen=0) ─┐
+//                                    ├→ Process(Merge) → Storage("Combined", Merge, gen=1, parents=[A,B])
+// Storage("Dataset B", Root, gen=0) ─┘
 ```
 
-### Database Schema Evolution
+### Database Schema Evolution with Migration Strategy
 
 ```sql
--- 🚧 EVOLVE EXISTING PROJECTS TABLE
-ALTER TABLE projects ADD COLUMN plan_dag_json TEXT; -- JSON Plan DAG
+-- 🚧 PHASE 1: BACKWARD-COMPATIBLE ADDITIONS (No breaking changes)
 
--- 🚧 NEW: LayercakeGraph instances (separate from Plan DAG)
+-- Add new columns with default values to existing tables
+ALTER TABLE projects ADD COLUMN plan_dag_json TEXT DEFAULT NULL;
+ALTER TABLE projects ADD COLUMN schema_version INTEGER DEFAULT 1;
+ALTER TABLE projects ADD COLUMN migration_state TEXT DEFAULT 'legacy'; -- 'legacy', 'migrating', 'migrated'
+
+-- Create new LayercakeGraph table with hierarchy constraints
 CREATE TABLE layercake_graphs (
     id INTEGER PRIMARY KEY,
-    project_id INTEGER REFERENCES projects(id),
+    project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     graph_name TEXT NOT NULL,
-    parent_graph_id INTEGER REFERENCES layercake_graphs(id),
-    generation INTEGER DEFAULT 0,
-    graph_type TEXT NOT NULL, -- 'root', 'copy', 'transform', 'merge', 'scenario'
-    metadata TEXT,            -- JSON metadata
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+    -- HIERARCHY CONSTRAINTS with validation
+    parent_graph_id INTEGER REFERENCES layercake_graphs(id) ON DELETE CASCADE,
+    generation INTEGER NOT NULL DEFAULT 0 CHECK (generation >= 0 AND generation <= 10),
+
+    -- TYPE CONSTRAINTS
+    graph_type TEXT NOT NULL CHECK (graph_type IN ('root', 'copy', 'transform', 'merge', 'scenario')),
+
+    -- METADATA
+    metadata TEXT NOT NULL DEFAULT '{}', -- JSON LayercakeGraphMetadata
+    validation_state TEXT NOT NULL DEFAULT '{}', -- JSON GraphValidationState
+
+    -- TIMESTAMPS
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    -- CONSTRAINTS
+    UNIQUE(project_id, graph_name), -- Unique names within project
+
+    -- ROOT TYPE CONSTRAINTS
+    CHECK (
+        (graph_type = 'root' AND parent_graph_id IS NULL AND generation = 0) OR
+        (graph_type != 'root' AND parent_graph_id IS NOT NULL AND generation > 0)
+    )
 );
 
--- 🚧 EVOLVE: Link nodes/edges/layers to LayercakeGraph instances
-ALTER TABLE nodes ADD COLUMN layercake_graph_id INTEGER REFERENCES layercake_graphs(id);
-ALTER TABLE edges ADD COLUMN layercake_graph_id INTEGER REFERENCES layercake_graphs(id);
-ALTER TABLE layers ADD COLUMN layercake_graph_id INTEGER REFERENCES layercake_graphs(id);
+-- Create indexes for hierarchy queries
+CREATE INDEX idx_layercake_graphs_parent ON layercake_graphs(parent_graph_id);
+CREATE INDEX idx_layercake_graphs_project_generation ON layercake_graphs(project_id, generation);
+CREATE INDEX idx_layercake_graphs_type ON layercake_graphs(graph_type);
 
--- 🚧 NEW: Track edit operations for reproducibility
+-- 🚧 PHASE 2: ADD FOREIGN KEYS TO EXISTING TABLES (Gradual migration)
+
+-- Add new columns to existing tables (nullable during migration)
+ALTER TABLE nodes ADD COLUMN layercake_graph_id INTEGER REFERENCES layercake_graphs(id) ON DELETE CASCADE;
+ALTER TABLE edges ADD COLUMN layercake_graph_id INTEGER REFERENCES layercake_graphs(id) ON DELETE CASCADE;
+ALTER TABLE layers ADD COLUMN layercake_graph_id INTEGER REFERENCES layercake_graphs(id) ON DELETE CASCADE;
+
+-- Create indexes for performance
+CREATE INDEX idx_nodes_layercake_graph ON nodes(layercake_graph_id);
+CREATE INDEX idx_edges_layercake_graph ON edges(layercake_graph_id);
+CREATE INDEX idx_layers_layercake_graph ON layers(layercake_graph_id);
+
+-- 🚧 PHASE 3: OPERATION TRACKING
+
 CREATE TABLE graph_edit_operations (
     id INTEGER PRIMARY KEY,
-    layercake_graph_id INTEGER REFERENCES layercake_graphs(id),
-    operation_type TEXT NOT NULL, -- 'create_node', 'update_node', 'delete_node', etc.
+    layercake_graph_id INTEGER NOT NULL REFERENCES layercake_graphs(id) ON DELETE CASCADE,
+    operation_type TEXT NOT NULL CHECK (operation_type IN (
+        'create_node', 'update_node', 'delete_node',
+        'create_edge', 'update_edge', 'delete_edge',
+        'create_layer', 'update_layer', 'delete_layer',
+        'bulk_operation', 'transform_operation'
+    )),
     operation_data TEXT NOT NULL, -- JSON operation details
-    applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    is_reproducible BOOLEAN DEFAULT TRUE,
-    user_session_id TEXT
+    applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    is_reproducible BOOLEAN NOT NULL DEFAULT TRUE,
+    user_session_id TEXT,
+    batch_id TEXT, -- For grouping related operations
+
+    -- Performance optimization
+    FOREIGN KEY (layercake_graph_id) REFERENCES layercake_graphs(id)
 );
+
+CREATE INDEX idx_graph_operations_graph ON graph_edit_operations(layercake_graph_id, applied_at);
+CREATE INDEX idx_graph_operations_batch ON graph_edit_operations(batch_id);
+
+-- 🚧 MIGRATION PROCEDURES
+
+-- Trigger to automatically update updated_at timestamp
+CREATE TRIGGER update_layercake_graphs_timestamp
+    BEFORE UPDATE ON layercake_graphs
+    FOR EACH ROW
+    EXECUTE FUNCTION update_timestamp();
+
+-- Function to validate hierarchy constraints
+CREATE OR REPLACE FUNCTION validate_graph_hierarchy()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Prevent circular references
+    IF NEW.parent_graph_id IS NOT NULL THEN
+        WITH RECURSIVE hierarchy AS (
+            SELECT id, parent_graph_id, 1 as depth
+            FROM layercake_graphs
+            WHERE id = NEW.parent_graph_id
+
+            UNION ALL
+
+            SELECT lg.id, lg.parent_graph_id, h.depth + 1
+            FROM layercake_graphs lg
+            JOIN hierarchy h ON lg.id = h.parent_graph_id
+            WHERE h.depth < 20 -- Prevent infinite loops
+        )
+        SELECT 1 FROM hierarchy WHERE id = NEW.id;
+
+        IF FOUND THEN
+            RAISE EXCEPTION 'Circular reference detected in graph hierarchy';
+        END IF;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER check_graph_hierarchy
+    BEFORE INSERT OR UPDATE ON layercake_graphs
+    FOR EACH ROW
+    EXECUTE FUNCTION validate_graph_hierarchy();
+
+-- 🚧 SCHEMA VERSIONING STRATEGY
+
+CREATE TABLE schema_migrations (
+    version INTEGER PRIMARY KEY,
+    description TEXT NOT NULL,
+    applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    rollback_sql TEXT, -- SQL to rollback this migration
+    is_breaking BOOLEAN NOT NULL DEFAULT FALSE
+);
+
+-- Insert initial migration records
+INSERT INTO schema_migrations (version, description, is_breaking) VALUES
+(1, 'Initial layercake schema', FALSE),
+(2, 'Add Plan DAG support to projects', FALSE),
+(3, 'Add LayercakeGraph hierarchy system', FALSE),
+(4, 'Add operation tracking', FALSE);
+
+-- Automated backup and restore procedures
+
+-- Function to create schema backup
+CREATE OR REPLACE FUNCTION create_schema_backup(backup_name TEXT)
+RETURNS TEXT AS $$
+DECLARE
+    backup_path TEXT;
+    tables_to_backup TEXT[];
+BEGIN
+    backup_path := '/tmp/layercake_backup_' || backup_name || '_' || to_char(now(), 'YYYY_MM_DD_HH24_MI_SS') || '.sql';
+
+    -- List all layercake tables
+    tables_to_backup := ARRAY[
+        'projects', 'plans', 'nodes', 'edges', 'layers',
+        'layercake_graphs', 'graph_edit_operations',
+        'user_sessions', 'collaboration_operations',
+        'schema_migrations', 'migration_execution_log'
+    ];
+
+    -- Create backup using pg_dump (this would be called from application)
+    -- pg_dump --data-only --table=projects --table=plans ... > backup_path
+
+    -- Log backup creation
+    INSERT INTO migration_execution_log (
+        migration_version, step_number, step_description,
+        sql_executed, execution_time_ms, success
+    ) VALUES (
+        0, 0, 'Schema backup created: ' || backup_name,
+        'pg_dump to ' || backup_path, 0, TRUE
+    );
+
+    RETURN backup_path;
+END;
+$$ LANGUAGE plpgsql;
+
+-- View for monitoring migration status
+CREATE VIEW migration_status AS
+SELECT
+    m.version,
+    m.description,
+    m.status,
+    m.is_breaking,
+    m.applied_at,
+    m.min_app_version,
+    CASE
+        WHEN m.status = 'completed' THEN 'Ready'
+        WHEN m.status = 'pending' AND check_migration_prerequisites(m.version) THEN 'Can Apply'
+        WHEN m.status = 'pending' THEN 'Waiting for Dependencies'
+        ELSE m.status
+    END as readiness_status,
+    (
+        SELECT COUNT(*)
+        FROM migration_execution_log mel
+        WHERE mel.migration_version = m.version AND mel.success = FALSE
+    ) as error_count
+FROM schema_migrations m
+ORDER BY m.version;
+
+-- Function to get current effective schema version
+CREATE OR REPLACE FUNCTION get_effective_schema_version()
+RETURNS INTEGER AS $$
+BEGIN
+    RETURN COALESCE(
+        (SELECT MAX(version) FROM schema_migrations WHERE status = 'completed'),
+        0
+    );
+END;
+$$ LANGUAGE plpgsql;
 ```
 
-### Phase 1 Extensions (Plan DAG Migration)
+### Phase 1 Extensions (Plan DAG Migration) - UPDATED
 
 ```sql
--- 🚧 NEW COLUMNS TO ADD
-ALTER TABLE projects ADD COLUMN parent_project_id INTEGER REFERENCES projects(id);
-ALTER TABLE projects ADD COLUMN hierarchy_level INTEGER DEFAULT 0;
-ALTER TABLE projects ADD COLUMN is_scenario BOOLEAN DEFAULT FALSE;
+-- 🚧 PROJECT HIERARCHY (Separate from LayercakeGraph hierarchy)
+-- Projects can contain multiple LayercakeGraphs, creating a two-level hierarchy:
+-- Project Hierarchy: For organizational/access control
+-- Graph Hierarchy: For data lineage and transformations
 
--- 🚧 NEW TABLES FOR COLLABORATION
+ALTER TABLE projects ADD COLUMN parent_project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE;
+ALTER TABLE projects ADD COLUMN hierarchy_level INTEGER DEFAULT 0 CHECK (hierarchy_level >= 0 AND hierarchy_level <= 5);
+ALTER TABLE projects ADD COLUMN is_scenario BOOLEAN DEFAULT FALSE;
+ALTER TABLE projects ADD COLUMN access_level TEXT DEFAULT 'private' CHECK (access_level IN ('private', 'shared', 'public'));
+
+-- Prevent project hierarchy cycles
+CREATE OR REPLACE FUNCTION validate_project_hierarchy()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.parent_project_id IS NOT NULL THEN
+        WITH RECURSIVE project_hierarchy AS (
+            SELECT id, parent_project_id, 1 as depth
+            FROM projects
+            WHERE id = NEW.parent_project_id
+
+            UNION ALL
+
+            SELECT p.id, p.parent_project_id, ph.depth + 1
+            FROM projects p
+            JOIN project_hierarchy ph ON p.id = ph.parent_project_id
+            WHERE ph.depth < 10
+        )
+        SELECT 1 FROM project_hierarchy WHERE id = NEW.id;
+
+        IF FOUND THEN
+            RAISE EXCEPTION 'Circular reference detected in project hierarchy';
+        END IF;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER check_project_hierarchy
+    BEFORE INSERT OR UPDATE ON projects
+    FOR EACH ROW
+    EXECUTE FUNCTION validate_project_hierarchy();
+
+-- 🚧 ENHANCED COLLABORATION TABLES
 CREATE TABLE user_sessions (
     id INTEGER PRIMARY KEY,
     session_id TEXT UNIQUE NOT NULL,
-    user_name TEXT,
-    project_id INTEGER REFERENCES projects(id),
-    last_seen TIMESTAMP,
-    cursor_position TEXT -- JSON
+    user_name TEXT NOT NULL,
+    project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    layercake_graph_id INTEGER REFERENCES layercake_graphs(id) ON DELETE CASCADE, -- Current graph being edited
+
+    -- Session state
+    last_seen TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    cursor_position TEXT DEFAULT '{}', -- JSON cursor/selection state
+    viewport_state TEXT DEFAULT '{}',  -- JSON zoom/pan state
+
+    -- Session metadata
+    user_agent TEXT,
+    ip_address INET,
+    session_duration INTERVAL,
+
+    UNIQUE(session_id, project_id)
 );
 
-CREATE TABLE change_operations (
+CREATE TABLE collaboration_operations (
     id INTEGER PRIMARY KEY,
-    session_id TEXT REFERENCES user_sessions(session_id),
-    project_id INTEGER REFERENCES projects(id),
-    operation_type TEXT NOT NULL, -- 'create', 'update', 'delete'
-    entity_type TEXT NOT NULL,    -- 'node', 'edge', 'layer', 'plan'
+    session_id TEXT NOT NULL REFERENCES user_sessions(session_id) ON DELETE CASCADE,
+    project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    layercake_graph_id INTEGER REFERENCES layercake_graphs(id) ON DELETE CASCADE,
+
+    -- Operation details
+    operation_type TEXT NOT NULL CHECK (operation_type IN (
+        'create', 'update', 'delete', 'move', 'copy', 'transform', 'bulk'
+    )),
+    entity_type TEXT NOT NULL CHECK (entity_type IN (
+        'node', 'edge', 'layer', 'plan_dag', 'graph', 'project'
+    )),
     entity_id TEXT NOT NULL,
-    operation_data TEXT NOT NULL, -- JSON
-    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    applied BOOLEAN DEFAULT FALSE
+
+    -- Operation data and conflict resolution
+    operation_data TEXT NOT NULL, -- JSON operation details
+    conflict_resolution_data TEXT, -- JSON conflict resolution info
+
+    -- Timestamps and status
+    timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    applied BOOLEAN NOT NULL DEFAULT FALSE,
+    applied_at TIMESTAMP,
+
+    -- Operational transform data
+    operation_vector_clock TEXT, -- JSON vector clock for ordering
+    causality_dependencies TEXT, -- JSON array of operation IDs this depends on
+
+    -- Performance indexes
+    INDEX idx_collab_ops_session (session_id, timestamp),
+    INDEX idx_collab_ops_entity (entity_type, entity_id),
+    INDEX idx_collab_ops_graph (layercake_graph_id, timestamp)
+);
+
+-- Conflict detection and resolution table
+CREATE TABLE operation_conflicts (
+    id INTEGER PRIMARY KEY,
+    operation_a_id INTEGER NOT NULL REFERENCES collaboration_operations(id) ON DELETE CASCADE,
+    operation_b_id INTEGER NOT NULL REFERENCES collaboration_operations(id) ON DELETE CASCADE,
+    conflict_type TEXT NOT NULL CHECK (conflict_type IN (
+        'concurrent_edit', 'delete_vs_update', 'type_mismatch', 'constraint_violation'
+    )),
+    resolution_strategy TEXT CHECK (resolution_strategy IN (
+        'last_writer_wins', 'merge_changes', 'manual_resolution', 'reject_operation'
+    )),
+    resolution_data TEXT, -- JSON resolution details
+    resolved_at TIMESTAMP,
+    resolved_by TEXT, -- User who resolved the conflict
+
+    UNIQUE(operation_a_id, operation_b_id)
 );
 ```
+
+## Revised Implementation Phases (Updated for Maintainability)
+
+### Design Changes for Better Maintainability:
+
+1. **Separation of Concerns**: Plan DAG execution separated from data models
+2. **Trait-Based Architecture**: Execution strategies implemented as pluggable traits
+3. **Versioned Schema**: Explicit migration strategy with rollback support
+4. **Clear Error Boundaries**: Each component has defined error handling
+5. **Simplified State Management**: Reduced complex state passing between operations
 
 ## Implementation Phases
 
@@ -1079,20 +1707,171 @@ impl PlanDagExecutor {
 
     fn resolve_graph_node_id(&self, node_id: &str, plan_dag: &PlanDag) -> Result<i32> {
         // Find GraphNode in Plan DAG and return its layercake_graph_id
-        plan_dag.nodes.iter()
-            .find_map(|node| {
-                if let PlanDagNode::GraphNode { id, graph_id, .. } = node {
-                    if id == node_id {
-                        Some(*graph_id)
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            })
-            .ok_or_else(|| anyhow!("GraphNode not found: {}", node_id))
+/// Plan DAG validator for execution readiness
+pub struct PlanDagValidator;
+
+impl PlanDagValidator {
+    pub fn validate_for_execution(plan_dag: &PlanDag) -> Result<(), ValidationError> {
+        // Check for cycles (already done in topological sort, but explicit check)
+        Self::check_cycles(plan_dag)?;
+
+        // Validate node connections
+        Self::validate_connections(plan_dag)?;
+
+        // Check resource requirements
+        Self::validate_resources(plan_dag)?;
+
+        Ok(())
     }
+
+    fn check_cycles(plan_dag: &PlanDag) -> Result<(), ValidationError> {
+        // Cycle detection using DFS
+        use std::collections::{HashMap, HashSet};
+
+        let mut adjacency: HashMap<String, Vec<String>> = HashMap::new();
+        for node in &plan_dag.nodes {
+            adjacency.insert(ExecutionPlanner::extract_node_id(node), Vec::new());
+        }
+
+        for edge in &plan_dag.edges {
+            adjacency.get_mut(&edge.source).unwrap().push(edge.target.clone());
+        }
+
+        let mut visited = HashSet::new();
+        let mut rec_stack = HashSet::new();
+
+        for node_id in adjacency.keys() {
+            if !visited.contains(node_id) {
+                if Self::has_cycle_dfs(node_id, &adjacency, &mut visited, &mut rec_stack) {
+                    return Err(ValidationError::CyclicDependency);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn has_cycle_dfs(
+        node: &str,
+        adjacency: &HashMap<String, Vec<String>>,
+        visited: &mut HashSet<String>,
+        rec_stack: &mut HashSet<String>,
+    ) -> bool {
+        visited.insert(node.to_string());
+        rec_stack.insert(node.to_string());
+
+        if let Some(neighbors) = adjacency.get(node) {
+            for neighbor in neighbors {
+                if !visited.contains(neighbor) {
+                    if Self::has_cycle_dfs(neighbor, adjacency, visited, rec_stack) {
+                        return true;
+                    }
+                } else if rec_stack.contains(neighbor) {
+                    return true;
+                }
+            }
+        }
+
+        rec_stack.remove(node);
+        false
+    }
+
+    fn validate_connections(plan_dag: &PlanDag) -> Result<(), ValidationError> {
+        for edge in &plan_dag.edges {
+            // Validate edge connection rules based on ConnectionType
+            match &edge.connection_type {
+                ConnectionType::StreamingData { data_type, .. } => {
+                    Self::validate_data_flow_connection(&edge.source, &edge.target, data_type, plan_dag)?;
+                },
+                ConnectionType::StorageReference { .. } => {
+                    Self::validate_storage_reference_connection(&edge.source, &edge.target, plan_dag)?;
+                },
+                ConnectionType::ControlFlow { .. } => {
+                    // Control flow connections are always valid
+                },
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_data_flow_connection(
+        source_id: &str,
+        target_id: &str,
+        _data_type: &DataType,
+        plan_dag: &PlanDag,
+    ) -> Result<(), ValidationError> {
+        let source_node = plan_dag.nodes.iter()
+            .find(|n| ExecutionPlanner::extract_node_id(n) == source_id)
+            .ok_or_else(|| ValidationError::NodeNotFound(source_id.to_string()))?;
+
+        let target_node = plan_dag.nodes.iter()
+            .find(|n| ExecutionPlanner::extract_node_id(n) == target_id)
+            .ok_or_else(|| ValidationError::NodeNotFound(target_id.to_string()))?;
+
+        // Validate that source can produce data and target can consume it
+        match (source_node, target_node) {
+            (PlanDagNode::Input { .. }, PlanDagNode::Storage { .. }) => Ok(()),
+            (PlanDagNode::Input { .. }, PlanDagNode::Process { .. }) => Ok(()),
+            (PlanDagNode::Process { .. }, PlanDagNode::Storage { .. }) => Ok(()),
+            (PlanDagNode::Process { .. }, PlanDagNode::Process { .. }) => Ok(()),
+            (PlanDagNode::Process { .. }, PlanDagNode::Output { .. }) => Ok(()),
+            _ => Err(ValidationError::InvalidConnection {
+                source: source_id.to_string(),
+                target: target_id.to_string(),
+                reason: "Invalid data flow connection type".to_string(),
+            }),
+        }
+    }
+
+    fn validate_storage_reference_connection(
+        source_id: &str,
+        target_id: &str,
+        plan_dag: &PlanDag,
+    ) -> Result<(), ValidationError> {
+        let source_node = plan_dag.nodes.iter()
+            .find(|n| ExecutionPlanner::extract_node_id(n) == source_id)
+            .ok_or_else(|| ValidationError::NodeNotFound(source_id.to_string()))?;
+
+        // Only Storage nodes can be sources for storage references
+        match source_node {
+            PlanDagNode::Storage { .. } => Ok(()),
+            _ => Err(ValidationError::InvalidConnection {
+                source: source_id.to_string(),
+                target: target_id.to_string(),
+                reason: "Storage reference must originate from Storage node".to_string(),
+            }),
+        }
+    }
+
+    fn validate_resources(plan_dag: &PlanDag) -> Result<(), ValidationError> {
+        // Check if total resource requirements are reasonable
+        let total_memory: usize = plan_dag.nodes.iter()
+            .map(|_| 100) // Simplified - would calculate actual requirements
+            .sum();
+
+        if total_memory > 10_000 { // 10GB limit
+            return Err(ValidationError::ExcessiveResourceRequirements {
+                required_memory_mb: total_memory,
+                limit_memory_mb: 10_000,
+            });
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ValidationError {
+    #[error("Cyclic dependency detected in Plan DAG")]
+    CyclicDependency,
+    #[error("Node not found: {0}")]
+    NodeNotFound(String),
+    #[error("Invalid connection from {source} to {target}: {reason}")]
+    InvalidConnection { source: String, target: String, reason: String },
+    #[error("Excessive resource requirements: {required_memory_mb}MB required, limit is {limit_memory_mb}MB")]
+    ExcessiveResourceRequirements { required_memory_mb: usize, limit_memory_mb: usize },
+    #[error("Empty graph name")]
+    EmptyGraphName,
 }
 ```
 
