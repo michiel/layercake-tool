@@ -400,7 +400,7 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
           <Panel position="top-left">
             <Stack spacing="xs" p="xs" bg="white" style={{ borderRadius: 4, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
               <Text size="sm" fw={500}>
-                {planDag.metadata.name || 'Untitled Plan'}
+                {mockPlanDag.metadata.name || 'Untitled Plan'}
               </Text>
               <Text size="xs" c="dimmed">
                 {nodes.length} nodes, {edges.length} connections

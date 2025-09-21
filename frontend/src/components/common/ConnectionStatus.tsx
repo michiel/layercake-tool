@@ -14,10 +14,11 @@ const HEALTH_CHECK = gql`
 `
 
 export const ConnectionStatus: React.FC = () => {
-  const { loading, error } = useQuery(HEALTH_CHECK, {
-    pollInterval: 5000, // Poll every 5 seconds
-    errorPolicy: 'ignore', // Don't crash on connection errors
-  })
+  // Disabled for frontend-only development
+  const { loading, error } = { loading: false, error: null } // useQuery(HEALTH_CHECK, {
+  //   pollInterval: 5000, // Poll every 5 seconds
+  //   errorPolicy: 'ignore', // Don't crash on connection errors
+  // })
 
   const getStatusConfig = () => {
     if (loading) {

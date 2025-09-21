@@ -22,11 +22,11 @@ function App() {
   const [currentView, setCurrentView] = useState<ViewType>('home')
   const [selectedProjectId, setSelectedProjectId] = useState<number>(1) // Mock project ID
 
-  // Mock health check query - will be replaced with actual schema
-  const { loading, error } = useQuery(HEALTH_CHECK, {
-    errorPolicy: 'ignore', // Ignore errors for now since backend isn't ready
-    skip: true, // Skip the query entirely for frontend-only development
-  })
+  // Mock health check query - completely disabled for frontend-only development
+  const { loading, error } = { loading: false, error: null } // useQuery(HEALTH_CHECK, {
+  //   errorPolicy: 'ignore', // Ignore errors for now since backend isn't ready
+  //   skip: true, // Skip the query entirely for frontend-only development
+  // })
 
   const renderCurrentView = () => {
     switch (currentView) {
