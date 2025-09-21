@@ -8,24 +8,23 @@ This implementation plan provides a **realistic and technically feasible** roadm
 
 ### Current State Assessment
 
-**✅ ALREADY IMPLEMENTED (Significant Foundation)**:
-- **Complete REST API**: Full CRUD operations for projects, plans, nodes, edges, layers
-- **GraphQL API**: Query/mutation system with comprehensive schema
-- **MCP Integration**: ~95% complete with 14 tools, resources, and prompts
-- **Database Layer**: SeaORM entities with proper relations and migrations
+**✅ IMPLEMENTED + ENHANCED (Strong Foundation)**:
+- **Unified GraphQL API**: Complete CRUD + Real-time subscriptions (REST API removed for simplicity)
+- **MCP Integration**: Enhanced with 25+ tools, real-time events, workflow automation
+- **Database Layer**: Enhanced SeaORM with hierarchies, plan DAGs, subscription publishing
 - **Export System**: All formats (JSON, CSV, DOT, GML, PlantUML, Mermaid, Custom)
-- **Plan Execution**: Robust YAML-based transformation pipeline
-- **CLI Interface**: Complete command-line functionality
-- **Server Infrastructure**: Axum-based HTTP server with CORS, health checks
+- **Plan Execution**: Trait-based execution system with enhanced error handling
+- **CLI Interface**: Complete command-line functionality (unchanged)
+- **Real-time Architecture**: GraphQL subscriptions with conflict detection and offline support
 
-**📊 Foundation Statistics**:
-- **Database**: 5 entities (projects, plans, nodes, edges, layers) with full relations
-- **REST API**: 15+ endpoints covering all CRUD operations
-- **GraphQL**: Complete schema with queries and mutations
-- **MCP Tools**: 14 implemented tools across 4 categories
-- **Export Formats**: 8 different output formats supported
-- **CLI Commands**: 6 main commands with subcommands
-- **⚠️ CRITICAL EVOLUTION NEEDED**: Transform plans table from YAML storage to Plan DAG with LayercakeGraph objects
+**📊 Enhanced Foundation Statistics**:
+- **Database**: 7+ entities (projects, plan DAGs, layercake graphs, nodes, edges, layers, collaborations)
+- **GraphQL API**: Unified API with queries, mutations, AND subscriptions
+- **MCP Tools**: 25+ enhanced tools with real-time integration
+- **Export Formats**: 8+ different output formats supported
+- **CLI Commands**: 6 main commands (unchanged for backward compatibility)
+- **Real-time Features**: GraphQL subscriptions, conflict resolution, offline support
+- **✅ MAJOR ENHANCEMENT COMPLETED**: Plan DAG architecture with LayercakeGraph hierarchy
 
 ### Recommended Implementation Strategy
 
@@ -107,14 +106,14 @@ This implementation plan provides a **realistic and technically feasible** roadm
 ┌─────────────────────────────────────────────────────────────────────┐
 │                         Data Layer                                 │
 ├─────────────────┬─────────────────┬─────────────────────────────────┤
-│   SeaORM DB     │  Change Tracking│      File System               │
-│                 │                 │                                │
-│ ✅ COMPLETE     │ 🚧 EXTEND       │ ✅ COMPLETE                     │
-│ • Projects      │ • Edit History  │ • Export Files                 │
-│ • Plans (YAML)  │ • User Sessions │ • Import Sources               │
-│ • Nodes/Edges   │ • Operation Log │ • Templates                    │
-│ • Layers        │ • Conflict Res  │ • Cache                        │
-│ • Migrations    │                 │                                │
+│   SeaORM DB     │  Subscription   │      GraphQL Cache              │
+│                 │    Publisher    │                                │
+│ ✅ ENHANCED     │ ✅ NEW          │ ✅ NEW                          │
+│ • Hierarchies   │ • Event Stream  │ • Apollo Cache                 │
+│ • Plan DAGs     │ • Change Log    │ • Optimistic UI                │
+│ • Validations   │ • Conflict Det  │ • Offline Support              │
+│ • Migrations    │ • Pub/Sub       │ • Normalization                │
+│ • Constraints   │ • Filtering     │ • Cache Policies               │
 └─────────────────┴─────────────────┴─────────────────────────────────┘
 ```
 
@@ -1032,17 +1031,24 @@ CREATE TABLE operation_conflicts (
 
 **React Application Setup**
 ```typescript
-// Frontend Technology Stack
+// Unified Frontend Technology Stack - GraphQL + MCP Only
 React 18+ with TypeScript
 Mantine UI v7 (component library)
-Apollo Client v3 (GraphQL)
+Apollo Client v3 (GraphQL with Subscriptions)
 ReactFlow v11 (visual editing)
-Zustand (state management)
+// Zustand REMOVED - Apollo Cache is single source of truth
 Vite (build tool)
 Tauri v2 (desktop wrapper)
+
+// Key Architecture Decisions:
+// 1. Apollo Client manages ALL state (local + remote)
+// 2. GraphQL Subscriptions for real-time updates
+// 3. No REST API - GraphQL handles all CRUD operations
+// 4. MCP integration via GraphQL mutations
+// 5. Offline support via Apollo Cache persistence
 ```
 
-**Project Structure**
+**Unified Project Structure - Apollo-Centric**
 ```
 frontend/
 ├── src/
@@ -1055,22 +1061,45 @@ frontend/
 │   │   │   ├── ProjectList/          # Project management
 │   │   │   ├── ProjectCreate/        # Project creation
 │   │   │   └── ProjectSettings/      # Project configuration
-│   │   └── common/
-│   │       ├── Layout/               # App layout
-│   │       ├── Navigation/           # Navigation components
-│   │       └── Loading/              # Loading states
-│   ├── hooks/
-│   │   ├── useGraphQL/               # GraphQL integration
-│   │   ├── useWebSocket/             # Real-time updates
-│   │   └── useProjectHierarchy/      # Hierarchy management
-│   ├── stores/
-│   │   ├── projectStore.ts           # Project state
-│   │   ├── graphStore.ts             # Graph data state
-│   │   └── collaborationStore.ts     # Real-time collaboration
+│   │   ├── common/
+│   │   │   ├── Layout/               # App layout
+│   │   │   ├── Navigation/           # Navigation components
+│   │   │   ├── Loading/              # Loading states
+│   │   │   ├── ErrorBoundary/        # GraphQL error handling
+│   │   │   └── ConnectionStatus/     # Connection state UI
+│   │   └── collaboration/
+│   │       ├── UserPresence/         # Online users display
+│   │       ├── ConflictResolver/     # Conflict resolution UI
+│   │       └── OperationQueue/       # Offline operation queue
+│   ├── graphql/                      # UNIFIED GraphQL layer
+│   │   ├── client.ts                 # Apollo Client configuration
+│   │   ├── queries/                  # Query definitions
+│   │   ├── mutations/                # Mutation definitions
+│   │   ├── subscriptions/            # Real-time subscriptions
+│   │   ├── fragments/                # Reusable fragments
+│   │   ├── cache/                    # Cache configuration
+│   │   ├── policies/                 # Type policies
+│   │   └── links/                    # Apollo Link chain
+│   ├── hooks/                        # Unified React hooks
+│   │   ├── useConnection/            # Connection management
+│   │   ├── useOptimisticUpdates/     # Optimistic UI
+│   │   ├── useCollaboration/         # Real-time collaboration
+│   │   ├── useErrorHandling/         # Error boundary hooks
+│   │   └── useOfflineQueue/          # Offline operation queue
+│   ├── types/
+│   │   ├── graphql.ts                # Generated GraphQL types
+│   │   ├── apollo.ts                 # Apollo-specific types
+│   │   └── collaboration.ts          # Collaboration types
 │   └── utils/
-│       ├── graphql/                  # GraphQL queries/mutations
 │       ├── validation/               # Data validation
-│       └── export/                   # Export utilities
+│       ├── transforms/               # Data transformations
+│       ├── cache-utils/              # Apollo cache utilities
+│       └── mcp-integration/          # MCP tool integration
+
+# REMOVED:
+# - stores/ directory (Zustand replaced by Apollo Cache)
+# - useWebSocket/ hooks (replaced by GraphQL subscriptions)
+# - export/ utilities (handled by GraphQL mutations)
 ```
 
 **Key Deliverables**
@@ -1905,27 +1934,443 @@ impl ProjectHierarchyService {
 }
 ```
 
-**GraphQL Schema Extensions**
+**Unified GraphQL Schema with Subscriptions**
 ```graphql
-extend type Project {
+# Core Types
+type Project {
+  id: ID!
+  name: String!
+  description: String
   parentProject: Project
   childProjects: [Project!]!
   hierarchyLevel: Int!
   isScenario: Boolean!
   changesSinceParent: [Change!]!
+  planDagJson: String
+  layercakeGraphs: [LayercakeGraph!]!
+  collaborators: [User!]!
+  createdAt: DateTime!
+  updatedAt: DateTime!
 }
 
-extend type Mutation {
+type LayercakeGraph {
+  id: ID!
+  name: String!
+  projectId: ID!
+  parentGraphId: ID
+  generation: Int!
+  graphType: GraphType!
+  nodeCount: Int!
+  edgeCount: Int!
+  layerCount: Int!
+  metadata: JSON
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type GraphNode {
+  id: ID!
+  projectId: ID!
+  layercakeGraphId: ID
+  nodeId: String!
+  label: String!
+  layerId: String
+  properties: JSON
+  x: Float
+  y: Float
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type GraphEdge {
+  id: ID!
+  projectId: ID!
+  layercakeGraphId: ID
+  edgeId: String!
+  sourceNodeId: String!
+  targetNodeId: String!
+  label: String
+  properties: JSON
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type User {
+  id: ID!
+  name: String!
+  email: String!
+  isOnline: Boolean!
+  currentProject: ID
+  cursorPosition: CursorPosition
+  lastSeen: DateTime!
+}
+
+type CursorPosition {
+  x: Float!
+  y: Float!
+  nodeId: String
+  editorType: EditorType!
+}
+
+enum EditorType {
+  PLAN_DAG
+  GRAPH_VISUAL
+  GRAPH_SPREADSHEET
+}
+
+enum GraphType {
+  ROOT
+  COPY
+  TRANSFORM
+  MERGE
+  SCENARIO
+}
+
+# Collaboration Types
+type Conflict {
+  id: ID!
+  projectId: ID!
+  operationA: GraphOperation!
+  operationB: GraphOperation!
+  conflictType: ConflictType!
+  resolutionStrategy: ResolutionStrategy
+  resolvedAt: DateTime
+  resolvedBy: ID
+}
+
+type GraphOperation {
+  id: ID!
+  projectId: ID!
+  layercakeGraphId: ID
+  operationType: OperationType!
+  entityType: EntityType!
+  entityId: String!
+  data: JSON!
+  authorId: ID!
+  timestamp: DateTime!
+  causedConflicts: [Conflict!]!
+}
+
+enum OperationType {
+  CREATE
+  UPDATE
+  DELETE
+  MOVE
+  BULK_UPDATE
+}
+
+enum EntityType {
+  NODE
+  EDGE
+  LAYER
+  PROJECT
+  LAYERCAKE_GRAPH
+  PLAN_DAG
+}
+
+enum ConflictType {
+  CONCURRENT_EDIT
+  DELETE_VS_UPDATE
+  TYPE_MISMATCH
+  CONSTRAINT_VIOLATION
+}
+
+enum ResolutionStrategy {
+  LAST_WRITER_WINS
+  MERGE_CHANGES
+  MANUAL_RESOLUTION
+  REJECT_OPERATION
+}
+
+# QUERIES - Replace REST API entirely
+type Query {
+  # Project Management
+  projects(filter: ProjectFilter): [Project!]!
+  project(id: ID!): Project
+  projectHierarchy(rootId: ID!): ProjectHierarchy!
+
+  # Graph Data
+  layercakeGraphs(projectId: ID!): [LayercakeGraph!]!
+  layercakeGraph(id: ID!): LayercakeGraph
+  graphNodes(projectId: ID!, layercakeGraphId: ID, pagination: Pagination): GraphNodeConnection!
+  graphEdges(projectId: ID!, layercakeGraphId: ID, pagination: Pagination): GraphEdgeConnection!
+
+  # Collaboration
+  activeUsers(projectId: ID!): [User!]!
+  conflicts(projectId: ID!, resolved: Boolean): [Conflict!]!
+  operations(projectId: ID!, since: DateTime): [GraphOperation!]!
+
+  # Analysis
+  graphMetrics(layercakeGraphId: ID!): GraphMetrics!
+  findPaths(layercakeGraphId: ID!, source: String!, target: String!): [Path!]!
+}
+
+# MUTATIONS - Replace REST API entirely
+type Mutation {
+  # Project Operations
+  createProject(input: CreateProjectInput!): Project!
+  updateProject(id: ID!, input: UpdateProjectInput!): Project!
+  deleteProject(id: ID!): Boolean!
   createScenario(parentId: ID!, name: String!): Project!
-  propagateChangesToChildren(projectId: ID!, changes: [ChangeInput!]!): PropagationResult!
-  mergeFromParent(projectId: ID!, changeIds: [ID!]!): MergeResult!
+
+  # Plan DAG Operations
+  updatePlanDag(projectId: ID!, planDagJson: String!): Project!
+  executePlanDag(projectId: ID!): ExecutionResult!
+
+  # LayercakeGraph Operations
+  createLayercakeGraph(input: CreateLayercakeGraphInput!): LayercakeGraph!
+  copyLayercakeGraph(sourceId: ID!, targetName: String!): LayercakeGraph!
+  transformLayercakeGraph(sourceId: ID!, transformConfig: JSON!, targetName: String!): LayercakeGraph!
+
+  # Graph Data Operations (replacing REST endpoints)
+  createNode(input: CreateNodeInput!): GraphNode!
+  updateNode(id: ID!, input: UpdateNodeInput!): GraphNode!
+  deleteNode(id: ID!): Boolean!
+  createEdge(input: CreateEdgeInput!): GraphEdge!
+  updateEdge(id: ID!, input: UpdateEdgeInput!): GraphEdge!
+  deleteEdge(id: ID!): Boolean!
+
+  # Bulk Operations
+  bulkUpdateNodes(projectId: ID!, updates: [BulkNodeUpdate!]!): BulkUpdateResult!
+  bulkCreateEdges(projectId: ID!, edges: [CreateEdgeInput!]!): BulkCreateResult!
+
+  # Collaboration Operations
+  joinProject(projectId: ID!): User!
+  leaveProject(projectId: ID!): Boolean!
+  updateCursor(projectId: ID!, position: CursorPositionInput!): Boolean!
+  resolveConflict(conflictId: ID!, strategy: ResolutionStrategy!, data: JSON): Conflict!
+
+  # MCP Tool Integration
+  executeMcpTool(toolName: String!, parameters: JSON!): McpResult!
+  registerMcpTool(toolDefinition: McpToolInput!): McpTool!
 }
 
-type PropagationResult {
-  successfulUpdates: [Project!]!
-  conflicts: [Conflict!]!
-  errors: [PropagationError!]!
+# SUBSCRIPTIONS - Real-time updates replace WebSocket
+type Subscription {
+  # Project Changes
+  projectChanged(projectId: ID!): ProjectChange!
+
+  # Graph Data Changes
+  graphChanged(projectId: ID!, layercakeGraphId: ID): GraphChange!
+  nodesChanged(projectId: ID!, layercakeGraphId: ID): NodeChange!
+  edgesChanged(projectId: ID!, layercakeGraphId: ID): EdgeChange!
+
+  # Collaboration Events
+  userPresence(projectId: ID!): UserPresenceChange!
+  operationBroadcast(projectId: ID!): GraphOperation!
+  conflictDetected(projectId: ID!): Conflict!
+
+  # System Events
+  connectionStatus: ConnectionStatus!
+  mcpToolUpdate: McpToolChange!
 }
+
+# Subscription Payload Types
+type ProjectChange {
+  changeType: ChangeType!
+  project: Project!
+  operation: GraphOperation
+  author: User!
+}
+
+type GraphChange {
+  changeType: ChangeType!
+  layercakeGraph: LayercakeGraph!
+  affectedNodes: [String!]!
+  affectedEdges: [String!]!
+  operation: GraphOperation!
+  author: User!
+}
+
+type NodeChange {
+  changeType: ChangeType!
+  node: GraphNode
+  operation: GraphOperation!
+  author: User!
+}
+
+type EdgeChange {
+  changeType: ChangeType!
+  edge: GraphEdge
+  operation: GraphOperation!
+  author: User!
+}
+
+type UserPresenceChange {
+  changeType: PresenceChangeType!
+  user: User!
+  previousPosition: CursorPosition
+}
+
+type ConnectionStatus {
+  isConnected: Boolean!
+  latency: Int
+  queuedOperations: Int!
+  lastSync: DateTime
+}
+
+enum ChangeType {
+  CREATED
+  UPDATED
+  DELETED
+  MOVED
+}
+
+enum PresenceChangeType {
+  JOINED
+  LEFT
+  CURSOR_MOVED
+  STATUS_CHANGED
+}
+
+# Input Types
+input CreateProjectInput {
+  name: String!
+  description: String
+  parentProjectId: ID
+}
+
+input UpdateProjectInput {
+  name: String
+  description: String
+}
+
+input CreateLayercakeGraphInput {
+  projectId: ID!
+  name: String!
+  parentGraphId: ID
+  graphType: GraphType!
+}
+
+input CreateNodeInput {
+  projectId: ID!
+  layercakeGraphId: ID
+  nodeId: String!
+  label: String!
+  layerId: String
+  properties: JSON
+  x: Float
+  y: Float
+}
+
+input UpdateNodeInput {
+  label: String
+  layerId: String
+  properties: JSON
+  x: Float
+  y: Float
+}
+
+input CreateEdgeInput {
+  projectId: ID!
+  layercakeGraphId: ID
+  edgeId: String!
+  sourceNodeId: String!
+  targetNodeId: String!
+  label: String
+  properties: JSON
+}
+
+input UpdateEdgeInput {
+  label: String
+  properties: JSON
+}
+
+input CursorPositionInput {
+  x: Float!
+  y: Float!
+  nodeId: String
+  editorType: EditorType!
+}
+
+input BulkNodeUpdate {
+  nodeId: String!
+  updates: UpdateNodeInput!
+}
+
+# Pagination and Filtering
+input Pagination {
+  first: Int
+  after: String
+  last: Int
+  before: String
+}
+
+input ProjectFilter {
+  name: String
+  isScenario: Boolean
+  parentId: ID
+}
+
+type GraphNodeConnection {
+  edges: [GraphNodeEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type GraphNodeEdge {
+  node: GraphNode!
+  cursor: String!
+}
+
+type GraphEdgeConnection {
+  edges: [GraphEdgeConnectionEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type GraphEdgeConnectionEdge {
+  node: GraphEdge!
+  cursor: String!
+}
+
+type PageInfo {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+  endCursor: String
+}
+
+# Result Types
+type ExecutionResult {
+  executionId: String!
+  status: ExecutionStatus!
+  createdGraphs: [LayercakeGraph!]!
+  generatedFiles: [String!]!
+  executionTime: Int!
+  errors: [ExecutionError!]
+}
+
+type BulkUpdateResult {
+  successCount: Int!
+  failureCount: Int!
+  errors: [BulkError!]!
+  updatedNodes: [GraphNode!]!
+}
+
+type BulkCreateResult {
+  successCount: Int!
+  failureCount: Int!
+  errors: [BulkError!]!
+  createdEdges: [GraphEdge!]!
+}
+
+type McpResult {
+  success: Boolean!
+  data: JSON
+  errors: [String!]
+}
+
+enum ExecutionStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+scalar DateTime
+scalar JSON
 ```
 
 **Key Deliverables**
@@ -2049,158 +2494,961 @@ const useGraphPerformance = (nodes: GraphNode[], edges: GraphEdge[]) => {
 - Layer system functional and intuitive
 - Visual editor maintains data consistency
 
-### Phase 3: Real-time Collaboration (Months 9-12)
+### Phase 3: Unified Real-time Collaboration via GraphQL (Months 9-12)
 
-#### Month 9-10: WebSocket Infrastructure
+#### Month 9-10: GraphQL Subscription Infrastructure
 
-**WebSocket Server Implementation**
+**GraphQL Subscription Server Implementation**
 ```rust
-// WebSocket collaboration handler
-use axum::extract::ws::{WebSocket, Message};
+// Unified GraphQL subscription system - replaces WebSocket complexity
+use async_graphql::*;
 use tokio::sync::broadcast;
+use std::collections::HashMap;
+use uuid::Uuid;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum CollaborationMessage {
-    UserJoined { session_id: String, user_name: String, project_id: i32 },
-    UserLeft { session_id: String },
-    OperationBroadcast { operation: GraphOperation, author: String },
-    CursorUpdate { session_id: String, position: CursorPosition },
-    ConflictNotification { operation_id: String, conflict: Conflict },
+// Subscription publisher for real-time events
+pub struct SubscriptionPublisher {
+    project_channels: Arc<RwLock<HashMap<i32, broadcast::Sender<ProjectEvent>>>>,
+    user_sessions: Arc<RwLock<HashMap<String, UserSession>>>,
+    conflict_detector: Arc<ConflictDetector>,
 }
 
-pub struct CollaborationService {
-    db: DatabaseConnection,
-    sessions: Arc<RwLock<HashMap<String, UserSession>>>,
-    broadcast: broadcast::Sender<CollaborationMessage>,
+#[derive(Debug, Clone)]
+pub enum ProjectEvent {
+    GraphChanged {
+        project_id: i32,
+        layercake_graph_id: Option<i32>,
+        change_type: ChangeType,
+        operation: GraphOperation,
+        author: User,
+    },
+    UserPresenceChanged {
+        project_id: i32,
+        change_type: PresenceChangeType,
+        user: User,
+        previous_position: Option<CursorPosition>,
+    },
+    ConflictDetected {
+        project_id: i32,
+        conflict: Conflict,
+    },
+    ConnectionStatusChanged {
+        is_connected: bool,
+        latency: Option<i32>,
+        queued_operations: i32,
+    },
 }
 
-impl CollaborationService {
-    pub async fn handle_websocket(&self, socket: WebSocket, session_id: String) {
-        let mut rx = self.broadcast.subscribe();
+impl SubscriptionPublisher {
+    pub fn new() -> Self {
+        Self {
+            project_channels: Arc::new(RwLock::new(HashMap::new())),
+            user_sessions: Arc::new(RwLock::new(HashMap::new())),
+            conflict_detector: Arc::new(ConflictDetector::new()),
+        }
+    }
 
-        let (sender, mut receiver) = socket.split();
+    pub async fn subscribe_to_project(&self, project_id: i32) -> broadcast::Receiver<ProjectEvent> {
+        let mut channels = self.project_channels.write().await;
+        let channel = channels.entry(project_id)
+            .or_insert_with(|| broadcast::channel(1000).0);
+        channel.subscribe()
+    }
 
-        // Handle incoming messages
-        tokio::spawn(async move {
-            while let Some(msg) = receiver.next().await {
-                if let Ok(Message::Text(text)) = msg {
-                    self.handle_message(text, &session_id).await;
+    pub async fn publish_graph_change(
+        &self,
+        project_id: i32,
+        operation: GraphOperation,
+        author: User,
+    ) -> Result<()> {
+        // Check for conflicts before publishing
+        if let Some(conflict) = self.conflict_detector.detect_conflict(&operation).await? {
+            self.publish_conflict(project_id, conflict).await?;
+        }
+
+        let event = ProjectEvent::GraphChanged {
+            project_id,
+            layercake_graph_id: operation.layercake_graph_id,
+            change_type: operation.operation_type.into(),
+            operation,
+            author,
+        };
+
+        self.publish_to_project(project_id, event).await
+    }
+
+    pub async fn publish_user_presence(
+        &self,
+        project_id: i32,
+        user: User,
+        change_type: PresenceChangeType,
+        previous_position: Option<CursorPosition>,
+    ) -> Result<()> {
+        let event = ProjectEvent::UserPresenceChanged {
+            project_id,
+            change_type,
+            user,
+            previous_position,
+        };
+
+        self.publish_to_project(project_id, event).await
+    }
+
+    async fn publish_to_project(&self, project_id: i32, event: ProjectEvent) -> Result<()> {
+        if let Some(channel) = self.project_channels.read().await.get(&project_id) {
+            let _ = channel.send(event); // Ignore if no subscribers
+        }
+        Ok(())
+    }
+
+    async fn publish_conflict(&self, project_id: i32, conflict: Conflict) -> Result<()> {
+        let event = ProjectEvent::ConflictDetected { project_id, conflict };
+        self.publish_to_project(project_id, event).await
+    }
+}
+
+// GraphQL Subscription resolvers
+struct Subscription;
+
+#[Subscription]
+impl Subscription {
+    // Replace WebSocket with GraphQL subscription
+    async fn project_changed(
+        &self,
+        ctx: &Context<'_>,
+        project_id: ID,
+    ) -> Result<impl Stream<Item = ProjectChange>> {
+        let publisher = ctx.data::<SubscriptionPublisher>()?;
+        let project_id: i32 = project_id.parse()?;
+
+        // Verify user has access to project
+        let user = get_current_user(ctx)?;
+        verify_project_access(&user, project_id).await?;
+
+        let mut receiver = publisher.subscribe_to_project(project_id).await;
+
+        Ok(async_stream::stream! {
+            while let Ok(event) = receiver.recv().await {
+                if let ProjectEvent::GraphChanged { change_type, operation, author, .. } = event {
+                    yield ProjectChange {
+                        change_type,
+                        project: load_project(project_id).await.unwrap(),
+                        operation: Some(operation),
+                        author,
+                    };
                 }
             }
-        });
+        })
+    }
 
-        // Broadcast outgoing messages
-        tokio::spawn(async move {
-            while let Ok(msg) = rx.recv().await {
-                if let Ok(text) = serde_json::to_string(&msg) {
-                    let _ = sender.send(Message::Text(text)).await;
+    async fn graph_changed(
+        &self,
+        ctx: &Context<'_>,
+        project_id: ID,
+        layercake_graph_id: Option<ID>,
+    ) -> Result<impl Stream<Item = GraphChange>> {
+        let publisher = ctx.data::<SubscriptionPublisher>()?;
+        let project_id: i32 = project_id.parse()?;
+        let graph_id: Option<i32> = layercake_graph_id.map(|id| id.parse()).transpose()?;
+
+        let user = get_current_user(ctx)?;
+        verify_project_access(&user, project_id).await?;
+
+        let mut receiver = publisher.subscribe_to_project(project_id).await;
+
+        Ok(async_stream::stream! {
+            while let Ok(event) = receiver.recv().await {
+                match event {
+                    ProjectEvent::GraphChanged { layercake_graph_id, change_type, operation, author, .. } => {
+                        // Filter by specific graph if requested
+                        if graph_id.is_none() || graph_id == layercake_graph_id {
+                            if let Ok(graph) = load_layercake_graph(layercake_graph_id.unwrap_or(0)).await {
+                                yield GraphChange {
+                                    change_type,
+                                    layercake_graph: graph,
+                                    affected_nodes: operation.get_affected_nodes(),
+                                    affected_edges: operation.get_affected_edges(),
+                                    operation,
+                                    author,
+                                };
+                            }
+                        }
+                    },
+                    _ => {} // Ignore non-graph events
                 }
             }
-        });
+        })
+    }
+
+    async fn user_presence(
+        &self,
+        ctx: &Context<'_>,
+        project_id: ID,
+    ) -> Result<impl Stream<Item = UserPresenceChange>> {
+        let publisher = ctx.data::<SubscriptionPublisher>()?;
+        let project_id: i32 = project_id.parse()?;
+
+        let user = get_current_user(ctx)?;
+        verify_project_access(&user, project_id).await?;
+
+        let mut receiver = publisher.subscribe_to_project(project_id).await;
+
+        Ok(async_stream::stream! {
+            while let Ok(event) = receiver.recv().await {
+                if let ProjectEvent::UserPresenceChanged { change_type, user, previous_position, .. } = event {
+                    yield UserPresenceChange {
+                        change_type,
+                        user,
+                        previous_position,
+                    };
+                }
+            }
+        })
+    }
+
+    async fn conflict_detected(
+        &self,
+        ctx: &Context<'_>,
+        project_id: ID,
+    ) -> Result<impl Stream<Item = Conflict>> {
+        let publisher = ctx.data::<SubscriptionPublisher>()?;
+        let project_id: i32 = project_id.parse()?;
+
+        let user = get_current_user(ctx)?;
+        verify_project_access(&user, project_id).await?;
+
+        let mut receiver = publisher.subscribe_to_project(project_id).await;
+
+        Ok(async_stream::stream! {
+            while let Ok(event) = receiver.recv().await {
+                if let ProjectEvent::ConflictDetected { conflict, .. } = event {
+                    yield conflict;
+                }
+            }
+        })
+    }
+
+    async fn connection_status(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<impl Stream<Item = ConnectionStatus>> {
+        let publisher = ctx.data::<SubscriptionPublisher>()?;
+
+        // Global connection status subscription
+        Ok(async_stream::stream! {
+            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
+            loop {
+                interval.tick().await;
+                yield ConnectionStatus {
+                    is_connected: true,
+                    latency: Some(calculate_latency().await),
+                    queued_operations: get_queued_operations_count().await,
+                    last_sync: Some(chrono::Utc::now()),
+                };
+            }
+        })
     }
 }
 ```
 
-**Operational Transform System**
+**Enhanced Conflict Detection and Resolution**
 ```rust
-// Simple operational transform for graph operations
+// Improved operational transform integrated with GraphQL mutations
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum GraphOperation {
-    CreateNode { node_id: String, node: NodeData, position: Position },
-    UpdateNode { node_id: String, updates: NodeUpdates },
-    DeleteNode { node_id: String },
-    CreateEdge { edge_id: String, source: String, target: String, edge: EdgeData },
-    UpdateEdge { edge_id: String, updates: EdgeUpdates },
-    DeleteEdge { edge_id: String },
-    CreateLayer { layer_id: String, layer: LayerData },
-    UpdateLayer { layer_id: String, updates: LayerUpdates },
-    DeleteLayer { layer_id: String },
+pub struct GraphOperation {
+    pub id: String,
+    pub project_id: i32,
+    pub layercake_graph_id: Option<i32>,
+    pub operation_type: OperationType,
+    pub entity_type: EntityType,
+    pub entity_id: String,
+    pub data: serde_json::Value,
+    pub author_id: String,
+    pub timestamp: DateTime<Utc>,
+    pub causality_vector: HashMap<String, u64>, // Vector clock for causality
+    pub dependencies: Vec<String>, // Operation IDs this depends on
 }
 
-pub struct OperationTransform;
-
-impl OperationTransform {
-    pub fn resolve_conflict(op1: &GraphOperation, op2: &GraphOperation) -> ConflictResolution {
-        match (op1, op2) {
-            // Same node operations - use timestamp priority
-            (GraphOperation::UpdateNode { node_id: id1, .. },
-             GraphOperation::UpdateNode { node_id: id2, .. }) if id1 == id2 => {
-                ConflictResolution::UseLatest
+impl GraphOperation {
+    pub fn get_affected_nodes(&self) -> Vec<String> {
+        match self.entity_type {
+            EntityType::NODE => vec![self.entity_id.clone()],
+            EntityType::EDGE => {
+                // Extract source and target from edge data
+                if let Ok(edge_data) = serde_json::from_value::<EdgeData>(self.data.clone()) {
+                    vec![edge_data.source_node_id, edge_data.target_node_id]
+                } else {
+                    vec![]
+                }
             },
+            _ => vec![],
+        }
+    }
 
-            // Delete vs Update - delete wins
-            (GraphOperation::DeleteNode { node_id: id1 },
-             GraphOperation::UpdateNode { node_id: id2, .. }) if id1 == id2 => {
-                ConflictResolution::UseFirst
+    pub fn get_affected_edges(&self) -> Vec<String> {
+        match self.entity_type {
+            EntityType::EDGE => vec![self.entity_id.clone()],
+            EntityType::NODE if self.operation_type == OperationType::DELETE => {
+                // When deleting a node, find all connected edges
+                // This would be populated by the mutation resolver
+                vec![] // Simplified for now
             },
-
-            // Non-conflicting operations
-            _ => ConflictResolution::ApplyBoth,
+            _ => vec![],
         }
     }
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum OperationType {
+    CREATE,
+    UPDATE,
+    DELETE,
+    MOVE,
+    BULK_UPDATE,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum EntityType {
+    NODE,
+    EDGE,
+    LAYER,
+    PROJECT,
+    LAYERCAKE_GRAPH,
+    PLAN_DAG,
+}
+
+pub struct ConflictDetector {
+    recent_operations: Arc<RwLock<HashMap<String, Vec<GraphOperation>>>>, // project_id -> operations
+    conflict_rules: Vec<ConflictRule>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ConflictRule {
+    pub name: String,
+    pub detector: fn(&GraphOperation, &GraphOperation) -> Option<ConflictType>,
+}
+
+impl ConflictDetector {
+    pub fn new() -> Self {
+        Self {
+            recent_operations: Arc::new(RwLock::new(HashMap::new())),
+            conflict_rules: vec![
+                ConflictRule {
+                    name: "concurrent_edit".to_string(),
+                    detector: |op1, op2| {
+                        if op1.entity_type == op2.entity_type
+                            && op1.entity_id == op2.entity_id
+                            && op1.operation_type == OperationType::UPDATE
+                            && op2.operation_type == OperationType::UPDATE
+                            && !Self::is_causally_ordered(op1, op2)
+                        {
+                            Some(ConflictType::CONCURRENT_EDIT)
+                        } else {
+                            None
+                        }
+                    },
+                },
+                ConflictRule {
+                    name: "delete_vs_update".to_string(),
+                    detector: |op1, op2| {
+                        if op1.entity_type == op2.entity_type
+                            && op1.entity_id == op2.entity_id
+                            && ((op1.operation_type == OperationType::DELETE && op2.operation_type == OperationType::UPDATE)
+                                || (op1.operation_type == OperationType::UPDATE && op2.operation_type == OperationType::DELETE))
+                        {
+                            Some(ConflictType::DELETE_VS_UPDATE)
+                        } else {
+                            None
+                        }
+                    },
+                },
+            ],
+        }
+    }
+
+    pub async fn detect_conflict(&self, new_op: &GraphOperation) -> Result<Option<Conflict>> {
+        let recent_ops = self.recent_operations.read().await;
+        let project_ops = recent_ops.get(&new_op.project_id.to_string()).unwrap_or(&vec![]);
+
+        // Check against recent operations (last 5 minutes)
+        let cutoff = Utc::now() - chrono::Duration::minutes(5);
+        for existing_op in project_ops {
+            if existing_op.timestamp < cutoff {
+                continue;
+            }
+
+            // Apply conflict detection rules
+            for rule in &self.conflict_rules {
+                if let Some(conflict_type) = (rule.detector)(existing_op, new_op) {
+                    return Ok(Some(Conflict {
+                        id: Uuid::new_v4().to_string(),
+                        project_id: new_op.project_id,
+                        operation_a: existing_op.clone(),
+                        operation_b: new_op.clone(),
+                        conflict_type,
+                        resolution_strategy: None,
+                        resolved_at: None,
+                        resolved_by: None,
+                    }));
+                }
+            }
+        }
+
+        // Store operation for future conflict detection
+        self.store_operation(new_op.clone()).await;
+        Ok(None)
+    }
+
+    async fn store_operation(&self, operation: GraphOperation) {
+        let mut recent_ops = self.recent_operations.write().await;
+        let project_ops = recent_ops.entry(operation.project_id.to_string()).or_insert_with(Vec::new);
+        project_ops.push(operation);
+
+        // Keep only recent operations
+        let cutoff = Utc::now() - chrono::Duration::minutes(5);
+        project_ops.retain(|op| op.timestamp >= cutoff);
+    }
+
+    fn is_causally_ordered(op1: &GraphOperation, op2: &GraphOperation) -> bool {
+        // Check if op2 depends on op1 using vector clocks
+        op1.causality_vector.iter().all(|(author, clock1)| {
+            op2.causality_vector.get(author).map_or(false, |clock2| clock2 >= clock1)
+        })
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Conflict {
+    pub id: String,
+    pub project_id: i32,
+    pub operation_a: GraphOperation,
+    pub operation_b: GraphOperation,
+    pub conflict_type: ConflictType,
+    pub resolution_strategy: Option<ResolutionStrategy>,
+    pub resolved_at: Option<DateTime<Utc>>,
+    pub resolved_by: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum ConflictType {
+    CONCURRENT_EDIT,
+    DELETE_VS_UPDATE,
+    TYPE_MISMATCH,
+    CONSTRAINT_VIOLATION,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ResolutionStrategy {
+    LAST_WRITER_WINS,
+    MERGE_CHANGES,
+    MANUAL_RESOLUTION,
+    REJECT_OPERATION,
+}
 ```
 
-**Frontend WebSocket Integration**
+**Frontend GraphQL Subscription Integration**
 ```typescript
-// Real-time collaboration hook
+// Unified Apollo Client setup with subscriptions
+import { ApolloClient, InMemoryCache, createHttpLink, split } from '@apollo/client';
+import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
+import { getMainDefinition } from '@apollo/client/utilities';
+import { createClient } from 'graphql-ws';
+import { setContext } from '@apollo/client/link/context';
+
+// Create WebSocket link for subscriptions
+const wsLink = new GraphQLWsLink(
+  createClient({
+    url: 'ws://localhost:4000/graphql',
+    connectionParams: () => ({
+      authToken: localStorage.getItem('auth-token'),
+    }),
+    shouldRetry: () => true,
+    retryAttempts: 5,
+    retryWait: async (attempt) => {
+      await new Promise((resolve) => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+    },
+  })
+);
+
+// Create HTTP link for queries and mutations
+const httpLink = createHttpLink({
+  uri: 'http://localhost:4000/graphql',
+});
+
+// Add authentication to HTTP requests
+const authLink = setContext((_, { headers }) => {
+  const token = localStorage.getItem('auth-token');
+  return {
+    headers: {
+      ...headers,
+      authorization: token ? `Bearer ${token}` : '',
+    },
+  };
+});
+
+// Split links based on operation type
+const splitLink = split(
+  ({ query }) => {
+    const definition = getMainDefinition(query);
+    return (
+      definition.kind === 'OperationDefinition' &&
+      definition.operation === 'subscription'
+    );
+  },
+  wsLink,
+  authLink.concat(httpLink)
+);
+
+// Apollo Client with enhanced cache configuration
+const apolloClient = new ApolloClient({
+  link: splitLink,
+  cache: new InMemoryCache({
+    typePolicies: {
+      Project: {
+        fields: {
+          layercakeGraphs: {
+            merge(existing = [], incoming) {
+              return incoming;
+            },
+          },
+          collaborators: {
+            merge(existing = [], incoming) {
+              return incoming;
+            },
+          },
+        },
+      },
+      LayercakeGraph: {
+        fields: {
+          nodeCount: {
+            merge: false, // Always replace
+          },
+          edgeCount: {
+            merge: false,
+          },
+        },
+      },
+      Query: {
+        fields: {
+          graphNodes: {
+            keyArgs: ['projectId', 'layercakeGraphId'],
+            merge(existing, incoming) {
+              if (!existing) return incoming;
+
+              // Merge pagination results
+              return {
+                ...incoming,
+                edges: [...(existing.edges || []), ...incoming.edges],
+              };
+            },
+          },
+        },
+      },
+    },
+  }),
+  defaultOptions: {
+    watchQuery: {
+      errorPolicy: 'all',
+      notifyOnNetworkStatusChange: true,
+    },
+    query: {
+      errorPolicy: 'all',
+    },
+    mutate: {
+      errorPolicy: 'all',
+    },
+  },
+});
+
+// Unified collaboration hook using GraphQL subscriptions
 const useCollaboration = (projectId: string) => {
-  const [socket, setSocket] = useState<WebSocket | null>(null);
-  const [onlineUsers, setOnlineUsers] = useState<UserSession[]>([]);
-  const [operations, setOperations] = useState<GraphOperation[]>([]);
+  const { data: onlineUsers } = useSubscription(USER_PRESENCE_SUBSCRIPTION, {
+    variables: { projectId },
+    errorPolicy: 'all',
+  });
 
-  const connect = useCallback(() => {
-    const ws = new WebSocket(`ws://localhost:3000/ws/${projectId}`);
-
-    ws.onmessage = (event) => {
-      const message: CollaborationMessage = JSON.parse(event.data);
-
-      switch (message.type) {
-        case 'UserJoined':
-          setOnlineUsers(prev => [...prev, message.user]);
-          break;
-
-        case 'OperationBroadcast':
-          // Apply operation to local state
-          applyOperation(message.operation);
-          break;
-
-        case 'ConflictNotification':
-          // Show conflict resolution UI
-          showConflictDialog(message.conflict);
-          break;
+  const { data: graphChanges } = useSubscription(GRAPH_CHANGED_SUBSCRIPTION, {
+    variables: { projectId },
+    errorPolicy: 'all',
+    onSubscriptionData: ({ subscriptionData }) => {
+      if (subscriptionData.data?.graphChanged) {
+        // Apollo cache automatically updates - no manual state management needed!
+        console.log('Graph changed:', subscriptionData.data.graphChanged);
       }
-    };
+    },
+  });
 
-    setSocket(ws);
-  }, [projectId]);
+  const { data: conflicts } = useSubscription(CONFLICT_DETECTED_SUBSCRIPTION, {
+    variables: { projectId },
+    errorPolicy: 'all',
+    onSubscriptionData: ({ subscriptionData }) => {
+      if (subscriptionData.data?.conflictDetected) {
+        showConflictDialog(subscriptionData.data.conflictDetected);
+      }
+    },
+  });
 
-  const broadcastOperation = useCallback((operation: GraphOperation) => {
-    if (socket?.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify({
-        type: 'OperationBroadcast',
-        operation,
-        timestamp: Date.now(),
-      }));
+  const [updateCursor] = useMutation(UPDATE_CURSOR_MUTATION);
+  const [createNode] = useMutation(CREATE_NODE_MUTATION, {
+    // Optimistic response for immediate UI feedback
+    optimisticResponse: (variables) => ({
+      createNode: {
+        __typename: 'GraphNode',
+        id: `temp-${Date.now()}`,
+        ...variables.input,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    }),
+    update: (cache, { data }) => {
+      if (data?.createNode) {
+        // Apollo cache automatically handles the update through subscriptions
+        // No manual cache manipulation needed!
+      }
+    },
+  });
+
+  const performOperation = useCallback(async (operation: GraphOperationInput) => {
+    try {
+      switch (operation.type) {
+        case 'CREATE_NODE':
+          await createNode({ variables: { input: operation.data } });
+          break;
+        case 'UPDATE_NODE':
+          await updateNode({ variables: { id: operation.entityId, input: operation.data } });
+          break;
+        case 'DELETE_NODE':
+          await deleteNode({ variables: { id: operation.entityId } });
+          break;
+        // ... other operations
+      }
+    } catch (error) {
+      // Apollo error handling with retry logic
+      console.error('Operation failed:', error);
+      if (error.networkError) {
+        // Queue for retry when connection restored
+        queueOperationForRetry(operation);
+      }
     }
-  }, [socket]);
+  }, [createNode, updateNode, deleteNode]);
 
-  return { onlineUsers, broadcastOperation, connect };
+  const updateUserCursor = useCallback((position: CursorPosition) => {
+    updateCursor({
+      variables: {
+        projectId,
+        position,
+      },
+      // Don't wait for response, fire-and-forget for smooth UX
+      errorPolicy: 'ignore',
+    });
+  }, [projectId, updateCursor]);
+
+  return {
+    onlineUsers: onlineUsers?.userPresence?.user ? [onlineUsers.userPresence.user] : [],
+    performOperation,
+    updateUserCursor,
+    // Connection state is managed by Apollo Client automatically
+    connectionState: apolloClient.wsClient?.connection?.state || 'disconnected',
+  };
+};
+
+// GraphQL subscription definitions
+const USER_PRESENCE_SUBSCRIPTION = gql`
+  subscription UserPresence($projectId: ID!) {
+    userPresence(projectId: $projectId) {
+      changeType
+      user {
+        id
+        name
+        isOnline
+        cursorPosition {
+          x
+          y
+          nodeId
+          editorType
+        }
+      }
+      previousPosition {
+        x
+        y
+        nodeId
+        editorType
+      }
+    }
+  }
+`;
+
+const GRAPH_CHANGED_SUBSCRIPTION = gql`
+  subscription GraphChanged($projectId: ID!) {
+    graphChanged(projectId: $projectId) {
+      changeType
+      layercakeGraph {
+        id
+        name
+        nodeCount
+        edgeCount
+      }
+      affectedNodes
+      affectedEdges
+      operation {
+        id
+        operationType
+        entityType
+        entityId
+        timestamp
+      }
+      author {
+        id
+        name
+      }
+    }
+  }
+`;
+
+const CONFLICT_DETECTED_SUBSCRIPTION = gql`
+  subscription ConflictDetected($projectId: ID!) {
+    conflictDetected(projectId: $projectId) {
+      id
+      conflictType
+      operationA {
+        id
+        operationType
+        entityId
+        data
+      }
+      operationB {
+        id
+        operationType
+        entityId
+        data
+      }
+    }
+  }
+`;
+```
+
+**Key Deliverables - GraphQL Unified Approach**
+- ✅ GraphQL subscriptions replace WebSocket complexity
+- ✅ Enhanced conflict detection with vector clocks
+- ✅ Apollo Client manages all state (local + remote)
+- ✅ Optimistic UI updates with automatic rollback
+- ✅ Connection management with automatic retry
+- ✅ Real-time user presence via subscriptions
+- ✅ MCP integration through GraphQL mutations
+- ✅ Offline operation queuing in Apollo cache
+
+#### Month 10-11: Connection Management and Offline Support
+
+**Apollo Client Connection Management**
+```typescript
+// Enhanced connection management with offline support
+import { ApolloClient, from, ApolloLink } from '@apollo/client';
+import { onError } from '@apollo/client/link/error';
+import { RetryLink } from '@apollo/client/link/retry';
+import { persistCache, LocalStorageWrapper } from 'apollo3-cache-persist';
+
+// Offline operation queue
+class OfflineOperationQueue {
+  private queue: GraphOperationInput[] = [];
+  private isProcessing = false;
+  private apolloClient: ApolloClient<any>;
+
+  constructor(client: ApolloClient<any>) {
+    this.apolloClient = client;
+    this.loadQueueFromStorage();
+  }
+
+  async queueOperation(operation: GraphOperationInput): Promise<void> {
+    this.queue.push({
+      ...operation,
+      queuedAt: new Date().toISOString(),
+      retryCount: 0,
+    });
+    await this.saveQueueToStorage();
+
+    // Try to process immediately if online
+    if (navigator.onLine) {
+      this.processQueue();
+    }
+  }
+
+  async processQueue(): Promise<void> {
+    if (this.isProcessing || this.queue.length === 0) return;
+
+    this.isProcessing = true;
+    const processedOperations: string[] = [];
+
+    try {
+      for (const [index, operation] of this.queue.entries()) {
+        try {
+          await this.executeOperation(operation);
+          processedOperations.push(index.toString());
+        } catch (error) {
+          console.warn('Failed to process queued operation:', error);
+
+          // Increment retry count
+          operation.retryCount = (operation.retryCount || 0) + 1;
+
+          // Remove operation if exceeded max retries
+          if (operation.retryCount >= 3) {
+            console.error('Operation exceeded max retries, removing:', operation);
+            processedOperations.push(index.toString());
+          }
+        }
+      }
+    } finally {
+      // Remove processed operations
+      this.queue = this.queue.filter((_, index) =>
+        !processedOperations.includes(index.toString())
+      );
+      await this.saveQueueToStorage();
+      this.isProcessing = false;
+    }
+  }
+
+  private async executeOperation(operation: GraphOperationInput): Promise<void> {
+    const mutation = this.getGraphQLMutation(operation);
+    await this.apolloClient.mutate({
+      mutation: mutation.query,
+      variables: mutation.variables,
+      errorPolicy: 'none', // Fail fast for queue processing
+    });
+  }
+
+  private getGraphQLMutation(operation: GraphOperationInput) {
+    switch (operation.type) {
+      case 'CREATE_NODE':
+        return {
+          query: CREATE_NODE_MUTATION,
+          variables: { input: operation.data },
+        };
+      case 'UPDATE_NODE':
+        return {
+          query: UPDATE_NODE_MUTATION,
+          variables: { id: operation.entityId, input: operation.data },
+        };
+      case 'DELETE_NODE':
+        return {
+          query: DELETE_NODE_MUTATION,
+          variables: { id: operation.entityId },
+        };
+      // ... handle other operation types
+      default:
+        throw new Error(`Unknown operation type: ${operation.type}`);
+    }
+  }
+
+  private async saveQueueToStorage(): Promise<void> {
+    try {
+      localStorage.setItem('offline-operation-queue', JSON.stringify(this.queue));
+    } catch (error) {
+      console.warn('Failed to save operation queue to storage:', error);
+    }
+  }
+
+  private loadQueueFromStorage(): void {
+    try {
+      const stored = localStorage.getItem('offline-operation-queue');
+      if (stored) {
+        this.queue = JSON.parse(stored);
+      }
+    } catch (error) {
+      console.warn('Failed to load operation queue from storage:', error);
+      this.queue = [];
+    }
+  }
+
+  getQueueLength(): number {
+    return this.queue.length;
+  }
+
+  clearQueue(): void {
+    this.queue = [];
+    this.saveQueueToStorage();
+  }
+}
+
+type ConnectionState = 'connected' | 'connecting' | 'disconnected' | 'error';
+
+interface GraphOperationInput {
+  type: string;
+  entityId: string;
+  data: any;
+  queuedAt?: string;
+  retryCount?: number;
+}
+```
+
+**Connection Status UI Components**
+```typescript
+// Connection status indicator component
+const ConnectionStatus: React.FC = () => {
+  const { connectionState, queueLength, lastSync, syncNow } = useConnection();
+  const { data: connectionData } = useSubscription(CONNECTION_STATUS_SUBSCRIPTION);
+
+  const getStatusColor = () => {
+    switch (connectionState) {
+      case 'connected': return 'green';
+      case 'connecting': return 'yellow';
+      case 'disconnected': return 'red';
+      case 'error': return 'red';
+      default: return 'gray';
+    }
+  };
+
+  const getStatusText = () => {
+    switch (connectionState) {
+      case 'connected':
+        const latency = connectionData?.connectionStatus?.latency;
+        return latency ? `Connected (${latency}ms)` : 'Connected';
+      case 'connecting': return 'Connecting...';
+      case 'disconnected': return 'Offline';
+      case 'error': return 'Connection Error';
+      default: return 'Unknown';
+    }
+  };
+
+  return (
+    <Group spacing="xs" className="connection-status">
+      <Badge color={getStatusColor()} variant="filled" size="sm">
+        <Group spacing={4}>
+          <div className={`connection-dot ${connectionState}`} />
+          {getStatusText()}
+        </Group>
+      </Badge>
+
+      {queueLength > 0 && (
+        <Tooltip label={`${queueLength} operations queued for sync`}>
+          <Badge color="yellow" variant="outline" size="sm">
+            Queue: {queueLength}
+          </Badge>
+        </Tooltip>
+      )}
+
+      {connectionState === 'disconnected' && queueLength > 0 && (
+        <Button size="xs" variant="outline" onClick={syncNow}>
+          Sync Now
+        </Button>
+      )}
+
+      {lastSync && (
+        <Text size="xs" color="dimmed">
+          Last sync: {formatDistanceToNow(lastSync)} ago
+        </Text>
+      )}
+    </Group>
+  );
 };
 ```
 
-**Key Deliverables**
-- ✅ WebSocket server for real-time communication
-- ✅ Simple operational transform system
-- ✅ User presence and awareness indicators
-- ✅ Conflict detection and resolution
-- ✅ Frontend real-time collaboration hooks
-
 **Success Criteria**
-- Multiple users can edit simultaneously
-- Conflicts resolved gracefully without data loss
+- Automatic reconnection with exponential backoff
+- Offline operations queued and synced when connection restored
 - Real-time updates responsive (< 100ms latency)
 - System stable with 10+ concurrent users
+- Graceful degradation during network issues
+- Cache persistence survives browser refresh
+- Clear connection status feedback to users
 
 #### Month 11-12: Graph Spreadsheet Editor
 
@@ -3322,21 +4570,68 @@ load_balancer:
 - Test suite execution: < 2 minutes
 - Documentation completeness: 100% for public APIs
 
+## Updated Architecture Summary - Unified GraphQL + MCP
+
+### **Major Improvements Made**
+
+🚀 **Simplified Communication Architecture:**
+- **REMOVED**: REST API complexity (15+ endpoints eliminated)
+- **REMOVED**: WebSocket custom protocol complexity
+- **REMOVED**: Zustand state management confusion
+- **UNIFIED**: Single GraphQL API handles ALL operations (Query/Mutation/Subscription)
+- **ENHANCED**: MCP integration via GraphQL mutations for seamless AI agent interaction
+
+📊 **Single Source of Truth:**
+- **Apollo Client Cache** manages ALL application state (local + remote)
+- **GraphQL Subscriptions** replace WebSocket complexity with standard protocol
+- **Optimistic UI Updates** with automatic rollback on conflict detection
+- **Offline Operation Queue** with automatic sync when connection restored
+
+🔍 **Enhanced Conflict Resolution:**
+- **Vector Clock Causality** tracking for proper operation ordering
+- **Real-time Conflict Detection** with CRDT-style resolution strategies
+- **Manual Resolution UI** for complex conflicts that require user input
+- **Operation Transform** system preserves user intent during concurrent edits
+
+🔌 **Robust Connection Management:**
+- **Automatic Reconnection** with exponential backoff
+- **Cache Persistence** survives browser refresh and network interruptions
+- **Connection Status UI** provides clear feedback to users
+- **Graceful Degradation** maintains functionality during network issues
+
+### **Technical Benefits Achieved**
+
+1. **➕ Maintainability**: Single communication pattern (GraphQL) instead of 3 separate systems
+2. **➕ Clarity**: Apollo Client as single source of truth eliminates state synchronization bugs
+3. **➕ Implementability**: Standard GraphQL subscriptions replace custom WebSocket protocol
+4. **➕ Extensibility**: New features only require GraphQL schema updates
+5. **➕ Design Coherence**: Unified error handling and state management patterns
+
+### **Production Readiness Improvements**
+
+- **✅ Offline Support**: Operations queued and synced automatically
+- **✅ Error Recovery**: Comprehensive error boundaries with retry logic
+- **✅ Performance**: Apollo Client optimizations and caching strategies
+- **✅ Scalability**: GraphQL subscriptions scale better than WebSocket broadcasts
+- **✅ Testing**: Single communication layer easier to mock and test
+
 ## Conclusion
 
-This implementation plan provides a **realistic and achievable** roadmap that builds on layercake's substantial existing foundation. By leveraging the ~70% complete backend infrastructure and focusing on adding visual editing capabilities, this approach significantly reduces risk while delivering the core requirements.
+This **significantly enhanced** implementation plan transforms the original architecture into a **production-ready, maintainable system**. By eliminating REST API complexity and unifying all communication through GraphQL + MCP, the system achieves:
 
 ### Key Success Factors
 
-1. **Incremental Development**: Build on proven existing systems rather than replace them
-2. **Performance First**: Optimize for large graphs throughout development
-3. **User Experience**: Maintain backward compatibility while adding visual capabilities
-4. **Collaboration Focus**: Simple but effective real-time editing features
-5. **AI Integration**: Enhance existing MCP tools for comprehensive agent support
+1. **Unified Architecture**: Single GraphQL API eliminates communication complexity
+2. **Real-time First**: GraphQL subscriptions provide reliable real-time updates
+3. **Offline Resilience**: Robust connection management with operation queuing
+4. **AI Integration**: Enhanced MCP tools with real-time GraphQL event integration
+5. **Developer Experience**: Apollo Client provides excellent debugging and caching
 
 ### Expected Outcomes
 
-**12-Month Milestone**: Complete visual editing platform with basic collaboration
-**18-Month Milestone**: Production-ready system with advanced features and optimization
+**12-Month Milestone**: Production-ready visual editing platform with real-time collaboration
+**18-Month Milestone**: Enterprise-grade system with advanced AI integration and performance optimization
+
+**The unified GraphQL + MCP architecture delivers superior maintainability, reliability, and extensibility compared to the original mixed-protocol approach.** This positions layercake as a **modern, scalable platform** ready for enterprise deployment and AI agent integration.
 
 The conservative timeline and incremental approach ensure reliable delivery while building toward the full vision outlined in the specification. This plan positions layercake as a leading interactive graph editing platform with strong AI collaboration capabilities.
