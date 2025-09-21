@@ -15,7 +15,7 @@ import ReactFlow, {
   Panel,
 } from 'reactflow'
 import { Stack, Title, Alert, Loader, Text, ActionIcon, Tooltip, Group } from '@mantine/core'
-import { IconAlertCircle, IconEye, IconSettings, IconPlay } from '@tabler/icons-react'
+import { IconAlertCircle, IconEye, IconSettings, IconPlayerPlay } from '@tabler/icons-react'
 
 import { usePlanDag, usePlanDagMutations, usePlanDagSubscription } from '../../../hooks/usePlanDag'
 import { PlanDag, PlanDagNode, PlanDagEdge, ReactFlowNode, ReactFlowEdge } from '../../../types/plan-dag'
@@ -306,7 +306,7 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
           </Tooltip>
           <Tooltip label="Run plan">
             <ActionIcon variant="light" color="green">
-              <IconPlay size="1rem" />
+              <IconPlayerPlay size="1rem" />
             </ActionIcon>
           </Tooltip>
           <Tooltip label="Settings">
