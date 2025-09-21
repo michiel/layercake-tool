@@ -4,9 +4,9 @@
 
 The overall goal is to change this pipeline graph transformation and creation tool to an interactive application that can be used to create and edit a graph visually, spawn child graphs from a parent graph, with changes higher up in the hierarchy propagating downwards. Multiple instances of the layercake tool can run at the same time and synchronise changes in real time, updating the user interface in real time. A desktop instance can connect to a server instance (any instance to any instance).
 
-Building this as a distributed and collaborative graph editing platform is an explicit goal. Backwards compatibility with the existing software is not a priority.
-
 Agentic AI with tooling exposed via Model Context Protocol for agentic collaboration is a key goal.
+
+Building this as a distributed and collaborative graph editing platform is a later goal and not a priority for version 1.0.0
 
 ### Layercake plans and graphs
 

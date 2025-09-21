@@ -192,7 +192,7 @@ CREATE TABLE layers (
 ### Plan DAG Node Types
 
 ```rust
-// Plan DAG Node Architecture
+// Improved Plan DAG Node Architecture
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PlanDagNode {
     InputNode {
@@ -202,45 +202,55 @@ pub enum PlanDagNode {
         config: InputConfig,
         position: Position,
     },
+
+    // GraphNode represents a persisted LayercakeGraph (storage)
     GraphNode {
         id: String,
         label: String,
-        graph_id: i32,  // References graphs table
-        metadata: GraphMetadata,
+        layercake_graph_id: Option<i32>, // None until graph is created/persisted
+        graph_metadata: GraphMetadata,
         position: Position,
     },
+
+    // CopyNode creates a copy operation (data flows through, no persistence)
     CopyNode {
         id: String,
         label: String,
-        source_graph_id: String,  // Source GraphNode ID
-        target_graph_id: String,  // Target GraphNode ID
         copy_config: CopyConfig,
         position: Position,
+        // Input: Graph data from connection
+        // Output: Copied graph data (flows to next node)
     },
+
+    // TransformNode applies transformations to flowing data
     TransformNode {
         id: String,
         label: String,
-        source_graph_id: String,
-        target_graph_id: String,
         transform_config: TransformConfig, // Existing YAML transform options
         position: Position,
+        // Input: Graph data from CopyNode or another TransformNode
+        // Output: Transformed graph data (flows to next node)
     },
+
+    // MergeNode combines multiple graph data streams
     MergeNode {
         id: String,
         label: String,
-        source_graph_ids: Vec<String>,
-        target_graph_id: String,
         merge_config: MergeConfig,
         position: Position,
+        // Input: Multiple graph data streams
+        // Output: Merged graph data (flows to next node)
     },
+
+    // OutputNode exports from a persisted GraphNode
     OutputNode {
         id: String,
         label: String,
-        source_graph_id: String,
         export_format: String, // "GML", "PlantUML", etc.
         export_config: ExportConfig,
         filename: String,
         position: Position,
+        // Input: Must connect to GraphNode (references persisted graph)
     },
 }
 
@@ -270,9 +280,10 @@ pub struct PlanDagEdge {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PlanDagEdgeType {
-    DataFlow,      // Data flows from source to target
-    Dependency,    // Target depends on source completion
-    Transformation, // Source transforms into target
+    GraphReference,    // GraphNode → other nodes (references persisted graph)
+    DataFlow,         // Copy/Transform data flowing through pipeline
+    Export,           // GraphNode → OutputNode (for export operations)
+    Input,            // InputNode → GraphNode (initial data loading)
 }
 ```
 
@@ -302,14 +313,20 @@ pub enum LayercakeGraphType {
     Scenario,      // User-created scenario/projection
 }
 
-// Example Plan DAG with LayercakeGraph projections:
-// InputNode(CSV) → GraphNode(graph1: "Current State")
-//                     ↓
-//                  CopyNode → GraphNode(graph2: "Scenario A")
-//                     ↓
-//                  TransformNode → GraphNode(graph3: "Scenario A Optimized")
-//                     ↓
-//                  OutputNode(PlantUML)
+// Example Plan DAG workflows:
+
+// 1. Simple Copy with Transform:
+// InputNode → GraphNode("Base") → CopyNode → TransformNode → GraphNode("Transformed")
+
+// 2. Multiple Independent Copies:
+//                                     ┌→ CopyNode → TransformNode → GraphNode("Scenario A")
+// InputNode → GraphNode("Base Data") ─┤
+//                                     └→ CopyNode → GraphNode("Exact Copy")
+
+// 3. Complex Pipeline:
+// InputNode → GraphNode("Raw") → CopyNode → TransformNode → TransformNode → GraphNode("Processed")
+//                           ↘
+//                             CopyNode → TransformNode → GraphNode("Summary")
 ```
 
 ### Database Schema Evolution
@@ -477,12 +494,13 @@ const planDagNodeTypes = {
   outputNode: OutputNodeComponent,      // Export formats
 };
 
-// GraphNode component for LayercakeGraph objects
+// Improved GraphNode component - shows persistence state
 const GraphNodeComponent: React.FC<NodeProps> = ({ data, id }) => {
   const { layercakeGraphId, graphMetadata, label } = data;
   const [graphStats, setGraphStats] = useState<GraphStats | null>(null);
+  const isPersisted = layercakeGraphId !== null;
 
-  // Load graph statistics
+  // Load graph statistics if persisted
   useEffect(() => {
     if (layercakeGraphId) {
       loadGraphStats(layercakeGraphId).then(setGraphStats);
@@ -490,39 +508,42 @@ const GraphNodeComponent: React.FC<NodeProps> = ({ data, id }) => {
   }, [layercakeGraphId]);
 
   const handleEditGraph = () => {
-    // Open GraphVisualEditor or GraphSpreadsheetEditor
-    openGraphEditor(layercakeGraphId);
+    if (layercakeGraphId) {
+      openGraphEditor(layercakeGraphId);
+    }
   };
 
   return (
-    <div className="plan-dag-graph-node">
+    <div className={`plan-dag-graph-node ${isPersisted ? 'persisted' : 'pending'}`}>
       <Handle type="target" position={Position.Top} />
 
       <div className="node-header">
-        <LayersIcon size={16} />
+        <DatabaseIcon size={16} />
         <span className="node-type">LayercakeGraph</span>
+        {isPersisted && <CheckIcon size={12} className="persisted-icon" />}
       </div>
 
       <div className="node-content">
         <h4>{label}</h4>
-        {graphStats && (
+        {isPersisted ? (
           <div className="graph-stats">
-            <span>{graphStats.nodeCount} nodes</span>
-            <span>{graphStats.edgeCount} edges</span>
-            <span>{graphStats.layerCount} layers</span>
+            <span>ID: {layercakeGraphId}</span>
+            {graphStats && (
+              <>
+                <span>{graphStats.nodeCount} nodes</span>
+                <span>{graphStats.edgeCount} edges</span>
+                <span>{graphStats.layerCount} layers</span>
+              </>
+            )}
+            <Button size="xs" onClick={handleEditGraph}>
+              Edit Graph
+            </Button>
+          </div>
+        ) : (
+          <div className="pending-state">
+            <span>Will be created when pipeline executes</span>
           </div>
         )}
-        {graphMetadata?.parentGraphId && (
-          <div className="graph-hierarchy">
-            <span>Child of Graph {graphMetadata.parentGraphId}</span>
-          </div>
-        )}
-      </div>
-
-      <div className="node-actions">
-        <Button size="xs" onClick={handleEditGraph}>
-          Edit Graph
-        </Button>
       </div>
 
       <Handle type="source" position={Position.Bottom} />
@@ -530,70 +551,152 @@ const GraphNodeComponent: React.FC<NodeProps> = ({ data, id }) => {
   );
 };
 
-// Copy→Transform→Graph Pipeline Example
-const createCopyTransformPipeline = async (
-  sourceGraphId: number,
-  transformConfig: TransformConfig
+// CopyNode component - shows operation
+const CopyNodeComponent: React.FC<NodeProps> = ({ data }) => {
+  return (
+    <div className="copy-node operation-node">
+      <Handle type="target" position={Position.Top} />
+
+      <div className="node-header">
+        <CopyIcon size={16} />
+        <span>Copy Operation</span>
+      </div>
+
+      <div className="node-content">
+        <h4>{data.label}</h4>
+        <p>Creates copy of input graph data</p>
+        <small>Data flows through to next node</small>
+      </div>
+
+      <Handle type="source" position={Position.Bottom} />
+    </div>
+  );
+};
+
+// TransformNode component - shows operation
+const TransformNodeComponent: React.FC<NodeProps> = ({ data }) => {
+  const { transform_config } = data;
+
+  return (
+    <div className="transform-node operation-node">
+      <Handle type="target" position={Position.Top} />
+
+      <div className="node-header">
+        <TransformIcon size={16} />
+        <span>Transform Operation</span>
+      </div>
+
+      <div className="node-content">
+        <h4>{data.label}</h4>
+        <p>Applies transformations to flowing data</p>
+        {transform_config && (
+          <div className="transform-summary">
+            <small>{Object.keys(transform_config).join(', ')}</small>
+          </div>
+        )}
+      </div>
+
+      <Handle type="source" position={Position.Bottom} />
+    </div>
+  );
+};
+
+// Improved Copy→Transform→Graph Pipeline Creation
+const createCopyTransformPipeline = (
+  sourceGraphNode: PlanDagNode,
+  transformConfig: TransformConfig,
+  targetGraphName: string
 ) => {
-  // 1. Create target LayercakeGraph for copy
-  const copyGraph = await createLayercakeGraph({
-    projectId,
-    graphName: `${sourceGraph.name} - Copy`,
-    parentGraphId: sourceGraphId,
-    graphType: 'copy',
-  });
-
-  // 2. Create target LayercakeGraph for transform result
-  const transformGraph = await createLayercakeGraph({
-    projectId,
-    graphName: `${sourceGraph.name} - Transformed`,
-    parentGraphId: copyGraph.id,
-    graphType: 'transform',
-  });
-
-  // 3. Add Plan DAG nodes
+  // 1. Create CopyNode (operation, no persistence)
   const copyNode: PlanDagNode = {
     id: generateId(),
     type: 'copy',
-    position: { x: 200, y: 100 },
+    position: { x: sourceGraphNode.position.x + 200, y: sourceGraphNode.position.y },
     data: {
-      label: 'Copy Graph',
-      config: { sourceGraphId, targetGraphId: copyGraph.id },
+      label: 'Copy Operation',
+      copy_config: {},
       status: 'pending',
     },
   };
 
+  // 2. Create TransformNode (operation, no persistence)
   const transformNode: PlanDagNode = {
     id: generateId(),
     type: 'transform',
-    position: { x: 400, y: 100 },
+    position: { x: copyNode.position.x + 200, y: copyNode.position.y },
     data: {
-      label: 'Transform Graph',
-      config: {
-        sourceGraphId: copyGraph.id,
-        targetGraphId: transformGraph.id,
-        transformConfig,
-      },
+      label: 'Transform Operation',
+      transform_config: transformConfig,
       status: 'pending',
     },
   };
 
-  const graphNode: PlanDagNode = {
+  // 3. Create target GraphNode (will persist result)
+  const targetGraphNode: PlanDagNode = {
     id: generateId(),
     type: 'graph',
-    position: { x: 600, y: 100 },
+    position: { x: transformNode.position.x + 200, y: transformNode.position.y },
     data: {
-      label: transformGraph.graphName,
-      layercakeGraphId: transformGraph.id,
+      label: targetGraphName,
+      layercakeGraphId: null, // Will be created during execution
       graphMetadata: {
-        parentGraphId: copyGraph.id,
-        generation: transformGraph.generation,
+        graphType: 'transform',
+        sourceGraphId: sourceGraphNode.data.layercakeGraphId,
       },
       status: 'pending',
     },
   };
 
-  return [copyNode, transformNode, graphNode];
+  // 4. Create connections
+  const edges: PlanDagEdge[] = [
+    {
+      id: generateId(),
+      source: sourceGraphNode.id,
+      target: copyNode.id,
+      type: 'dataflow',
+    },
+    {
+      id: generateId(),
+      source: copyNode.id,
+      target: transformNode.id,
+      type: 'dataflow',
+    },
+    {
+      id: generateId(),
+      source: transformNode.id,
+      target: targetGraphNode.id,
+      type: 'dataflow',
+    },
+  ];
+
+  return { nodes: [copyNode, transformNode, targetGraphNode], edges };
+};
+
+// Multiple Independent Copies Handler
+const handleMultipleCopies = () => {
+  // Allow multiple outbound connections from GraphNode
+  const onConnect = (connection: Connection) => {
+    const sourceNode = getNode(connection.source);
+    const targetNode = getNode(connection.target);
+
+    if (sourceNode?.type === 'graphNode' && targetNode?.type === 'copyNode') {
+      // Allow multiple copy operations from same graph
+      addEdge({
+        id: generateEdgeId(),
+        source: connection.source,
+        target: connection.target,
+        type: 'dataflow',
+        label: 'Graph Data',
+      });
+    }
+  };
+
+  // Visual feedback for multiple connections
+  const onConnectStart = (event: any, { nodeId, handleType }: any) => {
+    if (handleType === 'source' && getNodeType(nodeId) === 'graphNode') {
+      showConnectionHint('Can create multiple copies from this graph');
+    }
+  };
 };
 ```
 
@@ -877,37 +980,101 @@ impl PlanDagExecutor {
         Ok(ExecutionResult::Success)
     }
 
-    async fn execute_node(&self, node: &PlanDagNode, plan_dag: &PlanDag) -> Result<()> {
-        match node {
-            PlanDagNode::InputNode { id, input_type, config, .. } => {
-                self.execute_input_node(id, input_type, config).await
-            },
-            PlanDagNode::CopyNode { source_graph_id, target_graph_id, .. } => {
-                let source_id = self.resolve_graph_node_id(source_graph_id, plan_dag)?;
-                let target_id = self.resolve_graph_node_id(target_graph_id, plan_dag)?;
-                self.graph_service.copy_graph_data(source_id, target_id).await
-            },
-            PlanDagNode::TransformNode { source_graph_id, target_graph_id, transform_config, .. } => {
-                let source_id = self.resolve_graph_node_id(source_graph_id, plan_dag)?;
-                let target_id = self.resolve_graph_node_id(target_graph_id, plan_dag)?;
-                self.graph_service.apply_transformation(source_id, target_id, transform_config.clone()).await
-            },
-            PlanDagNode::OutputNode { source_graph_id, export_format, export_config, filename, .. } => {
-                let graph_id = self.resolve_graph_node_id(source_graph_id, plan_dag)?;
-                self.execute_export(graph_id, export_format, export_config, filename).await
-            },
-            PlanDagNode::GraphNode { .. } => {
-                // GraphNodes are references, no execution needed
-                Ok(())
-            },
-            PlanDagNode::MergeNode { source_graph_ids, target_graph_id, merge_config, .. } => {
-                let source_ids: Result<Vec<i32>> = source_graph_ids.iter()
-                    .map(|id| self.resolve_graph_node_id(id, plan_dag))
-                    .collect();
-                let target_id = self.resolve_graph_node_id(target_graph_id, plan_dag)?;
-                self.execute_merge(source_ids?, target_id, merge_config).await
-            },
+    // Improved execution with data flow model
+    async fn execute_plan_dag(&self, project_id: i32) -> Result<ExecutionResult> {
+        let project = Project::find_by_id(project_id)
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| anyhow!("Project not found"))?;
+
+        let plan_dag: PlanDag = serde_json::from_str(
+            &project.plan_dag_json.unwrap_or_default()
+        )?;
+
+        // Find all execution paths (from InputNode to GraphNode)
+        let execution_paths = self.find_execution_paths(&plan_dag)?;
+
+        // Execute each path independently (supports multiple copies)
+        for path in execution_paths {
+            self.execute_path_async(path).await?;
         }
+
+        Ok(ExecutionResult::Success)
+    }
+
+    async fn execute_path_async(&self, path: Vec<&PlanDagNode>) -> Result<()> {
+        let mut graph_data: Option<GraphData> = None;
+
+        for node in path {
+            match node {
+                PlanDagNode::InputNode { input_type, config, .. } => {
+                    // Load initial data
+                    graph_data = Some(self.load_input_data(input_type, config).await?);
+                },
+
+                PlanDagNode::GraphNode { layercake_graph_id, .. } => {
+                    if let Some(graph_id) = layercake_graph_id {
+                        // Load existing persisted graph
+                        graph_data = Some(self.load_graph_data(*graph_id).await?);
+                    } else {
+                        // Create new graph from flowing data
+                        if let Some(data) = &graph_data {
+                            let new_graph = self.graph_service
+                                .create_layercake_graph_from_data(data.clone())
+                                .await?;
+
+                            // Update node with persisted graph ID
+                            self.update_graph_node_id(node.id(), new_graph.id).await?;
+                        }
+                    }
+                },
+
+                PlanDagNode::CopyNode { copy_config, .. } => {
+                    // Copy graph data (in memory, not persisted)
+                    if let Some(data) = &graph_data {
+                        graph_data = Some(self.deep_copy_graph_data(data, copy_config)?);
+                    }
+                },
+
+                PlanDagNode::TransformNode { transform_config, .. } => {
+                    // Apply transformation to flowing data
+                    if let Some(data) = &graph_data {
+                        graph_data = Some(self.apply_transformation(data, transform_config).await?);
+                    }
+                },
+
+                PlanDagNode::MergeNode { merge_config, .. } => {
+                    // Merge multiple data streams (implementation depends on merge strategy)
+                    graph_data = Some(self.merge_graph_data(graph_data, merge_config).await?);
+                },
+
+                PlanDagNode::OutputNode { export_format, export_config, filename, .. } => {
+                    // Export from flowing data or connected GraphNode
+                    if let Some(data) = &graph_data {
+                        self.export_graph_data(data, export_format, export_config, filename).await?;
+                    }
+                },
+            }
+        }
+
+        Ok(())
+    }
+
+    fn find_execution_paths(&self, plan_dag: &PlanDag) -> Result<Vec<Vec<&PlanDagNode>>> {
+        let mut paths = Vec::new();
+
+        // Find all InputNodes as starting points
+        let input_nodes: Vec<&PlanDagNode> = plan_dag.nodes.iter()
+            .filter(|node| matches!(node, PlanDagNode::InputNode { .. }))
+            .collect();
+
+        // Trace paths from each InputNode
+        for input_node in input_nodes {
+            let mut current_path = vec![input_node];
+            self.trace_path_recursive(input_node, &mut current_path, plan_dag, &mut paths);
+        }
+
+        Ok(paths)
     }
 
     fn resolve_graph_node_id(&self, node_id: &str, plan_dag: &PlanDag) -> Result<i32> {
@@ -983,19 +1150,22 @@ type PropagationResult {
 ```
 
 **Key Deliverables**
+- ✅ Improved Plan DAG node architecture with clear data flow
 - ✅ LayercakeGraph entity and service implementation
-- ✅ Graph copying and transformation pipelines
-- ✅ Plan DAG execution engine
-- ✅ Graph hierarchy management within Plan DAG
+- ✅ Copy→Transform→Graph pipelines with proper UX flow
+- ✅ Multiple independent copies from single graph support
+- ✅ Plan DAG execution engine with path-based execution
+- ✅ Visual distinction between operations and storage nodes
 - ✅ Edit operation tracking for reproducibility
-- ✅ GraphQL API for LayercakeGraph operations
 
 **Success Criteria**
-- LayercakeGraph instances properly separate from Plan DAG metadata
-- Copy→Transform→Graph pipelines execute correctly
-- Graph data copying preserves all nodes, edges, layers
-- Plan DAG execution follows topological order
-- Edit operations tracked for reproducibility
+- Copy operations flow data without immediate persistence
+- Transform chains can be applied before creating final graphs
+- Multiple independent copies can branch from single source graph
+- Plan DAG execution follows data flow paths correctly
+- Visual editor clearly distinguishes operations vs. storage
+- LayercakeGraph instances only created when data reaches GraphNode
+- Complex branching and merging pipelines work correctly
 
 #### Month 7-8: Graph Visual Editor
 
