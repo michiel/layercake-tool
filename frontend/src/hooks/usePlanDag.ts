@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useSubscription } from '@apollo/client'
+import { useQuery, useMutation, useSubscription } from '@apollo/client/react'
 import { useCallback, useMemo } from 'react'
 import {
   GET_PLAN_DAG,
