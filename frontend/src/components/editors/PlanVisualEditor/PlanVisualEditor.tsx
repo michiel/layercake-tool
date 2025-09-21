@@ -115,6 +115,9 @@ const convertReactFlowToPlanDag = (
 }
 
 export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readonly = false }: PlanVisualEditorProps) => {
+  // Memoize nodeTypes to prevent recreation warnings
+  const memoizedNodeTypes = useMemo(() => nodeTypes, [])
+
   // Skip backend calls for frontend-only development
   const { planDag, loading, error } = { planDag: null, loading: false, error: null } // usePlanDag(projectId)
   const mutations = {} as any // usePlanDagMutations(projectId)
@@ -126,8 +129,8 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
   const [selectedEdge, setSelectedEdge] = useState<string | null>(null)
   const [isDirty, setIsDirty] = useState(false)
 
-  // Create mock Plan DAG for frontend-only development
-  const mockPlanDag = planDag || {
+  // Create mock Plan DAG for frontend-only development - memoized to prevent recreations
+  const mockPlanDag = useMemo(() => planDag || {
     version: "1.0",
     nodes: [
       {
@@ -186,7 +189,7 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
       name: "Demo Plan DAG",
       description: "Frontend development demonstration"
     }
-  }
+  }, [planDag])
 
   // Initialize ReactFlow from Plan DAG data
   useEffect(() => {
@@ -195,7 +198,7 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
       setNodes(rfNodes)
       setEdges(rfEdges)
     }
-  }, [mockPlanDag, setNodes, setEdges])
+  }, [mockPlanDag]) // Removed setNodes/setEdges from deps to prevent infinite loop
 
   // Handle real-time changes from other users
   useEffect(() => {
@@ -387,7 +390,7 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
           onNodesChange={handleNodesChange}
           onEdgesChange={handleEdgesChange}
           onConnect={onConnect}
-          nodeTypes={nodeTypes}
+          nodeTypes={memoizedNodeTypes}
           connectionMode={ConnectionMode.Loose}
           fitView
           attributionPosition="top-right"
