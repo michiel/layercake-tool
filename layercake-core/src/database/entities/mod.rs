@@ -5,6 +5,10 @@ pub mod edges;
 pub mod layers;
 pub mod plan_dag_nodes;
 pub mod plan_dag_edges;
+pub mod users;
+pub mod user_sessions;
+pub mod project_collaborators;
+pub mod user_presence;
 
 // Re-export specific entities to avoid naming conflicts
 pub use projects::{Entity as ProjectEntity, Model as ProjectModel, ActiveModel as ProjectActiveModel};
@@ -14,3 +18,7 @@ pub use edges::{Entity as EdgeEntity, Model as EdgeModel, ActiveModel as EdgeAct
 pub use layers::{Entity as LayerEntity, Model as LayerModel, ActiveModel as LayerActiveModel};
 pub use plan_dag_nodes::{Entity as PlanDagNodeEntity, Model as PlanDagNodeModel, ActiveModel as PlanDagNodeActiveModel};
 pub use plan_dag_edges::{Entity as PlanDagEdgeEntity, Model as PlanDagEdgeModel, ActiveModel as PlanDagEdgeActiveModel};
+pub use users::{Entity as UserEntity, Model as UserModel, ActiveModel as UserActiveModel};
+pub use user_sessions::{Entity as UserSessionEntity, Model as UserSessionModel, ActiveModel as UserSessionActiveModel};
+pub use project_collaborators::{Entity as ProjectCollaboratorEntity, Model as ProjectCollaboratorModel, ActiveModel as ProjectCollaboratorActiveModel};
+pub use user_presence::{Entity as UserPresenceEntity, Model as UserPresenceModel, ActiveModel as UserPresenceActiveModel};

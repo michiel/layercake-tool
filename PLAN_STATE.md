@@ -810,21 +810,126 @@ const staticMockPlanDag: PlanDag = {
 - **Coordinate System**: Proper world ↔ screen coordinate transformations
 - **Performance**: Fixed infinite loops and ReactFlow warnings
 
-#### **Option B: Jump to Phase 2 - Backend Integration**
-```
-1. Implement backend GraphQL API
-2. Database schema for Plan DAG storage
-3. Connect frontend to real data
-4. Node configuration dialogs
-```
+---
 
-#### **Option C: Polish Phase 1.3 - Enhanced UX**
-```
-1. Node configuration popup dialogs
-2. Form validation for node properties
-3. Plan execution preview
-4. Error handling improvements
-```
+## **🚀 Phase 2: Backend Integration & Persistence (CURRENT PHASE)**
+
+### **Goal**: Add persistent data storage, multi-user support, and complete backend integration
+
+**Key Technology Decisions**:
+- 🔄 SQLite database with SQLx for development
+- 🔄 PostgreSQL for production deployment
+- 🔄 Database migrations and schema versioning
+- 🔄 User authentication (simple session-based initially)
+- 🔄 Project ownership and sharing model
+
+### **Stage 2.1: Database Foundation**
+**Goal**: Set up persistent storage for Plan DAGs and user data
+**Success Criteria**: Database schema created, migrations working, basic CRUD operations
+**Tests**: Database integration tests, migration tests
+**Status**: ✅ Completed
+
+#### Tasks:
+- [x] **2.1.1** Database schema design
+  - Plan DAG storage (nodes, edges, metadata) - **✅ SeaORM entities created**
+  - User accounts and authentication - **✅ users.rs entity with auth fields**
+  - Project ownership and collaboration - **✅ project_collaborators.rs with roles**
+  - User presence for real-time collaboration - **✅ user_presence.rs entity**
+
+- [x] **2.1.2** Database setup and migrations
+  - Discovered existing SeaORM setup (better than SQLx) - **✅ Already configured**
+  - Create migration system - **✅ m003_user_authentication.rs migration created**
+  - Implement schema versioning - **✅ Migration system already in place**
+  - Database entities compile successfully - **✅ All entities verified**
+
+- [x] **2.1.3** Entity models and relationships
+  - Rust entity structs with serde support
+  - Foreign key relationships
+  - Validation and constraints
+  - Database indexing strategy
+
+### **Stage 2.2: GraphQL API Implementation**
+**Goal**: Complete backend GraphQL API with persistent storage
+**Success Criteria**: All frontend operations work with real backend data
+**Tests**: API integration tests, GraphQL schema validation
+**Status**: Not Started
+
+#### Tasks:
+- [ ] **2.2.1** Query implementations
+  - Get user projects
+  - Load Plan DAG data
+  - User authentication queries
+  - Project collaboration queries
+
+- [ ] **2.2.2** Mutation implementations
+  - Create/update/delete projects
+  - Plan DAG modifications (nodes, edges)
+  - User registration/login
+  - Project sharing and permissions
+
+- [ ] **2.2.3** Subscription enhancements
+  - Database-backed real-time updates
+  - User presence persistence
+  - Cross-session collaboration
+  - Conflict resolution with persistence
+
+### **Stage 2.3: Frontend Integration**
+**Goal**: Connect frontend to real backend with seamless user experience
+**Success Criteria**: No more mock data, full CRUD operations working
+**Tests**: End-to-end user workflows, data persistence tests
+**Status**: Not Started
+
+#### Tasks:
+- [ ] **2.3.1** Apollo Client backend integration
+  - Replace mock GraphQL responses
+  - Error handling for network failures
+  - Optimistic UI updates
+  - Cache invalidation strategies
+
+- [ ] **2.3.2** User authentication flow
+  - Login/register components
+  - Protected routes and permissions
+  - Session persistence
+  - User profile management
+
+- [ ] **2.3.3** Project management UI
+  - Project creation and listing
+  - Project sharing and collaboration
+  - Import/export functionality
+  - Version history browser
+
+### **Stage 2.4: Advanced Features**
+**Goal**: Add production-ready features and polish
+**Success Criteria**: Multi-user collaboration, file operations, deployment ready
+**Tests**: Load testing, security testing, user acceptance tests
+**Status**: Not Started
+
+#### Tasks:
+- [ ] **2.4.1** File import/export
+  - CSV/JSON import for Plan DAG data
+  - Export to various formats
+  - Bulk operations and validation
+  - File upload handling
+
+- [ ] **2.4.2** Advanced collaboration
+  - Persistent user presence
+  - Commenting and annotations
+  - Change tracking and history
+  - Merge conflict resolution
+
+- [ ] **2.4.3** Production deployment
+  - PostgreSQL migration
+  - Environment configuration
+  - Security hardening
+  - Performance optimization
+
+### **Current Focus: Stage 2.1 - Database Foundation**
+
+**Immediate Next Steps**:
+1. Design comprehensive database schema
+2. Set up SQLx with SQLite
+3. Create migration system
+4. Implement core entity models
 
 ### **🎮 How to Test Current Implementation**
 ```bash

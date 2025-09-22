@@ -2,6 +2,7 @@ use sea_orm_migration::prelude::*;
 
 mod m001_create_tables;
 mod m002_plan_dag_tables;
+mod m003_user_authentication;
 
 pub struct Migrator;
 
@@ -11,6 +12,7 @@ impl MigratorTrait for Migrator {
         vec![
             Box::new(m001_create_tables::Migration),
             Box::new(m002_plan_dag_tables::Migration),
+            Box::new(m003_user_authentication::Migration),
         ]
     }
 }
