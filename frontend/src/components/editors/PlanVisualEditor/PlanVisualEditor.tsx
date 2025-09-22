@@ -415,6 +415,8 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
 
     // Convert screen coordinates to world coordinates for broadcasting
     const viewport = viewportRef.current
+    if (!viewport) return // Guard against null viewport
+
     const worldX = (screenX - viewport.x) / viewport.zoom
     const worldY = (screenY - viewport.y) / viewport.zoom
 
