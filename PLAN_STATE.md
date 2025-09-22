@@ -793,13 +793,22 @@ const staticMockPlanDag: PlanDag = {
 
 ### **🚀 Immediate Next Steps (Recommended Priority)**
 
-#### **Option A: Continue Phase 1.4 - Real-time Collaboration**
+#### **✅ Phase 1.4 - Real-time Collaboration (COMPLETED)**
 ```
-1. Implement GraphQL subscriptions backend
-2. Add user presence indicators
-3. Real-time plan synchronization
-4. Conflict resolution UI
+✅ 1. Implement GraphQL subscriptions backend
+✅ 2. Add user presence indicators
+✅ 3. Real-time plan synchronization
+✅ 4. Conflict resolution UI infrastructure
+✅ 5. Viewport-aware collaborative cursors
+✅ 6. ReactFlow infinite loop fixes
 ```
+
+**Implementation Details:**
+- **Backend**: Complete GraphQL subscriptions with Tokio broadcast channels
+- **Frontend**: Apollo Client WebSocket integration with subscription hooks
+- **UI Components**: User presence indicators and collaborative cursors
+- **Coordinate System**: Proper world ↔ screen coordinate transformations
+- **Performance**: Fixed infinite loops and ReactFlow warnings
 
 #### **Option B: Jump to Phase 2 - Backend Integration**
 ```
@@ -819,23 +828,27 @@ const staticMockPlanDag: PlanDag = {
 
 ### **🎮 How to Test Current Implementation**
 ```bash
-# 1. Development server is running at http://localhost:5173/
-# 2. Open browser to http://localhost:5173/
+# 1. Frontend running at http://localhost:1420/
+# 2. Backend running at http://localhost:3001/ (GraphQL subscriptions)
 # 3. Click "Plan Editor" in sidebar
-# 4. Test the fully functional visual editor:
+# 4. Test the fully functional collaborative visual editor:
 #    - 3 nodes display automatically (CSV Import → Filter → Export)
-#    - Drag nodes to reposition (see console logs)
+#    - Drag nodes to reposition (real-time collaboration ready)
 #    - Select nodes and edges for interaction
 #    - Use ReactFlow controls (zoom, pan, fit view)
 #    - Try creating new connections (validation prevents invalid links)
-#    - Check browser console for mock operation logs
+#    - Double-click nodes to open configuration dialogs
+#    - See collaborative user presence indicators (2 online users shown)
+#    - Watch collaborative cursors move with zoom/pan operations
+#    - Check browser console for collaboration events
 #    - Navigate between different app sections
 ```
 
 ### **📋 Technical Debt & Cleanup**
 - [ ] Add proper error boundaries for ReactFlow
 - [x] Implement node configuration dialogs ✅ (Complete with form validation and JSON support)
-- [ ] Add unit tests for Plan DAG operations
+- [x] Real-time collaboration infrastructure ✅ (Complete with viewport-aware cursors)
+- [ ] Add unit tests for Plan DAG operations and collaboration hooks
 - [x] Create mock data for better demonstration ✅ (Complete demonstration workflow implemented)
 - [ ] Add loading states for async operations
 - [ ] Clean up multiple background bash sessions
