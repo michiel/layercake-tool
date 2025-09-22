@@ -4,6 +4,7 @@ use chrono::Utc;
 
 use crate::database::entities::{projects, plans, nodes, edges, layers, plan_dag_nodes, plan_dag_edges, users, user_sessions, project_collaborators, user_presence};
 use crate::graphql::context::GraphQLContext;
+use crate::services::{AuthService, ValidationService};
 use crate::graphql::types::{
     Project, Plan, Node, Edge, Layer,
     CreateProjectInput, UpdateProjectInput,
@@ -558,6 +559,14 @@ impl Mutation {
     async fn register(&self, ctx: &Context<'_>, input: RegisterUserInput) -> Result<RegisterResponse> {
         let context = ctx.data::<GraphQLContext>()?;
 
+        // Validate input
+        AuthService::validate_email(&input.email)
+            .map_err(|e| Error::new(format!("Email validation failed: {}", e)))?;
+        AuthService::validate_username(&input.username)
+            .map_err(|e| Error::new(format!("Username validation failed: {}", e)))?;
+        AuthService::validate_display_name(&input.display_name)
+            .map_err(|e| Error::new(format!("Display name validation failed: {}", e)))?;
+
         // Check if user already exists
         let existing_user = users::Entity::find()
             .filter(users::Column::Email.eq(&input.email))
@@ -577,8 +586,9 @@ impl Mutation {
             return Err(Error::new("Username already taken"));
         }
 
-        // Hash password (in a real implementation, use proper password hashing)
-        let password_hash = format!("hashed_{}", input.password); // TODO: Use bcrypt or argon2
+        // Hash password using bcrypt
+        let password_hash = AuthService::hash_password(&input.password)
+            .map_err(|e| Error::new(format!("Password hashing failed: {}", e)))?;
 
         // Create user
         let mut user = users::ActiveModel::new();
@@ -586,6 +596,7 @@ impl Mutation {
         user.username = Set(input.username);
         user.display_name = Set(input.display_name);
         user.password_hash = Set(password_hash);
+        user.avatar_color = Set(AuthService::generate_avatar_color());
 
         let user = user.insert(&context.db).await?;
 
@@ -611,9 +622,11 @@ impl Mutation {
             .await?
             .ok_or_else(|| Error::new("Invalid email or password"))?;
 
-        // Verify password (in a real implementation, verify hashed password)
-        let expected_hash = format!("hashed_{}", input.password);
-        if user.password_hash != expected_hash {
+        // Verify password using bcrypt
+        let is_valid = AuthService::verify_password(&input.password, &user.password_hash)
+            .map_err(|e| Error::new(format!("Password verification failed: {}", e)))?;
+
+        if !is_valid {
             return Err(Error::new("Invalid email or password"));
         }
 

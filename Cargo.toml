@@ -56,6 +56,9 @@ async-graphql-axum = "7.0"
 async-stream = "0.3"
 lazy_static = "1.4"
 
+# Authentication dependencies
+bcrypt = "0.15"
+
 # MCP dependencies
 axum-mcp = { path = "external-modules/axum-mcp" }
 tokio-tungstenite = { version = "0.21", features = ["rustls-tls-webpki-roots"] }

@@ -88,6 +88,9 @@ async-graphql-axum = { workspace = true, optional = true }
 async-stream = { workspace = true, optional = true }
 lazy_static = { workspace = true, optional = true }
 
+# Authentication dependencies
+bcrypt = { workspace = true }
+
 # MCP dependencies (optional)
 axum-mcp = { workspace = true, optional = true }
 tokio-tungstenite = { workspace = true, optional = true }
