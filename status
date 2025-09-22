@@ -1,0 +1,7 @@
+  Todos
+  ☒ Start Phase 2.3: Frontend-Backend Integration
+  ☒ Update backend GraphQL server to serve Plan DAG endpoints
+  ☐ Test GraphQL Plan DAG endpoints functionality
+  ☐ Configure frontend Apollo Client to connect to real backend
+  ☐ Test end-to-end Plan DAG operations
+  ☐ Replace frontend mock data with real backend calls

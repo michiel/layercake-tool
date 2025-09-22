@@ -132,13 +132,17 @@ Visual Editor: ✅ Fully functional drag-and-drop interface
 Application Integration: ✅ Integrated into main app with navigation
 Development Server: ✅ Running without compilation errors
 Form Validation: ✅ Comprehensive validation with JSON config support
+Real-time Collaboration: ✅ GraphQL subscriptions with WebSocket transport
+User Presence: ✅ Collaborative cursors and user indicators implemented
+Broadcast System: ✅ Tokio channels with global plan broadcaster
+Frontend Integration: ✅ Apollo Client subscription hooks and UI components
 ```
 
 ### **Stage 1.4: Real-time Collaboration Foundation**
 **Goal**: Enable multiple users to edit plans simultaneously with real-time synchronization
 **Success Criteria**: Changes from one user appear in real-time for others, user presence indicators working, basic conflict resolution
 **Tests**: Multi-user editing scenarios, conflict detection, WebSocket connection stability
-**Status**: ✅ IN PROGRESS
+**Status**: ✅ COMPLETED
 
 #### **Implementation Plan - Option A: Real-time Collaboration**
 
@@ -148,19 +152,19 @@ Form Validation: ✅ Comprehensive validation with JSON config support
 **Estimated Time**: 3-4 days
 
 ##### Backend Tasks:
-- [ ] **1.4.1.1** GraphQL subscription schema design
-  - Define `PLAN_DAG_UPDATED` subscription type for node/edge changes
-  - Design `USER_PRESENCE_CHANGED` subscription for collaborative cursors
-  - Create `PLAN_COLLABORATION_EVENT` union type for all real-time events
-  - Add subscription resolvers in `layercake-core/src/graphql/subscriptions/`
+- [x] **1.4.1.1** GraphQL subscription schema design
+  - ✅ Define `PLAN_DAG_UPDATED` subscription type for node/edge changes
+  - ✅ Design `USER_PRESENCE_CHANGED` subscription for collaborative cursors
+  - ✅ Create `PLAN_COLLABORATION_EVENT` union type for all real-time events
+  - ✅ Add subscription resolvers in `layercake-core/src/graphql/subscriptions/`
 
-- [ ] **1.4.1.2** WebSocket server implementation
-  - Configure `graphql-ws` WebSocket transport in Rust backend
-  - Implement subscription event broadcasting with channels
-  - Add connection lifecycle management (connect/disconnect/heartbeat)
-  - Set up subscription authentication and authorization
+- [x] **1.4.1.2** WebSocket server implementation
+  - ✅ Configure `graphql-ws` WebSocket transport in Rust backend
+  - ✅ Implement subscription event broadcasting with channels
+  - ✅ Add connection lifecycle management (connect/disconnect/heartbeat)
+  - ✅ Set up subscription authentication and authorization
 
-- [ ] **1.4.1.3** Real-time event system
+- [x] **1.4.1.3** Real-time event system
   - Create `PlanCollaborationService` for managing active sessions
   - Implement user session tracking with Redis or in-memory store
   - Add event publishing for plan mutations (create/update/delete nodes/edges)
