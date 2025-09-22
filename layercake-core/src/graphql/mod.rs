@@ -7,6 +7,8 @@ pub mod queries;
 #[cfg(feature = "graphql")]
 pub mod mutations;
 #[cfg(feature = "graphql")]
+pub mod subscriptions;
+#[cfg(feature = "graphql")]
 pub mod context;
 
 #[cfg(feature = "graphql")]

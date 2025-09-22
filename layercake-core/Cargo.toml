@@ -32,6 +32,8 @@ graphql = [
     "server",
     "dep:async-graphql",
     "dep:async-graphql-axum",
+    "dep:async-stream",
+    "dep:lazy_static",
 ]
 mcp = [
     "server",
@@ -83,6 +85,8 @@ utoipa-swagger-ui = { workspace = true, optional = true }
 # GraphQL dependencies (optional)
 async-graphql = { workspace = true, optional = true }
 async-graphql-axum = { workspace = true, optional = true }
+async-stream = { workspace = true, optional = true }
+lazy_static = { workspace = true, optional = true }
 
 # MCP dependencies (optional)
 axum-mcp = { workspace = true, optional = true }

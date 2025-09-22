@@ -53,6 +53,8 @@ utoipa-swagger-ui = { version = "6.0", features = ["axum"] }
 # GraphQL dependencies
 async-graphql = { version = "7.0", features = ["chrono", "uuid"] }
 async-graphql-axum = "7.0"
+async-stream = "0.3"
+lazy_static = "1.4"
 
 # MCP dependencies
 axum-mcp = { path = "external-modules/axum-mcp" }

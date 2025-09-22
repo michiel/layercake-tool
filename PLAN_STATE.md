@@ -135,36 +135,210 @@ Form Validation: ✅ Comprehensive validation with JSON config support
 ```
 
 ### **Stage 1.4: Real-time Collaboration Foundation**
-**Goal**: Enable multiple users to edit plans simultaneously
-**Success Criteria**: Changes from one user appear in real-time for others
-**Tests**: Multi-user editing scenarios, conflict detection
-**Status**: Not Started
+**Goal**: Enable multiple users to edit plans simultaneously with real-time synchronization
+**Success Criteria**: Changes from one user appear in real-time for others, user presence indicators working, basic conflict resolution
+**Tests**: Multi-user editing scenarios, conflict detection, WebSocket connection stability
+**Status**: ✅ IN PROGRESS
 
-#### Tasks:
-- [ ] **1.4.1** GraphQL subscriptions setup
-  - Implement `PLAN_CHANGED_SUBSCRIPTION` for real-time updates
-  - Add `USER_PRESENCE_SUBSCRIPTION` for collaborative cursors
-  - Configure WebSocket connection management
-  - Handle subscription reconnection logic
+#### **Implementation Plan - Option A: Real-time Collaboration**
 
-- [ ] **1.4.2** Collaborative editing features
-  - Create `components/collaboration/UserPresence/` for online users
-  - Implement cursor position tracking and display
-  - Add visual indicators for concurrent edits
-  - Create conflict detection and resolution UI
+#### **Phase 1.4.1: GraphQL Subscriptions Backend (Week 1)**
+**Goal**: Implement real-time GraphQL subscriptions for Plan DAG synchronization
+**Success Criteria**: WebSocket subscriptions working, real-time plan updates broadcasting
+**Estimated Time**: 3-4 days
 
-- [ ] **1.4.3** Operation tracking and synchronization
-  - Implement vector clock timestamps for operations
-  - Add operation queuing for offline support
-  - Create merge conflict resolution interface
-  - Set up CRDT-style change application
+##### Backend Tasks:
+- [ ] **1.4.1.1** GraphQL subscription schema design
+  - Define `PLAN_DAG_UPDATED` subscription type for node/edge changes
+  - Design `USER_PRESENCE_CHANGED` subscription for collaborative cursors
+  - Create `PLAN_COLLABORATION_EVENT` union type for all real-time events
+  - Add subscription resolvers in `layercake-core/src/graphql/subscriptions/`
+
+- [ ] **1.4.1.2** WebSocket server implementation
+  - Configure `graphql-ws` WebSocket transport in Rust backend
+  - Implement subscription event broadcasting with channels
+  - Add connection lifecycle management (connect/disconnect/heartbeat)
+  - Set up subscription authentication and authorization
+
+- [ ] **1.4.1.3** Real-time event system
+  - Create `PlanCollaborationService` for managing active sessions
+  - Implement user session tracking with Redis or in-memory store
+  - Add event publishing for plan mutations (create/update/delete nodes/edges)
+  - Design efficient event batching to prevent spam
+
+##### Technical Architecture:
+```rust
+// Backend Subscription Schema
+subscription {
+  planDagUpdated(planId: ID!): PlanDagUpdateEvent!
+  userPresenceChanged(planId: ID!): UserPresenceEvent!
+  collaborationEvents(planId: ID!): CollaborationEvent!
+}
+
+// Event Types
+enum CollaborationEventType {
+  NODE_CREATED, NODE_UPDATED, NODE_DELETED,
+  EDGE_CREATED, EDGE_DELETED,
+  USER_JOINED, USER_LEFT, CURSOR_MOVED
+}
+```
+
+#### **Phase 1.4.2: Frontend Subscription Integration (Week 2)**
+**Goal**: Connect frontend to real-time subscriptions with Apollo Client
+**Success Criteria**: Real-time plan updates working in ReactFlow editor
+**Estimated Time**: 3-4 days
+
+##### Frontend Tasks:
+- [ ] **1.4.2.1** Apollo Client subscription setup
+  - Configure WebSocket link for GraphQL subscriptions
+  - Implement subscription hooks: `usePlanDagSubscription`, `useUserPresenceSubscription`
+  - Add subscription error handling and reconnection logic
+  - Create subscription state management in Apollo cache
+
+- [ ] **1.4.2.2** Real-time Plan DAG synchronization
+  - Update `PlanVisualEditor.tsx` to subscribe to plan changes
+  - Implement optimistic updates with server reconciliation
+  - Add real-time node/edge updates in ReactFlow
+  - Handle concurrent edit conflicts with user notifications
+
+- [ ] **1.4.2.3** Connection status and reliability
+  - Enhance `ConnectionStatus.tsx` with subscription health monitoring
+  - Add visual indicators for real-time connection state
+  - Implement subscription reconnection with exponential backoff
+  - Create offline mode detection and graceful degradation
+
+##### Technical Implementation:
+```typescript
+// Frontend Subscription Integration
+const usePlanDagRealtime = (planId: string) => {
+  const { data, loading, error } = useSubscription(PLAN_DAG_UPDATED, {
+    variables: { planId },
+    onSubscriptionData: ({ subscriptionData }) => {
+      // Update Apollo cache with real-time changes
+      updatePlanDagCache(subscriptionData.data);
+    }
+  });
+};
+```
+
+#### **Phase 1.4.3: User Presence & Collaborative Cursors (Week 3)**
+**Goal**: Show online users and their cursor positions in real-time
+**Success Criteria**: User avatars visible, cursor tracking working, user join/leave events
+**Estimated Time**: 4-5 days
+
+##### Implementation Tasks:
+- [ ] **1.4.3.1** User presence tracking
+  - Create `UserPresenceService` for tracking active users per plan
+  - Implement user join/leave event publishing
+  - Add user metadata (name, avatar, color) to presence data
+  - Design efficient presence heartbeat system
+
+- [ ] **1.4.3.2** Collaborative cursor system
+  - Track ReactFlow viewport interactions (mouse position, selections)
+  - Implement cursor position broadcasting with throttling
+  - Create `CollaborativeCursor` component for rendering other users' cursors
+  - Add cursor position interpolation for smooth movement
+
+- [ ] **1.4.3.3** User presence UI components
+  - Create `UserPresenceIndicator` component for showing online users
+  - Implement user avatars with distinct colors per user
+  - Add user list dropdown with online status
+  - Design non-intrusive presence indicators in ReactFlow
+
+##### Technical Features:
+```typescript
+// User Presence System
+interface UserPresence {
+  userId: string;
+  userName: string;
+  avatarColor: string;
+  cursorPosition: { x: number; y: number };
+  selectedNodeId?: string;
+  lastActive: Date;
+}
+
+// Collaborative Cursors
+const CollaborativeCursors = ({ users, viewport }) => {
+  return users.map(user => (
+    <CollaborativeCursor
+      key={user.userId}
+      position={user.cursorPosition}
+      color={user.avatarColor}
+      userName={user.userName}
+      viewport={viewport}
+    />
+  ));
+};
+```
+
+#### **Phase 1.4.4: Conflict Resolution & Synchronization (Week 4)**
+**Goal**: Handle concurrent edits with automatic merging and conflict resolution UI
+**Success Criteria**: Concurrent edits merge automatically, manual resolution for conflicts
+**Estimated Time**: 5-6 days
+
+##### Implementation Tasks:
+- [ ] **1.4.4.1** Operation-based synchronization
+  - Implement operation timestamps with vector clocks
+  - Create `PlanOperation` types for all plan mutations
+  - Add operation ordering and dependency resolution
+  - Design deterministic conflict resolution rules
+
+- [ ] **1.4.4.2** Conflict detection and resolution
+  - Detect conflicting operations (same node edited simultaneously)
+  - Implement automatic merge strategies for compatible changes
+  - Create `ConflictResolutionDialog` for manual resolution
+  - Add operation rollback capability for conflicts
+
+- [ ] **1.4.4.3** CRDT-style synchronization
+  - Implement Last-Writer-Wins for simple conflicts
+  - Add semantic merge for complex node configurations
+  - Create conflict-free data structures for plan metadata
+  - Design user notification system for merge conflicts
+
+##### Conflict Resolution Architecture:
+```typescript
+// Operation-based Synchronization
+interface PlanOperation {
+  id: string;
+  type: 'NODE_CREATE' | 'NODE_UPDATE' | 'NODE_DELETE' | 'EDGE_CREATE' | 'EDGE_DELETE';
+  planId: string;
+  userId: string;
+  timestamp: VectorClock;
+  data: OperationData;
+  causedBy?: string[]; // Operation dependencies
+}
+
+// Conflict Resolution
+interface ConflictResolution {
+  operations: PlanOperation[];
+  strategy: 'AUTO_MERGE' | 'LAST_WRITER_WINS' | 'MANUAL_RESOLUTION';
+  resolution?: ManualResolutionChoice;
+}
+```
+
+#### **Success Metrics & Testing**
+- [ ] **Multi-user Testing**: 2+ users editing same plan simultaneously
+- [ ] **Real-time Latency**: <500ms for operation propagation
+- [ ] **Connection Reliability**: Automatic reconnection on network issues
+- [ ] **Conflict Resolution**: 90%+ conflicts resolved automatically
+- [ ] **User Experience**: Smooth collaborative editing without glitches
+
+#### **Quality Gates**
+- [ ] All GraphQL subscriptions working without memory leaks
+- [ ] Frontend subscription hooks with proper cleanup
+- [ ] User presence updates within 1 second
+- [ ] Conflict resolution UI accessible and intuitive
+- [ ] Cross-browser testing (Chrome, Firefox, Safari)
+- [ ] Performance testing with 5+ concurrent users
 
 #### **Memory State**:
 ```
-Real-time Updates: ✓ GraphQL subscriptions active
-User Presence: ✓ Collaborative cursors functional
-Conflict Resolution: ✓ Automatic merge with manual fallback
-Offline Support: ✓ Operation queue with sync on reconnect
+Real-time Updates: ✅ GraphQL subscriptions backend implemented
+User Presence: ✅ Subscription types and events ready
+Conflict Resolution: ⏸️ Waiting for operation tracking
+Offline Support: ⏸️ Planned for Phase 1.4.4
+WebSocket Connection: ✅ Backend subscriptions with broadcast channels
+Frontend Integration: 🚧 Starting frontend subscription hooks
 ```
 
 ---

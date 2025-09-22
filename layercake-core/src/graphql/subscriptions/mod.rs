@@ -1,0 +1,432 @@
+use async_graphql::*;
+use futures_util::Stream;
+use tokio::sync::broadcast;
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use std::pin::Pin;
+
+use crate::graphql::context::GraphQLContext;
+use crate::graphql::types::{PlanDagNode, PlanDagEdge};
+
+pub struct Subscription;
+
+/// Collaboration event types for real-time updates
+#[derive(Clone, Debug, SimpleObject)]
+pub struct CollaborationEvent {
+    pub event_id: String,
+    pub plan_id: String,
+    pub user_id: String,
+    pub event_type: CollaborationEventType,
+    pub timestamp: String,
+    pub data: CollaborationEventData,
+}
+
+#[derive(Clone, Debug, Enum, Copy, PartialEq, Eq)]
+pub enum CollaborationEventType {
+    NodeCreated,
+    NodeUpdated,
+    NodeDeleted,
+    EdgeCreated,
+    EdgeDeleted,
+    UserJoined,
+    UserLeft,
+    CursorMoved,
+}
+
+#[derive(Clone, Debug, SimpleObject)]
+pub struct CollaborationEventData {
+    pub node_event: Option<NodeEventData>,
+    pub edge_event: Option<EdgeEventData>,
+    pub user_event: Option<UserEventData>,
+    pub cursor_event: Option<CursorEventData>,
+}
+
+#[derive(Clone, Debug, SimpleObject)]
+pub struct NodeEventData {
+    pub node: PlanDagNode,
+}
+
+#[derive(Clone, Debug, SimpleObject)]
+pub struct EdgeEventData {
+    pub edge: PlanDagEdge,
+}
+
+#[derive(Clone, Debug, SimpleObject)]
+pub struct UserEventData {
+    pub user_id: String,
+    pub user_name: String,
+    pub avatar_color: String,
+}
+
+#[derive(Clone, Debug, SimpleObject)]
+pub struct CursorEventData {
+    pub user_id: String,
+    pub user_name: String,
+    pub avatar_color: String,
+    pub position_x: f64,
+    pub position_y: f64,
+    pub selected_node_id: Option<String>,
+}
+
+/// User presence information for collaborative editing
+#[derive(Clone, Debug, SimpleObject)]
+pub struct UserPresenceEvent {
+    pub user_id: String,
+    pub user_name: String,
+    pub avatar_color: String,
+    pub plan_id: String,
+    pub is_online: bool,
+    pub cursor_position: Option<CursorPosition>,
+    pub selected_node_id: Option<String>,
+    pub last_active: String,
+}
+
+#[derive(Clone, Debug, SimpleObject)]
+pub struct CursorPosition {
+    pub x: f64,
+    pub y: f64,
+}
+
+/// Plan DAG update events for real-time synchronization
+#[derive(Clone, Debug, SimpleObject)]
+pub struct PlanDagUpdateEvent {
+    pub plan_id: String,
+    pub update_type: PlanDagUpdateType,
+    pub data: PlanDagUpdateData,
+    pub user_id: String,
+    pub timestamp: String,
+}
+
+#[derive(Clone, Debug, Enum, Copy, PartialEq, Eq)]
+pub enum PlanDagUpdateType {
+    NodeAdded,
+    NodeUpdated,
+    NodeRemoved,
+    EdgeAdded,
+    EdgeRemoved,
+    MetadataUpdated,
+}
+
+#[derive(Clone, Debug, SimpleObject)]
+pub struct PlanDagUpdateData {
+    pub node: Option<PlanDagNode>,
+    pub edge: Option<PlanDagEdge>,
+    pub metadata: Option<String>, // JSON string for metadata
+}
+
+/// Global subscription broadcaster for managing real-time events
+pub type SubscriptionBroadcaster = Arc<RwLock<HashMap<String, broadcast::Sender<CollaborationEvent>>>>;
+
+#[Subscription]
+impl Subscription {
+    /// Subscribe to Plan DAG updates for a specific plan
+    async fn plan_dag_updated(
+        &self,
+        ctx: &Context<'_>,
+        plan_id: String,
+    ) -> Result<Pin<Box<dyn Stream<Item = PlanDagUpdateEvent> + Send>>> {
+        let _context = ctx.data::<GraphQLContext>()?;
+
+        // Get or create broadcaster for this plan
+        let broadcaster = get_plan_broadcaster(&plan_id).await;
+        let mut receiver = broadcaster.subscribe();
+
+        // Filter events for Plan DAG updates only
+        let stream = async_stream::stream! {
+            while let Ok(event) = receiver.recv().await {
+                if event.plan_id == plan_id {
+                    let update_event = match event.event_type {
+                        CollaborationEventType::NodeCreated => {
+                            if let Some(node_data) = &event.data.node_event {
+                                Some(PlanDagUpdateEvent {
+                                    plan_id: event.plan_id,
+                                    update_type: PlanDagUpdateType::NodeAdded,
+                                    data: PlanDagUpdateData {
+                                        node: Some(node_data.node.clone()),
+                                        edge: None,
+                                        metadata: None,
+                                    },
+                                    user_id: event.user_id,
+                                    timestamp: event.timestamp,
+                                })
+                            } else { None }
+                        },
+                        CollaborationEventType::NodeUpdated => {
+                            if let Some(node_data) = &event.data.node_event {
+                                Some(PlanDagUpdateEvent {
+                                    plan_id: event.plan_id,
+                                    update_type: PlanDagUpdateType::NodeUpdated,
+                                    data: PlanDagUpdateData {
+                                        node: Some(node_data.node.clone()),
+                                        edge: None,
+                                        metadata: None,
+                                    },
+                                    user_id: event.user_id,
+                                    timestamp: event.timestamp,
+                                })
+                            } else { None }
+                        },
+                        CollaborationEventType::NodeDeleted => {
+                            if let Some(node_data) = &event.data.node_event {
+                                Some(PlanDagUpdateEvent {
+                                    plan_id: event.plan_id,
+                                    update_type: PlanDagUpdateType::NodeRemoved,
+                                    data: PlanDagUpdateData {
+                                        node: Some(node_data.node.clone()),
+                                        edge: None,
+                                        metadata: None,
+                                    },
+                                    user_id: event.user_id,
+                                    timestamp: event.timestamp,
+                                })
+                            } else { None }
+                        },
+                        CollaborationEventType::EdgeCreated => {
+                            if let Some(edge_data) = &event.data.edge_event {
+                                Some(PlanDagUpdateEvent {
+                                    plan_id: event.plan_id,
+                                    update_type: PlanDagUpdateType::EdgeAdded,
+                                    data: PlanDagUpdateData {
+                                        node: None,
+                                        edge: Some(edge_data.edge.clone()),
+                                        metadata: None,
+                                    },
+                                    user_id: event.user_id,
+                                    timestamp: event.timestamp,
+                                })
+                            } else { None }
+                        },
+                        CollaborationEventType::EdgeDeleted => {
+                            if let Some(edge_data) = &event.data.edge_event {
+                                Some(PlanDagUpdateEvent {
+                                    plan_id: event.plan_id,
+                                    update_type: PlanDagUpdateType::EdgeRemoved,
+                                    data: PlanDagUpdateData {
+                                        node: None,
+                                        edge: Some(edge_data.edge.clone()),
+                                        metadata: None,
+                                    },
+                                    user_id: event.user_id,
+                                    timestamp: event.timestamp,
+                                })
+                            } else { None }
+                        },
+                        _ => None,
+                    };
+
+                    if let Some(update) = update_event {
+                        yield update;
+                    }
+                }
+            }
+        };
+
+        Ok(Box::pin(stream))
+    }
+
+    /// Subscribe to user presence changes for a specific plan
+    async fn user_presence_changed(
+        &self,
+        ctx: &Context<'_>,
+        plan_id: String,
+    ) -> Result<Pin<Box<dyn Stream<Item = UserPresenceEvent> + Send>>> {
+        let _context = ctx.data::<GraphQLContext>()?;
+
+        // Get or create broadcaster for this plan
+        let broadcaster = get_plan_broadcaster(&plan_id).await;
+        let mut receiver = broadcaster.subscribe();
+
+        // Filter events for user presence only
+        let stream = async_stream::stream! {
+            while let Ok(event) = receiver.recv().await {
+                if event.plan_id == plan_id {
+                    let presence_event = match event.event_type {
+                        CollaborationEventType::UserJoined => {
+                            if let Some(user_data) = &event.data.user_event {
+                                Some(UserPresenceEvent {
+                                    user_id: user_data.user_id.clone(),
+                                    user_name: user_data.user_name.clone(),
+                                    avatar_color: user_data.avatar_color.clone(),
+                                    plan_id: event.plan_id,
+                                    is_online: true,
+                                    cursor_position: None,
+                                    selected_node_id: None,
+                                    last_active: event.timestamp,
+                                })
+                            } else { None }
+                        },
+                        CollaborationEventType::UserLeft => {
+                            if let Some(user_data) = &event.data.user_event {
+                                Some(UserPresenceEvent {
+                                    user_id: user_data.user_id.clone(),
+                                    user_name: user_data.user_name.clone(),
+                                    avatar_color: user_data.avatar_color.clone(),
+                                    plan_id: event.plan_id,
+                                    is_online: false,
+                                    cursor_position: None,
+                                    selected_node_id: None,
+                                    last_active: event.timestamp,
+                                })
+                            } else { None }
+                        },
+                        CollaborationEventType::CursorMoved => {
+                            if let Some(cursor_data) = &event.data.cursor_event {
+                                Some(UserPresenceEvent {
+                                    user_id: cursor_data.user_id.clone(),
+                                    user_name: cursor_data.user_name.clone(),
+                                    avatar_color: cursor_data.avatar_color.clone(),
+                                    plan_id: event.plan_id,
+                                    is_online: true,
+                                    cursor_position: Some(CursorPosition {
+                                        x: cursor_data.position_x,
+                                        y: cursor_data.position_y,
+                                    }),
+                                    selected_node_id: cursor_data.selected_node_id.clone(),
+                                    last_active: event.timestamp,
+                                })
+                            } else { None }
+                        },
+                        _ => None,
+                    };
+
+                    if let Some(presence) = presence_event {
+                        yield presence;
+                    }
+                }
+            }
+        };
+
+        Ok(Box::pin(stream))
+    }
+
+    /// Subscribe to all collaboration events for a specific plan
+    async fn collaboration_events(
+        &self,
+        ctx: &Context<'_>,
+        plan_id: String,
+    ) -> Result<Pin<Box<dyn Stream<Item = CollaborationEvent> + Send>>> {
+        let _context = ctx.data::<GraphQLContext>()?;
+
+        // Get or create broadcaster for this plan
+        let broadcaster = get_plan_broadcaster(&plan_id).await;
+        let mut receiver = broadcaster.subscribe();
+
+        // Stream all events for this plan
+        let stream = async_stream::stream! {
+            while let Ok(event) = receiver.recv().await {
+                if event.plan_id == plan_id {
+                    yield event;
+                }
+            }
+        };
+
+        Ok(Box::pin(stream))
+    }
+}
+
+// Global storage for plan broadcasters
+lazy_static::lazy_static! {
+    static ref PLAN_BROADCASTERS: Arc<RwLock<HashMap<String, broadcast::Sender<CollaborationEvent>>>> =
+        Arc::new(RwLock::new(HashMap::new()));
+}
+
+/// Get or create a broadcaster for a specific plan
+async fn get_plan_broadcaster(plan_id: &str) -> broadcast::Sender<CollaborationEvent> {
+    let broadcasters = PLAN_BROADCASTERS.read().await;
+
+    if let Some(sender) = broadcasters.get(plan_id) {
+        sender.clone()
+    } else {
+        drop(broadcasters);
+        let mut broadcasters = PLAN_BROADCASTERS.write().await;
+
+        // Double-check pattern to avoid race conditions
+        if let Some(sender) = broadcasters.get(plan_id) {
+            sender.clone()
+        } else {
+            let (sender, _) = broadcast::channel(1000); // Buffer size of 1000 events
+            broadcasters.insert(plan_id.to_string(), sender.clone());
+            sender
+        }
+    }
+}
+
+/// Publish a collaboration event to all subscribers of a plan
+pub async fn publish_collaboration_event(event: CollaborationEvent) -> Result<(), String> {
+    let broadcaster = get_plan_broadcaster(&event.plan_id).await;
+
+    if let Err(_) = broadcaster.send(event.clone()) {
+        return Err("Failed to broadcast collaboration event".to_string());
+    }
+
+    Ok(())
+}
+
+/// Helper function to create collaboration events
+pub fn create_collaboration_event(
+    plan_id: String,
+    user_id: String,
+    event_type: CollaborationEventType,
+    data: CollaborationEventData,
+) -> CollaborationEvent {
+    CollaborationEvent {
+        event_id: uuid::Uuid::new_v4().to_string(),
+        plan_id,
+        user_id,
+        event_type,
+        timestamp: chrono::Utc::now().to_rfc3339(),
+        data,
+    }
+}
+
+/// Helper functions to create specific event data
+pub fn create_node_event_data(node: PlanDagNode) -> CollaborationEventData {
+    CollaborationEventData {
+        node_event: Some(NodeEventData { node }),
+        edge_event: None,
+        user_event: None,
+        cursor_event: None,
+    }
+}
+
+pub fn create_edge_event_data(edge: PlanDagEdge) -> CollaborationEventData {
+    CollaborationEventData {
+        node_event: None,
+        edge_event: Some(EdgeEventData { edge }),
+        user_event: None,
+        cursor_event: None,
+    }
+}
+
+pub fn create_user_event_data(user_id: String, user_name: String, avatar_color: String) -> CollaborationEventData {
+    CollaborationEventData {
+        node_event: None,
+        edge_event: None,
+        user_event: Some(UserEventData { user_id, user_name, avatar_color }),
+        cursor_event: None,
+    }
+}
+
+pub fn create_cursor_event_data(
+    user_id: String,
+    user_name: String,
+    avatar_color: String,
+    position_x: f64,
+    position_y: f64,
+    selected_node_id: Option<String>,
+) -> CollaborationEventData {
+    CollaborationEventData {
+        node_event: None,
+        edge_event: None,
+        user_event: None,
+        cursor_event: Some(CursorEventData {
+            user_id,
+            user_name,
+            avatar_color,
+            position_x,
+            position_y,
+            selected_node_id,
+        }),
+    }
+}

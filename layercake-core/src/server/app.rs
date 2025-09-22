@@ -21,7 +21,7 @@ use std::sync::Arc;
 #[cfg(feature = "graphql")]
 use async_graphql::{Schema, Request, Response as GraphQLResponse};
 #[cfg(feature = "graphql")]
-use crate::graphql::{GraphQLContext, GraphQLSchema, queries::Query, mutations::Mutation};
+use crate::graphql::{GraphQLContext, GraphQLSchema, queries::Query, mutations::Mutation, subscriptions::Subscription};
 #[cfg(feature = "graphql")]
 use crate::services::{ImportService, ExportService, GraphService};
 
@@ -81,7 +81,7 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
         Schema::build(
             Query,
             Mutation,
-            async_graphql::EmptySubscription,
+            Subscription,
         )
         .data(graphql_context)
         .finish()
