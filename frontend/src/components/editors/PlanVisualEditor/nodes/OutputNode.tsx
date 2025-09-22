@@ -3,8 +3,13 @@ import { NodeProps } from 'reactflow'
 import { BaseNode } from './BaseNode'
 import { PlanDagNodeType } from '../../../../types/plan-dag'
 
-export const OutputNode = memo((props: NodeProps) => {
-  const { data } = props
+interface OutputNodeProps extends NodeProps {
+  onEdit?: (nodeId: string) => void
+  onDelete?: (nodeId: string) => void
+}
+
+export const OutputNode = memo((props: OutputNodeProps) => {
+  const { data, onEdit, onDelete } = props
 
   return (
     <BaseNode
@@ -12,8 +17,8 @@ export const OutputNode = memo((props: NodeProps) => {
       nodeType={PlanDagNodeType.OUTPUT}
       config={data.config}
       metadata={data.metadata}
-      onEdit={() => console.log('Edit output node:', props.id)}
-      onDelete={() => console.log('Delete output node:', props.id)}
+      onEdit={() => onEdit?.(props.id)}
+      onDelete={() => onDelete?.(props.id)}
     />
   )
 })

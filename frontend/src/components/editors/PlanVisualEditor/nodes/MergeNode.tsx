@@ -3,8 +3,13 @@ import { NodeProps } from 'reactflow'
 import { BaseNode } from './BaseNode'
 import { PlanDagNodeType } from '../../../../types/plan-dag'
 
-export const MergeNode = memo((props: NodeProps) => {
-  const { data } = props
+interface MergeNodeProps extends NodeProps {
+  onEdit?: (nodeId: string) => void
+  onDelete?: (nodeId: string) => void
+}
+
+export const MergeNode = memo((props: MergeNodeProps) => {
+  const { data, onEdit, onDelete } = props
 
   return (
     <BaseNode
@@ -12,8 +17,8 @@ export const MergeNode = memo((props: NodeProps) => {
       nodeType={PlanDagNodeType.MERGE}
       config={data.config}
       metadata={data.metadata}
-      onEdit={() => console.log('Edit merge node:', props.id)}
-      onDelete={() => console.log('Delete merge node:', props.id)}
+      onEdit={() => onEdit?.(props.id)}
+      onDelete={() => onDelete?.(props.id)}
     />
   )
 })

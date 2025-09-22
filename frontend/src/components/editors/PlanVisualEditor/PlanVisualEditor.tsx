@@ -18,7 +18,7 @@ import { Stack, Title, Alert, Loader, Text, ActionIcon, Tooltip, Group } from '@
 import { IconAlertCircle, IconEye, IconSettings, IconPlayerPlay } from '@tabler/icons-react'
 
 import { usePlanDag, usePlanDagMutations, usePlanDagSubscription } from '../../../hooks/usePlanDag'
-import { PlanDag, PlanDagNode, PlanDagEdge, ReactFlowNode, ReactFlowEdge, PlanDagNodeType } from '../../../types/plan-dag'
+import { PlanDag, PlanDagNode, PlanDagEdge, ReactFlowNode, ReactFlowEdge, PlanDagNodeType, NodeConfig, NodeMetadata } from '../../../types/plan-dag'
 import { validateConnection } from '../../../utils/planDagValidation'
 
 // Import custom node types
@@ -28,6 +28,9 @@ import { TransformNode } from './nodes/TransformNode'
 import { MergeNode } from './nodes/MergeNode'
 import { CopyNode } from './nodes/CopyNode'
 import { OutputNode } from './nodes/OutputNode'
+
+// Import dialogs
+import { NodeConfigDialog } from './dialogs/NodeConfigDialog'
 
 // Import ReactFlow styles
 import 'reactflow/dist/style.css'
@@ -39,15 +42,6 @@ interface PlanVisualEditorProps {
   readonly?: boolean
 }
 
-// Custom node types for ReactFlow
-const nodeTypes = {
-  InputNode,
-  GraphNode,
-  TransformNode,
-  MergeNode,
-  CopyNode,
-  OutputNode,
-}
 
 // Static mock Plan DAG for frontend-only development - prevents recreation issues
 const staticMockPlanDag: PlanDag = {
@@ -200,6 +194,13 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
   const [isDirty, setIsDirty] = useState(false)
   const initializedRef = useRef(false)
 
+  // Configuration dialog state
+  const [configDialogOpen, setConfigDialogOpen] = useState(false)
+  const [configNodeId, setConfigNodeId] = useState<string>('')
+  const [configNodeType, setConfigNodeType] = useState<PlanDagNodeType>(PlanDagNodeType.INPUT)
+  const [configNodeConfig, setConfigNodeConfig] = useState<NodeConfig>({})
+  const [configNodeMetadata, setConfigNodeMetadata] = useState<NodeMetadata>({ label: '', description: '' })
+
   // Use static mock Plan DAG for frontend-only development
   const mockPlanDag = planDag || staticMockPlanDag
 
@@ -304,6 +305,64 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
     },
     [nodes, readonly, mutations, setEdges]
   )
+
+  // Handle node configuration
+  const handleNodeEdit = useCallback((nodeId: string) => {
+    const node = nodes.find(n => n.id === nodeId)
+    if (!node) return
+
+    setConfigNodeId(nodeId)
+    setConfigNodeType(node.data.nodeType)
+    setConfigNodeConfig(node.data.config)
+    setConfigNodeMetadata(node.data.metadata)
+    setConfigDialogOpen(true)
+  }, [nodes])
+
+  const handleNodeConfigSave = useCallback((nodeId: string, config: NodeConfig, metadata: NodeMetadata) => {
+    setNodes((nodes) =>
+      nodes.map((node) =>
+        node.id === nodeId
+          ? {
+              ...node,
+              data: {
+                ...node.data,
+                config,
+                metadata,
+                label: metadata.label, // Update the label for ReactFlow
+              },
+            }
+          : node
+      )
+    )
+    setIsDirty(true)
+    console.log('Node configuration updated:', nodeId, config, metadata)
+  }, [setNodes])
+
+  const handleNodeDelete = useCallback((nodeId: string) => {
+    setNodes((nodes) => nodes.filter((node) => node.id !== nodeId))
+    setEdges((edges) => edges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId))
+    setIsDirty(true)
+    console.log('Node deleted:', nodeId)
+  }, [setNodes, setEdges])
+
+  // Create nodeTypes with stable reference - define once per component instance
+  const nodeTypesRef = useRef<any>(null)
+
+  if (!nodeTypesRef.current) {
+    const createNodeComponent = (Component: any) => (props: any) =>
+      <Component {...props} onEdit={handleNodeEdit} onDelete={handleNodeDelete} />
+
+    nodeTypesRef.current = {
+      [PlanDagNodeType.INPUT]: createNodeComponent(InputNode),
+      [PlanDagNodeType.GRAPH]: createNodeComponent(GraphNode),
+      [PlanDagNodeType.TRANSFORM]: createNodeComponent(TransformNode),
+      [PlanDagNodeType.MERGE]: createNodeComponent(MergeNode),
+      [PlanDagNodeType.COPY]: createNodeComponent(CopyNode),
+      [PlanDagNodeType.OUTPUT]: createNodeComponent(OutputNode),
+    }
+  }
+
+  const nodeTypes = nodeTypesRef.current
 
   // Save Plan DAG changes (mock for frontend-only development)
   const savePlanDag = useCallback(async () => {
@@ -423,6 +482,17 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
           </Panel>
         </ReactFlow>
       </div>
+
+      {/* Node Configuration Dialog */}
+      <NodeConfigDialog
+        opened={configDialogOpen}
+        onClose={() => setConfigDialogOpen(false)}
+        nodeId={configNodeId}
+        nodeType={configNodeType}
+        config={configNodeConfig}
+        metadata={configNodeMetadata}
+        onSave={handleNodeConfigSave}
+      />
     </Stack>
   )
 }

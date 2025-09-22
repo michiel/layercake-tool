@@ -60,12 +60,14 @@ export const BaseNode = memo(({
       <Paper
         shadow={selected ? "md" : "sm"}
         p="sm"
+        onDoubleClick={() => !readonly && onEdit?.()}
         style={{
           border: selected ? `2px solid ${color}` : `1px solid #e9ecef`,
           borderRadius: 8,
           minWidth: 180,
           maxWidth: 250,
           background: '#fff',
+          cursor: readonly ? 'default' : 'pointer',
         }}
       >
         <Group justify="space-between" mb="xs">
