@@ -1,9 +1,9 @@
 use async_graphql::*;
 use sea_orm::{EntityTrait, ColumnTrait, QueryFilter};
 
-use crate::database::entities::{projects, plans, nodes, edges, layers, plan_dag_nodes, plan_dag_edges};
+use crate::database::entities::{projects, plans, nodes, edges, layers, plan_dag_nodes, plan_dag_edges, users, user_sessions, project_collaborators, user_presence};
 use crate::graphql::context::GraphQLContext;
-use crate::graphql::types::{Project, Plan, Node, Edge, Layer, PlanDag, PlanDagNode, PlanDagEdge, PlanDagMetadata, ValidationResult, PlanDagInput};
+use crate::graphql::types::{Project, Plan, Node, Edge, Layer, PlanDag, PlanDagNode, PlanDagEdge, PlanDagMetadata, ValidationResult, PlanDagInput, User, UserSession, ProjectCollaborator, UserPresence};
 
 pub struct Query;
 
@@ -216,6 +216,164 @@ impl Query {
             errors,
             warnings,
         })
+    }
+
+    // Authentication and User Management Queries
+
+    /// Get current user from session
+    async fn me(&self, ctx: &Context<'_>, session_id: String) -> Result<Option<User>> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        // Find active session
+        let session = user_sessions::Entity::find()
+            .filter(user_sessions::Column::SessionId.eq(&session_id))
+            .filter(user_sessions::Column::IsActive.eq(true))
+            .one(&context.db)
+            .await?;
+
+        if let Some(session) = session {
+            // Check if session is not expired
+            if session.expires_at > chrono::Utc::now() {
+                let user = users::Entity::find_by_id(session.user_id)
+                    .one(&context.db)
+                    .await?;
+                Ok(user.map(User::from))
+            } else {
+                Ok(None)
+            }
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Get user by ID
+    async fn user(&self, ctx: &Context<'_>, id: i32) -> Result<Option<User>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let user = users::Entity::find_by_id(id)
+            .one(&context.db)
+            .await?;
+
+        Ok(user.map(User::from))
+    }
+
+    /// Get user by username
+    async fn user_by_username(&self, ctx: &Context<'_>, username: String) -> Result<Option<User>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let user = users::Entity::find()
+            .filter(users::Column::Username.eq(&username))
+            .one(&context.db)
+            .await?;
+
+        Ok(user.map(User::from))
+    }
+
+    /// Get user by email
+    async fn user_by_email(&self, ctx: &Context<'_>, email: String) -> Result<Option<User>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let user = users::Entity::find()
+            .filter(users::Column::Email.eq(&email))
+            .one(&context.db)
+            .await?;
+
+        Ok(user.map(User::from))
+    }
+
+    // Project Collaboration Queries
+
+    /// Get all collaborators for a project
+    async fn project_collaborators(&self, ctx: &Context<'_>, project_id: i32) -> Result<Vec<ProjectCollaborator>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let collaborators = project_collaborators::Entity::find()
+            .filter(project_collaborators::Column::ProjectId.eq(project_id))
+            .filter(project_collaborators::Column::IsActive.eq(true))
+            .all(&context.db)
+            .await?;
+
+        Ok(collaborators.into_iter().map(ProjectCollaborator::from).collect())
+    }
+
+    /// Get specific collaborator
+    async fn project_collaborator(&self, ctx: &Context<'_>, id: i32) -> Result<Option<ProjectCollaborator>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let collaborator = project_collaborators::Entity::find_by_id(id)
+            .one(&context.db)
+            .await?;
+
+        Ok(collaborator.map(ProjectCollaborator::from))
+    }
+
+    /// Get user's collaborations (projects they have access to)
+    async fn user_collaborations(&self, ctx: &Context<'_>, user_id: i32) -> Result<Vec<ProjectCollaborator>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let collaborations = project_collaborators::Entity::find()
+            .filter(project_collaborators::Column::UserId.eq(user_id))
+            .filter(project_collaborators::Column::IsActive.eq(true))
+            .all(&context.db)
+            .await?;
+
+        Ok(collaborations.into_iter().map(ProjectCollaborator::from).collect())
+    }
+
+    /// Check if user has access to project
+    async fn user_project_access(&self, ctx: &Context<'_>, user_id: i32, project_id: i32) -> Result<Option<ProjectCollaborator>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let collaboration = project_collaborators::Entity::find()
+            .filter(project_collaborators::Column::UserId.eq(user_id))
+            .filter(project_collaborators::Column::ProjectId.eq(project_id))
+            .filter(project_collaborators::Column::IsActive.eq(true))
+            .one(&context.db)
+            .await?;
+
+        Ok(collaboration.map(ProjectCollaborator::from))
+    }
+
+    // User Presence Queries
+
+    /// Get all online users for a project
+    async fn project_online_users(&self, ctx: &Context<'_>, project_id: i32) -> Result<Vec<UserPresence>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let online_users = user_presence::Entity::find()
+            .filter(user_presence::Column::ProjectId.eq(project_id))
+            .filter(user_presence::Column::IsOnline.eq(true))
+            .all(&context.db)
+            .await?;
+
+        Ok(online_users.into_iter().map(UserPresence::from).collect())
+    }
+
+    /// Get user presence for specific project
+    async fn user_presence(&self, ctx: &Context<'_>, user_id: i32, project_id: i32) -> Result<Option<UserPresence>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let presence = user_presence::Entity::find()
+            .filter(user_presence::Column::UserId.eq(user_id))
+            .filter(user_presence::Column::ProjectId.eq(project_id))
+            .one(&context.db)
+            .await?;
+
+        Ok(presence.map(UserPresence::from))
+    }
+
+    /// Get all active sessions for a user
+    async fn user_sessions(&self, ctx: &Context<'_>, user_id: i32) -> Result<Vec<UserSession>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let sessions = user_sessions::Entity::find()
+            .filter(user_sessions::Column::UserId.eq(user_id))
+            .filter(user_sessions::Column::IsActive.eq(true))
+            .all(&context.db)
+            .await?;
+
+        Ok(sessions.into_iter().map(UserSession::from).collect())
+    }
+
+    /// Get session by ID
+    async fn session(&self, ctx: &Context<'_>, session_id: String) -> Result<Option<UserSession>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let session = user_sessions::Entity::find()
+            .filter(user_sessions::Column::SessionId.eq(&session_id))
+            .one(&context.db)
+            .await?;
+
+        Ok(session.map(UserSession::from))
     }
 }
 

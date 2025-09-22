@@ -2,7 +2,7 @@ use async_graphql::*;
 use sea_orm::{ActiveModelTrait, EntityTrait, Set, ActiveValue, ColumnTrait, QueryFilter};
 use chrono::Utc;
 
-use crate::database::entities::{projects, plans, nodes, edges, layers, plan_dag_nodes, plan_dag_edges};
+use crate::database::entities::{projects, plans, nodes, edges, layers, plan_dag_nodes, plan_dag_edges, users, user_sessions, project_collaborators, user_presence};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::{
     Project, Plan, Node, Edge, Layer,
@@ -12,6 +12,9 @@ use crate::graphql::types::{
     PlanDagInput, PlanDagResponse, PlanDagNodeInput, PlanDagEdgeInput,
     PlanDagNodeUpdateInput, NodeResponse, EdgeResponse, Position,
     PlanDag, PlanDagNode, PlanDagEdge, PlanDagMetadata,
+    User, UserSession, ProjectCollaborator, UserPresence,
+    RegisterUserInput, LoginInput, UpdateUserInput, LoginResponse, RegisterResponse,
+    InviteCollaboratorInput, UpdateCollaboratorRoleInput, UpdateUserPresenceInput,
 };
 
 pub struct Mutation;
@@ -547,6 +550,368 @@ impl Mutation {
         };
 
         self.update_plan_dag_node(ctx, project_id, node_id, updates).await
+    }
+
+    // Authentication Mutations
+
+    /// Register a new user
+    async fn register(&self, ctx: &Context<'_>, input: RegisterUserInput) -> Result<RegisterResponse> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        // Check if user already exists
+        let existing_user = users::Entity::find()
+            .filter(users::Column::Email.eq(&input.email))
+            .one(&context.db)
+            .await?;
+
+        if existing_user.is_some() {
+            return Err(Error::new("User with this email already exists"));
+        }
+
+        let existing_username = users::Entity::find()
+            .filter(users::Column::Username.eq(&input.username))
+            .one(&context.db)
+            .await?;
+
+        if existing_username.is_some() {
+            return Err(Error::new("Username already taken"));
+        }
+
+        // Hash password (in a real implementation, use proper password hashing)
+        let password_hash = format!("hashed_{}", input.password); // TODO: Use bcrypt or argon2
+
+        // Create user
+        let mut user = users::ActiveModel::new();
+        user.email = Set(input.email);
+        user.username = Set(input.username);
+        user.display_name = Set(input.display_name);
+        user.password_hash = Set(password_hash);
+
+        let user = user.insert(&context.db).await?;
+
+        // Create session for the new user
+        let session = user_sessions::ActiveModel::new(user.id, user.username.clone(), 1); // Assuming project ID 1 for now
+        let session = session.insert(&context.db).await?;
+
+        Ok(RegisterResponse {
+            user: User::from(user),
+            session_id: session.session_id,
+            expires_at: session.expires_at,
+        })
+    }
+
+    /// Login user
+    async fn login(&self, ctx: &Context<'_>, input: LoginInput) -> Result<LoginResponse> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        // Find user by email
+        let user = users::Entity::find()
+            .filter(users::Column::Email.eq(&input.email))
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Invalid email or password"))?;
+
+        // Verify password (in a real implementation, verify hashed password)
+        let expected_hash = format!("hashed_{}", input.password);
+        if user.password_hash != expected_hash {
+            return Err(Error::new("Invalid email or password"));
+        }
+
+        // Check if user is active
+        if !user.is_active {
+            return Err(Error::new("Account is deactivated"));
+        }
+
+        // Create new session
+        let session = user_sessions::ActiveModel::new(user.id, user.username.clone(), 1); // Assuming project ID 1 for now
+        let session = session.insert(&context.db).await?;
+
+        // Update last login
+        let mut user_active: users::ActiveModel = user.clone().into();
+        user_active.last_login_at = Set(Some(Utc::now()));
+        user_active.update(&context.db).await?;
+
+        Ok(LoginResponse {
+            user: User::from(user),
+            session_id: session.session_id,
+            expires_at: session.expires_at,
+        })
+    }
+
+    /// Logout user (deactivate session)
+    async fn logout(&self, ctx: &Context<'_>, session_id: String) -> Result<bool> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        // Find and deactivate session
+        let session = user_sessions::Entity::find()
+            .filter(user_sessions::Column::SessionId.eq(&session_id))
+            .one(&context.db)
+            .await?;
+
+        if let Some(session) = session {
+            let mut session_active: user_sessions::ActiveModel = session.into();
+            session_active = session_active.deactivate();
+            session_active.update(&context.db).await?;
+
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    /// Update user profile
+    async fn update_user(&self, ctx: &Context<'_>, user_id: i32, input: UpdateUserInput) -> Result<User> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        let user = users::Entity::find_by_id(user_id)
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("User not found"))?;
+
+        let mut user_active: users::ActiveModel = user.into();
+
+        if let Some(display_name) = input.display_name {
+            user_active.display_name = Set(display_name);
+        }
+
+        if let Some(email) = input.email {
+            // Check if email is already taken by another user
+            let existing = users::Entity::find()
+                .filter(users::Column::Email.eq(&email))
+                .filter(users::Column::Id.ne(user_id))
+                .one(&context.db)
+                .await?;
+
+            if existing.is_some() {
+                return Err(Error::new("Email already taken"));
+            }
+
+            user_active.email = Set(email);
+        }
+
+        user_active = user_active.set_updated_at();
+        let updated_user = user_active.update(&context.db).await?;
+
+        Ok(User::from(updated_user))
+    }
+
+    // Project Collaboration Mutations
+
+    /// Invite a user to collaborate on a project
+    async fn invite_collaborator(&self, ctx: &Context<'_>, input: InviteCollaboratorInput) -> Result<ProjectCollaborator> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        // Find user by email
+        let user = users::Entity::find()
+            .filter(users::Column::Email.eq(&input.email))
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("User not found with this email"))?;
+
+        // Check if user is already a collaborator
+        let existing = project_collaborators::Entity::find()
+            .filter(project_collaborators::Column::ProjectId.eq(input.project_id))
+            .filter(project_collaborators::Column::UserId.eq(user.id))
+            .filter(project_collaborators::Column::IsActive.eq(true))
+            .one(&context.db)
+            .await?;
+
+        if existing.is_some() {
+            return Err(Error::new("User is already a collaborator on this project"));
+        }
+
+        // Parse role
+        let role = crate::database::entities::project_collaborators::ProjectRole::from_str(&input.role)
+            .map_err(|_| Error::new("Invalid role"))?;
+
+        // Create collaboration
+        // Note: In a real app, you'd get invited_by from the authentication context
+        let collaboration = project_collaborators::ActiveModel::new(
+            input.project_id,
+            user.id,
+            role,
+            Some(1), // TODO: Get from auth context
+        );
+
+        let collaboration = collaboration.insert(&context.db).await?;
+
+        Ok(ProjectCollaborator::from(collaboration))
+    }
+
+    /// Accept collaboration invitation
+    async fn accept_collaboration(&self, ctx: &Context<'_>, collaboration_id: i32) -> Result<ProjectCollaborator> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        let collaboration = project_collaborators::Entity::find_by_id(collaboration_id)
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Collaboration not found"))?;
+
+        let mut collaboration_active: project_collaborators::ActiveModel = collaboration.into();
+        collaboration_active = collaboration_active.accept_invitation();
+        let updated = collaboration_active.update(&context.db).await?;
+
+        Ok(ProjectCollaborator::from(updated))
+    }
+
+    /// Decline collaboration invitation
+    async fn decline_collaboration(&self, ctx: &Context<'_>, collaboration_id: i32) -> Result<ProjectCollaborator> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        let collaboration = project_collaborators::Entity::find_by_id(collaboration_id)
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Collaboration not found"))?;
+
+        let mut collaboration_active: project_collaborators::ActiveModel = collaboration.into();
+        collaboration_active = collaboration_active.decline_invitation();
+        let updated = collaboration_active.update(&context.db).await?;
+
+        Ok(ProjectCollaborator::from(updated))
+    }
+
+    /// Update collaborator role
+    async fn update_collaborator_role(&self, ctx: &Context<'_>, input: UpdateCollaboratorRoleInput) -> Result<ProjectCollaborator> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        let collaboration = project_collaborators::Entity::find_by_id(input.collaborator_id)
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Collaboration not found"))?;
+
+        // Parse new role
+        let role = crate::database::entities::project_collaborators::ProjectRole::from_str(&input.role)
+            .map_err(|_| Error::new("Invalid role"))?;
+
+        let mut collaboration_active: project_collaborators::ActiveModel = collaboration.into();
+        collaboration_active = collaboration_active.update_role(role);
+        let updated = collaboration_active.update(&context.db).await?;
+
+        Ok(ProjectCollaborator::from(updated))
+    }
+
+    /// Remove collaborator from project
+    async fn remove_collaborator(&self, ctx: &Context<'_>, collaboration_id: i32) -> Result<bool> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        let collaboration = project_collaborators::Entity::find_by_id(collaboration_id)
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Collaboration not found"))?;
+
+        let mut collaboration_active: project_collaborators::ActiveModel = collaboration.into();
+        collaboration_active = collaboration_active.deactivate();
+        collaboration_active.update(&context.db).await?;
+
+        Ok(true)
+    }
+
+    // User Presence Mutations
+
+    /// Update user presence (cursor position, tool, etc.)
+    async fn update_user_presence(&self, ctx: &Context<'_>, input: UpdateUserPresenceInput) -> Result<UserPresence> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        // Find existing presence or create new one
+        let existing = user_presence::Entity::find()
+            .filter(user_presence::Column::ProjectId.eq(input.project_id))
+            .filter(user_presence::Column::SessionId.eq(&input.session_id))
+            .one(&context.db)
+            .await?;
+
+        let presence = if let Some(existing) = existing {
+            // Update existing presence
+            let mut presence_active: user_presence::ActiveModel = existing.into();
+
+            if let Some(cursor) = input.cursor_position {
+                presence_active = presence_active.update_cursor_position(cursor.x, cursor.y);
+            }
+
+            if let Some(viewport) = input.viewport_position {
+                presence_active = presence_active.update_viewport(viewport.x, viewport.y, viewport.zoom);
+            }
+
+            if let Some(node_id) = input.selected_node_id {
+                presence_active = presence_active.select_node(Some(node_id));
+            }
+
+            if let Some(tool) = input.current_tool {
+                presence_active = presence_active.set_tool(tool);
+            }
+
+            presence_active.update(&context.db).await?
+        } else {
+            // Get user ID from session
+            let session = user_sessions::Entity::find()
+                .filter(user_sessions::Column::SessionId.eq(&input.session_id))
+                .one(&context.db)
+                .await?
+                .ok_or_else(|| Error::new("Session not found"))?;
+
+            // Create new presence
+            let mut presence = user_presence::ActiveModel::new(
+                session.user_id,
+                input.project_id,
+                input.session_id.clone(),
+            );
+
+            if let Some(cursor) = input.cursor_position {
+                presence = presence.update_cursor_position(cursor.x, cursor.y);
+            }
+
+            if let Some(viewport) = input.viewport_position {
+                presence = presence.update_viewport(viewport.x, viewport.y, viewport.zoom);
+            }
+
+            if let Some(node_id) = input.selected_node_id {
+                presence = presence.select_node(Some(node_id));
+            }
+
+            if let Some(tool) = input.current_tool {
+                presence = presence.set_tool(tool);
+            }
+
+            presence.insert(&context.db).await?
+        };
+
+        Ok(UserPresence::from(presence))
+    }
+
+    /// User goes offline (cleanup presence)
+    async fn user_offline(&self, ctx: &Context<'_>, session_id: String) -> Result<bool> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        // Find all presence records for this session
+        let presences = user_presence::Entity::find()
+            .filter(user_presence::Column::SessionId.eq(&session_id))
+            .all(&context.db)
+            .await?;
+
+        for presence in presences {
+            let mut presence_active: user_presence::ActiveModel = presence.into();
+            presence_active = presence_active.go_offline();
+            presence_active.update(&context.db).await?;
+        }
+
+        Ok(true)
+    }
+
+    /// Send presence heartbeat
+    async fn presence_heartbeat(&self, ctx: &Context<'_>, session_id: String, project_id: i32) -> Result<UserPresence> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        let presence = user_presence::Entity::find()
+            .filter(user_presence::Column::SessionId.eq(&session_id))
+            .filter(user_presence::Column::ProjectId.eq(project_id))
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Presence not found"))?;
+
+        let mut presence_active: user_presence::ActiveModel = presence.into();
+        presence_active = presence_active.heartbeat();
+        let updated = presence_active.update(&context.db).await?;
+
+        Ok(UserPresence::from(updated))
     }
 }
 
