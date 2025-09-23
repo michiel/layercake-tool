@@ -27,6 +27,7 @@ impl AuthorizationService {
             .ok_or_else(|| Error::new("No session ID provided"))?;
 
         self.get_user_from_session(session_id).await
+            .map_err(|e| Error::new(e.to_string()))
     }
 
     /// Get user from session ID
