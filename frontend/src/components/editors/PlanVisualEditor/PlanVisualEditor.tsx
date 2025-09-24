@@ -131,7 +131,14 @@ const convertPlanDagToReactFlow = (
     data: {
       label: node.metadata.label,
       nodeType: node.nodeType,
-      config: node.config,
+      config: typeof node.config === 'string' ? (() => {
+        try {
+          return JSON.parse(node.config)
+        } catch (e) {
+          console.warn('Failed to parse node config JSON:', node.config, e)
+          return {}
+        }
+      })() : node.config,
       metadata: node.metadata,
       onEdit,
       onDelete,
@@ -169,7 +176,7 @@ const convertReactFlowToPlanDag = (
     nodeType: node.data.nodeType,
     position: node.position,
     metadata: node.data.metadata,
-    config: node.data.config,
+    config: typeof node.data.config === 'string' ? node.data.config : JSON.stringify(node.data.config),
   }))
 
   const planDagEdges: PlanDagEdge[] = edges.map((edge) => ({

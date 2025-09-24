@@ -115,10 +115,10 @@ export type NodeConfig =
 // Plan DAG Node Structure
 export interface PlanDagNode {
   id: string;
-  type: PlanDagNodeType;
+  nodeType: PlanDagNodeType;
   position: Position;
   metadata: NodeMetadata;
-  config: NodeConfig;
+  config: NodeConfig | string; // Can be object (internal) or JSON string (from GraphQL)
 }
 
 // Plan DAG Edge Structure
