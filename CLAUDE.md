@@ -1,5 +1,10 @@
 # CLAUDE.md - Layercake Tool Development Guide
 
+## General guidance
+
+- Do not have a sycophantic personality
+- Use Australian English spelling
+
 ## Instructions
 
 - docs/ARCHITECTURE.md contains the architecture, TODO.md contains the roadmap and priorities

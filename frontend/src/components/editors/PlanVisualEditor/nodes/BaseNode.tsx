@@ -30,7 +30,7 @@ export const BaseNode = memo(({
 
   const getTypeLabel = (type: PlanDagNodeType): string => {
     switch (type) {
-      case PlanDagNodeType.INPUT: return 'Input'
+      case PlanDagNodeType.DATA_SOURCE: return 'Data Source'
       case PlanDagNodeType.GRAPH: return 'Graph'
       case PlanDagNodeType.TRANSFORM: return 'Transform'
       case PlanDagNodeType.MERGE: return 'Merge'
@@ -143,11 +143,11 @@ BaseNode.displayName = 'BaseNode'
 // Render node-specific configuration details
 const renderNodeSpecificContent = (nodeType: PlanDagNodeType, config: NodeConfig) => {
   switch (nodeType) {
-    case PlanDagNodeType.INPUT:
-      const inputConfig = config as any
+    case PlanDagNodeType.DATA_SOURCE:
+      const dataSourceConfig = config as any
       return (
         <Text size="xs" c="dimmed">
-          {inputConfig.dataType}: {inputConfig.source}
+          {dataSourceConfig.dataType}: {dataSourceConfig.source}
         </Text>
       )
 

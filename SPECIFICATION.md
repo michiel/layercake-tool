@@ -199,7 +199,7 @@ plan:
  - Undo/redo functionality that works across collaborative sessions
 
 ### Data Import and Integration
- - Support for additional data sources: JSON, XML, SQL databases, REST APIs
+ - Support for additional data sources: JSON, XML, SQL databases
  - Scheduled data imports with change detection
  - Data validation and transformation pipelines
  - Import preview and rollback functionality

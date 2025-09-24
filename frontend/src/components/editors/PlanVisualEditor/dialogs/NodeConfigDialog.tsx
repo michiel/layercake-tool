@@ -80,7 +80,7 @@ export const NodeConfigDialog = ({
 
   const getNodeTypeLabel = (type: PlanDagNodeType): string => {
     switch (type) {
-      case PlanDagNodeType.INPUT: return 'Input Node'
+      case PlanDagNodeType.DATA_SOURCE: return 'Data Source Node'
       case PlanDagNodeType.GRAPH: return 'Graph Node'
       case PlanDagNodeType.TRANSFORM: return 'Transform Node'
       case PlanDagNodeType.MERGE: return 'Merge Node'
@@ -150,13 +150,13 @@ export const NodeConfigDialog = ({
 // Get default config values for form initialization
 function getConfigDefaults(nodeType: PlanDagNodeType, config: NodeConfig): Record<string, any> {
   switch (nodeType) {
-    case PlanDagNodeType.INPUT:
-      const inputConfig = config as any
+    case PlanDagNodeType.DATA_SOURCE:
+      const dataSourceConfig = config as any
       return {
-        inputType: inputConfig.inputType || 'CSVNodesFromFile',
-        source: inputConfig.source || '',
-        dataType: inputConfig.dataType || 'Nodes',
-        outputGraphRef: inputConfig.outputGraphRef || '',
+        inputType: dataSourceConfig.inputType || 'CSVNodesFromFile',
+        source: dataSourceConfig.source || '',
+        dataType: dataSourceConfig.dataType || 'Nodes',
+        outputGraphRef: dataSourceConfig.outputGraphRef || '',
       }
 
     case PlanDagNodeType.GRAPH:
@@ -208,7 +208,7 @@ function getConfigDefaults(nodeType: PlanDagNodeType, config: NodeConfig): Recor
 // Render node-specific configuration fields
 function renderNodeSpecificFields(nodeType: PlanDagNodeType, form: any) {
   switch (nodeType) {
-    case PlanDagNodeType.INPUT:
+    case PlanDagNodeType.DATA_SOURCE:
       return (
         <>
           <Select
@@ -389,7 +389,7 @@ function renderNodeSpecificFields(nodeType: PlanDagNodeType, form: any) {
 // Build config object from form values
 function buildConfigFromForm(nodeType: PlanDagNodeType, values: FormData): NodeConfig {
   switch (nodeType) {
-    case PlanDagNodeType.INPUT:
+    case PlanDagNodeType.DATA_SOURCE:
       return {
         inputType: values.inputType,
         source: values.source,
@@ -459,7 +459,7 @@ function validateNodeConfig(nodeType: PlanDagNodeType, values: FormData): string
   }
 
   switch (nodeType) {
-    case PlanDagNodeType.INPUT:
+    case PlanDagNodeType.DATA_SOURCE:
       if (!values.source) errors.push('Source path is required')
       if (!values.outputGraphRef) errors.push('Output graph reference is required')
       break

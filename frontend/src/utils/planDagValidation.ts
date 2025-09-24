@@ -9,7 +9,7 @@ export const validateConnection = (
 ): ConnectionType => {
   // Define valid connections based on Plan DAG flow logic
   const validConnections: Record<PlanDagNodeType, PlanDagNodeType[]> = {
-    [PlanDagNodeType.INPUT]: [
+    [PlanDagNodeType.DATA_SOURCE]: [
       PlanDagNodeType.MERGE,
       PlanDagNodeType.TRANSFORM,
       PlanDagNodeType.OUTPUT,
@@ -45,7 +45,7 @@ export const validateConnection = (
     switch (source) {
       case PlanDagNodeType.GRAPH:
         return 'GraphReference'
-      case PlanDagNodeType.INPUT:
+      case PlanDagNodeType.DATA_SOURCE:
       case PlanDagNodeType.TRANSFORM:
       case PlanDagNodeType.MERGE:
       case PlanDagNodeType.COPY:
@@ -80,7 +80,7 @@ export const canAcceptMultipleInputs = (nodeType: PlanDagNodeType): boolean => {
   switch (nodeType) {
     case PlanDagNodeType.MERGE:
       return true
-    case PlanDagNodeType.INPUT:
+    case PlanDagNodeType.DATA_SOURCE:
     case PlanDagNodeType.GRAPH:
     case PlanDagNodeType.TRANSFORM:
     case PlanDagNodeType.COPY:
@@ -96,7 +96,7 @@ export const canAcceptMultipleInputs = (nodeType: PlanDagNodeType): boolean => {
  */
 export const canHaveMultipleOutputs = (nodeType: PlanDagNodeType): boolean => {
   switch (nodeType) {
-    case PlanDagNodeType.INPUT:
+    case PlanDagNodeType.DATA_SOURCE:
     case PlanDagNodeType.GRAPH:
     case PlanDagNodeType.TRANSFORM:
     case PlanDagNodeType.MERGE:
@@ -114,7 +114,7 @@ export const canHaveMultipleOutputs = (nodeType: PlanDagNodeType): boolean => {
  */
 export const getRequiredInputCount = (nodeType: PlanDagNodeType): number => {
   switch (nodeType) {
-    case PlanDagNodeType.INPUT:
+    case PlanDagNodeType.DATA_SOURCE:
     case PlanDagNodeType.GRAPH:
       return 0 // These are source nodes
     case PlanDagNodeType.TRANSFORM:
@@ -133,7 +133,7 @@ export const getRequiredInputCount = (nodeType: PlanDagNodeType): number => {
  */
 export const getNodeTypeColor = (nodeType: PlanDagNodeType): string => {
   switch (nodeType) {
-    case PlanDagNodeType.INPUT:
+    case PlanDagNodeType.DATA_SOURCE:
       return '#51cf66' // Green
     case PlanDagNodeType.GRAPH:
       return '#339af0' // Blue
@@ -155,7 +155,7 @@ export const getNodeTypeColor = (nodeType: PlanDagNodeType): string => {
  */
 export const getNodeTypeIcon = (nodeType: PlanDagNodeType): string => {
   switch (nodeType) {
-    case PlanDagNodeType.INPUT:
+    case PlanDagNodeType.DATA_SOURCE:
       return 'import'
     case PlanDagNodeType.GRAPH:
       return 'sitemap'

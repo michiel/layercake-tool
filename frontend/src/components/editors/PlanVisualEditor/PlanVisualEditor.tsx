@@ -22,7 +22,7 @@ import { PlanDag, PlanDagNode, PlanDagEdge, ReactFlowNode, ReactFlowEdge, PlanDa
 import { validateConnection } from '../../../utils/planDagValidation'
 
 // Import custom node types
-import { InputNode } from './nodes/InputNode'
+import { DataSourceNode } from './nodes/DataSourceNode'
 import { GraphNode } from './nodes/GraphNode'
 import { TransformNode } from './nodes/TransformNode'
 import { MergeNode } from './nodes/MergeNode'
@@ -48,7 +48,7 @@ interface PlanVisualEditorProps {
 
 // Define stable nodeTypes outside component to prevent recreation warning
 const NODE_TYPES = {
-  [PlanDagNodeType.INPUT]: InputNode,
+  [PlanDagNodeType.DATA_SOURCE]: DataSourceNode,
   [PlanDagNodeType.GRAPH]: GraphNode,
   [PlanDagNodeType.TRANSFORM]: TransformNode,
   [PlanDagNodeType.MERGE]: MergeNode,
@@ -63,7 +63,7 @@ const staticMockPlanDag: PlanDag = {
   nodes: [
     {
       id: 'input_1',
-      nodeType: PlanDagNodeType.INPUT,
+      nodeType: PlanDagNodeType.DATA_SOURCE,
       position: { x: 100, y: 100 },
       metadata: { label: 'CSV Import', description: 'Import nodes from CSV file' },
       config: {
@@ -221,7 +221,7 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
   // Configuration dialog state
   const [configDialogOpen, setConfigDialogOpen] = useState(false)
   const [configNodeId, setConfigNodeId] = useState<string>('')
-  const [configNodeType, setConfigNodeType] = useState<PlanDagNodeType>(PlanDagNodeType.INPUT)
+  const [configNodeType, setConfigNodeType] = useState<PlanDagNodeType>(PlanDagNodeType.DATA_SOURCE)
   const [configNodeConfig, setConfigNodeConfig] = useState<NodeConfig>({})
   const [configNodeMetadata, setConfigNodeMetadata] = useState<NodeMetadata>({ label: '', description: '' })
 
@@ -495,7 +495,7 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
 
   const miniMapNodeColor = useCallback((node: Node) => {
     switch (node.data?.nodeType) {
-      case 'InputNode':
+      case 'DataSourceNode':
         return '#51cf66'
       case 'GraphNode':
         return '#339af0'

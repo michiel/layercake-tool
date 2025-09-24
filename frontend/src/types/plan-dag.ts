@@ -24,7 +24,7 @@ export interface EdgeMetadata {
 
 // Plan DAG Node Types
 export enum PlanDagNodeType {
-  INPUT = 'InputNode',
+  DATA_SOURCE = 'DataSourceNode',
   GRAPH = 'GraphNode',
   TRANSFORM = 'TransformNode',
   MERGE = 'MergeNode',
@@ -32,8 +32,8 @@ export enum PlanDagNodeType {
   OUTPUT = 'OutputNode'
 }
 
-// Input Node Configuration
-export interface InputNodeConfig {
+// Data Source Node Configuration
+export interface DataSourceNodeConfig {
   inputType: 'CSVNodesFromFile' | 'CSVEdgesFromFile' | 'CSVLayersFromFile';
   source: string;
   dataType: 'Nodes' | 'Edges' | 'Layers';
@@ -105,7 +105,7 @@ export interface OutputNodeConfig {
 
 // Union type for all node configurations
 export type NodeConfig =
-  | InputNodeConfig
+  | DataSourceNodeConfig
   | GraphNodeConfig
   | TransformNodeConfig
   | MergeNodeConfig
