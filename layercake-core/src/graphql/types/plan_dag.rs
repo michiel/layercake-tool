@@ -31,8 +31,8 @@ pub struct EdgeMetadata {
 // Plan DAG Node Types (matching frontend enum)
 #[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub enum PlanDagNodeType {
-    #[graphql(name = "InputNode")]
-    Input,
+    #[graphql(name = "DataSourceNode")]
+    DataSource,
     #[graphql(name = "GraphNode")]
     Graph,
     #[graphql(name = "TransformNode")]
@@ -52,10 +52,10 @@ pub enum DataType {
     GraphReference,
 }
 
-// Input Node Configuration
+// Data Source Node Configuration
 #[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
-#[graphql(input_name = "InputNodeConfigInput")]
-pub struct InputNodeConfig {
+#[graphql(input_name = "DataSourceNodeConfigInput")]
+pub struct DataSourceNodeConfig {
     pub input_type: InputType,
     pub source: String,
     pub data_type: InputDataType,
@@ -215,7 +215,7 @@ pub struct GraphConfig {
 // Union type for all node configurations
 #[derive(Union, Clone, Debug, Serialize, Deserialize)]
 pub enum NodeConfig {
-    Input(InputNodeConfig),
+    DataSource(DataSourceNodeConfig),
     Graph(GraphNodeConfig),
     Transform(TransformNodeConfig),
     Merge(MergeNodeConfig),
@@ -366,13 +366,13 @@ pub enum ValidationWarningType {
 impl From<plan_dag_nodes::Model> for PlanDagNode {
     fn from(model: plan_dag_nodes::Model) -> Self {
         let node_type = match model.node_type.as_str() {
-            "InputNode" => PlanDagNodeType::Input,
+            "DataSourceNode" => PlanDagNodeType::DataSource,
             "GraphNode" => PlanDagNodeType::Graph,
             "TransformNode" => PlanDagNodeType::Transform,
             "MergeNode" => PlanDagNodeType::Merge,
             "CopyNode" => PlanDagNodeType::Copy,
             "OutputNode" => PlanDagNodeType::Output,
-            _ => PlanDagNodeType::Input, // Default fallback
+            _ => PlanDagNodeType::DataSource, // Default fallback
         };
 
         let metadata: NodeMetadata = serde_json::from_str(&model.metadata_json)

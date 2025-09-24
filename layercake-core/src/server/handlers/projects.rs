@@ -5,7 +5,6 @@ use axum::{
 };
 use sea_orm::{ActiveModelTrait, EntityTrait, Set};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 #[cfg(feature = "server")]
 use utoipa::ToSchema;

@@ -4,11 +4,11 @@ use chrono::{Duration, Utc};
 use sea_orm::DatabaseConnection;
 use uuid::Uuid;
 
-use crate::database::entities::{users, user_sessions};
 
 /// Service for handling authentication operations
 #[derive(Clone)]
 pub struct AuthService {
+    #[allow(dead_code)]
     db: DatabaseConnection,
 }
 

@@ -1,5 +1,4 @@
 use sea_orm::entity::prelude::*;
-use sea_orm::{Set, ActiveValue};
 use serde::{Deserialize, Serialize};
 
 // Simplified to String for now - will improve to enum later

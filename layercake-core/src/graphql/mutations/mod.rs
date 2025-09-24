@@ -4,7 +4,9 @@ use chrono::Utc;
 
 use crate::database::entities::{projects, plans, nodes, edges, layers, plan_dag_nodes, plan_dag_edges, users, user_sessions, project_collaborators, user_presence};
 use crate::graphql::context::GraphQLContext;
-use crate::services::{AuthService, ValidationService};
+use crate::services::auth_service::AuthService;
+use crate::services::validation::ValidationService;
+
 use crate::graphql::types::{
     Project, Plan, Node, Edge, Layer,
     CreateProjectInput, UpdateProjectInput,
@@ -262,7 +264,7 @@ impl Mutation {
         // Insert new Plan DAG nodes
         for node in &plan_dag.nodes {
             let node_type_str = match node.node_type {
-                crate::graphql::types::PlanDagNodeType::Input => "InputNode",
+                crate::graphql::types::PlanDagNodeType::DataSource => "DataSourceNode",
                 crate::graphql::types::PlanDagNodeType::Graph => "GraphNode",
                 crate::graphql::types::PlanDagNodeType::Transform => "TransformNode",
                 crate::graphql::types::PlanDagNodeType::Merge => "MergeNode",
@@ -348,7 +350,7 @@ impl Mutation {
             .ok_or_else(|| Error::new("Plan not found for project"))?;
 
         let node_type_str = match node.node_type {
-            crate::graphql::types::PlanDagNodeType::Input => "InputNode",
+            crate::graphql::types::PlanDagNodeType::DataSource => "DataSourceNode",
             crate::graphql::types::PlanDagNodeType::Graph => "GraphNode",
             crate::graphql::types::PlanDagNodeType::Transform => "TransformNode",
             crate::graphql::types::PlanDagNodeType::Merge => "MergeNode",
@@ -941,22 +943,8 @@ impl Mutation {
         // For now, we'll broadcast the cursor event without storing it in the database
         // In a full implementation, you might want to store recent cursor positions
 
-        // In development mode, create or get a development user session
-        #[cfg(debug_assertions)]
+        // TODO: Extract from authenticated user context when authentication is implemented
         let (user_id, user_name, avatar_color) = {
-            match crate::dev_utils::setup_dev_user_session(&context.db).await {
-                Ok(dev_session) => dev_session.user_info(),
-                Err(_) => {
-                    // Fallback to demo values if dev setup fails
-                    ("demo_user".to_string(), "Demo User".to_string(), "#3B82F6".to_string())
-                }
-            }
-        };
-
-        // In production mode, extract from auth context
-        #[cfg(not(debug_assertions))]
-        let (user_id, user_name, avatar_color) = {
-            // TODO: Extract from authenticated user context
             ("demo_user".to_string(), "Demo User".to_string(), "#3B82F6".to_string())
         };
 
@@ -995,22 +983,8 @@ impl Mutation {
     ) -> Result<bool> {
         let context = ctx.data::<GraphQLContext>()?;
 
-        // In development mode, create or get a development user session
-        #[cfg(debug_assertions)]
+        // TODO: Extract from authenticated user context when authentication is implemented
         let (user_id, user_name, avatar_color) = {
-            match crate::dev_utils::setup_dev_user_session(&context.db).await {
-                Ok(dev_session) => dev_session.user_info(),
-                Err(_) => {
-                    // Fallback to demo values if dev setup fails
-                    ("demo_user".to_string(), "Demo User".to_string(), "#3B82F6".to_string())
-                }
-            }
-        };
-
-        // In production mode, extract from auth context
-        #[cfg(not(debug_assertions))]
-        let (user_id, user_name, avatar_color) = {
-            // TODO: Extract from authenticated user context
             ("demo_user".to_string(), "Demo User".to_string(), "#3B82F6".to_string())
         };
 
@@ -1046,22 +1020,8 @@ impl Mutation {
     ) -> Result<bool> {
         let context = ctx.data::<GraphQLContext>()?;
 
-        // In development mode, create or get a development user session
-        #[cfg(debug_assertions)]
+        // TODO: Extract from authenticated user context when authentication is implemented
         let (user_id, user_name, avatar_color) = {
-            match crate::dev_utils::setup_dev_user_session(&context.db).await {
-                Ok(dev_session) => dev_session.user_info(),
-                Err(_) => {
-                    // Fallback to demo values if dev setup fails
-                    ("demo_user".to_string(), "Demo User".to_string(), "#3B82F6".to_string())
-                }
-            }
-        };
-
-        // In production mode, extract from auth context
-        #[cfg(not(debug_assertions))]
-        let (user_id, user_name, avatar_color) = {
-            // TODO: Extract from authenticated user context
             ("demo_user".to_string(), "Demo User".to_string(), "#3B82F6".to_string())
         };
 

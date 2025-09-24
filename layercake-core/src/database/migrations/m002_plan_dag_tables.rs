@@ -82,6 +82,7 @@ impl MigrationTrait for Migration {
 #[derive(Iden)]
 enum Plans {
     Table,
+    #[allow(dead_code)]
     Id,
     PlanDagJson,
 }

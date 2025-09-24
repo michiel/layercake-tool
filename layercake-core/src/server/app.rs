@@ -1,7 +1,6 @@
 use axum::{
-    extract::State,
-    http::StatusCode,
-    response::{Json, IntoResponse},
+    extract::{Json, State},
+    response::IntoResponse,
     routing::{get, post, put, delete},
     Router,
 };
@@ -194,10 +193,10 @@ fn api_v1_routes() -> Router<AppState> {
 #[cfg(feature = "graphql")]
 async fn graphql_handler(
     State(state): State<AppState>,
-    req: axum::extract::Json<Request>,
-) -> axum::response::Json<GraphQLResponse> {
-    let response = state.graphql_schema.execute(req.0).await;
-    axum::response::Json(response)
+    Json(req): Json<Request>,
+) -> Json<GraphQLResponse> {
+    let response = state.graphql_schema.execute(req).await;
+    Json(response)
 }
 
 #[cfg(feature = "graphql")]

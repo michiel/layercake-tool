@@ -1,8 +1,6 @@
 use axum::{http::StatusCode, response::Json};
 use serde_json::{json, Value};
 
-#[cfg(feature = "server")]
-use utoipa::OpenApi;
 
 #[cfg(feature = "server")]
 #[utoipa::path(

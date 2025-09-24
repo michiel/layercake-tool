@@ -34,7 +34,7 @@ impl LayercakeResourceRegistry {
 
     /// Get project resource
     async fn get_project_resource(&self, project_id: i32) -> McpResult<Resource> {
-        let graph_service = GraphService::new(self.db.clone());
+        let _graph_service = GraphService::new(self.db.clone());
         
         // Get project details (assuming we have a method for this)
         // For now, create a basic project resource structure

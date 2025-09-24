@@ -7,9 +7,6 @@ use tracing::{info, warn};
 
 use crate::database::entities::{
     nodes, edges, layers,
-    nodes::Entity as Nodes,
-    edges::Entity as Edges,
-    layers::Entity as Layers,
 };
 
 #[derive(Debug)]
