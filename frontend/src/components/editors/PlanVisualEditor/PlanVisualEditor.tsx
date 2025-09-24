@@ -436,7 +436,12 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
     const worldX = (screenX - viewport.x) / viewport.zoom
     const worldY = (screenY - viewport.y) / viewport.zoom
 
-    broadcastCursorPosition(worldX, worldY, selectedNode || undefined)
+    // Only broadcast if coordinates are valid numbers
+    if (typeof worldX === 'number' && typeof worldY === 'number' &&
+        !isNaN(worldX) && !isNaN(worldY) &&
+        isFinite(worldX) && isFinite(worldY)) {
+      broadcastCursorPosition(worldX, worldY, selectedNode || undefined)
+    }
   }, [broadcastCursorPosition, selectedNode, readonly])
 
   // Use stable nodeTypes reference to prevent ReactFlow warnings

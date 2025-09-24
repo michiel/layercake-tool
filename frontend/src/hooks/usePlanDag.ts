@@ -12,6 +12,9 @@ import {
   MOVE_PLAN_DAG_NODE,
   PLAN_DAG_CHANGED_SUBSCRIPTION,
   USER_PRESENCE_SUBSCRIPTION,
+  UPDATE_CURSOR_POSITION,
+  JOIN_PROJECT_COLLABORATION,
+  LEAVE_PROJECT_COLLABORATION,
   type PlanDagQueryVariables,
   type PlanDagMutationVariables,
   type PlanDagSubscriptionVariables
@@ -57,7 +60,57 @@ export const usePlanDagValidation = () => {
 // Hook for Plan DAG mutations
 export const usePlanDagMutations = (projectId: number) => {
   const [updatePlanDag] = useMutation(UPDATE_PLAN_DAG, {
-    optimisticResponse: true,
+    optimisticResponse: (variables) => ({
+      updatePlanDag: {
+        __typename: 'PlanDagResponse',
+        success: true,
+        errors: [],
+        planDag: {
+          __typename: 'PlanDag',
+          version: variables.planDag.version,
+          nodes: variables.planDag.nodes.map((node: any) => ({
+            __typename: 'PlanDagNode',
+            id: node.id,
+            nodeType: node.nodeType,
+            position: {
+              __typename: 'Position',
+              x: node.position.x,
+              y: node.position.y,
+            },
+            metadata: {
+              __typename: 'NodeMetadata',
+              label: node.metadata.label,
+              description: node.metadata.description,
+            },
+            config: node.config || '{}',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          })),
+          edges: variables.planDag.edges.map((edge: any) => ({
+            __typename: 'PlanDagEdge',
+            id: edge.id,
+            source: edge.source,
+            target: edge.target,
+            metadata: {
+              __typename: 'EdgeMetadata',
+              label: edge.metadata.label,
+              dataType: edge.metadata.dataType,
+            },
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          })),
+          metadata: {
+            __typename: 'PlanDagMetadata',
+            version: variables.planDag.metadata.version,
+            name: variables.planDag.metadata.name,
+            description: variables.planDag.metadata.description,
+            created: variables.planDag.metadata.created || new Date().toISOString(),
+            lastModified: new Date().toISOString(),
+            author: variables.planDag.metadata.author || 'Unknown',
+          },
+        },
+      },
+    }),
     update: (cache, { data }) => {
       if (data?.updatePlanDag?.success) {
         cache.writeQuery({
@@ -74,12 +127,18 @@ export const usePlanDagMutations = (projectId: number) => {
   const [addNode] = useMutation(ADD_PLAN_DAG_NODE, {
     optimisticResponse: (variables) => ({
       addPlanDagNode: {
-        __typename: 'PlanDagNodeResult',
+        __typename: 'NodeResponse',
         success: true,
         errors: [],
         node: {
           __typename: 'PlanDagNode',
-          ...variables.node,
+          id: variables.node.id,
+          nodeType: variables.node.nodeType,
+          position: variables.node.position,
+          metadata: variables.node.metadata,
+          config: variables.node.config || '{}',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         },
       },
     }),
@@ -109,13 +168,18 @@ export const usePlanDagMutations = (projectId: number) => {
   const [updateNode] = useMutation(UPDATE_PLAN_DAG_NODE, {
     optimisticResponse: (variables) => ({
       updatePlanDagNode: {
-        __typename: 'PlanDagNodeResult',
+        __typename: 'NodeResponse',
         success: true,
         errors: [],
         node: {
           __typename: 'PlanDagNode',
           id: variables.nodeId,
-          ...variables.updates,
+          nodeType: variables.updates.nodeType,
+          position: variables.updates.position,
+          metadata: variables.updates.metadata,
+          config: variables.updates.config || '{}',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         },
       },
     }),
@@ -124,10 +188,10 @@ export const usePlanDagMutations = (projectId: number) => {
   const [deleteNode] = useMutation(DELETE_PLAN_DAG_NODE, {
     optimisticResponse: (variables) => ({
       deletePlanDagNode: {
-        __typename: 'PlanDagDeleteResult',
+        __typename: 'NodeResponse',
         success: true,
         errors: [],
-        deletedNodeId: variables.nodeId,
+        node: null,
       },
     }),
     update: (cache, { data }, { variables }) => {
@@ -142,17 +206,14 @@ export const usePlanDagMutations = (projectId: number) => {
             query: GET_PLAN_DAG,
             variables: { projectId },
             data: {
-              project: {
-                ...existing.project,
-                planDag: {
-                  ...existing.getPlanDag,
-                  nodes: existing.getPlanDag.nodes.filter(
-                    (node: any) => node.id !== variables.nodeId
-                  ),
-                  edges: existing.getPlanDag.edges.filter(
-                    (edge: any) => edge.source !== variables.nodeId && edge.target !== variables.nodeId
-                  ),
-                },
+              getPlanDag: {
+                ...existing.getPlanDag,
+                nodes: existing.getPlanDag.nodes.filter(
+                  (node: any) => node.id !== variables.nodeId
+                ),
+                edges: existing.getPlanDag.edges.filter(
+                  (edge: any) => edge.source !== variables.nodeId && edge.target !== variables.nodeId
+                ),
               },
             },
           })
@@ -164,12 +225,17 @@ export const usePlanDagMutations = (projectId: number) => {
   const [addEdge] = useMutation(ADD_PLAN_DAG_EDGE, {
     optimisticResponse: (variables) => ({
       addPlanDagEdge: {
-        __typename: 'PlanDagEdgeResult',
+        __typename: 'EdgeResponse',
         success: true,
         errors: [],
         edge: {
           __typename: 'PlanDagEdge',
-          ...variables.edge,
+          id: variables.edge.id,
+          source: variables.edge.source,
+          target: variables.edge.target,
+          metadata: variables.edge.metadata,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         },
       },
     }),
@@ -185,12 +251,9 @@ export const usePlanDagMutations = (projectId: number) => {
             query: GET_PLAN_DAG,
             variables: { projectId },
             data: {
-              project: {
-                ...existing.project,
-                planDag: {
-                  ...existing.getPlanDag,
-                  edges: [...existing.getPlanDag.edges, data.addPlanDagEdge.edge],
-                },
+              getPlanDag: {
+                ...existing.getPlanDag,
+                edges: [...existing.getPlanDag.edges, data.addPlanDagEdge.edge],
               },
             },
           })
@@ -202,10 +265,10 @@ export const usePlanDagMutations = (projectId: number) => {
   const [deleteEdge] = useMutation(DELETE_PLAN_DAG_EDGE, {
     optimisticResponse: (variables) => ({
       deletePlanDagEdge: {
-        __typename: 'PlanDagDeleteResult',
+        __typename: 'EdgeResponse',
         success: true,
         errors: [],
-        deletedEdgeId: variables.edgeId,
+        edge: null,
       },
     }),
     update: (cache, { data }, { variables }) => {
@@ -220,14 +283,11 @@ export const usePlanDagMutations = (projectId: number) => {
             query: GET_PLAN_DAG,
             variables: { projectId },
             data: {
-              project: {
-                ...existing.project,
-                planDag: {
-                  ...existing.getPlanDag,
-                  edges: existing.getPlanDag.edges.filter(
-                    (edge: any) => edge.id !== variables.edgeId
-                  ),
-                },
+              getPlanDag: {
+                ...existing.getPlanDag,
+                edges: existing.getPlanDag.edges.filter(
+                  (edge: any) => edge.id !== variables.edgeId
+                ),
               },
             },
           })
@@ -239,13 +299,18 @@ export const usePlanDagMutations = (projectId: number) => {
   const [moveNode] = useMutation(MOVE_PLAN_DAG_NODE, {
     optimisticResponse: (variables) => ({
       movePlanDagNode: {
-        __typename: 'PlanDagNodeResult',
+        __typename: 'NodeResponse',
         success: true,
         errors: [],
         node: {
           __typename: 'PlanDagNode',
           id: variables.nodeId,
           position: variables.position,
+          nodeType: 'Input', // Placeholder - will be updated from server response
+          metadata: { label: 'Moving Node', description: null },
+          config: '{}',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         },
       },
     }),
@@ -305,5 +370,51 @@ export const useUserPresence = (projectId: number) => {
     users,
     loading,
     error,
+  }
+}
+
+// Hook for collaboration features
+export const useCollaboration = (projectId: number) => {
+  const [updateCursorPosition] = useMutation(UPDATE_CURSOR_POSITION)
+  const [joinCollaboration] = useMutation(JOIN_PROJECT_COLLABORATION)
+  const [leaveCollaboration] = useMutation(LEAVE_PROJECT_COLLABORATION)
+
+  const broadcastCursorPosition = useCallback((positionX: number, positionY: number, selectedNodeId?: string) => {
+    // Validate that positions are valid numbers before sending
+    if (typeof positionX !== 'number' || typeof positionY !== 'number' ||
+        isNaN(positionX) || isNaN(positionY) ||
+        !isFinite(positionX) || !isFinite(positionY)) {
+      console.warn('Invalid cursor position values:', { positionX, positionY })
+      return
+    }
+
+    updateCursorPosition({
+      variables: {
+        projectId,
+        positionX,
+        positionY,
+        selectedNodeId
+      }
+    }).catch(err => {
+      console.warn('Failed to broadcast cursor position:', err)
+    })
+  }, [projectId, updateCursorPosition])
+
+  const joinProject = useCallback(() => {
+    return joinCollaboration({
+      variables: { projectId }
+    })
+  }, [projectId, joinCollaboration])
+
+  const leaveProject = useCallback(() => {
+    return leaveCollaboration({
+      variables: { projectId }
+    })
+  }, [projectId, leaveCollaboration])
+
+  return {
+    broadcastCursorPosition,
+    joinProject,
+    leaveProject,
   }
 }
