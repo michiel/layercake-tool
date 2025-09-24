@@ -296,7 +296,12 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
   const handleNodesChange = useCallback(
     (changes: NodeChange[]) => {
       onNodesChange(changes)
-      setIsDirty(true)
+
+      // Only mark as dirty for non-position changes (position changes are handled separately)
+      const hasNonPositionChanges = changes.some(change => change.type !== 'position')
+      if (hasNonPositionChanges) {
+        setIsDirty(true)
+      }
 
       // Handle non-position changes
       changes.forEach((change) => {
