@@ -1,7 +1,7 @@
 //! Graph data management tools for MCP
 
 use axum_mcp::prelude::*;
-use crate::mcp::tools::{get_required_param, get_optional_param};
+use crate::mcp::tools::{get_required_param, get_optional_param, create_success_response};
 use crate::services::{ImportService, ExportService, GraphService};
 use sea_orm::DatabaseConnection;
 use serde_json::{json, Value};
@@ -227,13 +227,7 @@ pub async fn export_graph(
         "message": format!("Graph exported successfully as {}", format)
     });
 
-    Ok(ToolsCallResult {
-        content: vec![ToolContent::Text {
-            text: serde_json::to_string_pretty(&result).unwrap(),
-        }],
-        is_error: false,
-        metadata: HashMap::new(),
-    })
+    create_success_response(&result)
 }
 
 /// Get graph data structure
@@ -303,11 +297,5 @@ pub async fn get_graph_data(
         });
     }
 
-    Ok(ToolsCallResult {
-        content: vec![ToolContent::Text {
-            text: serde_json::to_string_pretty(&result).unwrap(),
-        }],
-        is_error: false,
-        metadata: HashMap::new(),
-    })
+    create_success_response(&result)
 }

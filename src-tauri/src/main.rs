@@ -56,7 +56,8 @@ async fn main() {
             info!("Tauri application setup complete");
 
             // Set up window event handlers
-            let window = app.get_webview_window("main").unwrap();
+            let window = app.get_webview_window("main")
+                .ok_or_else(|| "Failed to get main window".to_string())?;
 
             // Handle window close event
             let window_clone = window.clone();

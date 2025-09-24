@@ -1,7 +1,7 @@
 //! Graph analysis tools for MCP
 
 use axum_mcp::prelude::*;
-use crate::mcp::tools::{get_required_param, get_optional_param};
+use crate::mcp::tools::{get_required_param, get_optional_param, create_success_response};
 use crate::services::GraphService;
 use sea_orm::DatabaseConnection;
 use serde_json::{json, Value};
@@ -174,13 +174,7 @@ pub async fn analyze_connectivity(
         }
     });
 
-    Ok(ToolsCallResult {
-        content: vec![ToolContent::Text {
-            text: serde_json::to_string_pretty(&result).unwrap(),
-        }],
-        is_error: false,
-        metadata: HashMap::new(),
-    })
+    create_success_response(&result)
 }
 
 /// Find paths between nodes
@@ -258,13 +252,7 @@ pub async fn find_paths(
         }
     });
 
-    Ok(ToolsCallResult {
-        content: vec![ToolContent::Text {
-            text: serde_json::to_string_pretty(&result).unwrap(),
-        }],
-        is_error: false,
-        metadata: HashMap::new(),
-    })
+    create_success_response(&result)
 }
 
 /// Find connected components using DFS

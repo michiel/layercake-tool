@@ -6,7 +6,7 @@ use std::path::Path;
 use std::sync::mpsc::channel;
 use tracing::{debug, error, info, warn};
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use csv::StringRecord;
 
 /// Loads a data file from disk, supporting CSV and TSV formats
@@ -52,14 +52,18 @@ fn create_graph_from_plan(plan: &Plan) -> Graph {
 /// Loads data from import profiles into the graph
 fn load_data_into_graph(graph: &mut Graph, plan: &Plan, plan_file_path: &Path) -> Result<()> {
     for profile in &plan.import.profiles {
-        let import_file_path = plan_file_path.parent().unwrap().join(&profile.filename);
+        let parent_dir = plan_file_path.parent()
+            .ok_or_else(|| anyhow!("Plan file has no parent directory"))?;
+        let import_file_path = parent_dir.join(&profile.filename);
         info!(
             "Importing file: {} as {:?}",
             import_file_path.display(),
             profile.filetype
         );
         
-        let (headers, records) = load_file(import_file_path.to_str().unwrap())?;
+        let file_path_str = import_file_path.to_str()
+            .ok_or_else(|| anyhow!("Import file path contains invalid UTF-8: {}", import_file_path.display()))?;
+        let (headers, records) = load_file(file_path_str)?;
         
         match profile.filetype {
             ImportFileType::Nodes => {
@@ -315,7 +319,9 @@ fn watch_for_changes(plan: Plan, plan_file_path: &Path) -> Result<()> {
     let (tx, rx) = channel();
     let mut watcher = RecommendedWatcher::new(tx, Config::default())?;
     for file in &files {
-        let path = plan_file_path.parent().unwrap().join(file);
+        let parent_dir = plan_file_path.parent()
+            .ok_or_else(|| anyhow!("Plan file has no parent directory"))?;
+        let path = parent_dir.join(file);
         watcher.watch(&path, RecursiveMode::NonRecursive)?;
     }
 
@@ -323,8 +329,7 @@ fn watch_for_changes(plan: Plan, plan_file_path: &Path) -> Result<()> {
         match rx.recv() {
             Ok(event) => {
                 // debug!("Event: {:?}", event);
-                if event.is_ok() {
-                    let event = event.unwrap();
+                if let Ok(event) = event {
                     if let EventKind::Modify(_) = event.kind {
                         debug!("File modified {:?}", event.paths);
                         info!("Change detected, re-executing plan");

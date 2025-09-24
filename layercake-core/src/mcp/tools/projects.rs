@@ -2,7 +2,7 @@
 
 use axum_mcp::prelude::*;
 use crate::database::entities::projects;
-use crate::mcp::tools::{get_required_param, get_optional_param};
+use crate::mcp::tools::{get_required_param, get_optional_param, create_success_response};
 use sea_orm::*;
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -100,13 +100,7 @@ pub async fn list_projects(db: &DatabaseConnection) -> McpResult<ToolsCallResult
         "count": project_list.len()
     });
 
-    Ok(ToolsCallResult {
-        content: vec![ToolContent::Text {
-            text: serde_json::to_string_pretty(&result).unwrap(),
-        }],
-        is_error: false,
-        metadata: HashMap::new(),
-    })
+    create_success_response(&result)
 }
 
 /// Create a new project
@@ -146,13 +140,7 @@ pub async fn create_project(
         "message": "Project created successfully"
     });
 
-    Ok(ToolsCallResult {
-        content: vec![ToolContent::Text {
-            text: serde_json::to_string_pretty(&result).unwrap(),
-        }],
-        is_error: false,
-        metadata: HashMap::new(),
-    })
+    create_success_response(&result)
 }
 
 /// Get project details
@@ -183,13 +171,7 @@ pub async fn get_project(
         "updated_at": project.updated_at
     });
 
-    Ok(ToolsCallResult {
-        content: vec![ToolContent::Text {
-            text: serde_json::to_string_pretty(&result).unwrap(),
-        }],
-        is_error: false,
-        metadata: HashMap::new(),
-    })
+    create_success_response(&result)
 }
 
 /// Delete a project
@@ -225,11 +207,5 @@ pub async fn delete_project(
         "message": "Project deleted successfully"
     });
 
-    Ok(ToolsCallResult {
-        content: vec![ToolContent::Text {
-            text: serde_json::to_string_pretty(&result).unwrap(),
-        }],
-        is_error: false,
-        metadata: HashMap::new(),
-    })
+    create_success_response(&result)
 }

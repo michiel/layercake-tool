@@ -2,7 +2,7 @@
 
 use axum_mcp::prelude::*;
 use crate::database::entities::plans;
-use crate::mcp::tools::{get_required_param, get_optional_param};
+use crate::mcp::tools::{get_required_param, get_optional_param, create_success_response};
 use sea_orm::*;
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -149,13 +149,7 @@ pub async fn create_plan(
         "message": "Plan created successfully"
     });
 
-    Ok(ToolsCallResult {
-        content: vec![ToolContent::Text {
-            text: serde_json::to_string_pretty(&result).unwrap(),
-        }],
-        is_error: false,
-        metadata: HashMap::new(),
-    })
+    create_success_response(&result)
 }
 
 /// Execute a plan (placeholder implementation)
@@ -233,13 +227,7 @@ pub async fn execute_plan(
         "message": "Plan executed successfully"
     });
 
-    Ok(ToolsCallResult {
-        content: vec![ToolContent::Text {
-            text: serde_json::to_string_pretty(&result).unwrap(),
-        }],
-        is_error: false,
-        metadata: HashMap::new(),
-    })
+    create_success_response(&result)
 }
 
 /// Get plan status
@@ -279,11 +267,5 @@ pub async fn get_plan_status(
         "updated_at": plan.updated_at
     });
 
-    Ok(ToolsCallResult {
-        content: vec![ToolContent::Text {
-            text: serde_json::to_string_pretty(&result).unwrap(),
-        }],
-        is_error: false,
-        metadata: HashMap::new(),
-    })
+    create_success_response(&result)
 }

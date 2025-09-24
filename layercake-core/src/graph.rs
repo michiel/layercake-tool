@@ -107,7 +107,7 @@ impl Graph {
         let mut edges = Vec::new();
         self.nodes.iter().for_each(|node| {
             if let Some(parent_id) = &node.belongs_to {
-                let parent = self.get_node_by_id(parent_id).unwrap();
+                if let Some(parent) = self.get_node_by_id(parent_id) {
                 edges.push(Edge {
                     id: format!("{}_{}", parent.id, node.id),
                     source: parent.id.clone(),
@@ -117,6 +117,8 @@ impl Graph {
                     weight: 1,
                     comment: None,
                 });
+                }
+                // If parent node not found, skip this edge - could log warning if needed
             }
         });
 
@@ -128,9 +130,11 @@ impl Graph {
             .edges
             .iter()
             .filter(|e| {
-                let source = self.get_node_by_id(&e.source).unwrap();
-                let target = self.get_node_by_id(&e.target).unwrap();
-                !(source.is_partition || target.is_partition)
+                if let (Some(source), Some(target)) = (self.get_node_by_id(&e.source), self.get_node_by_id(&e.target)) {
+                    !(source.is_partition || target.is_partition)
+                } else {
+                    false // Skip edges with missing nodes
+                }
             })
             .collect();
 
@@ -256,8 +260,9 @@ impl Graph {
     }
 
     pub fn modify_graph_limit_partition_depth(&mut self, depth: i32) -> Result<(), String> {
-        fn trim_node(node_id: &String, graph: &mut Graph, current_depth: i32, max_depth: i32) {
-            let node = graph.get_node_by_id(node_id).unwrap();
+        fn trim_node(node_id: &String, graph: &mut Graph, current_depth: i32, max_depth: i32) -> Result<(), String> {
+            let node = graph.get_node_by_id(node_id)
+                .ok_or_else(|| format!("Node with id '{}' not found", node_id))?;
             let children = graph.get_children(&node);
 
             let all_child_node_ids: Vec<String> = children.iter().map(|n| n.id.clone()).collect();
@@ -269,12 +274,13 @@ impl Graph {
 
             // Recursively process children first
             for child_id in &all_child_node_ids {
-                trim_node(child_id, graph, current_depth + 1, max_depth);
+                trim_node(child_id, graph, current_depth + 1, max_depth)?;
             }
 
             if current_depth >= max_depth {
                 let mut agg_node = {
-                    let node = graph.get_node_by_id(node_id).unwrap();
+                    let node = graph.get_node_by_id(node_id)
+                        .ok_or_else(|| format!("Node with id '{}' not found", node_id))?;
                     let mut cloned_node = node.clone();
                     cloned_node.is_partition = false; // Ensure the aggregated node is non-partition
                     cloned_node
@@ -324,6 +330,7 @@ impl Graph {
                 // Update the parent node in the graph
                 graph.set_node(agg_node);
             }
+            Ok(())
         }
 
         // Collect root nodes first to avoid borrowing issues
@@ -334,16 +341,17 @@ impl Graph {
             .collect();
 
         for node_id in &root_node_ids {
-            trim_node(node_id, self, 0, depth);
+            trim_node(node_id, self, 0, depth)?;
         }
 
         Ok(())
     }
 
     pub fn modify_graph_limit_partition_width(&mut self, max_width: i32) -> Result<(), String> {
-        fn trim_node(node_id: &String, graph: &mut Graph, max_width: i32) {
+        fn trim_node(node_id: &String, graph: &mut Graph, max_width: i32) -> Result<(), String> {
             let node = {
-                let node = graph.get_node_by_id(node_id).unwrap();
+                let node = graph.get_node_by_id(node_id)
+                    .ok_or_else(|| format!("Node with id '{}' not found", node_id))?;
                 node.clone()
             };
 
@@ -379,13 +387,13 @@ impl Graph {
                     partition_child_node_ids.len(),
                     max_width
                 );
-                return;
+                return Ok(());
             }
 
             // Recursively process partition children first
             for child_id in &partition_child_node_ids {
                 debug!("Processing partition child: {} / {}", node.id, child_id);
-                trim_node(child_id, graph, max_width);
+                trim_node(child_id, graph, max_width)?;
             }
 
             if non_partition_child_node_ids.len() as i32 > max_width {
@@ -419,7 +427,7 @@ impl Graph {
 
                 let children: Vec<Node> = non_partition_child_node_ids
                     .iter()
-                    .map(|id| graph.get_node_by_id(id).unwrap().clone())
+                    .filter_map(|id| graph.get_node_by_id(id).map(|n| n.clone()))
                     .collect();
 
                 // Remove children beyond max_width
@@ -449,6 +457,7 @@ impl Graph {
                 }
             }
             debug!("Updated graph stats: {}", graph.stats());
+            Ok(())
         }
 
         // Collect root nodes first to avoid borrowing issues
@@ -459,7 +468,7 @@ impl Graph {
             .collect();
 
         for node_id in &root_node_ids {
-            trim_node(node_id, self, max_width);
+            trim_node(node_id, self, max_width)?;
         }
 
         Ok(())
