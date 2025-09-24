@@ -926,6 +926,168 @@ impl Mutation {
 
         Ok(UserPresence::from(updated))
     }
+
+    /// Update cursor position and broadcast to collaborators
+    async fn update_cursor_position(
+        &self,
+        ctx: &Context<'_>,
+        project_id: i32,
+        position_x: f64,
+        position_y: f64,
+        selected_node_id: Option<String>,
+    ) -> Result<bool> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        // For now, we'll broadcast the cursor event without storing it in the database
+        // In a full implementation, you might want to store recent cursor positions
+
+        // In development mode, create or get a development user session
+        #[cfg(debug_assertions)]
+        let (user_id, user_name, avatar_color) = {
+            match crate::dev_utils::setup_dev_user_session(&context.db).await {
+                Ok(dev_session) => dev_session.user_info(),
+                Err(_) => {
+                    // Fallback to demo values if dev setup fails
+                    ("demo_user".to_string(), "Demo User".to_string(), "#3B82F6".to_string())
+                }
+            }
+        };
+
+        // In production mode, extract from auth context
+        #[cfg(not(debug_assertions))]
+        let (user_id, user_name, avatar_color) = {
+            // TODO: Extract from authenticated user context
+            ("demo_user".to_string(), "Demo User".to_string(), "#3B82F6".to_string())
+        };
+
+        let plan_id = format!("project_{}", project_id);
+
+        // Create cursor event data
+        let cursor_data = crate::graphql::subscriptions::create_cursor_event_data(
+            user_id.clone(),
+            user_name,
+            avatar_color,
+            position_x,
+            position_y,
+            selected_node_id,
+        );
+
+        // Create collaboration event
+        let event = crate::graphql::subscriptions::create_collaboration_event(
+            plan_id,
+            user_id,
+            crate::graphql::subscriptions::CollaborationEventType::CursorMoved,
+            cursor_data,
+        );
+
+        // Broadcast the event
+        match crate::graphql::subscriptions::publish_collaboration_event(event).await {
+            Ok(()) => Ok(true),
+            Err(_) => Ok(false), // Don't fail the mutation if broadcasting fails
+        }
+    }
+
+    /// Join a project for collaboration
+    async fn join_project_collaboration(
+        &self,
+        ctx: &Context<'_>,
+        project_id: i32,
+    ) -> Result<bool> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        // In development mode, create or get a development user session
+        #[cfg(debug_assertions)]
+        let (user_id, user_name, avatar_color) = {
+            match crate::dev_utils::setup_dev_user_session(&context.db).await {
+                Ok(dev_session) => dev_session.user_info(),
+                Err(_) => {
+                    // Fallback to demo values if dev setup fails
+                    ("demo_user".to_string(), "Demo User".to_string(), "#3B82F6".to_string())
+                }
+            }
+        };
+
+        // In production mode, extract from auth context
+        #[cfg(not(debug_assertions))]
+        let (user_id, user_name, avatar_color) = {
+            // TODO: Extract from authenticated user context
+            ("demo_user".to_string(), "Demo User".to_string(), "#3B82F6".to_string())
+        };
+
+        let plan_id = format!("project_{}", project_id);
+
+        // Create user joined event data
+        let user_data = crate::graphql::subscriptions::create_user_event_data(
+            user_id.clone(),
+            user_name,
+            avatar_color,
+        );
+
+        // Create collaboration event
+        let event = crate::graphql::subscriptions::create_collaboration_event(
+            plan_id,
+            user_id,
+            crate::graphql::subscriptions::CollaborationEventType::UserJoined,
+            user_data,
+        );
+
+        // Broadcast the event
+        match crate::graphql::subscriptions::publish_collaboration_event(event).await {
+            Ok(()) => Ok(true),
+            Err(_) => Ok(false),
+        }
+    }
+
+    /// Leave a project collaboration
+    async fn leave_project_collaboration(
+        &self,
+        ctx: &Context<'_>,
+        project_id: i32,
+    ) -> Result<bool> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        // In development mode, create or get a development user session
+        #[cfg(debug_assertions)]
+        let (user_id, user_name, avatar_color) = {
+            match crate::dev_utils::setup_dev_user_session(&context.db).await {
+                Ok(dev_session) => dev_session.user_info(),
+                Err(_) => {
+                    // Fallback to demo values if dev setup fails
+                    ("demo_user".to_string(), "Demo User".to_string(), "#3B82F6".to_string())
+                }
+            }
+        };
+
+        // In production mode, extract from auth context
+        #[cfg(not(debug_assertions))]
+        let (user_id, user_name, avatar_color) = {
+            // TODO: Extract from authenticated user context
+            ("demo_user".to_string(), "Demo User".to_string(), "#3B82F6".to_string())
+        };
+
+        let plan_id = format!("project_{}", project_id);
+
+        // Create user left event data
+        let user_data = crate::graphql::subscriptions::create_user_event_data(
+            user_id.clone(),
+            user_name,
+            avatar_color,
+        );
+
+        // Create collaboration event
+        let event = crate::graphql::subscriptions::create_collaboration_event(
+            plan_id,
+            user_id,
+            crate::graphql::subscriptions::CollaborationEventType::UserLeft,
+            user_data,
+        );
+
+        // Broadcast the event
+        match crate::graphql::subscriptions::publish_collaboration_event(event).await {
+            Ok(()) => Ok(true),
+            Err(_) => Ok(false),
+        }
+    }
 }
 
 #[derive(SimpleObject)]

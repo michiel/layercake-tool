@@ -10,6 +10,9 @@ pub mod database;
 pub mod server;
 pub mod services;
 
+#[cfg(debug_assertions)]
+pub mod dev_utils;
+
 #[cfg(feature = "graphql")]
 pub mod graphql;
 
