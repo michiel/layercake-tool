@@ -298,19 +298,29 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
       onNodesChange(changes)
       setIsDirty(true)
 
-      // Handle node position changes
+      // Handle non-position changes
       changes.forEach((change) => {
-        if (change.type === 'position' && change.position && !readonly) {
-          mutations.moveNode(change.id, change.position)
-        }
         if (change.type === 'select') {
           const nodeId = change.selected ? change.id : null
           setSelectedNode(nodeId)
           onNodeSelect?.(nodeId)
         }
+        // Note: Position changes are handled separately in onNodeDragStop
       })
     },
-    [onNodesChange, mutations, onNodeSelect, readonly]
+    [onNodesChange, onNodeSelect]
+  )
+
+  // Handle node drag end - save position only when dragging is complete
+  const handleNodeDragStop = useCallback(
+    (event: React.MouseEvent, node: Node) => {
+      if (!readonly) {
+        // Save the final position to backend
+        mutations.moveNode(node.id, node.position)
+        console.log('Node position saved:', node.id, node.position)
+      }
+    },
+    [mutations, readonly]
   )
 
   // Handle edge changes
@@ -552,6 +562,7 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
           onEdgesChange={handleEdgesChange}
           onConnect={onConnect}
           onMove={handleViewportChange}
+          onNodeDragStop={handleNodeDragStop}
           nodeTypes={nodeTypes}
           connectionMode={ConnectionMode.Loose}
           fitView
