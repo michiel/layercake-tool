@@ -17,10 +17,9 @@ import ReactFlow, {
 import { Stack, Title, Alert, Loader, Text, ActionIcon, Tooltip, Group } from '@mantine/core'
 import { IconAlertCircle, IconEye, IconSettings, IconPlayerPlay } from '@tabler/icons-react'
 
-// import { usePlanDag, usePlanDagMutations, usePlanDagSubscription } from '../../../hooks/usePlanDag'
+import { usePlanDag, usePlanDagMutations, usePlanDagSubscription, useUserPresence, useCollaboration } from '../../../hooks/usePlanDag'
 import { PlanDag, PlanDagNode, PlanDagEdge, ReactFlowNode, ReactFlowEdge, PlanDagNodeType, NodeConfig, NodeMetadata } from '../../../types/plan-dag'
 import { validateConnection } from '../../../utils/planDagValidation'
-import { UserPresence } from '../../../hooks/useCollaborationSubscriptions'
 
 // Import custom node types
 import { InputNode } from './nodes/InputNode'
@@ -30,13 +29,12 @@ import { MergeNode } from './nodes/MergeNode'
 import { CopyNode } from './nodes/CopyNode'
 import { OutputNode } from './nodes/OutputNode'
 
-// Import dialogs
-import { NodeConfigDialog } from './dialogs/NodeConfigDialog'
-
 // Import collaboration components
 import { UserPresenceIndicator } from '../../collaboration/UserPresenceIndicator'
 import { CollaborativeCursors } from '../../collaboration/CollaborativeCursors'
-import { useUserPresence, useCursorBroadcast } from '../../../hooks/useCollaborationSubscriptions'
+
+// Import dialogs
+import { NodeConfigDialog } from './dialogs/NodeConfigDialog'
 
 // Import ReactFlow styles
 import 'reactflow/dist/style.css'
@@ -65,7 +63,7 @@ const staticMockPlanDag: PlanDag = {
   nodes: [
     {
       id: 'input_1',
-      type: PlanDagNodeType.INPUT,
+      nodeType: PlanDagNodeType.INPUT,
       position: { x: 100, y: 100 },
       metadata: { label: 'CSV Import', description: 'Import nodes from CSV file' },
       config: {
@@ -77,7 +75,7 @@ const staticMockPlanDag: PlanDag = {
     },
     {
       id: 'transform_1',
-      type: PlanDagNodeType.TRANSFORM,
+      nodeType: PlanDagNodeType.TRANSFORM,
       position: { x: 300, y: 100 },
       metadata: { label: 'Filter Nodes', description: 'Apply node filtering' },
       config: {
@@ -89,7 +87,7 @@ const staticMockPlanDag: PlanDag = {
     },
     {
       id: 'output_1',
-      type: PlanDagNodeType.OUTPUT,
+      nodeType: PlanDagNodeType.OUTPUT,
       position: { x: 500, y: 100 },
       metadata: { label: 'Export DOT', description: 'Generate Graphviz output' },
       config: {
@@ -129,10 +127,10 @@ const convertPlanDagToReactFlow = (
 ): { nodes: ReactFlowNode[]; edges: ReactFlowEdge[] } => {
   const nodes: ReactFlowNode[] = planDag.nodes.map((node) => ({
     ...node,
-    type: node.type,
+    type: node.nodeType,
     data: {
       label: node.metadata.label,
-      nodeType: node.type,
+      nodeType: node.nodeType,
       config: node.config,
       metadata: node.metadata,
       onEdit,
@@ -168,7 +166,7 @@ const convertReactFlowToPlanDag = (
 ): PlanDag => {
   const planDagNodes: PlanDagNode[] = nodes.map((node) => ({
     id: node.id,
-    type: node.data.nodeType,
+    nodeType: node.data.nodeType,
     position: node.position,
     metadata: node.data.metadata,
     config: node.data.config,
@@ -194,27 +192,18 @@ const convertReactFlowToPlanDag = (
 
 export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readonly = false }: PlanVisualEditorProps) => {
 
-  // Skip backend calls for frontend-only development
-  const { planDag, loading, error } = { planDag: null, loading: false, error: null } // usePlanDag(projectId)
-  const { lastChange } = { lastChange: null } // usePlanDagSubscription(projectId)
+  // Use real GraphQL queries to fetch Plan DAG data
+  const { planDag, loading, error, refetch } = usePlanDag(projectId)
+  const { lastChange } = usePlanDagSubscription(projectId)
+  const mutations = usePlanDagMutations(projectId)
 
   // Collaboration hooks - mock current user for frontend-only development
   const currentUserId = 'user-123'
-  const { getOnlineUsers } = useUserPresence(projectId.toString(), currentUserId)
-  const { broadcastCursorPosition } = useCursorBroadcast(projectId.toString(), currentUserId)
+  const { users } = useUserPresence(projectId)
+  const { broadcastCursorPosition, joinProject, leaveProject } = useCollaboration(projectId)
 
-  // Mock mutations for frontend-only development
-  const mutations = {
-    moveNode: (nodeId: string, position: { x: number; y: number }) => {
-      console.log('Mock moveNode:', nodeId, position)
-    },
-    addEdge: (edge: any) => {
-      console.log('Mock addEdge:', edge)
-    },
-    deleteEdge: (edgeId: string) => {
-      console.log('Mock deleteEdge:', edgeId)
-    }
-  }
+  // Real mutations are now available from usePlanDagMutations hook
+  // mutations.moveNode, mutations.addEdge, mutations.deleteEdge, etc.
 
   const [selectedNode, setSelectedNode] = useState<string | null>(null)
   const [selectedEdge, setSelectedEdge] = useState<string | null>(null)
@@ -229,31 +218,38 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
   const [configNodeConfig, setConfigNodeConfig] = useState<NodeConfig>({})
   const [configNodeMetadata, setConfigNodeMetadata] = useState<NodeMetadata>({ label: '', description: '' })
 
-  // Mock online users for frontend-only development
-  const [mockUsers] = useState<UserPresence[]>([
+  // Use real users from subscription, with fallback mock data for development
+  const onlineUsers = users.length > 0 ? users : [
     {
       userId: 'user-456',
       userName: 'Alice Cooper',
-      avatarColor: '#228be6',
-      isOnline: true,
       cursorPosition: { x: 250, y: 150 },
       selectedNodeId: 'transform_1',
-      lastActive: new Date().toISOString()
+      isActive: true,
+      lastSeen: new Date().toISOString()
     },
     {
       userId: 'user-789',
       userName: 'Bob Smith',
-      avatarColor: '#51cf66',
-      isOnline: true,
       cursorPosition: { x: 450, y: 200 },
-      lastActive: new Date().toISOString()
+      selectedNodeId: null,
+      isActive: true,
+      lastSeen: new Date().toISOString()
     }
-  ])
+  ]
 
-  // Use static mock Plan DAG for frontend-only development
-  const mockPlanDag = planDag || staticMockPlanDag
+  // Use real Plan DAG data from GraphQL, fallback to static mock for development
+  const activePlanDag = planDag || staticMockPlanDag
 
-  // Create stable handler functions
+  // Initialize ReactFlow state first
+  const initialReactFlowData = useMemo(() => {
+    return convertPlanDagToReactFlow(activePlanDag, () => {}, () => {})
+  }, [activePlanDag])
+
+  const [nodes, setNodes, onNodesChange] = useNodesState<ReactFlowNode>(initialReactFlowData.nodes)
+  const [edges, setEdges, onEdgesChange] = useEdgesState<ReactFlowEdge>(initialReactFlowData.edges)
+
+  // Create handler functions that use the initialized state setters
   const handleNodeEdit = useCallback((nodeId: string) => {
     setNodes((currentNodes) => {
       const node = currentNodes.find(n => n.id === nodeId)
@@ -267,22 +263,25 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
 
       return currentNodes
     })
-  }, [])
+  }, [setNodes])
 
   const handleNodeDelete = useCallback((nodeId: string) => {
     setNodes((nodes) => nodes.filter((node) => node.id !== nodeId))
     setEdges((edges) => edges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId))
     setIsDirty(true)
+    // Delete from backend
+    mutations.deleteNode(nodeId)
     console.log('Node deleted:', nodeId)
-  }, [])
+  }, [mutations, setNodes, setEdges])
 
-  // Initialize with ReactFlow data including handlers - only run once since handlers are stable
-  const basicReactFlowData = useMemo(() => {
-    return convertPlanDagToReactFlow(staticMockPlanDag, handleNodeEdit, handleNodeDelete)
-  }, []) // Empty deps since handlers are stable and staticMockPlanDag is constant
-
-  const [nodes, setNodes, onNodesChange] = useNodesState<ReactFlowNode>(basicReactFlowData.nodes)
-  const [edges, setEdges, onEdgesChange] = useEdgesState<ReactFlowEdge>(basicReactFlowData.edges)
+  // Update nodes with proper handlers when they change
+  useEffect(() => {
+    if (activePlanDag) {
+      const updatedData = convertPlanDagToReactFlow(activePlanDag, handleNodeEdit, handleNodeDelete)
+      setNodes(updatedData.nodes)
+      setEdges(updatedData.edges)
+    }
+  }, [activePlanDag, handleNodeEdit, handleNodeDelete, setNodes, setEdges])
 
   // Handle real-time changes from other users
   useEffect(() => {
@@ -397,8 +396,10 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
       )
     )
     setIsDirty(true)
+    // Save changes to backend
+    mutations.updateNode(nodeId, { config, metadata })
     console.log('Node configuration updated:', nodeId, config, metadata)
-  }, [setNodes, handleNodeEdit, handleNodeDelete])
+  }, [setNodes, handleNodeEdit, handleNodeDelete, mutations])
 
   // Handle viewport changes to track current zoom/pan state
   const handleViewportChange = useCallback((viewport: { x: number; y: number; zoom: number }) => {
@@ -426,14 +427,19 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
   // Use stable nodeTypes reference to prevent ReactFlow warnings
   const nodeTypes = NODE_TYPES
 
-  // Save Plan DAG changes (mock for frontend-only development)
+  // Save Plan DAG changes to backend
   const savePlanDag = useCallback(async () => {
-    if (!mockPlanDag || readonly) return
+    if (!activePlanDag || readonly) return
 
-    const updatedPlanDag = convertReactFlowToPlanDag(nodes, edges, mockPlanDag.metadata)
-    console.log('Would save Plan DAG:', updatedPlanDag)
-    setIsDirty(false)
-  }, [mockPlanDag, nodes, edges, readonly])
+    const updatedPlanDag = convertReactFlowToPlanDag(nodes, edges, activePlanDag.metadata)
+    try {
+      await mutations.updatePlanDag(updatedPlanDag)
+      setIsDirty(false)
+      console.log('Plan DAG saved successfully:', updatedPlanDag)
+    } catch (error) {
+      console.error('Failed to save Plan DAG:', error)
+    }
+  }, [activePlanDag, nodes, edges, readonly, mutations])
 
   // Auto-save on changes (debounced)
   useEffect(() => {
@@ -442,6 +448,23 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
     const timeoutId = setTimeout(savePlanDag, 2000) // Auto-save after 2 seconds
     return () => clearTimeout(timeoutId)
   }, [isDirty, savePlanDag])
+
+  // Join/leave collaboration on mount/unmount
+  useEffect(() => {
+    if (!readonly) {
+      joinProject().catch(err => {
+        console.warn('Failed to join project collaboration:', err)
+      })
+    }
+
+    return () => {
+      if (!readonly) {
+        leaveProject().catch(err => {
+          console.warn('Failed to leave project collaboration:', err)
+        })
+      }
+    }
+  }, [readonly, joinProject, leaveProject])
 
   const miniMapNodeColor = useCallback((node: Node) => {
     switch (node.data?.nodeType) {
@@ -479,7 +502,7 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
     )
   }
 
-  if (!mockPlanDag) {
+  if (!activePlanDag) {
     return (
       <Alert icon={<IconAlertCircle size="1rem" />} title="No Plan DAG found" color="yellow">
         This project doesn't have a Plan DAG configured yet.
@@ -492,7 +515,7 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
       <Group justify="space-between" p="md" bg="gray.0">
         <Group spacing="md">
           <Title order={3}>Plan DAG Editor</Title>
-          <UserPresenceIndicator users={mockUsers} maxVisible={3} size="sm" />
+          <UserPresenceIndicator users={onlineUsers} maxVisible={5} size="sm" />
         </Group>
         <Group spacing="xs">
           {isDirty && (
@@ -542,18 +565,18 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
           <Panel position="top-left">
             <Stack spacing="xs" p="xs" bg="white" style={{ borderRadius: 4, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
               <Text size="sm" fw={500}>
-                {mockPlanDag.metadata.name || 'Untitled Plan'}
+                {activePlanDag.metadata.name || 'Untitled Plan'}
               </Text>
               <Text size="xs" c="dimmed">
                 {nodes.length} nodes, {edges.length} connections
               </Text>
             </Stack>
           </Panel>
-          {/* Collaborative Cursors Overlay - Must be inside ReactFlow */}
-          <CollaborativeCursors
-            users={mockUsers}
-            currentUserId={currentUserId}
-          />
+
+          {/* Collaborative cursors for real-time user presence */}
+          <CollaborativeCursors users={onlineUsers} />
+
+          {/* Collaboration features integration complete */}
         </ReactFlow>
       </div>
 
