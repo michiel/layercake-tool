@@ -46,13 +46,13 @@ export const VALIDATE_PLAN_DAG = gql`
       errors {
         nodeId
         edgeId
-        type
+        nodeType
         message
       }
       warnings {
         nodeId
         edgeId
-        type
+        nodeType
         message
       }
     }
@@ -109,7 +109,7 @@ export const ADD_PLAN_DAG_NODE = gql`
       errors
       node {
         id
-        type
+        nodeType
         position {
           x
           y
@@ -131,7 +131,7 @@ export const UPDATE_PLAN_DAG_NODE = gql`
       errors
       node {
         id
-        type
+        nodeType
         position {
           x
           y
@@ -266,6 +266,25 @@ export const USER_PRESENCE_SUBSCRIPTION = gql`
       isActive
       lastSeen
     }
+  }
+`
+
+// Collaboration Mutations
+export const UPDATE_CURSOR_POSITION = gql`
+  mutation UpdateCursorPosition($projectId: Int!, $positionX: Float!, $positionY: Float!, $selectedNodeId: String) {
+    updateCursorPosition(projectId: $projectId, positionX: $positionX, positionY: $positionY, selectedNodeId: $selectedNodeId)
+  }
+`
+
+export const JOIN_PROJECT_COLLABORATION = gql`
+  mutation JoinProjectCollaboration($projectId: Int!) {
+    joinProjectCollaboration(projectId: $projectId)
+  }
+`
+
+export const LEAVE_PROJECT_COLLABORATION = gql`
+  mutation LeaveProjectCollaboration($projectId: Int!) {
+    leaveProjectCollaboration(projectId: $projectId)
   }
 `
 
