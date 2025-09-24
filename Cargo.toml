@@ -47,8 +47,6 @@ sea-orm = { version = "0.12", features = ["sqlx-sqlite", "runtime-tokio-rustls",
 sea-orm-migration = "0.12"
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.0", features = ["v4"] }
-utoipa = { version = "4.0", features = ["axum_extras"] }
-utoipa-swagger-ui = { version = "6.0", features = ["axum"] }
 
 # GraphQL dependencies
 async-graphql = { version = "7.0", features = ["chrono", "uuid"] }

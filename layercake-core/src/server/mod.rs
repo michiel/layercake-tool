@@ -39,14 +39,12 @@ pub async fn start_server(port: u16, database_path: &str, cors_origin: Option<&s
 fn log_routes(port: u16) {
     info!("API Endpoints:");
     info!("  /health                     - Health check");
-    info!("  /docs                       - Swagger UI documentation");  
-    info!("  /api/v1/*                   - REST API (projects, plans, graph data)");
-    
+
     #[cfg(feature = "graphql")]
     {
         info!("  /graphql                    - GraphQL API & Playground");
     }
-    
+
     #[cfg(feature = "mcp")]
     {
         info!("  /mcp                        - MCP HTTP JSON-RPC API (POST) & Server Info (GET)");

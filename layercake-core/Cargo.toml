@@ -25,8 +25,6 @@ server = [
     "dep:sea-orm-migration",
     "dep:chrono",
     "dep:uuid",
-    "dep:utoipa",
-    "dep:utoipa-swagger-ui",
 ]
 graphql = [
     "server",
@@ -79,8 +77,6 @@ sea-orm = { workspace = true, optional = true }
 sea-orm-migration = { workspace = true, optional = true }
 chrono = { workspace = true, optional = true }
 uuid = { workspace = true, optional = true }
-utoipa = { workspace = true, optional = true }
-utoipa-swagger-ui = { workspace = true, optional = true }
 
 # GraphQL dependencies (optional)
 async-graphql = { workspace = true, optional = true }
