@@ -22,6 +22,7 @@ use super::handlers::health;
 
 #[derive(Clone)]
 pub struct AppState {
+    #[allow(dead_code)] // Reserved for future REST endpoints or middleware
     pub db: DatabaseConnection,
     #[cfg(feature = "graphql")]
     pub graphql_schema: GraphQLSchema,

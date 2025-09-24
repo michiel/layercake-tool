@@ -66,6 +66,7 @@ impl ExportService {
         }
     }
 
+    #[allow(dead_code)] // Reserved for future plan export execution
     pub async fn execute_plan_exports(&self, project_id: i32, plan_yaml: &str) -> Result<Vec<String>> {
         let plan: Plan = serde_yaml::from_str(plan_yaml)?;
         let graph_service = GraphService::new(self.db.clone());

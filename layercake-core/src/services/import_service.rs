@@ -9,6 +9,7 @@ use crate::database::entities::{
     nodes, edges, layers,
 };
 
+#[allow(dead_code)] // Reserved for future CSV import features
 #[derive(Debug)]
 pub struct CsvImportData {
     pub nodes_csv: Option<String>,
@@ -40,6 +41,7 @@ impl ImportService {
         self.import_layers(project_id, csv_content).await
     }
 
+    #[allow(dead_code)] // Reserved for future CSV import features
     pub async fn import_csv_data(&self, project_id: i32, data: CsvImportData) -> Result<ImportResult> {
         let mut result = ImportResult {
             nodes_imported: 0,
@@ -231,6 +233,7 @@ impl ImportService {
     }
 }
 
+#[allow(dead_code)] // Reserved for future import result tracking
 #[derive(Debug)]
 pub struct ImportResult {
     pub nodes_imported: usize,

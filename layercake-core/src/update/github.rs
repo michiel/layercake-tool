@@ -20,6 +20,7 @@ impl GitHubVersionManager {
         }
     }
 
+    #[allow(dead_code)] // Reserved for future custom GitHub API endpoints
     pub fn with_api_base(mut self, api_base: String) -> Self {
         self.api_base = api_base;
         self

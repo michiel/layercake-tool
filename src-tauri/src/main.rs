@@ -60,7 +60,6 @@ async fn main() {
                 .ok_or_else(|| "Failed to get main window".to_string())?;
 
             // Handle window close event
-            let window_clone = window.clone();
             window.on_window_event(move |event| {
                 if let tauri::WindowEvent::CloseRequested { .. } = event {
                     info!("Application closing");

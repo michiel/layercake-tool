@@ -25,6 +25,7 @@ pub enum UpdateError {
     InstallationError(String),
     
     #[error("Permission denied: {0}")]
+    #[allow(dead_code)] // Reserved for future permission handling
     PermissionError(String),
     
     #[error("Backup creation failed: {0}")]
@@ -76,6 +77,7 @@ pub struct UpdateInfo {
 
 /// Update progress information
 #[derive(Debug)]
+#[allow(dead_code)] // Reserved for future update progress reporting
 pub struct UpdateProgress {
     pub stage: UpdateStage,
     pub progress: f64,
@@ -86,6 +88,7 @@ pub struct UpdateProgress {
 
 /// Update stages
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // Reserved for future update stage tracking
 pub enum UpdateStage {
     CheckingVersion,
     DownloadingRelease,
@@ -98,6 +101,7 @@ pub enum UpdateStage {
 
 /// Update channel
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // Reserved for future update channel management
 pub enum UpdateChannel {
     Stable,
     Beta,

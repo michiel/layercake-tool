@@ -6,9 +6,9 @@ use uuid::Uuid;
 
 
 /// Service for handling authentication operations
+#[allow(dead_code)] // Authentication service reserved for future use
 #[derive(Clone)]
 pub struct AuthService {
-    #[allow(dead_code)]
     db: DatabaseConnection,
 }
 

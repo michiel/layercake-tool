@@ -11,11 +11,14 @@ pub struct UpdateCommand {
     pub check_only: bool,
     pub force: bool,
     pub pre_release: bool,
+    #[allow(dead_code)] // Reserved for future version targeting
     pub version: Option<String>,
+    #[allow(dead_code)] // Reserved for future custom install directory
     pub install_dir: Option<PathBuf>,
     pub backup: bool,
     pub rollback: bool,
     pub dry_run: bool,
+    #[allow(dead_code)] // Reserved for future signature verification
     pub skip_verify: bool,
 }
 

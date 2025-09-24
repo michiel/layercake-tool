@@ -28,6 +28,7 @@ impl DefaultBinaryManager {
         backup_path
     }
 
+    #[allow(dead_code)] // Reserved for future hash verification
     async fn calculate_sha256(path: &PathBuf) -> Result<String, UpdateError> {
         let contents = tokio::fs::read(path).await?;
         let mut hasher = Sha256::new();

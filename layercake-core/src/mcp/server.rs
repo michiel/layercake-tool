@@ -8,6 +8,7 @@ use std::collections::HashMap;
 /// Layercake-specific server state implementing axum-mcp traits
 #[derive(Clone)]
 pub struct LayercakeServerState {
+    #[allow(dead_code)] // Available for MCP tools that need direct database access
     pub db: DatabaseConnection,
     pub tools: LayercakeToolRegistry,
     pub resources: super::resources::LayercakeResourceRegistry,

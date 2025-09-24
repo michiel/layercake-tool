@@ -9,6 +9,7 @@ use crate::database::entities::{users, user_sessions, project_collaborators};
 use crate::graphql::context::GraphQLContext;
 
 /// Authorization service for checking user permissions
+#[allow(dead_code)] // Authorization service reserved for future use
 #[derive(Clone, Debug)]
 pub struct AuthorizationService {
     db: DatabaseConnection,

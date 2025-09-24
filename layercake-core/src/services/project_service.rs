@@ -8,6 +8,7 @@ use chrono::Utc;
 use crate::database::entities::{projects, project_collaborators, users};
 use crate::services::{ValidationService, AuthorizationService, ProjectRole};
 
+#[allow(dead_code)] // Project service reserved for future use
 #[derive(Clone)]
 pub struct ProjectService {
     db: DatabaseConnection,

@@ -31,6 +31,7 @@ impl DefaultUpdater {
         }
     }
 
+    #[allow(dead_code)] // Reserved for future custom temp directory configuration
     pub fn with_temp_dir(mut self, temp_dir: PathBuf) -> Self {
         self.temp_dir = temp_dir;
         self
@@ -94,14 +95,13 @@ impl DefaultUpdater {
         }
 
         let total_size = response.content_length().or(expected_size);
-        let mut downloaded = 0u64;
-        
+
         let mut file = tokio::fs::File::create(target_path).await?;
         let content = response.bytes().await?;
-        
+
         file.write_all(&content).await?;
-        downloaded = content.len() as u64;
-        
+        let downloaded = content.len() as u64;
+
         // Progress reporting
         if let Some(total) = total_size {
             let progress = downloaded as f64 / total as f64;

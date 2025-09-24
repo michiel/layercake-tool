@@ -3,6 +3,7 @@ use regex::Regex;
 use serde_json::Value;
 
 /// Service for data validation and sanitization
+#[allow(dead_code)] // Validation service reserved for future use
 pub struct ValidationService;
 
 impl ValidationService {
