@@ -40,7 +40,7 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({
   const items: BreadcrumbItem[] = [
     {
       title: 'Home',
-      href: 'home',
+      href: '/',
       icon: getIcon('home'),
     },
   ]
@@ -49,7 +49,7 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({
   if (projectId && projectName) {
     items.push({
       title: projectName,
-      href: `project-${projectId}`,
+      href: `/projects/${projectId}`,
       icon: getIcon('projects'),
     })
   }
