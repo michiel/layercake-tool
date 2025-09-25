@@ -37,14 +37,13 @@ export const USER_PRESENCE_CHANGED_SUBSCRIPTION = gql`
       userId
       userName
       avatarColor
-      planId
-      isOnline
       cursorPosition {
         x
         y
       }
       selectedNodeId
-      lastActive
+      isActive
+      lastSeen
     }
   }
 `

@@ -1,74 +1,57 @@
-// import { useSubscription } from '@apollo/client'
+import { useSubscription } from '@apollo/client/react'
 import { useEffect, useRef, useCallback } from 'react'
-// import {
-//   PLAN_DAG_UPDATED_SUBSCRIPTION,
-//   USER_PRESENCE_CHANGED_SUBSCRIPTION,
-//   COLLABORATION_EVENTS_SUBSCRIPTION,
-//   PlanDagUpdateEvent,
-//   UserPresenceEvent,
-//   CollaborationEvent,
-// } from '../graphql/subscriptions'
+import {
+  PLAN_DAG_UPDATED_SUBSCRIPTION,
+  USER_PRESENCE_CHANGED_SUBSCRIPTION,
+  COLLABORATION_EVENTS_SUBSCRIPTION,
+  type PlanDagUpdateEvent,
+  type UserPresenceEvent,
+  type CollaborationEvent,
+} from '../graphql/subscriptions'
 
-// Mock types for frontend-only development
-interface PlanDagUpdateEvent {
-  id: string;
-  userId: string;
-  timestamp: string;
-}
-
-interface UserPresenceEvent {
-  userId: string;
-  userName: string;
-  avatarColor: string;
-  isOnline: boolean;
-  cursorPosition?: { x: number; y: number };
-  selectedNodeId?: string;
-  lastActive: string;
-}
-
-interface CollaborationEvent {
-  eventType: string;
-  userId: string;
-  data: any;
-}
-
-// Hook for Plan DAG real-time updates - Mock for frontend-only development
+// Hook for Plan DAG real-time updates
 export const usePlanDagSubscription = (
   planId: string,
   onUpdate?: (event: PlanDagUpdateEvent) => void
 ) => {
-  // Mock implementation for frontend-only development
-  return {
-    data: null,
-    loading: false,
-    error: null,
-  }
+  return useSubscription(PLAN_DAG_UPDATED_SUBSCRIPTION, {
+    variables: { planId },
+    onData: ({ data }: any) => {
+      if (data.data?.planDagUpdated && onUpdate) {
+        onUpdate(data.data.planDagUpdated);
+      }
+    },
+  });
 }
 
-// Hook for user presence tracking - Mock for frontend-only development
+// Hook for user presence tracking
 export const useUserPresenceSubscription = (
   planId: string,
   onPresenceChange?: (event: UserPresenceEvent) => void
 ) => {
-  // Mock implementation for frontend-only development
-  return {
-    data: null,
-    loading: false,
-    error: null,
-  }
+  return useSubscription(USER_PRESENCE_CHANGED_SUBSCRIPTION, {
+    variables: { planId },
+    onData: ({ data }: any) => {
+      if (data.data?.userPresenceChanged && onPresenceChange) {
+        onPresenceChange(data.data.userPresenceChanged);
+      }
+    },
+  });
 }
 
-// Hook for all collaboration events - Mock for frontend-only development
+// Hook for all collaboration events
 export const useCollaborationEventsSubscription = (
   planId: string,
   onEvent?: (event: CollaborationEvent) => void
 ) => {
-  // Mock implementation for frontend-only development
-  return {
-    data: null,
-    loading: false,
-    error: null,
-  }
+  return useSubscription(COLLABORATION_EVENTS_SUBSCRIPTION, {
+    variables: { planId },
+    onData: ({ data }: any) => {
+      if (data.data?.collaborationEvents && onEvent) {
+        onEvent(data.data.collaborationEvents);
+      }
+    },
+  });
 }
 
 // User presence state management
@@ -163,17 +146,15 @@ export const useCursorBroadcast = (planId: string, userId: string) => {
     broadcastTimeoutRef.current = window.setTimeout(() => {
       lastPositionRef.current = { x, y }
 
-      // In a real implementation, this would publish a cursor moved event
+      // TODO: Implement actual cursor position broadcasting
+      // This would typically be done through a mutation that triggers
+      // the collaboration event system
       console.log('Broadcasting cursor position:', {
         planId,
         userId,
         position: { x, y },
         selectedNodeId
       })
-
-      // TODO: Implement actual cursor position broadcasting
-      // This would typically be done through a mutation that triggers
-      // the collaboration event system
     }, 100) // Throttle to 10 updates per second
   }, [planId, userId])
 

@@ -95,7 +95,7 @@ export const NodeConfigDialog = ({
       opened={opened}
       onClose={onClose}
       title={
-        <Group spacing="sm">
+        <Group gap="sm">
           <Title order={4}>{getNodeTypeLabel(nodeType)} Configuration</Title>
           <Text size="sm" c="dimmed">({nodeId})</Text>
         </Group>
@@ -104,10 +104,10 @@ export const NodeConfigDialog = ({
       centered
     >
       <form onSubmit={form.onSubmit(handleSave)}>
-        <Stack spacing="md">
+        <Stack gap="md">
           {!isValid && validationErrors.length > 0 && (
             <Alert icon={<IconAlertCircle size="1rem" />} color="red" title="Configuration Error">
-              <Stack spacing="xs">
+              <Stack gap="xs">
                 {validationErrors.map((error, index) => (
                   <Text key={index} size="sm">{error}</Text>
                 ))}
@@ -399,8 +399,12 @@ function buildConfigFromForm(nodeType: PlanDagNodeType, values: FormData): NodeC
 
     case PlanDagNodeType.GRAPH:
       return {
-        graphId: values.graphId,
-        graphSource: values.graphSource,
+        graphId: values.graphId ? parseInt(values.graphId) : 0,
+        isReference: values.isReference || false,
+        metadata: {
+          nodeCount: values.nodeCount ? parseInt(values.nodeCount) : undefined,
+          edgeCount: values.edgeCount ? parseInt(values.edgeCount) : undefined,
+        },
       }
 
     case PlanDagNodeType.TRANSFORM:
@@ -419,9 +423,10 @@ function buildConfigFromForm(nodeType: PlanDagNodeType, values: FormData): NodeC
 
     case PlanDagNodeType.MERGE:
       return {
-        inputGraphRefs: values.inputGraphRefs.split(',').map((ref: string) => ref.trim()).filter(Boolean),
+        inputRefs: values.inputGraphRefs.split(',').map((ref: string) => ref.trim()).filter(Boolean),
         outputGraphRef: values.outputGraphRef,
         mergeStrategy: values.mergeStrategy,
+        conflictResolution: values.conflictResolution || 'PreferFirst',
       }
 
     case PlanDagNodeType.COPY:
@@ -429,6 +434,7 @@ function buildConfigFromForm(nodeType: PlanDagNodeType, values: FormData): NodeC
         sourceGraphRef: values.sourceGraphRef,
         outputGraphRef: values.outputGraphRef,
         copyType: values.copyType,
+        preserveMetadata: values.preserveMetadata !== undefined ? values.preserveMetadata : true,
       }
 
     case PlanDagNodeType.OUTPUT:
@@ -446,7 +452,7 @@ function buildConfigFromForm(nodeType: PlanDagNodeType, values: FormData): NodeC
       }
 
     default:
-      return {}
+      return {} as NodeConfig
   }
 }
 

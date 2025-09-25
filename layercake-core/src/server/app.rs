@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Json, State},
+    extract::{Json, State, WebSocketUpgrade},
     response::IntoResponse,
     routing::get,
     Router,
@@ -76,7 +76,9 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
     // Add GraphQL routes if feature is enabled
     #[cfg(feature = "graphql")]
     {
-        app = app.route("/graphql", get(graphql_playground).post(graphql_handler));
+        app = app
+            .route("/graphql", get(graphql_playground).post(graphql_handler))
+            .route("/graphql/ws", get(graphql_ws_handler));
     }
 
     // Add MCP routes if feature is enabled
@@ -131,6 +133,102 @@ async fn graphql_playground() -> impl axum::response::IntoResponse {
     axum::response::Html(async_graphql::http::playground_source(
         async_graphql::http::GraphQLPlaygroundConfig::new("/graphql"),
     ))
+}
+
+#[cfg(feature = "graphql")]
+async fn graphql_ws_handler(
+    ws: axum::extract::WebSocketUpgrade,
+    State(state): State<AppState>,
+) -> impl axum::response::IntoResponse {
+    ws.protocols(["graphql-transport-ws", "graphql-ws"])
+        .on_upgrade(move |socket| async move {
+            handle_graphql_ws(socket, state.graphql_schema).await;
+        })
+}
+
+#[cfg(feature = "graphql")]
+async fn handle_graphql_ws(
+    mut socket: axum::extract::ws::WebSocket,
+    schema: crate::graphql::GraphQLSchema,
+) {
+    use axum::extract::ws::Message;
+    use serde_json::{json, Value};
+    use futures_util::StreamExt;
+    use std::collections::HashMap;
+    use tokio::sync::mpsc;
+
+    let mut subscriptions: HashMap<String, mpsc::UnboundedSender<()>> = HashMap::new();
+    let mut connection_ack_sent = false;
+
+    // Handle graphql-transport-ws protocol
+    while let Some(msg) = socket.recv().await {
+        if let Ok(Message::Text(text)) = msg {
+            if let Ok(payload) = serde_json::from_str::<Value>(&text) {
+                let msg_type = payload.get("type").and_then(|t| t.as_str()).unwrap_or("");
+
+                match msg_type {
+                    "connection_init" => {
+                        if !connection_ack_sent {
+                            let ack = json!({
+                                "type": "connection_ack"
+                            });
+                            if socket.send(Message::Text(ack.to_string())).await.is_err() {
+                                break;
+                            }
+                            connection_ack_sent = true;
+                        }
+                    }
+                    "subscribe" => {
+                        if let Some(id) = payload.get("id").and_then(|i| i.as_str()) {
+                            if let Some(query_payload) = payload.get("payload") {
+                                if let Ok(request) = serde_json::from_value::<async_graphql::Request>(query_payload.clone()) {
+                                    // Execute the subscription immediately and send first response
+                                    let response = schema.execute(request).await;
+                                    let next_msg = json!({
+                                        "id": id,
+                                        "type": "next",
+                                        "payload": response
+                                    });
+                                    if socket.send(Message::Text(next_msg.to_string())).await.is_err() {
+                                        break;
+                                    }
+
+                                    // For now, immediately complete the subscription
+                                    // In a real implementation, we'd manage ongoing subscriptions
+                                    let complete_msg = json!({
+                                        "id": id,
+                                        "type": "complete"
+                                    });
+                                    if socket.send(Message::Text(complete_msg.to_string())).await.is_err() {
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    "complete" => {
+                        // Handle subscription stop
+                        if let Some(id) = payload.get("id").and_then(|i| i.as_str()) {
+                            if let Some(cancel_tx) = subscriptions.remove(id) {
+                                let _ = cancel_tx.send(());
+                            }
+                        }
+                    }
+                    "pong" => {
+                        // Client responded to ping - do nothing
+                    }
+                    _ => {}
+                }
+            }
+        } else if let Ok(Message::Close(_)) = msg {
+            break;
+        }
+    }
+
+    // Clean up any remaining subscriptions
+    for (_, cancel_tx) in subscriptions {
+        let _ = cancel_tx.send(());
+    }
 }
 
 

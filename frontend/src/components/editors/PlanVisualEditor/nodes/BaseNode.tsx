@@ -15,7 +15,6 @@ interface BaseNodeProps extends NodeProps {
 }
 
 export const BaseNode = memo(({
-  id,
   nodeType,
   config,
   metadata,
@@ -23,7 +22,7 @@ export const BaseNode = memo(({
   onEdit,
   onDelete,
   readonly = false
-}: BaseNodeProps) => {
+}: Omit<BaseNodeProps, 'id'>) => {
   const color = getNodeTypeColor(nodeType)
   const requiredInputs = getRequiredInputCount(nodeType)
   const canHaveOutputs = canHaveMultipleOutputs(nodeType)
@@ -80,7 +79,7 @@ export const BaseNode = memo(({
           </Badge>
 
           {!readonly && (
-            <Group spacing="xs">
+            <Group gap="xs">
               <Tooltip label="Edit node">
                 <ActionIcon
                   size="sm"

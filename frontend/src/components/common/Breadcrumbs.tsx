@@ -1,6 +1,6 @@
 import React from 'react'
 import { Breadcrumbs as MantineBreadcrumbs, Anchor, Text } from '@mantine/core'
-import { IconHome, IconDatabase, IconGraph, IconSettings } from '@tabler/icons-react'
+import { IconHome, IconDatabase, IconGraph } from '@tabler/icons-react'
 
 interface BreadcrumbItem {
   title: string

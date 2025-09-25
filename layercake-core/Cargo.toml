@@ -32,6 +32,8 @@ graphql = [
     "dep:async-graphql-axum",
     "dep:async-stream",
     "dep:lazy_static",
+    "dep:tokio-tungstenite",
+    "dep:futures-util",
 ]
 mcp = [
     "server",

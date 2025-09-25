@@ -254,10 +254,11 @@ export const PLAN_DAG_CHANGED_SUBSCRIPTION = gql`
 `
 
 export const USER_PRESENCE_SUBSCRIPTION = gql`
-  subscription UserPresence($projectId: Int!) {
-    userPresence(projectId: $projectId) {
+  subscription UserPresenceChanged($planId: ID!) {
+    userPresenceChanged(planId: $planId) {
       userId
       userName
+      avatarColor
       cursorPosition {
         x
         y

@@ -5,9 +5,11 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use std::pin::Pin;
+use sea_orm::{EntityTrait, ColumnTrait, QueryFilter};
 
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::{PlanDagNode, PlanDagEdge};
+use crate::graphql::types::user::CursorPosition;
 
 pub struct Subscription;
 
@@ -82,11 +84,6 @@ pub struct UserPresenceEvent {
     pub last_active: String,
 }
 
-#[derive(Clone, Debug, SimpleObject)]
-pub struct CursorPosition {
-    pub x: f64,
-    pub y: f64,
-}
 
 /// Plan DAG update events for real-time synchronization
 #[derive(Clone, Debug, SimpleObject)]
@@ -225,80 +222,6 @@ impl Subscription {
         Ok(Box::pin(stream))
     }
 
-    /// Subscribe to user presence changes for a specific plan
-    async fn user_presence_changed(
-        &self,
-        ctx: &Context<'_>,
-        plan_id: String,
-    ) -> Result<Pin<Box<dyn Stream<Item = UserPresenceEvent> + Send>>> {
-        let _context = ctx.data::<GraphQLContext>()?;
-
-        // Get or create broadcaster for this plan
-        let broadcaster = get_plan_broadcaster(&plan_id).await;
-        let mut receiver = broadcaster.subscribe();
-
-        // Filter events for user presence only
-        let stream = async_stream::stream! {
-            while let Ok(event) = receiver.recv().await {
-                if event.plan_id == plan_id {
-                    let presence_event = match event.event_type {
-                        CollaborationEventType::UserJoined => {
-                            if let Some(user_data) = &event.data.user_event {
-                                Some(UserPresenceEvent {
-                                    user_id: user_data.user_id.clone(),
-                                    user_name: user_data.user_name.clone(),
-                                    avatar_color: user_data.avatar_color.clone(),
-                                    plan_id: event.plan_id,
-                                    is_online: true,
-                                    cursor_position: None,
-                                    selected_node_id: None,
-                                    last_active: event.timestamp,
-                                })
-                            } else { None }
-                        },
-                        CollaborationEventType::UserLeft => {
-                            if let Some(user_data) = &event.data.user_event {
-                                Some(UserPresenceEvent {
-                                    user_id: user_data.user_id.clone(),
-                                    user_name: user_data.user_name.clone(),
-                                    avatar_color: user_data.avatar_color.clone(),
-                                    plan_id: event.plan_id,
-                                    is_online: false,
-                                    cursor_position: None,
-                                    selected_node_id: None,
-                                    last_active: event.timestamp,
-                                })
-                            } else { None }
-                        },
-                        CollaborationEventType::CursorMoved => {
-                            if let Some(cursor_data) = &event.data.cursor_event {
-                                Some(UserPresenceEvent {
-                                    user_id: cursor_data.user_id.clone(),
-                                    user_name: cursor_data.user_name.clone(),
-                                    avatar_color: cursor_data.avatar_color.clone(),
-                                    plan_id: event.plan_id,
-                                    is_online: true,
-                                    cursor_position: Some(CursorPosition {
-                                        x: cursor_data.position_x,
-                                        y: cursor_data.position_y,
-                                    }),
-                                    selected_node_id: cursor_data.selected_node_id.clone(),
-                                    last_active: event.timestamp,
-                                })
-                            } else { None }
-                        },
-                        _ => None,
-                    };
-
-                    if let Some(presence) = presence_event {
-                        yield presence;
-                    }
-                }
-            }
-        };
-
-        Ok(Box::pin(stream))
-    }
 
     /// Subscribe to all collaboration events for a specific plan
     async fn collaboration_events(
@@ -317,6 +240,117 @@ impl Subscription {
             while let Ok(event) = receiver.recv().await {
                 if event.plan_id == plan_id {
                     yield event;
+                }
+            }
+        };
+
+        Ok(Box::pin(stream))
+    }
+
+    /// Subscribe to user presence for a specific project (matching frontend expectation)
+    async fn user_presence_changed(
+        &self,
+        ctx: &Context<'_>,
+        plan_id: String,
+    ) -> Result<Pin<Box<dyn Stream<Item = crate::graphql::types::UserPresenceInfo> + Send + 'static>>> {
+        use crate::database::entities::{user_presence, users};
+        use sea_orm::EntityTrait;
+
+        let context = ctx.data::<GraphQLContext>()?;
+        let db = context.db.clone();
+
+        // Parse plan_id to project_id
+        let project_id: i32 = plan_id.parse().map_err(|_| async_graphql::Error::new("Invalid plan_id format"))?;
+
+        // Get current active users for this project
+        let active_users = user_presence::Entity::find()
+            .filter(user_presence::Column::ProjectId.eq(project_id))
+            .filter(user_presence::Column::IsOnline.eq(true))
+            .all(&db)
+            .await?;
+
+        // Create a stream that emits current users and then listens for updates
+        let stream = async_stream::stream! {
+            // First, emit all currently active users
+            for presence in active_users {
+                // Get user details
+                if let Ok(Some(user)) = users::Entity::find_by_id(presence.user_id)
+                    .one(&db)
+                    .await
+                {
+                    let cursor_position = presence.cursor_position
+                        .as_ref()
+                        .and_then(|pos| serde_json::from_str::<crate::database::entities::user_presence::CursorPosition>(pos).ok())
+                        .map(|pos| crate::graphql::types::CursorPosition { x: pos.x, y: pos.y });
+
+                    let user_presence_info = crate::graphql::types::UserPresenceInfo {
+                        user_id: presence.user_id.to_string(),
+                        user_name: user.display_name,
+                        avatar_color: user.avatar_color,
+                        cursor_position,
+                        selected_node_id: presence.selected_node_id,
+                        is_active: presence.is_online && presence.status == "active",
+                        last_seen: presence.last_seen.to_rfc3339(),
+                    };
+
+                    yield user_presence_info;
+                }
+            }
+
+            // Then subscribe to future collaboration events for presence changes
+            let broadcaster = get_plan_broadcaster(&project_id.to_string()).await;
+            let mut receiver = broadcaster.subscribe();
+
+            while let Ok(event) = receiver.recv().await {
+                if event.plan_id == project_id.to_string() {
+                    match event.event_type {
+                        CollaborationEventType::UserJoined => {
+                            if let Some(user_data) = &event.data.user_event {
+                                let user_presence_info = crate::graphql::types::UserPresenceInfo {
+                                    user_id: user_data.user_id.clone(),
+                                    user_name: user_data.user_name.clone(),
+                                    avatar_color: user_data.avatar_color.clone(),
+                                    cursor_position: None,
+                                    selected_node_id: None,
+                                    is_active: true,
+                                    last_seen: event.timestamp,
+                                };
+                                yield user_presence_info;
+                            }
+                        },
+                        CollaborationEventType::UserLeft => {
+                            if let Some(user_data) = &event.data.user_event {
+                                let user_presence_info = crate::graphql::types::UserPresenceInfo {
+                                    user_id: user_data.user_id.clone(),
+                                    user_name: user_data.user_name.clone(),
+                                    avatar_color: user_data.avatar_color.clone(),
+                                    cursor_position: None,
+                                    selected_node_id: None,
+                                    is_active: false,
+                                    last_seen: event.timestamp,
+                                };
+                                yield user_presence_info;
+                            }
+                        },
+                        CollaborationEventType::CursorMoved => {
+                            if let Some(cursor_data) = &event.data.cursor_event {
+                                let user_presence_info = crate::graphql::types::UserPresenceInfo {
+                                    user_id: cursor_data.user_id.clone(),
+                                    user_name: cursor_data.user_name.clone(),
+                                    avatar_color: cursor_data.avatar_color.clone(),
+                                    cursor_position: Some(crate::graphql::types::CursorPosition {
+                                        x: cursor_data.position_x,
+                                        y: cursor_data.position_y,
+                                    }),
+                                    selected_node_id: cursor_data.selected_node_id.clone(),
+                                    is_active: true,
+                                    last_seen: event.timestamp,
+                                };
+                                yield user_presence_info;
+                            }
+                        },
+                        _ => {} // Ignore other event types
+                    }
                 }
             }
         };

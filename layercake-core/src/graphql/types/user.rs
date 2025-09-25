@@ -305,3 +305,41 @@ pub enum UserStatus {
     Away,
     Offline,
 }
+
+// Collaboration-specific types that match the frontend expectations
+#[derive(SimpleObject)]
+pub struct UserPresenceInfo {
+    pub user_id: String,
+    pub user_name: String,
+    pub avatar_color: String,
+    pub cursor_position: Option<CursorPosition>,
+    pub selected_node_id: Option<String>,
+    pub is_active: bool,
+    pub last_seen: String, // ISO 8601 timestamp
+}
+
+#[derive(Clone, Debug, SimpleObject)]
+pub struct CursorPosition {
+    pub x: f64,
+    pub y: f64,
+}
+
+impl From<user_presence::Model> for UserPresenceInfo {
+    fn from(presence: user_presence::Model) -> Self {
+        // Parse cursor position from JSON string
+        let cursor_position = presence.cursor_position
+            .as_ref()
+            .and_then(|pos| serde_json::from_str::<crate::database::entities::user_presence::CursorPosition>(pos).ok())
+            .map(|pos| CursorPosition { x: pos.x, y: pos.y });
+
+        Self {
+            user_id: presence.user_id.to_string(),
+            user_name: format!("User {}", presence.user_id), // Default name - should be replaced with actual user lookup
+            avatar_color: "#3b82f6".to_string(), // Default blue - should be replaced with actual user color
+            cursor_position,
+            selected_node_id: presence.selected_node_id,
+            is_active: presence.is_online && presence.status == "active",
+            last_seen: presence.last_seen.to_rfc3339(),
+        }
+    }
+}

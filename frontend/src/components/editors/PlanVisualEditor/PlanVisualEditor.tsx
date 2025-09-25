@@ -7,18 +7,20 @@ import ReactFlow, {
   useEdgesState,
   addEdge,
   Connection,
-  Edge,
   Node,
   NodeChange,
   EdgeChange,
   ConnectionMode,
   Panel,
+  OnMove,
+  Viewport,
 } from 'reactflow'
 import { Stack, Title, Alert, Loader, Text, ActionIcon, Tooltip, Group } from '@mantine/core'
-import { IconAlertCircle, IconEye, IconSettings, IconPlayerPlay } from '@tabler/icons-react'
+import { IconAlertCircle, IconEye, IconSettings, IconPlayerPlay, IconPlayerPause, IconRotate, IconCircleCheck, IconExclamationCircle } from '@tabler/icons-react'
 
 import { usePlanDag, usePlanDagMutations, usePlanDagSubscription, useUserPresence, useCollaboration } from '../../../hooks/usePlanDag'
-import { PlanDag, PlanDagNode, PlanDagEdge, ReactFlowNode, ReactFlowEdge, PlanDagNodeType, NodeConfig, NodeMetadata } from '../../../types/plan-dag'
+import { PlanDag, PlanDagNode, PlanDagEdge, ReactFlowNode, ReactFlowEdge, PlanDagNodeType, NodeConfig, NodeMetadata, DataSourceNodeConfig } from '../../../types/plan-dag'
+import { UserPresence } from '../../../hooks/useCollaborationSubscriptions'
 import { validateConnection } from '../../../utils/planDagValidation'
 
 // Import custom node types
@@ -121,33 +123,42 @@ const staticMockPlanDag: PlanDag = {
 
 // Convert Plan DAG to ReactFlow format
 const convertPlanDagToReactFlow = (
-  planDag: PlanDag,
+  planDag: PlanDag | any,
   onEdit?: (nodeId: string) => void,
   onDelete?: (nodeId: string) => void
 ): { nodes: ReactFlowNode[]; edges: ReactFlowEdge[] } => {
-  const nodes: ReactFlowNode[] = planDag.nodes.map((node) => ({
-    ...node,
-    type: node.nodeType,
-    data: {
-      label: node.metadata.label,
-      nodeType: node.nodeType,
-      config: typeof node.config === 'string' ? (() => {
-        try {
-          return JSON.parse(node.config)
-        } catch (e) {
-          console.warn('Failed to parse node config JSON:', node.config, e)
-          return {}
-        }
-      })() : node.config,
-      metadata: node.metadata,
-      onEdit,
-      onDelete,
-    },
-    draggable: true,
-    selectable: true,
-  }))
+  const nodes: ReactFlowNode[] = planDag.nodes.map((node: any) => {
+    // Convert string nodeType to enum if needed
+    const nodeType = typeof node.nodeType === 'string' ?
+      (Object.values(PlanDagNodeType) as string[]).includes(node.nodeType) ?
+        node.nodeType as PlanDagNodeType : PlanDagNodeType.DATA_SOURCE
+      : node.nodeType;
 
-  const edges: ReactFlowEdge[] = planDag.edges.map((edge) => ({
+    return {
+      ...node,
+      nodeType,
+      type: nodeType,
+      data: {
+        label: node.metadata.label,
+        nodeType,
+        config: typeof node.config === 'string' ? (() => {
+          try {
+            return JSON.parse(node.config)
+          } catch (e) {
+            console.warn('Failed to parse node config JSON:', node.config, e)
+            return {}
+          }
+        })() : node.config,
+        metadata: node.metadata,
+        onEdit,
+        onDelete,
+      },
+      draggable: true,
+      selectable: true,
+    }
+  })
+
+  const edges: ReactFlowEdge[] = planDag.edges.map((edge: any) => ({
     ...edge,
     type: 'smoothstep',
     animated: false,
@@ -173,10 +184,10 @@ const convertReactFlowToPlanDag = (
 ): PlanDag => {
   const planDagNodes: PlanDagNode[] = nodes.map((node) => ({
     id: node.id,
-    nodeType: node.data.nodeType,
+    nodeType: node.data?.nodeType || node.nodeType || PlanDagNodeType.DATA_SOURCE,
     position: node.position,
-    metadata: node.data.metadata,
-    config: typeof node.data.config === 'string' ? node.data.config : JSON.stringify(node.data.config),
+    metadata: node.data?.metadata || node.metadata || { label: '' },
+    config: typeof node.data?.config === 'string' ? node.data.config : JSON.stringify(node.data?.config || node.config || {}),
   }))
 
   const planDagEdges: PlanDagEdge[] = edges.map((edge) => ({
@@ -200,12 +211,12 @@ const convertReactFlowToPlanDag = (
 export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readonly = false }: PlanVisualEditorProps) => {
 
   // Use real GraphQL queries to fetch Plan DAG data
-  const { planDag, loading, error, refetch } = usePlanDag(projectId)
+  const { planDag, loading, error } = usePlanDag(projectId)
   const { lastChange } = usePlanDagSubscription(projectId)
   const mutations = usePlanDagMutations(projectId)
 
   // Collaboration hooks - mock current user for frontend-only development
-  const currentUserId = 'user-123'
+  // const currentUserId = 'user-123' // Unused for now
   const { users } = useUserPresence(projectId)
   const { broadcastCursorPosition, joinProject, leaveProject } = useCollaboration(projectId)
 
@@ -214,47 +225,217 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
 
   const [selectedNode, setSelectedNode] = useState<string | null>(null)
   const [selectedEdge, setSelectedEdge] = useState<string | null>(null)
+
   const [isDirty, setIsDirty] = useState(false)
-  const initializedRef = useRef(false)
+  // const initializedRef = useRef(false) // Unused for now
   const viewportRef = useRef({ x: 0, y: 0, zoom: 1 })
 
   // Configuration dialog state
   const [configDialogOpen, setConfigDialogOpen] = useState(false)
   const [configNodeId, setConfigNodeId] = useState<string>('')
   const [configNodeType, setConfigNodeType] = useState<PlanDagNodeType>(PlanDagNodeType.DATA_SOURCE)
-  const [configNodeConfig, setConfigNodeConfig] = useState<NodeConfig>({})
+  const [configNodeConfig, setConfigNodeConfig] = useState<NodeConfig>({
+    inputType: 'CSVNodesFromFile',
+    source: '',
+    dataType: 'Nodes',
+    outputGraphRef: ''
+  } as DataSourceNodeConfig)
   const [configNodeMetadata, setConfigNodeMetadata] = useState<NodeMetadata>({ label: '', description: '' })
 
   // Use real users from subscription, with fallback mock data for development
-  const onlineUsers = users.length > 0 ? users : [
+  const onlineUsers: UserPresence[] = users.length > 0 ? users : [
     {
       userId: 'user-456',
       userName: 'Alice Cooper',
+      avatarColor: '#51cf66',
+      isOnline: true,
       cursorPosition: { x: 250, y: 150 },
       selectedNodeId: 'transform_1',
-      isActive: true,
-      lastSeen: new Date().toISOString()
+      lastActive: new Date().toISOString()
     },
     {
       userId: 'user-789',
       userName: 'Bob Smith',
+      avatarColor: '#339af0',
+      isOnline: true,
       cursorPosition: { x: 450, y: 200 },
-      selectedNodeId: null,
-      isActive: true,
-      lastSeen: new Date().toISOString()
+      selectedNodeId: undefined,
+      lastActive: new Date().toISOString()
     }
   ]
 
-  // Use real Plan DAG data from GraphQL, fallback to static mock for development
-  const activePlanDag = planDag || staticMockPlanDag
+  // Feature flag for dynamic data - can be controlled via environment or debug flag
+  const useDynamicData = import.meta.env.VITE_USE_DYNAMIC_DATA === 'true' || false
 
-  // Initialize ReactFlow state first
-  const initialReactFlowData = useMemo(() => {
-    return convertPlanDagToReactFlow(activePlanDag, () => {}, () => {})
-  }, [activePlanDag])
+  // Phase 2: Controlled update mechanisms
+  const [updatesPaused, setUpdatesPaused] = useState(false)
+  const [pendingUpdates, setPendingUpdates] = useState(0)
+  const lastUpdateTimeRef = useRef<number>(0)
+  const updateThrottleRef = useRef<NodeJS.Timeout | null>(null)
+  const updateDebounceRef = useRef<NodeJS.Timeout | null>(null)
 
-  const [nodes, setNodes, onNodesChange] = useNodesState<ReactFlowNode>(initialReactFlowData.nodes)
-  const [edges, setEdges, onEdgesChange] = useEdgesState<ReactFlowEdge>(initialReactFlowData.edges)
+  // Update throttling configuration
+  const UPDATE_THROTTLE_MS = 1000 // Minimum time between updates
+  const UPDATE_DEBOUNCE_MS = 500  // Wait time after last change before applying
+  const MAX_PENDING_UPDATES = 10  // Maximum queued updates
+
+  // Stable reference pattern - only update when content actually changes
+  const previousPlanDagRef = useRef<PlanDag | null>(null)
+  const planDagStableRef = useRef<PlanDag>(staticMockPlanDag)
+
+  // Controlled update functions
+  const throttledUpdate = useCallback((updateFn: () => void) => {
+    const now = Date.now()
+    const timeSinceLastUpdate = now - lastUpdateTimeRef.current
+
+    if (updatesPaused) {
+      console.log('Updates paused, queuing update')
+      setPendingUpdates(prev => Math.min(prev + 1, MAX_PENDING_UPDATES))
+      return
+    }
+
+    if (timeSinceLastUpdate < UPDATE_THROTTLE_MS) {
+      // Throttle: delay update until minimum time has passed
+      if (updateThrottleRef.current) {
+        clearTimeout(updateThrottleRef.current)
+      }
+
+      const delay = UPDATE_THROTTLE_MS - timeSinceLastUpdate
+      updateThrottleRef.current = setTimeout(() => {
+        lastUpdateTimeRef.current = Date.now()
+        updateFn()
+      }, delay)
+    } else {
+      // Can update immediately
+      lastUpdateTimeRef.current = now
+      updateFn()
+    }
+  }, [updatesPaused])
+
+  const debouncedUpdate = useCallback((updateFn: () => void) => {
+    if (updateDebounceRef.current) {
+      clearTimeout(updateDebounceRef.current)
+    }
+
+    updateDebounceRef.current = setTimeout(() => {
+      if (!updatesPaused) {
+        updateFn()
+      } else {
+        setPendingUpdates(prev => Math.min(prev + 1, MAX_PENDING_UPDATES))
+      }
+    }, UPDATE_DEBOUNCE_MS)
+  }, [updatesPaused])
+
+  // Emergency pause function to stop all updates
+  const pauseUpdates = useCallback(() => {
+    console.log('Pausing all updates')
+    setUpdatesPaused(true)
+  }, [])
+
+  const resumeUpdates = useCallback(() => {
+    console.log('Resuming updates, processing', pendingUpdates, 'pending updates')
+    setUpdatesPaused(false)
+    setPendingUpdates(0)
+  }, [pendingUpdates])
+
+  // Deep equality check helper for plan DAG data
+  const planDagEqual = useCallback((a: PlanDag | null, b: PlanDag | null): boolean => {
+    if (a === b) return true
+    if (!a || !b) return false
+
+    return (
+      a.version === b.version &&
+      a.nodes.length === b.nodes.length &&
+      a.edges.length === b.edges.length &&
+      JSON.stringify(a.metadata) === JSON.stringify(b.metadata) &&
+      a.nodes.every((nodeA, i) => {
+        const nodeB = b.nodes[i]
+        return nodeA && nodeB &&
+               nodeA.id === nodeB.id &&
+               nodeA.nodeType === nodeB.nodeType &&
+               JSON.stringify(nodeA.position) === JSON.stringify(nodeB.position) &&
+               JSON.stringify(nodeA.config) === JSON.stringify(nodeB.config)
+      }) &&
+      a.edges.every((edgeA, i) => {
+        const edgeB = b.edges[i]
+        return edgeA && edgeB &&
+               edgeA.id === edgeB.id &&
+               edgeA.source === edgeB.source &&
+               edgeA.target === edgeB.target
+      })
+    )
+  }, [])
+
+  // Safe data selection with controlled updates and proper fallback
+  const activePlanDag: PlanDag = useMemo(() => {
+    let currentData: PlanDag
+
+    if (!useDynamicData) {
+      console.log('Using static mock data (dynamic data disabled)')
+      currentData = staticMockPlanDag
+    } else if (!planDag) {
+      console.log('Using static mock data (no GraphQL data available)')
+      currentData = staticMockPlanDag
+    } else {
+      console.log('Processing dynamic GraphQL data with controlled updates')
+      currentData = {
+        ...planDag,
+        nodes: planDag.nodes.map((node: any) => ({
+          ...node,
+          nodeType: (typeof node.nodeType === 'string' &&
+            (Object.values(PlanDagNodeType) as string[]).includes(node.nodeType)) ?
+            node.nodeType as PlanDagNodeType : PlanDagNodeType.DATA_SOURCE
+        })),
+        edges: planDag.edges.map((edge: any) => ({
+          ...edge,
+          metadata: {
+            ...edge.metadata,
+            dataType: edge.metadata?.dataType || 'GraphData'
+          }
+        }))
+      }
+    }
+
+    // Use controlled update mechanism for data changes
+    const updateStableReference = () => {
+      if (!planDagEqual(previousPlanDagRef.current, currentData)) {
+        console.log('Plan DAG data changed, updating stable reference with controls')
+        previousPlanDagRef.current = currentData
+        planDagStableRef.current = currentData
+      } else {
+        console.log('Plan DAG data unchanged, using existing stable reference')
+      }
+    }
+
+    // Apply throttling to prevent too frequent updates
+    if (useDynamicData && planDag) {
+      throttledUpdate(updateStableReference)
+    } else {
+      // For static data, update immediately without throttling
+      updateStableReference()
+    }
+
+    return planDagStableRef.current
+  }, [useDynamicData, planDag, planDagEqual, throttledUpdate])
+
+  // Initialize ReactFlow state first with stable handlers
+  const stableHandleEdit = useCallback((nodeId: string) => {
+    console.log('Edit node:', nodeId)
+    // Handle edit logic without causing re-renders
+  }, [])
+
+  const stableHandleDelete = useCallback((nodeId: string) => {
+    console.log('Delete node:', nodeId)
+    // Handle delete logic without causing re-renders
+  }, [])
+
+  // Use controlled data with stable conversion
+  const reactFlowData = useMemo(() => {
+    return convertPlanDagToReactFlow(activePlanDag, stableHandleEdit, stableHandleDelete)
+  }, [activePlanDag, stableHandleEdit, stableHandleDelete])
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(reactFlowData.nodes)
+  const [edges, setEdges, onEdgesChange] = useEdgesState(reactFlowData.edges)
 
   // Create handler functions that use the initialized state setters
   const handleNodeEdit = useCallback((nodeId: string) => {
@@ -264,13 +445,26 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
 
       setConfigNodeId(nodeId)
       setConfigNodeType(node.data.nodeType)
-      setConfigNodeConfig(node.data.config)
+      setConfigNodeConfig(typeof node.data.config === 'string' ?
+        (() => {
+          try {
+            return JSON.parse(node.data.config)
+          } catch (e) {
+            console.warn('Failed to parse node config JSON:', node.data.config, e)
+            return {
+              inputType: 'CSVNodesFromFile',
+              source: '',
+              dataType: 'Nodes',
+              outputGraphRef: ''
+            } as DataSourceNodeConfig
+          }
+        })() : node.data.config)
       setConfigNodeMetadata(node.data.metadata)
       setConfigDialogOpen(true)
 
       return currentNodes
     })
-  }, [setNodes])
+  }, [])
 
   const handleNodeDelete = useCallback((nodeId: string) => {
     setNodes((nodes) => nodes.filter((node) => node.id !== nodeId))
@@ -279,16 +473,9 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
     // Delete from backend
     mutations.deleteNode(nodeId)
     console.log('Node deleted:', nodeId)
-  }, [mutations, setNodes, setEdges])
+  }, [mutations])
 
-  // Update nodes with proper handlers when they change
-  useEffect(() => {
-    if (activePlanDag) {
-      const updatedData = convertPlanDagToReactFlow(activePlanDag, handleNodeEdit, handleNodeDelete)
-      setNodes(updatedData.nodes)
-      setEdges(updatedData.edges)
-    }
-  }, [activePlanDag, handleNodeEdit, handleNodeDelete, setNodes, setEdges])
+  // Removed problematic useEffect that was causing infinite loops
 
   // Handle real-time changes from other users
   useEffect(() => {
@@ -325,7 +512,7 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
 
   // Handle node drag end - save position only when dragging is complete
   const handleNodeDragStop = useCallback(
-    (event: React.MouseEvent, node: Node) => {
+    (_event: React.MouseEvent, node: Node) => {
       if (!readonly) {
         // Save the final position to backend
         mutations.moveNode(node.id, node.position)
@@ -424,7 +611,7 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
   }, [setNodes, handleNodeEdit, handleNodeDelete, mutations])
 
   // Handle viewport changes to track current zoom/pan state
-  const handleViewportChange = useCallback((viewport: { x: number; y: number; zoom: number }) => {
+  const handleViewportChange: OnMove = useCallback((_event, viewport: Viewport) => {
     viewportRef.current = viewport
   }, [])
 
@@ -458,7 +645,7 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
   const savePlanDag = useCallback(async () => {
     if (!activePlanDag || readonly) return
 
-    const updatedPlanDag = convertReactFlowToPlanDag(nodes, edges, activePlanDag.metadata)
+    const updatedPlanDag = convertReactFlowToPlanDag(nodes as ReactFlowNode[], edges as ReactFlowEdge[], activePlanDag.metadata)
     try {
       await mutations.updatePlanDag(updatedPlanDag)
       setIsDirty(false)
@@ -490,6 +677,14 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
           console.warn('Failed to leave project collaboration:', err)
         })
       }
+
+      // Phase 2: Cleanup update timers
+      if (updateThrottleRef.current) {
+        clearTimeout(updateThrottleRef.current)
+      }
+      if (updateDebounceRef.current) {
+        clearTimeout(updateDebounceRef.current)
+      }
     }
   }, [readonly, joinProject, leaveProject])
 
@@ -514,7 +709,7 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
 
   if (loading) {
     return (
-      <Stack align="center" justify="center" h="100%" spacing="md">
+      <Stack align="center" justify="center" h="100%" gap="md">
         <Loader size="lg" />
         <Text>Loading Plan DAG...</Text>
       </Stack>
@@ -538,13 +733,13 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
   }
 
   return (
-    <Stack h="100%" spacing={0}>
+    <Stack h="100%" gap={0}>
       <Group justify="space-between" p="md" bg="gray.0">
-        <Group spacing="md">
+        <Group gap="md">
           <Title order={3}>Plan DAG Editor</Title>
           <UserPresenceIndicator users={onlineUsers} maxVisible={5} size="sm" />
         </Group>
-        <Group spacing="xs">
+        <Group gap="xs">
           {isDirty && (
             <Text size="sm" c="yellow.6">
               Unsaved changes
@@ -591,13 +786,57 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
           <MiniMap nodeColor={miniMapNodeColor} />
 
           <Panel position="top-left">
-            <Stack spacing="xs" p="xs" bg="white" style={{ borderRadius: 4, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+            <Stack gap="xs" p="xs" bg="white" style={{ borderRadius: 4, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
               <Text size="sm" fw={500}>
                 {activePlanDag.metadata.name || 'Untitled Plan'}
               </Text>
               <Text size="xs" c="dimmed">
                 {nodes.length} nodes, {edges.length} connections
+                {selectedEdge && ` - Edge ${selectedEdge} selected`}
               </Text>
+
+              {/* Phase 2: Update Control Panel */}
+              <Group gap="xs" mt="xs">
+                <Text size="xs" fw={500} c="gray.6">Updates:</Text>
+                <Group gap={4}>
+                  <Tooltip label={useDynamicData ? "Dynamic data enabled" : "Static data mode"}>
+                    <ActionIcon
+                      size="xs"
+                      variant="light"
+                      color={useDynamicData ? "blue" : "gray"}
+                    >
+                      <IconRotate size="0.7rem" />
+                    </ActionIcon>
+                  </Tooltip>
+
+                  <Tooltip label={updatesPaused ? "Resume updates" : "Pause updates"}>
+                    <ActionIcon
+                      size="xs"
+                      variant="light"
+                      color={updatesPaused ? "orange" : "green"}
+                      onClick={updatesPaused ? resumeUpdates : pauseUpdates}
+                    >
+                      {updatesPaused ? <IconPlayerPlay size="0.7rem" /> : <IconPlayerPause size="0.7rem" />}
+                    </ActionIcon>
+                  </Tooltip>
+
+                  {pendingUpdates > 0 && (
+                    <Tooltip label={`${pendingUpdates} pending updates`}>
+                      <ActionIcon size="xs" variant="light" color="orange">
+                        <IconExclamationCircle size="0.7rem" />
+                      </ActionIcon>
+                    </Tooltip>
+                  )}
+
+                  {updatesPaused === false && pendingUpdates === 0 && (
+                    <Tooltip label="Updates active">
+                      <ActionIcon size="xs" variant="light" color="green">
+                        <IconCircleCheck size="0.7rem" />
+                      </ActionIcon>
+                    </Tooltip>
+                  )}
+                </Group>
+              </Group>
             </Stack>
           </Panel>
 

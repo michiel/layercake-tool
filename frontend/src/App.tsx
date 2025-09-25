@@ -182,7 +182,15 @@ const HomePage = () => {
 // Projects list page component
 const ProjectsPage = () => {
   const navigate = useNavigate()
-  const { data: projectsData, loading: projectsLoading, error: projectsError } = useQuery(GET_PROJECTS, {
+  const { data: projectsData, loading: projectsLoading, error: projectsError } = useQuery<{
+    projects: Array<{
+      id: number
+      name: string
+      description: string
+      createdAt: string
+      updatedAt: string
+    }>
+  }>(GET_PROJECTS, {
     errorPolicy: 'all',
   })
 
@@ -295,7 +303,15 @@ const ProjectsPage = () => {
 const ProjectDetailPage = () => {
   const navigate = useNavigate()
   const { projectId } = useParams<{ projectId: string }>()
-  const { data: projectsData } = useQuery(GET_PROJECTS)
+  const { data: projectsData } = useQuery<{
+    projects: Array<{
+      id: number
+      name: string
+      description: string
+      createdAt: string
+      updatedAt: string
+    }>
+  }>(GET_PROJECTS)
 
   const projects = projectsData?.projects || []
   const selectedProject = projects.find((p: any) => p.id === parseInt(projectId || '0'))
@@ -422,7 +438,15 @@ const ProjectDetailPage = () => {
 const PlanEditorPage = () => {
   const navigate = useNavigate()
   const { projectId } = useParams<{ projectId: string }>()
-  const { data: projectsData } = useQuery(GET_PROJECTS)
+  const { data: projectsData } = useQuery<{
+    projects: Array<{
+      id: number
+      name: string
+      description: string
+      createdAt: string
+      updatedAt: string
+    }>
+  }>(GET_PROJECTS)
 
   const projects = projectsData?.projects || []
   const selectedProject = projects.find((p: any) => p.id === parseInt(projectId || '0'))
@@ -467,7 +491,15 @@ const PlanEditorPage = () => {
 const GraphEditorPage = () => {
   const navigate = useNavigate()
   const { projectId } = useParams<{ projectId: string }>()
-  const { data: projectsData } = useQuery(GET_PROJECTS)
+  const { data: projectsData } = useQuery<{
+    projects: Array<{
+      id: number
+      name: string
+      description: string
+      createdAt: string
+      updatedAt: string
+    }>
+  }>(GET_PROJECTS)
 
   const projects = projectsData?.projects || []
   const selectedProject = projects.find((p: any) => p.id === parseInt(projectId || '0'))

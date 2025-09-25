@@ -23,13 +23,38 @@ import { PlanDag, PlanDagNode, PlanDagEdge, Position } from '../types/plan-dag'
 
 // Hook for fetching Plan DAG data
 export const usePlanDag = (projectId: number) => {
-  const { data, loading, error, refetch } = useQuery(GET_PLAN_DAG, {
+  const { data, loading, error, refetch } = useQuery<{
+    getPlanDag: {
+      version: string
+      nodes: Array<{
+        id: string
+        nodeType: string
+        position: { x: number; y: number }
+        metadata: { label: string; description?: string }
+        config: string
+      }>
+      edges: Array<{
+        id: string
+        source: string
+        target: string
+        metadata: { label: string; dataType?: string }
+      }>
+      metadata: {
+        version: string
+        name: string
+        description?: string
+        created: string
+        lastModified: string
+        author: string
+      }
+    }
+  }>(GET_PLAN_DAG, {
     variables: { projectId } as PlanDagQueryVariables,
     errorPolicy: 'all',
     notifyOnNetworkStatusChange: true,
   })
 
-  const planDag = useMemo(() => data?.getPlanDag, [data])
+  const planDag = useMemo(() => data?.getPlanDag || null, [data])
 
   return {
     planDag,
@@ -41,7 +66,17 @@ export const usePlanDag = (projectId: number) => {
 
 // Hook for Plan DAG validation
 export const usePlanDagValidation = () => {
-  const [validatePlanDag, { data, loading, error }] = useMutation(VALIDATE_PLAN_DAG)
+  const [validatePlanDag, { data, loading, error }] = useMutation<{
+    validatePlanDag: {
+      isValid: boolean
+      errors: Array<{
+        nodeId?: string
+        edgeId?: string
+        nodeType?: string
+        message: string
+      }>
+    }
+  }>(VALIDATE_PLAN_DAG)
 
   const validate = useCallback((planDag: PlanDag) => {
     return validatePlanDag({
@@ -51,7 +86,7 @@ export const usePlanDagValidation = () => {
 
   return {
     validate,
-    validationResult: data?.validatePlanDag,
+    validationResult: data?.validatePlanDag || null,
     loading,
     error,
   }
@@ -59,7 +94,13 @@ export const usePlanDagValidation = () => {
 
 // Hook for Plan DAG mutations
 export const usePlanDagMutations = (projectId: number) => {
-  const [updatePlanDag] = useMutation(UPDATE_PLAN_DAG, {
+  const [updatePlanDag] = useMutation<{
+    updatePlanDag: {
+      success: boolean
+      errors: string[]
+      planDag: any
+    }
+  }>(UPDATE_PLAN_DAG, {
     optimisticResponse: (variables) => ({
       updatePlanDag: {
         __typename: 'PlanDagResponse',
@@ -124,7 +165,13 @@ export const usePlanDagMutations = (projectId: number) => {
     },
   })
 
-  const [addNode] = useMutation(ADD_PLAN_DAG_NODE, {
+  const [addNode] = useMutation<{
+    addPlanDagNode: {
+      success: boolean
+      errors: string[]
+      node: any
+    }
+  }>(ADD_PLAN_DAG_NODE, {
     optimisticResponse: (variables) => ({
       addPlanDagNode: {
         __typename: 'NodeResponse',
@@ -142,9 +189,16 @@ export const usePlanDagMutations = (projectId: number) => {
         },
       },
     }),
-    update: (cache, { data }, { variables }) => {
+    update: (cache, { data }) => {
       if (data?.addPlanDagNode?.success) {
-        const existing = cache.readQuery({
+        const existing = cache.readQuery<{
+          getPlanDag: {
+            version: string
+            nodes: any[]
+            edges: any[]
+            metadata: any
+          }
+        }>({
           query: GET_PLAN_DAG,
           variables: { projectId },
         })
@@ -165,7 +219,7 @@ export const usePlanDagMutations = (projectId: number) => {
     },
   })
 
-  const [updateNode] = useMutation(UPDATE_PLAN_DAG_NODE, {
+  const [updateNode] = useMutation<{ updatePlanDagNode: { success: boolean; errors: string[]; node: any } }>(UPDATE_PLAN_DAG_NODE, {
     optimisticResponse: (variables) => ({
       updatePlanDagNode: {
         __typename: 'NodeResponse',
@@ -183,10 +237,42 @@ export const usePlanDagMutations = (projectId: number) => {
         },
       },
     }),
+    update: (cache, { data }, { variables }) => {
+      if (data?.updatePlanDagNode?.success && variables) {
+        const existing = cache.readQuery<{
+          getPlanDag: {
+            version: string
+            nodes: any[]
+            edges: any[]
+            metadata: any
+          }
+        }>({
+          query: GET_PLAN_DAG,
+          variables: { projectId },
+        })
+
+        if (existing?.getPlanDag) {
+          const updatedNodes = existing.getPlanDag.nodes.map((node: any) =>
+            node.id === variables.nodeId ? { ...node, ...data.updatePlanDagNode.node } : node
+          )
+
+          cache.writeQuery({
+            query: GET_PLAN_DAG,
+            variables: { projectId },
+            data: {
+              getPlanDag: {
+                ...existing.getPlanDag,
+                nodes: updatedNodes,
+              },
+            },
+          })
+        }
+      }
+    },
   })
 
-  const [deleteNode] = useMutation(DELETE_PLAN_DAG_NODE, {
-    optimisticResponse: (variables) => ({
+  const [deleteNode] = useMutation<{ deletePlanDagNode: { success: boolean; errors: string[]; node: any } }>(DELETE_PLAN_DAG_NODE, {
+    optimisticResponse: () => ({
       deletePlanDagNode: {
         __typename: 'NodeResponse',
         success: true,
@@ -195,8 +281,15 @@ export const usePlanDagMutations = (projectId: number) => {
       },
     }),
     update: (cache, { data }, { variables }) => {
-      if (data?.deletePlanDagNode?.success) {
-        const existing = cache.readQuery({
+      if (data?.deletePlanDagNode?.success && variables) {
+        const existing = cache.readQuery<{
+          getPlanDag: {
+            version: string
+            nodes: any[]
+            edges: any[]
+            metadata: any
+          }
+        }>({
           query: GET_PLAN_DAG,
           variables: { projectId },
         })
@@ -222,7 +315,7 @@ export const usePlanDagMutations = (projectId: number) => {
     },
   })
 
-  const [addEdge] = useMutation(ADD_PLAN_DAG_EDGE, {
+  const [addEdge] = useMutation<{ addPlanDagEdge: { success: boolean; errors: string[]; edge: any } }>(ADD_PLAN_DAG_EDGE, {
     optimisticResponse: (variables) => ({
       addPlanDagEdge: {
         __typename: 'EdgeResponse',
@@ -239,9 +332,16 @@ export const usePlanDagMutations = (projectId: number) => {
         },
       },
     }),
-    update: (cache, { data }, { variables }) => {
+    update: (cache, { data }) => {
       if (data?.addPlanDagEdge?.success) {
-        const existing = cache.readQuery({
+        const existing = cache.readQuery<{
+          getPlanDag: {
+            version: string
+            nodes: any[]
+            edges: any[]
+            metadata: any
+          }
+        }>({
           query: GET_PLAN_DAG,
           variables: { projectId },
         })
@@ -262,8 +362,8 @@ export const usePlanDagMutations = (projectId: number) => {
     },
   })
 
-  const [deleteEdge] = useMutation(DELETE_PLAN_DAG_EDGE, {
-    optimisticResponse: (variables) => ({
+  const [deleteEdge] = useMutation<{ deletePlanDagEdge: { success: boolean; errors: string[]; edge: any } }>(DELETE_PLAN_DAG_EDGE, {
+    optimisticResponse: () => ({
       deletePlanDagEdge: {
         __typename: 'EdgeResponse',
         success: true,
@@ -272,8 +372,15 @@ export const usePlanDagMutations = (projectId: number) => {
       },
     }),
     update: (cache, { data }, { variables }) => {
-      if (data?.deletePlanDagEdge?.success) {
-        const existing = cache.readQuery({
+      if (data?.deletePlanDagEdge?.success && variables) {
+        const existing = cache.readQuery<{
+          getPlanDag: {
+            version: string
+            nodes: any[]
+            edges: any[]
+            metadata: any
+          }
+        }>({
           query: GET_PLAN_DAG,
           variables: { projectId },
         })
@@ -296,7 +403,7 @@ export const usePlanDagMutations = (projectId: number) => {
     },
   })
 
-  const [moveNode] = useMutation(MOVE_PLAN_DAG_NODE, {
+  const [moveNode] = useMutation<{ movePlanDagNode: { success: boolean; errors: string[]; node: any } }>(MOVE_PLAN_DAG_NODE, {
     optimisticResponse: (variables) => ({
       movePlanDagNode: {
         __typename: 'NodeResponse',
@@ -345,11 +452,19 @@ export const usePlanDagMutations = (projectId: number) => {
 
 // Hook for real-time Plan DAG changes
 export const usePlanDagSubscription = (projectId: number) => {
-  const { data, loading, error } = useSubscription(PLAN_DAG_CHANGED_SUBSCRIPTION, {
+  const { data, loading, error } = useSubscription<{
+    planDagChanged: {
+      planId: string
+      updateType: string
+      data: any
+      userId: string
+      timestamp: string
+    }
+  }>(PLAN_DAG_CHANGED_SUBSCRIPTION, {
     variables: { projectId } as PlanDagSubscriptionVariables,
   })
 
-  const lastChange = useMemo(() => data?.planDagChanged, [data])
+  const lastChange = useMemo(() => data?.planDagChanged || null, [data])
 
   return {
     lastChange,
@@ -360,11 +475,21 @@ export const usePlanDagSubscription = (projectId: number) => {
 
 // Hook for user presence in collaborative editing
 export const useUserPresence = (projectId: number) => {
-  const { data, loading, error } = useSubscription(USER_PRESENCE_SUBSCRIPTION, {
-    variables: { projectId } as PlanDagSubscriptionVariables,
+  const { data, loading, error } = useSubscription<{
+    userPresenceChanged: Array<{
+      userId: string
+      userName: string
+      avatarColor: string
+      isOnline: boolean
+      cursorPosition?: { x: number; y: number }
+      selectedNodeId?: string
+      lastActive: string
+    }>
+  }>(USER_PRESENCE_SUBSCRIPTION, {
+    variables: { planId: projectId.toString() },
   })
 
-  const users = useMemo(() => data?.userPresence || [], [data])
+  const users = useMemo(() => data?.userPresenceChanged || [], [data])
 
   return {
     users,
