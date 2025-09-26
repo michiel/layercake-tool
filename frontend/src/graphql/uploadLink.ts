@@ -1,8 +1,8 @@
-import { ApolloLink, Operation, NextLink, FetchResult, Observable } from '@apollo/client'
+import { ApolloLink, Operation, FetchResult, Observable } from '@apollo/client'
 import { print } from 'graphql'
 
 export const createUploadLink = (uri: string) => {
-  return new ApolloLink((operation: Operation, forward?: NextLink) => {
+  return new ApolloLink((operation: Operation) => {
     return new Observable<FetchResult>((observer) => {
       const { variables } = operation
 

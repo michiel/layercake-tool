@@ -123,14 +123,42 @@ export const DataSourceEditor: React.FC<DataSourceEditorProps> = () => {
     navigate(`/projects/${projectId}/datasources`)
   }
 
+  // Convert file to base64
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const result = reader.result as string
+        // Remove the data URL prefix (e.g., "data:text/csv;base64,")
+        const base64 = result.split(',')[1]
+        resolve(base64)
+      }
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+  }
+
   const handleSave = async (values: { name: string; description: string }) => {
     if (!dataSource) return
 
     try {
-      const input: UpdateDataSourceInput = {
-        name: values.name,
-        description: values.description || undefined,
-        file: selectedFile || undefined
+      let input: UpdateDataSourceInput
+
+      if (selectedFile) {
+        // If updating with new file, convert to base64
+        const fileContent = await fileToBase64(selectedFile)
+        input = {
+          name: values.name,
+          description: values.description || undefined,
+          filename: selectedFile.name,
+          fileContent
+        }
+      } else {
+        // If just updating metadata
+        input = {
+          name: values.name,
+          description: values.description || undefined
+        }
       }
 
       await updateDataSource({

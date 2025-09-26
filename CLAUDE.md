@@ -18,12 +18,19 @@
 - Do not break existing functionality when making changes
 
 ## Build/Test Commands
+
+### Rust
+
 - Build: `cargo build`
 - Run: `cargo run -- -p sample/ref/plan.yaml`
 - Watch mode: `cargo run -- -p sample/ref/plan.yaml -w`
 - Run tests: `cargo test`
 - Run single test: `cargo test reference_exports`
 - With log levels: `cargo run -- --log-level debug -p sample/ref/plan.yaml`
+
+### Frontend
+
+ - npm run build
 
 ## Code Style Guidelines
 - **Imports**: Group standard library, external crates, then internal modules
