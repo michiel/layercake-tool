@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react'
-import { Modal, Title, Button, Group, Stack, Text, TextInput, Select, Textarea, Alert } from '@mantine/core'
+import { Modal, Title, Button, Group, Stack, Text, TextInput, Select, Textarea, Alert, Badge, Card } from '@mantine/core'
 import { useForm } from '@mantine/form'
-import { IconAlertCircle, IconCheck } from '@tabler/icons-react'
-import { PlanDagNodeType, NodeConfig, NodeMetadata } from '../../../../types/plan-dag'
+import { IconAlertCircle, IconCheck, IconFile, IconPlus } from '@tabler/icons-react'
+import { PlanDagNodeType, NodeConfig, NodeMetadata, DataSourceNodeConfig } from '../../../../types/plan-dag'
+import { DataSourceSelectionDialog } from './DataSourceSelectionDialog'
+import { useQuery } from '@apollo/client/react'
+import { GET_DATASOURCE, DataSource, getDataSourceTypeDisplayName } from '../../../../graphql/datasources'
 
 interface NodeConfigDialogProps {
   opened: boolean
@@ -32,6 +35,26 @@ export const NodeConfigDialog = ({
 }: NodeConfigDialogProps) => {
   const [isValid, setIsValid] = useState(true)
   const [validationErrors, setValidationErrors] = useState<string[]>([])
+  const [dataSourceDialogOpen, setDataSourceDialogOpen] = useState(false)
+  const [selectedDataSource, setSelectedDataSource] = useState<DataSource | null>(null)
+
+  // Query current DataSource if this is a DataSource node with a dataSourceId
+  const currentDataSourceId = nodeType === PlanDagNodeType.DATA_SOURCE
+    ? (config as DataSourceNodeConfig).dataSourceId
+    : null
+
+  const { data: dataSourceData } = useQuery(GET_DATASOURCE, {
+    variables: { id: currentDataSourceId || 0 },
+    skip: !currentDataSourceId,
+    errorPolicy: 'ignore'
+  })
+
+  // Update selectedDataSource when dataSourceData changes
+  useEffect(() => {
+    if ((dataSourceData as any)?.dataSource) {
+      setSelectedDataSource((dataSourceData as any).dataSource as DataSource)
+    }
+  }, [dataSourceData])
 
   const form = useForm<FormData>({
     initialValues: {
@@ -131,7 +154,10 @@ export const NodeConfigDialog = ({
           />
 
           {/* Node-specific configuration fields */}
-          {renderNodeSpecificFields(nodeType, form)}
+          {renderNodeSpecificFields(nodeType, form, {
+            selectedDataSource,
+            onSelectDataSource: () => setDataSourceDialogOpen(true)
+          })}
 
           <Group justify="flex-end" mt="md">
             <Button variant="subtle" onClick={onClose}>
@@ -143,6 +169,17 @@ export const NodeConfigDialog = ({
           </Group>
         </Stack>
       </form>
+
+      {/* DataSource Selection Dialog */}
+      <DataSourceSelectionDialog
+        opened={dataSourceDialogOpen}
+        onClose={() => setDataSourceDialogOpen(false)}
+        onSelect={(dataSource) => {
+          setSelectedDataSource(dataSource)
+          form.setFieldValue('dataSourceId', dataSource.id)
+        }}
+        currentDataSourceId={selectedDataSource?.id}
+      />
     </Modal>
   )
 }
@@ -151,12 +188,17 @@ export const NodeConfigDialog = ({
 function getConfigDefaults(nodeType: PlanDagNodeType, config: NodeConfig): Record<string, any> {
   switch (nodeType) {
     case PlanDagNodeType.DATA_SOURCE:
-      const dataSourceConfig = config as any
+      const dataSourceConfig = config as DataSourceNodeConfig
       return {
+        // New DataSource system
+        dataSourceId: dataSourceConfig.dataSourceId || null,
+        displayMode: dataSourceConfig.displayMode || 'summary',
+        outputGraphRef: dataSourceConfig.outputGraphRef || '',
+
+        // Legacy support (backward compatibility)
         inputType: dataSourceConfig.inputType || 'CSVNodesFromFile',
         source: dataSourceConfig.source || '',
         dataType: dataSourceConfig.dataType || 'Nodes',
-        outputGraphRef: dataSourceConfig.outputGraphRef || '',
       }
 
     case PlanDagNodeType.GRAPH:
@@ -206,40 +248,119 @@ function getConfigDefaults(nodeType: PlanDagNodeType, config: NodeConfig): Recor
 }
 
 // Render node-specific configuration fields
-function renderNodeSpecificFields(nodeType: PlanDagNodeType, form: any) {
+function renderNodeSpecificFields(
+  nodeType: PlanDagNodeType,
+  form: any,
+  extraProps?: {
+    selectedDataSource?: DataSource | null
+    onSelectDataSource?: () => void
+  }
+) {
   switch (nodeType) {
     case PlanDagNodeType.DATA_SOURCE:
+      const { selectedDataSource, onSelectDataSource } = extraProps || {}
       return (
         <>
+          {/* New DataSource Selection */}
+          <div>
+            <Text size="sm" fw={500} mb="xs">Data Source</Text>
+            {selectedDataSource ? (
+              <Card withBorder p="sm" mb="sm">
+                <Group justify="space-between" align="flex-start">
+                  <div style={{ flex: 1 }}>
+                    <Group gap="xs" mb="xs">
+                      <IconFile size={16} />
+                      <Text fw={500} size="sm">{selectedDataSource.name}</Text>
+                      <Badge variant="outline" size="xs">
+                        {getDataSourceTypeDisplayName(selectedDataSource.sourceType)}
+                      </Badge>
+                    </Group>
+
+                    {selectedDataSource.description && (
+                      <Text size="xs" c="dimmed" mb="xs">
+                        {selectedDataSource.description}
+                      </Text>
+                    )}
+
+                    <Text size="xs" c="dimmed" ff="monospace">
+                      {selectedDataSource.filename}
+                    </Text>
+                  </div>
+
+                  <Button
+                    size="xs"
+                    variant="light"
+                    onClick={onSelectDataSource}
+                  >
+                    Change
+                  </Button>
+                </Group>
+              </Card>
+            ) : (
+              <Button
+                variant="light"
+                fullWidth
+                leftSection={<IconPlus size={16} />}
+                onClick={onSelectDataSource}
+                mb="sm"
+              >
+                Select Data Source
+              </Button>
+            )}
+          </div>
+
+          {/* Display Mode */}
           <Select
-            label="Input Type"
+            label="Display Mode"
             data={[
-              { value: 'CSVNodesFromFile', label: 'CSV Nodes from File' },
-              { value: 'CSVEdgesFromFile', label: 'CSV Edges from File' },
-              { value: 'GraphMLFromFile', label: 'GraphML from File' },
-              { value: 'JSONGraphFromFile', label: 'JSON Graph from File' },
+              { value: 'summary', label: 'Summary' },
+              { value: 'detailed', label: 'Detailed' },
+              { value: 'preview', label: 'Preview' },
             ]}
-            {...form.getInputProps('inputType')}
+            {...form.getInputProps('displayMode')}
           />
-          <TextInput
-            label="Source Path"
-            placeholder="e.g., import/nodes.csv"
-            {...form.getInputProps('source')}
-          />
-          <Select
-            label="Data Type"
-            data={[
-              { value: 'Nodes', label: 'Nodes' },
-              { value: 'Edges', label: 'Edges' },
-              { value: 'Graph', label: 'Complete Graph' },
-            ]}
-            {...form.getInputProps('dataType')}
-          />
+
+          {/* Output Graph Reference */}
           <TextInput
             label="Output Graph Reference"
-            placeholder="e.g., graph_main"
+            placeholder="e.g., imported_data"
             {...form.getInputProps('outputGraphRef')}
           />
+
+          {/* Legacy Fields (for backward compatibility) */}
+          {(!selectedDataSource && (form.values.source || form.values.inputType)) && (
+            <Alert icon={<IconAlertCircle size={16} />} title="Legacy Configuration" color="orange" mb="md">
+              <Text size="sm" mb="sm">
+                This node uses legacy configuration. Consider selecting a DataSource for better integration.
+              </Text>
+
+              <Stack gap="sm">
+                <Select
+                  label="Input Type (Legacy)"
+                  data={[
+                    { value: 'CSVNodesFromFile', label: 'CSV Nodes from File' },
+                    { value: 'CSVEdgesFromFile', label: 'CSV Edges from File' },
+                    { value: 'CSVLayersFromFile', label: 'CSV Layers from File' },
+                  ]}
+                  {...form.getInputProps('inputType')}
+                />
+                <TextInput
+                  label="Source Path (Legacy)"
+                  placeholder="e.g., import/nodes.csv"
+                  {...form.getInputProps('source')}
+                />
+                <Select
+                  label="Data Type (Legacy)"
+                  data={[
+                    { value: 'Nodes', label: 'Nodes' },
+                    { value: 'Edges', label: 'Edges' },
+                    { value: 'Layers', label: 'Layers' },
+                  ]}
+                  {...form.getInputProps('dataType')}
+                />
+              </Stack>
+            </Alert>
+          )}
         </>
       )
 
@@ -390,12 +511,24 @@ function renderNodeSpecificFields(nodeType: PlanDagNodeType, form: any) {
 function buildConfigFromForm(nodeType: PlanDagNodeType, values: FormData): NodeConfig {
   switch (nodeType) {
     case PlanDagNodeType.DATA_SOURCE:
-      return {
-        inputType: values.inputType,
-        source: values.source,
-        dataType: values.dataType,
+      const dataSourceConfig: DataSourceNodeConfig = {
         outputGraphRef: values.outputGraphRef,
       }
+
+      // Add new DataSource system properties if available
+      if (values.dataSourceId) {
+        dataSourceConfig.dataSourceId = values.dataSourceId
+        dataSourceConfig.displayMode = values.displayMode || 'summary'
+      }
+
+      // Add legacy properties for backward compatibility
+      if (values.inputType || values.source) {
+        dataSourceConfig.inputType = values.inputType
+        dataSourceConfig.source = values.source
+        dataSourceConfig.dataType = values.dataType
+      }
+
+      return dataSourceConfig
 
     case PlanDagNodeType.GRAPH:
       return {
@@ -466,8 +599,18 @@ function validateNodeConfig(nodeType: PlanDagNodeType, values: FormData): string
 
   switch (nodeType) {
     case PlanDagNodeType.DATA_SOURCE:
-      if (!values.source) errors.push('Source path is required')
-      if (!values.outputGraphRef) errors.push('Output graph reference is required')
+      // Check if using new DataSource system or legacy system
+      if (values.dataSourceId) {
+        // New DataSource system validation
+        if (!values.outputGraphRef) errors.push('Output graph reference is required')
+      } else if (values.source || values.inputType) {
+        // Legacy system validation
+        if (!values.source) errors.push('Source path is required')
+        if (!values.outputGraphRef) errors.push('Output graph reference is required')
+      } else {
+        // No configuration at all
+        errors.push('Please select a DataSource or provide legacy source configuration')
+      }
       break
 
     case PlanDagNodeType.GRAPH:

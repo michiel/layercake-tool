@@ -10,9 +10,10 @@ export const validateConnection = (
   // Define valid connections based on Plan DAG flow logic
   const validConnections: Record<PlanDagNodeType, PlanDagNodeType[]> = {
     [PlanDagNodeType.DATA_SOURCE]: [
-      PlanDagNodeType.MERGE,
-      PlanDagNodeType.TRANSFORM,
-      PlanDagNodeType.OUTPUT,
+      PlanDagNodeType.GRAPH,     // DataSources primarily connect to Graph nodes
+      PlanDagNodeType.MERGE,     // Can also merge multiple data sources
+      PlanDagNodeType.TRANSFORM, // Or transform data directly
+      PlanDagNodeType.OUTPUT,    // Or output directly
     ],
     [PlanDagNodeType.GRAPH]: [
       PlanDagNodeType.TRANSFORM,
@@ -56,12 +57,23 @@ export const validateConnection = (
   }
 
   if (!isValid) {
+    // Provide more specific error messages for common invalid connections
+    let errorMessage = `Cannot connect ${sourceType} to ${targetType}`
+
+    if (sourceType === PlanDagNodeType.DATA_SOURCE) {
+      errorMessage = `DataSource nodes can only connect to Graph, Merge, Transform, or Output nodes`
+    } else if (targetType === PlanDagNodeType.DATA_SOURCE) {
+      errorMessage = `DataSource nodes cannot receive input connections (they are source nodes)`
+    } else if (targetType === PlanDagNodeType.GRAPH) {
+      errorMessage = `Only DataSource nodes can connect to Graph nodes`
+    }
+
     return {
       sourceType,
       targetType,
       dataType: getDataType(sourceType),
       isValid: false,
-      errorMessage: `Cannot connect ${sourceType} to ${targetType}`,
+      errorMessage,
     }
   }
 
