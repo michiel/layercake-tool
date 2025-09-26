@@ -6,11 +6,12 @@ use std::fs::File;
 use std::io::Write;
 use std::path::Path;
 
-pub fn create_path_if_not_exists(path: &str) -> std::io::Result<()> {
+pub fn create_path_if_not_exists(path: &str) -> anyhow::Result<()> {
     //
     // remove the file name from the path
 
-    let path = Path::new(path).parent().unwrap();
+    let path = Path::new(path).parent()
+        .ok_or_else(|| anyhow::anyhow!("Invalid path: no parent directory for '{}'", path))?;
     if !path.exists() {
         info!("Creating path: {:?}", path);
         std::fs::create_dir_all(path)?;
@@ -18,7 +19,7 @@ pub fn create_path_if_not_exists(path: &str) -> std::io::Result<()> {
     Ok(())
 }
 
-pub fn write_string_to_file(filename: &str, content: &str) -> std::io::Result<()> {
+pub fn write_string_to_file(filename: &str, content: &str) -> anyhow::Result<()> {
     create_path_if_not_exists(filename)?;
     let path = Path::new(filename);
     let mut file = File::create(path)?;

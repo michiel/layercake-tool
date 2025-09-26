@@ -1,6 +1,5 @@
 use indexmap::IndexMap;
 use csv::StringRecord;
-use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use tracing::{debug, error, warn};
@@ -495,7 +494,7 @@ impl Graph {
         self.edges = edge_map.values().cloned().collect();
     }
 
-    pub fn invert_graph(&mut self) -> Graph {
+    pub fn invert_graph(&mut self) -> Result<Graph, String> {
         /*
          * Invert the graph
          * 1. Create a new graph
@@ -568,13 +567,13 @@ impl Graph {
                             incident_edges[i].source.clone(),
                             incident_edges[i].target.clone(),
                         ))
-                        .unwrap();
+                        .ok_or_else(|| format!("Failed to find node in edge mapping for edge {} -> {}", incident_edges[i].source, incident_edges[i].target))?;
                     let node2 = edge_to_node_map
                         .get(&(
                             incident_edges[j].source.clone(),
                             incident_edges[j].target.clone(),
                         ))
-                        .unwrap();
+                        .ok_or_else(|| format!("Failed to find node in edge mapping for edge {} -> {}", incident_edges[j].source, incident_edges[j].target))?;
                     inverted_graph.edges.push(Edge {
                         id: format!("{}_{}_{}", node1.id, node2.id, edge_counter),
                         source: node1.id.clone(),
@@ -616,7 +615,7 @@ impl Graph {
             }
         }
 
-        inverted_graph
+        Ok(inverted_graph)
     }
 
     pub fn build_json_tree(&self) -> serde_json::Value {
@@ -694,13 +693,15 @@ impl Graph {
         });
 
         self.nodes.iter().for_each(|n| {
-            if n.belongs_to.is_some() && !node_ids.contains(n.belongs_to.as_ref().unwrap()) {
-                let err = format!(
-                    "Node id:[{}] belongs_to {:?} not found in nodes",
-                    n.id,
-                    n.belongs_to.as_ref().unwrap()
-                );
-                errors.push(err);
+            if let Some(belongs_to) = &n.belongs_to {
+                if !node_ids.contains(belongs_to) {
+                    let err = format!(
+                        "Node id:[{}] belongs_to {:?} not found in nodes",
+                        n.id,
+                        belongs_to
+                    );
+                    errors.push(err);
+                }
             }
         });
 
@@ -843,8 +844,7 @@ impl Layer {
 
 fn is_truthy(s: &str) -> bool {
     let trimmed_lowercase = s.trim().to_lowercase();
-    let re = Regex::new(r"(true|y|yes)").unwrap();
-    re.is_match(&trimmed_lowercase)
+    matches!(trimmed_lowercase.as_str(), "true" | "y" | "yes")
 }
 
 fn strip_quotes_and_whitespace(s: &str) -> &str {
@@ -1249,7 +1249,7 @@ mod tests {
     #[test]
     fn test_invert_graph() {
         let mut graph = create_test_graph();
-        let inverted = graph.invert_graph();
+        let inverted = graph.invert_graph().expect("Failed to invert graph in test");
 
         // Basic structure checks
         assert_eq!(inverted.name, "Inverted Test Graph");

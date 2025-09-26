@@ -79,7 +79,7 @@ impl ExportService {
             
             // Apply transformations if specified
             if graph_config.invert_graph {
-                graph = graph.invert_graph();
+                graph = graph.invert_graph().map_err(|e| anyhow::anyhow!("Failed to invert graph: {}", e))?;
             }
 
             if graph_config.max_partition_width > 0 {

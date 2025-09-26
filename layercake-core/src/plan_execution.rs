@@ -117,7 +117,7 @@ fn apply_graph_transformations(graph: &mut Graph, graph_config: &crate::plan::Gr
     if graph_config.invert_graph {
         info!("Inverting graph (flipping nodes and edges)");
         warn!("Inverting graph is an experimental feature");
-        *graph = graph.invert_graph();
+        *graph = graph.invert_graph().map_err(|e| anyhow::anyhow!("Failed to invert graph: {}", e))?;
     }
 
     if graph_config.max_partition_depth > 0 {
