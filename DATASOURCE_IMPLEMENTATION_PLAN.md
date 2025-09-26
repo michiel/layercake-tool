@@ -106,23 +106,23 @@ Based on the SPECIFICATION.md changes, we need to implement a simplified DataSou
 - [x] File size limits and format validation
 
 ### Phase 4: PlanDAG Integration Enhancement
-**Status: Partially Complete**
+**Status: ✅ Completed**
 
 #### 4.1 Enhanced DataSourceNode
-- Improve DataSourceNode component to show DataSource details
-- Add DataSource selection dialog
-- Display import status and data preview
-- Show connection indicators to GraphNodes
+- [x] Improve DataSourceNode component to show DataSource details
+- [x] Add DataSource selection dialog
+- [x] Display import status and data preview
+- [x] Show connection indicators to GraphNodes
 
 #### 4.2 Edge Validation
-- Ensure DataSource nodes can only connect to GraphNodes
-- Validate that referenced DataSource exists
-- Update edge creation validation logic
+- [x] Ensure DataSource nodes can only connect to GraphNodes
+- [x] Validate that referenced DataSource exists
+- [x] Update edge creation validation logic
 
 #### 4.3 Data Flow Visualization
-- Show data lineage from DataSource through GraphNodes
-- Display data transformation pipeline
-- Add data freshness indicators
+- [x] Show data lineage from DataSource through GraphNodes
+- [x] Display data transformation pipeline
+- [x] Add data freshness indicators
 
 ### Phase 5: Advanced Features
 **Status: Not Started**
@@ -324,17 +324,17 @@ export interface CSVLayerRow {
 - [x] Error handling for invalid files
 - [x] DataSources integrated into project dashboard
 
-### Phase 4 Complete
-- [ ] Enhanced DataSourceNode with file info display
-- [ ] DataSource selection dialog in PlanDAG
-- [ ] Proper edge validation between DataSource and GraphNodes
-- [ ] File processing status indicators
+### Phase 4 Complete ✅
+- [x] Enhanced DataSourceNode with file info display
+- [x] DataSource selection dialog in PlanDAG
+- [x] Proper edge validation between DataSource and GraphNodes
+- [x] File processing status indicators
 
-### Final Success
-- [ ] Complete file-based DataSource management
-- [ ] Robust CSV/JSON processing with error handling
-- [ ] Seamless upload/download workflows
-- [ ] Production-ready file handling and validation
+### Final Success ✅
+- [x] Complete file-based DataSource management
+- [x] Robust CSV/JSON processing with error handling
+- [x] Seamless upload/download workflows
+- [x] Production-ready file handling and validation
 
 ## Next Steps
 
