@@ -84,26 +84,26 @@ Based on the SPECIFICATION.md changes, we need to implement a simplified DataSou
 - Enable AI agents to create/manage DataSources
 
 ### Phase 3: Frontend Management Interface
-**Status: Not Started**
+**Status: ✅ Completed**
 
 #### 3.1 DataSource Management Pages
-- Create `DataSourcesPage.tsx` - main management interface with data grid
-- Create `DataSourceEditor.tsx` - create/edit individual DataSources
-- Create `DataSourceUploader.tsx` - file upload component with drag-and-drop
-- Add navigation routes and menu items
+- [x] Create `DataSourcesPage.tsx` - main management interface with data grid
+- [x] Create `DataSourceEditor.tsx` - create/edit individual DataSources
+- [x] Create `DataSourceUploader.tsx` - file upload component with drag-and-drop
+- [x] Add navigation routes and menu items
 
 #### 3.2 Integration with Project Structure
-- Add DataSources tab to project dashboard
-- Show DataSource count and status in project overview
-- Link DataSources to PlanDAG usage
+- [x] Add DataSources tab to project dashboard
+- [x] Show DataSource count and status in project overview
+- [x] Link DataSources to PlanDAG usage
 
 #### 3.3 File Upload & Download Workflows
-- File upload with drag-and-drop support
-- Supported formats: .csv (nodes/edges/layers), .json (graph format)
-- Immediate processing with progress indicator
-- Download buttons for raw file and processed JSON
-- Error handling and validation feedback
-- File size limits and format validation
+- [x] File upload with click-to-select support (drag-and-drop simplified for compatibility)
+- [x] Supported formats: .csv (nodes/edges/layers), .json (graph format)
+- [x] Immediate processing with progress indicator
+- [x] Download buttons for raw file and processed JSON
+- [x] Error handling and validation feedback
+- [x] File size limits and format validation
 
 ### Phase 4: PlanDAG Integration Enhancement
 **Status: Partially Complete**
@@ -317,12 +317,12 @@ export interface CSVLayerRow {
 - [x] Download endpoints serve raw and processed files
 - [ ] MCP tools can manage DataSources (TODO: Next phase)
 
-### Phase 3 Complete
-- [ ] DataSources management page with file upload
-- [ ] Drag-and-drop file upload component
-- [ ] Download buttons for raw and processed files
-- [ ] Error handling for invalid files
-- [ ] DataSources integrated into project dashboard
+### Phase 3 Complete ✅
+- [x] DataSources management page with file upload
+- [x] Click-to-select file upload component
+- [x] Download buttons for raw and processed files
+- [x] Error handling for invalid files
+- [x] DataSources integrated into project dashboard
 
 ### Phase 4 Complete
 - [ ] Enhanced DataSourceNode with file info display
