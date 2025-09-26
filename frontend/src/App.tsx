@@ -1,13 +1,15 @@
 import React from 'react'
 import { Routes, Route, useNavigate, useParams, useLocation } from 'react-router-dom'
 import { AppShell, Group, Title, Stack, Button, Container, Text, Card, Badge, Alert } from '@mantine/core'
-import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconPlayerPlay, IconAlertCircle } from '@tabler/icons-react'
+import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconPlayerPlay, IconAlertCircle, IconFileDatabase } from '@tabler/icons-react'
 import { useQuery } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import { ConnectionStatus } from './components/common/ConnectionStatus'
 import { Breadcrumbs } from './components/common/Breadcrumbs'
 import { PlanVisualEditor } from './components/editors/PlanVisualEditor/PlanVisualEditor'
 import { ErrorBoundary } from './components/common/ErrorBoundary'
+import { DataSourcesPage } from './components/datasources/DataSourcesPage'
+import { DataSourceEditor } from './components/datasources/DataSourceEditor'
 
 // Health check query to verify backend connectivity
 const HEALTH_CHECK = gql`
@@ -93,6 +95,14 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                 onClick={() => navigate(`/projects/${projectId}/plan`)}
               >
                 Plan Editor
+              </Button>
+              <Button
+                variant={isActiveRoute(`/projects/${projectId}/datasources`) ? 'filled' : 'light'}
+                fullWidth
+                leftSection={<IconFileDatabase size={16} />}
+                onClick={() => navigate(`/projects/${projectId}/datasources`)}
+              >
+                Data Sources
               </Button>
               <Button
                 variant={isActiveRoute(`/projects/${projectId}/graph`) ? 'filled' : 'light'}
@@ -341,6 +351,12 @@ const ProjectDetailPage = () => {
       primary: true,
     },
     {
+      title: 'Data Sources',
+      description: 'Manage CSV and JSON files that serve as input data for your Plan DAGs',
+      icon: <IconFileDatabase size={20} />,
+      onClick: () => navigate(`/projects/${projectId}/datasources`),
+    },
+    {
       title: 'Graph Editor',
       description: 'Visualize and edit graph data structures',
       icon: <IconDatabase size={20} />,
@@ -586,6 +602,16 @@ function App() {
           <Route path="/projects/:projectId/graph" element={
             <ErrorBoundary>
               <GraphEditorPage />
+            </ErrorBoundary>
+          } />
+          <Route path="/projects/:projectId/datasources" element={
+            <ErrorBoundary>
+              <DataSourcesPage />
+            </ErrorBoundary>
+          } />
+          <Route path="/projects/:projectId/datasources/:dataSourceId/edit" element={
+            <ErrorBoundary>
+              <DataSourceEditor />
             </ErrorBoundary>
           } />
           <Route path="*" element={
