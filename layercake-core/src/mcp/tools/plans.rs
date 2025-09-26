@@ -204,14 +204,20 @@ pub async fn execute_plan(
             message: format!("Failed to update plan status: {}", e),
         })?;
 
-    // TODO: Implement actual plan execution using existing plan_execution module
-    // For now, we'll simulate execution and mark as completed
-    
-    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+    // Execute the plan using the existing plan_execution module
+    let execution_result = crate::plan_execution::execute_plan(plan.yaml_content.clone(), false);
 
-    // Update status to completed
+    let (status, error_message) = match execution_result {
+        Ok(_) => ("completed".to_string(), None),
+        Err(e) => {
+            tracing::error!("Plan execution failed: {}", e);
+            ("failed".to_string(), Some(format!("Plan execution failed: {}", e)))
+        }
+    };
+
+    // Update status based on execution result
     let mut plan_active: plans::ActiveModel = plan.into();
-    plan_active.status = Set("completed".to_string());
+    plan_active.status = Set(status.clone());
     plan_active.updated_at = Set(chrono::Utc::now());
     
     plans::Entity::update(plan_active)
@@ -223,8 +229,8 @@ pub async fn execute_plan(
 
     let result = json!({
         "plan_id": plan_id,
-        "status": "completed",
-        "message": "Plan executed successfully"
+        "status": status,
+        "message": error_message.unwrap_or_else(|| "Plan executed successfully".to_string())
     });
 
     create_success_response(&result)

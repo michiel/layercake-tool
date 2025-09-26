@@ -624,9 +624,6 @@ impl Graph {
     }
 
     pub fn verify_graph_integrity(&self) -> Result<(), Vec<String>> {
-        // TODO verify graph integrity
-        // TODO verify that all nodes have unique ids
-
         let node_ids: HashSet<String> = self.nodes.iter().map(|n| n.id.clone()).collect();
         let mut errors = Vec::new();
 
@@ -725,14 +722,12 @@ impl Graph {
             }
         });
 
-        // TODO implement an info level log for the following
-        // // verify that all edges are assigned to a layer
-        // self.edges.iter().for_each(|e| {
-        //     if !self.layers.iter().any(|l| l.id == e.layer) {
-        //         let err = format!("Edge id:[{}] layer {:?} not found in layers", e.id, e.layer);
-        //         errors.push(err);
-        //     }
-        // });
+        // verify that all edges are assigned to a layer (info level - not critical)
+        self.edges.iter().for_each(|e| {
+            if !self.layers.iter().any(|l| l.id == e.layer) {
+                tracing::info!("Edge id:[{}] layer {:?} not found in layers - this is not critical but may affect styling", e.id, e.layer);
+            }
+        });
 
         // verify that all nodes have unique ids
         let mut node_id_set = HashSet::new();
