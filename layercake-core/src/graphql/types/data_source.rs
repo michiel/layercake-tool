@@ -92,14 +92,16 @@ pub struct CreateDataSourceInput {
     pub project_id: i32,
     pub name: String,
     pub description: Option<String>,
-    pub file: Upload,
+    pub filename: String,
+    pub file_content: String, // Base64 encoded file content
 }
 
 #[derive(InputObject)]
 pub struct UpdateDataSourceInput {
     pub name: Option<String>,
     pub description: Option<String>,
-    pub file: Option<Upload>,
+    pub filename: Option<String>,
+    pub file_content: Option<String>, // Base64 encoded file content
 }
 
 // Data source type enum
@@ -126,25 +128,6 @@ impl From<crate::database::entities::data_sources::DataSourceType> for DataSourc
     }
 }
 
-// Upload scalar for file uploads
-#[derive(Clone)]
-pub struct Upload {
-    pub filename: String,
-    pub content_type: Option<String>,
-    pub content: Vec<u8>,
-}
-
-#[Scalar]
-impl ScalarType for Upload {
-    fn parse(_value: Value) -> InputValueResult<Self> {
-        // File uploads are handled by multipart/form-data, not JSON
-        Err(InputValueError::custom("Upload must be provided as multipart/form-data"))
-    }
-
-    fn to_value(&self) -> Value {
-        Value::Null
-    }
-}
 
 // Response types for download URLs
 #[derive(SimpleObject)]

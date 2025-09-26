@@ -154,13 +154,15 @@ export interface CreateDataSourceInput {
   projectId: number
   name: string
   description?: string
-  file: File
+  filename: string
+  fileContent: string // Base64 encoded file content
 }
 
 export interface UpdateDataSourceInput {
   name?: string
   description?: string
-  file?: File
+  filename?: string
+  fileContent?: string // Base64 encoded file content
 }
 
 // Helper function to format file size

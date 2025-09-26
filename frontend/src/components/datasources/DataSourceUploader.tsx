@@ -137,17 +137,37 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
     }
   }
 
+  // Convert file to base64
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const result = reader.result as string
+        // Remove the data URL prefix (e.g., "data:text/csv;base64,")
+        const base64 = result.split(',')[1]
+        resolve(base64)
+      }
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+  }
+
   const handleSubmit = async (values: { name: string; description: string }) => {
     if (!selectedFile) return
 
     try {
       setUploadProgress(10)
 
+      // Convert file to base64
+      const fileContent = await fileToBase64(selectedFile.file)
+      setUploadProgress(30)
+
       const input: CreateDataSourceInput = {
         projectId,
         name: values.name,
         description: values.description || undefined,
-        file: selectedFile.file
+        filename: selectedFile.file.name,
+        fileContent
       }
 
       setUploadProgress(50)

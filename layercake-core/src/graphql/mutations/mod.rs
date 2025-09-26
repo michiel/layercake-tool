@@ -1060,17 +1060,18 @@ impl Mutation {
         let context = ctx.data::<GraphQLContext>()?;
         let data_source_service = DataSourceService::new(context.db.clone());
 
-        // Extract file data (in a real implementation, this would handle multipart upload)
-        let file_data = input.file.content;
-        let filename = input.file.filename;
+        // Decode the base64 file content
+        use base64::Engine;
+        let file_content = base64::engine::general_purpose::STANDARD.decode(&input.file_content)
+            .map_err(|e| Error::new(format!("Failed to decode base64 file content: {}", e)))?;
 
         let data_source = data_source_service
             .create_from_file(
                 input.project_id,
                 input.name,
                 input.description,
-                filename,
-                file_data,
+                input.filename,
+                file_content,
             )
             .await
             .map_err(|e| Error::new(format!("Failed to create DataSource: {}", e)))?;
@@ -1088,10 +1089,16 @@ impl Mutation {
         let context = ctx.data::<GraphQLContext>()?;
         let data_source_service = DataSourceService::new(context.db.clone());
 
-        let data_source = if let Some(file) = input.file {
-            // Update with new file
+        let data_source = if let Some(file_content_b64) = input.file_content {
+            // Update with new file - decode base64 content
+            use base64::Engine;
+            let file_content = base64::engine::general_purpose::STANDARD.decode(&file_content_b64)
+                .map_err(|e| Error::new(format!("Failed to decode base64 file content: {}", e)))?;
+
+            let filename = input.filename.unwrap_or_else(|| "updated_file".to_string());
+
             data_source_service
-                .update_file(id, file.filename, file.content)
+                .update_file(id, filename, file_content)
                 .await
                 .map_err(|e| Error::new(format!("Failed to update DataSource file: {}", e)))?
         } else {

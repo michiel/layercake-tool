@@ -22,7 +22,7 @@ const { httpUrl, wsUrl } = getGraphQLEndpoints()
 // HTTP Link for queries and mutations
 const httpLink = createHttpLink({
   uri: httpUrl,
-  credentials: 'omit', // Don't include credentials for cross-origin development
+  credentials: 'omit',
 })
 
 // WebSocket Link for subscriptions (real-time collaboration)

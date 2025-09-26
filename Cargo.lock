@@ -2730,6 +2730,7 @@ dependencies = [
  "async-trait",
  "axum 0.7.9",
  "axum-mcp",
+ "base64 0.22.1",
  "bcrypt",
  "chrono",
  "clap",

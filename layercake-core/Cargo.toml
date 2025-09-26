@@ -70,6 +70,7 @@ async-trait = { workspace = true }
 thiserror = { workspace = true }
 colored = { workspace = true }
 tokio = { workspace = true }
+base64 = "0.22"
 
 # Server dependencies (optional)
 axum = { workspace = true, optional = true }
