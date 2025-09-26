@@ -11,7 +11,6 @@ import ReactFlow, {
   NodeChange,
   EdgeChange,
   ConnectionMode,
-  Panel,
   OnMove,
   Viewport,
 } from 'reactflow'
@@ -20,14 +19,7 @@ import {
   IconAlertCircle,
   IconEye,
   IconSettings,
-  IconPlayerPlay,
-  IconPlayerPause,
-  IconRotate,
-  IconCircleCheck,
-  IconExclamationCircle,
-  IconRefresh,
-  IconNetwork,
-  IconNetworkOff
+  IconPlayerPlay
 } from '@tabler/icons-react'
 
 import { usePlanDag, usePlanDagMutations, usePlanDagValidation, usePlanDagSubscription, useUserPresence, useCollaboration } from '../../../hooks/usePlanDag'
@@ -56,6 +48,11 @@ import { CollaborativeCursors } from '../../collaboration/CollaborativeCursors'
 
 // Import dialogs
 import { NodeConfigDialog } from './dialogs/NodeConfigDialog'
+
+// Import extracted components and hooks
+import { ControlPanel } from './components/ControlPanel'
+import { CollaborationManager } from './components/CollaborationManager'
+import { useUpdateManagement } from './hooks/useUpdateManagement'
 
 // Import ReactFlow styles
 import 'reactflow/dist/style.css'
@@ -256,72 +253,20 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
   const [lastValidation, setLastValidation] = useState<Date | null>(null)
   const validationTimeoutRef = useRef<number | null>(null)
 
-  // Phase 2: State and configuration (moved up to resolve dependency order)
-  const [updatesPaused, setUpdatesPaused] = useState(false)
-  const [pendingUpdates, setPendingUpdates] = useState(0)
-  const lastUpdateTimeRef = useRef<number>(0)
-  const updateThrottleRef = useRef<number | null>(null)
-  const updateDebounceRef = useRef<number | null>(null)
-
-  // Update throttling configuration
-  const UPDATE_THROTTLE_MS = 1000 // Minimum time between updates
-  const UPDATE_DEBOUNCE_MS = 500  // Wait time after last change before applying
-  const MAX_PENDING_UPDATES = 10  // Maximum queued updates
-
-  // Phase 2: Controlled update functions (moved up to resolve dependency order)
-  const throttledUpdate = useCallback((updateFn: () => void) => {
-    const now = Date.now()
-    const timeSinceLastUpdate = now - lastUpdateTimeRef.current
-
-    if (updatesPaused) {
-      console.log('Updates paused, queuing update')
-      setPendingUpdates(prev => Math.min(prev + 1, MAX_PENDING_UPDATES))
-      return
-    }
-
-    if (timeSinceLastUpdate < UPDATE_THROTTLE_MS) {
-      // Throttle: delay update until minimum time has passed
-      if (updateThrottleRef.current) {
-        clearTimeout(updateThrottleRef.current)
-      }
-
-      const delay = UPDATE_THROTTLE_MS - timeSinceLastUpdate
-      updateThrottleRef.current = setTimeout(() => {
-        lastUpdateTimeRef.current = Date.now()
-        updateFn()
-      }, delay)
-    } else {
-      // Can update immediately
-      lastUpdateTimeRef.current = now
-      updateFn()
-    }
-  }, [updatesPaused])
-
-  const debouncedUpdate = useCallback((updateFn: () => void) => {
-    if (updateDebounceRef.current) {
-      clearTimeout(updateDebounceRef.current)
-    }
-
-    updateDebounceRef.current = setTimeout(() => {
-      if (!updatesPaused) {
-        updateFn()
-      } else {
-        setPendingUpdates(prev => Math.min(prev + 1, MAX_PENDING_UPDATES))
-      }
-    }, UPDATE_DEBOUNCE_MS)
-  }, [updatesPaused])
-
-  // Emergency pause function to stop all updates
-  const pauseUpdates = useCallback(() => {
-    console.log('Pausing all updates')
-    setUpdatesPaused(true)
-  }, [])
-
-  const resumeUpdates = useCallback(() => {
-    console.log('Resuming updates, processing', pendingUpdates, 'pending updates')
-    setUpdatesPaused(false)
-    setPendingUpdates(0)
-  }, [pendingUpdates])
+  // Phase 2: Update management using custom hook
+  const {
+    updatesPaused,
+    pendingUpdates,
+    throttledUpdate,
+    debouncedUpdate,
+    pauseUpdates,
+    resumeUpdates,
+    cleanup: cleanupUpdateManagement
+  } = useUpdateManagement({
+    throttleMs: 1000,
+    debounceMs: 500,
+    maxPendingUpdates: 10
+  })
 
   // Handle collaboration events integration with controlled updates
   const handleCollaborationEvent = useCallback((event: CollaborationEvent) => {
@@ -575,6 +520,13 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
 
     return planDagStableRef.current
   }, [useDynamicData, planDag, planDagEqual, throttledUpdate, scheduleValidation])
+
+  // Handle validation trigger
+  const handleValidate = useCallback(() => {
+    if (validate) {
+      validate(activePlanDag)
+    }
+  }, [validate, activePlanDag])
 
   // Initialize ReactFlow state first with stable handlers
   const stableHandleEdit = useCallback((nodeId: string) => {
@@ -837,19 +789,14 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
       }
 
       // Phase 2: Cleanup update timers
-      if (updateThrottleRef.current) {
-        clearTimeout(updateThrottleRef.current)
-      }
-      if (updateDebounceRef.current) {
-        clearTimeout(updateDebounceRef.current)
-      }
+      cleanupUpdateManagement()
 
       // Phase 4: Cleanup validation timer
       if (validationTimeoutRef.current) {
         clearTimeout(validationTimeoutRef.current)
       }
     }
-  }, [readonly, joinProject, leaveProject])
+  }, [readonly, joinProject, leaveProject, cleanupUpdateManagement])
 
   const miniMapNodeColor = useCallback((node: Node) => {
     switch (node.data?.nodeType) {
@@ -948,122 +895,20 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
           <Controls />
           <MiniMap nodeColor={miniMapNodeColor} />
 
-          <Panel position="top-left">
-            <Stack gap="xs" p="xs" bg="white" style={{ borderRadius: 4, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-              <Text size="sm" fw={500}>
-                {activePlanDag.metadata.name || 'Untitled Plan'}
-              </Text>
-              <Text size="xs" c="dimmed">
-                {nodes.length} nodes, {edges.length} connections
-                {selectedEdge && ` - Edge ${selectedEdge} selected`}
-              </Text>
-
-              {/* Phase 2: Update Control Panel */}
-              <Group gap="xs" mt="xs">
-                <Text size="xs" fw={500} c="gray.6">Updates:</Text>
-                <Group gap={4}>
-                  <Tooltip label={useDynamicData ? "Dynamic data enabled" : "Static data mode"}>
-                    <ActionIcon
-                      size="xs"
-                      variant="light"
-                      color={useDynamicData ? "blue" : "gray"}
-                    >
-                      <IconRotate size="0.7rem" />
-                    </ActionIcon>
-                  </Tooltip>
-
-                  <Tooltip label={updatesPaused ? "Resume updates" : "Pause updates"}>
-                    <ActionIcon
-                      size="xs"
-                      variant="light"
-                      color={updatesPaused ? "orange" : "green"}
-                      onClick={updatesPaused ? resumeUpdates : pauseUpdates}
-                    >
-                      {updatesPaused ? <IconPlayerPlay size="0.7rem" /> : <IconPlayerPause size="0.7rem" />}
-                    </ActionIcon>
-                  </Tooltip>
-
-                  {pendingUpdates > 0 && (
-                    <Tooltip label={`${pendingUpdates} pending updates`}>
-                      <ActionIcon size="xs" variant="light" color="orange">
-                        <IconExclamationCircle size="0.7rem" />
-                      </ActionIcon>
-                    </Tooltip>
-                  )}
-
-                  {updatesPaused === false && pendingUpdates === 0 && (
-                    <Tooltip label="Updates active">
-                      <ActionIcon size="xs" variant="light" color="green">
-                        <IconCircleCheck size="0.7rem" />
-                      </ActionIcon>
-                    </Tooltip>
-                  )}
-                </Group>
-              </Group>
-
-              {/* Phase 3: Collaboration Status Panel */}
-              <Group gap="xs" mt="xs">
-                <Text size="xs" fw={500} c="gray.6">Collaboration:</Text>
-                <Group gap={4}>
-                  <Tooltip label={`Connection: ${collaborationStatus}`}>
-                    <ActionIcon
-                      size="xs"
-                      variant="light"
-                      color={isConnected ? "green" : hasError ? "red" : "orange"}
-                    >
-                      {isConnected ? <IconNetwork size="0.7rem" /> : <IconNetworkOff size="0.7rem" />}
-                    </ActionIcon>
-                  </Tooltip>
-
-                  {activeConflicts.length > 0 && (
-                    <Tooltip label={`${activeConflicts.length} conflict${activeConflicts.length > 1 ? 's' : ''} detected`}>
-                      <ActionIcon size="xs" variant="light" color="red">
-                        <IconExclamationCircle size="0.7rem" />
-                      </ActionIcon>
-                    </Tooltip>
-                  )}
-
-                  {collaborationEvents.length > 0 && (
-                    <Tooltip label={`${collaborationEvents.length} recent events`}>
-                      <ActionIcon size="xs" variant="light" color="blue">
-                        <IconRotate size="0.7rem" />
-                      </ActionIcon>
-                    </Tooltip>
-                  )}
-                </Group>
-              </Group>
-
-              {/* Phase 4: Validation Status Panel */}
-              <Group gap="xs" mt="xs">
-                <Text size="xs" fw={500} c="gray.6">Validation:</Text>
-                <Group gap={4}>
-                  {validationLoading && (
-                    <Tooltip label="Validating Plan DAG...">
-                      <ActionIcon size="xs" variant="light" color="blue">
-                        <IconRefresh size="0.7rem" />
-                      </ActionIcon>
-                    </Tooltip>
-                  )}
-
-                  {validationErrors.length > 0 && !validationLoading && (
-                    <Tooltip label={`${validationErrors.length} validation error${validationErrors.length > 1 ? 's' : ''}`}>
-                      <ActionIcon size="xs" variant="light" color="red">
-                        <IconExclamationCircle size="0.7rem" />
-                      </ActionIcon>
-                    </Tooltip>
-                  )}
-
-                  {validationErrors.length === 0 && !validationLoading && lastValidation && (
-                    <Tooltip label={`Validation passed (${lastValidation.toLocaleTimeString()})`}>
-                      <ActionIcon size="xs" variant="light" color="green">
-                        <IconCircleCheck size="0.7rem" />
-                      </ActionIcon>
-                    </Tooltip>
-                  )}
-                </Group>
-              </Group>
-            </Stack>
-          </Panel>
+          <ControlPanel
+            validationLoading={validationLoading}
+            validationErrors={validationErrors}
+            lastValidation={lastValidation}
+            onValidate={handleValidate}
+            updatesPaused={updatesPaused}
+            pendingUpdates={pendingUpdates}
+            onPauseUpdates={pauseUpdates}
+            onResumeUpdates={resumeUpdates}
+            isConnected={isConnected}
+            collaborationStatus={collaborationStatus}
+            hasError={hasError}
+            onlineUsers={onlineUsers}
+          />
 
           {/* Phase 3: Collaborative cursors for real-time user presence */}
           <CollaborativeCursors users={onlineUsers} currentUserId={currentUserId} />
