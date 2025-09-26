@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback, ReactNode } from 'react'
 import {
-  UserPresence,
   useCollaborationEventsSubscription,
   useConflictDetection,
   useCollaborationConnection,
@@ -24,32 +23,26 @@ export const CollaborationManager = ({
 }: CollaborationManagerProps) => {
   // Collaboration hooks
   const { users: onlineUsers } = useUserPresence(projectId, currentUserId)
-  const { broadcastCursorPosition, joinProject, leaveProject } = useCollaboration(projectId)
-  const { status: collaborationStatus, isConnected, hasError } = useCollaborationConnection(projectId.toString())
+  const { joinProject, leaveProject } = useCollaboration(projectId)
+  const { status: _collaborationStatus, isConnected: _isConnected, hasError: _hasError } = useCollaborationConnection(projectId.toString())
   const { getActiveConflicts } = useConflictDetection(projectId.toString())
 
-  // Collaboration events state
-  const [collaborationEvents, setCollaborationEvents] = useState<CollaborationEvent[]>([])
-  const [activeConflicts, setActiveConflicts] = useState<ConflictEvent[]>([])
+  // Collaboration events state (for future use)
+  const [_collaborationEvents, setCollaborationEvents] = useState<CollaborationEvent[]>([])
+  const [_activeConflicts, setActiveConflicts] = useState<ConflictEvent[]>([])
   const collaborationEventsRef = useRef<CollaborationEvent[]>([])
 
   // Subscribe to collaboration events
-  const { events } = useCollaborationEventsSubscription(projectId.toString())
-
-  // Handle collaboration events
-  useEffect(() => {
-    if (events && events.length > 0) {
-      const newEvents = events.filter(
-        event => !collaborationEventsRef.current.some(existing => existing.eventId === event.eventId)
-      )
-
-      if (newEvents.length > 0) {
-        setCollaborationEvents(prevEvents => [...prevEvents, ...newEvents])
-        collaborationEventsRef.current = [...collaborationEventsRef.current, ...newEvents]
-        console.log('New collaboration events received:', newEvents)
-      }
+  const handleCollaborationEvent = useCallback((event: CollaborationEvent) => {
+    const newEvent = event
+    if (!collaborationEventsRef.current.some(existing => existing.eventId === newEvent.eventId)) {
+      setCollaborationEvents(prevEvents => [...prevEvents, newEvent])
+      collaborationEventsRef.current = [...collaborationEventsRef.current, newEvent]
+      console.log('New collaboration event received:', newEvent)
     }
-  }, [events])
+  }, [])
+
+  useCollaborationEventsSubscription(projectId.toString(), handleCollaborationEvent)
 
   // Handle conflicts
   useEffect(() => {
@@ -65,19 +58,13 @@ export const CollaborationManager = ({
   // Join project on mount, leave on unmount
   useEffect(() => {
     joinProject()
-    return () => leaveProject()
+    return () => {
+      leaveProject()
+    }
   }, [joinProject, leaveProject])
 
-  // Provide collaboration data and functions to children
-  const collaborationData = {
-    onlineUsers,
-    collaborationStatus,
-    isConnected,
-    hasError,
-    collaborationEvents,
-    activeConflicts,
-    broadcastCursorPosition
-  }
+  // Collaboration data available through props and component state
+  // Future versions could expose this data via React Context if needed
 
   return (
     <>
@@ -86,8 +73,8 @@ export const CollaborationManager = ({
       {/* User Presence Indicator */}
       <UserPresenceIndicator
         users={onlineUsers}
-        currentUserId={currentUserId}
-        projectId={projectId}
+        maxVisible={5}
+        size="sm"
       />
 
       {/* Collaborative Cursors */}

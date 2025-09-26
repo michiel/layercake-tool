@@ -51,7 +51,7 @@ import { NodeConfigDialog } from './dialogs/NodeConfigDialog'
 
 // Import extracted components and hooks
 import { ControlPanel } from './components/ControlPanel'
-import { CollaborationManager } from './components/CollaborationManager'
+// import { CollaborationManager } from './components/CollaborationManager'
 import { useUpdateManagement } from './hooks/useUpdateManagement'
 
 // Import ReactFlow styles
@@ -244,8 +244,8 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
   const { getActiveConflicts } = useConflictDetection(projectId.toString())
 
   // Collaboration events state
-  const [collaborationEvents, setCollaborationEvents] = useState<CollaborationEvent[]>([])
-  const [activeConflicts, setActiveConflicts] = useState<ConflictEvent[]>([])
+  const [_collaborationEvents, setCollaborationEvents] = useState<CollaborationEvent[]>([])
+  const [_activeConflicts, setActiveConflicts] = useState<ConflictEvent[]>([])
   const collaborationEventsRef = useRef<CollaborationEvent[]>([])
 
   // Phase 4: Validation state and error tracking
@@ -299,7 +299,7 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
   // mutations.moveNode, mutations.addEdge, mutations.deleteEdge, etc.
 
   const [selectedNode, setSelectedNode] = useState<string | null>(null)
-  const [selectedEdge, setSelectedEdge] = useState<string | null>(null)
+  const [_selectedEdge, setSelectedEdge] = useState<string | null>(null)
 
   const [isDirty, setIsDirty] = useState(false)
   // const initializedRef = useRef(false) // Unused for now
