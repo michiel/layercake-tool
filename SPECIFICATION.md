@@ -11,6 +11,9 @@ Building this as a distributed and collaborative graph editing platform is a lat
 ### Layercake plans and graphs
 
  - All aspected of the layercake process from ingestion to transformation to renderings are stored as a DAG. This is the layercake plan. If an upstream node (e.g. representing ingestion of a CSV as a nodeset) changes, all downstream nodes are updated
+ - Each Project has DataSources. DataSources are tables belonging to a project that are a raw import of their source (attr: blob), and contain a graph_json attribute that imports the raw attributes to the appropriate graph_json={{nodes:[], edges:[], layers:[]}} attributes
+ - DataSources can be referenced as a node in the PlanDAG, and can be used as source nodes for an edge with a target node GraphNode. GraphNodes can have multiple DataSourceNodes
+ - DataSources have their own data management page(s) for CRUD operations under a Project
  - Graph data can be imported from CSVs (the existing layercake source format), REST endpoints, SQL querie (react component name : PlanVisualEditor)
  - The layercake plan (PlanDAG) can be edited (visually using react-flow / xflow, component name PlanVisualEditor), with the inputs, graph hierarchy and exports of different graphs in the hierarchy all represented and editable from the same interface
  - Graphs (or more specifically LayercakeGraphs) can be edited using the spreadsheet editor component that has three tabs for nodes, edges, layers (react component name : GraphSpreadsheetEditor) OR using another instance of react-flow / xflow for graph editing (react component name : GraphVisualEditor)

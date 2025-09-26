@@ -34,10 +34,14 @@ export enum PlanDagNodeType {
 
 // Data Source Node Configuration
 export interface DataSourceNodeConfig {
-  inputType: 'CSVNodesFromFile' | 'CSVEdgesFromFile' | 'CSVLayersFromFile';
-  source: string;
-  dataType: 'Nodes' | 'Edges' | 'Layers';
+  dataSourceId?: number; // Reference to DataSource entity (new)
+  displayMode?: 'summary' | 'detailed' | 'preview'; // Optional for backward compatibility
   outputGraphRef: string;
+
+  // Legacy support (to be deprecated after migration)
+  inputType?: 'CSVNodesFromFile' | 'CSVEdgesFromFile' | 'CSVLayersFromFile';
+  source?: string;
+  dataType?: 'Nodes' | 'Edges' | 'Layers';
 }
 
 // Graph Node Configuration
@@ -145,6 +149,64 @@ export interface PlanDag {
   nodes: PlanDagNode[];
   edges: PlanDagEdge[];
   metadata: PlanDagMetadata;
+}
+
+// DataSource types (new)
+export type DataSourceType = 'csv_nodes' | 'csv_edges' | 'csv_layers' | 'json_graph';
+
+export interface DataSource {
+  id: number;
+  projectId: number;
+  name: string;
+  description?: string;
+  sourceType: DataSourceType;
+  filename: string;
+  graphJson: string;
+  status: 'active' | 'processing' | 'error';
+  errorMessage?: string;
+  fileSize: number;
+  processedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProcessedGraphData {
+  nodes: any[]; // Will be properly typed when we have GraphNode interface
+  edges: any[]; // Will be properly typed when we have GraphEdge interface
+  layers: any[]; // Will be properly typed when we have GraphLayer interface
+}
+
+// CSV format specifications
+export interface CSVNodeRow {
+  id: string;
+  label: string;
+  layer?: string;
+  x?: number;
+  y?: number;
+  [key: string]: any; // additional metadata
+}
+
+export interface CSVEdgeRow {
+  id: string;
+  source: string;
+  target: string;
+  label?: string;
+  [key: string]: any; // additional metadata
+}
+
+export interface CSVLayerRow {
+  id: string;
+  label: string;
+  color?: string;
+  [key: string]: any; // additional metadata
+}
+
+// File upload types
+export interface DataSourceUpload {
+  file: File;
+  name: string;
+  description?: string;
+  projectId: number;
 }
 
 // ReactFlow-specific types for rendering
