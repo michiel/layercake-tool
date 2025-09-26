@@ -1,9 +1,9 @@
 use async_graphql::*;
 use sea_orm::{EntityTrait, ColumnTrait, QueryFilter};
 
-use crate::database::entities::{projects, plans, nodes, edges, layers, plan_dag_nodes, plan_dag_edges, users, user_sessions, project_collaborators, user_presence};
+use crate::database::entities::{projects, plans, nodes, edges, layers, plan_dag_nodes, plan_dag_edges, users, user_sessions, project_collaborators, user_presence, data_sources};
 use crate::graphql::context::GraphQLContext;
-use crate::graphql::types::{Project, Plan, Node, Edge, Layer, PlanDag, PlanDagNode, PlanDagEdge, PlanDagMetadata, ValidationResult, PlanDagInput, User, UserSession, ProjectCollaborator, UserPresence};
+use crate::graphql::types::{Project, Plan, Node, Edge, Layer, PlanDag, PlanDagNode, PlanDagEdge, PlanDagMetadata, ValidationResult, PlanDagInput, User, UserSession, ProjectCollaborator, UserPresence, DataSource, DownloadUrl};
 
 pub struct Query;
 
@@ -374,6 +374,53 @@ impl Query {
             .await?;
 
         Ok(session.map(UserSession::from))
+    }
+
+    /// Get DataSource by ID
+    async fn data_source(&self, ctx: &Context<'_>, id: i32) -> Result<Option<DataSource>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let data_source = data_sources::Entity::find_by_id(id)
+            .one(&context.db)
+            .await?;
+
+        Ok(data_source.map(DataSource::from))
+    }
+
+    /// Get all DataSources for a project
+    async fn data_sources(&self, ctx: &Context<'_>, project_id: i32) -> Result<Vec<DataSource>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let data_sources_list = data_sources::Entity::find()
+            .filter(data_sources::Column::ProjectId.eq(project_id))
+            .all(&context.db)
+            .await?;
+
+        Ok(data_sources_list.into_iter().map(DataSource::from).collect())
+    }
+
+    /// Generate download URL for raw DataSource file
+    async fn download_data_source_raw(&self, ctx: &Context<'_>, id: i32) -> Result<String> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let data_source = data_sources::Entity::find_by_id(id)
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("DataSource not found"))?;
+
+        // Generate a temporary download URL (in a real implementation, this would be a signed URL)
+        let download_url = format!("/api/data-sources/{}/download/raw", id);
+        Ok(download_url)
+    }
+
+    /// Generate download URL for processed DataSource JSON
+    async fn download_data_source_json(&self, ctx: &Context<'_>, id: i32) -> Result<String> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let data_source = data_sources::Entity::find_by_id(id)
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("DataSource not found"))?;
+
+        // Generate a temporary download URL (in a real implementation, this would be a signed URL)
+        let download_url = format!("/api/data-sources/{}/download/json", id);
+        Ok(download_url)
     }
 }
 

@@ -24,6 +24,8 @@ pub enum Relation {
     Edges,
     #[sea_orm(has_many = "super::layers::Entity")]
     Layers,
+    #[sea_orm(has_many = "super::data_sources::Entity")]
+    DataSources,
 }
 
 impl Related<super::plans::Entity> for Entity {
@@ -47,6 +49,12 @@ impl Related<super::edges::Entity> for Entity {
 impl Related<super::layers::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Layers.def()
+    }
+}
+
+impl Related<super::data_sources::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::DataSources.def()
     }
 }
 

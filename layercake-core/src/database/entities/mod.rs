@@ -5,6 +5,7 @@ pub mod edges;
 pub mod layers;
 pub mod plan_dag_nodes;
 pub mod plan_dag_edges;
+pub mod data_sources;
 pub mod users;
 pub mod user_sessions;
 pub mod project_collaborators;

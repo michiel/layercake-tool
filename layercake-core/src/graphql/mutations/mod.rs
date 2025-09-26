@@ -2,10 +2,11 @@ use async_graphql::*;
 use sea_orm::{ActiveModelTrait, EntityTrait, Set, ActiveValue, ColumnTrait, QueryFilter};
 use chrono::Utc;
 
-use crate::database::entities::{projects, plans, nodes, edges, layers, plan_dag_nodes, plan_dag_edges, users, user_sessions, project_collaborators, user_presence};
+use crate::database::entities::{projects, plans, nodes, edges, layers, plan_dag_nodes, plan_dag_edges, users, user_sessions, project_collaborators, user_presence, data_sources};
 use crate::graphql::context::GraphQLContext;
 use crate::services::auth_service::AuthService;
 use crate::services::validation::ValidationService;
+use crate::services::data_source_service::DataSourceService;
 
 use crate::graphql::types::{
     Project, Plan, Node, Edge, Layer,
@@ -18,6 +19,7 @@ use crate::graphql::types::{
     User, UserSession, ProjectCollaborator, UserPresence,
     RegisterUserInput, LoginInput, UpdateUserInput, LoginResponse, RegisterResponse,
     InviteCollaboratorInput, UpdateCollaboratorRoleInput, UpdateUserPresenceInput,
+    DataSource, CreateDataSourceInput, UpdateDataSourceInput,
 };
 
 pub struct Mutation;
@@ -1047,6 +1049,86 @@ impl Mutation {
             Ok(()) => Ok(true),
             Err(_) => Ok(false),
         }
+    }
+
+    /// Create a new DataSource from uploaded file
+    async fn create_data_source_from_file(
+        &self,
+        ctx: &Context<'_>,
+        input: CreateDataSourceInput
+    ) -> Result<DataSource> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let data_source_service = DataSourceService::new(context.db.clone());
+
+        // Extract file data (in a real implementation, this would handle multipart upload)
+        let file_data = input.file.content;
+        let filename = input.file.filename;
+
+        let data_source = data_source_service
+            .create_from_file(
+                input.project_id,
+                input.name,
+                input.description,
+                filename,
+                file_data,
+            )
+            .await
+            .map_err(|e| Error::new(format!("Failed to create DataSource: {}", e)))?;
+
+        Ok(DataSource::from(data_source))
+    }
+
+    /// Update DataSource metadata
+    async fn update_data_source(
+        &self,
+        ctx: &Context<'_>,
+        id: i32,
+        input: UpdateDataSourceInput
+    ) -> Result<DataSource> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let data_source_service = DataSourceService::new(context.db.clone());
+
+        let data_source = if let Some(file) = input.file {
+            // Update with new file
+            data_source_service
+                .update_file(id, file.filename, file.content)
+                .await
+                .map_err(|e| Error::new(format!("Failed to update DataSource file: {}", e)))?
+        } else {
+            // Update metadata only
+            data_source_service
+                .update(id, input.name, input.description)
+                .await
+                .map_err(|e| Error::new(format!("Failed to update DataSource: {}", e)))?
+        };
+
+        Ok(DataSource::from(data_source))
+    }
+
+    /// Delete DataSource
+    async fn delete_data_source(&self, ctx: &Context<'_>, id: i32) -> Result<bool> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let data_source_service = DataSourceService::new(context.db.clone());
+
+        data_source_service
+            .delete(id)
+            .await
+            .map_err(|e| Error::new(format!("Failed to delete DataSource: {}", e)))?;
+
+        Ok(true)
+    }
+
+    /// Reprocess existing DataSource file
+    async fn reprocess_data_source(&self, ctx: &Context<'_>, id: i32) -> Result<DataSource> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let data_source_service = DataSourceService::new(context.db.clone());
+
+        let data_source = data_source_service
+            .reprocess(id)
+            .await
+            .map_err(|e| Error::new(format!("Failed to reprocess DataSource: {}", e)))?;
+
+        Ok(DataSource::from(data_source))
     }
 }
 
