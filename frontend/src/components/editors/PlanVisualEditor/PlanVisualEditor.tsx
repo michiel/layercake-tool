@@ -16,11 +16,29 @@ import ReactFlow, {
   Viewport,
 } from 'reactflow'
 import { Stack, Title, Alert, Loader, Text, ActionIcon, Tooltip, Group } from '@mantine/core'
-import { IconAlertCircle, IconEye, IconSettings, IconPlayerPlay, IconPlayerPause, IconRotate, IconCircleCheck, IconExclamationCircle } from '@tabler/icons-react'
+import {
+  IconAlertCircle,
+  IconEye,
+  IconSettings,
+  IconPlayerPlay,
+  IconPlayerPause,
+  IconRotate,
+  IconCircleCheck,
+  IconExclamationCircle,
+  IconRefresh,
+  IconNetwork,
+  IconNetworkOff
+} from '@tabler/icons-react'
 
-import { usePlanDag, usePlanDagMutations, usePlanDagSubscription, useUserPresence, useCollaboration } from '../../../hooks/usePlanDag'
+import { usePlanDag, usePlanDagMutations, usePlanDagValidation, usePlanDagSubscription, useUserPresence, useCollaboration } from '../../../hooks/usePlanDag'
 import { PlanDag, PlanDagNode, PlanDagEdge, ReactFlowNode, ReactFlowEdge, PlanDagNodeType, NodeConfig, NodeMetadata, DataSourceNodeConfig } from '../../../types/plan-dag'
-import { UserPresence } from '../../../hooks/useCollaborationSubscriptions'
+import {
+  UserPresence,
+  useCollaborationEventsSubscription,
+  useConflictDetection,
+  useCollaborationConnection,
+  type ConflictEvent
+} from '../../../hooks/useCollaborationSubscriptions'
 import { validateConnection } from '../../../utils/planDagValidation'
 
 // Import custom node types
@@ -215,59 +233,29 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
   const { lastChange } = usePlanDagSubscription(projectId)
   const mutations = usePlanDagMutations(projectId)
 
-  // Collaboration hooks - mock current user for frontend-only development
-  // const currentUserId = 'user-123' // Unused for now
-  const { users } = useUserPresence(projectId)
+  // Phase 4: Plan DAG validation integration
+  const { validate, validationResult, loading: validationLoading } = usePlanDagValidation()
+
+  // Phase 3: Advanced collaboration hooks integration
+  const currentUserId = 'user-123' // Mock current user for frontend-only development
+  const { users } = useUserPresence(projectId, currentUserId)
   const { broadcastCursorPosition, joinProject, leaveProject } = useCollaboration(projectId)
 
-  // Real mutations are now available from usePlanDagMutations hook
-  // mutations.moveNode, mutations.addEdge, mutations.deleteEdge, etc.
+  // Advanced collaboration features
+  const { status: collaborationStatus, isConnected, hasError, error: collaborationError } = useCollaborationConnection(projectId.toString())
+  const { getActiveConflicts } = useConflictDetection(projectId.toString())
 
-  const [selectedNode, setSelectedNode] = useState<string | null>(null)
-  const [selectedEdge, setSelectedEdge] = useState<string | null>(null)
+  // Collaboration events state
+  const [collaborationEvents, setCollaborationEvents] = useState<CollaborationEvent[]>([])
+  const [activeConflicts, setActiveConflicts] = useState<ConflictEvent[]>([])
+  const collaborationEventsRef = useRef<CollaborationEvent[]>([])
 
-  const [isDirty, setIsDirty] = useState(false)
-  // const initializedRef = useRef(false) // Unused for now
-  const viewportRef = useRef({ x: 0, y: 0, zoom: 1 })
+  // Phase 4: Validation state and error tracking
+  const [validationErrors, setValidationErrors] = useState<any[]>([])
+  const [lastValidation, setLastValidation] = useState<Date | null>(null)
+  const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Configuration dialog state
-  const [configDialogOpen, setConfigDialogOpen] = useState(false)
-  const [configNodeId, setConfigNodeId] = useState<string>('')
-  const [configNodeType, setConfigNodeType] = useState<PlanDagNodeType>(PlanDagNodeType.DATA_SOURCE)
-  const [configNodeConfig, setConfigNodeConfig] = useState<NodeConfig>({
-    inputType: 'CSVNodesFromFile',
-    source: '',
-    dataType: 'Nodes',
-    outputGraphRef: ''
-  } as DataSourceNodeConfig)
-  const [configNodeMetadata, setConfigNodeMetadata] = useState<NodeMetadata>({ label: '', description: '' })
-
-  // Use real users from subscription, with fallback mock data for development
-  const onlineUsers: UserPresence[] = users.length > 0 ? users : [
-    {
-      userId: 'user-456',
-      userName: 'Alice Cooper',
-      avatarColor: '#51cf66',
-      isOnline: true,
-      cursorPosition: { x: 250, y: 150 },
-      selectedNodeId: 'transform_1',
-      lastActive: new Date().toISOString()
-    },
-    {
-      userId: 'user-789',
-      userName: 'Bob Smith',
-      avatarColor: '#339af0',
-      isOnline: true,
-      cursorPosition: { x: 450, y: 200 },
-      selectedNodeId: undefined,
-      lastActive: new Date().toISOString()
-    }
-  ]
-
-  // Feature flag for dynamic data - can be controlled via environment or debug flag
-  const useDynamicData = import.meta.env.VITE_USE_DYNAMIC_DATA === 'true' || false
-
-  // Phase 2: Controlled update mechanisms
+  // Phase 2: State and configuration (moved up to resolve dependency order)
   const [updatesPaused, setUpdatesPaused] = useState(false)
   const [pendingUpdates, setPendingUpdates] = useState(0)
   const lastUpdateTimeRef = useRef<number>(0)
@@ -279,11 +267,7 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
   const UPDATE_DEBOUNCE_MS = 500  // Wait time after last change before applying
   const MAX_PENDING_UPDATES = 10  // Maximum queued updates
 
-  // Stable reference pattern - only update when content actually changes
-  const previousPlanDagRef = useRef<PlanDag | null>(null)
-  const planDagStableRef = useRef<PlanDag>(staticMockPlanDag)
-
-  // Controlled update functions
+  // Phase 2: Controlled update functions (moved up to resolve dependency order)
   const throttledUpdate = useCallback((updateFn: () => void) => {
     const now = Date.now()
     const timeSinceLastUpdate = now - lastUpdateTimeRef.current
@@ -337,6 +321,176 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
     setUpdatesPaused(false)
     setPendingUpdates(0)
   }, [pendingUpdates])
+
+  // Handle collaboration events integration with controlled updates
+  const handleCollaborationEvent = useCallback((event: CollaborationEvent) => {
+    console.log('Collaboration event received:', event)
+
+    // Add to events log (keep last 100 events)
+    collaborationEventsRef.current = [event, ...collaborationEventsRef.current.slice(0, 99)]
+    setCollaborationEvents([...collaborationEventsRef.current])
+
+    // Handle different event types with controlled updates
+    if (event.eventType === 'NODE_UPDATED' && event.data.nodeEvent) {
+      // Throttled update for node changes from other users
+      throttledUpdate(() => {
+        console.log('Processing remote node update:', event.data.nodeEvent)
+        // Node updates are handled via GraphQL subscriptions automatically
+      })
+    } else if (event.eventType === 'EDGE_CREATED' || event.eventType === 'EDGE_DELETED') {
+      // Immediate update for edge changes (less frequent, more critical)
+      debouncedUpdate(() => {
+        console.log('Processing remote edge change:', event.eventType)
+        // Edge updates are handled via GraphQL subscriptions automatically
+      })
+    }
+  }, [throttledUpdate, debouncedUpdate])
+
+  // Subscribe to collaboration events
+  useCollaborationEventsSubscription(projectId.toString(), handleCollaborationEvent)
+
+  // Real mutations are now available from usePlanDagMutations hook
+  // mutations.moveNode, mutations.addEdge, mutations.deleteEdge, etc.
+
+  const [selectedNode, setSelectedNode] = useState<string | null>(null)
+  const [selectedEdge, setSelectedEdge] = useState<string | null>(null)
+
+  const [isDirty, setIsDirty] = useState(false)
+  // const initializedRef = useRef(false) // Unused for now
+  const viewportRef = useRef({ x: 0, y: 0, zoom: 1 })
+
+  // Configuration dialog state
+  const [configDialogOpen, setConfigDialogOpen] = useState(false)
+  const [configNodeId, setConfigNodeId] = useState<string>('')
+  const [configNodeType, setConfigNodeType] = useState<PlanDagNodeType>(PlanDagNodeType.DATA_SOURCE)
+  const [configNodeConfig, setConfigNodeConfig] = useState<NodeConfig>({
+    inputType: 'CSVNodesFromFile',
+    source: '',
+    dataType: 'Nodes',
+    outputGraphRef: ''
+  } as DataSourceNodeConfig)
+  const [configNodeMetadata, setConfigNodeMetadata] = useState<NodeMetadata>({ label: '', description: '' })
+
+  // Use real users from subscription, with fallback mock data for development
+  const onlineUsers: UserPresence[] = users.length > 0 ? users : [
+    {
+      userId: 'user-456',
+      userName: 'Alice Cooper',
+      avatarColor: '#51cf66',
+      isOnline: true,
+      cursorPosition: { x: 250, y: 150 },
+      selectedNodeId: 'transform_1',
+      lastActive: new Date().toISOString()
+    },
+    {
+      userId: 'user-789',
+      userName: 'Bob Smith',
+      avatarColor: '#339af0',
+      isOnline: true,
+      cursorPosition: { x: 450, y: 200 },
+      selectedNodeId: undefined,
+      lastActive: new Date().toISOString()
+    }
+  ]
+
+  // Feature flag for dynamic data - can be controlled via environment or debug flag
+  const useDynamicData = import.meta.env.VITE_USE_DYNAMIC_DATA === 'true' || false
+
+
+  // Stable reference pattern - only update when content actually changes
+  const previousPlanDagRef = useRef<PlanDag | null>(null)
+  const planDagStableRef = useRef<PlanDag>(staticMockPlanDag)
+
+
+  // Phase 3: Conflict detection and resolution
+  const checkForConflicts = useCallback(() => {
+    const conflicts = getActiveConflicts()
+    setActiveConflicts(conflicts)
+    return conflicts
+  }, [getActiveConflicts])
+
+  // Auto-check for conflicts every 5 seconds
+  useEffect(() => {
+    if (!isConnected) return
+
+    const intervalId = setInterval(() => {
+      checkForConflicts()
+    }, 5000)
+
+    return () => clearInterval(intervalId)
+  }, [isConnected, checkForConflicts])
+
+  // Handle remote changes from subscriptions
+  useEffect(() => {
+    if (!lastChange || !isConnected) return
+
+    console.log('Real-time subscription change detected:', lastChange)
+
+    // Check for conflicts when remote changes come in
+    const conflicts = checkForConflicts()
+    if (conflicts.length > 0) {
+      console.warn('Conflicts detected with remote changes:', conflicts)
+      // Pause updates temporarily to handle conflicts
+      pauseUpdates()
+    }
+
+    // Integrate remote change with controlled update system
+    debouncedUpdate(() => {
+      console.log('Processing real-time subscription update')
+      // GraphQL subscription data is automatically merged by Apollo Client
+      // This just ensures we don't miss any updates during controlled update periods
+    })
+  }, [lastChange, isConnected, checkForConflicts, pauseUpdates, debouncedUpdate])
+
+  // Phase 4: Validation integration with controlled updates
+  const runValidation = useCallback(async (planDagToValidate: PlanDag) => {
+    if (validationLoading) return
+
+    console.log('Running Plan DAG validation')
+    setLastValidation(new Date())
+
+    try {
+      const result = await validate(planDagToValidate)
+      if (result.data?.validatePlanDag) {
+        const validation = result.data.validatePlanDag
+        setValidationErrors(validation.errors || [])
+
+        if (!validation.isValid && validation.errors.length > 0) {
+          console.warn('Plan DAG validation failed:', validation.errors)
+          // Pause updates temporarily if there are critical validation errors
+          const criticalErrors = validation.errors.filter(err =>
+            err.message.includes('cycle') || err.message.includes('unreachable')
+          )
+          if (criticalErrors.length > 0) {
+            pauseUpdates()
+          }
+        } else {
+          console.log('Plan DAG validation passed')
+        }
+      }
+    } catch (error) {
+      console.error('Validation failed:', error)
+      setValidationErrors([{ message: 'Validation service unavailable' }])
+    }
+  }, [validate, validationLoading, pauseUpdates])
+
+  // Auto-validate after changes (debounced)
+  const scheduleValidation = useCallback((planDagToValidate: PlanDag) => {
+    if (validationTimeoutRef.current) {
+      clearTimeout(validationTimeoutRef.current)
+    }
+
+    validationTimeoutRef.current = setTimeout(() => {
+      runValidation(planDagToValidate)
+    }, 2000) // Validate 2 seconds after last change
+  }, [runValidation])
+
+  // Update validation results when validationResult changes
+  useEffect(() => {
+    if (validationResult) {
+      setValidationErrors(validationResult.errors || [])
+    }
+  }, [validationResult])
 
   // Deep equality check helper for plan DAG data
   const planDagEqual = useCallback((a: PlanDag | null, b: PlanDag | null): boolean => {
@@ -399,9 +553,12 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
     // Use controlled update mechanism for data changes
     const updateStableReference = () => {
       if (!planDagEqual(previousPlanDagRef.current, currentData)) {
-        console.log('Plan DAG data changed, updating stable reference with controls')
+        console.log('Plan DAG data changed, updating stable reference with controls and scheduling validation')
         previousPlanDagRef.current = currentData
         planDagStableRef.current = currentData
+
+        // Phase 4: Schedule validation after data changes
+        scheduleValidation(currentData)
       } else {
         console.log('Plan DAG data unchanged, using existing stable reference')
       }
@@ -416,7 +573,7 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
     }
 
     return planDagStableRef.current
-  }, [useDynamicData, planDag, planDagEqual, throttledUpdate])
+  }, [useDynamicData, planDag, planDagEqual, throttledUpdate, scheduleValidation])
 
   // Initialize ReactFlow state first with stable handlers
   const stableHandleEdit = useCallback((nodeId: string) => {
@@ -685,6 +842,11 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
       if (updateDebounceRef.current) {
         clearTimeout(updateDebounceRef.current)
       }
+
+      // Phase 4: Cleanup validation timer
+      if (validationTimeoutRef.current) {
+        clearTimeout(validationTimeoutRef.current)
+      }
     }
   }, [readonly, joinProject, leaveProject])
 
@@ -837,11 +999,73 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
                   )}
                 </Group>
               </Group>
+
+              {/* Phase 3: Collaboration Status Panel */}
+              <Group gap="xs" mt="xs">
+                <Text size="xs" fw={500} c="gray.6">Collaboration:</Text>
+                <Group gap={4}>
+                  <Tooltip label={`Connection: ${collaborationStatus}`}>
+                    <ActionIcon
+                      size="xs"
+                      variant="light"
+                      color={isConnected ? "green" : hasError ? "red" : "orange"}
+                    >
+                      {isConnected ? <IconNetwork size="0.7rem" /> : <IconNetworkOff size="0.7rem" />}
+                    </ActionIcon>
+                  </Tooltip>
+
+                  {activeConflicts.length > 0 && (
+                    <Tooltip label={`${activeConflicts.length} conflict${activeConflicts.length > 1 ? 's' : ''} detected`}>
+                      <ActionIcon size="xs" variant="light" color="red">
+                        <IconExclamationCircle size="0.7rem" />
+                      </ActionIcon>
+                    </Tooltip>
+                  )}
+
+                  {collaborationEvents.length > 0 && (
+                    <Tooltip label={`${collaborationEvents.length} recent events`}>
+                      <ActionIcon size="xs" variant="light" color="blue">
+                        <IconRotate size="0.7rem" />
+                      </ActionIcon>
+                    </Tooltip>
+                  )}
+                </Group>
+              </Group>
+
+              {/* Phase 4: Validation Status Panel */}
+              <Group gap="xs" mt="xs">
+                <Text size="xs" fw={500} c="gray.6">Validation:</Text>
+                <Group gap={4}>
+                  {validationLoading && (
+                    <Tooltip label="Validating Plan DAG...">
+                      <ActionIcon size="xs" variant="light" color="blue">
+                        <IconRefresh size="0.7rem" />
+                      </ActionIcon>
+                    </Tooltip>
+                  )}
+
+                  {validationErrors.length > 0 && !validationLoading && (
+                    <Tooltip label={`${validationErrors.length} validation error${validationErrors.length > 1 ? 's' : ''}`}>
+                      <ActionIcon size="xs" variant="light" color="red">
+                        <IconExclamationCircle size="0.7rem" />
+                      </ActionIcon>
+                    </Tooltip>
+                  )}
+
+                  {validationErrors.length === 0 && !validationLoading && lastValidation && (
+                    <Tooltip label={`Validation passed (${lastValidation.toLocaleTimeString()})`}>
+                      <ActionIcon size="xs" variant="light" color="green">
+                        <IconCircleCheck size="0.7rem" />
+                      </ActionIcon>
+                    </Tooltip>
+                  )}
+                </Group>
+              </Group>
             </Stack>
           </Panel>
 
-          {/* Collaborative cursors for real-time user presence */}
-          <CollaborativeCursors users={onlineUsers} />
+          {/* Phase 3: Collaborative cursors for real-time user presence */}
+          <CollaborativeCursors users={onlineUsers} currentUserId={currentUserId} />
 
           {/* Collaboration features integration complete */}
         </ReactFlow>
