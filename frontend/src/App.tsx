@@ -7,6 +7,7 @@ import { gql } from '@apollo/client'
 import { ConnectionStatus } from './components/common/ConnectionStatus'
 import { Breadcrumbs } from './components/common/Breadcrumbs'
 import { PlanVisualEditor } from './components/editors/PlanVisualEditor/PlanVisualEditor'
+import { ErrorBoundary } from './components/common/ErrorBoundary'
 
 // Health check query to verify backend connectivity
 const HEALTH_CHECK = gql`
@@ -477,11 +478,13 @@ const PlanEditorPage = () => {
         />
       </div>
       <div style={{ flex: 1, overflow: 'hidden' }}>
-        <PlanVisualEditor
-          projectId={selectedProject.id}
-          onNodeSelect={(nodeId) => console.log('Selected node:', nodeId)}
-          onEdgeSelect={(edgeId) => console.log('Selected edge:', edgeId)}
-        />
+        <ErrorBoundary>
+          <PlanVisualEditor
+            projectId={selectedProject.id}
+            onNodeSelect={(nodeId) => console.log('Selected node:', nodeId)}
+            onEdgeSelect={(edgeId) => console.log('Selected edge:', edgeId)}
+          />
+        </ErrorBoundary>
       </div>
     </Stack>
   )
@@ -557,24 +560,48 @@ const GraphEditorPage = () => {
 // Main App component with routing
 function App() {
   return (
-    <AppLayout>
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/projects" element={<ProjectsPage />} />
-        <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
-        <Route path="/projects/:projectId/plan" element={<PlanEditorPage />} />
-        <Route path="/projects/:projectId/graph" element={<GraphEditorPage />} />
-        <Route path="*" element={
-          <Container size="xl">
-            <Title order={1}>Page Not Found</Title>
-            <Text mb="md">The page you're looking for doesn't exist.</Text>
-            <Button onClick={() => window.location.href = '/'}>
-              Go Home
-            </Button>
-          </Container>
-        } />
-      </Routes>
-    </AppLayout>
+    <ErrorBoundary>
+      <AppLayout>
+        <Routes>
+          <Route path="/" element={
+            <ErrorBoundary>
+              <HomePage />
+            </ErrorBoundary>
+          } />
+          <Route path="/projects" element={
+            <ErrorBoundary>
+              <ProjectsPage />
+            </ErrorBoundary>
+          } />
+          <Route path="/projects/:projectId" element={
+            <ErrorBoundary>
+              <ProjectDetailPage />
+            </ErrorBoundary>
+          } />
+          <Route path="/projects/:projectId/plan" element={
+            <ErrorBoundary>
+              <PlanEditorPage />
+            </ErrorBoundary>
+          } />
+          <Route path="/projects/:projectId/graph" element={
+            <ErrorBoundary>
+              <GraphEditorPage />
+            </ErrorBoundary>
+          } />
+          <Route path="*" element={
+            <ErrorBoundary>
+              <Container size="xl">
+                <Title order={1}>Page Not Found</Title>
+                <Text mb="md">The page you're looking for doesn't exist.</Text>
+                <Button onClick={() => window.location.href = '/'}>
+                  Go Home
+                </Button>
+              </Container>
+            </ErrorBoundary>
+          } />
+        </Routes>
+      </AppLayout>
+    </ErrorBoundary>
   )
 }
 
