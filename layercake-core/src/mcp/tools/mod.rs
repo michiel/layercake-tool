@@ -4,6 +4,7 @@ pub mod projects;
 pub mod plans;
 pub mod graph_data;
 pub mod analysis;
+pub mod auth;
 
 // Helper functions for parameter extraction and response formatting
 use axum_mcp::prelude::*;
