@@ -39,6 +39,7 @@ import {
   useCollaborationConnection,
   type ConflictEvent
 } from '../../../hooks/useCollaborationSubscriptions'
+import { CollaborationEvent } from '../../../graphql/subscriptions'
 import { validateConnection } from '../../../utils/planDagValidation'
 
 // Import custom node types
@@ -242,7 +243,7 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
   const { broadcastCursorPosition, joinProject, leaveProject } = useCollaboration(projectId)
 
   // Advanced collaboration features
-  const { status: collaborationStatus, isConnected, hasError, error: collaborationError } = useCollaborationConnection(projectId.toString())
+  const { status: collaborationStatus, isConnected, hasError } = useCollaborationConnection(projectId.toString())
   const { getActiveConflicts } = useConflictDetection(projectId.toString())
 
   // Collaboration events state
@@ -253,14 +254,14 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
   // Phase 4: Validation state and error tracking
   const [validationErrors, setValidationErrors] = useState<any[]>([])
   const [lastValidation, setLastValidation] = useState<Date | null>(null)
-  const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const validationTimeoutRef = useRef<number | null>(null)
 
   // Phase 2: State and configuration (moved up to resolve dependency order)
   const [updatesPaused, setUpdatesPaused] = useState(false)
   const [pendingUpdates, setPendingUpdates] = useState(0)
   const lastUpdateTimeRef = useRef<number>(0)
-  const updateThrottleRef = useRef<NodeJS.Timeout | null>(null)
-  const updateDebounceRef = useRef<NodeJS.Timeout | null>(null)
+  const updateThrottleRef = useRef<number | null>(null)
+  const updateDebounceRef = useRef<number | null>(null)
 
   // Update throttling configuration
   const UPDATE_THROTTLE_MS = 1000 // Minimum time between updates

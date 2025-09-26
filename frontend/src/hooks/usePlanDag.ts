@@ -474,7 +474,7 @@ export const usePlanDagSubscription = (projectId: number) => {
 }
 
 // Hook for user presence in collaborative editing
-export const useUserPresence = (projectId: number) => {
+export const useUserPresence = (projectId: number, _currentUserId?: string) => {
   const { data, loading, error } = useSubscription<{
     userPresenceChanged: Array<{
       userId: string
