@@ -108,6 +108,18 @@ plan:
 
 ## Requirements
 
+### Frontend
+
+#### DAG Plan Editor
+
+ - The DAG plan editor has the following nodes
+   * DataSourceNode - this references an *existing* DataSource entity of the Project
+   * GraphNode - this *creates and manages* a Graph entity of the Project
+   * TransformNode - changes a Graph. Input is a GraphNode, output is a GraphNode. The configuration for the TransformNode is a list of rules that are applied in order (example: invert_graph, max_partition_width:2, max_partition_depth:3, node_label_max_length:4, edge_label_max_length:4)
+   * MergeNode - merges DataSourceNodes and/or GraphNodes. The output is a new GraphNode. The configuration for MergeNode are the merge rules (default: overwrite existing nodes/edges/layers with same ID)
+   * OutputNode - this triggers a specific export or visualisation (example: GraphvizDOT, CSV), input is a GraphNode
+ - The DAG Plan editor has a toolbar on the top. This toolbar has draggable icons for each of the node types that can be dropped on the canvas as unconfigured nodes. Unconfigured nodes are highlighted in orange. Clicking the cog icon on an uncofigured node opens the configuration dialog, which is different for each node. A DataSource node allows you to select an existing DataSource. A TransformNode allows you to create a list of rules, each of which has their own configuration
+
 ### Artefacts
 
  - The entire project (minus desktop) and all its functionality is distributed as a single binary

@@ -47,7 +47,7 @@ import { UserPresenceIndicator } from '../../collaboration/UserPresenceIndicator
 import { CollaborativeCursors } from '../../collaboration/CollaborativeCursors'
 
 // Import dialogs
-import { NodeConfigDialog } from './dialogs/NodeConfigDialog'
+import { NodeConfigDialog } from './NodeConfigDialog'
 
 // Import extracted components and hooks
 import { ControlPanel } from './components/ControlPanel'
@@ -925,6 +925,7 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
         nodeType={configNodeType}
         config={configNodeConfig}
         metadata={configNodeMetadata}
+        projectId={projectId}
         onSave={handleNodeConfigSave}
       />
     </Stack>
