@@ -29,7 +29,10 @@ static USER_COUNTER: OnceLock<std::sync::Mutex<u32>> = OnceLock::new();
 
 fn get_next_counter() -> u32 {
     let counter = USER_COUNTER.get_or_init(|| std::sync::Mutex::new(1));
-    let mut count = counter.lock().unwrap();
+    let mut count = counter.lock().unwrap_or_else(|poisoned| {
+        // If the mutex is poisoned, we recover by using the inner value
+        poisoned.into_inner()
+    });
     let result = *count;
     *count += 1;
     result

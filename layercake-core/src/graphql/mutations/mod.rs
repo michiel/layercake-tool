@@ -229,37 +229,20 @@ impl Mutation {
     async fn update_plan_dag(&self, ctx: &Context<'_>, project_id: i32, plan_dag: PlanDagInput) -> Result<PlanDagResponse> {
         let context = ctx.data::<GraphQLContext>()?;
 
-        // Find or create the plan for this project
-        let plan = plans::Entity::find()
-            .filter(plans::Column::ProjectId.eq(project_id))
+        // Verify project exists
+        let _project = projects::Entity::find_by_id(project_id)
             .one(&context.db)
-            .await?;
+            .await?
+            .ok_or_else(|| Error::new("Project not found"))?;
 
-        let plan = match plan {
-            Some(p) => p,
-            None => {
-                // Create a new plan if none exists
-                let new_plan = plans::ActiveModel {
-                    project_id: Set(project_id),
-                    name: Set(plan_dag.metadata.name.clone().unwrap_or_else(|| "Plan DAG".to_string())),
-                    yaml_content: Set("".to_string()), // Empty YAML for now
-                    dependencies: Set(None),
-                    status: Set("active".to_string()),
-                    plan_dag_json: Set(Some(serde_json::to_string(&plan_dag.metadata)?)),
-                    ..Default::default()
-                };
-                new_plan.insert(&context.db).await?
-            }
-        };
-
-        // Clear existing Plan DAG nodes and edges
+        // Clear existing Plan DAG nodes and edges for this project
         plan_dag_nodes::Entity::delete_many()
-            .filter(plan_dag_nodes::Column::PlanId.eq(plan.id))
+            .filter(plan_dag_nodes::Column::PlanId.eq(project_id))
             .exec(&context.db)
             .await?;
 
         plan_dag_edges::Entity::delete_many()
-            .filter(plan_dag_edges::Column::PlanId.eq(plan.id))
+            .filter(plan_dag_edges::Column::PlanId.eq(project_id))
             .exec(&context.db)
             .await?;
 
@@ -278,7 +261,7 @@ impl Mutation {
 
             let dag_node = plan_dag_nodes::ActiveModel {
                 id: Set(node.id.clone()),
-                plan_id: Set(plan.id),
+                plan_id: Set(project_id), // Use project_id directly
                 node_type: Set(node_type_str.to_string()),
                 position_x: Set(node.position.x),
                 position_y: Set(node.position.y),
@@ -297,7 +280,7 @@ impl Mutation {
 
             let dag_edge = plan_dag_edges::ActiveModel {
                 id: Set(edge.id.clone()),
-                plan_id: Set(plan.id),
+                plan_id: Set(project_id), // Use project_id directly
                 source_node_id: Set(edge.source.clone()),
                 target_node_id: Set(edge.target.clone()),
                 metadata_json: Set(metadata_json),
@@ -308,20 +291,14 @@ impl Mutation {
             dag_edge.insert(&context.db).await?;
         }
 
-        // Update plan with new metadata
-        let mut plan_active: plans::ActiveModel = plan.into();
-        plan_active.plan_dag_json = Set(Some(serde_json::to_string(&plan_dag.metadata)?));
-        plan_active.updated_at = Set(Utc::now());
-        let updated_plan = plan_active.update(&context.db).await?;
-
         // Return the updated Plan DAG
         let dag_nodes = plan_dag_nodes::Entity::find()
-            .filter(plan_dag_nodes::Column::PlanId.eq(updated_plan.id))
+            .filter(plan_dag_nodes::Column::PlanId.eq(project_id))
             .all(&context.db)
             .await?;
 
         let dag_edges = plan_dag_edges::Entity::find()
-            .filter(plan_dag_edges::Column::PlanId.eq(updated_plan.id))
+            .filter(plan_dag_edges::Column::PlanId.eq(project_id))
             .all(&context.db)
             .await?;
 
@@ -344,12 +321,11 @@ impl Mutation {
     async fn add_plan_dag_node(&self, ctx: &Context<'_>, project_id: i32, node: PlanDagNodeInput) -> Result<NodeResponse> {
         let context = ctx.data::<GraphQLContext>()?;
 
-        // Find the plan for this project
-        let plan = plans::Entity::find()
-            .filter(plans::Column::ProjectId.eq(project_id))
+        // Verify project exists
+        let _project = projects::Entity::find_by_id(project_id)
             .one(&context.db)
             .await?
-            .ok_or_else(|| Error::new("Plan not found for project"))?;
+            .ok_or_else(|| Error::new("Project not found"))?;
 
         let node_type_str = match node.node_type {
             crate::graphql::types::PlanDagNodeType::DataSource => "DataSourceNode",
@@ -364,7 +340,7 @@ impl Mutation {
 
         let dag_node = plan_dag_nodes::ActiveModel {
             id: Set(node.id.clone()),
-            plan_id: Set(plan.id),
+            plan_id: Set(project_id), // Use project_id directly as plan_id for now
             node_type: Set(node_type_str.to_string()),
             position_x: Set(node.position.x),
             position_y: Set(node.position.y),

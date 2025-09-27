@@ -402,7 +402,8 @@ impl DataSourceService {
             return Err(anyhow!("JSON must be an object"));
         }
 
-        let obj = graph_data.as_object().unwrap();
+        let obj = graph_data.as_object()
+            .ok_or_else(|| anyhow!("JSON data is not a valid object"))?;
 
         // Ensure required fields exist
         if !obj.contains_key("nodes") || !obj.contains_key("edges") || !obj.contains_key("layers") {

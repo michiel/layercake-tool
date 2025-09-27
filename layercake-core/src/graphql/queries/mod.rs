@@ -4,6 +4,7 @@ use sea_orm::{EntityTrait, ColumnTrait, QueryFilter};
 use crate::database::entities::{projects, plans, nodes, edges, layers, plan_dag_nodes, plan_dag_edges, users, user_sessions, project_collaborators, user_presence, data_sources};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::{Project, Plan, Node, Edge, Layer, PlanDag, PlanDagNode, PlanDagEdge, PlanDagMetadata, ValidationResult, PlanDagInput, User, UserSession, ProjectCollaborator, UserPresence, DataSource, DownloadUrl};
+use crate::graphql::types::plan_dag::DataSourceReference;
 
 pub struct Query;
 
@@ -110,26 +111,21 @@ impl Query {
     async fn get_plan_dag(&self, ctx: &Context<'_>, project_id: i32) -> Result<Option<PlanDag>> {
         let context = ctx.data::<GraphQLContext>()?;
 
-        // First, find the plan for this project (assuming one plan per project for now)
-        let plan = plans::Entity::find()
-            .filter(plans::Column::ProjectId.eq(project_id))
+        // Verify project exists
+        let project = projects::Entity::find_by_id(project_id)
             .one(&context.db)
-            .await?;
+            .await?
+            .ok_or_else(|| Error::new("Project not found"))?;
 
-        let plan = match plan {
-            Some(p) => p,
-            None => return Ok(None),
-        };
-
-        // Get Plan DAG nodes for this plan
+        // Get Plan DAG nodes for this project
         let dag_nodes = plan_dag_nodes::Entity::find()
-            .filter(plan_dag_nodes::Column::PlanId.eq(plan.id))
+            .filter(plan_dag_nodes::Column::PlanId.eq(project_id))
             .all(&context.db)
             .await?;
 
-        // Get Plan DAG edges for this plan
+        // Get Plan DAG edges for this project
         let dag_edges = plan_dag_edges::Entity::find()
-            .filter(plan_dag_edges::Column::PlanId.eq(plan.id))
+            .filter(plan_dag_edges::Column::PlanId.eq(project_id))
             .all(&context.db)
             .await?;
 
@@ -137,26 +133,14 @@ impl Query {
         let nodes: Vec<PlanDagNode> = dag_nodes.into_iter().map(PlanDagNode::from).collect();
         let edges: Vec<PlanDagEdge> = dag_edges.into_iter().map(PlanDagEdge::from).collect();
 
-        // Parse Plan DAG metadata from plan_dag_json field or create default
-        let metadata = if let Some(json_str) = &plan.plan_dag_json {
-            serde_json::from_str::<PlanDagMetadata>(json_str)
-                .unwrap_or_else(|_| PlanDagMetadata {
-                    version: "1.0".to_string(),
-                    name: Some(plan.name.clone()),
-                    description: None,
-                    created: Some(plan.created_at.to_rfc3339()),
-                    last_modified: Some(plan.updated_at.to_rfc3339()),
-                    author: None,
-                })
-        } else {
-            PlanDagMetadata {
-                version: "1.0".to_string(),
-                name: Some(plan.name.clone()),
-                description: None,
-                created: Some(plan.created_at.to_rfc3339()),
-                last_modified: Some(plan.updated_at.to_rfc3339()),
-                author: None,
-            }
+        // Create default metadata using project information
+        let metadata = PlanDagMetadata {
+            version: "1.0".to_string(),
+            name: Some(format!("{} Plan DAG", project.name)),
+            description: project.description.clone(),
+            created: Some(project.created_at.to_rfc3339()),
+            last_modified: Some(project.updated_at.to_rfc3339()),
+            author: None,
         };
 
         Ok(Some(PlanDag {
@@ -395,6 +379,17 @@ impl Query {
             .await?;
 
         Ok(data_sources_list.into_iter().map(DataSource::from).collect())
+    }
+
+    /// Get available DataSources for selection in DAG editor
+    async fn available_data_sources(&self, ctx: &Context<'_>, project_id: i32) -> Result<Vec<DataSourceReference>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let data_sources_list = data_sources::Entity::find()
+            .filter(data_sources::Column::ProjectId.eq(project_id))
+            .all(&context.db)
+            .await?;
+
+        Ok(data_sources_list.into_iter().map(DataSourceReference::from).collect())
     }
 
     /// Generate download URL for raw DataSource file

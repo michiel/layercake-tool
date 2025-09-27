@@ -2,7 +2,7 @@ use async_graphql::*;
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 
-use crate::database::entities::{plan_dag_nodes, plan_dag_edges};
+use crate::database::entities::{plan_dag_nodes, plan_dag_edges, data_sources};
 
 // Position for ReactFlow nodes
 #[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
@@ -74,6 +74,28 @@ pub enum InputDataType {
     Nodes,
     Edges,
     Layers,
+}
+
+// Data Source Reference for dropdown selection
+#[derive(SimpleObject, Clone, Debug, Serialize, Deserialize)]
+pub struct DataSourceReference {
+    pub id: i32,
+    pub name: String,
+    pub description: Option<String>,
+    pub data_type: String,
+    pub created_at: DateTime<Utc>,
+}
+
+impl From<data_sources::Model> for DataSourceReference {
+    fn from(model: data_sources::Model) -> Self {
+        Self {
+            id: model.id,
+            name: model.name,
+            description: model.description,
+            data_type: model.data_type,
+            created_at: model.created_at,
+        }
+    }
 }
 
 // Graph Node Configuration

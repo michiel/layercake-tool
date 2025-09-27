@@ -64,7 +64,8 @@ impl ValidationService {
         }
 
         // Node IDs should be alphanumeric with underscores
-        let regex = Regex::new(r"^[a-zA-Z0-9_]+$").unwrap();
+        let regex = Regex::new(r"^[a-zA-Z0-9_]+$")
+            .map_err(|e| anyhow!("Failed to compile node ID regex: {}", e))?;
         if !regex.is_match(trimmed) {
             return Err(anyhow!("Node ID can only contain letters, numbers, and underscores"));
         }
@@ -159,7 +160,8 @@ impl ValidationService {
         }
 
         // Layer names should be simple identifiers
-        let regex = Regex::new(r"^[a-zA-Z0-9_\-\s]+$").unwrap();
+        let regex = Regex::new(r"^[a-zA-Z0-9_\-\s]+$")
+            .map_err(|e| anyhow!("Failed to compile display name regex: {}", e))?;
         if !regex.is_match(trimmed) {
             return Err(anyhow!("Layer name can only contain letters, numbers, spaces, underscores, and hyphens"));
         }
@@ -176,7 +178,8 @@ impl ValidationService {
         }
 
         // Must be valid hex color
-        let regex = Regex::new(r"^#[0-9A-Fa-f]{6}$").unwrap();
+        let regex = Regex::new(r"^#[0-9A-Fa-f]{6}$")
+            .map_err(|e| anyhow!("Failed to compile color regex: {}", e))?;
         if !regex.is_match(trimmed) {
             return Err(anyhow!("Color must be a valid hex code (e.g., #FF0000)"));
         }

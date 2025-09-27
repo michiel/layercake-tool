@@ -7,7 +7,7 @@ use axum::{
 use sea_orm::DatabaseConnection;
 use tower::ServiceBuilder;
 use tower_http::cors::{Any, CorsLayer};
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 
 #[cfg(feature = "graphql")]
 use std::sync::Arc;
@@ -60,7 +60,8 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
 
     let cors = match cors_origin {
         Some(origin) => CorsLayer::new()
-            .allow_origin(origin.parse::<axum::http::HeaderValue>().unwrap())
+            .allow_origin(origin.parse::<axum::http::HeaderValue>()
+                .map_err(|e| anyhow!("Invalid CORS origin: {}", e))?)
             .allow_methods(Any)
             .allow_headers(Any),
         None => CorsLayer::new()
@@ -388,9 +389,16 @@ where
     // Set additional headers for Claude Desktop compatibility
     let mut response = sse.into_response();
     let headers = response.headers_mut();
-    headers.insert("Cache-Control", "no-cache".parse().unwrap());
-    headers.insert("Connection", "keep-alive".parse().unwrap());
-    headers.insert("Access-Control-Allow-Origin", "*".parse().unwrap());
+    // These are static strings that should always parse correctly
+    if let Ok(cache_control) = "no-cache".parse() {
+        headers.insert("Cache-Control", cache_control);
+    }
+    if let Ok(connection) = "keep-alive".parse() {
+        headers.insert("Connection", connection);
+    }
+    if let Ok(access_control) = "*".parse() {
+        headers.insert("Access-Control-Allow-Origin", access_control);
+    }
     
     response
 }
