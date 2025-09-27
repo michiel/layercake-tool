@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useSubscription } from '@apollo/client/react'
-import { useCallback, useMemo, useRef } from 'react'
+import { useCallback, useMemo } from 'react'
 import {
   GET_PLAN_DAG,
   VALIDATE_PLAN_DAG,
@@ -12,7 +12,6 @@ import {
   MOVE_PLAN_DAG_NODE,
   PLAN_DAG_CHANGED_SUBSCRIPTION,
   USER_PRESENCE_SUBSCRIPTION,
-  UPDATE_CURSOR_POSITION,
   JOIN_PROJECT_COLLABORATION,
   LEAVE_PROJECT_COLLABORATION,
   type PlanDagQueryVariables,
@@ -499,42 +498,17 @@ export const useUserPresence = (projectId: number, _currentUserId?: string) => {
 }
 
 // Hook for collaboration features
+// DEPRECATED: Use useCollaborationV2 from ./useCollaborationV2 instead
 export const useCollaboration = (projectId: number) => {
-  const [updateCursorPosition] = useMutation(UPDATE_CURSOR_POSITION)
+  console.warn('useCollaboration is deprecated. Use useCollaborationV2 instead for WebSocket support.');
+
   const [joinCollaboration] = useMutation(JOIN_PROJECT_COLLABORATION)
   const [leaveCollaboration] = useMutation(LEAVE_PROJECT_COLLABORATION)
 
-  // Throttle cursor position updates to reduce network traffic
-  const lastUpdateRef = useRef<number>(0)
-  const updateThrottleMs = 100 // Update at most every 100ms (10 FPS)
-
-  const broadcastCursorPosition = useCallback((positionX: number, positionY: number, selectedNodeId?: string) => {
-    // Validate that positions are valid numbers before sending
-    if (typeof positionX !== 'number' || typeof positionY !== 'number' ||
-        isNaN(positionX) || isNaN(positionY) ||
-        !isFinite(positionX) || !isFinite(positionY)) {
-      console.warn('Invalid cursor position values:', { positionX, positionY })
-      return
-    }
-
-    // Throttle updates to reduce network traffic
-    const now = Date.now()
-    if (now - lastUpdateRef.current < updateThrottleMs) {
-      return
-    }
-    lastUpdateRef.current = now
-
-    updateCursorPosition({
-      variables: {
-        projectId,
-        positionX,
-        positionY,
-        selectedNodeId
-      }
-    }).catch(err => {
-      console.warn('Failed to broadcast cursor position:', err)
-    })
-  }, [projectId, updateCursorPosition])
+  // DEPRECATED: Cursor position updates disabled - use useCollaborationV2 for WebSocket support
+  const broadcastCursorPosition = useCallback((_positionX: number, _positionY: number, _selectedNodeId?: string) => {
+    console.warn('broadcastCursorPosition is deprecated and disabled. Use useCollaborationV2 for WebSocket cursor updates.');
+  }, [])
 
   const joinProject = useCallback(() => {
     return joinCollaboration({

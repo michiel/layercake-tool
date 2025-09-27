@@ -1,7 +1,6 @@
 import { useCallback, useRef, useState, useMemo } from 'react';
 import { useMutation } from '@apollo/client/react';
 import {
-  UPDATE_CURSOR_POSITION,
   JOIN_PROJECT_COLLABORATION,
   LEAVE_PROJECT_COLLABORATION,
 } from '../graphql/plan-dag';
@@ -41,16 +40,12 @@ export const useCollaborationV2 = (options: UseCollaborationV2Options) => {
     enabled: enableWebSocket
   });
 
-  // GraphQL fallback mutations
-  const [updateCursorPositionGraphQL] = useMutation(UPDATE_CURSOR_POSITION);
+  // GraphQL fallback mutations (cursor position mutation removed - using WebSocket only)
   const [joinCollaborationGraphQL] = useMutation(JOIN_PROJECT_COLLABORATION);
   const [leaveCollaborationGraphQL] = useMutation(LEAVE_PROJECT_COLLABORATION);
 
   // Local state for fallback mode
   const [isJoined, setIsJoined] = useState(false);
-
-  // Throttling for GraphQL fallback
-  const lastUpdateRef = useRef(0);
 
   // Determine if we should use WebSocket or GraphQL fallback
   const useWebSocketMode = useMemo(() => {
@@ -104,33 +99,15 @@ export const useCollaborationV2 = (options: UseCollaborationV2Options) => {
         selectedNodeId
       });
     } else {
-      // Fallback to GraphQL with throttling
-      const now = Date.now();
-      const updateThrottleMs = 100;
-
-      if (now - lastUpdateRef.current < updateThrottleMs) {
-        return;
-      }
-
-      lastUpdateRef.current = now;
-
-      updateCursorPositionGraphQL({
-        variables: {
-          projectId,
-          positionX,
-          positionY,
-          selectedNodeId
-        }
-      }).catch(err => {
-        console.warn('Failed to broadcast cursor position via GraphQL:', err);
-      });
+      // WebSocket not available - cursor position updates disabled
+      // NOTE: GraphQL cursor position mutations have been removed as part of WebSocket migration
+      console.debug('Cursor position update skipped - WebSocket not connected and GraphQL fallback removed');
     }
   }, [
     useWebSocketMode,
     webSocket,
     documentId,
     documentType,
-    updateCursorPositionGraphQL,
     projectId
   ]);
 

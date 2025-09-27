@@ -271,11 +271,6 @@ export const USER_PRESENCE_SUBSCRIPTION = gql`
 `
 
 // Collaboration Mutations
-export const UPDATE_CURSOR_POSITION = gql`
-  mutation UpdateCursorPosition($projectId: Int!, $positionX: Float!, $positionY: Float!, $selectedNodeId: String) {
-    updateCursorPosition(projectId: $projectId, positionX: $positionX, positionY: $positionY, selectedNodeId: $selectedNodeId)
-  }
-`
 
 export const JOIN_PROJECT_COLLABORATION = gql`
   mutation JoinProjectCollaboration($projectId: Int!) {

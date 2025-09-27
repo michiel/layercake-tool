@@ -914,51 +914,8 @@ impl Mutation {
         Ok(UserPresence::from(updated))
     }
 
-    /// Update cursor position and broadcast to collaborators
-    async fn update_cursor_position(
-        &self,
-        ctx: &Context<'_>,
-        project_id: i32,
-        position_x: f64,
-        position_y: f64,
-        selected_node_id: Option<String>,
-    ) -> Result<bool> {
-        let context = ctx.data::<GraphQLContext>()?;
-
-        // For now, we'll broadcast the cursor event without storing it in the database
-        // In a full implementation, you might want to store recent cursor positions
-
-        // TODO: Extract from authenticated user context when authentication is implemented
-        let (user_id, user_name, avatar_color) = {
-            ("demo_user".to_string(), "Demo User".to_string(), "#3B82F6".to_string())
-        };
-
-        let plan_id = format!("project_{}", project_id);
-
-        // Create cursor event data
-        let cursor_data = crate::graphql::subscriptions::create_cursor_event_data(
-            user_id.clone(),
-            user_name,
-            avatar_color,
-            position_x,
-            position_y,
-            selected_node_id,
-        );
-
-        // Create collaboration event
-        let event = crate::graphql::subscriptions::create_collaboration_event(
-            plan_id,
-            user_id,
-            crate::graphql::subscriptions::CollaborationEventType::CursorMoved,
-            cursor_data,
-        );
-
-        // Broadcast the event
-        match crate::graphql::subscriptions::publish_collaboration_event(event).await {
-            Ok(()) => Ok(true),
-            Err(_) => Ok(false), // Don't fail the mutation if broadcasting fails
-        }
-    }
+    // REMOVED: update_cursor_position mutation - replaced by WebSocket implementation
+    // Cursor position updates are now handled via WebSocket at /ws/collaboration for better performance
 
     /// Join a project for collaboration
     async fn join_project_collaboration(
