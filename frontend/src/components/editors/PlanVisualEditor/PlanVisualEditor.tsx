@@ -54,8 +54,11 @@ import { NodeConfigDialog } from './NodeConfigDialog'
 // Import extracted components and hooks
 import { ControlPanel } from './components/ControlPanel'
 import { NodeToolbar } from './components/NodeToolbar'
+import { AdvancedToolbar } from './components/AdvancedToolbar'
+import { ContextMenu } from './components/ContextMenu'
 // import { CollaborationManager } from './components/CollaborationManager'
 import { useUpdateManagement } from './hooks/useUpdateManagement'
+import { useAdvancedOperations } from './hooks/useAdvancedOperations'
 import { generateNodeId, getDefaultNodeConfig, getDefaultNodeMetadata } from './utils/nodeDefaults'
 
 // Import ReactFlow styles
@@ -79,67 +82,6 @@ const NODE_TYPES = {
 }
 
 
-// Static mock Plan DAG for frontend-only development - prevents recreation issues
-const staticMockPlanDag: PlanDag = {
-  version: "1.0",
-  nodes: [
-    {
-      id: 'input_1',
-      nodeType: PlanDagNodeType.DATA_SOURCE,
-      position: { x: 100, y: 100 },
-      metadata: { label: 'CSV Import', description: 'Import nodes from CSV file' },
-      config: {
-        inputType: 'CSVNodesFromFile',
-        source: 'import/nodes.csv',
-        dataType: 'Nodes',
-        outputGraphRef: 'graph_main'
-      }
-    },
-    {
-      id: 'transform_1',
-      nodeType: PlanDagNodeType.TRANSFORM,
-      position: { x: 300, y: 100 },
-      metadata: { label: 'Filter Nodes', description: 'Apply node filtering' },
-      config: {
-        inputGraphRef: 'graph_main',
-        outputGraphRef: 'graph_filtered',
-        transformType: 'FilterNodes',
-        transformConfig: { nodeFilter: 'type = "important"' }
-      }
-    },
-    {
-      id: 'output_1',
-      nodeType: PlanDagNodeType.OUTPUT,
-      position: { x: 500, y: 100 },
-      metadata: { label: 'Export DOT', description: 'Generate Graphviz output' },
-      config: {
-        sourceGraphRef: 'graph_filtered',
-        renderTarget: 'DOT',
-        outputPath: 'output/result.dot',
-        renderConfig: { containNodes: true, orientation: 'TB' }
-      }
-    }
-  ],
-  edges: [
-    {
-      id: 'edge_1',
-      source: 'input_1',
-      target: 'transform_1',
-      metadata: { label: 'Data', dataType: 'GraphData' }
-    },
-    {
-      id: 'edge_2',
-      source: 'transform_1',
-      target: 'output_1',
-      metadata: { label: 'Filtered', dataType: 'GraphData' }
-    }
-  ],
-  metadata: {
-    version: "1.0",
-    name: "Demo Plan DAG",
-    description: "Frontend development demonstration"
-  }
-}
 
 // Convert Plan DAG to ReactFlow format
 const convertPlanDagToReactFlow = (
@@ -239,7 +181,8 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
   const { validate, validationResult, loading: validationLoading } = usePlanDagValidation()
 
   // Phase 3: Advanced collaboration hooks integration
-  const currentUserId = 'user-123' // Mock current user for frontend-only development
+  // TODO: Implement proper authentication and get current user ID
+  const currentUserId: string | undefined = undefined
   const { users } = useUserPresence(projectId, currentUserId)
   const { broadcastCursorPosition, joinProject, leaveProject } = useCollaboration(projectId)
 
@@ -343,13 +286,9 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     }
   ]
 
-  // Feature flag for dynamic data - can be controlled via environment or debug flag
-  const useDynamicData = import.meta.env.VITE_USE_DYNAMIC_DATA === 'true' || false
-
-
   // Stable reference pattern - only update when content actually changes
   const previousPlanDagRef = useRef<PlanDag | null>(null)
-  const planDagStableRef = useRef<PlanDag>(staticMockPlanDag)
+  const planDagStableRef = useRef<PlanDag | null>(null)
 
 
   // Phase 3: Conflict detection and resolution
@@ -471,33 +410,28 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
   }, [])
 
   // Safe data selection with controlled updates and proper fallback
-  const activePlanDag: PlanDag = useMemo(() => {
-    let currentData: PlanDag
+  const activePlanDag: PlanDag | null = useMemo(() => {
+    if (!planDag) {
+      console.log('No GraphQL data available - showing empty state')
+      return null
+    }
 
-    if (!useDynamicData) {
-      console.log('Using static mock data (dynamic data disabled)')
-      currentData = staticMockPlanDag
-    } else if (!planDag) {
-      console.log('Using static mock data (no GraphQL data available)')
-      currentData = staticMockPlanDag
-    } else {
-      console.log('Processing dynamic GraphQL data with controlled updates')
-      currentData = {
-        ...planDag,
-        nodes: planDag.nodes.map((node: any) => ({
-          ...node,
-          nodeType: (typeof node.nodeType === 'string' &&
-            (Object.values(PlanDagNodeType) as string[]).includes(node.nodeType)) ?
-            node.nodeType as PlanDagNodeType : PlanDagNodeType.DATA_SOURCE
-        })),
-        edges: planDag.edges.map((edge: any) => ({
-          ...edge,
-          metadata: {
-            ...edge.metadata,
-            dataType: edge.metadata?.dataType || 'GraphData'
-          }
-        }))
-      }
+    console.log('Processing live GraphQL data with controlled updates')
+    const currentData: PlanDag = {
+      ...planDag,
+      nodes: planDag.nodes.map((node: any) => ({
+        ...node,
+        nodeType: (typeof node.nodeType === 'string' &&
+          (Object.values(PlanDagNodeType) as string[]).includes(node.nodeType)) ?
+          node.nodeType as PlanDagNodeType : PlanDagNodeType.DATA_SOURCE
+      })),
+      edges: planDag.edges.map((edge: any) => ({
+        ...edge,
+        metadata: {
+          ...edge.metadata,
+          dataType: edge.metadata?.dataType || 'GraphData'
+        }
+      }))
     }
 
     // Use controlled update mechanism for data changes
@@ -514,20 +448,15 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
       }
     }
 
-    // Apply throttling to prevent too frequent updates
-    if (useDynamicData && planDag) {
-      throttledUpdate(updateStableReference)
-    } else {
-      // For static data, update immediately without throttling
-      updateStableReference()
-    }
+    // Apply throttling to prevent too frequent updates for live data
+    throttledUpdate(updateStableReference)
 
     return planDagStableRef.current
-  }, [useDynamicData, planDag, planDagEqual, throttledUpdate, scheduleValidation])
+  }, [planDag, planDagEqual, throttledUpdate, scheduleValidation])
 
   // Handle validation trigger
   const handleValidate = useCallback(() => {
-    if (validate) {
+    if (validate && activePlanDag) {
       validate(activePlanDag)
     }
   }, [validate, activePlanDag])
@@ -545,11 +474,29 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
 
   // Use controlled data with stable conversion
   const reactFlowData = useMemo(() => {
+    if (!activePlanDag) {
+      return { nodes: [], edges: [] }
+    }
     return convertPlanDagToReactFlow(activePlanDag, stableHandleEdit, stableHandleDelete)
   }, [activePlanDag, stableHandleEdit, stableHandleDelete])
 
   const [nodes, setNodes, onNodesChange] = useNodesState(reactFlowData.nodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(reactFlowData.edges)
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{
+    opened: boolean;
+    position: { x: number; y: number };
+  }>({ opened: false, position: { x: 0, y: 0 } })
+
+  // Advanced operations hook
+  const advancedOps = useAdvancedOperations({
+    nodes,
+    edges,
+    setNodes,
+    setEdges,
+    readonly,
+  })
 
   // Create handler functions that use the initialized state setters
   const handleNodeEdit = useCallback((nodeId: string) => {
@@ -840,11 +787,42 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
       setNodes((nds) => nds.concat(newNode));
       setIsDirty(true);
 
-      // TODO: The backend sync will be handled when the user saves or the component unmounts
-      // For now, we just add to the local ReactFlow state
+      // Persist to database via GraphQL mutation
+      const planDagNode: Partial<PlanDagNode> = {
+        id: nodeId,
+        nodeType,
+        position,
+        metadata,
+        config: JSON.stringify(config)
+      };
+
+      mutations.addNode(planDagNode).catch(err => {
+        console.error('Failed to add node to database:', err);
+        // TODO: Show user-friendly error message
+      });
     },
-    [screenToFlowPosition, setNodes, setIsDirty, handleNodeEdit, handleNodeDelete]
+    [screenToFlowPosition, setNodes, setIsDirty, handleNodeEdit, handleNodeDelete, mutations]
   );
+
+  // Context menu handlers
+  const handleContextMenu = useCallback((event: React.MouseEvent) => {
+    event.preventDefault();
+    setContextMenu({
+      opened: true,
+      position: { x: event.clientX, y: event.clientY }
+    });
+  }, []);
+
+  const handleCloseContextMenu = useCallback(() => {
+    setContextMenu(prev => ({ ...prev, opened: false }));
+  }, []);
+
+  // Close context menu when clicking elsewhere
+  const handleCanvasClick = useCallback(() => {
+    if (contextMenu.opened) {
+      handleCloseContextMenu();
+    }
+  }, [contextMenu.opened, handleCloseContextMenu]);
 
   // Use stable nodeTypes reference to prevent ReactFlow warnings
   const nodeTypes = NODE_TYPES
@@ -934,9 +912,14 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
 
   if (!activePlanDag) {
     return (
-      <Alert icon={<IconAlertCircle size="1rem" />} title="No Plan DAG found" color="yellow">
-        This project doesn't have a Plan DAG configured yet.
-      </Alert>
+      <Stack align="center" justify="center" h="100%" gap="md">
+        <Alert icon={<IconAlertCircle size="1rem" />} title="No Plan DAG found" color="blue" w="100%" maw="500px">
+          This project doesn't have a Plan DAG configured yet. Create one by adding nodes to the canvas using the toolbar.
+        </Alert>
+        <Text size="sm" c="dimmed" ta="center">
+          Plan DAGs define data transformation workflows through connected nodes and edges.
+        </Text>
+      </Stack>
     )
   }
 
@@ -974,11 +957,38 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
       {/* Node Toolbar for drag-and-drop */}
       <NodeToolbar onNodeDragStart={handleNodeDragStart} readonly={readonly} />
 
+      {/* Advanced Operations Toolbar */}
+      <AdvancedToolbar
+        selectedNodeCount={advancedOps.selectedNodes.length}
+        hasClipboardData={advancedOps.hasClipboardData}
+        clipboardInfo={advancedOps.clipboardInfo}
+        canAlign={advancedOps.canAlign}
+        canDistribute={advancedOps.canDistribute}
+        readonly={readonly}
+        onDuplicate={advancedOps.handleDuplicate}
+        onCopy={advancedOps.handleCopy}
+        onPaste={advancedOps.handlePaste}
+        onCut={advancedOps.handleCut}
+        onDelete={advancedOps.handleDelete}
+        onSelectAll={advancedOps.handleSelectAll}
+        onDeselectAll={advancedOps.handleDeselectAll}
+        onAlignLeft={advancedOps.handleAlignLeft}
+        onAlignRight={advancedOps.handleAlignRight}
+        onAlignTop={advancedOps.handleAlignTop}
+        onAlignBottom={advancedOps.handleAlignBottom}
+        onAlignCenterHorizontal={() => advancedOps.handleAlignCenter('horizontal')}
+        onAlignCenterVertical={() => advancedOps.handleAlignCenter('vertical')}
+        onDistributeHorizontal={() => advancedOps.handleDistribute('horizontal')}
+        onDistributeVertical={() => advancedOps.handleDistribute('vertical')}
+      />
+
       <div
         style={{ flex: 1, position: 'relative' }}
         onMouseMove={handleMouseMove}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
+        onContextMenu={handleContextMenu}
+        onClick={handleCanvasClick}
       >
         <ReactFlow
           nodes={nodes}
@@ -1014,8 +1024,37 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
             onlineUsers={onlineUsers}
           />
 
+          {/* Empty state overlay when no nodes exist */}
+          {nodes.length === 0 && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                zIndex: 10,
+                pointerEvents: 'none',
+                textAlign: 'center',
+              }}
+            >
+              <Stack align="center" gap="md" p="xl">
+                <Alert
+                  icon={<IconAlertCircle size="1rem" />}
+                  title="Start building your Plan DAG"
+                  color="blue"
+                  style={{ maxWidth: '400px', pointerEvents: 'auto' }}
+                >
+                  Drag nodes from the toolbar on the left to begin creating your data transformation workflow.
+                </Alert>
+                <Text size="sm" c="dimmed" ta="center" style={{ maxWidth: '350px' }}>
+                  Create connections between nodes to define how data flows through your pipeline.
+                </Text>
+              </Stack>
+            </div>
+          )}
+
           {/* Phase 3: Collaborative cursors for real-time user presence */}
-          <CollaborativeCursors users={onlineUsers} currentUserId={currentUserId} />
+          <CollaborativeCursors users={onlineUsers} currentUserId={currentUserId || undefined} />
 
           {/* Collaboration features integration complete */}
         </ReactFlow>
@@ -1031,6 +1070,33 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         metadata={configNodeMetadata}
         projectId={projectId}
         onSave={handleNodeConfigSave}
+      />
+
+      {/* Context Menu for advanced operations */}
+      <ContextMenu
+        opened={contextMenu.opened}
+        onClose={handleCloseContextMenu}
+        position={contextMenu.position}
+        selectedNodeCount={advancedOps.selectedNodes.length}
+        hasClipboardData={advancedOps.hasClipboardData}
+        canAlign={advancedOps.canAlign}
+        canDistribute={advancedOps.canDistribute}
+        readonly={readonly}
+        onDuplicate={advancedOps.handleDuplicate}
+        onCopy={advancedOps.handleCopy}
+        onPaste={advancedOps.handlePaste}
+        onCut={advancedOps.handleCut}
+        onDelete={advancedOps.handleDelete}
+        onSelectAll={advancedOps.handleSelectAll}
+        onDeselectAll={advancedOps.handleDeselectAll}
+        onAlignLeft={advancedOps.handleAlignLeft}
+        onAlignRight={advancedOps.handleAlignRight}
+        onAlignTop={advancedOps.handleAlignTop}
+        onAlignBottom={advancedOps.handleAlignBottom}
+        onAlignCenterHorizontal={() => advancedOps.handleAlignCenter('horizontal')}
+        onAlignCenterVertical={() => advancedOps.handleAlignCenter('vertical')}
+        onDistributeHorizontal={() => advancedOps.handleDistribute('horizontal')}
+        onDistributeVertical={() => advancedOps.handleDistribute('vertical')}
       />
     </Stack>
   )

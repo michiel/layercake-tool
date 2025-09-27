@@ -108,6 +108,12 @@ plan:
 
 ## Requirements
 
+### Presence
+
+ - All user presence is tracked and shared on a per-project basis. cursor position is tracked on a per-project-per-document basis. position can be different depending on the document, example: current implementation tracks position data on canvas, it should also be able to track position in (for example) spreadsheet coordinates, or in a 3d rendering of a VR journey
+ - User presence like cursor information is ephemeral data and is communicated between the client and server using a direct, raw websocket connection and NOT via GraphQL mutations
+
+
 ### Frontend
 
 #### DAG Plan Editor

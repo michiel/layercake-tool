@@ -2,6 +2,9 @@ pub mod app;
 pub mod handlers;
 pub mod middleware;
 
+#[cfg(feature = "graphql")]
+pub mod websocket;
+
 use clap::Subcommand;
 
 #[derive(Subcommand, Debug)]
@@ -44,6 +47,7 @@ fn log_routes(port: u16) {
     #[cfg(feature = "graphql")]
     {
         info!("  /graphql                    - GraphQL API & Playground");
+        info!("  /ws/collaboration/:project_id - WebSocket collaboration endpoint");
     }
 
     #[cfg(feature = "mcp")]

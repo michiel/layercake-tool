@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useSubscription } from '@apollo/client/react'
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 import {
   GET_PLAN_DAG,
   VALIDATE_PLAN_DAG,
@@ -504,6 +504,10 @@ export const useCollaboration = (projectId: number) => {
   const [joinCollaboration] = useMutation(JOIN_PROJECT_COLLABORATION)
   const [leaveCollaboration] = useMutation(LEAVE_PROJECT_COLLABORATION)
 
+  // Throttle cursor position updates to reduce network traffic
+  const lastUpdateRef = useRef<number>(0)
+  const updateThrottleMs = 100 // Update at most every 100ms (10 FPS)
+
   const broadcastCursorPosition = useCallback((positionX: number, positionY: number, selectedNodeId?: string) => {
     // Validate that positions are valid numbers before sending
     if (typeof positionX !== 'number' || typeof positionY !== 'number' ||
@@ -512,6 +516,13 @@ export const useCollaboration = (projectId: number) => {
       console.warn('Invalid cursor position values:', { positionX, positionY })
       return
     }
+
+    // Throttle updates to reduce network traffic
+    const now = Date.now()
+    if (now - lastUpdateRef.current < updateThrottleMs) {
+      return
+    }
+    lastUpdateRef.current = now
 
     updateCursorPosition({
       variables: {

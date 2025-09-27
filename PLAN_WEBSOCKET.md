@@ -200,21 +200,21 @@ This allows users to seamlessly switch between different types of documents with
 
 ## Implementation Plan
 
-### Phase 1: Backend WebSocket Infrastructure
+### Phase 1: Backend WebSocket Infrastructure ✅ COMPLETED
 **Duration**: 2-3 days
 
-1. **Create WebSocket Handler Module**
+1. **Create WebSocket Handler Module** ✅
    - File: `layercake-core/src/server/websocket/`
    - Implement WebSocket connection management
    - Handle project-specific session rooms
-   - Add authentication middleware
+   - Add authentication middleware (TODO: JWT validation)
 
-2. **Message Protocol Implementation**
+2. **Message Protocol Implementation** ✅
    - Define message types and serialization
    - Implement message routing and validation
    - Add rate limiting for cursor updates (max 20 updates/second)
 
-3. **Multi-Document Session Management**
+3. **Multi-Document Session Management** ✅
    - Track active users per project in memory-only data structures
    - Store document-specific cursor positions and selections per user
    - Support multiple document types (canvas, spreadsheet, 3D, timeline, code)
@@ -222,8 +222,8 @@ This allows users to seamlessly switch between different types of documents with
    - Implement heartbeat/keepalive mechanism with memory cleanup
    - Data structure: `DashMap<ProjectId, DashMap<UserId, DashMap<DocumentId, DocumentState>>>`
 
-4. **Integration with Axum Server**
-   - Add WebSocket route to existing server
+4. **Integration with Axum Server** ✅
+   - Add WebSocket route to existing server: `/ws/collaboration`
    - Configure CORS for WebSocket connections
    - Add WebSocket endpoint to server startup logs
 

@@ -1,7 +1,7 @@
 use axum::{
     extract::{Json, State, WebSocketUpgrade},
     response::IntoResponse,
-    routing::get,
+    routing::{get, post},
     Router,
 };
 use sea_orm::DatabaseConnection;
@@ -17,6 +17,8 @@ use async_graphql::{Schema, Request, Response as GraphQLResponse};
 use crate::graphql::{GraphQLContext, GraphQLSchema, queries::Query, mutations::Mutation, subscriptions::Subscription};
 #[cfg(feature = "graphql")]
 use crate::services::{ImportService, ExportService, GraphService};
+#[cfg(feature = "graphql")]
+use crate::server::websocket::{SessionManager, websocket_handler};
 
 use super::handlers::health;
 
@@ -26,36 +28,43 @@ pub struct AppState {
     pub db: DatabaseConnection,
     #[cfg(feature = "graphql")]
     pub graphql_schema: GraphQLSchema,
+    #[cfg(feature = "graphql")]
+    pub session_manager: Arc<SessionManager>,
 }
 
 
 pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Result<Router> {
     #[cfg(feature = "graphql")]
-    let graphql_schema = {
+    let (graphql_schema, session_manager) = {
         let import_service = Arc::new(ImportService::new(db.clone()));
         let export_service = Arc::new(ExportService::new(db.clone()));
         let graph_service = Arc::new(GraphService::new(db.clone()));
-        
+        let session_manager = Arc::new(SessionManager::new());
+
         let graphql_context = GraphQLContext::new(
             db.clone(),
             import_service,
             export_service,
             graph_service,
         );
-        
-        Schema::build(
+
+        let schema = Schema::build(
             Query,
             Mutation,
             Subscription,
         )
         .data(graphql_context)
-        .finish()
+        .finish();
+
+        (schema, session_manager)
     };
 
     let state = AppState {
         db: db.clone(),
         #[cfg(feature = "graphql")]
         graphql_schema,
+        #[cfg(feature = "graphql")]
+        session_manager,
     };
 
     let cors = match cors_origin {
@@ -79,7 +88,8 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
     {
         app = app
             .route("/graphql", get(graphql_playground).post(graphql_handler))
-            .route("/graphql/ws", get(graphql_ws_handler));
+            .route("/graphql/ws", get(graphql_ws_handler))
+            .route("/ws/collaboration", get(websocket_handler));
     }
 
     // Add MCP routes if feature is enabled

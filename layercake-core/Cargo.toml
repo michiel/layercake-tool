@@ -34,6 +34,7 @@ graphql = [
     "dep:lazy_static",
     "dep:tokio-tungstenite",
     "dep:futures-util",
+    "dep:dashmap",
 ]
 mcp = [
     "server",
@@ -95,6 +96,9 @@ axum-mcp = { workspace = true, optional = true }
 tokio-tungstenite = { workspace = true, optional = true }
 futures-util = { workspace = true, optional = true }
 url = { workspace = true, optional = true }
+
+# WebSocket collaboration dependencies (optional)
+dashmap = { workspace = true, optional = true }
 
 [dev-dependencies]
 # Test dependencies for E2E tests
