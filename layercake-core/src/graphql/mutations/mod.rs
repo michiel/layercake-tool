@@ -327,6 +327,13 @@ impl Mutation {
             .await?
             .ok_or_else(|| Error::new("Project not found"))?;
 
+        // Find or create a plan for this project
+        let plan = plans::Entity::find()
+            .filter(plans::Column::ProjectId.eq(project_id))
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Plan not found for project"))?;
+
         let node_type_str = match node.node_type {
             crate::graphql::types::PlanDagNodeType::DataSource => "DataSourceNode",
             crate::graphql::types::PlanDagNodeType::Graph => "GraphNode",
@@ -340,7 +347,7 @@ impl Mutation {
 
         let dag_node = plan_dag_nodes::ActiveModel {
             id: Set(node.id.clone()),
-            plan_id: Set(project_id), // Use project_id directly as plan_id for now
+            plan_id: Set(plan.id), // Use the actual plan ID instead of project ID
             node_type: Set(node_type_str.to_string()),
             position_x: Set(node.position.x),
             position_y: Set(node.position.y),
