@@ -147,7 +147,7 @@ export const useAdvancedOperations = ({
       return [...deselectedNodes, ...duplicatedNodes];
     });
 
-    console.log(`Successfully duplicated ${duplicatedNodes.length} node(s)`);
+    // Successfully duplicated nodes
   }, [readonly, selectedNodes, setNodes]);
 
   const handleCopy = useCallback(() => {
@@ -155,7 +155,7 @@ export const useAdvancedOperations = ({
 
     const success = copyToClipboard(selectedNodes, selectedEdges, edges);
     if (success) {
-      console.log(`Copied ${selectedNodes.length} node(s) and ${selectedEdges.length} edge(s) to clipboard`);
+      // Successfully copied to clipboard
     }
   }, [readonly, selectedNodes, selectedEdges, edges]);
 
@@ -164,7 +164,7 @@ export const useAdvancedOperations = ({
 
     const clipboardData = pasteFromClipboard();
     if (!clipboardData) {
-      console.warn('Paste failed: No valid clipboard data available');
+      // Paste failed: No valid clipboard data available
       return;
     }
 
@@ -179,7 +179,7 @@ export const useAdvancedOperations = ({
       return [...deselectedEdges, ...clipboardData.edges];
     });
 
-    console.log(`Pasted ${clipboardData.nodes.length} node(s) and ${clipboardData.edges.length} edge(s) from clipboard`);
+    // Successfully pasted from clipboard
   }, [readonly, setNodes, setEdges]);
 
   const handleCut = useCallback(() => {
@@ -197,7 +197,7 @@ export const useAdvancedOperations = ({
     setNodes(newNodes);
     setEdges(newEdges);
 
-    console.log(`Deleted ${selectedNodeIds.length} node(s) and their connections`);
+    // Successfully deleted nodes and connections
   }, [readonly, selectedNodes, nodes, edges, selectedNodeIds, setNodes, setEdges]);
 
   const handleSelectAll = useCallback(() => {

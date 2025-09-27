@@ -6,10 +6,10 @@ import {
   type ConflictEvent
 } from '../../../../hooks/useCollaborationSubscriptions'
 import { CollaborationEvent } from '../../../../graphql/subscriptions'
-import { useUserPresence, useCollaboration } from '../../../../hooks/usePlanDag'
+import { useCollaborationV2 } from '../../../../hooks/useCollaborationV2'
 import { UserPresenceIndicator } from '../../../collaboration/UserPresenceIndicator'
 import { CollaborativeCursors } from '../../../collaboration/CollaborativeCursors'
-import { UserPresenceData, ConnectionState } from '../../../../types/websocket'
+import { UserPresenceData } from '../../../../types/websocket'
 
 interface CollaborationManagerProps {
   projectId: number
@@ -22,41 +22,24 @@ export const CollaborationManager = ({
   currentUserId,
   children
 }: CollaborationManagerProps) => {
-  // Collaboration hooks
-  const { users: onlineUsersLegacy } = useUserPresence(projectId, currentUserId)
-  const { joinProject, leaveProject } = useCollaboration(projectId)
+  // New WebSocket collaboration hook
+  const collaboration = useCollaborationV2({
+    projectId,
+    documentId: 'plan-dag-canvas',
+    documentType: 'canvas',
+    enableWebSocket: true,
+    userInfo: {
+      id: currentUserId,
+      name: `User ${currentUserId}`,
+      avatarColor: '#3b82f6'
+    }
+  })
+
   const { status: _collaborationStatus, isConnected: _isConnected, hasError: _hasError } = useCollaborationConnection(projectId.toString())
   const { getActiveConflicts } = useConflictDetection(projectId.toString())
 
-  // Convert old UserPresence type to new UserPresenceData type
-  const convertToUserPresenceData = (user: any): UserPresenceData => {
-    const documents: Record<string, any> = {};
-
-    // Create a mock document entry if the user has cursor position
-    if (user.cursorPosition) {
-      documents['plan-dag-canvas'] = {
-        position: {
-          type: 'canvas' as const,
-          x: user.cursorPosition.x,
-          y: user.cursorPosition.y
-        },
-        selectedNodeId: user.selectedNodeId,
-        lastActiveInDocument: user.lastActive
-      };
-    }
-
-    return {
-      userId: user.userId,
-      userName: user.userName,
-      avatarColor: user.avatarColor,
-      isOnline: user.isOnline,
-      lastActive: user.lastActive,
-      documents
-    };
-  };
-
-  // Convert legacy users to new format
-  const onlineUsers: UserPresenceData[] = onlineUsersLegacy.map(convertToUserPresenceData);
+  // Use users directly from the new collaboration hook
+  const onlineUsers: UserPresenceData[] = collaboration.users || []
 
   // Collaboration events state (for future use)
   const [_collaborationEvents, setCollaborationEvents] = useState<CollaborationEvent[]>([])
@@ -69,7 +52,7 @@ export const CollaborationManager = ({
     if (!collaborationEventsRef.current.some(existing => existing.eventId === newEvent.eventId)) {
       setCollaborationEvents(prevEvents => [...prevEvents, newEvent])
       collaborationEventsRef.current = [...collaborationEventsRef.current, newEvent]
-      console.log('New collaboration event received:', newEvent)
+      // Event processed successfully
     }
   }, [])
 
@@ -88,11 +71,11 @@ export const CollaborationManager = ({
 
   // Join project on mount, leave on unmount
   useEffect(() => {
-    joinProject()
+    collaboration.joinProject()
     return () => {
-      leaveProject()
+      collaboration.leaveProject()
     }
-  }, [joinProject, leaveProject])
+  }, [collaboration])
 
   // Collaboration data available through props and component state
   // Future versions could expose this data via React Context if needed
@@ -104,7 +87,7 @@ export const CollaborationManager = ({
       {/* User Presence Indicator */}
       <UserPresenceIndicator
         users={onlineUsers}
-        connectionState={ConnectionState.CONNECTED}
+        connectionState={collaboration.connectionState}
         maxVisible={5}
         size="sm"
       />

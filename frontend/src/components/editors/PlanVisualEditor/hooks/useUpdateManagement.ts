@@ -24,7 +24,6 @@ export const useUpdateManagement = (options: UseUpdateManagementOptions = {}) =>
     const timeSinceLastUpdate = now - lastUpdateTimeRef.current
 
     if (updatesPaused) {
-      console.log('Updates paused, queuing update')
       setPendingUpdates(prev => Math.min(prev + 1, maxPendingUpdates))
       return
     }
@@ -62,12 +61,10 @@ export const useUpdateManagement = (options: UseUpdateManagementOptions = {}) =>
   }, [updatesPaused, debounceMs, maxPendingUpdates])
 
   const pauseUpdates = useCallback(() => {
-    console.log('Pausing all updates')
     setUpdatesPaused(true)
   }, [])
 
   const resumeUpdates = useCallback(() => {
-    console.log('Resuming updates, processing', pendingUpdates, 'pending updates')
     setUpdatesPaused(false)
     setPendingUpdates(0)
   }, [pendingUpdates])
