@@ -16,22 +16,100 @@ pub struct LayercakeServerState {
     pub auth: LayercakeAuth,
 }
 
-/// Simple authentication that allows all operations for now
+/// Authentication manager with configurable security levels
 #[derive(Clone)]
-pub struct LayercakeAuth;
+pub struct LayercakeAuth {
+    pub allow_anonymous: bool,
+    pub require_api_key: bool,
+    pub valid_api_keys: std::collections::HashSet<String>,
+}
+
+impl LayercakeAuth {
+    pub fn new() -> Self {
+        Self {
+            allow_anonymous: std::env::var("LAYERCAKE_ALLOW_ANONYMOUS")
+                .unwrap_or_else(|_| "true".to_string())
+                .parse()
+                .unwrap_or(true),
+            require_api_key: std::env::var("LAYERCAKE_REQUIRE_API_KEY")
+                .unwrap_or_else(|_| "false".to_string())
+                .parse()
+                .unwrap_or(false),
+            valid_api_keys: std::env::var("LAYERCAKE_API_KEYS")
+                .unwrap_or_default()
+                .split(',')
+                .filter(|key| !key.is_empty())
+                .map(|key| key.trim().to_string())
+                .collect(),
+        }
+    }
+
+    fn validate_api_key(&self, key: &str) -> bool {
+        if !self.require_api_key {
+            return true;
+        }
+        self.valid_api_keys.contains(key)
+    }
+}
 
 #[async_trait]
 impl McpAuth for LayercakeAuth {
-    async fn authenticate(&self, _client_info: &ClientContext) -> McpResult<SecurityContext> {
-        // For now, all clients get full access
-        // TODO: Implement proper authentication if needed
-        Ok(SecurityContext::system())
+    async fn authenticate(&self, client_info: &ClientContext) -> McpResult<SecurityContext> {
+        if self.require_api_key {
+            // Check for API key in client metadata
+            if let Some(auth_header) = client_info.metadata.get("authorization") {
+                if let Some(api_key) = auth_header.strip_prefix("Bearer ") {
+                    if self.validate_api_key(api_key) {
+                        return Ok(SecurityContext::authenticated(
+                            client_info.clone(),
+                            vec!["api_key".to_string(), "authenticated".to_string()]
+                        ));
+                    }
+                }
+            }
+
+            // Check for API key in query parameters
+            if let Some(api_key) = client_info.metadata.get("api_key") {
+                if self.validate_api_key(api_key) {
+                    return Ok(SecurityContext::authenticated(
+                        client_info.clone(),
+                        vec!["api_key".to_string(), "authenticated".to_string()]
+                    ));
+                }
+            }
+
+            return Err(McpError::Authentication {
+                message: "Valid API key required".to_string(),
+            });
+        }
+
+        if self.allow_anonymous {
+            Ok(SecurityContext::anonymous())
+        } else {
+            Err(McpError::Authentication {
+                message: "Authentication required".to_string(),
+            })
+        }
     }
 
-    async fn authorize(&self, _context: &SecurityContext, _resource: &str, _action: &str) -> bool {
-        // Allow all operations for now
-        // TODO: Implement proper authorization if needed
-        true
+    async fn authorize(&self, context: &SecurityContext, resource: &str, action: &str) -> bool {
+        if context.is_system() {
+            // System context has full access
+            true
+        } else if context.is_authenticated() {
+            // Authenticated users can access most resources but not destructive system operations
+            !matches!((resource, action),
+                ("projects", "delete") | ("system", _)
+            )
+        } else if context.is_anonymous() {
+            // Anonymous users have read-only access to non-sensitive resources
+            matches!((resource, action),
+                ("projects", "read") | ("graph_data", "read") | ("analysis", "read")
+            )
+        } else {
+            // Default deny
+            false
+        }
     }
 }
 

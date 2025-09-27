@@ -112,7 +112,7 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
             tools: LayercakeToolRegistry::new(db.clone()),
             resources: crate::mcp::resources::LayercakeResourceRegistry::new(db.clone()),
             prompts: crate::mcp::prompts::LayercakePromptRegistry::new(),
-            auth: LayercakeAuth,
+            auth: LayercakeAuth::new(),
         };
         
         let mcp_server = Arc::new(McpServer::new(mcp_config, mcp_state));
