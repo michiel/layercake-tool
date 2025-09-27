@@ -2,7 +2,7 @@ use async_graphql::*;
 use chrono::{DateTime, Utc};
 use sea_orm::{EntityTrait, ColumnTrait, QueryFilter};
 
-use crate::database::entities::{users, user_sessions, project_collaborators, user_presence};
+use crate::database::entities::{users, user_sessions, project_collaborators};
 use crate::graphql::context::GraphQLContext;
 
 #[derive(SimpleObject)]
@@ -59,17 +59,8 @@ impl User {
         Ok(collaborations.into_iter().map(ProjectCollaborator::from).collect())
     }
 
-    async fn presence(&self, ctx: &Context<'_>, project_id: i32) -> Result<Option<UserPresence>> {
-        let context = ctx.data::<GraphQLContext>()?;
-        let presence = user_presence::Entity::find()
-            .filter(user_presence::Column::UserId.eq(self.id))
-            .filter(user_presence::Column::ProjectId.eq(project_id))
-            .filter(user_presence::Column::IsOnline.eq(true))
-            .one(&context.db)
-            .await?;
-
-        Ok(presence.map(UserPresence::from))
-    }
+    // REMOVED: presence method - user presence now handled via WebSocket only (memory-only storage)
+    // Real-time presence data is available through the WebSocket collaboration system at /ws/collaboration
 }
 
 #[derive(SimpleObject)]
@@ -170,46 +161,8 @@ impl ProjectCollaborator {
     }
 }
 
-#[derive(SimpleObject)]
-pub struct UserPresence {
-    pub id: i32,
-    pub user_id: i32,
-    pub project_id: i32,
-    pub session_id: String,
-    pub layercake_graph_id: Option<i32>,
-    pub cursor_position: Option<String>,
-    pub selected_node_id: Option<String>,
-    pub viewport_position: Option<String>,
-    pub current_tool: Option<String>,
-    pub is_online: bool,
-    pub last_seen: DateTime<Utc>,
-    pub last_heartbeat: DateTime<Utc>,
-    pub status: String,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-impl From<user_presence::Model> for UserPresence {
-    fn from(model: user_presence::Model) -> Self {
-        Self {
-            id: model.id,
-            user_id: model.user_id,
-            project_id: model.project_id,
-            session_id: model.session_id,
-            layercake_graph_id: model.layercake_graph_id,
-            cursor_position: model.cursor_position,
-            selected_node_id: model.selected_node_id,
-            viewport_position: model.viewport_position,
-            current_tool: model.current_tool,
-            is_online: model.is_online,
-            last_seen: model.last_seen,
-            last_heartbeat: model.last_heartbeat,
-            status: model.status,
-            created_at: model.created_at,
-            updated_at: model.updated_at,
-        }
-    }
-}
+// REMOVED: UserPresence type - user presence now handled via WebSocket only (memory-only storage)
+// WebSocket presence data is available through the WebSocket collaboration system at /ws/collaboration
 
 // Input types for mutations
 #[derive(InputObject)]
@@ -245,15 +198,7 @@ pub struct UpdateCollaboratorRoleInput {
     pub role: String,
 }
 
-#[derive(InputObject)]
-pub struct UpdateUserPresenceInput {
-    pub project_id: i32,
-    pub session_id: String,
-    pub cursor_position: Option<CursorPositionInput>,
-    pub selected_node_id: Option<String>,
-    pub viewport_position: Option<ViewportPositionInput>,
-    pub current_tool: Option<String>,
-}
+// REMOVED: UpdateUserPresenceInput - user presence updates now handled via WebSocket only
 
 #[derive(InputObject)]
 pub struct CursorPositionInput {
@@ -306,40 +251,5 @@ pub enum UserStatus {
     Offline,
 }
 
-// Collaboration-specific types that match the frontend expectations
-#[derive(SimpleObject)]
-pub struct UserPresenceInfo {
-    pub user_id: String,
-    pub user_name: String,
-    pub avatar_color: String,
-    pub cursor_position: Option<CursorPosition>,
-    pub selected_node_id: Option<String>,
-    pub is_active: bool,
-    pub last_seen: String, // ISO 8601 timestamp
-}
-
-#[derive(Clone, Debug, SimpleObject)]
-pub struct CursorPosition {
-    pub x: f64,
-    pub y: f64,
-}
-
-impl From<user_presence::Model> for UserPresenceInfo {
-    fn from(presence: user_presence::Model) -> Self {
-        // Parse cursor position from JSON string
-        let cursor_position = presence.cursor_position
-            .as_ref()
-            .and_then(|pos| serde_json::from_str::<crate::database::entities::user_presence::CursorPosition>(pos).ok())
-            .map(|pos| CursorPosition { x: pos.x, y: pos.y });
-
-        Self {
-            user_id: presence.user_id.to_string(),
-            user_name: format!("User {}", presence.user_id), // Default name - should be replaced with actual user lookup
-            avatar_color: "#3b82f6".to_string(), // Default blue - should be replaced with actual user color
-            cursor_position,
-            selected_node_id: presence.selected_node_id,
-            is_active: presence.is_online && presence.status == "active",
-            last_seen: presence.last_seen.to_rfc3339(),
-        }
-    }
-}
+// REMOVED: UserPresenceInfo and CursorPosition types - user presence now handled via WebSocket only
+// Real-time collaboration data is available through the WebSocket system at /ws/collaboration

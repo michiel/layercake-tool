@@ -27,8 +27,7 @@ pub enum Relation {
     UserSessions,
     #[sea_orm(has_many = "super::project_collaborators::Entity")]
     ProjectCollaborators,
-    #[sea_orm(has_many = "super::user_presence::Entity")]
-    UserPresence,
+    // REMOVED: UserPresence relation - user presence now handled via WebSocket only
 }
 
 impl Related<super::user_sessions::Entity> for Entity {
@@ -43,11 +42,7 @@ impl Related<super::project_collaborators::Entity> for Entity {
     }
 }
 
-impl Related<super::user_presence::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::UserPresence.def()
-    }
-}
+// REMOVED: Related implementation for user_presence - user presence now handled via WebSocket only
 
 impl ActiveModelBehavior for ActiveModel {}
 

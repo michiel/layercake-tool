@@ -1,9 +1,9 @@
 use async_graphql::*;
 use sea_orm::{EntityTrait, ColumnTrait, QueryFilter};
 
-use crate::database::entities::{projects, plans, nodes, edges, layers, plan_dag_nodes, plan_dag_edges, users, user_sessions, project_collaborators, user_presence, data_sources};
+use crate::database::entities::{projects, plans, nodes, edges, layers, plan_dag_nodes, plan_dag_edges, users, user_sessions, project_collaborators, data_sources};
 use crate::graphql::context::GraphQLContext;
-use crate::graphql::types::{Project, Plan, Node, Edge, Layer, PlanDag, PlanDagNode, PlanDagEdge, PlanDagMetadata, ValidationResult, PlanDagInput, User, UserSession, ProjectCollaborator, UserPresence, DataSource, DownloadUrl};
+use crate::graphql::types::{Project, Plan, Node, Edge, Layer, PlanDag, PlanDagNode, PlanDagEdge, PlanDagMetadata, ValidationResult, PlanDagInput, User, UserSession, ProjectCollaborator, DataSource, DownloadUrl};
 use crate::graphql::types::plan_dag::DataSourceReference;
 
 pub struct Query;
@@ -313,29 +313,8 @@ impl Query {
 
     // User Presence Queries
 
-    /// Get all online users for a project
-    async fn project_online_users(&self, ctx: &Context<'_>, project_id: i32) -> Result<Vec<UserPresence>> {
-        let context = ctx.data::<GraphQLContext>()?;
-        let online_users = user_presence::Entity::find()
-            .filter(user_presence::Column::ProjectId.eq(project_id))
-            .filter(user_presence::Column::IsOnline.eq(true))
-            .all(&context.db)
-            .await?;
-
-        Ok(online_users.into_iter().map(UserPresence::from).collect())
-    }
-
-    /// Get user presence for specific project
-    async fn user_presence(&self, ctx: &Context<'_>, user_id: i32, project_id: i32) -> Result<Option<UserPresence>> {
-        let context = ctx.data::<GraphQLContext>()?;
-        let presence = user_presence::Entity::find()
-            .filter(user_presence::Column::UserId.eq(user_id))
-            .filter(user_presence::Column::ProjectId.eq(project_id))
-            .one(&context.db)
-            .await?;
-
-        Ok(presence.map(UserPresence::from))
-    }
+    // REMOVED: project_online_users and user_presence queries - user presence now handled via WebSocket only
+    // Real-time presence data is available through the WebSocket collaboration system at /ws/collaboration
 
     /// Get all active sessions for a user
     async fn user_sessions(&self, ctx: &Context<'_>, user_id: i32) -> Result<Vec<UserSession>> {

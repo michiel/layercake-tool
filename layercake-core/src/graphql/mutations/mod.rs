@@ -16,9 +16,9 @@ use crate::graphql::types::{
     PlanDagInput, PlanDagResponse, PlanDagNodeInput, PlanDagEdgeInput,
     PlanDagNodeUpdateInput, NodeResponse, EdgeResponse, Position,
     PlanDag, PlanDagNode, PlanDagEdge, PlanDagMetadata,
-    User, UserSession, ProjectCollaborator, UserPresence,
+    User, UserSession, ProjectCollaborator,
     RegisterUserInput, LoginInput, UpdateUserInput, LoginResponse, RegisterResponse,
-    InviteCollaboratorInput, UpdateCollaboratorRoleInput, UpdateUserPresenceInput,
+    InviteCollaboratorInput, UpdateCollaboratorRoleInput,
     DataSource, CreateDataSourceInput, UpdateDataSourceInput,
 };
 
@@ -808,111 +808,9 @@ impl Mutation {
 
     // User Presence Mutations
 
-    /// Update user presence (cursor position, tool, etc.)
-    async fn update_user_presence(&self, ctx: &Context<'_>, input: UpdateUserPresenceInput) -> Result<UserPresence> {
-        let context = ctx.data::<GraphQLContext>()?;
-
-        // Find existing presence or create new one
-        let existing = user_presence::Entity::find()
-            .filter(user_presence::Column::ProjectId.eq(input.project_id))
-            .filter(user_presence::Column::SessionId.eq(&input.session_id))
-            .one(&context.db)
-            .await?;
-
-        let presence = if let Some(existing) = existing {
-            // Update existing presence
-            let mut presence_active: user_presence::ActiveModel = existing.into();
-
-            if let Some(cursor) = input.cursor_position {
-                presence_active = presence_active.update_cursor_position(cursor.x, cursor.y);
-            }
-
-            if let Some(viewport) = input.viewport_position {
-                presence_active = presence_active.update_viewport(viewport.x, viewport.y, viewport.zoom);
-            }
-
-            if let Some(node_id) = input.selected_node_id {
-                presence_active = presence_active.select_node(Some(node_id));
-            }
-
-            if let Some(tool) = input.current_tool {
-                presence_active = presence_active.set_tool(tool);
-            }
-
-            presence_active.update(&context.db).await?
-        } else {
-            // Get user ID from session
-            let session = user_sessions::Entity::find()
-                .filter(user_sessions::Column::SessionId.eq(&input.session_id))
-                .one(&context.db)
-                .await?
-                .ok_or_else(|| Error::new("Session not found"))?;
-
-            // Create new presence
-            let mut presence = user_presence::ActiveModel::new(
-                session.user_id,
-                input.project_id,
-                input.session_id.clone(),
-            );
-
-            if let Some(cursor) = input.cursor_position {
-                presence = presence.update_cursor_position(cursor.x, cursor.y);
-            }
-
-            if let Some(viewport) = input.viewport_position {
-                presence = presence.update_viewport(viewport.x, viewport.y, viewport.zoom);
-            }
-
-            if let Some(node_id) = input.selected_node_id {
-                presence = presence.select_node(Some(node_id));
-            }
-
-            if let Some(tool) = input.current_tool {
-                presence = presence.set_tool(tool);
-            }
-
-            presence.insert(&context.db).await?
-        };
-
-        Ok(UserPresence::from(presence))
-    }
-
-    /// User goes offline (cleanup presence)
-    async fn user_offline(&self, ctx: &Context<'_>, session_id: String) -> Result<bool> {
-        let context = ctx.data::<GraphQLContext>()?;
-
-        // Find all presence records for this session
-        let presences = user_presence::Entity::find()
-            .filter(user_presence::Column::SessionId.eq(&session_id))
-            .all(&context.db)
-            .await?;
-
-        for presence in presences {
-            let mut presence_active: user_presence::ActiveModel = presence.into();
-            presence_active = presence_active.go_offline();
-            presence_active.update(&context.db).await?;
-        }
-
-        Ok(true)
-    }
-
-    /// Send presence heartbeat
-    async fn presence_heartbeat(&self, ctx: &Context<'_>, session_id: String, project_id: i32) -> Result<UserPresence> {
-        let context = ctx.data::<GraphQLContext>()?;
-
-        let presence = user_presence::Entity::find()
-            .filter(user_presence::Column::SessionId.eq(&session_id))
-            .filter(user_presence::Column::ProjectId.eq(project_id))
-            .one(&context.db)
-            .await?
-            .ok_or_else(|| Error::new("Presence not found"))?;
-
-        let mut presence_active: user_presence::ActiveModel = presence.into();
-        presence_active = presence_active.heartbeat();
-        let updated = presence_active.update(&context.db).await?;
-
-        Ok(UserPresence::from(updated))
-    }
+    // REMOVED: update_user_presence, user_offline, and presence_heartbeat mutations
+    // User presence is now handled via WebSocket only (memory-only storage) at /ws/collaboration
+    // These GraphQL mutations have been replaced by real-time WebSocket communication for better performance
 
     // REMOVED: update_cursor_position mutation - replaced by WebSocket implementation
     // Cursor position updates are now handled via WebSocket at /ws/collaboration for better performance
