@@ -1,28 +1,67 @@
 import { memo } from 'react'
 import { Group, Avatar, Tooltip, Badge, Box, Text } from '@mantine/core'
-import { IconUser, IconWifi, IconWifiOff } from '@tabler/icons-react'
-import { UserPresence } from '../../hooks/useCollaborationSubscriptions'
+import { IconUser, IconWifi, IconWifiOff, IconRefresh } from '@tabler/icons-react'
+import { UserPresenceData, ConnectionState } from '../../types/websocket'
 
 interface UserPresenceIndicatorProps {
-  users: UserPresence[]
+  users: UserPresenceData[]
+  connectionState: ConnectionState
+  currentUserId?: string
   maxVisible?: number
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl'
+  onReconnect?: () => void
 }
 
 export const UserPresenceIndicator = memo(({
   users,
+  connectionState,
+  currentUserId,
   maxVisible = 5,
-  size = 'sm'
+  size = 'sm',
+  onReconnect
 }: UserPresenceIndicatorProps) => {
-  const onlineUsers = users.filter(user => user.isOnline)
+  const onlineUsers = users.filter(user => user.userId !== currentUserId && user.isOnline)
   const visibleUsers = onlineUsers.slice(0, maxVisible)
   const hiddenCount = Math.max(0, onlineUsers.length - maxVisible)
 
-  if (onlineUsers.length === 0) {
+  const getConnectionIcon = () => {
+    switch (connectionState) {
+      case ConnectionState.CONNECTED:
+        return <IconWifi size={16} style={{ color: 'var(--mantine-color-green-6)' }} />
+      case ConnectionState.CONNECTING:
+      case ConnectionState.RECONNECTING:
+        return <IconRefresh size={16} style={{ color: 'var(--mantine-color-yellow-6)' }} className="animate-spin" />
+      default:
+        return <IconWifiOff size={16} style={{ color: 'var(--mantine-color-red-6)' }} />
+    }
+  }
+
+  const getConnectionText = () => {
+    switch (connectionState) {
+      case ConnectionState.CONNECTED:
+        return onlineUsers.length === 0 ? 'No collaborators' : `${onlineUsers.length} online`
+      case ConnectionState.CONNECTING:
+        return 'Connecting...'
+      case ConnectionState.RECONNECTING:
+        return 'Reconnecting...'
+      case ConnectionState.ERROR:
+      case ConnectionState.DISCONNECTED:
+        return 'Disconnected'
+      default:
+        return 'Unknown status'
+    }
+  }
+
+  if (connectionState !== ConnectionState.CONNECTED || onlineUsers.length === 0) {
     return (
       <Group gap="xs" align="center">
-        <IconWifiOff size={16} style={{ color: 'var(--mantine-color-gray-5)' }} />
-        <Text size="xs" c="dimmed">No collaborators</Text>
+        {getConnectionIcon()}
+        <Text size="xs" c="dimmed">{getConnectionText()}</Text>
+        {(connectionState === ConnectionState.ERROR || connectionState === ConnectionState.DISCONNECTED) && onReconnect && (
+          <Text size="xs" c="blue" style={{ cursor: 'pointer' }} onClick={onReconnect}>
+            Retry
+          </Text>
+        )}
       </Group>
     )
   }
@@ -41,14 +80,20 @@ export const UserPresenceIndicator = memo(({
                 <Text size="xs" c="dimmed">
                   Last active: {new Date(user.lastActive).toLocaleTimeString()}
                 </Text>
-                {user.cursorPosition && (
+                {Object.keys(user.documents).length > 0 && (
                   <Text size="xs" c="dimmed">
-                    Cursor: ({Math.round(user.cursorPosition.x)}, {Math.round(user.cursorPosition.y)})
+                    Active in {Object.keys(user.documents).length} document{Object.keys(user.documents).length > 1 ? 's' : ''}
                   </Text>
                 )}
-                {user.selectedNodeId && (
+                {/* Show cursor position from first active document */}
+                {Object.values(user.documents)[0]?.position && (
+                  <Text size="xs" c="dimmed">
+                    Cursor: ({Math.round((Object.values(user.documents)[0].position as any).x || 0)}, {Math.round((Object.values(user.documents)[0].position as any).y || 0)})
+                  </Text>
+                )}
+                {Object.values(user.documents)[0]?.selectedNodeId && (
                   <Text size="xs" c="blue">
-                    Editing: {user.selectedNodeId}
+                    Editing: {Object.values(user.documents)[0].selectedNodeId}
                   </Text>
                 )}
               </Box>

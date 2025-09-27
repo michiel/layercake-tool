@@ -47,6 +47,7 @@ import { OutputNode } from './nodes/OutputNode'
 // Import collaboration components
 import { UserPresenceIndicator } from '../../collaboration/UserPresenceIndicator'
 import { CollaborativeCursors } from '../../collaboration/CollaborativeCursors'
+import { UserPresenceData, ConnectionState } from '../../../types/websocket'
 
 // Import dialogs
 import { NodeConfigDialog } from './NodeConfigDialog'
@@ -264,8 +265,35 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
   } as DataSourceNodeConfig)
   const [configNodeMetadata, setConfigNodeMetadata] = useState<NodeMetadata>({ label: '', description: '' })
 
+  // Convert old UserPresence type to new UserPresenceData type
+  const convertToUserPresenceData = (user: UserPresence): UserPresenceData => {
+    const documents: Record<string, any> = {};
+
+    // Create a mock document entry if the user has cursor position
+    if (user.cursorPosition) {
+      documents['plan-dag-canvas'] = {
+        position: {
+          type: 'canvas' as const,
+          x: user.cursorPosition.x,
+          y: user.cursorPosition.y
+        },
+        selectedNodeId: user.selectedNodeId,
+        lastActiveInDocument: user.lastActive
+      };
+    }
+
+    return {
+      userId: user.userId,
+      userName: user.userName,
+      avatarColor: user.avatarColor,
+      isOnline: user.isOnline,
+      lastActive: user.lastActive,
+      documents
+    };
+  };
+
   // Use real users from subscription, with fallback mock data for development
-  const onlineUsers: UserPresence[] = users.length > 0 ? users : [
+  const onlineUsersLegacy: UserPresence[] = users.length > 0 ? users : [
     {
       userId: 'user-456',
       userName: 'Alice Cooper',
@@ -284,7 +312,10 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
       selectedNodeId: undefined,
       lastActive: new Date().toISOString()
     }
-  ]
+  ];
+
+  // Convert to new format for components
+  const onlineUsers: UserPresenceData[] = onlineUsersLegacy.map(convertToUserPresenceData);
 
   // Stable reference pattern - only update when content actually changes
   const previousPlanDagRef = useRef<PlanDag | null>(null)
@@ -928,7 +959,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
       <Group justify="space-between" p="md" bg="gray.0">
         <Group gap="md">
           <Title order={3}>Plan DAG Editor</Title>
-          <UserPresenceIndicator users={onlineUsers} maxVisible={5} size="sm" />
+          <UserPresenceIndicator users={onlineUsers} connectionState={ConnectionState.CONNECTED} maxVisible={5} size="sm" />
         </Group>
         <Group gap="xs">
           {isDirty && (
