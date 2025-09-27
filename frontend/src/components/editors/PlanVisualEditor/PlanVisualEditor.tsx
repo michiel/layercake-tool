@@ -24,16 +24,9 @@ import {
   IconPlayerPlay
 } from '@tabler/icons-react'
 
-import { usePlanDag, usePlanDagMutations, usePlanDagValidation, usePlanDagSubscription, useUserPresence, useCollaboration } from '../../../hooks/usePlanDag'
+import { usePlanDag, usePlanDagMutations, usePlanDagValidation, usePlanDagSubscription } from '../../../hooks/usePlanDag'
+import { useCollaborationV2 } from '../../../hooks/useCollaborationV2'
 import { PlanDag, PlanDagNode, PlanDagEdge, ReactFlowNode, ReactFlowEdge, PlanDagNodeType, NodeConfig, NodeMetadata, DataSourceNodeConfig } from '../../../types/plan-dag'
-import {
-  UserPresence,
-  useCollaborationEventsSubscription,
-  useConflictDetection,
-  useCollaborationConnection,
-  type ConflictEvent
-} from '../../../hooks/useCollaborationSubscriptions'
-import { CollaborationEvent } from '../../../graphql/subscriptions'
 import { validateConnectionWithCycleDetection } from '../../../utils/planDagValidation'
 
 // Import custom node types
@@ -47,7 +40,7 @@ import { OutputNode } from './nodes/OutputNode'
 // Import collaboration components
 import { UserPresenceIndicator } from '../../collaboration/UserPresenceIndicator'
 import { CollaborativeCursors } from '../../collaboration/CollaborativeCursors'
-import { UserPresenceData, ConnectionState } from '../../../types/websocket'
+import { UserPresenceData } from '../../../types/websocket'
 
 // Import dialogs
 import { NodeConfigDialog } from './NodeConfigDialog'
@@ -184,17 +177,21 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
   // Phase 3: Advanced collaboration hooks integration
   // TODO: Implement proper authentication and get current user ID
   const currentUserId: string | undefined = undefined
-  const { users } = useUserPresence(projectId, currentUserId)
-  const { broadcastCursorPosition, joinProject, leaveProject } = useCollaboration(projectId)
 
-  // Advanced collaboration features
-  const { status: collaborationStatus, isConnected, hasError } = useCollaborationConnection(projectId.toString())
-  const { getActiveConflicts } = useConflictDetection(projectId.toString())
+  // New WebSocket collaboration hook
+  const collaboration = useCollaborationV2({
+    projectId,
+    documentId: 'plan-dag-canvas',
+    documentType: 'canvas',
+    enableWebSocket: true,
+    userInfo: {
+      id: currentUserId || 'anonymous',
+      name: currentUserId ? `User ${currentUserId}` : 'Anonymous User',
+      avatarColor: '#3b82f6'
+    }
+  })
 
-  // Collaboration events state
-  const [_collaborationEvents, setCollaborationEvents] = useState<CollaborationEvent[]>([])
-  const [_activeConflicts, setActiveConflicts] = useState<ConflictEvent[]>([])
-  const collaborationEventsRef = useRef<CollaborationEvent[]>([])
+  // Collaboration is now handled via WebSocket through CollaborationManager
 
   // Phase 4: Validation state and error tracking
   const [validationErrors, setValidationErrors] = useState<any[]>([])
@@ -216,32 +213,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     maxPendingUpdates: 10
   })
 
-  // Handle collaboration events integration with controlled updates
-  const handleCollaborationEvent = useCallback((event: CollaborationEvent) => {
-    console.log('Collaboration event received:', event)
-
-    // Add to events log (keep last 100 events)
-    collaborationEventsRef.current = [event, ...collaborationEventsRef.current.slice(0, 99)]
-    setCollaborationEvents([...collaborationEventsRef.current])
-
-    // Handle different event types with controlled updates
-    if (event.eventType === 'NODE_UPDATED' && event.data.nodeEvent) {
-      // Throttled update for node changes from other users
-      throttledUpdate(() => {
-        console.log('Processing remote node update:', event.data.nodeEvent)
-        // Node updates are handled via GraphQL subscriptions automatically
-      })
-    } else if (event.eventType === 'EDGE_CREATED' || event.eventType === 'EDGE_DELETED') {
-      // Immediate update for edge changes (less frequent, more critical)
-      debouncedUpdate(() => {
-        console.log('Processing remote edge change:', event.eventType)
-        // Edge updates are handled via GraphQL subscriptions automatically
-      })
-    }
-  }, [throttledUpdate, debouncedUpdate])
-
-  // Subscribe to collaboration events
-  useCollaborationEventsSubscription(projectId.toString(), handleCollaborationEvent)
+  // Real-time collaboration events are now handled via WebSocket
 
   // Real mutations are now available from usePlanDagMutations hook
   // mutations.moveNode, mutations.addEdge, mutations.deleteEdge, etc.
@@ -265,94 +237,24 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
   } as DataSourceNodeConfig)
   const [configNodeMetadata, setConfigNodeMetadata] = useState<NodeMetadata>({ label: '', description: '' })
 
-  // Convert old UserPresence type to new UserPresenceData type
-  const convertToUserPresenceData = (user: UserPresence): UserPresenceData => {
-    const documents: Record<string, any> = {};
-
-    // Create a mock document entry if the user has cursor position
-    if (user.cursorPosition) {
-      documents['plan-dag-canvas'] = {
-        position: {
-          type: 'canvas' as const,
-          x: user.cursorPosition.x,
-          y: user.cursorPosition.y
-        },
-        selectedNodeId: user.selectedNodeId,
-        lastActiveInDocument: user.lastActive
-      };
-    }
-
-    return {
-      userId: user.userId,
-      userName: user.userName,
-      avatarColor: user.avatarColor,
-      isOnline: user.isOnline,
-      lastActive: user.lastActive,
-      documents
-    };
-  };
-
-  // Use real users from subscription, with fallback mock data for development
-  const onlineUsersLegacy: UserPresence[] = users.length > 0 ? users : [
-    {
-      userId: 'user-456',
-      userName: 'Alice Cooper',
-      avatarColor: '#51cf66',
-      isOnline: true,
-      cursorPosition: { x: 250, y: 150 },
-      selectedNodeId: 'transform_1',
-      lastActive: new Date().toISOString()
-    },
-    {
-      userId: 'user-789',
-      userName: 'Bob Smith',
-      avatarColor: '#339af0',
-      isOnline: true,
-      cursorPosition: { x: 450, y: 200 },
-      selectedNodeId: undefined,
-      lastActive: new Date().toISOString()
-    }
-  ];
-
-  // Convert to new format for components
-  const onlineUsers: UserPresenceData[] = onlineUsersLegacy.map(convertToUserPresenceData);
+  // Use users directly from the new collaboration hook
+  const onlineUsers: UserPresenceData[] = collaboration.users || []
 
   // Stable reference pattern - only update when content actually changes
   const previousPlanDagRef = useRef<PlanDag | null>(null)
   const planDagStableRef = useRef<PlanDag | null>(null)
 
 
-  // Phase 3: Conflict detection and resolution
-  const checkForConflicts = useCallback(() => {
-    const conflicts = getActiveConflicts()
-    setActiveConflicts(conflicts)
-    return conflicts
-  }, [getActiveConflicts])
-
-  // Auto-check for conflicts every 5 seconds
-  useEffect(() => {
-    if (!isConnected) return
-
-    const intervalId = setInterval(() => {
-      checkForConflicts()
-    }, 5000)
-
-    return () => clearInterval(intervalId)
-  }, [isConnected, checkForConflicts])
+  // Phase 3: Conflict detection will be handled via WebSocket events
+  // Future implementation will leverage real-time collaboration events
 
   // Handle remote changes from subscriptions
   useEffect(() => {
-    if (!lastChange || !isConnected) return
+    if (!lastChange || !collaboration.connected) return
 
     console.log('Real-time subscription change detected:', lastChange)
 
-    // Check for conflicts when remote changes come in
-    const conflicts = checkForConflicts()
-    if (conflicts.length > 0) {
-      console.warn('Conflicts detected with remote changes:', conflicts)
-      // Pause updates temporarily to handle conflicts
-      pauseUpdates()
-    }
+    // Conflict detection will be handled via WebSocket events in the future
 
     // Integrate remote change with controlled update system
     debouncedUpdate(() => {
@@ -360,7 +262,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
       // GraphQL subscription data is automatically merged by Apollo Client
       // This just ensures we don't miss any updates during controlled update periods
     })
-  }, [lastChange, isConnected, checkForConflicts, pauseUpdates, debouncedUpdate])
+  }, [lastChange, collaboration.connected, pauseUpdates, debouncedUpdate])
 
   // Phase 4: Validation integration with controlled updates
   const runValidation = useCallback(async (planDagToValidate: PlanDag) => {
@@ -758,9 +660,9 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     if (typeof worldX === 'number' && typeof worldY === 'number' &&
         !isNaN(worldX) && !isNaN(worldY) &&
         isFinite(worldX) && isFinite(worldY)) {
-      broadcastCursorPosition(worldX, worldY, selectedNode || undefined)
+      collaboration.broadcastCursorPosition(worldX, worldY, selectedNode || undefined)
     }
-  }, [broadcastCursorPosition, selectedNode, readonly])
+  }, [collaboration, selectedNode, readonly])
 
   // Drag and drop handlers for creating new nodes
   const handleNodeDragStart = useCallback((event: React.DragEvent, nodeType: PlanDagNodeType) => {
@@ -883,16 +785,12 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
   // Join/leave collaboration on mount/unmount
   useEffect(() => {
     if (!readonly) {
-      joinProject().catch(err => {
-        console.warn('Failed to join project collaboration:', err)
-      })
+      collaboration.joinProject()
     }
 
     return () => {
       if (!readonly) {
-        leaveProject().catch(err => {
-          console.warn('Failed to leave project collaboration:', err)
-        })
+        collaboration.leaveProject()
       }
 
       // Phase 2: Cleanup update timers
@@ -903,7 +801,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         clearTimeout(validationTimeoutRef.current)
       }
     }
-  }, [readonly, joinProject, leaveProject, cleanupUpdateManagement])
+  }, [readonly, collaboration, cleanupUpdateManagement])
 
   const miniMapNodeColor = useCallback((node: Node) => {
     switch (node.data?.nodeType) {
@@ -959,7 +857,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
       <Group justify="space-between" p="md" bg="gray.0">
         <Group gap="md">
           <Title order={3}>Plan DAG Editor</Title>
-          <UserPresenceIndicator users={onlineUsers} connectionState={ConnectionState.CONNECTED} maxVisible={5} size="sm" />
+          <UserPresenceIndicator users={onlineUsers} connectionState={collaboration.connectionState} maxVisible={5} size="sm" />
         </Group>
         <Group gap="xs">
           {isDirty && (
@@ -1049,9 +947,9 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
             pendingUpdates={pendingUpdates}
             onPauseUpdates={pauseUpdates}
             onResumeUpdates={resumeUpdates}
-            isConnected={isConnected}
-            collaborationStatus={collaborationStatus}
-            hasError={hasError}
+            isConnected={collaboration.connected}
+            collaborationStatus={collaboration.connectionState}
+            hasError={!!collaboration.error}
             onlineUsers={onlineUsers}
           />
 

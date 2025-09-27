@@ -1,10 +1,10 @@
 import { memo, useCallback, useEffect, useState } from 'react'
 import { useViewport } from 'reactflow'
 import { CollaborativeCursor } from './CollaborativeCursor'
-import { UserPresence } from '../../hooks/useCollaborationSubscriptions'
+import { UserPresenceData } from '../../types/websocket'
 
 interface CollaborativeCursorsProps {
-  users: UserPresence[]
+  users: UserPresenceData[]
   currentUserId?: string
 }
 
@@ -13,15 +13,18 @@ export const CollaborativeCursors = memo(({
   currentUserId
 }: CollaborativeCursorsProps) => {
   const viewport = useViewport()
-  const [visibleCursors, setVisibleCursors] = useState<UserPresence[]>([])
+  const [visibleCursors, setVisibleCursors] = useState<UserPresenceData[]>([])
 
-  // Filter users to show cursors for (exclude current user, only show online users with cursor positions)
+  // Filter users to show cursors for (exclude current user, only show online users with canvas cursor positions)
   const updateVisibleCursors = useCallback(() => {
-    const cursorsToShow = users.filter(user =>
-      user.userId !== currentUserId &&
-      user.isOnline &&
-      user.cursorPosition
-    )
+    const cursorsToShow = users.filter(user => {
+      const canvasData = user.documents['plan-dag-canvas']
+      return (
+        user.userId !== currentUserId &&
+        user.isOnline &&
+        canvasData?.position?.type === 'canvas'
+      )
+    })
     setVisibleCursors(cursorsToShow)
   }, [users, currentUserId])
 
@@ -36,19 +39,25 @@ export const CollaborativeCursors = memo(({
 
   return (
     <>
-      {visibleCursors.map((user) => (
-        user.cursorPosition && (
+      {visibleCursors.map((user) => {
+        const canvasData = user.documents['plan-dag-canvas']
+        const position = canvasData?.position
+
+        // Type guard to ensure we have a canvas position
+        if (!position || position.type !== 'canvas') return null
+
+        return (
           <CollaborativeCursor
             key={user.userId}
             userId={user.userId}
             userName={user.userName}
             avatarColor={user.avatarColor}
-            position={user.cursorPosition}
+            position={{ x: position.x, y: position.y }}
             viewport={viewport}
-            selectedNodeId={user.selectedNodeId}
+            selectedNodeId={canvasData.selectedNodeId}
           />
         )
-      ))}
+      })}
     </>
   )
 })

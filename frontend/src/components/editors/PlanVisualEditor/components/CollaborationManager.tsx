@@ -1,11 +1,4 @@
-import { useState, useEffect, useRef, useCallback, ReactNode } from 'react'
-import {
-  useCollaborationEventsSubscription,
-  useConflictDetection,
-  useCollaborationConnection,
-  type ConflictEvent
-} from '../../../../hooks/useCollaborationSubscriptions'
-import { CollaborationEvent } from '../../../../graphql/subscriptions'
+import { useEffect, ReactNode } from 'react'
 import { useCollaborationV2 } from '../../../../hooks/useCollaborationV2'
 import { UserPresenceIndicator } from '../../../collaboration/UserPresenceIndicator'
 import { CollaborativeCursors } from '../../../collaboration/CollaborativeCursors'
@@ -35,39 +28,11 @@ export const CollaborationManager = ({
     }
   })
 
-  const { status: _collaborationStatus, isConnected: _isConnected, hasError: _hasError } = useCollaborationConnection(projectId.toString())
-  const { getActiveConflicts } = useConflictDetection(projectId.toString())
-
   // Use users directly from the new collaboration hook
   const onlineUsers: UserPresenceData[] = collaboration.users || []
 
-  // Collaboration events state (for future use)
-  const [_collaborationEvents, setCollaborationEvents] = useState<CollaborationEvent[]>([])
-  const [_activeConflicts, setActiveConflicts] = useState<ConflictEvent[]>([])
-  const collaborationEventsRef = useRef<CollaborationEvent[]>([])
-
-  // Subscribe to collaboration events
-  const handleCollaborationEvent = useCallback((event: CollaborationEvent) => {
-    const newEvent = event
-    if (!collaborationEventsRef.current.some(existing => existing.eventId === newEvent.eventId)) {
-      setCollaborationEvents(prevEvents => [...prevEvents, newEvent])
-      collaborationEventsRef.current = [...collaborationEventsRef.current, newEvent]
-      // Event processed successfully
-    }
-  }, [])
-
-  useCollaborationEventsSubscription(projectId.toString(), handleCollaborationEvent)
-
-  // Handle conflicts
-  useEffect(() => {
-    const checkConflicts = async () => {
-      const conflicts = await getActiveConflicts()
-      setActiveConflicts(conflicts)
-    }
-
-    const interval = setInterval(checkConflicts, 5000) // Check every 5 seconds
-    return () => clearInterval(interval)
-  }, [getActiveConflicts])
+  // Note: Conflict detection will be handled via WebSocket in the future
+  // For now, collaboration events and conflicts are managed through the WebSocket system
 
   // Join project on mount, leave on unmount
   useEffect(() => {
