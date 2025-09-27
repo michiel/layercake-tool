@@ -1,4 +1,5 @@
 import { PlanDagNodeType, ConnectionType } from '../types/plan-dag'
+import { Node, Edge } from 'reactflow'
 
 /**
  * Validates if a connection between two node types is allowed
@@ -183,3 +184,127 @@ export const getNodeTypeIcon = (nodeType: PlanDagNodeType): string => {
       return 'box'
   }
 }
+
+/**
+ * Detects if adding a new edge would create a cycle in the DAG
+ */
+export const wouldCreateCycle = (
+  nodes: Node[],
+  edges: Edge[],
+  newEdge: { source: string; target: string }
+): boolean => {
+  // Create a temporary edge list including the new edge
+  const edgesWithNew = [...edges, {
+    id: 'temp',
+    source: newEdge.source,
+    target: newEdge.target
+  }];
+
+  return hasCycle(nodes, edgesWithNew);
+};
+
+/**
+ * Checks if the graph contains any cycles using DFS
+ */
+export const hasCycle = (nodes: Node[], edges: Edge[]): boolean => {
+  const nodeIds = nodes.map(node => node.id);
+  const adjList = createAdjacencyList(nodeIds, edges);
+
+  const visited = new Set<string>();
+  const recursionStack = new Set<string>();
+
+  // Check each node as a potential starting point
+  for (const nodeId of nodeIds) {
+    if (!visited.has(nodeId)) {
+      if (hasCycleDFS(nodeId, adjList, visited, recursionStack)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+};
+
+/**
+ * DFS helper function for cycle detection
+ */
+const hasCycleDFS = (
+  nodeId: string,
+  adjList: Map<string, string[]>,
+  visited: Set<string>,
+  recursionStack: Set<string>
+): boolean => {
+  visited.add(nodeId);
+  recursionStack.add(nodeId);
+
+  const neighbors = adjList.get(nodeId) || [];
+  for (const neighbor of neighbors) {
+    if (!visited.has(neighbor)) {
+      if (hasCycleDFS(neighbor, adjList, visited, recursionStack)) {
+        return true;
+      }
+    } else if (recursionStack.has(neighbor)) {
+      // Back edge found - cycle detected
+      return true;
+    }
+  }
+
+  recursionStack.delete(nodeId);
+  return false;
+};
+
+/**
+ * Creates an adjacency list representation of the graph
+ */
+const createAdjacencyList = (nodeIds: string[], edges: Edge[]): Map<string, string[]> => {
+  const adjList = new Map<string, string[]>();
+
+  // Initialize adjacency list for all nodes
+  for (const nodeId of nodeIds) {
+    adjList.set(nodeId, []);
+  }
+
+  // Add edges to adjacency list
+  for (const edge of edges) {
+    const sourceNeighbors = adjList.get(edge.source) || [];
+    sourceNeighbors.push(edge.target);
+    adjList.set(edge.source, sourceNeighbors);
+  }
+
+  return adjList;
+};
+
+/**
+ * Validates a connection including cycle detection
+ */
+export const validateConnectionWithCycleDetection = (
+  sourceType: PlanDagNodeType,
+  targetType: PlanDagNodeType,
+  nodes: Node[],
+  edges: Edge[],
+  newConnection: { source: string; target: string }
+): ConnectionType & { wouldCreateCycle?: boolean } => {
+  // First check basic connection validity
+  const basicValidation = validateConnection(sourceType, targetType);
+
+  if (!basicValidation.isValid) {
+    return basicValidation;
+  }
+
+  // Check for cycle creation
+  const cycleDetected = wouldCreateCycle(nodes, edges, newConnection);
+
+  if (cycleDetected) {
+    return {
+      ...basicValidation,
+      isValid: false,
+      wouldCreateCycle: true,
+      errorMessage: 'This connection would create a cycle, which is not allowed in a DAG'
+    };
+  }
+
+  return {
+    ...basicValidation,
+    wouldCreateCycle: false
+  };
+};

@@ -34,7 +34,7 @@ import {
   type ConflictEvent
 } from '../../../hooks/useCollaborationSubscriptions'
 import { CollaborationEvent } from '../../../graphql/subscriptions'
-import { validateConnection } from '../../../utils/planDagValidation'
+import { validateConnectionWithCycleDetection } from '../../../utils/planDagValidation'
 
 // Import custom node types
 import { DataSourceNode } from './nodes/DataSourceNode'
@@ -667,9 +667,20 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
 
       if (!sourceNode || !targetNode) return
 
-      const isValid = validateConnection(sourceNode.data.nodeType, targetNode.data.nodeType)
+      // Use enhanced validation with cycle detection
+      const isValid = validateConnectionWithCycleDetection(
+        sourceNode.data.nodeType,
+        targetNode.data.nodeType,
+        nodes,
+        edges,
+        { source: connection.source!, target: connection.target! }
+      )
+
       if (!isValid.isValid) {
         console.error('Invalid connection:', isValid.errorMessage)
+
+        // Show user-friendly error notification (temporary alert)
+        alert(`Connection Error: ${isValid.errorMessage}`)
         return
       }
 
@@ -697,7 +708,28 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
       setEdges((eds) => addEdge(newEdge, eds))
       mutations.addEdge(newEdge)
     },
-    [nodes, readonly, mutations, setEdges]
+[nodes, edges, readonly, mutations, setEdges]
+  )
+
+  // Validate connections in real-time during drag for visual feedback
+  const isValidConnection = useCallback(
+    (connection: Connection) => {
+      const sourceNode = nodes.find((n) => n.id === connection.source)
+      const targetNode = nodes.find((n) => n.id === connection.target)
+
+      if (!sourceNode || !targetNode) return false
+
+      const validation = validateConnectionWithCycleDetection(
+        sourceNode.data.nodeType,
+        targetNode.data.nodeType,
+        nodes,
+        edges,
+        { source: connection.source!, target: connection.target! }
+      )
+
+      return validation.isValid
+    },
+    [nodes, edges]
   )
 
   const handleNodeConfigSave = useCallback((nodeId: string, config: NodeConfig, metadata: NodeMetadata) => {
@@ -954,6 +986,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
           onNodesChange={handleNodesChange}
           onEdgesChange={handleEdgesChange}
           onConnect={onConnect}
+          isValidConnection={isValidConnection}
           onMove={handleViewportChange}
           onNodeDragStop={handleNodeDragStop}
           nodeTypes={nodeTypes}
