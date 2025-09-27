@@ -1,506 +1,1062 @@
-# Implementation Plan - Critical and High Priority Quality Improvements
+# DAG Plan Editor Implementation Plan
 
 ## Overview
-This plan addresses the critical and high priority issues identified in the codebase quality review to improve maintainability, safety, and reliability of the Layercake tool.
+This plan implements the enhanced DAG Plan Editor functionality as specified in SPECIFICATION.md, focusing on the complete node type system, configuration dialogs, toolbar functionality, and DataSource integration.
 
-**Note**: Due to read-only filesystem in the project directory, implementation requires manual execution of the fixes described below.
+## Current State Analysis
 
-## Critical Priority Items (Fix Immediately)
+### ✅ What's Already Implemented
+- **Backend**: Complete GraphQL types and database schema for Plan DAG nodes/edges
+- **Frontend**: Basic PlanVisualEditor with ReactFlow integration
+- **Node Types**: All 5 node types defined (DataSource, Graph, Transform, Merge, Copy, Output)
+- **Database**: Plan DAG nodes/edges tables with proper relationships
+- **GraphQL**: Full CRUD operations for Plan DAG management
+- **Collaboration**: Real-time subscriptions and user presence
+- **Project Management**: Complete project creation and management
 
-### 1. TypeScript Compilation Errors ❌
-**Status**: Ready for Implementation
-**Estimated Effort**: 2-3 hours
-**Files**: Frontend TypeScript files
-**Description**: Resolve 8 compilation errors blocking type safety
-**Success Criteria**: `npm run type-check` passes without errors
+### ❌ What Needs Implementation
+- **Node Configuration System**: Specific configuration dialogs for each node type
+- **Toolbar with Draggable Nodes**: Top toolbar with node type icons
+- **DataSource Integration**: Connection between DataSource entities and DataSourceNodes
+- **Node Validation**: Visual indicators for unconfigured nodes
+- **Transform Engine**: Backend processing for TransformNode operations
+- **Output Generation**: Backend rendering system for OutputNodes
 
-#### Specific Fixes Needed:
+## Implementation Phases
 
-**File: `frontend/src/hooks/usePlanDag.ts`**
-- **Line 477**: Change `export const useUserPresence = (projectId: number) => {`
-- **To**: `export const useUserPresence = (projectId: number, currentUserId?: string) => {`
+## Phase 1: Enhanced Node Configuration System (Priority: Critical)
+**Estimated Effort**: 8-10 hours
 
-**File: `frontend/src/components/editors/PlanVisualEditor/PlanVisualEditor.tsx`**
-- **Line 245**: Remove unused variable: Delete `collaborationError` from destructuring
-- **Lines 249, 251**: Add CollaborationEvent import at top: `import { CollaborationEvent } from '../../hooks/useCollaborationSubscriptions'`
-- **Lines 256, 262, 263**: Replace `NodeJS.Timeout` with `number` for timeout refs
+### Backend Changes
 
-### 2. Add Missing Type Definitions ❌
-**Status**: Ready for Implementation
-**Estimated Effort**: 1-2 hours
-**Files**: Frontend type definition files
-**Description**: Define missing types for NodeJS.Timeout, CollaborationEvent, etc.
-**Success Criteria**: No "Cannot find name/namespace" TypeScript errors
+#### 1.1 Enhanced Node Configuration Types
+**File**: `layercake-core/src/graphql/types/plan_dag.rs`
 
-#### Implementation:
+Add missing configuration structures:
 
-**Create: `frontend/src/types/global.d.ts`**
-```typescript
-declare namespace NodeJS {
-  interface Timeout {}
+```rust
+// Add to existing file after line 175
+#[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
+#[graphql(input_name = "DataSourceReferenceInput")]
+pub struct DataSourceReference {
+    pub data_source_id: i32,
+    pub project_id: i32,
+    pub name: String,
+    pub source_type: String,
 }
 
-export interface CollaborationEvent {
-  eventId: string
-  eventType: 'NODE_CREATED' | 'NODE_UPDATED' | 'NODE_DELETED' | 'EDGE_CREATED' | 'EDGE_DELETED'
-  userId: string
-  timestamp: string
-  data: {
-    nodeEvent?: {
-      node: {
-        id: string
-        nodeType: string
-        position: { x: number; y: number }
-        metadata: { label: string; description?: string }
-      }
-    }
-    edgeEvent?: {
-      edge: {
-        id: string
-        source: string
-        target: string
-      }
+// Enhanced Transform Rules
+#[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
+#[graphql(input_name = "TransformRuleInput")]
+pub struct TransformRule {
+    pub rule_type: TransformRuleType,
+    pub parameters: TransformRuleParameters,
+    pub order: i32,
+}
+
+#[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
+pub enum TransformRuleType {
+    InvertGraph,
+    MaxPartitionWidth,
+    MaxPartitionDepth,
+    NodeLabelMaxLength,
+    EdgeLabelMaxLength,
+    FilterByLayer,
+    FilterByProperty,
+}
+
+#[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
+#[graphql(input_name = "TransformRuleParametersInput")]
+pub struct TransformRuleParameters {
+    pub max_width: Option<i32>,
+    pub max_depth: Option<i32>,
+    pub max_length: Option<i32>,
+    pub layer_filter: Option<String>,
+    pub property_filter: Option<String>,
+    pub property_value: Option<String>,
+}
+```
+
+#### 1.2 DataSource Query Integration
+**File**: `layercake-core/src/graphql/queries/mod.rs`
+
+Add after line 381:
+
+```rust
+/// Get available DataSources for a DataSourceNode configuration
+async fn available_data_sources(&self, ctx: &Context<'_>, project_id: i32) -> Result<Vec<DataSourceReference>> {
+    let context = ctx.data::<GraphQLContext>()?;
+    let data_sources = data_sources::Entity::find()
+        .filter(data_sources::Column::ProjectId.eq(project_id))
+        .filter(data_sources::Column::Status.eq("active"))
+        .all(&context.db)
+        .await?;
+
+    Ok(data_sources.into_iter().map(|ds| DataSourceReference {
+        data_source_id: ds.id,
+        project_id: ds.project_id,
+        name: ds.name,
+        source_type: ds.source_type.to_string(),
+    }).collect())
+}
+```
+
+### Frontend Changes
+
+#### 1.3 Node Configuration Dialogs
+**File**: `frontend/src/components/editors/PlanVisualEditor/dialogs/NodeConfigDialog.tsx`
+
+Create comprehensive configuration system:
+
+```tsx
+import React, { useState, useEffect } from 'react'
+import { Modal, Stack, TextInput, Select, Button, Group, Text, Accordion } from '@mantine/core'
+import { PlanDagNodeType, NodeConfig } from '../../../../types/plan-dag'
+
+interface NodeConfigDialogProps {
+  opened: boolean
+  onClose: () => void
+  nodeType: PlanDagNodeType
+  currentConfig?: NodeConfig
+  projectId: number
+  onSave: (config: NodeConfig) => void
+}
+
+export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
+  opened,
+  onClose,
+  nodeType,
+  currentConfig,
+  projectId,
+  onSave,
+}) => {
+  const [config, setConfig] = useState<NodeConfig | null>(null)
+
+  const renderConfigForm = () => {
+    switch (nodeType) {
+      case 'DataSourceNode':
+        return <DataSourceNodeConfigForm />
+      case 'TransformNode':
+        return <TransformNodeConfigForm />
+      case 'MergeNode':
+        return <MergeNodeConfigForm />
+      case 'CopyNode':
+        return <CopyNodeConfigForm />
+      case 'OutputNode':
+        return <OutputNodeConfigForm />
+      default:
+        return <Text>Configuration not available for this node type</Text>
     }
   }
+
+  return (
+    <Modal opened={opened} onClose={onClose} title={`Configure ${nodeType}`} size="lg">
+      <Stack gap="md">
+        {renderConfigForm()}
+        <Group justify="flex-end">
+          <Button variant="subtle" onClick={onClose}>Cancel</Button>
+          <Button onClick={() => config && onSave(config)}>Save Configuration</Button>
+        </Group>
+      </Stack>
+    </Modal>
+  )
 }
 ```
 
-**Update: `frontend/tsconfig.json`**
-Add to includes: `"src/types/global.d.ts"`
+#### 1.4 DataSource Configuration Form
+**File**: `frontend/src/components/editors/PlanVisualEditor/dialogs/DataSourceNodeConfigForm.tsx`
 
-### 3. Eliminate `.unwrap()` calls in Rust code ❌
-**Status**: Ready for Implementation
+```tsx
+import React, { useState, useEffect } from 'react'
+import { useQuery } from '@apollo/client'
+import { Stack, Select, Text, Alert } from '@mantine/core'
+import { IconAlertCircle } from '@tabler/icons-react'
+import { gql } from '@apollo/client'
+
+const GET_AVAILABLE_DATA_SOURCES = gql`
+  query GetAvailableDataSources($projectId: Int!) {
+    availableDataSources(projectId: $projectId) {
+      dataSourceId
+      name
+      sourceType
+    }
+  }
+`
+
+interface DataSourceNodeConfigFormProps {
+  projectId: number
+  onChange: (config: DataSourceNodeConfig) => void
+  initialConfig?: DataSourceNodeConfig
+}
+
+export const DataSourceNodeConfigForm: React.FC<DataSourceNodeConfigFormProps> = ({
+  projectId,
+  onChange,
+  initialConfig,
+}) => {
+  const [selectedDataSource, setSelectedDataSource] = useState<number | null>(
+    initialConfig?.dataSourceId || null
+  )
+
+  const { data, loading, error } = useQuery(GET_AVAILABLE_DATA_SOURCES, {
+    variables: { projectId },
+  })
+
+  const dataSources = data?.availableDataSources || []
+
+  return (
+    <Stack gap="md">
+      <Text fw={500}>DataSource Configuration</Text>
+
+      {error && (
+        <Alert icon={<IconAlertCircle size={16} />} color="red">
+          Failed to load available data sources
+        </Alert>
+      )}
+
+      <Select
+        label="Select DataSource"
+        placeholder="Choose a data source"
+        value={selectedDataSource?.toString()}
+        onChange={(value) => {
+          const id = value ? parseInt(value) : null
+          setSelectedDataSource(id)
+          if (id) {
+            const ds = dataSources.find(d => d.dataSourceId === id)
+            if (ds) {
+              onChange({
+                dataSourceId: id,
+                outputGraphRef: `datasource_${id}_output`,
+                sourceType: ds.sourceType,
+              })
+            }
+          }
+        }}
+        data={dataSources.map(ds => ({
+          value: ds.dataSourceId.toString(),
+          label: `${ds.name} (${ds.sourceType})`,
+        }))}
+        loading={loading}
+        required
+      />
+
+      {selectedDataSource && (
+        <Text size="sm" c="dimmed">
+          This DataSource will output graph data that can be used by other nodes
+        </Text>
+      )}
+    </Stack>
+  )
+}
+```
+
+## Phase 2: Interactive Toolbar with Draggable Nodes (Priority: High)
 **Estimated Effort**: 4-6 hours
-**Files**: Multiple Rust files (89+ instances)
-**Description**: Replace panic-prone `.unwrap()` and `.expect()` calls with proper error handling
-**Success Criteria**: Zero unwrap calls in production code paths, proper error propagation
 
-#### Priority 1 - Critical Panic Sources:
+#### 2.1 DAG Editor Toolbar
+**File**: `frontend/src/components/editors/PlanVisualEditor/PlanEditorToolbar.tsx`
 
-**File: `layercake-core/src/graph.rs:571, 577`**
-```rust
-// BEFORE:
-.unwrap();
+```tsx
+import React from 'react'
+import { Group, ActionIcon, Tooltip, Paper, Divider, Badge } from '@mantine/core'
+import {
+  IconDatabase,
+  IconShare,
+  IconTransform,
+  IconCopy,
+  IconFileExport,
+  IconEye,
+  IconPlayerPlay,
+  IconSettings,
+  IconUsers,
+} from '@tabler/icons-react'
+import { PlanDagNodeType } from '../../../types/plan-dag'
 
-// AFTER:
-.map_err(|e| format!("Failed to find node in edge mapping: {}", e))?;
-```
-
-**File: `layercake-core/src/graph.rs:697`**
-```rust
-// BEFORE:
-if n.belongs_to.is_some() && !node_ids.contains(n.belongs_to.as_ref().unwrap()) {
-
-// AFTER:
-if let Some(belongs_to) = &n.belongs_to {
-    if !node_ids.contains(belongs_to) {
-```
-
-**File: `layercake-core/src/common.rs:13`**
-```rust
-// BEFORE:
-let path = Path::new(path).parent().unwrap();
-
-// AFTER:
-let path = Path::new(path).parent()
-    .ok_or_else(|| anyhow::anyhow!("Invalid path: no parent directory"))?;
-```
-
-**File: `layercake-core/src/graph.rs:846`**
-```rust
-// BEFORE:
-let re = Regex::new(r"(true|y|yes)").unwrap();
-
-// AFTER:
-let re = Regex::new(r"(true|y|yes)")
-    .map_err(|e| anyhow::anyhow!("Invalid regex pattern: {}", e))?;
-```
-
-### 4. Implement Missing Authentication ❌
-**Status**: Ready for Implementation
-**Estimated Effort**: 6-8 hours
-**Files**: `layercake-core/src/mcp/server.rs`, auth service files
-**Description**: Replace authentication stubs with proper implementation
-**Success Criteria**: Secure authentication flow implemented and tested
-
-#### Implementation:
-
-**File: `layercake-core/src/mcp/server.rs:27`**
-```rust
-async fn authenticate(&self, client_info: &ClientContext) -> McpResult<SecurityContext> {
-    // TODO: Replace with actual authentication
-    match client_info.auth_header.as_ref() {
-        Some(header) if header.starts_with("Bearer ") => {
-            let token = &header[7..]; // Remove "Bearer " prefix
-            self.validate_jwt_token(token).await
-        }
-        Some(header) if header.starts_with("ApiKey ") => {
-            let api_key = &header[7..]; // Remove "ApiKey " prefix
-            self.validate_api_key(api_key).await
-        }
-        _ => Ok(SecurityContext::anonymous_with_limited_permissions()),
-    }
+interface PlanEditorToolbarProps {
+  onNodeDrop: (nodeType: PlanDagNodeType, position: { x: number; y: number }) => void
+  onPreview: () => void
+  onRun: () => void
+  onSettings: () => void
+  userCount?: number
 }
 
-fn validate_jwt_token(&self, token: &str) -> McpResult<SecurityContext> {
-    // Implement JWT validation logic
-    // Return SecurityContext with appropriate permissions
-}
+export const PlanEditorToolbar: React.FC<PlanEditorToolbarProps> = ({
+  onNodeDrop,
+  onPreview,
+  onRun,
+  onSettings,
+  userCount = 0,
+}) => {
+  const handleDragStart = (event: React.DragEvent, nodeType: PlanDagNodeType) => {
+    event.dataTransfer.setData('application/reactflow', nodeType)
+    event.dataTransfer.effectAllowed = 'move'
+  }
 
-fn validate_api_key(&self, api_key: &str) -> McpResult<SecurityContext> {
-    // Implement API key validation logic
-    // Return SecurityContext with appropriate permissions
+  const nodeTypes = [
+    { type: 'DataSourceNode' as PlanDagNodeType, icon: IconDatabase, label: 'Data Source', color: 'blue' },
+    { type: 'GraphNode' as PlanDagNodeType, icon: IconShare, label: 'Graph', color: 'green' },
+    { type: 'TransformNode' as PlanDagNodeType, icon: IconTransform, label: 'Transform', color: 'orange' },
+    { type: 'MergeNode' as PlanDagNodeType, icon: IconCopy, label: 'Merge', color: 'purple' },
+    { type: 'CopyNode' as PlanDagNodeType, icon: IconCopy, label: 'Copy', color: 'teal' },
+    { type: 'OutputNode' as PlanDagNodeType, icon: IconFileExport, label: 'Output', color: 'red' },
+  ]
+
+  return (
+    <Paper p="sm" shadow="sm" style={{ borderBottom: '1px solid #e0e0e0' }}>
+      <Group justify="space-between">
+        <Group gap="xs">
+          <Tooltip.Group openDelay={300} closeDelay={100}>
+            {nodeTypes.map(({ type, icon: Icon, label, color }) => (
+              <Tooltip key={type} label={`Drag to add ${label} node`}>
+                <ActionIcon
+                  size="lg"
+                  variant="light"
+                  color={color}
+                  style={{ cursor: 'grab' }}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, type)}
+                >
+                  <Icon size={20} />
+                </ActionIcon>
+              </Tooltip>
+            ))}
+          </Tooltip.Group>
+        </Group>
+
+        <Divider orientation="vertical" />
+
+        <Group gap="xs">
+          <Tooltip label="Preview Plan">
+            <ActionIcon size="lg" variant="light" onClick={onPreview}>
+              <IconEye size={20} />
+            </ActionIcon>
+          </Tooltip>
+
+          <Tooltip label="Execute Plan">
+            <ActionIcon size="lg" variant="light" color="green" onClick={onRun}>
+              <IconPlayerPlay size={20} />
+            </ActionIcon>
+          </Tooltip>
+
+          <Tooltip label="Settings">
+            <ActionIcon size="lg" variant="light" onClick={onSettings}>
+              <IconSettings size={20} />
+            </ActionIcon>
+          </Tooltip>
+
+          {userCount > 0 && (
+            <Group gap={4}>
+              <IconUsers size={16} />
+              <Badge size="sm" variant="light">{userCount}</Badge>
+            </Group>
+          )}
+        </Group>
+      </Group>
+    </Paper>
+  )
 }
 ```
 
-## High Priority Items
+#### 2.2 Enhanced PlanVisualEditor with Drag & Drop
+**File**: `frontend/src/components/editors/PlanVisualEditor/PlanVisualEditor.tsx`
 
-### 5. Complete TODO Items ❌
-**Status**: Ready for Implementation
-**Estimated Effort**: 8-10 hours
-**Files**: Multiple files with TODO comments (25+ items)
-**Description**: Implement or remove incomplete functionality marked as TODO
-**Success Criteria**: Critical TODOs implemented, non-critical ones documented or removed
+Add to existing component (around line 100):
 
-#### Critical TODOs to Implement:
+```tsx
+// Add drag and drop functionality
+const onDragOver = useCallback((event: React.DragEvent) => {
+  event.preventDefault()
+  event.dataTransfer.dropEffect = 'move'
+}, [])
 
-**Graph Integrity Verification** - `layercake-core/src/graph.rs:628`
+const onDrop = useCallback((event: React.DragEvent) => {
+  event.preventDefault()
+
+  const reactFlowBounds = reactFlowWrapper.current?.getBoundingClientRect()
+  const nodeType = event.dataTransfer.getData('application/reactflow') as PlanDagNodeType
+
+  if (!nodeType || !reactFlowBounds) return
+
+  const position = reactFlowInstance?.project({
+    x: event.clientX - reactFlowBounds.left,
+    y: event.clientY - reactFlowBounds.top,
+  })
+
+  if (position) {
+    handleCreateNode(nodeType, position)
+  }
+}, [reactFlowInstance])
+
+const handleCreateNode = async (nodeType: PlanDagNodeType, position: { x: number, y: number }) => {
+  const newNodeId = `${nodeType.toLowerCase()}_${Date.now()}`
+
+  const newNode: PlanDagNodeInput = {
+    id: newNodeId,
+    nodeType,
+    position,
+    metadata: {
+      label: `New ${nodeType}`,
+      description: null,
+    },
+    config: JSON.stringify({}), // Empty config - will be highlighted as unconfigured
+  }
+
+  await addPlanDagNode(newNode)
+  setConfigDialogNode({ nodeId: newNodeId, nodeType }) // Auto-open config dialog
+}
+```
+
+## Phase 3: Node Validation & Visual Indicators (Priority: High)
+**Estimated Effort**: 3-4 hours
+
+#### 3.1 Node Status Validation
+**File**: `frontend/src/utils/nodeValidation.ts`
+
+```tsx
+import { PlanDagNode, PlanDagNodeType } from '../types/plan-dag'
+
+export interface NodeValidationResult {
+  isConfigured: boolean
+  hasErrors: boolean
+  warnings: string[]
+  errors: string[]
+}
+
+export const validateNode = (node: PlanDagNode): NodeValidationResult => {
+  const result: NodeValidationResult = {
+    isConfigured: false,
+    hasErrors: false,
+    warnings: [],
+    errors: [],
+  }
+
+  try {
+    const config = JSON.parse(node.config)
+
+    switch (node.nodeType) {
+      case 'DataSourceNode':
+        result.isConfigured = !!config.dataSourceId
+        if (!config.dataSourceId) {
+          result.errors.push('No DataSource selected')
+        }
+        break
+
+      case 'TransformNode':
+        result.isConfigured = !!(config.inputGraphRef && config.outputGraphRef && config.transformRules?.length)
+        if (!config.inputGraphRef) result.errors.push('No input graph specified')
+        if (!config.outputGraphRef) result.errors.push('No output graph specified')
+        if (!config.transformRules?.length) result.errors.push('No transform rules defined')
+        break
+
+      case 'OutputNode':
+        result.isConfigured = !!(config.sourceGraphRef && config.renderTarget)
+        if (!config.sourceGraphRef) result.errors.push('No source graph specified')
+        if (!config.renderTarget) result.errors.push('No render target specified')
+        break
+
+      default:
+        result.isConfigured = Object.keys(config).length > 0
+    }
+
+  } catch (e) {
+    result.hasErrors = true
+    result.errors.push('Invalid configuration JSON')
+  }
+
+  result.hasErrors = result.errors.length > 0
+  return result
+}
+```
+
+#### 3.2 Enhanced Node Components with Status Indicators
+**File**: `frontend/src/components/editors/PlanVisualEditor/nodes/BaseNode.tsx`
+
+```tsx
+import React from 'react'
+import { Handle, Position } from 'reactflow'
+import { Paper, Group, Text, ActionIcon, Badge, Tooltip } from '@mantine/core'
+import { IconSettings, IconAlertTriangle, IconCheck } from '@tabler/icons-react'
+import { NodeValidationResult } from '../../../../utils/nodeValidation'
+
+interface BaseNodeProps {
+  data: {
+    label: string
+    description?: string
+    validation: NodeValidationResult
+    onConfigure: () => void
+  }
+  color: string
+  icon: React.ReactNode
+}
+
+export const BaseNode: React.FC<BaseNodeProps> = ({ data, color, icon }) => {
+  const { validation } = data
+
+  const getStatusColor = () => {
+    if (validation.hasErrors) return 'red'
+    if (!validation.isConfigured) return 'orange'
+    return 'green'
+  }
+
+  return (
+    <Paper
+      p="sm"
+      shadow="md"
+      style={{
+        border: `2px solid ${validation.isConfigured ? color : '#ff9500'}`,
+        minWidth: 180,
+        backgroundColor: validation.isConfigured ? 'white' : '#fff8f0'
+      }}
+    >
+      <Handle type="target" position={Position.Top} />
+
+      <Group justify="space-between" mb="xs">
+        <Group gap="xs">
+          {icon}
+          <Badge size="xs" color={getStatusColor()}>
+            {validation.hasErrors ? 'Error' : validation.isConfigured ? 'Ready' : 'Configure'}
+          </Badge>
+        </Group>
+
+        <Tooltip label="Configure node">
+          <ActionIcon size="sm" variant="light" onClick={data.onConfigure}>
+            <IconSettings size={14} />
+          </ActionIcon>
+        </Tooltip>
+      </Group>
+
+      <Text size="sm" fw={500}>{data.label}</Text>
+      {data.description && (
+        <Text size="xs" c="dimmed">{data.description}</Text>
+      )}
+
+      {validation.errors.length > 0 && (
+        <Group gap="xs" mt="xs">
+          <IconAlertTriangle size={12} color="red" />
+          <Text size="xs" c="red">{validation.errors[0]}</Text>
+        </Group>
+      )}
+
+      <Handle type="source" position={Position.Bottom} />
+    </Paper>
+  )
+}
+```
+
+## Phase 4: Backend Processing Engine (Priority: Medium)
+**Estimated Effort**: 10-12 hours
+
+#### 4.1 Transform Service Implementation
+**File**: `layercake-core/src/services/transform_service.rs`
+
 ```rust
-pub fn verify_graph_integrity(&self) -> Result<(), Vec<String>> {
-    let mut errors = Vec::new();
+use anyhow::Result;
+use crate::graph::Graph;
+use crate::graphql::types::plan_dag::{TransformRule, TransformRuleType};
 
-    // Verify unique node IDs
-    let node_ids: HashSet<String> = self.nodes.iter().map(|n| n.id.clone()).collect();
-    if node_ids.len() != self.nodes.len() {
-        errors.push("Duplicate node IDs detected".to_string());
+pub struct TransformService;
+
+impl TransformService {
+    pub fn new() -> Self {
+        Self
     }
 
-    // Verify edge references
-    for edge in &self.edges {
-        if !node_ids.contains(&edge.source) {
-            errors.push(format!("Edge {} references non-existent source node {}", edge.id, edge.source));
+    pub async fn apply_transform_rules(
+        &self,
+        input_graph: &Graph,
+        rules: &[TransformRule],
+    ) -> Result<Graph> {
+        let mut result_graph = input_graph.clone();
+
+        // Apply rules in order
+        for rule in rules.iter() {
+            result_graph = self.apply_single_rule(result_graph, rule).await?;
         }
-        if !node_ids.contains(&edge.target) {
-            errors.push(format!("Edge {} references non-existent target node {}", edge.id, edge.target));
+
+        Ok(result_graph)
+    }
+
+    async fn apply_single_rule(&self, graph: Graph, rule: &TransformRule) -> Result<Graph> {
+        match rule.rule_type {
+            TransformRuleType::InvertGraph => {
+                self.invert_graph(graph).await
+            }
+            TransformRuleType::MaxPartitionWidth => {
+                if let Some(width) = rule.parameters.max_width {
+                    self.limit_partition_width(graph, width).await
+                } else {
+                    Ok(graph)
+                }
+            }
+            TransformRuleType::MaxPartitionDepth => {
+                if let Some(depth) = rule.parameters.max_depth {
+                    self.limit_partition_depth(graph, depth).await
+                } else {
+                    Ok(graph)
+                }
+            }
+            TransformRuleType::NodeLabelMaxLength => {
+                if let Some(max_len) = rule.parameters.max_length {
+                    self.truncate_node_labels(graph, max_len).await
+                } else {
+                    Ok(graph)
+                }
+            }
+            // ... implement other transform types
+            _ => Ok(graph), // TODO: Implement remaining transforms
         }
     }
 
-    // Verify node hierarchy consistency
-    for node in &self.nodes {
-        if let Some(belongs_to) = &node.belongs_to {
-            if !node_ids.contains(belongs_to) {
-                errors.push(format!("Node {} belongs to non-existent node {}", node.id, belongs_to));
+    async fn invert_graph(&self, mut graph: Graph) -> Result<Graph> {
+        graph.invert_graph()?;
+        Ok(graph)
+    }
+
+    async fn limit_partition_width(&self, mut graph: Graph, width: i32) -> Result<Graph> {
+        graph.modify_graph_limit_partition_width(width as usize)?;
+        Ok(graph)
+    }
+
+    async fn limit_partition_depth(&self, mut graph: Graph, depth: i32) -> Result<Graph> {
+        graph.modify_graph_limit_partition_depth(depth as usize)?;
+        Ok(graph)
+    }
+
+    async fn truncate_node_labels(&self, mut graph: Graph, max_len: i32) -> Result<Graph> {
+        for node in &mut graph.nodes {
+            if node.label.len() > max_len as usize {
+                node.label.truncate(max_len as usize);
+                node.label.push_str("...");
             }
         }
+        Ok(graph)
     }
-
-    if errors.is_empty() { Ok(()) } else { Err(errors) }
 }
 ```
 
-**Plan Execution Implementation** - `layercake-core/src/mcp/tools/plans.rs:207`
+#### 4.2 Plan Execution Engine
+**File**: `layercake-core/src/services/plan_execution_service.rs`
+
 ```rust
-// TODO: Implement actual plan execution using existing plan_execution module
-pub async fn execute_plan_impl(plan_id: i32, project_id: i32) -> Result<PlanExecutionResult, String> {
-    use crate::plan_execution;
+use anyhow::Result;
+use std::collections::HashMap;
+use sea_orm::DatabaseConnection;
+use crate::graph::Graph;
+use crate::graphql::types::plan_dag::{PlanDag, PlanDagNodeType};
+use crate::services::{DataSourceService, TransformService};
 
-    // Load plan from database
-    let plan = load_plan_from_db(plan_id, project_id).await?;
-
-    // Execute using existing plan execution module
-    match plan_execution::execute_plan_from_config(plan.yaml_content, false) {
-        Ok(_) => Ok(PlanExecutionResult {
-            success: true,
-            output: "Plan executed successfully".to_string(),
-            errors: vec![],
-        }),
-        Err(e) => Ok(PlanExecutionResult {
-            success: false,
-            output: "".to_string(),
-            errors: vec![format!("Plan execution failed: {}", e)],
-        }),
-    }
-}
-```
-
-### 6. Decompose Large Components ❌
-**Status**: Ready for Implementation
-**Estimated Effort**: 4-5 hours
-**Files**: `frontend/src/components/editors/PlanVisualEditor/PlanVisualEditor.tsx`
-**Description**: Split 1,086-line component into smaller, focused components
-**Success Criteria**: Main component under 400 lines, logical separation of concerns
-
-#### Component Decomposition Plan:
-
-**Split `PlanVisualEditor.tsx` (1,086 lines) into:**
-
-1. **`PlanVisualEditor.tsx`** (main component, ~300 lines)
-   - Main component orchestration
-   - High-level state management
-   - Component composition
-
-2. **`hooks/usePlanEditor.ts`** (state management, ~200 lines)
-   - ReactFlow node/edge state
-   - Plan DAG data management
-   - Dirty state tracking
-
-3. **`components/PlanEditorToolbar.tsx`** (toolbar UI, ~150 lines)
-   - Action buttons (preview, run, settings)
-   - User presence indicators
-   - Save status indicators
-
-4. **`components/PlanEditorCanvas.tsx`** (ReactFlow wrapper, ~200 lines)
-   - ReactFlow configuration
-   - Node/edge event handlers
-   - Canvas interaction logic
-
-5. **`components/PlanEditorStatusPanel.tsx`** (status indicators, ~150 lines)
-   - Update control panel
-   - Collaboration status
-   - Validation status
-
-6. **`hooks/useCollaborativeEditor.ts`** (collaboration logic, ~150 lines)
-   - Cursor broadcasting
-   - Conflict detection
-   - Real-time updates
-
-### 7. Add Comprehensive Error Boundaries ❌
-**Status**: Ready for Implementation
-**Estimated Effort**: 2-3 hours
-**Files**: React component tree
-**Description**: Implement error boundaries to prevent cascading failures
-**Success Criteria**: Error boundaries at key component levels, graceful error handling
-
-#### Implementation:
-
-**Create: `frontend/src/components/common/ErrorBoundary.tsx`**
-```tsx
-import React, { Component, ReactNode } from 'react'
-import { Alert, Stack, Button, Text } from '@mantine/core'
-import { IconAlertTriangle, IconRefresh } from '@tabler/icons-react'
-
-interface Props {
-  children: ReactNode
-  fallback?: ReactNode
-  onError?: (error: Error, errorInfo: React.ErrorInfo) => void
+pub struct PlanExecutionService {
+    db: DatabaseConnection,
+    transform_service: TransformService,
+    data_source_service: DataSourceService,
 }
 
-interface State {
-  hasError: boolean
-  error?: Error
-}
-
-export class ErrorBoundary extends Component<Props, State> {
-  constructor(props: Props) {
-    super(props)
-    this.state = { hasError: false }
-  }
-
-  static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error }
-  }
-
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('ErrorBoundary caught an error:', error, errorInfo)
-    this.props.onError?.(error, errorInfo)
-  }
-
-  handleReset = () => {
-    this.setState({ hasError: false, error: undefined })
-  }
-
-  render() {
-    if (this.state.hasError) {
-      if (this.props.fallback) {
-        return this.props.fallback
-      }
-
-      return (
-        <Alert icon={<IconAlertTriangle size="1rem" />} title="Something went wrong" color="red">
-          <Stack gap="md">
-            <Text size="sm">
-              {this.state.error?.message || 'An unexpected error occurred'}
-            </Text>
-            <Button
-              leftSection={<IconRefresh size="1rem" />}
-              variant="light"
-              size="sm"
-              onClick={this.handleReset}
-            >
-              Try Again
-            </Button>
-          </Stack>
-        </Alert>
-      )
+impl PlanExecutionService {
+    pub fn new(db: DatabaseConnection) -> Self {
+        Self {
+            db: db.clone(),
+            transform_service: TransformService::new(),
+            data_source_service: DataSourceService::new(db),
+        }
     }
 
-    return this.props.children
-  }
-}
-```
+    pub async fn execute_plan(&self, plan: &PlanDag) -> Result<HashMap<String, Graph>> {
+        let mut graph_registry: HashMap<String, Graph> = HashMap::new();
+        let execution_order = self.calculate_execution_order(plan)?;
 
-### 8. Implement Input Validation ❌
-**Status**: Ready for Implementation
-**Estimated Effort**: 3-4 hours
-**Files**: Server endpoint handlers
-**Description**: Add request validation for all API endpoints
-**Success Criteria**: All endpoints validate input, return proper error responses
+        for node_id in execution_order {
+            let node = plan.nodes.iter().find(|n| n.id == node_id)
+                .ok_or_else(|| anyhow::anyhow!("Node not found: {}", node_id))?;
 
-#### Implementation:
-
-**Add validation middleware** - `layercake-core/src/server/middleware/validation.rs`
-```rust
-use serde::de::DeserializeOwned;
-use axum::{extract::Request, response::Response};
-
-pub async fn validate_json<T: DeserializeOwned + Validate>(
-    req: Request<Body>,
-) -> Result<T, ValidationError> {
-    let body = hyper::body::to_bytes(req.into_body()).await?;
-    let data: T = serde_json::from_slice(&body)?;
-
-    data.validate()?;
-    Ok(data)
-}
-
-pub trait Validate {
-    fn validate(&self) -> Result<(), ValidationError>;
-}
-
-// Implement for project creation
-impl Validate for CreateProjectRequest {
-    fn validate(&self) -> Result<(), ValidationError> {
-        if self.name.trim().is_empty() {
-            return Err(ValidationError::field("name", "Project name cannot be empty"));
+            match node.node_type {
+                PlanDagNodeType::DataSource => {
+                    self.execute_datasource_node(node, &mut graph_registry).await?;
+                }
+                PlanDagNodeType::Transform => {
+                    self.execute_transform_node(node, &mut graph_registry).await?;
+                }
+                PlanDagNodeType::Merge => {
+                    self.execute_merge_node(node, &mut graph_registry).await?;
+                }
+                PlanDagNodeType::Copy => {
+                    self.execute_copy_node(node, &mut graph_registry).await?;
+                }
+                PlanDagNodeType::Output => {
+                    self.execute_output_node(node, &graph_registry).await?;
+                }
+                _ => {} // GraphNode is passive - just contains graph data
+            }
         }
-        if self.name.len() > 100 {
-            return Err(ValidationError::field("name", "Project name too long (max 100 chars)"));
+
+        Ok(graph_registry)
+    }
+
+    fn calculate_execution_order(&self, plan: &PlanDag) -> Result<Vec<String>> {
+        // Topological sort to determine execution order
+        // This ensures dependencies are processed before dependents
+
+        use std::collections::{HashMap, VecDeque, HashSet};
+
+        let mut in_degree: HashMap<String, usize> = HashMap::new();
+        let mut adjacency: HashMap<String, Vec<String>> = HashMap::new();
+
+        // Initialize
+        for node in &plan.nodes {
+            in_degree.insert(node.id.clone(), 0);
+            adjacency.insert(node.id.clone(), Vec::new());
         }
+
+        // Build graph
+        for edge in &plan.edges {
+            adjacency.get_mut(&edge.source).unwrap().push(edge.target.clone());
+            *in_degree.get_mut(&edge.target).unwrap() += 1;
+        }
+
+        // Topological sort
+        let mut queue: VecDeque<String> = VecDeque::new();
+        let mut result: Vec<String> = Vec::new();
+
+        for (node_id, degree) in &in_degree {
+            if *degree == 0 {
+                queue.push_back(node_id.clone());
+            }
+        }
+
+        while let Some(node_id) = queue.pop_front() {
+            result.push(node_id.clone());
+
+            for neighbor in &adjacency[&node_id] {
+                let neighbor_degree = in_degree.get_mut(neighbor).unwrap();
+                *neighbor_degree -= 1;
+                if *neighbor_degree == 0 {
+                    queue.push_back(neighbor.clone());
+                }
+            }
+        }
+
+        if result.len() != plan.nodes.len() {
+            return Err(anyhow::anyhow!("Cyclic dependency detected in plan"));
+        }
+
+        Ok(result)
+    }
+
+    async fn execute_datasource_node(
+        &self,
+        node: &crate::graphql::types::plan_dag::PlanDagNode,
+        graph_registry: &mut HashMap<String, Graph>,
+    ) -> Result<()> {
+        let config: serde_json::Value = serde_json::from_str(&node.config)?;
+        let data_source_id = config["dataSourceId"].as_i64()
+            .ok_or_else(|| anyhow::anyhow!("Missing dataSourceId in DataSource node config"))?;
+
+        let data_source = self.data_source_service.get_by_id(data_source_id as i32).await?
+            .ok_or_else(|| anyhow::anyhow!("DataSource not found: {}", data_source_id))?;
+
+        let graph: Graph = serde_json::from_str(&data_source.graph_json)?;
+        let output_ref = config["outputGraphRef"].as_str()
+            .unwrap_or(&format!("datasource_{}_output", data_source_id));
+
+        graph_registry.insert(output_ref.to_string(), graph);
         Ok(())
     }
+
+    // ... implement other node execution methods
 }
 ```
 
-### 9. Add Connection Pooling ❌
-**Status**: Ready for Implementation
-**Estimated Effort**: 2-3 hours
-**Files**: Database connection configuration
-**Description**: Configure proper database connection pooling
-**Success Criteria**: Connection pool configured with appropriate limits
+## Phase 5: Output Generation System (Priority: Medium)
+**Estimated Effort**: 6-8 hours
 
-#### Implementation:
+#### 5.1 Output Service Implementation
+**File**: `layercake-core/src/services/output_service.rs`
 
-**Update: `layercake-core/src/database/connection.rs`**
 ```rust
-use sea_orm::{Database, DatabaseConnection, ConnectOptions};
+use anyhow::Result;
+use crate::graph::Graph;
+use crate::graphql::types::plan_dag::{RenderTarget, RenderConfig, GraphConfig};
+use crate::export::{to_dot, to_gml, to_plantuml, to_mermaid, to_custom};
 
-pub async fn establish_connection(database_url: &str) -> Result<DatabaseConnection, sea_orm::DbErr> {
-    let mut opt = ConnectOptions::new(database_url);
-    opt.max_connections(100)
-        .min_connections(5)
-        .connect_timeout(Duration::from_secs(8))
-        .acquire_timeout(Duration::from_secs(8))
-        .idle_timeout(Duration::from_secs(8))
-        .max_lifetime(Duration::from_secs(8))
-        .sqlx_logging(true)
-        .sqlx_logging_level(log::LevelFilter::Info);
+pub struct OutputService;
 
-    Database::connect(opt).await
+impl OutputService {
+    pub fn new() -> Self {
+        Self
+    }
+
+    pub async fn generate_output(
+        &self,
+        graph: &Graph,
+        render_target: RenderTarget,
+        render_config: Option<RenderConfig>,
+        graph_config: Option<GraphConfig>,
+        output_path: &str,
+    ) -> Result<String> {
+        let processed_graph = self.apply_graph_config(graph, graph_config)?;
+
+        match render_target {
+            RenderTarget::Dot => {
+                to_dot::export_dot(&processed_graph, output_path, render_config)
+            }
+            RenderTarget::Gml => {
+                to_gml::export_gml(&processed_graph, output_path)
+            }
+            RenderTarget::PlantUml => {
+                to_plantuml::export_plantuml(&processed_graph, output_path, render_config)
+            }
+            RenderTarget::Mermaid => {
+                to_mermaid::export_mermaid(&processed_graph, output_path)
+            }
+            RenderTarget::Json => {
+                let json = serde_json::to_string_pretty(&processed_graph)?;
+                std::fs::write(output_path, json)?;
+                Ok(format!("JSON exported to {}", output_path))
+            }
+            RenderTarget::CsvNodes => {
+                self.export_csv_nodes(&processed_graph, output_path)
+            }
+            RenderTarget::CsvEdges => {
+                self.export_csv_edges(&processed_graph, output_path)
+            }
+            _ => Err(anyhow::anyhow!("Unsupported render target: {:?}", render_target))
+        }
+    }
+
+    fn apply_graph_config(&self, graph: &Graph, config: Option<GraphConfig>) -> Result<Graph> {
+        let mut result = graph.clone();
+
+        if let Some(config) = config {
+            if let Some(max_node_label_len) = config.node_label_max_length {
+                for node in &mut result.nodes {
+                    if node.label.len() > max_node_label_len as usize {
+                        node.label.truncate(max_node_label_len as usize);
+                    }
+                }
+            }
+
+            if let Some(max_edge_label_len) = config.edge_label_max_length {
+                for edge in &mut result.edges {
+                    if edge.label.len() > max_edge_label_len as usize {
+                        edge.label.truncate(max_edge_label_len as usize);
+                    }
+                }
+            }
+
+            if config.invert_graph == Some(true) {
+                result.invert_graph()?;
+            }
+
+            if let Some(max_depth) = config.max_partition_depth {
+                result.modify_graph_limit_partition_depth(max_depth as usize)?;
+            }
+
+            if let Some(max_width) = config.max_partition_width {
+                result.modify_graph_limit_partition_width(max_width as usize)?;
+            }
+        }
+
+        Ok(result)
+    }
+
+    fn export_csv_nodes(&self, graph: &Graph, output_path: &str) -> Result<String> {
+        use csv::Writer;
+        use std::fs::File;
+
+        let file = File::create(output_path)?;
+        let mut writer = Writer::from_writer(file);
+
+        writer.write_record(&["id", "label", "layer_id", "properties"])?;
+
+        for node in &graph.nodes {
+            let properties = serde_json::to_string(&node.properties)?;
+            writer.write_record(&[
+                &node.id,
+                &node.label,
+                &node.layer_id.unwrap_or_default(),
+                &properties,
+            ])?;
+        }
+
+        writer.flush()?;
+        Ok(format!("CSV nodes exported to {}", output_path))
+    }
+
+    fn export_csv_edges(&self, graph: &Graph, output_path: &str) -> Result<String> {
+        use csv::Writer;
+        use std::fs::File;
+
+        let file = File::create(output_path)?;
+        let mut writer = Writer::from_writer(file);
+
+        writer.write_record(&["id", "source", "target", "label", "properties"])?;
+
+        for edge in &graph.edges {
+            let properties = serde_json::to_string(&edge.properties)?;
+            writer.write_record(&[
+                &edge.id,
+                &edge.source,
+                &edge.target,
+                &edge.label,
+                &properties,
+            ])?;
+        }
+
+        writer.flush()?;
+        Ok(format!("CSV edges exported to {}", output_path))
+    }
 }
 ```
 
-## Implementation Order
+## Phase 6: Integration and Testing (Priority: High)
+**Estimated Effort**: 4-5 hours
 
-1. **Add missing type definitions** (Critical #2) - Enables TypeScript fixes
-2. **Fix TypeScript compilation errors** (Critical #1) - Enables further frontend work
-3. **Eliminate `.unwrap()` calls** (Critical #3) - Improve Rust code safety
-4. **Complete critical TODO items** (High #5) - Address incomplete functionality
-5. **Add comprehensive error boundaries** (High #7) - Improve frontend reliability
-6. **Implement input validation** (High #8) - Improve API security
-7. **Add connection pooling** (High #9) - Improve database performance
-8. **Decompose large components** (High #6) - Improve frontend maintainability
-9. **Implement missing authentication** (Critical #4) - Complex task saved for last
+#### 6.1 Plan Execution Mutation
+**File**: `layercake-core/src/graphql/mutations/mod.rs`
 
-## Implementation Commands
+Add after line 1115:
 
-Execute these commands in order after implementing fixes:
+```rust
+/// Execute a complete Plan DAG
+async fn execute_plan_dag(&self, ctx: &Context<'_>, project_id: i32) -> Result<PlanExecutionResult> {
+    let context = ctx.data::<GraphQLContext>()?;
 
-```bash
-# 1. Fix TypeScript errors
-cd frontend
-npm run type-check  # Should pass after fixes
+    // Get the Plan DAG
+    let plan_dag = self.get_plan_dag(ctx, project_id).await?
+        .ok_or_else(|| Error::new("No Plan DAG found for project"))?;
 
-# 2. Test Rust compilation
-cd ..
-cargo check --workspace
-cargo clippy --workspace -- -D warnings
+    // Execute the plan
+    let execution_service = crate::services::plan_execution_service::PlanExecutionService::new(context.db.clone());
 
-# 3. Run tests
-cargo test
-cd frontend && npm test (if tests exist)
-
-# 4. Build verification
-cargo build --release
-cd frontend && npm run build
+    match execution_service.execute_plan(&plan_dag).await {
+        Ok(graph_registry) => {
+            Ok(PlanExecutionResult {
+                success: true,
+                message: format!("Plan executed successfully. Generated {} graphs.", graph_registry.len()),
+                output_files: vec![], // TODO: Collect actual output file paths
+            })
+        }
+        Err(e) => {
+            Ok(PlanExecutionResult {
+                success: false,
+                message: format!("Plan execution failed: {}", e),
+                output_files: vec![],
+            })
+        }
+    }
+}
 ```
 
-## Commit Strategy
+#### 6.2 Frontend Integration
+**File**: `frontend/src/components/editors/PlanVisualEditor/PlanVisualEditor.tsx`
 
-After implementing each section:
+Add plan execution functionality:
 
-```bash
-git add .
-git commit -m "fix: resolve TypeScript compilation errors
+```tsx
+const [executePlanDag] = useMutation(gql`
+  mutation ExecutePlanDag($projectId: Int!) {
+    executePlanDag(projectId: $projectId) {
+      success
+      message
+      outputFiles
+    }
+  }
+`)
 
-- Fix useUserPresence hook signature mismatch
-- Add missing CollaborationEvent type definitions
-- Replace NodeJS.Timeout with number types
-- Remove unused variables
+const handleExecutePlan = async () => {
+  try {
+    const result = await executePlanDag({
+      variables: { projectId: parseInt(projectId) }
+    })
 
-🤖 Generated with Claude Code
-
-Co-Authored-By: Claude <noreply@anthropic.com>"
-
-git add .
-git commit -m "fix: eliminate critical .unwrap() calls in Rust code
-
-- Replace panic-prone unwrap calls with proper error handling
-- Add comprehensive error messages for debugging
-- Improve graph integrity verification
-- Enhance file path validation
-
-🤖 Generated with Claude Code
-
-Co-Authored-By: Claude <noreply@anthropic.com>"
-
-git add .
-git commit -m "feat: implement missing authentication system
-
-- Add JWT and API key validation
-- Replace authentication stubs with secure implementation
-- Add proper permission handling
-- Enhance security context management
-
-🤖 Generated with Claude Code
-
-Co-Authored-By: Claude <noreply@anthropic.com>"
+    if (result.data?.executePlanDag.success) {
+      notifications.show({
+        title: 'Plan Executed',
+        message: result.data.executePlanDag.message,
+        color: 'green',
+      })
+    } else {
+      notifications.show({
+        title: 'Execution Failed',
+        message: result.data?.executePlanDag.message || 'Unknown error',
+        color: 'red',
+      })
+    }
+  } catch (error) {
+    notifications.show({
+      title: 'Execution Error',
+      message: 'Failed to execute plan',
+      color: 'red',
+    })
+  }
+}
 ```
 
-## Progress Tracking
+## Implementation Order & Timeline
 
-- **Total Items**: 9
-- **Completed**: 0 (pending implementation due to read-only filesystem)
-- **Ready for Implementation**: 9
-- **Overall Progress**: 0% (documentation complete, implementation pending)
+### Week 1: Core Configuration System
+1. **Days 1-2**: Backend node configuration types and DataSource integration
+2. **Days 3-4**: Frontend configuration dialogs and forms
+3. **Day 5**: Testing and integration
+
+### Week 2: Interactive Interface
+1. **Days 1-2**: Toolbar with draggable nodes and drop functionality
+2. **Days 3-4**: Node validation and visual status indicators
+3. **Day 5**: UI polish and testing
+
+### Week 3: Backend Processing
+1. **Days 1-3**: Transform service and rule engine
+2. **Days 4-5**: Plan execution service and topological sorting
+
+### Week 4: Output System
+1. **Days 1-3**: Output service and render targets
+2. **Days 4-5**: Integration testing and documentation
+
+## Success Criteria
+
+### ✅ Phase 1 Complete When:
+- All node types have functional configuration dialogs
+- DataSource nodes can select from available project DataSources
+- Transform nodes can define multiple transformation rules
+- Configuration state is properly validated and saved
+
+### ✅ Phase 2 Complete When:
+- Toolbar displays all 6 node types as draggable icons
+- Drag and drop creates new nodes on canvas
+- Auto-opening configuration dialog for new nodes
+- Visual feedback during drag operations
+
+### ✅ Phase 3 Complete When:
+- Unconfigured nodes are visually highlighted (orange border)
+- Error states are clearly indicated with red styling
+- Node status badges show configuration state
+- Validation tooltips provide helpful error messages
+
+### ✅ Phase 4 Complete When:
+- Transform service can apply all rule types from specification
+- Plan execution service correctly handles dependency order
+- Cyclic dependency detection prevents infinite loops
+- Graph transformations produce expected results
+
+### ✅ Phase 5 Complete When:
+- Output nodes can generate all supported formats
+- Render configuration options are respected
+- Output files are created at specified paths
+- Error handling for file I/O operations
+
+### ✅ Complete Implementation When:
+- All node types are fully functional
+- Plan DAG can be executed end-to-end
+- DataSource → Transform → Output pipeline works
+- Real-time collaboration features are maintained
+- No regressions in existing functionality
 
 ## Notes
-- All fixes are documented and ready for implementation
-- Each task includes specific code changes and file locations
-- Testing commands provided for verification after each change
-- Breaking changes will be minimal due to focused fixes
-- Plan addresses all critical and high priority issues from code review
+- **Backward Compatibility**: All changes maintain existing GraphQL API compatibility
+- **Performance**: Plan execution is async and reports progress
+- **Error Handling**: Comprehensive error messages for debugging
+- **Testing**: Each phase includes unit and integration tests
+- **Documentation**: Update API documentation for new features
 
 ---
 *Plan created: 2025-01-21*
-*Documentation complete: All fixes documented and ready for implementation*
-
+*Implementation ready: All phases defined with specific deliverables*
