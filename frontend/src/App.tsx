@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Routes, Route, useNavigate, useParams, useLocation } from 'react-router-dom'
 import { AppShell, Group, Title, Stack, Button, Container, Text, Card, Badge, Alert } from '@mantine/core'
 import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconPlayerPlay, IconAlertCircle, IconFileDatabase } from '@tabler/icons-react'
@@ -10,6 +10,7 @@ import { PlanVisualEditor } from './components/editors/PlanVisualEditor/PlanVisu
 import { ErrorBoundary } from './components/common/ErrorBoundary'
 import { DataSourcesPage } from './components/datasources/DataSourcesPage'
 import { DataSourceEditor } from './components/datasources/DataSourceEditor'
+import { CreateProjectModal } from './components/project/CreateProjectModal'
 
 // Health check query to verify backend connectivity
 const HEALTH_CHECK = gql`
@@ -128,6 +129,8 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
 // Home page component
 const HomePage = () => {
   const navigate = useNavigate()
+  const [createModalOpened, setCreateModalOpened] = useState(false)
+
   const { loading: healthLoading, error: healthError } = useQuery(HEALTH_CHECK, {
     errorPolicy: 'all',
     notifyOnNetworkStatusChange: true,
@@ -135,6 +138,14 @@ const HomePage = () => {
 
   const handleNavigate = (route: string) => {
     navigate(route)
+  }
+
+  const handleCreateProject = () => {
+    setCreateModalOpened(true)
+  }
+
+  const handleProjectCreated = (project: { id: number; name: string; description?: string }) => {
+    navigate(`/projects/${project.id}`) // Navigate to the new project
   }
 
   return (
@@ -177,7 +188,7 @@ const HomePage = () => {
           size="lg"
           variant="outline"
           leftSection={<IconGraph size={20} />}
-          onClick={() => navigate('/projects')}
+          onClick={handleCreateProject}
         >
           Create New Project
         </Button>
@@ -186,6 +197,12 @@ const HomePage = () => {
       <Text size="sm" c="dimmed">
         Phase 2.3: Frontend-Backend Integration Complete - Real-time Plan DAG editor ready
       </Text>
+
+      <CreateProjectModal
+        opened={createModalOpened}
+        onClose={() => setCreateModalOpened(false)}
+        onSuccess={handleProjectCreated}
+      />
     </Container>
   )
 }
@@ -193,7 +210,9 @@ const HomePage = () => {
 // Projects list page component
 const ProjectsPage = () => {
   const navigate = useNavigate()
-  const { data: projectsData, loading: projectsLoading, error: projectsError } = useQuery<{
+  const [createModalOpened, setCreateModalOpened] = useState(false)
+
+  const { data: projectsData, loading: projectsLoading, error: projectsError, refetch } = useQuery<{
     projects: Array<{
       id: number
       name: string
@@ -215,13 +234,22 @@ const ProjectsPage = () => {
     navigate(`/projects/${projectId}`)
   }
 
+  const handleCreateProject = () => {
+    setCreateModalOpened(true)
+  }
+
+  const handleProjectCreated = (project: { id: number; name: string; description?: string }) => {
+    refetch() // Refresh the projects list
+    navigate(`/projects/${project.id}`) // Navigate to the new project
+  }
+
   return (
     <Container size="xl">
       <Breadcrumbs currentPage="Projects" onNavigate={handleNavigate} />
 
       <Group justify="space-between" mb="md">
         <Title order={1}>Projects</Title>
-        <Button leftSection={<IconPlus size={16} />}>
+        <Button leftSection={<IconPlus size={16} />} onClick={handleCreateProject}>
           New Project
         </Button>
       </Group>
@@ -242,7 +270,7 @@ const ProjectsPage = () => {
             <Text ta="center" c="dimmed">
               Create your first project to start building Plan DAGs and transforming graphs.
             </Text>
-            <Button leftSection={<IconPlus size={16} />}>
+            <Button leftSection={<IconPlus size={16} />} onClick={handleCreateProject}>
               Create First Project
             </Button>
           </Stack>
@@ -306,6 +334,12 @@ const ProjectsPage = () => {
           ))}
         </Stack>
       )}
+
+      <CreateProjectModal
+        opened={createModalOpened}
+        onClose={() => setCreateModalOpened(false)}
+        onSuccess={handleProjectCreated}
+      />
     </Container>
   )
 }
