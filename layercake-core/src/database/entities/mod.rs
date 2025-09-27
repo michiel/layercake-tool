@@ -9,6 +9,6 @@ pub mod data_sources;
 pub mod users;
 pub mod user_sessions;
 pub mod project_collaborators;
-pub mod user_presence;
+// REMOVED: user_presence - ephemeral data now handled via WebSocket only
 
 // Re-export specific entities to avoid naming conflicts

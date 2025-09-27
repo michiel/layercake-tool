@@ -396,15 +396,17 @@ document_cleanup_interval = 300s    # Clean up empty document sessions
   - Connection retry logic with exponential backoff
   - TypeScript compilation successful across all components
 
-### Phase 3: Database Cleanup & Migration 🚧 IN PROGRESS
+### Phase 3: Database Cleanup & Migration 🔄 IN PROGRESS
 - **Remove Database Storage of Ephemeral Data** 🔄
-  - [ ] Remove `UPDATE_CURSOR_POSITION` mutation from GraphQL schema
-  - [ ] Remove cursor position database storage code
+  - [x] Remove `UPDATE_CURSOR_POSITION` mutation from GraphQL schema
+  - [x] Remove cursor position database storage code from GraphQL resolvers
+  - [x] Deprecate old useCollaboration hook with warning
+  - [ ] Remove user_presence database entity and migrations
   - [ ] Clean up unused GraphQL subscription code for presence
-  - [ ] Update database migrations to remove ephemeral data columns
 - **Backend Cleanup** 🔄
-  - [ ] Remove database persistence code for cursor positions
-  - [ ] Ensure all ephemeral data is memory-only
+  - [x] Remove database persistence code for cursor positions
+  - [ ] Remove user_presence database table structure
+  - [x] Ensure all ephemeral data is memory-only (WebSocket implementation complete)
   - [ ] Add memory cleanup verification
 - **Performance Optimization** ⏳ PLANNED
   - [ ] Implement cursor update batching (50ms intervals)
@@ -412,7 +414,7 @@ document_cleanup_interval = 300s    # Clean up empty document sessions
   - [ ] Optimize JSON serialization
   - [ ] Add memory usage monitoring for session data
 
-**Current Status**: Phase 2 complete with full TypeScript compilation success. All WebSocket infrastructure is functional and ready for testing. Phase 3 database cleanup is now in progress.
+**Current Status**: Phase 2 complete with full TypeScript compilation success. Phase 3 GraphQL cleanup mostly complete - cursor position mutations removed from frontend and backend. WebSocket infrastructure is functional and ready for production testing.
 
 ## Success Metrics
 

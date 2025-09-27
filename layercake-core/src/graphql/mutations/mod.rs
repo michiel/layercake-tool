@@ -2,7 +2,7 @@ use async_graphql::*;
 use sea_orm::{ActiveModelTrait, EntityTrait, Set, ActiveValue, ColumnTrait, QueryFilter};
 use chrono::Utc;
 
-use crate::database::entities::{projects, plans, nodes, edges, layers, plan_dag_nodes, plan_dag_edges, users, user_sessions, project_collaborators, user_presence, data_sources};
+use crate::database::entities::{projects, plans, nodes, edges, layers, plan_dag_nodes, plan_dag_edges, users, user_sessions, project_collaborators};
 use crate::graphql::context::GraphQLContext;
 use crate::services::auth_service::AuthService;
 use crate::services::validation::ValidationService;
