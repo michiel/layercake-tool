@@ -16,16 +16,25 @@ pub fn render(
 
     if let Some(partials) = params.partials {
         for (name, partial) in partials {
-            let partial_content = fs::read_to_string(&partial).unwrap();
-
-            if let Err(err) = handlebars.register_partial(&name, partial_content) {
-                error!("Failed to register partial: {}", err);
+            match fs::read_to_string(&partial) {
+                Ok(partial_content) => {
+                    if let Err(err) = handlebars.register_partial(&name, partial_content) {
+                        error!("Failed to register partial '{}': {}", name, err);
+                    }
+                }
+                Err(err) => {
+                    error!("Failed to read partial file '{}': {}", partial, err);
+                    return Err(format!("Failed to read partial file '{}': {}", partial, err).into());
+                }
             }
         }
     }
 
+    let template_content = fs::read_to_string(&params.template)
+        .map_err(|err| format!("Failed to read template file '{}': {}", params.template, err))?;
+
     let res = handlebars.render_template(
-        &fs::read_to_string(&params.template).unwrap(),
+        &template_content,
         &json!({
             "config": render_config,
             "hierarchy_nodes": graph.get_hierarchy_nodes(),

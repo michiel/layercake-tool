@@ -187,12 +187,17 @@ impl CollaborationState {
     }
 
     pub fn get_or_create_project(&self, project_id: i32) -> dashmap::mapref::one::Ref<i32, ProjectSession> {
+        // Use or_insert_with to create the entry if it doesn't exist
         self.projects.entry(project_id).or_insert_with(|| ProjectSession {
             users: dashmap::DashMap::new(),
             documents: dashmap::DashMap::new(),
             connections: dashmap::DashMap::new(),
         });
-        self.projects.get(&project_id).unwrap()
+
+        // Since we just ensured the entry exists, this should never panic,
+        // but we can handle it safely
+        self.projects.get(&project_id)
+            .expect("Project entry should exist after or_insert_with")
     }
 }
 
