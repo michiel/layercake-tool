@@ -13,6 +13,8 @@ import ReactFlow, {
   ConnectionMode,
   OnMove,
   Viewport,
+  useReactFlow,
+  ReactFlowProvider
 } from 'reactflow'
 import { Stack, Title, Alert, Loader, Text, ActionIcon, Tooltip, Group } from '@mantine/core'
 import {
@@ -51,8 +53,10 @@ import { NodeConfigDialog } from './NodeConfigDialog'
 
 // Import extracted components and hooks
 import { ControlPanel } from './components/ControlPanel'
+import { NodeToolbar } from './components/NodeToolbar'
 // import { CollaborationManager } from './components/CollaborationManager'
 import { useUpdateManagement } from './hooks/useUpdateManagement'
+import { generateNodeId, getDefaultNodeConfig, getDefaultNodeMetadata } from './utils/nodeDefaults'
 
 // Import ReactFlow styles
 import 'reactflow/dist/style.css'
@@ -224,7 +228,7 @@ const convertReactFlowToPlanDag = (
   }
 }
 
-export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readonly = false }: PlanVisualEditorProps) => {
+const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly = false }: PlanVisualEditorProps) => {
 
   // Use real GraphQL queries to fetch Plan DAG data
   const { planDag, loading, error } = usePlanDag(projectId)
@@ -748,6 +752,68 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
     }
   }, [broadcastCursorPosition, selectedNode, readonly])
 
+  // Drag and drop handlers for creating new nodes
+  const handleNodeDragStart = useCallback((event: React.DragEvent, nodeType: PlanDagNodeType) => {
+    event.dataTransfer.setData('application/reactflow', nodeType);
+    event.dataTransfer.effectAllowed = 'move';
+  }, []);
+
+  const handleDragOver = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  }, []);
+
+  const { screenToFlowPosition } = useReactFlow();
+
+  const handleDrop = useCallback(
+    (event: React.DragEvent) => {
+      event.preventDefault();
+
+      const nodeType = event.dataTransfer.getData('application/reactflow') as PlanDagNodeType;
+
+      // Check if the dropped element is a valid node type
+      if (!nodeType || !Object.values(PlanDagNodeType).includes(nodeType)) {
+        return;
+      }
+
+      // Calculate the position where the node was dropped
+      const position = screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+
+      // Generate unique ID and default configuration
+      const nodeId = generateNodeId(nodeType);
+      const config = getDefaultNodeConfig(nodeType);
+      const metadata = getDefaultNodeMetadata(nodeType);
+
+      // Create new node with temporary data structure for ReactFlow
+      const newNode: Node = {
+        id: nodeId,
+        type: 'dagNode',
+        position,
+        data: {
+          nodeType,
+          label: metadata.label,
+          config,
+          metadata,
+          isUnconfigured: true, // Mark as unconfigured (will show orange highlight)
+          onEdit: () => handleNodeEdit(nodeId),
+          onDelete: () => handleNodeDelete(nodeId),
+          readonly: false
+        }
+      };
+
+      // Add the node to the ReactFlow state
+      setNodes((nds) => nds.concat(newNode));
+      setIsDirty(true);
+
+      // TODO: The backend sync will be handled when the user saves or the component unmounts
+      // For now, we just add to the local ReactFlow state
+    },
+    [screenToFlowPosition, setNodes, setIsDirty, handleNodeEdit, handleNodeDelete]
+  );
+
   // Use stable nodeTypes reference to prevent ReactFlow warnings
   const nodeTypes = NODE_TYPES
 
@@ -873,9 +939,14 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
         </Group>
       </Group>
 
+      {/* Node Toolbar for drag-and-drop */}
+      <NodeToolbar onNodeDragStart={handleNodeDragStart} readonly={readonly} />
+
       <div
         style={{ flex: 1, position: 'relative' }}
         onMouseMove={handleMouseMove}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
       >
         <ReactFlow
           nodes={nodes}
@@ -931,3 +1002,11 @@ export const PlanVisualEditor = ({ projectId, onNodeSelect, onEdgeSelect, readon
     </Stack>
   )
 }
+
+export const PlanVisualEditor = (props: PlanVisualEditorProps) => {
+  return (
+    <ReactFlowProvider>
+      <PlanVisualEditorInner {...props} />
+    </ReactFlowProvider>
+  );
+};
