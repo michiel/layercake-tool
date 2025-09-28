@@ -46,7 +46,6 @@ import { NodeConfigDialog } from './NodeConfigDialog'
 
 // Import extracted components and hooks
 import { ControlPanel } from './components/ControlPanel'
-import { NodeToolbar } from './components/NodeToolbar'
 import { AdvancedToolbar } from './components/AdvancedToolbar'
 import { ContextMenu } from './components/ContextMenu'
 // import { CollaborationManager } from './components/CollaborationManager'
@@ -909,8 +908,6 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         </Group>
       </Group>
 
-      {/* Node Toolbar for drag-and-drop */}
-      <NodeToolbar onNodeDragStart={handleNodeDragStart} readonly={readonly} />
 
       {/* Advanced Operations Toolbar */}
       <AdvancedToolbar
@@ -978,6 +975,8 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
             collaborationStatus={collaboration.connectionState}
             hasError={!!collaboration.error}
             onlineUsers={onlineUsers}
+            onNodeDragStart={handleNodeDragStart}
+            readonly={readonly}
           />
 
           {/* Empty state overlay when no nodes exist */}

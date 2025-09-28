@@ -7,9 +7,15 @@ import {
   IconExclamationCircle,
   IconRefresh,
   IconNetwork,
-  IconNetworkOff
+  IconNetworkOff,
+  IconDatabase,
+  IconTransform,
+  IconGitMerge,
+  IconCopy,
+  IconFileExport
 } from '@tabler/icons-react'
 import { Panel } from 'reactflow'
+import { PlanDagNodeType } from '../../../../types/plan-dag'
 
 interface ControlPanelProps {
   // Validation props
@@ -29,6 +35,10 @@ interface ControlPanelProps {
   collaborationStatus: string
   hasError: boolean
   onlineUsers: any[]
+
+  // Node drag props
+  onNodeDragStart: (event: React.DragEvent, nodeType: PlanDagNodeType) => void
+  readonly?: boolean
 }
 
 export const ControlPanel = ({
@@ -43,11 +53,80 @@ export const ControlPanel = ({
   isConnected,
   collaborationStatus,
   hasError,
-  onlineUsers
+  onlineUsers,
+  onNodeDragStart,
+  readonly = false
 }: ControlPanelProps) => {
+  const nodeTypes = [
+    {
+      type: PlanDagNodeType.DATA_SOURCE,
+      label: 'Data Source',
+      icon: <IconDatabase size="0.7rem" />,
+      color: '#51cf66'
+    },
+    {
+      type: PlanDagNodeType.GRAPH,
+      label: 'Graph',
+      icon: <IconNetwork size="0.7rem" />,
+      color: '#339af0'
+    },
+    {
+      type: PlanDagNodeType.TRANSFORM,
+      label: 'Transform',
+      icon: <IconTransform size="0.7rem" />,
+      color: '#ff8cc8'
+    },
+    {
+      type: PlanDagNodeType.MERGE,
+      label: 'Merge',
+      icon: <IconGitMerge size="0.7rem" />,
+      color: '#ffd43b'
+    },
+    {
+      type: PlanDagNodeType.COPY,
+      label: 'Copy',
+      icon: <IconCopy size="0.7rem" />,
+      color: '#74c0fc'
+    },
+    {
+      type: PlanDagNodeType.OUTPUT,
+      label: 'Output',
+      icon: <IconFileExport size="0.7rem" />,
+      color: '#ff6b6b'
+    }
+  ];
+
+  const handleNodeDragStart = (event: React.DragEvent, nodeType: PlanDagNodeType) => {
+    if (!readonly) {
+      onNodeDragStart(event, nodeType);
+    }
+  };
+
   return (
     <Panel position="top-left">
       <Stack gap="xs" style={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', padding: '12px', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+        {/* Node Creation */}
+        {!readonly && (
+          <Group gap="md">
+            <Text size="xs" fw={500} c="gray.6">Nodes:</Text>
+            <Group gap={4}>
+              {nodeTypes.map((nodeType) => (
+                <Tooltip key={nodeType.type} label={`Drag to add ${nodeType.label}`}>
+                  <ActionIcon
+                    size="xs"
+                    variant="light"
+                    style={{ backgroundColor: nodeType.color, color: 'white', cursor: 'grab' }}
+                    draggable
+                    onDragStart={(event) => handleNodeDragStart(event, nodeType.type)}
+                  >
+                    {nodeType.icon}
+                  </ActionIcon>
+                </Tooltip>
+              ))}
+            </Group>
+          </Group>
+        )}
+
         <Group gap="md">
           <Text size="xs" fw={500} c="gray.6">Controls:</Text>
           <Group gap={4}>

@@ -214,6 +214,8 @@ Backend: http://localhost:3000 (with WebSocket at /ws/collaboration/:project_id)
 - `frontend/src/components/editors/PlanVisualEditor/nodes/BaseNode.tsx`
 - `frontend/src/components/editors/PlanVisualEditor/nodes/DataSourceNode.tsx`
 - `frontend/src/components/editors/PlanVisualEditor/components/CollaborationManager.tsx`
+- `frontend/src/components/editors/PlanVisualEditor/components/ControlPanel.tsx`
+- `frontend/src/components/editors/PlanVisualEditor/PlanVisualEditor.tsx`
 - `frontend/src/utils/planDagValidation.ts`
 
 #### ✅ **Enhanced GraphNode Input Validation and Visual Connectors**
@@ -247,6 +249,14 @@ Backend: http://localhost:3000 (with WebSocket at /ws/collaboration/:project_id)
 - **Better selection UX**: Nodes can be selected and moved without triggering edit dialogs
 - **Consistent interaction pattern**: All node types follow the same edit-only-on-cog behavior
 - **Updated cursor styles**: Removed pointer cursor to indicate nodes are not click-to-edit
+
+#### ✅ **Enhanced Toolbar Design and User Experience**
+- **Consolidated draggable nodes**: Moved from separate "Drag nodes to canvas" section to selection management toolbar
+- **Unified toolbar design**: Node creation icons now integrated with Controls, Status, and Validation sections
+- **Compact icon layout**: Draggable nodes now use small icons (same size as control icons) with hover tooltips
+- **Preserved node colors**: Each node type maintains its distinctive color (green=DataSource, blue=Graph, pink=Transform, etc.)
+- **Improved workspace efficiency**: Reduced toolbar clutter by combining functionality into single management panel
+- **Consistent interaction pattern**: All toolbar actions follow same small-icon-with-tooltip design language
 
 **Architecture Benefits:**
 - More intuitive connection points for users
