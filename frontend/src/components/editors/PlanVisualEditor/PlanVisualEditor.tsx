@@ -757,8 +757,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     }
   }, [contextMenu.opened, handleCloseContextMenu]);
 
-  // Use stable nodeTypes reference to prevent ReactFlow warnings
-  const nodeTypes = NODE_TYPES
+  // Note: NODE_TYPES is used directly in ReactFlow to prevent recreation warnings
 
   // Save Plan DAG changes to backend
   const savePlanDag = useCallback(async () => {
@@ -928,7 +927,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
           isValidConnection={isValidConnection}
           onMove={handleViewportChange}
           onNodeDragStop={handleNodeDragStop}
-          nodeTypes={nodeTypes}
+          nodeTypes={NODE_TYPES}
           connectionMode={ConnectionMode.Loose}
           fitView
           attributionPosition="top-right"
