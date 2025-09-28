@@ -79,7 +79,6 @@ pub struct UserPresenceEvent {
     pub avatar_color: String,
     pub plan_id: String,
     pub is_online: bool,
-    pub cursor_position: Option<String>, // DEPRECATED: Use WebSocket collaboration for real-time cursor data
     pub selected_node_id: Option<String>,
     pub last_active: String,
 }
