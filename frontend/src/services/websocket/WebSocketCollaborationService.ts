@@ -74,7 +74,6 @@ export class WebSocketCollaborationService {
       this.ws = new WebSocket(wsUrl);
       this.setupWebSocketHandlers();
     } catch (error) {
-      console.error('Failed to create WebSocket connection:', error);
       this.handleConnectionError('Failed to create WebSocket connection');
     }
   }
@@ -105,7 +104,6 @@ export class WebSocketCollaborationService {
         this.ws.send(JSON.stringify(message));
         return true;
       } catch (error) {
-        console.error('Failed to send WebSocket message:', error);
         this.queueMessage(message);
         return false;
       }
@@ -169,7 +167,7 @@ export class WebSocketCollaborationService {
     if (!this.ws) return;
 
     this.ws.onopen = () => {
-      console.log('WebSocket connected');
+      // WebSocket connected successfully
       this.setConnectionState(ConnectionState.CONNECTED);
       this.reconnectAttempts = 0;
       this.startHeartbeat();
@@ -177,7 +175,6 @@ export class WebSocketCollaborationService {
     };
 
     this.ws.onclose = (event) => {
-      console.log('WebSocket disconnected:', event.code, event.reason);
       this.clearHeartbeatTimer();
 
       if (!this.isIntentionalDisconnect && event.code !== 1000) {
@@ -188,8 +185,7 @@ export class WebSocketCollaborationService {
       }
     };
 
-    this.ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
+    this.ws.onerror = () => {
       this.handleConnectionError('WebSocket error occurred');
     };
 
@@ -198,7 +194,7 @@ export class WebSocketCollaborationService {
         const message: ServerMessage = JSON.parse(event.data);
         this.handleServerMessage(message);
       } catch (error) {
-        console.error('Failed to parse WebSocket message:', error);
+        this.onError('Failed to parse WebSocket message');
       }
     };
   }
@@ -218,7 +214,7 @@ export class WebSocketCollaborationService {
         this.onError(message.message);
         break;
       default:
-        console.warn('Unknown message type:', message);
+        this.onError(`Unknown message type: ${(message as any).type}`);
     }
   }
 
@@ -249,7 +245,6 @@ export class WebSocketCollaborationService {
 
     this.reconnectTimer = setTimeout(() => {
       this.reconnectAttempts++;
-      console.log(`Reconnecting attempt ${this.reconnectAttempts}...`);
       this.connect();
     }, delay);
   }
@@ -270,7 +265,7 @@ export class WebSocketCollaborationService {
         try {
           this.ws.send(JSON.stringify({ type: 'ping' }));
         } catch (error) {
-          console.warn('Failed to send heartbeat:', error);
+          // Heartbeat failed - connection will be handled by onclose
         }
       }
     }, this.config.heartbeatInterval || 30000);

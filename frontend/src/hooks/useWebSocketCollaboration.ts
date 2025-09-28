@@ -92,7 +92,6 @@ export function useWebSocketCollaboration(
 
     service.setOnError((errorMessage) => {
       setError(errorMessage);
-      console.error('WebSocket collaboration error:', errorMessage);
     });
 
     serviceRef.current = service;
