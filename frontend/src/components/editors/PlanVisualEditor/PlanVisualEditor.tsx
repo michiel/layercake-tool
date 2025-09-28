@@ -38,7 +38,6 @@ import { CopyNode } from './nodes/CopyNode'
 import { OutputNode } from './nodes/OutputNode'
 
 // Import collaboration components
-import { UserPresenceIndicator } from '../../collaboration/UserPresenceIndicator'
 import { CollaborativeCursors } from '../../collaboration/CollaborativeCursors'
 import { UserPresenceData } from '../../../types/websocket'
 
@@ -867,7 +866,6 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
       <Group justify="space-between" p="md" bg="gray.0">
         <Group gap="md">
           <Title order={3}>Plan DAG Editor</Title>
-          <UserPresenceIndicator users={onlineUsers} connectionState={collaboration.connectionState} />
         </Group>
         <Group gap="xs">
           {isDirty && (

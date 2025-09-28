@@ -1,63 +1,25 @@
 import { memo } from 'react'
 import { Group, Avatar, Badge, Box, Text, HoverCard, ActionIcon, Stack } from '@mantine/core'
-import { IconUser, IconWifi, IconWifiOff, IconRefresh, IconUsers } from '@tabler/icons-react'
+import { IconUser, IconUsers } from '@tabler/icons-react'
 import { UserPresenceData, ConnectionState } from '../../types/websocket'
 
 interface UserPresenceIndicatorProps {
   users: UserPresenceData[]
   connectionState: ConnectionState
   currentUserId?: string
-  onReconnect?: () => void
 }
 
 export const UserPresenceIndicator = memo(({
   users,
   connectionState,
-  currentUserId,
-  onReconnect
+  currentUserId
 }: UserPresenceIndicatorProps) => {
   const onlineUsers = users.filter(user => user.userId !== currentUserId && user.isOnline)
 
-  const getConnectionIcon = () => {
-    switch (connectionState) {
-      case ConnectionState.CONNECTED:
-        return <IconWifi size={16} style={{ color: 'var(--mantine-color-green-6)' }} />
-      case ConnectionState.CONNECTING:
-      case ConnectionState.RECONNECTING:
-        return <IconRefresh size={16} style={{ color: 'var(--mantine-color-yellow-6)' }} className="animate-spin" />
-      default:
-        return <IconWifiOff size={16} style={{ color: 'var(--mantine-color-red-6)' }} />
-    }
-  }
-
-  const getConnectionText = () => {
-    switch (connectionState) {
-      case ConnectionState.CONNECTED:
-        return onlineUsers.length === 0 ? 'No collaborators' : `${onlineUsers.length} online`
-      case ConnectionState.CONNECTING:
-        return 'Connecting...'
-      case ConnectionState.RECONNECTING:
-        return 'Reconnecting...'
-      case ConnectionState.ERROR:
-      case ConnectionState.DISCONNECTED:
-        return 'Disconnected'
-      default:
-        return 'Unknown status'
-    }
-  }
-
+  // Only show presence indicator when connected and there are users
+  // Connection status is handled by TopBar
   if (connectionState !== ConnectionState.CONNECTED || onlineUsers.length === 0) {
-    return (
-      <Group gap="xs" align="center">
-        {getConnectionIcon()}
-        <Text size="xs" c="dimmed">{getConnectionText()}</Text>
-        {(connectionState === ConnectionState.ERROR || connectionState === ConnectionState.DISCONNECTED) && onReconnect && (
-          <Text size="xs" c="blue" style={{ cursor: 'pointer' }} onClick={onReconnect}>
-            Retry
-          </Text>
-        )}
-      </Group>
-    )
+    return null
   }
 
   return (

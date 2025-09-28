@@ -1,6 +1,5 @@
 import { useEffect, ReactNode } from 'react'
 import { useCollaborationV2 } from '../../../../hooks/useCollaborationV2'
-import { UserPresenceIndicator } from '../../../collaboration/UserPresenceIndicator'
 import { CollaborativeCursors } from '../../../collaboration/CollaborativeCursors'
 import { UserPresenceData } from '../../../../types/websocket'
 
@@ -49,13 +48,7 @@ export const CollaborationManager = ({
     <>
       {children}
 
-      {/* User Presence Indicator */}
-      <UserPresenceIndicator
-        users={onlineUsers}
-        connectionState={collaboration.connectionState}
-      />
-
-      {/* Collaborative Cursors */}
+      {/* Collaborative Cursors - presence is now handled by TopBar */}
       <CollaborativeCursors
         users={onlineUsers}
         currentUserId={currentUserId}

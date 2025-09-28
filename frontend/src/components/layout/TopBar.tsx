@@ -40,10 +40,6 @@ export const TopBar: React.FC<TopBarProps> = ({
             users={users}
             connectionState={connectionState}
             currentUserId={currentUserId}
-            onReconnect={() => {
-              // TODO: implement reconnect logic
-              console.log('Reconnect requested');
-            }}
           />
         )}
 
