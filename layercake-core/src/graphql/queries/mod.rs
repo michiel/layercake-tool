@@ -3,7 +3,7 @@ use sea_orm::{EntityTrait, ColumnTrait, QueryFilter};
 
 use crate::database::entities::{projects, plans, nodes, edges, layers, plan_dag_nodes, plan_dag_edges, users, user_sessions, project_collaborators, data_sources};
 use crate::graphql::context::GraphQLContext;
-use crate::graphql::types::{Project, Plan, Node, Edge, Layer, PlanDag, PlanDagNode, PlanDagEdge, ValidationResult, PlanDagInput, User, ProjectCollaborator, DataSource};
+use crate::graphql::types::{Project, Plan, Node, Edge, Layer, PlanDag, PlanDagNode, PlanDagEdge, ValidationResult, PlanDagInput, User, ProjectCollaborator, DataSource, PlanDagMetadata, UserSession};
 use crate::graphql::types::plan_dag::DataSourceReference;
 
 pub struct Query;

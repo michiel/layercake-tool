@@ -182,7 +182,7 @@ async fn handle_graphql_ws(
                             let ack = json!({
                                 "type": "connection_ack"
                             });
-                            if socket.send(Message::Text(ack.to_string())).await.is_err() {
+                            if socket.send(Message::Text(ack.to_string().into())).await.is_err() {
                                 break;
                             }
                             connection_ack_sent = true;
@@ -199,7 +199,7 @@ async fn handle_graphql_ws(
                                         "type": "next",
                                         "payload": response
                                     });
-                                    if socket.send(Message::Text(next_msg.to_string())).await.is_err() {
+                                    if socket.send(Message::Text(next_msg.to_string().into())).await.is_err() {
                                         break;
                                     }
 
@@ -209,7 +209,7 @@ async fn handle_graphql_ws(
                                         "id": id,
                                         "type": "complete"
                                     });
-                                    if socket.send(Message::Text(complete_msg.to_string())).await.is_err() {
+                                    if socket.send(Message::Text(complete_msg.to_string().into())).await.is_err() {
                                         break;
                                     }
                                 }

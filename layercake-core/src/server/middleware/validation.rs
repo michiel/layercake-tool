@@ -47,6 +47,12 @@ impl IntoResponse for ValidationError {
     }
 }
 
+/// Trait for validating request data
+pub trait Validate {
+    /// Validate the data and return ValidationError if invalid
+    fn validate(&self) -> Result<(), ValidationError>;
+}
+
 
 // Project validation structures
 #[derive(serde::Deserialize)]

@@ -304,6 +304,15 @@ pub fn create_collaboration_event(
     }
 }
 
-
-
-
+/// Create user event data for subscriptions
+pub fn create_user_event_data(
+    user_id: String,
+    user_name: String,
+    avatar_color: String,
+) -> UserEventData {
+    UserEventData {
+        user_id,
+        user_name,
+        avatar_color,
+    }
+}

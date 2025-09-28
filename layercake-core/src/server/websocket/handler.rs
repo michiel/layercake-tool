@@ -49,7 +49,7 @@ async fn handle_socket(socket: WebSocket, project_id: i32, session_manager: Arc<
         while let Some(msg) = rx.recv().await {
             match serde_json::to_string(&msg) {
                 Ok(json) => {
-                    if let Err(e) = sender.send(axum::extract::ws::Message::Text(json)).await {
+                    if let Err(e) = sender.send(axum::extract::ws::Message::Text(json.into())).await {
                         error!("Failed to send WebSocket message: {}", e);
                         break;
                     }

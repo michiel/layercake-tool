@@ -837,11 +837,17 @@ impl Mutation {
         );
 
         // Create collaboration event
+        let event_data = crate::graphql::subscriptions::CollaborationEventData {
+            node_event: None,
+            edge_event: None,
+            user_event: Some(user_data),
+            cursor_event: None,
+        };
         let event = crate::graphql::subscriptions::create_collaboration_event(
             plan_id,
             user_id,
             crate::graphql::subscriptions::CollaborationEventType::UserJoined,
-            user_data,
+            event_data,
         );
 
         // Broadcast the event
@@ -874,11 +880,17 @@ impl Mutation {
         );
 
         // Create collaboration event
+        let event_data = crate::graphql::subscriptions::CollaborationEventData {
+            node_event: None,
+            edge_event: None,
+            user_event: Some(user_data),
+            cursor_event: None,
+        };
         let event = crate::graphql::subscriptions::create_collaboration_event(
             plan_id,
             user_id,
             crate::graphql::subscriptions::CollaborationEventType::UserLeft,
-            user_data,
+            event_data,
         );
 
         // Broadcast the event
