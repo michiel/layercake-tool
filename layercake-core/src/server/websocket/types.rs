@@ -66,6 +66,7 @@ pub enum ClientMessage {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct JoinSessionData {
     pub user_id: String,
     pub user_name: String,
@@ -74,6 +75,7 @@ pub struct JoinSessionData {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CursorUpdateData {
     pub document_id: String,
     pub document_type: DocumentType,
@@ -83,12 +85,14 @@ pub struct CursorUpdateData {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DocumentSwitchData {
     pub document_id: String,
     pub document_type: DocumentType,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct LeaveSessionData {
     pub document_id: Option<String>,
 }
@@ -112,6 +116,7 @@ pub enum ServerMessage {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UserPresenceData {
     pub user_id: String,
     pub user_name: String,
@@ -122,6 +127,7 @@ pub struct UserPresenceData {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DocumentPresence {
     pub document_type: DocumentType,
     pub position: Option<CursorPosition>,
@@ -130,12 +136,14 @@ pub struct DocumentPresence {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DocumentActivityData {
     pub document_id: String,
     pub active_users: Vec<DocumentUser>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DocumentUser {
     pub user_id: String,
     pub user_name: String,

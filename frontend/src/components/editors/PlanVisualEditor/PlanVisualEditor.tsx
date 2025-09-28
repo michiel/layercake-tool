@@ -702,7 +702,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
       // Create new node with temporary data structure for ReactFlow
       const newNode: Node = {
         id: nodeId,
-        type: 'dagNode',
+        type: nodeType,
         position,
         data: {
           nodeType,
@@ -757,7 +757,8 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     }
   }, [contextMenu.opened, handleCloseContextMenu]);
 
-  // Note: NODE_TYPES is used directly in ReactFlow to prevent recreation warnings
+  // Memoize nodeTypes to prevent recreation warnings
+  const nodeTypes = useMemo(() => NODE_TYPES, []);
 
   // Save Plan DAG changes to backend
   const savePlanDag = useCallback(async () => {
@@ -927,7 +928,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
           isValidConnection={isValidConnection}
           onMove={handleViewportChange}
           onNodeDragStop={handleNodeDragStop}
-          nodeTypes={NODE_TYPES}
+          nodeTypes={nodeTypes}
           connectionMode={ConnectionMode.Loose}
           fitView
           attributionPosition="top-right"
