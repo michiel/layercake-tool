@@ -4,13 +4,14 @@ import { AppShell, Group, Title, Stack, Button, Container, Text, Card, Badge, Al
 import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconPlayerPlay, IconAlertCircle, IconFileDatabase } from '@tabler/icons-react'
 import { useQuery } from '@apollo/client/react'
 import { gql } from '@apollo/client'
-import { ConnectionStatus } from './components/common/ConnectionStatus'
 import { Breadcrumbs } from './components/common/Breadcrumbs'
 import { PlanVisualEditor } from './components/editors/PlanVisualEditor/PlanVisualEditor'
 import { ErrorBoundary } from './components/common/ErrorBoundary'
 import { DataSourcesPage } from './components/datasources/DataSourcesPage'
 import { DataSourceEditor } from './components/datasources/DataSourceEditor'
 import { CreateProjectModal } from './components/project/CreateProjectModal'
+import { TopBar } from './components/layout/TopBar'
+import { useCollaborationV2 } from './hooks/useCollaborationV2'
 
 // Health check query to verify backend connectivity
 const HEALTH_CHECK = gql`
@@ -47,7 +48,21 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   }
 
   // Extract project info from current path for navbar
-  const projectId = location.pathname.match(/\/projects\/(\d+)/)?.[1]
+  const projectIdMatch = location.pathname.match(/\/projects\/(\d+)/)
+  const projectId = projectIdMatch ? parseInt(projectIdMatch[1]) : undefined
+
+  // Initialize collaboration only if we're in a project context
+  const collaboration = useCollaborationV2({
+    projectId: projectId || 0,
+    documentId: 'project-global',
+    documentType: 'canvas',
+    enableWebSocket: !!projectId,
+    userInfo: {
+      id: 'current-user',
+      name: 'Current User',
+      avatarColor: '#3b82f6'
+    }
+  })
 
   return (
     <AppShell
@@ -56,13 +71,13 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
       padding="md"
     >
       <AppShell.Header>
-        <Group h="100%" px="md" justify="space-between">
-          <Group style={{ cursor: 'pointer' }} onClick={() => navigate('/')}>
-            <IconGraph size={28} />
-            <Title order={2}>Layercake</Title>
-          </Group>
-          <ConnectionStatus />
-        </Group>
+        <TopBar
+          projectId={projectId}
+          connectionState={collaboration.connectionState}
+          users={collaboration.users}
+          currentUserId="current-user"
+          onNavigateHome={() => navigate('/')}
+        />
       </AppShell.Header>
 
       <AppShell.Navbar p="md">
