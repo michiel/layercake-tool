@@ -1,14 +1,12 @@
 import { memo } from 'react'
-import { Group, Avatar, Tooltip, Badge, Box, Text } from '@mantine/core'
-import { IconUser, IconWifi, IconWifiOff, IconRefresh } from '@tabler/icons-react'
+import { Group, Avatar, Badge, Box, Text, HoverCard, ActionIcon, Stack } from '@mantine/core'
+import { IconUser, IconWifi, IconWifiOff, IconRefresh, IconUsers } from '@tabler/icons-react'
 import { UserPresenceData, ConnectionState } from '../../types/websocket'
 
 interface UserPresenceIndicatorProps {
   users: UserPresenceData[]
   connectionState: ConnectionState
   currentUserId?: string
-  maxVisible?: number
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl'
   onReconnect?: () => void
 }
 
@@ -16,13 +14,9 @@ export const UserPresenceIndicator = memo(({
   users,
   connectionState,
   currentUserId,
-  maxVisible = 5,
-  size = 'sm',
   onReconnect
 }: UserPresenceIndicatorProps) => {
   const onlineUsers = users.filter(user => user.userId !== currentUserId && user.isOnline)
-  const visibleUsers = onlineUsers.slice(0, maxVisible)
-  const hiddenCount = Math.max(0, onlineUsers.length - maxVisible)
 
   const getConnectionIcon = () => {
     switch (connectionState) {
@@ -67,84 +61,75 @@ export const UserPresenceIndicator = memo(({
   }
 
   return (
-    <Group gap={4} align="center">
-      <IconWifi size={16} style={{ color: 'var(--mantine-color-green-6)' }} />
-
-      <Group gap={-8}>
-        {visibleUsers.map((user) => (
-          <Tooltip
-            key={user.userId}
-            label={
-              <Box>
-                <Text size="sm" fw={500}>{user.userName}</Text>
-                <Text size="xs" c="dimmed">
-                  Last active: {new Date(user.lastActive).toLocaleTimeString()}
-                </Text>
-                {Object.keys(user.documents).length > 0 && (
-                  <Text size="xs" c="dimmed">
-                    Active in {Object.keys(user.documents).length} document{Object.keys(user.documents).length > 1 ? 's' : ''}
-                  </Text>
-                )}
-                {/* Show cursor position from first active document */}
-                {Object.values(user.documents)[0]?.position && (
-                  <Text size="xs" c="dimmed">
-                    Cursor: ({Math.round((Object.values(user.documents)[0].position as any).x || 0)}, {Math.round((Object.values(user.documents)[0].position as any).y || 0)})
-                  </Text>
-                )}
-                {Object.values(user.documents)[0]?.selectedNodeId && (
-                  <Text size="xs" c="blue">
-                    Editing: {Object.values(user.documents)[0].selectedNodeId}
-                  </Text>
-                )}
-              </Box>
-            }
-            withArrow
-          >
-            <Avatar
-              size={size}
-              radius="xl"
+    <HoverCard width={300} shadow="md">
+      <HoverCard.Target>
+        <ActionIcon variant="subtle" size="lg" style={{ position: 'relative' }}>
+          <IconUsers size="1.2rem" />
+          {onlineUsers.length > 0 && (
+            <Badge
+              size="xs"
+              color="green"
+              variant="filled"
               style={{
-                backgroundColor: user.avatarColor,
-                border: '2px solid white',
-                position: 'relative',
+                position: 'absolute',
+                top: -2,
+                right: -2,
+                minWidth: '18px',
+                height: '18px',
+                padding: '0 4px',
+                fontSize: '10px'
               }}
             >
-              <IconUser size={size === 'xs' ? 12 : size === 'sm' ? 14 : 16} />
+              {onlineUsers.length}
+            </Badge>
+          )}
+        </ActionIcon>
+      </HoverCard.Target>
 
-              {/* Online indicator */}
-              <Badge
-                size="xs"
-                variant="filled"
-                color="green"
-                style={{
-                  position: 'absolute',
-                  bottom: -2,
-                  right: -2,
-                  minWidth: 8,
-                  height: 8,
-                  padding: 0,
-                  border: '1px solid white',
-                }}
-              />
-            </Avatar>
-          </Tooltip>
-        ))}
+      <HoverCard.Dropdown>
+        <Stack gap="xs">
+          <Text fw={500} size="sm">Active Users ({onlineUsers.length})</Text>
 
-        {hiddenCount > 0 && (
-          <Tooltip label={`${hiddenCount} more collaborator${hiddenCount > 1 ? 's' : ''}`}>
-            <Avatar size={size} radius="xl" color="gray">
-              <Text size={size === 'xs' ? '8px' : size === 'sm' ? '10px' : '12px'}>
-                +{hiddenCount}
-              </Text>
-            </Avatar>
-          </Tooltip>
-        )}
-      </Group>
+          {onlineUsers.length === 0 ? (
+            <Text size="xs" c="dimmed">No other users online</Text>
+          ) : (
+            onlineUsers.map((user) => (
+              <Group key={user.userId} gap="sm" justify="space-between">
+                <Group gap="xs">
+                  <Avatar
+                    size="sm"
+                    radius="xl"
+                    style={{ backgroundColor: user.avatarColor }}
+                  >
+                    <IconUser size={14} />
+                  </Avatar>
+                  <Box>
+                    <Text size="sm" fw={500}>{user.userName}</Text>
+                    <Text size="xs" c="dimmed">
+                      Last active: {new Date(user.lastActive).toLocaleTimeString()}
+                    </Text>
+                    {/* Show document activity if available */}
+                    {Object.keys(user.documents).length > 0 && (
+                      <Text size="xs" c="dimmed">
+                        Active in {Object.keys(user.documents).length} document{Object.keys(user.documents).length > 1 ? 's' : ''}
+                      </Text>
+                    )}
+                  </Box>
+                </Group>
 
-      <Text size="xs" c="dimmed">
-        {onlineUsers.length} online
-      </Text>
-    </Group>
+                <Badge
+                  size="xs"
+                  color="green"
+                  variant="filled"
+                >
+                  Online
+                </Badge>
+              </Group>
+            ))
+          )}
+        </Stack>
+      </HoverCard.Dropdown>
+    </HoverCard>
   )
 })
 

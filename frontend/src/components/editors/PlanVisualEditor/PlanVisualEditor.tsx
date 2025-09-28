@@ -867,7 +867,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
       <Group justify="space-between" p="md" bg="gray.0">
         <Group gap="md">
           <Title order={3}>Plan DAG Editor</Title>
-          <UserPresenceIndicator users={onlineUsers} connectionState={collaboration.connectionState} maxVisible={5} size="sm" />
+          <UserPresenceIndicator users={onlineUsers} connectionState={collaboration.connectionState} />
         </Group>
         <Group gap="xs">
           {isDirty && (

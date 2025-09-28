@@ -53,8 +53,6 @@ export const CollaborationManager = ({
       <UserPresenceIndicator
         users={onlineUsers}
         connectionState={collaboration.connectionState}
-        maxVisible={5}
-        size="sm"
       />
 
       {/* Collaborative Cursors */}
