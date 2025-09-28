@@ -5,7 +5,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use std::pin::Pin;
-use sea_orm::{EntityTrait, ColumnTrait, QueryFilter};
 
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::{PlanDagNode, PlanDagEdge};
@@ -305,53 +304,6 @@ pub fn create_collaboration_event(
     }
 }
 
-/// Helper functions to create specific event data
-pub fn create_node_event_data(node: PlanDagNode) -> CollaborationEventData {
-    CollaborationEventData {
-        node_event: Some(NodeEventData { node }),
-        edge_event: None,
-        user_event: None,
-        cursor_event: None,
-    }
-}
 
-pub fn create_edge_event_data(edge: PlanDagEdge) -> CollaborationEventData {
-    CollaborationEventData {
-        node_event: None,
-        edge_event: Some(EdgeEventData { edge }),
-        user_event: None,
-        cursor_event: None,
-    }
-}
 
-pub fn create_user_event_data(user_id: String, user_name: String, avatar_color: String) -> CollaborationEventData {
-    CollaborationEventData {
-        node_event: None,
-        edge_event: None,
-        user_event: Some(UserEventData { user_id, user_name, avatar_color }),
-        cursor_event: None,
-    }
-}
 
-pub fn create_cursor_event_data(
-    user_id: String,
-    user_name: String,
-    avatar_color: String,
-    position_x: f64,
-    position_y: f64,
-    selected_node_id: Option<String>,
-) -> CollaborationEventData {
-    CollaborationEventData {
-        node_event: None,
-        edge_event: None,
-        user_event: None,
-        cursor_event: Some(CursorEventData {
-            user_id,
-            user_name,
-            avatar_color,
-            position_x,
-            position_y,
-            selected_node_id,
-        }),
-    }
-}

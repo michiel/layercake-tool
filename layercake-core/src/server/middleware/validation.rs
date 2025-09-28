@@ -4,7 +4,6 @@ use axum::{
     response::{IntoResponse, Response},
     http::StatusCode,
     Json,
-    body::Bytes,
 };
 use serde_json::Value;
 use std::fmt;
@@ -16,13 +15,6 @@ pub struct ValidationError {
 }
 
 impl ValidationError {
-    pub fn new(message: impl Into<String>) -> Self {
-        Self {
-            field: None,
-            message: message.into(),
-        }
-    }
-
     pub fn field(field: impl Into<String>, message: impl Into<String>) -> Self {
         Self {
             field: Some(field.into()),
@@ -55,27 +47,6 @@ impl IntoResponse for ValidationError {
     }
 }
 
-pub async fn validate_json<T: DeserializeOwned + Validate>(
-    req: Request,
-) -> Result<T, ValidationError> {
-    let (parts, body) = req.into_parts();
-    let bytes = match axum::body::to_bytes(body, usize::MAX).await {
-        Ok(bytes) => bytes,
-        Err(e) => return Err(ValidationError::new(format!("Failed to read request body: {}", e))),
-    };
-
-    let data: T = match serde_json::from_slice(&bytes) {
-        Ok(data) => data,
-        Err(e) => return Err(ValidationError::new(format!("Invalid JSON: {}", e))),
-    };
-
-    data.validate()?;
-    Ok(data)
-}
-
-pub trait Validate {
-    fn validate(&self) -> Result<(), ValidationError>;
-}
 
 // Project validation structures
 #[derive(serde::Deserialize)]
@@ -212,37 +183,6 @@ impl Validate for EdgeRequest {
     }
 }
 
-// Helper function to validate numeric IDs
-pub fn validate_numeric_id(id: &str, field_name: &str) -> Result<i32, ValidationError> {
-    match id.parse::<i32>() {
-        Ok(num) if num > 0 => Ok(num),
-        Ok(_) => Err(ValidationError::field(field_name, "ID must be a positive number")),
-        Err(_) => Err(ValidationError::field(field_name, "ID must be a valid number")),
-    }
-}
-
-// Helper function to validate string length
-pub fn validate_string_length(
-    value: &str,
-    field_name: &str,
-    min_length: usize,
-    max_length: usize
-) -> Result<(), ValidationError> {
-    let len = value.trim().len();
-    if len < min_length {
-        return Err(ValidationError::field(
-            field_name,
-            format!("Must be at least {} characters long", min_length)
-        ));
-    }
-    if len > max_length {
-        return Err(ValidationError::field(
-            field_name,
-            format!("Must be at most {} characters long", max_length)
-        ));
-    }
-    Ok(())
-}
 
 #[cfg(test)]
 mod tests {
@@ -330,11 +270,4 @@ mod tests {
         assert!(edge.validate().is_err());
     }
 
-    #[test]
-    fn test_validate_numeric_id() {
-        assert_eq!(validate_numeric_id("123", "id").unwrap(), 123);
-        assert!(validate_numeric_id("0", "id").is_err());
-        assert!(validate_numeric_id("-1", "id").is_err());
-        assert!(validate_numeric_id("abc", "id").is_err());
-    }
 }

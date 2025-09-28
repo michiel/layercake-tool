@@ -1,11 +1,10 @@
 use async_graphql::*;
-use sea_orm::{ActiveModelTrait, EntityTrait, Set, ActiveValue, ColumnTrait, QueryFilter};
+use sea_orm::{ActiveModelTrait, EntityTrait, Set, ColumnTrait, QueryFilter};
 use chrono::Utc;
 
 use crate::database::entities::{projects, plans, nodes, edges, layers, plan_dag_nodes, plan_dag_edges, users, user_sessions, project_collaborators};
 use crate::graphql::context::GraphQLContext;
 use crate::services::auth_service::AuthService;
-use crate::services::validation::ValidationService;
 use crate::services::data_source_service::DataSourceService;
 
 use crate::graphql::types::{
@@ -15,8 +14,8 @@ use crate::graphql::types::{
     CreateNodeInput, CreateEdgeInput, CreateLayerInput,
     PlanDagInput, PlanDagResponse, PlanDagNodeInput, PlanDagEdgeInput,
     PlanDagNodeUpdateInput, NodeResponse, EdgeResponse, Position,
-    PlanDag, PlanDagNode, PlanDagEdge, PlanDagMetadata,
-    User, UserSession, ProjectCollaborator,
+    PlanDag, PlanDagNode, PlanDagEdge,
+    User, ProjectCollaborator,
     RegisterUserInput, LoginInput, UpdateUserInput, LoginResponse, RegisterResponse,
     InviteCollaboratorInput, UpdateCollaboratorRoleInput,
     DataSource, CreateDataSourceInput, UpdateDataSourceInput,

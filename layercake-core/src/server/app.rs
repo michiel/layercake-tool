@@ -1,7 +1,7 @@
 use axum::{
-    extract::{Json, State, WebSocketUpgrade},
+    extract::{Json, State},
     response::IntoResponse,
-    routing::{get, post},
+    routing::get,
     Router,
 };
 use sea_orm::DatabaseConnection;
@@ -164,7 +164,6 @@ async fn handle_graphql_ws(
 ) {
     use axum::extract::ws::Message;
     use serde_json::{json, Value};
-    use futures_util::StreamExt;
     use std::collections::HashMap;
     use tokio::sync::mpsc;
 

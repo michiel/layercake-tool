@@ -6,7 +6,3 @@ use crate::graphql::subscriptions::Subscription;
 
 pub type GraphQLSchema = Schema<Query, Mutation, Subscription>;
 
-pub fn build_schema() -> GraphQLSchema {
-    Schema::build(Query, Mutation, Subscription)
-        .finish()
-}
