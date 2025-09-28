@@ -1,6 +1,4 @@
-use serde::de::DeserializeOwned;
 use axum::{
-    extract::Request,
     response::{IntoResponse, Response},
     http::StatusCode,
     Json,
@@ -50,6 +48,7 @@ impl IntoResponse for ValidationError {
 /// Trait for validating request data
 pub trait Validate {
     /// Validate the data and return ValidationError if invalid
+    #[allow(dead_code)]
     fn validate(&self) -> Result<(), ValidationError>;
 }
 
@@ -118,6 +117,7 @@ pub struct NodeRequest {
     pub id: String,
     pub label: String,
     pub node_type: String,
+    #[allow(dead_code)]
     pub metadata: Option<Value>,
 }
 
@@ -159,6 +159,7 @@ pub struct EdgeRequest {
     pub id: String,
     pub source: String,
     pub target: String,
+    #[allow(dead_code)]
     pub connection_type: Option<String>,
 }
 

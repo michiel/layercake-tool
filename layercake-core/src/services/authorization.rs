@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use anyhow::{Result, anyhow, Error as AnyhowError};
 #[cfg(feature = "graphql")]
 use async_graphql::{Context, Error};

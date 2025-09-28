@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::sync::Arc;
 use std::collections::HashMap;
 use tokio::sync::RwLock;

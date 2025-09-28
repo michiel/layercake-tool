@@ -18,6 +18,7 @@ use super::{
 pub struct WebSocketQuery {
     pub project_id: i32,
     #[serde(default)]
+    #[allow(dead_code)]
     pub token: Option<String>, // JWT token for authentication
 }
 
@@ -44,7 +45,7 @@ async fn handle_socket(socket: WebSocket, project_id: i32, session_manager: Arc<
     let (tx, mut rx) = mpsc::unbounded_channel::<ServerMessage>();
 
     // Spawn a task to handle outgoing messages
-    let tx_clone = tx.clone();
+    let _tx_clone = tx.clone();
     let sender_task = tokio::spawn(async move {
         while let Some(msg) = rx.recv().await {
             match serde_json::to_string(&msg) {
@@ -114,7 +115,7 @@ async fn handle_socket(socket: WebSocket, project_id: i32, session_manager: Arc<
                 info!("WebSocket connection closed for project {}", project_id);
                 break;
             }
-            Ok(axum::extract::ws::Message::Ping(data)) => {
+            Ok(axum::extract::ws::Message::Ping(_data)) => {
                 // Respond to ping with pong - use tx channel instead of direct sender
                 let pong_msg = ServerMessage::Error {
                     message: "pong".to_string(),

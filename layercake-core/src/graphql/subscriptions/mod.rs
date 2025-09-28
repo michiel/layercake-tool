@@ -111,6 +111,7 @@ pub struct PlanDagUpdateData {
 }
 
 /// Global subscription broadcaster for managing real-time events
+#[allow(dead_code)]
 pub type SubscriptionBroadcaster = Arc<RwLock<HashMap<String, broadcast::Sender<CollaborationEvent>>>>;
 
 #[Subscription]

@@ -820,7 +820,7 @@ impl Mutation {
         ctx: &Context<'_>,
         project_id: i32,
     ) -> Result<bool> {
-        let context = ctx.data::<GraphQLContext>()?;
+        let _context = ctx.data::<GraphQLContext>()?;
 
         // TODO: Extract from authenticated user context when authentication is implemented
         let (user_id, user_name, avatar_color) = {
@@ -863,7 +863,7 @@ impl Mutation {
         ctx: &Context<'_>,
         project_id: i32,
     ) -> Result<bool> {
-        let context = ctx.data::<GraphQLContext>()?;
+        let _context = ctx.data::<GraphQLContext>()?;
 
         // TODO: Extract from authenticated user context when authentication is implemented
         let (user_id, user_name, avatar_color) = {

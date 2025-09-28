@@ -374,7 +374,7 @@ impl Query {
     /// Generate download URL for raw DataSource file
     async fn download_data_source_raw(&self, ctx: &Context<'_>, id: i32) -> Result<String> {
         let context = ctx.data::<GraphQLContext>()?;
-        let data_source = data_sources::Entity::find_by_id(id)
+        let _data_source = data_sources::Entity::find_by_id(id)
             .one(&context.db)
             .await?
             .ok_or_else(|| Error::new("DataSource not found"))?;
@@ -387,7 +387,7 @@ impl Query {
     /// Generate download URL for processed DataSource JSON
     async fn download_data_source_json(&self, ctx: &Context<'_>, id: i32) -> Result<String> {
         let context = ctx.data::<GraphQLContext>()?;
-        let data_source = data_sources::Entity::find_by_id(id)
+        let _data_source = data_sources::Entity::find_by_id(id)
             .one(&context.db)
             .await?
             .ok_or_else(|| Error::new("DataSource not found"))?;

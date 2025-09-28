@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use anyhow::{Result, anyhow};
 use bcrypt::{hash, verify, DEFAULT_COST};
 use chrono::{Duration, Utc};

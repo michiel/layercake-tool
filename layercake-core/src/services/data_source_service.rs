@@ -51,10 +51,10 @@ impl DataSourceService {
             ..data_sources::ActiveModel::new()
         };
 
-        let mut data_source = data_source.insert(&self.db).await?;
+        let data_source = data_source.insert(&self.db).await?;
 
         // Process the file
-        match self.process_file(&source_type, &file_data).await {
+        let updated_data_source = match self.process_file(&source_type, &file_data).await {
             Ok(graph_json) => {
                 // Update with successful processing
                 let mut active_model: data_sources::ActiveModel = data_source.into();
@@ -63,7 +63,7 @@ impl DataSourceService {
                 active_model.processed_at = Set(Some(chrono::Utc::now()));
                 active_model.updated_at = Set(chrono::Utc::now());
 
-                data_source = active_model.update(&self.db).await?;
+                active_model.update(&self.db).await?
             }
             Err(e) => {
                 // Update with error
@@ -72,12 +72,12 @@ impl DataSourceService {
                 active_model.error_message = Set(Some(e.to_string()));
                 active_model.updated_at = Set(chrono::Utc::now());
 
-                data_source = active_model.update(&self.db).await?;
+                let _updated = active_model.update(&self.db).await?;
                 return Err(e);
             }
-        }
+        };
 
-        Ok(data_source)
+        Ok(updated_data_source)
     }
 
     /// Get DataSource by ID
@@ -89,6 +89,7 @@ impl DataSourceService {
     }
 
     /// Get all DataSources for a project
+    #[allow(dead_code)]
     pub async fn get_by_project(&self, project_id: i32) -> Result<Vec<data_sources::Model>> {
         let data_sources = data_sources::Entity::find()
             .filter(data_sources::Column::ProjectId.eq(project_id))
@@ -145,10 +146,10 @@ impl DataSourceService {
         active_model.error_message = Set(None);
         active_model.updated_at = Set(chrono::Utc::now());
 
-        let mut data_source = active_model.update(&self.db).await?;
+        let data_source = active_model.update(&self.db).await?;
 
         // Process the new file
-        match self.process_file(&source_type, &file_data).await {
+        let updated_data_source = match self.process_file(&source_type, &file_data).await {
             Ok(graph_json) => {
                 let mut active_model: data_sources::ActiveModel = data_source.into();
                 active_model.graph_json = Set(graph_json);
@@ -156,7 +157,7 @@ impl DataSourceService {
                 active_model.processed_at = Set(Some(chrono::Utc::now()));
                 active_model.updated_at = Set(chrono::Utc::now());
 
-                data_source = active_model.update(&self.db).await?;
+                active_model.update(&self.db).await?
             }
             Err(e) => {
                 let mut active_model: data_sources::ActiveModel = data_source.into();
@@ -164,12 +165,12 @@ impl DataSourceService {
                 active_model.error_message = Set(Some(e.to_string()));
                 active_model.updated_at = Set(chrono::Utc::now());
 
-                data_source = active_model.update(&self.db).await?;
+                let _updated = active_model.update(&self.db).await?;
                 return Err(e);
             }
-        }
+        };
 
-        Ok(data_source)
+        Ok(updated_data_source)
     }
 
     /// Delete DataSource
@@ -198,10 +199,10 @@ impl DataSourceService {
         active_model.error_message = Set(None);
         active_model.updated_at = Set(chrono::Utc::now());
 
-        let mut data_source = active_model.update(&self.db).await?;
+        let data_source = active_model.update(&self.db).await?;
 
         // Process the file
-        match self.process_file(&source_type, &data_source.blob).await {
+        let updated_data_source = match self.process_file(&source_type, &data_source.blob).await {
             Ok(graph_json) => {
                 let mut active_model: data_sources::ActiveModel = data_source.into();
                 active_model.graph_json = Set(graph_json);
@@ -209,7 +210,7 @@ impl DataSourceService {
                 active_model.processed_at = Set(Some(chrono::Utc::now()));
                 active_model.updated_at = Set(chrono::Utc::now());
 
-                data_source = active_model.update(&self.db).await?;
+                active_model.update(&self.db).await?
             }
             Err(e) => {
                 let mut active_model: data_sources::ActiveModel = data_source.into();
@@ -217,12 +218,12 @@ impl DataSourceService {
                 active_model.error_message = Set(Some(e.to_string()));
                 active_model.updated_at = Set(chrono::Utc::now());
 
-                data_source = active_model.update(&self.db).await?;
+                let _updated = active_model.update(&self.db).await?;
                 return Err(e);
             }
-        }
+        };
 
-        Ok(data_source)
+        Ok(updated_data_source)
     }
 
     /// Process uploaded file data into graph JSON

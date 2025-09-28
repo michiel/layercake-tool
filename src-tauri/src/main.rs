@@ -29,6 +29,7 @@ async fn check_server_status(url: String) -> Result<bool, String> {
 // State management for the desktop application
 #[derive(Default)]
 struct AppState {
+    #[allow(dead_code)]
     server_url: Arc<RwLock<Option<String>>>,
 }
 

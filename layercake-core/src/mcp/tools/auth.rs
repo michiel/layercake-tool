@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use axum_mcp::prelude::*;
 use crate::database::entities::users;
 use crate::mcp::tools::{get_required_param, get_optional_param, create_success_response};
@@ -215,7 +217,7 @@ pub async fn logout_user(
 /// Validate session tool
 pub async fn validate_session(
     arguments: Option<Value>,
-    db: &DatabaseConnection,
+    _db: &DatabaseConnection,
 ) -> McpResult<ToolsCallResult> {
     let session_id = get_required_param(&arguments, "session_id")?
         .as_str()

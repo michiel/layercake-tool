@@ -136,6 +136,7 @@ impl SessionManager {
     }
 
     /// Get all users in a project
+    #[allow(dead_code)]
     pub fn get_project_users(&self, project_id: i32) -> Vec<UserPresenceData> {
         if let Some(project) = self.state.projects.get(&project_id) {
             self.collect_user_presence_data(&project)
@@ -264,6 +265,7 @@ impl SessionManager {
     }
 
     /// Clean up inactive sessions (to be called periodically)
+    #[allow(dead_code)]
     pub fn cleanup_inactive_sessions(&self, max_inactive_duration: std::time::Duration) {
         let now = Instant::now();
 

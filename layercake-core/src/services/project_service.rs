@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use anyhow::{Result, anyhow};
 use sea_orm::{
     DatabaseConnection, EntityTrait, QueryFilter, ColumnTrait,
