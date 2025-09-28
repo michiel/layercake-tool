@@ -41,32 +41,50 @@ export const BaseNode = memo(({
 
   return (
     <>
-      {/* Input Handles */}
+      {/* Input Handles - Left and Top sides */}
       {requiredInputs > 0 && (
-        <Handle
-          type="target"
-          position={Position.Left}
-          style={{
-            background: '#fff',
-            border: `2px solid ${color}`,
-            width: 12,
-            height: 12,
-          }}
-        />
+        <>
+          {/* Left Input Handle */}
+          <Handle
+            type="target"
+            position={Position.Left}
+            id="input-left"
+            style={{
+              background: '#fff',
+              border: `2px solid ${color}`,
+              width: 12,
+              height: 12,
+              borderRadius: '50%', // Round for inputs
+            }}
+          />
+
+          {/* Top Input Handle */}
+          <Handle
+            type="target"
+            position={Position.Top}
+            id="input-top"
+            style={{
+              background: '#fff',
+              border: `2px solid ${color}`,
+              width: 12,
+              height: 12,
+              borderRadius: '50%', // Round for inputs
+            }}
+          />
+        </>
       )}
 
       {/* Node Content */}
       <Paper
         shadow={selected ? "md" : "sm"}
         p="sm"
-        onDoubleClick={() => !readonly && onEdit?.()}
         style={{
           border: selected ? `2px solid ${color}` : `1px solid #e9ecef`,
           borderRadius: 8,
           minWidth: 180,
           maxWidth: 250,
           background: '#fff',
-          cursor: readonly ? 'default' : 'pointer',
+          cursor: 'default', // Remove pointer cursor since we don't want click-to-edit
         }}
       >
         <Group justify="space-between" mb="xs">
@@ -120,18 +138,37 @@ export const BaseNode = memo(({
         </div>
       </Paper>
 
-      {/* Output Handle */}
+      {/* Output Handles - Right and Bottom sides */}
       {canHaveOutputs && (
-        <Handle
-          type="source"
-          position={Position.Right}
-          style={{
-            background: '#fff',
-            border: `2px solid ${color}`,
-            width: 12,
-            height: 12,
-          }}
-        />
+        <>
+          {/* Right Output Handle */}
+          <Handle
+            type="source"
+            position={Position.Right}
+            id="output-right"
+            style={{
+              background: '#fff',
+              border: `2px solid ${color}`,
+              width: 12,
+              height: 12,
+              borderRadius: '0', // Square for outputs
+            }}
+          />
+
+          {/* Bottom Output Handle */}
+          <Handle
+            type="source"
+            position={Position.Bottom}
+            id="output-bottom"
+            style={{
+              background: '#fff',
+              border: `2px solid ${color}`,
+              width: 12,
+              height: 12,
+              borderRadius: '0', // Square for outputs
+            }}
+          />
+        </>
       )}
     </>
   )

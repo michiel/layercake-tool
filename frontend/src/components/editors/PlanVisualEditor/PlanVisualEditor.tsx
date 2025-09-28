@@ -65,14 +65,25 @@ interface PlanVisualEditorProps {
 }
 
 // Define stable nodeTypes outside component to prevent recreation warning
-const NODE_TYPES = {
-  [PlanDagNodeType.DATA_SOURCE]: DataSourceNode,
-  [PlanDagNodeType.GRAPH]: GraphNode,
-  [PlanDagNodeType.TRANSFORM]: TransformNode,
-  [PlanDagNodeType.MERGE]: MergeNode,
-  [PlanDagNodeType.COPY]: CopyNode,
-  [PlanDagNodeType.OUTPUT]: OutputNode,
-}
+// Use a function that creates the object once and memoizes it
+const createNodeTypes = (() => {
+  let nodeTypesCache: any = null;
+  return () => {
+    if (!nodeTypesCache) {
+      nodeTypesCache = {
+        [PlanDagNodeType.DATA_SOURCE]: DataSourceNode,
+        [PlanDagNodeType.GRAPH]: GraphNode,
+        [PlanDagNodeType.TRANSFORM]: TransformNode,
+        [PlanDagNodeType.MERGE]: MergeNode,
+        [PlanDagNodeType.COPY]: CopyNode,
+        [PlanDagNodeType.OUTPUT]: OutputNode,
+      };
+    }
+    return nodeTypesCache;
+  };
+})();
+
+const NODE_TYPES = createNodeTypes();
 
 
 
@@ -115,6 +126,8 @@ const convertPlanDagToReactFlow = (
 
   const edges: ReactFlowEdge[] = planDag.edges.map((edge: any) => ({
     ...edge,
+    sourceHandle: edge.sourceHandle || null, // Preserve handle info if available
+    targetHandle: edge.targetHandle || null, // Preserve handle info if available
     type: 'smoothstep',
     animated: false,
     label: edge.metadata.label,
@@ -141,7 +154,7 @@ const convertReactFlowToPlanDag = (
     id: node.id,
     nodeType: node.data?.nodeType || node.nodeType || PlanDagNodeType.DATA_SOURCE,
     position: node.position,
-    metadata: node.data?.metadata || node.metadata || { label: '' },
+    metadata: node.data?.metadata || node.metadata || { label: '', description: '' },
     config: typeof node.data?.config === 'string' ? node.data.config : JSON.stringify(node.data?.config || node.config || {}),
   }))
 
@@ -577,6 +590,8 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         id: `edge-${Date.now()}`,
         source: connection.source!,
         target: connection.target!,
+        sourceHandle: connection.sourceHandle || null, // Preserve specific handle used
+        targetHandle: connection.targetHandle || null, // Preserve specific handle used
         type: 'smoothstep',
         animated: false,
         metadata: {
@@ -766,8 +781,8 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     }
   }, [contextMenu.opened, handleCloseContextMenu]);
 
-  // Memoize nodeTypes to prevent recreation warnings
-  const nodeTypes = useMemo(() => NODE_TYPES, []);
+  // Use stable nodeTypes reference (already memoized outside component)
+  const nodeTypes = NODE_TYPES;
 
   // Save Plan DAG changes to backend
   const savePlanDag = useCallback(async () => {
@@ -810,7 +825,10 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         clearTimeout(validationTimeoutRef.current)
       }
     }
-  }, [readonly, collaboration, cleanupUpdateManagement])
+    // Note: 'collaboration' intentionally omitted from deps to prevent infinite re-joins
+    // Join/leave should only happen on component mount/unmount, not when collaboration object changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [readonly, cleanupUpdateManagement])
 
   const miniMapNodeColor = useCallback((node: Node) => {
     switch (node.data?.nodeType) {

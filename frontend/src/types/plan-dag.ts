@@ -222,6 +222,8 @@ export interface ReactFlowNode extends PlanDagNode {
 }
 
 export interface ReactFlowEdge extends PlanDagEdge {
+  sourceHandle?: string | null; // Specific handle ID used for source connection
+  targetHandle?: string | null; // Specific handle ID used for target connection
   type?: string;
   animated?: boolean;
   style?: Record<string, any>;

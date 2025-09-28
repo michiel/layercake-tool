@@ -12,8 +12,8 @@ const GET_AVAILABLE_DATA_SOURCES = gql`
       id
       name
       description
-      source_type
-      created_at
+      sourceType
+      createdAt
     }
   }
 `;
@@ -22,8 +22,8 @@ interface DataSourceReference {
   id: number;
   name: string;
   description?: string;
-  source_type: string;
-  created_at: string;
+  sourceType: string;
+  createdAt: string;
 }
 
 interface GetAvailableDataSourcesData {
@@ -122,7 +122,7 @@ export const DataSourceNodeConfigForm: React.FC<DataSourceNodeConfigFormProps> =
   const dataSourceOptions = data?.dataSources?.map((ds: DataSourceReference) => ({
     value: ds.id.toString(),
     label: ds.name,
-    description: ds.description || `Type: ${ds.source_type}`,
+    description: ds.description || `Type: ${ds.sourceType}`,
   })) || [];
 
   const selectedDataSource = data?.dataSources?.find(
@@ -149,7 +149,7 @@ export const DataSourceNodeConfigForm: React.FC<DataSourceNodeConfigFormProps> =
           <Stack gap="xs">
             <Text size="sm" fw={500}>Selected Data Source Details:</Text>
             <Text size="xs" c="dimmed">
-              <strong>Type:</strong> {selectedDataSource.source_type}
+              <strong>Type:</strong> {selectedDataSource.sourceType}
             </Text>
             {selectedDataSource.description && (
               <Text size="xs" c="dimmed">
@@ -157,7 +157,7 @@ export const DataSourceNodeConfigForm: React.FC<DataSourceNodeConfigFormProps> =
               </Text>
             )}
             <Text size="xs" c="dimmed">
-              <strong>Created:</strong> {new Date(selectedDataSource.created_at).toLocaleDateString()}
+              <strong>Created:</strong> {new Date(selectedDataSource.createdAt).toLocaleDateString()}
             </Text>
           </Stack>
         </Alert>

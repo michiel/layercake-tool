@@ -1,4 +1,4 @@
-import { useEffect, ReactNode } from 'react'
+import { ReactNode } from 'react'
 import { useCollaborationV2 } from '../../../../hooks/useCollaborationV2'
 import { CollaborativeCursors } from '../../../collaboration/CollaborativeCursors'
 import { UserPresenceData } from '../../../../types/websocket'
@@ -33,13 +33,8 @@ export const CollaborationManager = ({
   // Note: Conflict detection will be handled via WebSocket in the future
   // For now, collaboration events and conflicts are managed through the WebSocket system
 
-  // Join project on mount, leave on unmount
-  useEffect(() => {
-    collaboration.joinProject()
-    return () => {
-      collaboration.leaveProject()
-    }
-  }, [collaboration])
+  // Note: joinProject/leaveProject is handled by parent PlanVisualEditor
+  // This component only manages the collaborative cursors display
 
   // Collaboration data available through props and component state
   // Future versions could expose this data via React Context if needed

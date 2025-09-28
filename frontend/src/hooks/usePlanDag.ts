@@ -120,7 +120,7 @@ export const usePlanDagMutations = (projectId: number) => {
             metadata: {
               __typename: 'NodeMetadata',
               label: node.metadata.label,
-              description: node.metadata.description,
+              description: node.metadata.description || '',
             },
             config: node.config || '{}',
             createdAt: new Date().toISOString(),
@@ -227,9 +227,9 @@ export const usePlanDagMutations = (projectId: number) => {
         node: {
           __typename: 'PlanDagNode',
           id: variables.nodeId,
-          nodeType: variables.updates.nodeType,
-          position: variables.updates.position,
-          metadata: variables.updates.metadata,
+          nodeType: variables.updates.nodeType || 'DataSource',
+          position: variables.updates.position || { x: 0, y: 0 },
+          metadata: variables.updates.metadata || { label: '', description: '' },
           config: variables.updates.config || '{}',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -413,7 +413,7 @@ export const usePlanDagMutations = (projectId: number) => {
           id: variables.nodeId,
           position: variables.position,
           nodeType: 'Input', // Placeholder - will be updated from server response
-          metadata: { label: 'Moving Node', description: null },
+          metadata: { label: 'Moving Node', description: '' },
           config: '{}',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),

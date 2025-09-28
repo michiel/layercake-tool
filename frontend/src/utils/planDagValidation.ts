@@ -17,22 +17,26 @@ export const validateConnection = (
       PlanDagNodeType.OUTPUT,    // Or output directly
     ],
     [PlanDagNodeType.GRAPH]: [
+      PlanDagNodeType.GRAPH,       // Graphs can connect to other graphs
       PlanDagNodeType.TRANSFORM,
       PlanDagNodeType.COPY,
       PlanDagNodeType.OUTPUT,
     ],
     [PlanDagNodeType.TRANSFORM]: [
+      PlanDagNodeType.GRAPH,       // Transforms can connect to graphs
       PlanDagNodeType.MERGE,
       PlanDagNodeType.COPY,
       PlanDagNodeType.OUTPUT,
       PlanDagNodeType.TRANSFORM, // Allow chaining transforms
     ],
     [PlanDagNodeType.MERGE]: [
+      PlanDagNodeType.GRAPH,       // Merges can connect to graphs
       PlanDagNodeType.TRANSFORM,
       PlanDagNodeType.COPY,
       PlanDagNodeType.OUTPUT,
     ],
     [PlanDagNodeType.COPY]: [
+      PlanDagNodeType.GRAPH,       // Copies can connect to graphs
       PlanDagNodeType.TRANSFORM,
       PlanDagNodeType.OUTPUT,
     ],
@@ -65,8 +69,6 @@ export const validateConnection = (
       errorMessage = `DataSource nodes can only connect to Graph, Merge, Transform, or Output nodes`
     } else if (targetType === PlanDagNodeType.DATA_SOURCE) {
       errorMessage = `DataSource nodes cannot receive input connections (they are source nodes)`
-    } else if (targetType === PlanDagNodeType.GRAPH) {
-      errorMessage = `Only DataSource nodes can connect to Graph nodes`
     }
 
     return {
@@ -92,9 +94,9 @@ export const validateConnection = (
 export const canAcceptMultipleInputs = (nodeType: PlanDagNodeType): boolean => {
   switch (nodeType) {
     case PlanDagNodeType.MERGE:
+    case PlanDagNodeType.GRAPH:     // Graphs can accept multiple inputs from various sources
       return true
     case PlanDagNodeType.DATA_SOURCE:
-    case PlanDagNodeType.GRAPH:
     case PlanDagNodeType.TRANSFORM:
     case PlanDagNodeType.COPY:
     case PlanDagNodeType.OUTPUT:
@@ -128,8 +130,9 @@ export const canHaveMultipleOutputs = (nodeType: PlanDagNodeType): boolean => {
 export const getRequiredInputCount = (nodeType: PlanDagNodeType): number => {
   switch (nodeType) {
     case PlanDagNodeType.DATA_SOURCE:
+      return 0 // DataSource nodes are pure source nodes
     case PlanDagNodeType.GRAPH:
-      return 0 // These are source nodes
+      return 1 // Graph nodes can accept inputs from other nodes
     case PlanDagNodeType.TRANSFORM:
     case PlanDagNodeType.COPY:
     case PlanDagNodeType.OUTPUT:

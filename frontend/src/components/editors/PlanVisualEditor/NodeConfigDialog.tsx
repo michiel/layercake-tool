@@ -50,7 +50,7 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
   const handleSave = () => {
     if (isValid) {
       // Create dummy metadata for now
-      const metadata = { label: `${getNodeTypeName()} Node`, description: undefined };
+      const metadata = { label: `${getNodeTypeName()} Node`, description: '' };
       onSave(nodeId, config, metadata);
       onClose();
     }

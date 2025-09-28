@@ -170,15 +170,32 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
 
   return (
     <>
-      {/* Output Handle - DataSource nodes only have outputs, no inputs */}
+      {/* Output Handles - DataSource nodes only have outputs, no inputs */}
+      {/* Right Output Handle */}
       <Handle
         type="source"
         position={Position.Right}
+        id="output-right"
         style={{
           background: '#fff',
           border: `2px solid ${color}`,
           width: 12,
           height: 12,
+          borderRadius: '0', // Square for outputs
+        }}
+      />
+
+      {/* Bottom Output Handle */}
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        id="output-bottom"
+        style={{
+          background: '#fff',
+          border: `2px solid ${color}`,
+          width: 12,
+          height: 12,
+          borderRadius: '0', // Square for outputs
         }}
       />
 
@@ -186,14 +203,13 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
       <Paper
         shadow={selected ? "md" : "sm"}
         p="sm"
-        onDoubleClick={() => !readonly && onEdit?.(props.id)}
         style={{
           border: selected ? `2px solid ${color}` : `1px solid #e9ecef`,
           borderRadius: 8,
           minWidth: 200,
           maxWidth: 280,
           background: '#fff',
-          cursor: readonly ? 'default' : 'pointer',
+          cursor: 'default', // Remove pointer cursor since we don't want click-to-edit
         }}
       >
         <Group justify="space-between" mb="xs">
