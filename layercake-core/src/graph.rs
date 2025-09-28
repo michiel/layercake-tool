@@ -59,12 +59,6 @@ impl Graph {
         self.nodes.iter().find(|n| n.id == id)
     }
     
-    // Alias for get_node_by_id to provide consistent API
-    #[deprecated(since = "0.1.0", note = "Use get_node_by_id instead")]
-    #[allow(dead_code)] // Reserved for future node retrieval operations
-    pub fn get_node(&self, id: &str) -> Option<&Node> {
-        self.get_node_by_id(id)
-    }
 
     #[allow(dead_code)] // Reserved for future hierarchy analysis
     pub fn get_max_hierarchy_depth(&self) -> i32 {
