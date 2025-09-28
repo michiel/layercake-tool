@@ -1,5 +1,4 @@
 import React, { useState } from 'react'
-import { useParams } from 'react-router-dom'
 import { useQuery } from '@apollo/client/react'
 import {
   Modal,
@@ -39,15 +38,16 @@ interface DataSourceSelectionDialogProps {
   onClose: () => void
   onSelect: (dataSource: DataSource) => void
   currentDataSourceId?: number
+  projectId: number
 }
 
 export const DataSourceSelectionDialog: React.FC<DataSourceSelectionDialogProps> = ({
   opened,
   onClose,
   onSelect,
-  currentDataSourceId
+  currentDataSourceId,
+  projectId
 }) => {
-  const { projectId } = useParams<{ projectId: string }>()
   const [searchQuery, setSearchQuery] = useState('')
 
   // Query for DataSources in current project
@@ -57,7 +57,8 @@ export const DataSourceSelectionDialog: React.FC<DataSourceSelectionDialogProps>
     error: dataSourcesError,
     refetch: refetchDataSources
   } = useQuery(GET_DATASOURCES, {
-    variables: { projectId: parseInt(projectId || '0') },
+    variables: { projectId },
+    skip: !projectId || projectId === 0,
     errorPolicy: 'all',
     fetchPolicy: 'cache-and-network'
   })
@@ -118,7 +119,25 @@ export const DataSourceSelectionDialog: React.FC<DataSourceSelectionDialogProps>
             title="Error Loading Data Sources"
             color="red"
           >
-            {dataSourcesError.message}
+            <div>
+              <Text size="sm">{dataSourcesError.message}</Text>
+              <Text size="xs" mt="xs" c="dimmed">
+                Project ID: {projectId}, Query Variables: {JSON.stringify({ projectId })}
+              </Text>
+            </div>
+          </Alert>
+        )}
+
+        {/* Show loading state when projectId is invalid */}
+        {(!projectId || projectId === 0) && !dataSourcesError && (
+          <Alert
+            icon={<IconAlertCircle size={16} />}
+            title="Invalid Project"
+            color="orange"
+          >
+            <Text size="sm">
+              No valid project ID provided. Project ID: {projectId}
+            </Text>
           </Alert>
         )}
 

@@ -97,7 +97,7 @@ export const usePlanDagMutations = (projectId: number) => {
     updatePlanDag: {
       success: boolean
       errors: string[]
-      planDag: any
+      plan_dag: any
     }
   }>(UPDATE_PLAN_DAG, {
     optimisticResponse: (variables) => ({
@@ -105,7 +105,7 @@ export const usePlanDagMutations = (projectId: number) => {
         __typename: 'PlanDagResponse',
         success: true,
         errors: [],
-        planDag: {
+        plan_dag: {
           __typename: 'PlanDag',
           version: variables.planDag.version,
           nodes: variables.planDag.nodes.map((node: any) => ({
@@ -157,7 +157,7 @@ export const usePlanDagMutations = (projectId: number) => {
           query: GET_PLAN_DAG,
           variables: { projectId },
           data: {
-            getPlanDag: data.updatePlanDag.planDag,
+            getPlanDag: data.updatePlanDag.plan_dag,
           },
         })
       }

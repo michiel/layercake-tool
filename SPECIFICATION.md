@@ -112,9 +112,18 @@ plan:
 
  - All user presence is tracked and shared on a per-project basis. cursor position is tracked on a per-project-per-document basis. position can be different depending on the document, example: current implementation tracks position data on canvas, it should also be able to track position in (for example) spreadsheet coordinates, or in a 3d rendering of a VR journey
  - User presence like cursor information is ephemeral data and is communicated between the client and server using a direct, raw websocket connection and NOT via GraphQL mutations
-
+ - On the frontend, user presence shown on a per-project basis in the top bar (icon with the number of active users, click on icon to list active users by name in a Mantine Hover Card)
+ - On the frontend, user presence shown on a per-project-per-document basis by the active user cursor positioning (e.g. presence cursors on the canvas in Plan DAG Editor)
 
 ### Frontend
+
+#### Top bar
+
+ - Items on the top bar,
+  * (left) Top left the Layercake icon and title
+  * (right) Icon for light/dark theme switching
+  * (right) Icon for online/offline status indication (no text, red/green icon only)
+  * (right) Account name + avator, onclick dropdown menu with links to Settings, Profile
 
 #### DAG Plan Editor
 

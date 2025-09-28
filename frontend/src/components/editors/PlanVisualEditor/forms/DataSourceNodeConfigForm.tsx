@@ -8,12 +8,12 @@ import { DataSourceNodeConfig } from '../../../../types/plan-dag';
 // GraphQL query for available data sources
 const GET_AVAILABLE_DATA_SOURCES = gql`
   query GetAvailableDataSources($projectId: Int!) {
-    availableDataSources(projectId: $projectId) {
+    dataSources(projectId: $projectId) {
       id
       name
       description
-      dataType
-      createdAt
+      source_type
+      created_at
     }
   }
 `;
@@ -22,12 +22,12 @@ interface DataSourceReference {
   id: number;
   name: string;
   description?: string;
-  dataType: string;
-  createdAt: string;
+  source_type: string;
+  created_at: string;
 }
 
 interface GetAvailableDataSourcesData {
-  availableDataSources: DataSourceReference[];
+  dataSources: DataSourceReference[];
 }
 
 interface DataSourceNodeConfigFormProps {
@@ -70,7 +70,7 @@ export const DataSourceNodeConfigForm: React.FC<DataSourceNodeConfigFormProps> =
   const handleDataSourceChange = (value: string | null) => {
     if (value) {
       const dataSourceId = parseInt(value, 10);
-      const selectedDataSource = data?.availableDataSources?.find(
+      const selectedDataSource = data?.dataSources?.find(
         (ds: DataSourceReference) => ds.id === dataSourceId
       );
 
@@ -119,13 +119,13 @@ export const DataSourceNodeConfigForm: React.FC<DataSourceNodeConfigFormProps> =
     );
   }
 
-  const dataSourceOptions = data?.availableDataSources?.map((ds: DataSourceReference) => ({
+  const dataSourceOptions = data?.dataSources?.map((ds: DataSourceReference) => ({
     value: ds.id.toString(),
     label: ds.name,
-    description: ds.description || `Type: ${ds.dataType}`,
+    description: ds.description || `Type: ${ds.source_type}`,
   })) || [];
 
-  const selectedDataSource = data?.availableDataSources?.find(
+  const selectedDataSource = data?.dataSources?.find(
     (ds: DataSourceReference) => ds.id === localConfig.dataSourceId
   );
 
@@ -149,7 +149,7 @@ export const DataSourceNodeConfigForm: React.FC<DataSourceNodeConfigFormProps> =
           <Stack gap="xs">
             <Text size="sm" fw={500}>Selected Data Source Details:</Text>
             <Text size="xs" c="dimmed">
-              <strong>Type:</strong> {selectedDataSource.dataType}
+              <strong>Type:</strong> {selectedDataSource.source_type}
             </Text>
             {selectedDataSource.description && (
               <Text size="xs" c="dimmed">
@@ -157,7 +157,7 @@ export const DataSourceNodeConfigForm: React.FC<DataSourceNodeConfigFormProps> =
               </Text>
             )}
             <Text size="xs" c="dimmed">
-              <strong>Created:</strong> {new Date(selectedDataSource.createdAt).toLocaleDateString()}
+              <strong>Created:</strong> {new Date(selectedDataSource.created_at).toLocaleDateString()}
             </Text>
           </Stack>
         </Alert>

@@ -65,7 +65,7 @@ export const UPDATE_PLAN_DAG = gql`
     updatePlanDag(projectId: $projectId, planDag: $planDag) {
       success
       errors
-      planDag {
+      plan_dag {
         version
         nodes {
           id

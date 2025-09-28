@@ -14,6 +14,7 @@ interface NodeConfigDialogProps {
   nodeType: PlanDagNodeType
   config: NodeConfig
   metadata: NodeMetadata
+  projectId: number
   onSave: (nodeId: string, config: NodeConfig, metadata: NodeMetadata) => void
 }
 
@@ -31,6 +32,7 @@ export const NodeConfigDialog = ({
   nodeType,
   config,
   metadata,
+  projectId,
   onSave
 }: NodeConfigDialogProps) => {
   const [isValid, setIsValid] = useState(true)
@@ -179,6 +181,7 @@ export const NodeConfigDialog = ({
           form.setFieldValue('dataSourceId', dataSource.id)
         }}
         currentDataSourceId={selectedDataSource?.id}
+        projectId={projectId}
       />
     </Modal>
   )

@@ -516,6 +516,16 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     [mutations, readonly]
   )
 
+  // Handle node click - open configuration dialog
+  const handleNodeClick = useCallback(
+    (_event: React.MouseEvent, node: Node) => {
+      if (!readonly) {
+        handleNodeEdit(node.id)
+      }
+    },
+    [handleNodeEdit, readonly]
+  )
+
   // Handle edge changes
   const handleEdgesChange = useCallback(
     (changes: EdgeChange[]) => {
@@ -928,6 +938,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
           isValidConnection={isValidConnection}
           onMove={handleViewportChange}
           onNodeDragStop={handleNodeDragStop}
+          onNodeClick={handleNodeClick}
           nodeTypes={nodeTypes}
           connectionMode={ConnectionMode.Loose}
           fitView
