@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { PlanDag } from '../../../../types/plan-dag'
 
 interface UpdateOperation {
@@ -240,7 +240,8 @@ export const useUnifiedUpdateManager = (options: UseUnifiedUpdateManagerOptions 
     }
   }, [clearTimers])
 
-  return {
+  // Memoize the returned object to prevent infinite loops
+  return useMemo(() => ({
     // State
     ...state,
 
@@ -258,5 +259,13 @@ export const useUnifiedUpdateManager = (options: UseUnifiedUpdateManagerOptions 
 
     // Raw scheduling for custom operations
     scheduleOperation,
-  }
+  }), [
+    state,
+    scheduleStructuralUpdate,
+    scheduleCosmeticUpdate,
+    scheduleTransientUpdate,
+    cancelPendingOperations,
+    flushOperations,
+    scheduleOperation
+  ])
 }

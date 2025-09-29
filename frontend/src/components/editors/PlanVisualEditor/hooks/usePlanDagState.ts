@@ -227,18 +227,26 @@ export const usePlanDagState = (options: UsePlanDagStateOptions): PlanDagStateRe
   const [nodes, setNodes, onNodesChange] = useNodesState(reactFlowData.nodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(reactFlowData.edges)
 
-  // Sync ReactFlow state when data changes
+  // Sync ReactFlow state when data changes - FIXED: prevent infinite loop
   useEffect(() => {
-    const shouldSync = (reactFlowData.nodes.length > 0 || reactFlowData.edges.length > 0) &&
-                      (nodes.length === 0 && edges.length === 0) ||
-                      reactFlowData.nodes.length !== nodes.length ||
-                      reactFlowData.edges.length !== edges.length
+    // Only sync when we have new data and the current state is empty or different
+    const hasNewData = reactFlowData.nodes.length > 0 || reactFlowData.edges.length > 0
+    const isCurrentEmpty = nodes.length === 0 && edges.length === 0
+    const isDifferentLength = reactFlowData.nodes.length !== nodes.length || reactFlowData.edges.length !== edges.length
+
+    const shouldSync = hasNewData && (isCurrentEmpty || isDifferentLength)
 
     if (shouldSync) {
+      console.log('Syncing ReactFlow state:', {
+        newNodes: reactFlowData.nodes.length,
+        newEdges: reactFlowData.edges.length,
+        currentNodes: nodes.length,
+        currentEdges: edges.length
+      })
       setNodes(reactFlowData.nodes)
       setEdges(reactFlowData.edges)
     }
-  }, [reactFlowData, nodes.length, edges.length, setNodes, setEdges])
+  }, [reactFlowData.nodes.length, reactFlowData.edges.length, nodes.length, edges.length, setNodes, setEdges])
 
   // Handle real-time changes
   useEffect(() => {
