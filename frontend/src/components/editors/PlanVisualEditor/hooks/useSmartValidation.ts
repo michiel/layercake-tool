@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useMemo } from 'react'
+import React, { useState, useCallback, useRef } from 'react'
 import { PlanDag } from '../../../../types/plan-dag'
 import { usePlanDagValidation } from '../../../../hooks/usePlanDag'
 
@@ -16,49 +16,41 @@ interface ValidationState {
   isValid: boolean | null
 }
 
-interface StructuralChangeDetection {
-  hasStructuralChange: (previous: PlanDag | null, current: PlanDag | null) => boolean
-  shouldValidate: (changeType: 'structural' | 'cosmetic' | 'transient') => boolean
+// Helper function to detect structural changes (no hooks - pure function)
+const hasStructuralChange = (previous: PlanDag | null, current: PlanDag | null): boolean => {
+  if (!previous || !current) return true
+
+  // Quick structural checks
+  if (previous.nodes.length !== current.nodes.length) return true
+  if (previous.edges.length !== current.edges.length) return true
+
+  // Check for node type changes, config changes, or new/removed nodes
+  for (let i = 0; i < current.nodes.length; i++) {
+    const prevNode = previous.nodes.find(n => n.id === current.nodes[i].id)
+    const currNode = current.nodes[i]
+
+    if (!prevNode) return true // New node
+    if (prevNode.nodeType !== currNode.nodeType) return true // Type change
+    if (JSON.stringify(prevNode.config) !== JSON.stringify(currNode.config)) return true // Config change
+  }
+
+  // Check for edge changes (any edge change is structural)
+  for (let i = 0; i < current.edges.length; i++) {
+    const prevEdge = previous.edges.find(e => e.id === current.edges[i].id)
+    const currEdge = current.edges[i]
+
+    if (!prevEdge) return true // New edge
+    if (prevEdge.source !== currEdge.source || prevEdge.target !== currEdge.target) return true // Connection change
+    if (JSON.stringify(prevEdge.metadata) !== JSON.stringify(currEdge.metadata)) return true // Metadata change
+  }
+
+  // No structural changes detected
+  return false
 }
 
-// Detect if changes are structural (require validation) vs cosmetic (don't require validation)
-const createStructuralChangeDetector = (): StructuralChangeDetection => {
-  const hasStructuralChange = useCallback((previous: PlanDag | null, current: PlanDag | null): boolean => {
-    if (!previous || !current) return true
-
-    // Quick structural checks
-    if (previous.nodes.length !== current.nodes.length) return true
-    if (previous.edges.length !== current.edges.length) return true
-
-    // Check for node type changes, config changes, or new/removed nodes
-    for (let i = 0; i < current.nodes.length; i++) {
-      const prevNode = previous.nodes.find(n => n.id === current.nodes[i].id)
-      const currNode = current.nodes[i]
-
-      if (!prevNode) return true // New node
-      if (prevNode.nodeType !== currNode.nodeType) return true // Type change
-      if (JSON.stringify(prevNode.config) !== JSON.stringify(currNode.config)) return true // Config change
-    }
-
-    // Check for edge changes (any edge change is structural)
-    for (let i = 0; i < current.edges.length; i++) {
-      const prevEdge = previous.edges.find(e => e.id === current.edges[i].id)
-      const currEdge = current.edges[i]
-
-      if (!prevEdge) return true // New edge
-      if (prevEdge.source !== currEdge.source || prevEdge.target !== currEdge.target) return true // Connection change
-      if (JSON.stringify(prevEdge.metadata) !== JSON.stringify(currEdge.metadata)) return true // Metadata change
-    }
-
-    // No structural changes detected
-    return false
-  }, [])
-
-  const shouldValidate = useCallback((changeType: 'structural' | 'cosmetic' | 'transient'): boolean => {
-    return changeType === 'structural'
-  }, [])
-
-  return { hasStructuralChange, shouldValidate }
+// Helper function to determine if validation is needed
+const shouldValidate = (changeType: 'structural' | 'cosmetic' | 'transient'): boolean => {
+  return changeType === 'structural'
 }
 
 export const useSmartValidation = (options: UseSmartValidationOptions = {}) => {
@@ -81,8 +73,6 @@ export const useSmartValidation = (options: UseSmartValidationOptions = {}) => {
   const lastPlanDagRef = useRef<PlanDag | null>(null)
   const validationHistoryRef = useRef<Date[]>([])
 
-  // Structural change detection
-  const detector = useMemo(() => createStructuralChangeDetector(), [])
 
   // Rate limiting logic
   const isRateLimited = useCallback((): boolean => {
@@ -151,13 +141,13 @@ export const useSmartValidation = (options: UseSmartValidationOptions = {}) => {
     if (!enabled) return
 
     // Check if validation is needed based on change type
-    if (!detector.shouldValidate(changeType)) {
+    if (!shouldValidate(changeType)) {
       console.log(`Smart validation skipped - ${changeType} change detected`)
       return
     }
 
     // Check if structural changes actually occurred
-    const hasStructuralChanges = detector.hasStructuralChange(lastPlanDagRef.current, planDag)
+    const hasStructuralChanges = hasStructuralChange(lastPlanDagRef.current, planDag)
     if (!hasStructuralChanges) {
       console.log('Smart validation skipped - no structural changes detected')
       return
@@ -175,7 +165,7 @@ export const useSmartValidation = (options: UseSmartValidationOptions = {}) => {
     }, debounceMs)
 
     console.log(`Smart validation scheduled in ${debounceMs}ms for ${changeType} change`)
-  }, [enabled, detector, debounceMs, clearValidationTimeout, executeValidation])
+  }, [enabled, debounceMs, clearValidationTimeout, executeValidation])
 
   // Manual validation trigger
   const validateNow = useCallback(async (planDag: PlanDag): Promise<void> => {
@@ -234,5 +224,3 @@ export const useSmartValidation = (options: UseSmartValidationOptions = {}) => {
   }
 }
 
-// React import for useEffect
-import React from 'react'
