@@ -1,8 +1,10 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react'
 import { useNodesState, useEdgesState } from 'reactflow'
 import { PlanDag, PlanDagNode, PlanDagEdge, ReactFlowNode, ReactFlowEdge, PlanDagNodeType } from '../../../../types/plan-dag'
-import { usePlanDag, usePlanDagMutations, usePlanDagValidation, usePlanDagSubscription } from '../../../../hooks/usePlanDag'
+import { usePlanDag, usePlanDagMutations, usePlanDagSubscription } from '../../../../hooks/usePlanDag'
 import { useUnifiedUpdateManager } from './useUnifiedUpdateManager'
+import { useSmartValidation } from './useSmartValidation'
+import { usePerformanceMonitor } from './usePerformanceMonitor'
 
 interface UsePlanDagStateOptions {
   projectId: number
@@ -33,6 +35,9 @@ interface PlanDagStateResult {
   // Update management
   isDirty: boolean
   updateManager: ReturnType<typeof useUnifiedUpdateManager>
+
+  // Performance monitoring
+  performanceMonitor: ReturnType<typeof usePerformanceMonitor>
 
   // Actions
   savePlanDag: () => Promise<void>
@@ -134,12 +139,18 @@ export const usePlanDagState = (options: UsePlanDagStateOptions): PlanDagStateRe
   const { planDag: rawPlanDag, loading, error, refetch } = usePlanDag(projectId)
   const { lastChange } = usePlanDagSubscription(projectId)
   const mutations = usePlanDagMutations(projectId)
-  const { validate, validationResult, loading: validationLoading } = usePlanDagValidation()
 
   // Local state
   const [isDirty, setIsDirty] = useState(false)
-  const [validationErrors, setValidationErrors] = useState<any[]>([])
-  const [lastValidation, setLastValidation] = useState<Date | null>(null)
+
+  // Performance monitoring
+  const performanceMonitor = usePerformanceMonitor({
+    enabled: !readonly,
+    maxRenderTime: 16, // 60fps budget
+    maxRendersPerSecond: 60,
+    maxEventFrequency: 10,
+    memoryWarningThreshold: 150, // MB
+  })
 
   // Refs for stable comparisons
   const previousPlanDagRef = useRef<PlanDag | null>(null)
@@ -158,19 +169,19 @@ export const usePlanDagState = (options: UsePlanDagStateOptions): PlanDagStateRe
     return stablePlanDagRef.current
   }, [rawPlanDag])
 
+  // Smart validation system
+  const smartValidation = useSmartValidation({
+    enabled: !readonly,
+    debounceMs: 1500,
+    maxValidationRate: 8, // Max 8 validations per minute
+  })
+
   // Unified update manager
   const updateManager = useUnifiedUpdateManager({
     onValidationNeeded: useCallback((planDag: PlanDag) => {
-      setLastValidation(new Date())
-      validate(planDag).then((result) => {
-        if (result.data?.validatePlanDag) {
-          setValidationErrors(result.data.validatePlanDag.errors || [])
-        }
-      }).catch((error) => {
-        console.error('Validation failed:', error)
-        setValidationErrors([{ message: 'Validation service unavailable' }])
-      })
-    }, [validate]),
+      // Use smart validation instead of direct validation
+      smartValidation.scheduleValidation(planDag, 'structural')
+    }, [smartValidation]),
 
     onPersistenceNeeded: useCallback(async (planDag: PlanDag) => {
       try {
@@ -214,16 +225,10 @@ export const usePlanDagState = (options: UsePlanDagStateOptions): PlanDagStateRe
   // Handle real-time changes
   useEffect(() => {
     if (lastChange && stablePlanDag) {
+      performanceMonitor.trackEvent('websocketMessages')
       updateManager.scheduleStructuralUpdate(stablePlanDag, 'real-time-change')
     }
-  }, [lastChange, stablePlanDag, updateManager])
-
-  // Update validation results
-  useEffect(() => {
-    if (validationResult) {
-      setValidationErrors(validationResult.errors || [])
-    }
-  }, [validationResult])
+  }, [lastChange, stablePlanDag, updateManager, performanceMonitor])
 
   // Actions
   const savePlanDag = useCallback(async () => {
@@ -235,21 +240,10 @@ export const usePlanDagState = (options: UsePlanDagStateOptions): PlanDagStateRe
 
   const validatePlanDag = useCallback(() => {
     if (stablePlanDag) {
-      updateManager.scheduleOperation({
-        id: 'manual-validation',
-        type: 'structural',
-        priority: 'immediate',
-        operation: () => {
-          setLastValidation(new Date())
-          return validate(stablePlanDag).then((result) => {
-            if (result.data?.validatePlanDag) {
-              setValidationErrors(result.data.validatePlanDag.errors || [])
-            }
-          })
-        }
-      })
+      performanceMonitor.trackEvent('validations')
+      smartValidation.validateNow(stablePlanDag)
     }
-  }, [stablePlanDag, validate, updateManager])
+  }, [stablePlanDag, smartValidation, performanceMonitor])
 
   const refreshData = useCallback(() => {
     refetch()
@@ -269,14 +263,17 @@ export const usePlanDagState = (options: UsePlanDagStateOptions): PlanDagStateRe
     onNodesChange,
     onEdgesChange,
 
-    // Validation state
-    validationErrors,
-    validationLoading,
-    lastValidation,
+    // Validation state (from smart validation)
+    validationErrors: smartValidation.errors,
+    validationLoading: smartValidation.isValidating,
+    lastValidation: smartValidation.lastValidation,
 
     // Update management
     isDirty,
     updateManager,
+
+    // Performance monitoring
+    performanceMonitor,
 
     // Actions
     savePlanDag,

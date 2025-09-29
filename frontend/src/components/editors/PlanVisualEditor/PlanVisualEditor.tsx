@@ -329,6 +329,9 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
   // Handle node changes (position, selection, etc.)
   const handleNodesChange = useCallback(
     (changes: NodeChange[]) => {
+      // Track performance for node changes
+      planDagState.performanceMonitor.trackEvent('nodeChanges')
+
       onNodesChange(changes)
 
       // Handle structural changes with unified update manager
@@ -349,7 +352,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         }
       })
     },
-    [onNodesChange, onNodeSelect, updateManager, planDag]
+    [onNodesChange, onNodeSelect, updateManager, planDag, planDagState.performanceMonitor]
   )
 
   // Track initial positions when drag starts
@@ -375,6 +378,9 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
           const hasMovedY = Math.abs(node.position.y - initialPosition.y) > threshold
 
           if (hasMovedX || hasMovedY) {
+            // Track performance for position updates
+            planDagState.performanceMonitor.trackEvent('positionUpdates')
+
             // Use unified update manager for position changes (cosmetic updates)
             updateManager.scheduleCosmeticUpdate(planDag!, 'node-position-change')
 
@@ -441,8 +447,15 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
   // Handle edge changes
   const handleEdgesChange = useCallback(
     (changes: EdgeChange[]) => {
+      // Track performance for edge changes
+      planDagState.performanceMonitor.trackEvent('edgeChanges')
+
       onEdgesChange(changes)
-      setIsDirty(true)
+
+      // Use unified update manager for edge changes
+      if (planDag) {
+        updateManager.scheduleStructuralUpdate(planDag, 'edge-change')
+      }
 
       changes.forEach((change) => {
         if (change.type === 'remove' && !readonly) {
@@ -455,7 +468,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         }
       })
     },
-    [onEdgesChange, mutations, onEdgeSelect, readonly]
+    [onEdgesChange, mutations, onEdgeSelect, readonly, planDagState.performanceMonitor, planDag, updateManager]
   )
 
   // Handle new connections

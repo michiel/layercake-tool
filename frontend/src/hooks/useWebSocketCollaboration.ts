@@ -139,33 +139,71 @@ export function useWebSocketCollaboration(
     }
   }, []);
 
-  // Throttled cursor update to prevent spam
+  // Enhanced cursor update throttling with position diffing
   const throttledCursorUpdateRef = useRef<{
     timer: number | null;
     lastUpdate: number;
+    lastPosition: { x: number; y: number } | null;
     pendingUpdate: Omit<CursorUpdateData, 'timestamp'> | null;
   }>({
     timer: null,
     lastUpdate: 0,
+    lastPosition: null,
     pendingUpdate: null
   });
 
   const throttledUpdateCursorPosition = useCallback((data: Omit<CursorUpdateData, 'timestamp'>) => {
     const throttle = throttledCursorUpdateRef.current;
     const now = Date.now();
-    const throttleMs = 100; // Update at most every 100ms
+    const throttleMs = 250; // Increased from 100ms to 250ms to reduce network load
+
+    // Extract position based on document type
+    const currentPosition = data.position.type === 'canvas'
+      ? { x: data.position.x, y: data.position.y }
+      : data.position.type === 'spreadsheet'
+      ? { x: data.position.column, y: data.position.row }
+      : data.position.type === '3d'
+      ? { x: data.position.x, y: data.position.y }
+      : data.position.type === 'timeline'
+      ? { x: data.position.timestamp, y: 0 }
+      : { x: data.position.column, y: data.position.line };
+
+    // Skip update if position hasn't changed significantly (minimum 10px movement for canvas)
+    if (throttle.lastPosition && data.position.type === 'canvas') {
+      const deltaX = Math.abs(currentPosition.x - throttle.lastPosition.x);
+      const deltaY = Math.abs(currentPosition.y - throttle.lastPosition.y);
+      const minMovement = 10; // pixels
+
+      if (deltaX < minMovement && deltaY < minMovement) {
+        return; // Skip insignificant movements
+      }
+    }
 
     throttle.pendingUpdate = data;
 
     if (now - throttle.lastUpdate >= throttleMs) {
       updateCursorPosition(data);
       throttle.lastUpdate = now;
+      throttle.lastPosition = currentPosition;
       throttle.pendingUpdate = null;
     } else if (!throttle.timer) {
       throttle.timer = setTimeout(() => {
         if (throttle.pendingUpdate) {
           updateCursorPosition(throttle.pendingUpdate);
           throttle.lastUpdate = Date.now();
+
+          // Extract position from pending update
+          const pendingPosition = throttle.pendingUpdate.position.type === 'canvas'
+            ? { x: throttle.pendingUpdate.position.x, y: throttle.pendingUpdate.position.y }
+            : throttle.pendingUpdate.position.type === 'spreadsheet'
+            ? { x: throttle.pendingUpdate.position.column, y: throttle.pendingUpdate.position.row }
+            : throttle.pendingUpdate.position.type === '3d'
+            ? { x: throttle.pendingUpdate.position.x, y: throttle.pendingUpdate.position.y }
+            : throttle.pendingUpdate.position.type === 'timeline'
+            ? { x: throttle.pendingUpdate.position.timestamp, y: 0 }
+            : { x: throttle.pendingUpdate.position.column, y: throttle.pendingUpdate.position.line };
+
+          throttle.lastPosition = pendingPosition;
           throttle.pendingUpdate = null;
         }
         throttle.timer = null;
