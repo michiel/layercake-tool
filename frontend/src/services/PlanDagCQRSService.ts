@@ -2,7 +2,6 @@ import { ApolloClient } from '@apollo/client'
 import { PlanDagCommandService } from './PlanDagCommandService'
 import { PlanDagQueryService } from './PlanDagQueryService'
 import { ReactFlowAdapter } from '../adapters/ReactFlowAdapter'
-import { useSubscriptionFilter } from '../hooks/useGraphQLSubscriptionFilter'
 
 /**
  * Unified CQRS Service for Plan DAG operations
@@ -14,9 +13,7 @@ export class PlanDagCQRSService {
   private queryService: PlanDagQueryService
   private clientId: string
 
-  constructor(apollo: ApolloClient) {
-    // Get client ID from subscription filter hook
-    const { clientId } = useSubscriptionFilter()
+  constructor(apollo: ApolloClient, clientId: string) {
     this.clientId = clientId
 
     // Initialize separated services

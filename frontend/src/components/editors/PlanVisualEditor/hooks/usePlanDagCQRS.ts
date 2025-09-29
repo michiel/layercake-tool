@@ -8,6 +8,7 @@ import { useUnifiedUpdateManager } from './useUnifiedUpdateManager'
 import { useSmartValidation } from './useSmartValidation'
 import { usePerformanceMonitor } from './usePerformanceMonitor'
 import { useStableCallback, useExternalDataChangeDetector } from '../../../../hooks/useStableReference'
+import { useSubscriptionFilter } from '../../../../hooks/useGraphQLSubscriptionFilter'
 
 interface UsePlanDagCQRSOptions {
   projectId: number
@@ -75,10 +76,13 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
   // Apollo client for CQRS service
   const apollo = useApolloClient()
 
+  // Get client ID at top level to follow React hook rules
+  const { clientId } = useSubscriptionFilter()
+
   // Initialize CQRS service
   const cqrsService = useMemo(() => {
-    return new PlanDagCQRSService(apollo)
-  }, [apollo])
+    return new PlanDagCQRSService(apollo, clientId)
+  }, [apollo, clientId])
 
   // Local state
   const [planDag, setPlanDag] = useState<PlanDag | null>(null)

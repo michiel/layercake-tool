@@ -1,7 +1,8 @@
-import { useCallback } from 'react'
+import { useCallback, useMemo } from 'react'
 import { useApolloClient } from '@apollo/client/react'
 import { PlanDagCQRSService } from '../services/PlanDagCQRSService'
 import { PlanDagNode, ReactFlowEdge } from '../types/plan-dag'
+import { useSubscriptionFilter } from './useGraphQLSubscriptionFilter'
 
 interface UsePlanDagCQRSMutationsOptions {
   projectId: number
@@ -22,8 +23,13 @@ export const usePlanDagCQRSMutations = (options: UsePlanDagCQRSMutationsOptions)
   const { projectId } = options
   const apollo = useApolloClient()
 
+  // Get client ID at top level to follow React hook rules
+  const { clientId } = useSubscriptionFilter()
+
   // Initialize CQRS service
-  const cqrsService = new PlanDagCQRSService(apollo)
+  const cqrsService = useMemo(() => {
+    return new PlanDagCQRSService(apollo, clientId)
+  }, [apollo, clientId])
 
   const addNode = useCallback(async (node: Partial<PlanDagNode>): Promise<PlanDagNode> => {
     console.log('[usePlanDagCQRSMutations] Adding node via CQRS:', node.id)
