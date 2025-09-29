@@ -35,11 +35,11 @@ export const usePresence = (options: UsePresenceOptions): UsePresenceResult => {
   const {
     projectId,
     currentUser,
-    serverUrl = process.env.VITE_SERVER_URL || 'ws://localhost:3001',
+    serverUrl = import.meta.env.VITE_SERVER_URL || 'ws://localhost:3001',
     autoConnect = true
   } = options
 
-  const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected')
+  const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.DISCONNECTED)
   const [users, setUsers] = useState<UserPresenceData[]>([])
   const [error, setError] = useState<Error | null>(null)
 
@@ -62,20 +62,20 @@ export const usePresence = (options: UsePresenceOptions): UsePresenceResult => {
         presenceServiceRef.current.onPresenceUpdate(setUsers),
         presenceServiceRef.current.onError(setError),
         presenceServiceRef.current.onUserJoin((user) => {
-          console.log('[usePresence] User joined:', user.id)
+          console.log('[usePresence] User joined:', user.userId)
           setUsers(prev => {
-            const exists = prev.find(u => u.id === user.id)
+            const exists = prev.find(u => u.userId === user.userId)
             if (exists) return prev
             return [...prev, user]
           })
         }),
         presenceServiceRef.current.onUserLeave((userId) => {
           console.log('[usePresence] User left:', userId)
-          setUsers(prev => prev.filter(u => u.id !== userId))
+          setUsers(prev => prev.filter(u => u.userId !== userId))
         }),
         presenceServiceRef.current.onCursorMove((userId, x, y) => {
           setUsers(prev => prev.map(user =>
-            user.id === userId
+            user.userId === userId
               ? { ...user, cursorPosition: { x, y }, lastActivity: Date.now() }
               : user
           ))
@@ -90,11 +90,11 @@ export const usePresence = (options: UsePresenceOptions): UsePresenceResult => {
         presenceServiceRef.current = null
       }
     }
-  }, [projectId, serverUrl, currentUser.id])
+  }, [projectId, serverUrl, currentUser.userId])
 
   // Auto-connect if enabled
   useEffect(() => {
-    if (autoConnect && presenceServiceRef.current && connectionState === 'disconnected') {
+    if (autoConnect && presenceServiceRef.current && connectionState === ConnectionState.DISCONNECTED) {
       connect().catch(error => {
         console.error('[usePresence] Auto-connect failed:', error)
       })
@@ -145,7 +145,7 @@ export const usePresence = (options: UsePresenceOptions): UsePresenceResult => {
   return {
     // Connection state
     connectionState,
-    isConnected: connectionState === 'connected',
+    isConnected: connectionState === ConnectionState.CONNECTED,
     error,
 
     // Presence data

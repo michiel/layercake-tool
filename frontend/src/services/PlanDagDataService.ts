@@ -1,4 +1,5 @@
-import { ApolloClient, NormalizedCacheObject } from '@apollo/client'
+import { ApolloClient } from '@apollo/client'
+import * as PlanDagGraphQL from '../graphql/plan-dag'
 import { PlanDag, PlanDagNode, ReactFlowEdge } from '../types/plan-dag'
 import { createMutationContext } from '../hooks/useGraphQLSubscriptionFilter'
 
@@ -9,7 +10,7 @@ import { createMutationContext } from '../hooks/useGraphQLSubscriptionFilter'
  */
 export class PlanDagDataService {
   constructor(
-    private apollo: ApolloClient<NormalizedCacheObject>,
+    private apollo: ApolloClient,
     private clientId: string
   ) {}
 
@@ -18,20 +19,13 @@ export class PlanDagDataService {
       console.log('[PlanDagDataService] Updating Plan DAG:', planDag.version)
 
       const result = await this.apollo.mutate({
-        mutation: require('../graphql/plan-dag').UPDATE_PLAN_DAG,
+        mutation: PlanDagGraphQL.UPDATE_PLAN_DAG,
         variables: { planDag },
-        context: createMutationContext(this.clientId),
-        // Skip subscription for own mutations to prevent loops
-        update: (cache, { data }) => {
-          // Optimistic update - but don't trigger subscriptions
-          if (data?.updatePlanDag) {
-            console.log('[PlanDagDataService] Optimistic update applied')
-          }
-        }
+        context: createMutationContext(this.clientId)
       })
 
       console.log('[PlanDagDataService] Plan DAG updated successfully')
-      return result.data?.updatePlanDag
+      return (result.data as any)?.updatePlanDag || null
     } catch (error) {
       console.error('[PlanDagDataService] Failed to update Plan DAG:', error)
       throw error
@@ -43,13 +37,13 @@ export class PlanDagDataService {
       console.log('[PlanDagDataService] Adding node:', node.id)
 
       const result = await this.apollo.mutate({
-        mutation: require('../graphql/plan-dag').ADD_PLAN_DAG_NODE,
+        mutation: PlanDagGraphQL.ADD_PLAN_DAG_NODE,
         variables: { node },
         context: createMutationContext(this.clientId),
       })
 
       console.log('[PlanDagDataService] Node added successfully')
-      return result.data?.addPlanDagNode
+      return (result.data as any)?.addPlanDagNode || null
     } catch (error) {
       console.error('[PlanDagDataService] Failed to add node:', error)
       throw error
@@ -61,13 +55,13 @@ export class PlanDagDataService {
       console.log('[PlanDagDataService] Updating node:', nodeId)
 
       const result = await this.apollo.mutate({
-        mutation: require('../graphql/plan-dag').UPDATE_PLAN_DAG_NODE,
+        mutation: PlanDagGraphQL.UPDATE_PLAN_DAG_NODE,
         variables: { nodeId, updates },
         context: createMutationContext(this.clientId),
       })
 
       console.log('[PlanDagDataService] Node updated successfully')
-      return result.data?.updatePlanDagNode
+      return (result.data as any)?.updatePlanDagNode || null
     } catch (error) {
       console.error('[PlanDagDataService] Failed to update node:', error)
       throw error
@@ -79,13 +73,13 @@ export class PlanDagDataService {
       console.log('[PlanDagDataService] Deleting node:', nodeId)
 
       const result = await this.apollo.mutate({
-        mutation: require('../graphql/plan-dag').DELETE_PLAN_DAG_NODE,
+        mutation: PlanDagGraphQL.DELETE_PLAN_DAG_NODE,
         variables: { nodeId },
         context: createMutationContext(this.clientId),
       })
 
       console.log('[PlanDagDataService] Node deleted successfully')
-      return result.data?.deletePlanDagNode
+      return (result.data as any)?.deletePlanDagNode || false
     } catch (error) {
       console.error('[PlanDagDataService] Failed to delete node:', error)
       throw error
@@ -97,7 +91,7 @@ export class PlanDagDataService {
       console.log('[PlanDagDataService] Moving node:', nodeId, position)
 
       const result = await this.apollo.mutate({
-        mutation: require('../graphql/plan-dag').MOVE_PLAN_DAG_NODE,
+        mutation: PlanDagGraphQL.MOVE_PLAN_DAG_NODE,
         variables: { nodeId, position },
         context: createMutationContext(this.clientId),
         // Position updates are frequent - use optimistic response
@@ -106,7 +100,7 @@ export class PlanDagDataService {
         }
       })
 
-      return result.data?.movePlanDagNode
+      return (result.data as any)?.movePlanDagNode || false
     } catch (error) {
       console.error('[PlanDagDataService] Failed to move node:', error)
       throw error
@@ -118,13 +112,13 @@ export class PlanDagDataService {
       console.log('[PlanDagDataService] Adding edge:', edge.id)
 
       const result = await this.apollo.mutate({
-        mutation: require('../graphql/plan-dag').ADD_PLAN_DAG_EDGE,
+        mutation: PlanDagGraphQL.ADD_PLAN_DAG_EDGE,
         variables: { edge },
         context: createMutationContext(this.clientId),
       })
 
       console.log('[PlanDagDataService] Edge added successfully')
-      return result.data?.addPlanDagEdge
+      return (result.data as any)?.addPlanDagEdge || null
     } catch (error) {
       console.error('[PlanDagDataService] Failed to add edge:', error)
       throw error
@@ -133,16 +127,14 @@ export class PlanDagDataService {
 
   async updateEdge(edgeId: string, updates: Partial<ReactFlowEdge>): Promise<ReactFlowEdge> {
     try {
-      console.log('[PlanDagDataService] Updating edge:', edgeId)
+      console.log('[PlanDagDataService] Updating edge (delete+add):', edgeId)
 
-      const result = await this.apollo.mutate({
-        mutation: require('../graphql/plan-dag').UPDATE_PLAN_DAG_EDGE,
-        variables: { edgeId, updates },
-        context: createMutationContext(this.clientId),
-      })
+      // Since UPDATE_PLAN_DAG_EDGE doesn't exist, we'll delete and re-add
+      await this.deleteEdge(edgeId)
+      const newEdge = await this.addEdge({ ...updates, id: edgeId } as ReactFlowEdge)
 
       console.log('[PlanDagDataService] Edge updated successfully')
-      return result.data?.updatePlanDagEdge
+      return newEdge
     } catch (error) {
       console.error('[PlanDagDataService] Failed to update edge:', error)
       throw error
@@ -154,13 +146,13 @@ export class PlanDagDataService {
       console.log('[PlanDagDataService] Deleting edge:', edgeId)
 
       const result = await this.apollo.mutate({
-        mutation: require('../graphql/plan-dag').DELETE_PLAN_DAG_EDGE,
+        mutation: PlanDagGraphQL.DELETE_PLAN_DAG_EDGE,
         variables: { edgeId },
         context: createMutationContext(this.clientId),
       })
 
       console.log('[PlanDagDataService] Edge deleted successfully')
-      return result.data?.deletePlanDagEdge
+      return (result.data as any)?.deletePlanDagEdge || false
     } catch (error) {
       console.error('[PlanDagDataService] Failed to delete edge:', error)
       throw error
@@ -172,13 +164,13 @@ export class PlanDagDataService {
       console.log('[PlanDagDataService] Validating Plan DAG')
 
       const result = await this.apollo.query({
-        query: require('../graphql/plan-dag').VALIDATE_PLAN_DAG,
+        query: PlanDagGraphQL.VALIDATE_PLAN_DAG,
         variables: { planDag },
         fetchPolicy: 'no-cache' // Always get fresh validation
       })
 
       console.log('[PlanDagDataService] Plan DAG validated')
-      return result.data?.validatePlanDag
+      return (result.data as any)?.validatePlanDag || null
     } catch (error) {
       console.error('[PlanDagDataService] Failed to validate Plan DAG:', error)
       throw error
@@ -189,12 +181,12 @@ export class PlanDagDataService {
   async getPlanDag(projectId: number): Promise<PlanDag | null> {
     try {
       const result = await this.apollo.query({
-        query: require('../graphql/plan-dag').GET_PLAN_DAG,
+        query: PlanDagGraphQL.GET_PLAN_DAG,
         variables: { projectId },
         fetchPolicy: 'cache-first'
       })
 
-      return result.data?.planDag || null
+      return (result.data as any)?.getPlanDag || null
     } catch (error) {
       console.error('[PlanDagDataService] Failed to get Plan DAG:', error)
       throw error
@@ -210,12 +202,12 @@ export class PlanDagDataService {
     console.log('[PlanDagDataService] Subscribing to Plan DAG changes for project:', projectId)
 
     const subscription = this.apollo.subscribe({
-      query: require('../graphql/plan-dag').PLAN_DAG_SUBSCRIPTION,
+      query: PlanDagGraphQL.PLAN_DAG_CHANGED_SUBSCRIPTION,
       variables: { projectId }
     })
 
     return subscription.subscribe({
-      next: (result) => {
+      next: (result: any) => {
         const subscriptionData = result.data?.planDagChanged
 
         if (subscriptionData) {
@@ -231,7 +223,7 @@ export class PlanDagDataService {
           onUpdate(subscriptionData.planDag)
         }
       },
-      error: (error) => {
+      error: (error: any) => {
         console.error('[PlanDagDataService] Subscription error:', error)
         onError?.(error)
       }

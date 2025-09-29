@@ -38,7 +38,7 @@ export class PresenceService {
 
         this.websocket.onopen = () => {
           console.log('[PresenceService] Connected')
-          this.connectionState = 'connected'
+          this.connectionState = ConnectionState.CONNECTED
           this.reconnectAttempts = 0
           this.startHeartbeat()
           this.emit('connectionChange', this.connectionState)
@@ -50,7 +50,7 @@ export class PresenceService {
 
         this.websocket.onclose = (event) => {
           console.log('[PresenceService] Disconnected:', event.code, event.reason)
-          this.connectionState = 'disconnected'
+          this.connectionState = ConnectionState.DISCONNECTED
           this.stopHeartbeat()
           this.emit('connectionChange', this.connectionState)
 
@@ -82,7 +82,7 @@ export class PresenceService {
       this.websocket = null
     }
     this.stopHeartbeat()
-    this.connectionState = 'disconnected'
+    this.connectionState = ConnectionState.DISCONNECTED
     this.emit('connectionChange', this.connectionState)
   }
 
@@ -92,7 +92,7 @@ export class PresenceService {
     this.send({
       type: 'cursor_move',
       data: {
-        userId: this.currentUser.id,
+        userId: this.currentUser.userId,
         x,
         y,
         selectedNodeId,
@@ -107,7 +107,7 @@ export class PresenceService {
     this.send({
       type: 'user_status',
       data: {
-        userId: this.currentUser.id,
+        userId: this.currentUser.userId,
         status,
         timestamp: Date.now()
       }
@@ -120,7 +120,7 @@ export class PresenceService {
     this.send({
       type: 'viewport_change',
       data: {
-        userId: this.currentUser.id,
+        userId: this.currentUser.userId,
         viewport,
         timestamp: Date.now()
       }
@@ -252,8 +252,8 @@ export class PresenceService {
     console.log(`[PresenceService] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`)
 
     setTimeout(() => {
-      if (this.connectionState === 'disconnected') {
-        this.connectionState = 'connecting'
+      if (this.connectionState === ConnectionState.DISCONNECTED) {
+        this.connectionState = ConnectionState.CONNECTING
         this.emit('connectionChange', this.connectionState)
         this.connect().catch(error => {
           console.error('[PresenceService] Reconnection failed:', error)
