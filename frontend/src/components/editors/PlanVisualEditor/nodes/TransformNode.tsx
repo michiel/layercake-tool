@@ -19,6 +19,9 @@ export const TransformNode = memo((props: TransformNodeProps) => {
       metadata={data.metadata}
       onEdit={() => onEdit?.(props.id)}
       onDelete={() => onDelete?.(props.id)}
+      readonly={data.readonly}
+      edges={data.edges}
+      hasValidConfig={data.hasValidConfig}
     />
   )
 })

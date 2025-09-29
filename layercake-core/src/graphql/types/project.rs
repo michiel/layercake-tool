@@ -12,7 +12,9 @@ pub struct Project {
     pub id: i32,
     pub name: String,
     pub description: Option<String>,
+    #[graphql(name = "createdAt")]
     pub created_at: DateTime<Utc>,
+    #[graphql(name = "updatedAt")]
     pub updated_at: DateTime<Utc>,
 }
 

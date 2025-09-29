@@ -25,6 +25,7 @@ pub struct NodeMetadata {
 #[graphql(input_name = "EdgeMetadataInput")]
 pub struct EdgeMetadata {
     pub label: Option<String>,
+    #[graphql(name = "dataType")]
     pub data_type: DataType,
 }
 
@@ -112,6 +113,7 @@ pub struct GraphNodeConfig {
 pub struct GraphNodeMetadata {
     pub node_count: Option<i32>,
     pub edge_count: Option<i32>,
+    #[graphql(name = "lastModified")]
     pub last_modified: Option<String>,
 }
 
@@ -250,11 +252,14 @@ pub enum NodeConfig {
 #[graphql(complex)]
 pub struct PlanDagNode {
     pub id: String,
+    #[graphql(name = "nodeType")]
     pub node_type: PlanDagNodeType,
     pub position: Position,
     pub metadata: NodeMetadata,
     pub config: String, // JSON string for now, will be parsed as NodeConfig
+    #[graphql(name = "createdAt")]
     pub created_at: DateTime<Utc>,
+    #[graphql(name = "updatedAt")]
     pub updated_at: DateTime<Utc>,
 }
 
@@ -265,7 +270,9 @@ pub struct PlanDagEdge {
     pub source: String,
     pub target: String,
     pub metadata: EdgeMetadata,
+    #[graphql(name = "createdAt")]
     pub created_at: DateTime<Utc>,
+    #[graphql(name = "updatedAt")]
     pub updated_at: DateTime<Utc>,
 }
 
@@ -277,6 +284,7 @@ pub struct PlanDagMetadata {
     pub name: Option<String>,
     pub description: Option<String>,
     pub created: Option<String>,
+    #[graphql(name = "lastModified")]
     pub last_modified: Option<String>,
     pub author: Option<String>,
 }
@@ -302,6 +310,7 @@ pub struct PlanDagInput {
 #[derive(InputObject, Clone, Debug)]
 pub struct PlanDagNodeInput {
     pub id: String,
+    #[graphql(name = "nodeType")]
     pub node_type: PlanDagNodeType,
     pub position: Position,
     pub metadata: NodeMetadata,
@@ -328,6 +337,7 @@ pub struct PlanDagNodeUpdateInput {
 pub struct PlanDagResponse {
     pub success: bool,
     pub errors: Vec<String>,
+    #[graphql(name = "planDag")]
     pub plan_dag: Option<PlanDag>,
 }
 
@@ -355,7 +365,9 @@ pub struct ValidationResult {
 
 #[derive(SimpleObject, Clone, Debug)]
 pub struct ValidationError {
+    #[graphql(name = "nodeId")]
     pub node_id: Option<String>,
+    #[graphql(name = "edgeId")]
     pub edge_id: Option<String>,
     pub error_type: ValidationErrorType,
     pub message: String,
@@ -363,7 +375,9 @@ pub struct ValidationError {
 
 #[derive(SimpleObject, Clone, Debug)]
 pub struct ValidationWarning {
+    #[graphql(name = "nodeId")]
     pub node_id: Option<String>,
+    #[graphql(name = "edgeId")]
     pub edge_id: Option<String>,
     pub warning_type: ValidationWarningType,
     pub message: String,

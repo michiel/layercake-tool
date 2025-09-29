@@ -101,7 +101,7 @@ plan:
  - The code consistently logs using tracing at TRACING, DEBUG, INFO, WARN and ERROR, with the default level being INFO. This can be overridden via config, command line flags or then RUST_LOG environment variable, with different log levels configurable on a crate/module basis if necessary
  - The web interface will communicate with the backend via GraphQL
  - Layercake plan files can be represented as a YAML file. The Layercake binary will have a command for running the plan, similar to the current implementation ()
-
+NC
 ### Testing
 
  - All functionality must have test coverage
@@ -134,6 +134,19 @@ plan:
    * MergeNode - merges DataSourceNodes and/or GraphNodes. The output is a new GraphNode. The configuration for MergeNode are the merge rules (default: overwrite existing nodes/edges/layers with same ID)
    * OutputNode - this triggers a specific export or visualisation (example: GraphvizDOT, CSV), input is a GraphNode
  - The DAG Plan editor has a toolbar on the top. This toolbar has draggable icons for each of the node types that can be dropped on the canvas as unconfigured nodes. Unconfigured nodes are highlighted in orange. Clicking the cog icon on an uncofigured node opens the configuration dialog, which is different for each node. A DataSource node allows you to select an existing DataSource. A TransformNode allows you to create a list of rules, each of which has their own configuration
+ - Nodes in the DAG Plan Editor have connectors on all 4 sides. The left and top are INPUT connectors and will only connect FROM nodes that output the correct type. the right and bottom are OUTPUT connectors and will connect TO nodes that input the correct type. Visually input and output connectors are distinct. After connecting an edge to or from a top/left/bottom/right connector, that connection has to stay consistent (NOT connect to top and render as connect to left. if visually connected to top, the render has to be top as well, etc)
+ - The Plan DAG can have nodes in either CONFIGURED or UNCONFIGURED state
+ - Node must meet all their requirements (including node-specific configuration that passes validation, if applicable) to be in configured state, otherwise they are in unconfigured state
+ - Nodes that are not in CONFIGURED state have an orange outline
+ - Node connection rules :
+   * GraphNodes can have multiple inputs (of GraphNode type) but MUST have at least one to be in configured state
+   * GraphNodes can have multiple outputs (of GraphNode type)
+   * DataSourceNodes can have multiple outputs (of GraphNode type), but cannot connect to the same target twice, and MUST have at least one output connected to be in configured state
+   * TransformNodes can have only one input (GraphNode type) and multiple outputs (GraphNode type), but cannot connect to the same target twice, and MUST have one input and one output to be in configured state
+   * OutputNodes can have only one input (of GraphNode type) and MUST have one input to be in configured state
+   * These node connection rules also serve as part of Plan DAG validation on the backend
+ - Edges can be selected and then deleted OR changed OR disconnected and reconnected
+
 
 ### Artefacts
 
@@ -218,73 +231,4 @@ plan:
  - Graph rendering performance: 60fps for graphs up to 1000 nodes
  - React component optimization with memo and useMemo for large graphs
  - Virtual scrolling for large node/edge lists in spreadsheet view
-
-## Advanced Features and Extensions
-
-### Enhanced Real-time Collaboration
- - Presence indicators showing active users and their cursor positions
- - Collaborative cursors in visual editors (PlanVisualEditor, GraphVisualEditor)
- - Real-time typing indicators in text fields
- - Conflict-free collaborative editing using operational transform
- - Undo/redo functionality that works across collaborative sessions
-
-### Data Import and Integration
- - Support for additional data sources: JSON, XML, SQL databases
- - Scheduled data imports with change detection
- - Data validation and transformation pipelines
- - Import preview and rollback functionality
- - Bulk import operations with progress tracking
-
-### Advanced Visualization
- - 3D graph visualization using three.js and 3d-force-graph
- - Isoflow diagram generation for system architecture views
- - Custom layout algorithms for different graph types
- - Interactive filtering and search within visualizations
- - Export visualizations as SVG, PNG, PDF formats
-
-### Developer Experience
- - Hot reload for development environments
- - Comprehensive logging with structured output (JSON) for production
- - Metrics collection for performance monitoring
- - Error tracking and crash reporting
- - API documentation auto-generation from GraphQL schema
-
-## Security Requirements
-
-### Data Protection
- - Encryption at rest for sensitive graph data
- - Encryption in transit for all API communications (TLS 1.3)
- - Input validation and sanitization for all user inputs
- - Protection against GraphQL query complexity attacks
- - Rate limiting for API endpoints
-
-### Access Control
- - Multi-factor authentication support
- - Session timeout and concurrent session limits
- - Audit logging for all data modifications
- - IP allowlisting for enterprise deployments
- - Data export restrictions based on user roles
-
-## Deployment and Operations
-
-### Container Support
- - Docker containerization with multi-stage builds
- - Kubernetes deployment manifests
- - Environment-specific configuration management
- - Health check endpoints for load balancers
- - Graceful shutdown handling
-
-### Monitoring and Observability
- - Prometheus metrics export
- - Distributed tracing with OpenTelemetry
- - Structured logging compatible with ELK stack
- - Application performance monitoring (APM) integration
- - Database query performance monitoring
-
-### Backup and Recovery
- - Automated database backups with retention policies
- - Point-in-time recovery capabilities
- - Disaster recovery procedures documentation
- - Data migration tools between different storage backends
- - Configuration backup and restore functionality
 

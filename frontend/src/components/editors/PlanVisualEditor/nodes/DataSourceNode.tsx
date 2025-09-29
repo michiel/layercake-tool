@@ -4,7 +4,7 @@ import { useQuery } from '@apollo/client/react'
 import { Paper, Text, Group, ActionIcon, Tooltip, Badge, Stack, Loader } from '@mantine/core'
 import { IconSettings, IconTrash, IconFile, IconAlertCircle, IconCheck, IconClock, IconX } from '@tabler/icons-react'
 import { PlanDagNodeType, DataSourceNodeConfig } from '../../../../types/plan-dag'
-import { getNodeTypeColor } from '../../../../utils/planDagValidation'
+import { getNodeTypeColor, isNodeConfigured } from '../../../../utils/planDagValidation'
 import { GET_DATASOURCE, DataSource, getDataSourceTypeDisplayName, formatFileSize, getStatusColor } from '../../../../graphql/datasources'
 
 // Helper function to get data freshness information
@@ -44,6 +44,11 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
 
   const config = data.config as DataSourceNodeConfig
   const color = getNodeTypeColor(PlanDagNodeType.DATA_SOURCE)
+
+  // Check if node is configured according to SPECIFICATION.md
+  const edges = data.edges || []
+  const hasValidConfig = data.hasValidConfig !== false
+  const isConfigured = isNodeConfigured(PlanDagNodeType.DATA_SOURCE, props.id, edges, hasValidConfig)
 
   // Query DataSource details if dataSourceId is available
   const { data: dataSourceData, loading: dataSourceLoading } = useQuery(GET_DATASOURCE, {
@@ -204,7 +209,11 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
         shadow={selected ? "md" : "sm"}
         p="sm"
         style={{
-          border: selected ? `2px solid ${color}` : `1px solid #e9ecef`,
+          border: selected
+            ? `2px solid ${color}`
+            : !isConfigured
+              ? `2px solid #fd7e14` // Orange outline for unconfigured nodes
+              : `1px solid #e9ecef`,
           borderRadius: 8,
           minWidth: 200,
           maxWidth: 280,
@@ -222,6 +231,11 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
             >
               Data Source
             </Badge>
+            {!isConfigured && (
+              <Badge variant="outline" size="xs" color="orange">
+                Not Configured
+              </Badge>
+            )}
           </Group>
 
           {!readonly && (
@@ -231,7 +245,10 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
                   size="sm"
                   variant="subtle"
                   color="gray"
-                  onClick={() => onEdit?.(props.id)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onEdit?.(props.id)
+                  }}
                 >
                   <IconSettings size="0.8rem" />
                 </ActionIcon>
@@ -241,7 +258,10 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
                   size="sm"
                   variant="subtle"
                   color="red"
-                  onClick={() => onDelete?.(props.id)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onDelete?.(props.id)
+                  }}
                 >
                   <IconTrash size="0.8rem" />
                 </ActionIcon>

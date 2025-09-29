@@ -1,7 +1,7 @@
 use async_graphql::*;
 use sea_orm::{EntityTrait, ColumnTrait, QueryFilter};
 
-use crate::database::entities::{projects, plans, nodes, edges, layers, plan_dag_nodes, plan_dag_edges, users, user_sessions, project_collaborators, data_sources};
+use crate::database::entities::{projects, plans, nodes, edges, layers, users, user_sessions, project_collaborators, data_sources};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::{Project, Plan, Node, Edge, Layer, PlanDag, PlanDagNode, PlanDagEdge, ValidationResult, PlanDagInput, User, ProjectCollaborator, DataSource, PlanDagMetadata, UserSession};
 use crate::graphql::types::plan_dag::DataSourceReference;
@@ -117,21 +117,51 @@ impl Query {
             .await?
             .ok_or_else(|| Error::new("Project not found"))?;
 
-        // Get Plan DAG nodes for this project
-        let dag_nodes = plan_dag_nodes::Entity::find()
-            .filter(plan_dag_nodes::Column::PlanId.eq(project_id))
+        // Get nodes from the project's graph data
+        let graph_nodes = nodes::Entity::find()
+            .filter(nodes::Column::ProjectId.eq(project_id))
             .all(&context.db)
             .await?;
 
-        // Get Plan DAG edges for this project
-        let dag_edges = plan_dag_edges::Entity::find()
-            .filter(plan_dag_edges::Column::PlanId.eq(project_id))
+        // Get edges from the project's graph data
+        let graph_edges = edges::Entity::find()
+            .filter(edges::Column::ProjectId.eq(project_id))
             .all(&context.db)
             .await?;
 
-        // Convert to GraphQL types
-        let nodes: Vec<PlanDagNode> = dag_nodes.into_iter().map(PlanDagNode::from).collect();
-        let edges: Vec<PlanDagEdge> = dag_edges.into_iter().map(PlanDagEdge::from).collect();
+        // Convert graph nodes to Plan DAG nodes
+        let nodes: Vec<PlanDagNode> = graph_nodes.into_iter().map(|node| {
+            PlanDagNode {
+                id: node.node_id.clone(), // Use node_id instead of id
+                node_type: crate::graphql::types::plan_dag::PlanDagNodeType::DataSource, // Use the enum
+                position: crate::graphql::types::Position {
+                    x: 0.0, // Default position since nodes table doesn't have x,y
+                    y: 0.0,
+                },
+                metadata: crate::graphql::types::NodeMetadata {
+                    label: node.label.clone(),
+                    description: None,
+                },
+                config: "{}".to_string(), // Default empty config
+                created_at: chrono::Utc::now(),
+                updated_at: chrono::Utc::now(),
+            }
+        }).collect();
+
+        // Convert graph edges to Plan DAG edges
+        let edges: Vec<PlanDagEdge> = graph_edges.into_iter().map(|edge| {
+            PlanDagEdge {
+                id: edge.id.to_string(), // Convert i32 id to string
+                source: edge.source_node_id.clone(), // Use source_node_id
+                target: edge.target_node_id.clone(), // Use target_node_id
+                metadata: crate::graphql::types::EdgeMetadata {
+                    label: Some("Connection".to_string()), // Default label since edges don't have labels
+                    data_type: crate::graphql::types::DataType::GraphData,
+                },
+                created_at: chrono::Utc::now(),
+                updated_at: chrono::Utc::now(),
+            }
+        }).collect();
 
         // Create default metadata using project information
         let metadata = PlanDagMetadata {

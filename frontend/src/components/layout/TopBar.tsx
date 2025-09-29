@@ -1,6 +1,6 @@
 import React from 'react';
 import { Group, Text, ActionIcon, useMantineColorScheme } from '@mantine/core';
-import { IconSun, IconMoon, IconWifi, IconWifiOff, IconGraph } from '@tabler/icons-react';
+import { IconSun, IconMoon, IconWifi, IconWifiOff, IconGraph, IconLoader } from '@tabler/icons-react';
 import { UserPresenceIndicator } from '../collaboration/UserPresenceIndicator';
 import { ConnectionState } from '../../types/websocket';
 
@@ -22,6 +22,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   const { colorScheme, toggleColorScheme } = useMantineColorScheme();
   const isDark = colorScheme === 'dark';
   const isOnline = connectionState === ConnectionState.CONNECTED;
+  const isConnecting = connectionState === ConnectionState.CONNECTING;
 
   return (
     <Group h={60} px="md" justify="space-between"
@@ -53,14 +54,34 @@ export const TopBar: React.FC<TopBarProps> = ({
           {isDark ? <IconSun size="1.2rem" /> : <IconMoon size="1.2rem" />}
         </ActionIcon>
 
-        {/* Online status indicator */}
+        {/* Connection status indicator */}
         <ActionIcon
           variant="subtle"
           size="lg"
-          color={isOnline ? "green" : "red"}
-          title={isOnline ? "Online" : "Offline"}
+          color={isOnline ? "green" : isConnecting ? "yellow" : "red"}
+          title={
+            isOnline ? "Connected to backend" :
+            isConnecting ? "Connecting to backend..." :
+            "Disconnected from backend"
+          }
         >
-          {isOnline ? <IconWifi size="1.2rem" /> : <IconWifiOff size="1.2rem" />}
+          {isOnline ? (
+            <IconWifi size="1.2rem" />
+          ) : isConnecting ? (
+            <div style={{ animation: 'spin 1s linear infinite' }}>
+              <IconLoader size="1.2rem" />
+              <style>
+                {`
+                  @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                  }
+                `}
+              </style>
+            </div>
+          ) : (
+            <IconWifiOff size="1.2rem" />
+          )}
         </ActionIcon>
       </Group>
     </Group>

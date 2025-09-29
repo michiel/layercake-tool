@@ -12,6 +12,7 @@ import { DataSourceEditor } from './components/datasources/DataSourceEditor'
 import { CreateProjectModal } from './components/project/CreateProjectModal'
 import { TopBar } from './components/layout/TopBar'
 import { useCollaborationV2 } from './hooks/useCollaborationV2'
+import { useConnectionStatus } from './hooks/useConnectionStatus'
 
 // Health check query to verify backend connectivity
 const HEALTH_CHECK = gql`
@@ -64,6 +65,12 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
     }
   })
 
+  // Get overall connection status (GraphQL + WebSocket)
+  const connectionStatus = useConnectionStatus({
+    websocketConnectionState: collaboration.connectionState,
+    enableWebSocket: !!projectId
+  })
+
   return (
     <AppShell
       header={{ height: 60 }}
@@ -73,7 +80,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
       <AppShell.Header>
         <TopBar
           projectId={projectId}
-          connectionState={collaboration.connectionState}
+          connectionState={connectionStatus.state}
           users={collaboration.users}
           currentUserId="current-user"
           onNavigateHome={() => navigate('/')}

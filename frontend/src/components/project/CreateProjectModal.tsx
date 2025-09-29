@@ -3,6 +3,7 @@ import { Modal, Stack, TextInput, Textarea, Button, Group } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { useMutation } from '@apollo/client/react'
 import { gql } from '@apollo/client'
+import { UPDATE_PLAN_DAG } from '../../graphql/plan-dag'
 
 const CREATE_PROJECT = gql`
   mutation CreateProject($input: CreateProjectInput!) {
@@ -37,6 +38,14 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
     }
   }>(CREATE_PROJECT)
 
+  const [initializePlanDag] = useMutation<{
+    updatePlanDag: {
+      success: boolean
+      errors: string[]
+      planDag: any
+    }
+  }>(UPDATE_PLAN_DAG)
+
   const form = useForm({
     initialValues: {
       name: '',
@@ -70,6 +79,32 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
       })
 
       if (data?.createProject) {
+        // Initialize empty Plan DAG for the new project
+        try {
+          await initializePlanDag({
+            variables: {
+              projectId: data.createProject.id,
+              planDag: {
+                version: '1.0.0',
+                nodes: [],
+                edges: [],
+                metadata: {
+                  version: '1.0.0',
+                  name: `Plan DAG for ${data.createProject.name}`,
+                  description: 'Auto-generated empty Plan DAG for new project',
+                  created: new Date().toISOString(),
+                  lastModified: new Date().toISOString(),
+                  author: 'user'
+                }
+              }
+            }
+          })
+          console.log('Empty Plan DAG initialized for new project:', data.createProject.id)
+        } catch (planDagError) {
+          console.warn('Failed to initialize Plan DAG for new project (non-critical):', planDagError)
+          // Don't fail project creation if Plan DAG initialization fails
+        }
+
         onSuccess(data.createProject)
         form.reset()
         onClose()

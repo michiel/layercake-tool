@@ -8,17 +8,25 @@ use crate::graphql::types::Project;
 #[graphql(complex)]
 pub struct DataSource {
     pub id: i32,
+    #[graphql(name = "projectId")]
     pub project_id: i32,
     pub name: String,
     pub description: Option<String>,
+    #[graphql(name = "sourceType")]
     pub source_type: String,
     pub filename: String,
+    #[graphql(name = "graphJson")]
     pub graph_json: String,
     pub status: String,
+    #[graphql(name = "errorMessage")]
     pub error_message: Option<String>,
+    #[graphql(name = "fileSize")]
     pub file_size: i64,
+    #[graphql(name = "processedAt")]
     pub processed_at: Option<chrono::DateTime<chrono::Utc>>,
+    #[graphql(name = "createdAt")]
     pub created_at: chrono::DateTime<chrono::Utc>,
+    #[graphql(name = "updatedAt")]
     pub updated_at: chrono::DateTime<chrono::Utc>,
 }
 
@@ -89,10 +97,12 @@ impl From<crate::database::entities::data_sources::Model> for DataSource {
 
 #[derive(InputObject)]
 pub struct CreateDataSourceInput {
+    #[graphql(name = "projectId")]
     pub project_id: i32,
     pub name: String,
     pub description: Option<String>,
     pub filename: String,
+    #[graphql(name = "fileContent")]
     pub file_content: String, // Base64 encoded file content
 }
 
@@ -101,6 +111,7 @@ pub struct UpdateDataSourceInput {
     pub name: Option<String>,
     pub description: Option<String>,
     pub filename: Option<String>,
+    #[graphql(name = "fileContent")]
     pub file_content: Option<String>, // Base64 encoded file content
 }
 

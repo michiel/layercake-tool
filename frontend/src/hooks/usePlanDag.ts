@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useSubscription } from '@apollo/client/react'
+import { useQuery, useMutation, useSubscription, useLazyQuery } from '@apollo/client/react'
 import { useCallback, useMemo } from 'react'
 import {
   GET_PLAN_DAG,
@@ -19,6 +19,29 @@ import {
   type PlanDagSubscriptionVariables
 } from '../graphql/plan-dag'
 import { PlanDag, PlanDagNode, PlanDagEdge, Position } from '../types/plan-dag'
+
+// Utility function to remove __typename fields from objects
+const stripTypename = (obj: any): any => {
+  if (obj === null || obj === undefined) {
+    return obj
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(stripTypename)
+  }
+
+  if (typeof obj === 'object') {
+    const cleaned: any = {}
+    for (const [key, value] of Object.entries(obj)) {
+      if (key !== '__typename') {
+        cleaned[key] = stripTypename(value)
+      }
+    }
+    return cleaned
+  }
+
+  return obj
+}
 
 // Hook for fetching Plan DAG data
 export const usePlanDag = (projectId: number) => {
@@ -51,9 +74,22 @@ export const usePlanDag = (projectId: number) => {
     variables: { projectId } as PlanDagQueryVariables,
     errorPolicy: 'all',
     notifyOnNetworkStatusChange: true,
+    fetchPolicy: 'cache-and-network', // Force refresh to prevent stale data issues
   })
 
-  const planDag = useMemo(() => data?.getPlanDag || null, [data])
+  const planDag = useMemo(() => {
+    const result = data?.getPlanDag || null
+    if (result) {
+      console.log('usePlanDag - GraphQL data received:', {
+        version: result.version,
+        nodesCount: result.nodes?.length || 0,
+        edgesCount: result.edges?.length || 0,
+        actualEdges: result.edges,
+        metadata: result.metadata
+      })
+    }
+    return result
+  }, [data])
 
   return {
     planDag,
@@ -65,7 +101,7 @@ export const usePlanDag = (projectId: number) => {
 
 // Hook for Plan DAG validation
 export const usePlanDagValidation = () => {
-  const [validatePlanDag, { data, loading, error }] = useMutation<{
+  const [validatePlanDag, { data, loading, error }] = useLazyQuery<{
     validatePlanDag: {
       isValid: boolean
       errors: Array<{
@@ -79,7 +115,7 @@ export const usePlanDagValidation = () => {
 
   const validate = useCallback((planDag: PlanDag) => {
     return validatePlanDag({
-      variables: { planDag },
+      variables: { planDag: stripTypename(planDag) },
     })
   }, [validatePlanDag])
 
@@ -97,7 +133,7 @@ export const usePlanDagMutations = (projectId: number) => {
     updatePlanDag: {
       success: boolean
       errors: string[]
-      plan_dag: any
+      planDag: any
     }
   }>(UPDATE_PLAN_DAG, {
     optimisticResponse: (variables) => ({
@@ -105,7 +141,7 @@ export const usePlanDagMutations = (projectId: number) => {
         __typename: 'PlanDagResponse',
         success: true,
         errors: [],
-        plan_dag: {
+        planDag: {
           __typename: 'PlanDag',
           version: variables.planDag.version,
           nodes: variables.planDag.nodes.map((node: any) => ({
@@ -157,7 +193,7 @@ export const usePlanDagMutations = (projectId: number) => {
           query: GET_PLAN_DAG,
           variables: { projectId },
           data: {
-            getPlanDag: data.updatePlanDag.plan_dag,
+            getPlanDag: data.updatePlanDag.planDag,
           },
         })
       }
@@ -425,25 +461,25 @@ export const usePlanDagMutations = (projectId: number) => {
   // Wrapper functions with proper typing
   const mutations = useMemo(() => ({
     updatePlanDag: (planDag: PlanDag) =>
-      updatePlanDag({ variables: { projectId, planDag } as PlanDagMutationVariables }),
+      updatePlanDag({ variables: { projectId, planDag: stripTypename(planDag) } as PlanDagMutationVariables }),
 
     addNode: (node: Partial<PlanDagNode>) =>
-      addNode({ variables: { projectId, node } as PlanDagMutationVariables }),
+      addNode({ variables: { projectId, node: stripTypename(node) } as PlanDagMutationVariables }),
 
     updateNode: (nodeId: string, updates: Partial<PlanDagNode>) =>
-      updateNode({ variables: { projectId, nodeId, updates } as PlanDagMutationVariables }),
+      updateNode({ variables: { projectId, nodeId, updates: stripTypename(updates) } as PlanDagMutationVariables }),
 
     deleteNode: (nodeId: string) =>
       deleteNode({ variables: { projectId, nodeId } as PlanDagMutationVariables }),
 
     addEdge: (edge: Partial<PlanDagEdge>) =>
-      addEdge({ variables: { projectId, edge } as PlanDagMutationVariables }),
+      addEdge({ variables: { projectId, edge: stripTypename(edge) } as PlanDagMutationVariables }),
 
     deleteEdge: (edgeId: string) =>
       deleteEdge({ variables: { projectId, edgeId } as PlanDagMutationVariables }),
 
     moveNode: (nodeId: string, position: Position) =>
-      moveNode({ variables: { projectId, nodeId, position } as PlanDagMutationVariables }),
+      moveNode({ variables: { projectId, nodeId, position: stripTypename(position) } as PlanDagMutationVariables }),
   }), [projectId, updatePlanDag, addNode, updateNode, deleteNode, addEdge, deleteEdge, moveNode])
 
   return mutations

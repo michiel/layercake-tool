@@ -3,7 +3,7 @@ import { Handle, Position, NodeProps } from 'reactflow'
 import { Paper, Text, Group, ActionIcon, Tooltip, Badge } from '@mantine/core'
 import { IconSettings, IconTrash } from '@tabler/icons-react'
 import { PlanDagNodeType, NodeConfig, NodeMetadata } from '../../../../types/plan-dag'
-import { getNodeTypeColor, getRequiredInputCount, canHaveMultipleOutputs } from '../../../../utils/planDagValidation'
+import { getNodeTypeColor, getRequiredInputCount, canHaveMultipleOutputs, isNodeConfigured } from '../../../../utils/planDagValidation'
 
 interface BaseNodeProps extends NodeProps {
   nodeType: PlanDagNodeType
@@ -12,6 +12,8 @@ interface BaseNodeProps extends NodeProps {
   onEdit?: () => void
   onDelete?: () => void
   readonly?: boolean
+  edges?: any[] // Add edges for configuration validation
+  hasValidConfig?: boolean // Add configuration validation flag
 }
 
 export const BaseNode = memo(({
@@ -21,11 +23,17 @@ export const BaseNode = memo(({
   selected,
   onEdit,
   onDelete,
-  readonly = false
-}: Omit<BaseNodeProps, 'id'>) => {
+  readonly = false,
+  edges = [],
+  hasValidConfig = true,
+  id
+}: BaseNodeProps) => {
   const color = getNodeTypeColor(nodeType)
   const requiredInputs = getRequiredInputCount(nodeType)
   const canHaveOutputs = canHaveMultipleOutputs(nodeType)
+
+  // Check if node is configured according to SPECIFICATION.md
+  const isConfigured = isNodeConfigured(nodeType, id || '', edges, hasValidConfig)
 
   const getTypeLabel = (type: PlanDagNodeType): string => {
     switch (type) {
@@ -79,7 +87,11 @@ export const BaseNode = memo(({
         shadow={selected ? "md" : "sm"}
         p="sm"
         style={{
-          border: selected ? `2px solid ${color}` : `1px solid #e9ecef`,
+          border: selected
+            ? `2px solid ${color}`
+            : !isConfigured
+              ? `2px solid #fd7e14` // Orange outline for unconfigured nodes
+              : `1px solid #e9ecef`,
           borderRadius: 8,
           minWidth: 180,
           maxWidth: 250,
@@ -88,13 +100,20 @@ export const BaseNode = memo(({
         }}
       >
         <Group justify="space-between" mb="xs">
-          <Badge
-            color={color}
-            variant="light"
-            size="sm"
-          >
-            {getTypeLabel(nodeType)}
-          </Badge>
+          <Group gap="xs">
+            <Badge
+              color={color}
+              variant="light"
+              size="sm"
+            >
+              {getTypeLabel(nodeType)}
+            </Badge>
+            {!isConfigured && (
+              <Badge variant="outline" size="xs" color="orange">
+                Not Configured
+              </Badge>
+            )}
+          </Group>
 
           {!readonly && (
             <Group gap="xs">
@@ -103,7 +122,10 @@ export const BaseNode = memo(({
                   size="sm"
                   variant="subtle"
                   color="gray"
-                  onClick={onEdit}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onEdit?.()
+                  }}
                 >
                   <IconSettings size="0.8rem" />
                 </ActionIcon>
@@ -113,7 +135,10 @@ export const BaseNode = memo(({
                   size="sm"
                   variant="subtle"
                   color="red"
-                  onClick={onDelete}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onDelete?.()
+                  }}
                 >
                   <IconTrash size="0.8rem" />
                 </ActionIcon>

@@ -93,13 +93,13 @@ export const validateConnection = (
  */
 export const canAcceptMultipleInputs = (nodeType: PlanDagNodeType): boolean => {
   switch (nodeType) {
-    case PlanDagNodeType.MERGE:
-    case PlanDagNodeType.GRAPH:     // Graphs can accept multiple inputs from various sources
+    case PlanDagNodeType.GRAPH:     // GraphNodes can have multiple inputs (spec requirement)
+    case PlanDagNodeType.MERGE:     // MergeNodes merge multiple DataSource/Graph inputs
       return true
-    case PlanDagNodeType.DATA_SOURCE:
-    case PlanDagNodeType.TRANSFORM:
-    case PlanDagNodeType.COPY:
-    case PlanDagNodeType.OUTPUT:
+    case PlanDagNodeType.DATA_SOURCE: // DataSource nodes cannot have inputs
+    case PlanDagNodeType.TRANSFORM:   // TransformNodes can have only one input
+    case PlanDagNodeType.COPY:        // CopyNodes can have only one input
+    case PlanDagNodeType.OUTPUT:      // OutputNodes can have only one input
       return false
     default:
       return false
@@ -111,13 +111,13 @@ export const canAcceptMultipleInputs = (nodeType: PlanDagNodeType): boolean => {
  */
 export const canHaveMultipleOutputs = (nodeType: PlanDagNodeType): boolean => {
   switch (nodeType) {
-    case PlanDagNodeType.DATA_SOURCE:
-    case PlanDagNodeType.GRAPH:
-    case PlanDagNodeType.TRANSFORM:
-    case PlanDagNodeType.MERGE:
-    case PlanDagNodeType.COPY:
+    case PlanDagNodeType.DATA_SOURCE: // DataSource can have multiple outputs (but not to same target)
+    case PlanDagNodeType.GRAPH:       // GraphNodes can have multiple outputs
+    case PlanDagNodeType.TRANSFORM:   // TransformNodes can have multiple outputs (but not to same target)
       return true
-    case PlanDagNodeType.OUTPUT:
+    case PlanDagNodeType.MERGE:       // MergeNodes output one new GraphNode
+    case PlanDagNodeType.COPY:        // CopyNodes output graphs (spec unclear, assuming single)
+    case PlanDagNodeType.OUTPUT:      // OutputNodes have no outputs
       return false
     default:
       return false
@@ -310,4 +310,109 @@ export const validateConnectionWithCycleDetection = (
     ...basicValidation,
     wouldCreateCycle: false
   };
+};
+
+/**
+ * Node configuration state validation functions (per SPECIFICATION.md)
+ */
+
+/**
+ * Checks if a node is in CONFIGURED state based on connection requirements
+ */
+export const isNodeConfigured = (
+  nodeType: PlanDagNodeType,
+  nodeId: string,
+  edges: Edge[],
+  hasValidConfig: boolean = true
+): boolean => {
+  if (!hasValidConfig) {
+    return false; // Node-specific configuration must pass validation
+  }
+
+  const inputEdges = edges.filter(edge => edge.target === nodeId);
+  const outputEdges = edges.filter(edge => edge.source === nodeId);
+
+  switch (nodeType) {
+    case PlanDagNodeType.GRAPH:
+      // GraphNodes MUST have at least one input to be configured
+      return inputEdges.length >= 1;
+
+    case PlanDagNodeType.DATA_SOURCE:
+      // DataSource nodes MUST have at least one output connected to be configured
+      return outputEdges.length >= 1;
+
+    case PlanDagNodeType.TRANSFORM:
+      // TransformNodes MUST have one input and one output to be configured
+      return inputEdges.length === 1 && outputEdges.length >= 1;
+
+    case PlanDagNodeType.OUTPUT:
+      // OutputNodes MUST have one input to be configured
+      return inputEdges.length === 1;
+
+    case PlanDagNodeType.MERGE:
+      // MergeNodes need at least 2 inputs to merge (assuming this requirement)
+      return inputEdges.length >= 2;
+
+    case PlanDagNodeType.COPY:
+      // CopyNodes need 1 input and 1 output (assuming similar to Transform)
+      return inputEdges.length === 1 && outputEdges.length >= 1;
+
+    default:
+      return false;
+  }
+};
+
+/**
+ * Validates that a node doesn't connect to the same target twice
+ * (Required for DataSource and Transform nodes per spec)
+ */
+export const validateUniqueTargets = (
+  nodeId: string,
+  edges: Edge[]
+): boolean => {
+  const outputEdges = edges.filter(edge => edge.source === nodeId);
+  const targets = outputEdges.map(edge => edge.target);
+  const uniqueTargets = new Set(targets);
+
+  return targets.length === uniqueTargets.size; // No duplicate targets
+};
+
+/**
+ * Gets minimum required inputs for a node type to be configured
+ */
+export const getMinimumRequiredInputs = (nodeType: PlanDagNodeType): number => {
+  switch (nodeType) {
+    case PlanDagNodeType.DATA_SOURCE:
+      return 0; // DataSource nodes don't need inputs
+    case PlanDagNodeType.GRAPH:
+      return 1; // GraphNodes MUST have at least one input
+    case PlanDagNodeType.TRANSFORM:
+    case PlanDagNodeType.OUTPUT:
+      return 1; // These need exactly one input
+    case PlanDagNodeType.MERGE:
+      return 2; // Merge needs at least two inputs
+    case PlanDagNodeType.COPY:
+      return 1; // Copy needs one input
+    default:
+      return 0;
+  }
+};
+
+/**
+ * Gets minimum required outputs for a node type to be configured
+ */
+export const getMinimumRequiredOutputs = (nodeType: PlanDagNodeType): number => {
+  switch (nodeType) {
+    case PlanDagNodeType.DATA_SOURCE:
+    case PlanDagNodeType.TRANSFORM:
+    case PlanDagNodeType.COPY:
+      return 1; // These must have at least one output
+    case PlanDagNodeType.GRAPH:
+    case PlanDagNodeType.MERGE:
+      return 0; // These can exist without outputs (terminal nodes)
+    case PlanDagNodeType.OUTPUT:
+      return 0; // Output nodes have no outputs
+    default:
+      return 0;
+  }
 };

@@ -327,11 +327,28 @@ impl Mutation {
             .ok_or_else(|| Error::new("Project not found"))?;
 
         // Find or create a plan for this project
-        let plan = plans::Entity::find()
+        let plan = match plans::Entity::find()
             .filter(plans::Column::ProjectId.eq(project_id))
             .one(&context.db)
-            .await?
-            .ok_or_else(|| Error::new("Plan not found for project"))?;
+            .await? {
+            Some(plan) => plan,
+            None => {
+                // Auto-create a plan if one doesn't exist
+                let now = chrono::Utc::now();
+                let new_plan = plans::ActiveModel {
+                    project_id: Set(project_id),
+                    name: Set(format!("Plan for Project {}", project_id)),
+                    yaml_content: Set("".to_string()),
+                    dependencies: Set(None),
+                    status: Set("draft".to_string()),
+                    plan_dag_json: Set(None),
+                    created_at: Set(now),
+                    updated_at: Set(now),
+                    ..Default::default()
+                };
+                new_plan.insert(&context.db).await?
+            }
+        };
 
         let node_type_str = match node.node_type {
             crate::graphql::types::PlanDagNodeType::DataSource => "DataSourceNode",
@@ -369,12 +386,29 @@ impl Mutation {
     async fn update_plan_dag_node(&self, ctx: &Context<'_>, project_id: i32, node_id: String, updates: PlanDagNodeUpdateInput) -> Result<NodeResponse> {
         let context = ctx.data::<GraphQLContext>()?;
 
-        // Find the plan for this project
-        let plan = plans::Entity::find()
+        // Find or create a plan for this project
+        let plan = match plans::Entity::find()
             .filter(plans::Column::ProjectId.eq(project_id))
             .one(&context.db)
-            .await?
-            .ok_or_else(|| Error::new("Plan not found for project"))?;
+            .await? {
+            Some(plan) => plan,
+            None => {
+                // Auto-create a plan if one doesn't exist
+                let now = chrono::Utc::now();
+                let new_plan = plans::ActiveModel {
+                    project_id: Set(project_id),
+                    name: Set(format!("Plan for Project {}", project_id)),
+                    yaml_content: Set("".to_string()),
+                    dependencies: Set(None),
+                    status: Set("draft".to_string()),
+                    plan_dag_json: Set(None),
+                    created_at: Set(now),
+                    updated_at: Set(now),
+                    ..Default::default()
+                };
+                new_plan.insert(&context.db).await?
+            }
+        };
 
         // Find the node
         let node = plan_dag_nodes::Entity::find()
@@ -465,12 +499,29 @@ impl Mutation {
     async fn add_plan_dag_edge(&self, ctx: &Context<'_>, project_id: i32, edge: PlanDagEdgeInput) -> Result<EdgeResponse> {
         let context = ctx.data::<GraphQLContext>()?;
 
-        // Find the plan for this project
-        let plan = plans::Entity::find()
+        // Find or create a plan for this project
+        let plan = match plans::Entity::find()
             .filter(plans::Column::ProjectId.eq(project_id))
             .one(&context.db)
-            .await?
-            .ok_or_else(|| Error::new("Plan not found for project"))?;
+            .await? {
+            Some(plan) => plan,
+            None => {
+                // Auto-create a plan if one doesn't exist
+                let now = chrono::Utc::now();
+                let new_plan = plans::ActiveModel {
+                    project_id: Set(project_id),
+                    name: Set(format!("Plan for Project {}", project_id)),
+                    yaml_content: Set("".to_string()),
+                    dependencies: Set(None),
+                    status: Set("draft".to_string()),
+                    plan_dag_json: Set(None),
+                    created_at: Set(now),
+                    updated_at: Set(now),
+                    ..Default::default()
+                };
+                new_plan.insert(&context.db).await?
+            }
+        };
 
         let metadata_json = serde_json::to_string(&edge.metadata)?;
 
