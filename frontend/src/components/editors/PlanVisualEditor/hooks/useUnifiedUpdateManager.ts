@@ -43,8 +43,8 @@ export const useUnifiedUpdateManager = (options: UseUnifiedUpdateManagerOptions 
   const operationQueueRef = useRef<UpdateOperation[]>([])
   const processingRef = useRef(false)
   const timersRef = useRef<{
-    debounce: NodeJS.Timeout | null
-    throttle: NodeJS.Timeout | null
+    debounce: number | null
+    throttle: number | null
   }>({ debounce: null, throttle: null })
 
   // Performance monitoring

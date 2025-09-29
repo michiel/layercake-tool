@@ -1,10 +1,8 @@
-import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
+import { useCallback, useEffect, useState, useRef } from 'react'
 import ReactFlow, {
   Background,
   Controls,
   MiniMap,
-  useNodesState,
-  useEdgesState,
   addEdge,
   Connection,
   Node,
@@ -24,9 +22,9 @@ import {
   IconPlayerPlay
 } from '@tabler/icons-react'
 
-import { usePlanDag, usePlanDagMutations, usePlanDagValidation, usePlanDagSubscription } from '../../../hooks/usePlanDag'
+import { usePlanDagMutations } from '../../../hooks/usePlanDag'
 import { useCollaborationV2 } from '../../../hooks/useCollaborationV2'
-import { PlanDag, PlanDagNode, PlanDagEdge, ReactFlowNode, ReactFlowEdge, PlanDagNodeType, NodeConfig, NodeMetadata, DataSourceNodeConfig } from '../../../types/plan-dag'
+import { PlanDagNodeType, NodeConfig, NodeMetadata, DataSourceNodeConfig, ReactFlowEdge, PlanDagNode } from '../../../types/plan-dag'
 import { validateConnectionWithCycleDetection } from '../../../utils/planDagValidation'
 
 // Import custom node types
@@ -50,7 +48,6 @@ import { ControlPanel } from './components/ControlPanel'
 import { AdvancedToolbar } from './components/AdvancedToolbar'
 import { ContextMenu } from './components/ContextMenu'
 // import { CollaborationManager } from './components/CollaborationManager'
-import { useUpdateManagement } from './hooks/useUpdateManagement'
 import { usePlanDagState } from './hooks/usePlanDagState'
 import { useAdvancedOperations } from './hooks/useAdvancedOperations'
 import { generateNodeId, getDefaultNodeConfig, getDefaultNodeMetadata } from './utils/nodeDefaults'
@@ -78,138 +75,20 @@ const NODE_TYPES = Object.freeze({
 
 
 
-// Convert Plan DAG to ReactFlow format
-const convertPlanDagToReactFlow = (
-  planDag: PlanDag | any,
-  onEdit?: (nodeId: string) => void,
-  onDelete?: (nodeId: string) => void,
-  readonly?: boolean
-): { nodes: ReactFlowNode[]; edges: ReactFlowEdge[] } => {
-  // First, create edges to use for configuration validation
-  if (!planDag.edges || !Array.isArray(planDag.edges)) {
-    console.warn('No edges found in planDag or edges is not an array:', planDag.edges)
-    return { nodes: [], edges: [] }
-  }
-
-  console.log('Converting edges in planDag:', planDag.edges.length, planDag.edges)
-  const edges: ReactFlowEdge[] = planDag.edges.map((edge: any, index: number) => {
-    if (!edge.id || !edge.source || !edge.target) {
-      console.error('Invalid edge at index', index, ':', edge)
-      return null
-    }
-
-    const reactFlowEdge = {
-      id: String(edge.id), // Ensure ID is a string
-      source: String(edge.source), // Ensure source is a string
-      target: String(edge.target), // Ensure target is a string
-      sourceHandle: edge.sourceHandle || null,
-      targetHandle: edge.targetHandle || null,
-      type: 'smoothstep',
-      animated: false,
-      label: edge.metadata?.label || 'Data',
-      metadata: edge.metadata || { label: 'Data', dataType: 'GraphData' },
-      style: {
-        stroke: edge.metadata?.dataType === 'GraphReference' ? '#228be6' : '#868e96',
-        strokeWidth: 2,
-      },
-      labelStyle: {
-        fontSize: 12,
-        fontWeight: 500,
-      },
-    }
-    console.log('Converting edge:', edge.id, 'to ReactFlow edge:', reactFlowEdge)
-    return reactFlowEdge
-  }).filter(Boolean) // Remove null entries from invalid edges
-
-  console.log('Converted edges:', edges.length, edges)
-
-  const nodes: ReactFlowNode[] = planDag.nodes.map((node: any) => {
-    // Convert string nodeType to enum if needed
-    const nodeType = typeof node.nodeType === 'string' ?
-      (Object.values(PlanDagNodeType) as string[]).includes(node.nodeType) ?
-        node.nodeType as PlanDagNodeType : PlanDagNodeType.DATA_SOURCE
-      : node.nodeType;
-
-    // Basic configuration validation - check if node has proper config
-    const hasValidConfig = node.config &&
-      (typeof node.config === 'object' ||
-       (typeof node.config === 'string' && node.config.trim() !== '{}' && node.config.trim() !== ''));
-
-    return {
-      ...node,
-      nodeType,
-      type: nodeType,
-      data: {
-        label: node.metadata.label,
-        nodeType,
-        config: typeof node.config === 'string' ? (() => {
-          try {
-            return JSON.parse(node.config)
-          } catch (e) {
-            console.warn('Failed to parse node config JSON:', node.config, e)
-            return {}
-          }
-        })() : node.config,
-        metadata: node.metadata,
-        onEdit,
-        onDelete,
-        readonly,
-        edges, // Pass edges for configuration validation
-        hasValidConfig, // Pass configuration validation state
-      },
-      draggable: true,
-      selectable: true,
-    }
-  })
-
-  return { nodes, edges }
-}
-
-// Convert ReactFlow back to Plan DAG format
-const convertReactFlowToPlanDag = (
-  nodes: ReactFlowNode[],
-  edges: ReactFlowEdge[],
-  metadata: PlanDag['metadata']
-): PlanDag => {
-  const planDagNodes: PlanDagNode[] = nodes.map((node) => ({
-    id: node.id,
-    nodeType: node.data?.nodeType || node.nodeType || PlanDagNodeType.DATA_SOURCE,
-    position: node.position,
-    metadata: node.data?.metadata || node.metadata || { label: '', description: '' },
-    config: typeof node.data?.config === 'string' ? node.data.config : JSON.stringify(node.data?.config || node.config || {}),
-  }))
-
-  const planDagEdges: PlanDagEdge[] = edges.map((edge) => ({
-    id: edge.id,
-    source: edge.source,
-    target: edge.target,
-    metadata: {
-      label: edge.label as string,
-      dataType: edge.metadata?.dataType || 'GraphData',
-    },
-  }))
-
-  return {
-    version: metadata.version,
-    nodes: planDagNodes,
-    edges: planDagEdges,
-    metadata,
-  }
-}
 
 const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly = false }: PlanVisualEditorProps) => {
 
   // Configuration dialog state - needs to be defined early
   const [configDialogOpen, setConfigDialogOpen] = useState(false)
   const [configNodeId, setConfigNodeId] = useState<string>('')
-  const [configNodeType, setConfigNodeType] = useState<PlanDagNodeType>(PlanDagNodeType.DATA_SOURCE)
-  const [configNodeConfig, setConfigNodeConfig] = useState<NodeConfig>({
+  const [configNodeType] = useState<PlanDagNodeType>(PlanDagNodeType.DATA_SOURCE)
+  const [configNodeConfig] = useState<NodeConfig>({
     inputType: 'CSVNodesFromFile',
     source: '',
     dataType: 'Nodes',
     outputGraphRef: ''
   } as DataSourceNodeConfig)
-  const [configNodeMetadata, setConfigNodeMetadata] = useState<NodeMetadata>({ label: '', description: '' })
+  const [configNodeMetadata] = useState<NodeMetadata>({ label: '', description: '' })
 
   // Node action handlers (defined with stable references)
   const handleNodeEdit = useCallback((nodeId: string) => {
@@ -248,7 +127,6 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     lastValidation,
     isDirty,
     updateManager,
-    savePlanDag,
     validatePlanDag: handleValidate,
   } = planDagState
 
@@ -282,34 +160,6 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
   const onlineUsers: UserPresenceData[] = collaboration.users || []
 
 
-  // Update node edit handler to work with new state management
-  const enhancedHandleNodeEdit = useCallback((nodeId: string) => {
-    setConfigNodeId(nodeId)
-    const node = nodes.find(n => n.id === nodeId)
-    if (node) {
-      setConfigNodeType(node.data.nodeType)
-      setConfigNodeConfig(typeof node.data.config === 'string' ?
-        (() => {
-          try {
-            return JSON.parse(node.data.config)
-          } catch {
-            return {}
-          }
-        })() : node.data.config || {}
-      )
-      setConfigNodeMetadata(node.data.metadata)
-      setConfigDialogOpen(true)
-    }
-  }, [nodes])
-
-  // Update node delete handler to work with new state management
-  const enhancedHandleNodeDelete = useCallback((nodeId: string) => {
-    setNodes((nodes) => nodes.filter((node) => node.id !== nodeId))
-    setEdges((edges) => edges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId))
-    updateManager.scheduleStructuralUpdate(planDag!, 'node-delete')
-    mutations.deleteNode(nodeId)
-    console.log('Node deleted:', nodeId)
-  }, [setNodes, setEdges, updateManager, planDag, mutations])
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -415,13 +265,13 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
   // Handle edge update
   const handleEdgeUpdate = useCallback(
     async (edgeId: string, updates: Partial<ReactFlowEdge>) => {
-      if (!activePlanDag) return
+      if (!planDag) return
 
       try {
         // Create updated plan DAG with modified edge
         const updatedPlanDag = {
-          ...activePlanDag,
-          edges: activePlanDag.edges.map(edge =>
+          ...planDag,
+          edges: planDag.edges.map((edge: any) =>
             edge.id === edgeId
               ? {
                   ...edge,
@@ -441,7 +291,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         console.error('Failed to update edge:', error)
       }
     },
-    [activePlanDag, mutations]
+    [planDag, mutations]
   )
 
   // Handle edge changes
@@ -499,7 +349,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         return
       }
 
-      const newEdge: ReactFlowEdge = {
+      const newEdge = {
         id: `edge-${Date.now()}`,
         source: connection.source!,
         target: connection.target!,
@@ -507,10 +357,6 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         targetHandle: connection.targetHandle || null, // Preserve specific handle used
         type: 'smoothstep',
         animated: false,
-        metadata: {
-          label: isValid.dataType === 'GraphReference' ? 'Graph Ref' : 'Data',
-          dataType: isValid.dataType,
-        },
         label: isValid.dataType === 'GraphReference' ? 'Graph Ref' : 'Data',
         style: {
           stroke: isValid.dataType === 'GraphReference' ? '#228be6' : '#868e96',
@@ -520,10 +366,26 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
           fontSize: 12,
           fontWeight: 500,
         },
+        data: {
+          metadata: {
+            label: isValid.dataType === 'GraphReference' ? 'Graph Ref' : 'Data',
+            dataType: isValid.dataType,
+          }
+        }
       }
 
       setEdges((eds) => addEdge(newEdge, eds))
-      mutations.addEdge(newEdge)
+
+      // Convert to GraphQL edge format for mutation
+      const graphqlEdge: ReactFlowEdge = {
+        id: newEdge.id,
+        source: newEdge.source,
+        target: newEdge.target,
+        sourceHandle: newEdge.sourceHandle,
+        targetHandle: newEdge.targetHandle,
+        metadata: newEdge.data.metadata
+      }
+      mutations.addEdge(graphqlEdge)
     },
 [nodes, edges, readonly, mutations, setEdges]
   )
@@ -567,7 +429,6 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
           : node
       )
     )
-    setIsDirty(true)
     // Save changes to backend
     mutations.updateNode(nodeId, { config, metadata })
     console.log('Node configuration updated:', nodeId, config, metadata)
@@ -655,7 +516,6 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
 
       // Add the node to the ReactFlow state
       setNodes((nds) => nds.concat(newNode));
-      setIsDirty(true);
 
       // Persist to database via GraphQL mutation
       const planDagNode: Partial<PlanDagNode> = {
@@ -704,7 +564,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         }
       });
     },
-    [screenToFlowPosition, setNodes, setIsDirty, handleNodeEdit, handleNodeDelete, mutations, projectId]
+    [screenToFlowPosition, setNodes, handleNodeEdit, handleNodeDelete, mutations, projectId]
   );
 
   // Context menu handlers
@@ -729,27 +589,6 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
 
   // Use stable nodeTypes reference directly
 
-  // Save Plan DAG changes to backend
-  const savePlanDag = useCallback(async () => {
-    if (!activePlanDag || readonly) return
-
-    const updatedPlanDag = convertReactFlowToPlanDag(nodes as ReactFlowNode[], edges as ReactFlowEdge[], activePlanDag.metadata)
-    try {
-      await mutations.updatePlanDag(updatedPlanDag)
-      setIsDirty(false)
-      console.log('Plan DAG saved successfully:', updatedPlanDag)
-    } catch (error) {
-      console.error('Failed to save Plan DAG:', error)
-    }
-  }, [activePlanDag, nodes, edges, readonly, mutations])
-
-  // Auto-save on changes (debounced)
-  useEffect(() => {
-    if (!isDirty) return
-
-    const timeoutId = setTimeout(savePlanDag, 2000) // Auto-save after 2 seconds
-    return () => clearTimeout(timeoutId)
-  }, [isDirty, savePlanDag])
 
   // Join/leave collaboration on mount/unmount
   useEffect(() => {
@@ -761,19 +600,11 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
       if (!readonly) {
         collaboration.leaveProject()
       }
-
-      // Phase 2: Cleanup update timers
-      cleanupUpdateManagement()
-
-      // Phase 4: Cleanup validation timer
-      if (validationTimeoutRef.current) {
-        clearTimeout(validationTimeoutRef.current)
-      }
     }
     // Note: 'collaboration' intentionally omitted from deps to prevent infinite re-joins
     // Join/leave should only happen on component mount/unmount, not when collaboration object changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [readonly, cleanupUpdateManagement])
+  }, [readonly])
 
   const miniMapNodeColor = useCallback((node: Node) => {
     switch (node.data?.nodeType) {
@@ -811,7 +642,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     )
   }
 
-  if (!activePlanDag) {
+  if (!planDag) {
     return (
       <Stack align="center" justify="center" h="100%" gap="md">
         <Alert icon={<IconAlertCircle size="1rem" />} title="No Plan DAG found" color="blue" w="100%" maw="500px">
@@ -917,10 +748,10 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
             validationErrors={validationErrors}
             lastValidation={lastValidation}
             onValidate={handleValidate}
-            updatesPaused={updatesPaused}
-            pendingUpdates={pendingUpdates}
-            onPauseUpdates={pauseUpdates}
-            onResumeUpdates={resumeUpdates}
+            updatesPaused={false}
+            pendingUpdates={0}
+            onPauseUpdates={() => {}}
+            onResumeUpdates={() => {}}
             isConnected={collaboration.connected}
             collaborationStatus={collaboration.connectionState}
             hasError={!!collaboration.error}

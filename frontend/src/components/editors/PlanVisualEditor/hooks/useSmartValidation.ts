@@ -77,7 +77,7 @@ export const useSmartValidation = (options: UseSmartValidationOptions = {}) => {
   })
 
   const { validate: graphqlValidate, validationResult, loading } = usePlanDagValidation()
-  const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const validationTimeoutRef = useRef<number | null>(null)
   const lastPlanDagRef = useRef<PlanDag | null>(null)
   const validationHistoryRef = useRef<Date[]>([])
 

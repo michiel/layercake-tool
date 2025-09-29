@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react'
-import { useNodesState, useEdgesState } from 'reactflow'
-import { PlanDag, PlanDagNode, PlanDagEdge, ReactFlowNode, ReactFlowEdge, PlanDagNodeType } from '../../../../types/plan-dag'
+import { useNodesState, useEdgesState, Node, Edge } from 'reactflow'
+import { PlanDag, PlanDagNodeType } from '../../../../types/plan-dag'
 import { usePlanDag, usePlanDagMutations, usePlanDagSubscription } from '../../../../hooks/usePlanDag'
 import { useUnifiedUpdateManager } from './useUnifiedUpdateManager'
 import { useSmartValidation } from './useSmartValidation'
@@ -20,10 +20,10 @@ interface PlanDagStateResult {
   error: any
 
   // ReactFlow state
-  nodes: ReactFlowNode[]
-  edges: ReactFlowEdge[]
-  setNodes: (nodes: ReactFlowNode[] | ((nodes: ReactFlowNode[]) => ReactFlowNode[])) => void
-  setEdges: (edges: ReactFlowEdge[] | ((edges: ReactFlowEdge[]) => ReactFlowEdge[])) => void
+  nodes: Node[]
+  edges: Edge[]
+  setNodes: (nodes: Node[] | ((nodes: Node[]) => Node[])) => void
+  setEdges: (edges: Edge[] | ((edges: Edge[]) => Edge[])) => void
   onNodesChange: (changes: any[]) => void
   onEdgesChange: (changes: any[]) => void
 
@@ -69,12 +69,12 @@ const convertPlanDagToReactFlow = (
   onEdit?: (nodeId: string) => void,
   onDelete?: (nodeId: string) => void,
   readonly?: boolean
-): { nodes: ReactFlowNode[]; edges: ReactFlowEdge[] } => {
+): { nodes: Node[]; edges: Edge[] } => {
   if (!planDag.edges || !Array.isArray(planDag.edges)) {
     return { nodes: [], edges: [] }
   }
 
-  const edges: ReactFlowEdge[] = planDag.edges.map((edge: any) => ({
+  const edges: Edge[] = planDag.edges.map((edge: any) => ({
     id: String(edge.id),
     source: String(edge.source),
     target: String(edge.target),
@@ -94,7 +94,7 @@ const convertPlanDagToReactFlow = (
     },
   }))
 
-  const nodes: ReactFlowNode[] = planDag.nodes.map((node: any) => {
+  const nodes: Node[] = planDag.nodes.map((node: any) => {
     const nodeType = typeof node.nodeType === 'string' &&
       (Object.values(PlanDagNodeType) as string[]).includes(node.nodeType) ?
       node.nodeType as PlanDagNodeType : PlanDagNodeType.DATA_SOURCE
@@ -104,8 +104,8 @@ const convertPlanDagToReactFlow = (
        (typeof node.config === 'string' && node.config.trim() !== '{}' && node.config.trim() !== ''))
 
     return {
-      ...node,
-      nodeType,
+      id: node.id,
+      position: node.position,
       type: nodeType,
       data: {
         label: node.metadata.label,
@@ -156,18 +156,36 @@ export const usePlanDagState = (options: UsePlanDagStateOptions): PlanDagStateRe
   const previousPlanDagRef = useRef<PlanDag | null>(null)
   const stablePlanDagRef = useRef<PlanDag | null>(null)
 
+  // Convert raw GraphQL data to properly typed PlanDag
+  const convertRawPlanDag = useCallback((raw: any): PlanDag | null => {
+    if (!raw) return null
+
+    return {
+      ...raw,
+      nodes: raw.nodes.map((node: any) => ({
+        ...node,
+        nodeType: typeof node.nodeType === 'string' &&
+          (Object.values(PlanDagNodeType) as string[]).includes(node.nodeType) ?
+          node.nodeType as PlanDagNodeType : PlanDagNodeType.DATA_SOURCE
+      }))
+    }
+  }, [])
+
   // Stable plan DAG with change detection
   const stablePlanDag = useMemo(() => {
     if (!rawPlanDag) return null
 
-    const isNewData = !previousPlanDagRef.current || !planDagEqual(previousPlanDagRef.current, rawPlanDag)
+    const convertedPlanDag = convertRawPlanDag(rawPlanDag)
+    if (!convertedPlanDag) return null
+
+    const isNewData = !previousPlanDagRef.current || !planDagEqual(previousPlanDagRef.current, convertedPlanDag)
     if (isNewData) {
-      previousPlanDagRef.current = rawPlanDag
-      stablePlanDagRef.current = rawPlanDag
+      previousPlanDagRef.current = convertedPlanDag
+      stablePlanDagRef.current = convertedPlanDag
     }
 
     return stablePlanDagRef.current
-  }, [rawPlanDag])
+  }, [rawPlanDag, convertRawPlanDag])
 
   // Smart validation system
   const smartValidation = useSmartValidation({
