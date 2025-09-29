@@ -63,14 +63,14 @@ interface PlanVisualEditorProps {
 }
 
 // Define stable nodeTypes outside component to prevent recreation
-// Use a frozen object for maximum stability and performance
+// Use literal keys to ensure complete stability and prevent ReactFlow warnings
 const NODE_TYPES = Object.freeze({
-  [PlanDagNodeType.DATA_SOURCE]: DataSourceNode,
-  [PlanDagNodeType.GRAPH]: GraphNode,
-  [PlanDagNodeType.TRANSFORM]: TransformNode,
-  [PlanDagNodeType.MERGE]: MergeNode,
-  [PlanDagNodeType.COPY]: CopyNode,
-  [PlanDagNodeType.OUTPUT]: OutputNode,
+  'DataSourceNode': DataSourceNode,
+  'GraphNode': GraphNode,
+  'TransformNode': TransformNode,
+  'MergeNode': MergeNode,
+  'CopyNode': CopyNode,
+  'OutputNode': OutputNode,
 });
 
 
