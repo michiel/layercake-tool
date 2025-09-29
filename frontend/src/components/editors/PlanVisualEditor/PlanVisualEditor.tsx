@@ -22,7 +22,7 @@ import {
   IconPlayerPlay
 } from '@tabler/icons-react'
 
-import { usePlanDagMutations } from '../../../hooks/usePlanDag'
+import { usePlanDagCQRSMutations } from '../../../hooks/usePlanDagCQRSMutations'
 import { useCollaborationV2 } from '../../../hooks/useCollaborationV2'
 import { PlanDagNodeType, NodeConfig, NodeMetadata, DataSourceNodeConfig, ReactFlowEdge, PlanDagNode } from '../../../types/plan-dag'
 import { validateConnectionWithCycleDetection } from '../../../utils/planDagValidation'
@@ -48,7 +48,7 @@ import { ControlPanel } from './components/ControlPanel'
 import { AdvancedToolbar } from './components/AdvancedToolbar'
 import { ContextMenu } from './components/ContextMenu'
 // import { CollaborationManager } from './components/CollaborationManager'
-import { usePlanDagState } from './hooks/usePlanDagState'
+import { usePlanDagCQRS } from './hooks/usePlanDagCQRS'
 import { useAdvancedOperations } from './hooks/useAdvancedOperations'
 import { generateNodeId, getDefaultNodeConfig, getDefaultNodeMetadata } from './utils/nodeDefaults'
 
@@ -103,8 +103,8 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     // Will be implemented via callback from planDagState
   }, [])
 
-  // Use unified Plan DAG state management
-  const planDagState = usePlanDagState({
+  // Use CQRS Plan DAG state management
+  const planDagState = usePlanDagCQRS({
     projectId,
     readonly,
     onNodeEdit: handleNodeEdit,
@@ -130,8 +130,8 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     validatePlanDag: handleValidate,
   } = planDagState
 
-  // Get mutations for remaining operations
-  const mutations = usePlanDagMutations(projectId)
+  // Get CQRS mutations for remaining operations
+  const mutations = usePlanDagCQRSMutations({ projectId })
 
   // Collaboration setup
   const currentUserId: string | undefined = undefined
