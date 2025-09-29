@@ -103,6 +103,7 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
   const previousPlanDagRef = useRef<PlanDag | null>(null)
   const stablePlanDagRef = useRef<PlanDag | null>(null)
   const subscriptionRef = useRef<any>(null)
+  const initializedRef = useRef(false)
 
   // Stable plan DAG with change detection
   const stablePlanDag = useMemo(() => {
@@ -209,9 +210,15 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
     // Only depend on external data change detection, not local state
   }, [reactFlowDataChange.changeId, reactFlowData.nodes.length, reactFlowData.edges.length])
 
-  // Load initial data and setup subscription
+  // Load initial data and setup subscription - FIXED: prevent infinite loop
   useEffect(() => {
+    // Only run setup once per project to prevent infinite loops
+    if (initializedRef.current) {
+      return
+    }
+
     console.log('[usePlanDagCQRS] Setting up data loading and subscription for project:', projectId)
+    initializedRef.current = true
 
     const loadInitialData = async () => {
       try {
@@ -261,8 +268,9 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
         subscriptionRef.current.unsubscribe()
         subscriptionRef.current = null
       }
+      initializedRef.current = false
     }
-  }, [projectId, cqrsService, performanceMonitor])
+  }, [projectId])  // Only depend on projectId to prevent infinite loops
 
   // Actions
   const savePlanDag = useCallback(async () => {
