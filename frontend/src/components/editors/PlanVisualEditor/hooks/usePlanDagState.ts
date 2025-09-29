@@ -5,6 +5,8 @@ import { usePlanDag, usePlanDagMutations, usePlanDagSubscription } from '../../.
 import { useUnifiedUpdateManager } from './useUnifiedUpdateManager'
 import { useSmartValidation } from './useSmartValidation'
 import { usePerformanceMonitor } from './usePerformanceMonitor'
+import { useStableCallback, useExternalDataChangeDetector } from '../../../../hooks/useStableReference'
+import { useSubscriptionFilter } from '../../../../hooks/useGraphQLSubscriptionFilter'
 
 interface UsePlanDagStateOptions {
   projectId: number
@@ -135,6 +137,9 @@ const convertPlanDagToReactFlow = (
 export const usePlanDagState = (options: UsePlanDagStateOptions): PlanDagStateResult => {
   const { projectId, readonly = false, onNodeEdit, onNodeDelete } = options
 
+  // Subscription filtering to prevent client self-updates
+  const { filterSubscriptionData } = useSubscriptionFilter()
+
   // GraphQL data
   const { planDag: rawPlanDag, loading, error, refetch } = usePlanDag(projectId)
   const { lastChange } = usePlanDagSubscription(projectId)
@@ -194,22 +199,25 @@ export const usePlanDagState = (options: UsePlanDagStateOptions): PlanDagStateRe
     maxValidationRate: 8, // Max 8 validations per minute
   })
 
+  // Stable callbacks for update manager to prevent reference instability
+  const stableOnValidationNeeded = useStableCallback((planDag: PlanDag) => {
+    smartValidation.scheduleValidation(planDag, 'structural')
+  })
+
+  const stableOnPersistenceNeeded = useStableCallback(async (planDag: PlanDag) => {
+    try {
+      await mutations.updatePlanDag(planDag)
+      setIsDirty(false)
+    } catch (error) {
+      console.error('Failed to save Plan DAG:', error)
+      throw error
+    }
+  })
+
   // Unified update manager
   const updateManager = useUnifiedUpdateManager({
-    onValidationNeeded: useCallback((planDag: PlanDag) => {
-      // Use smart validation instead of direct validation
-      smartValidation.scheduleValidation(planDag, 'structural')
-    }, [smartValidation]),
-
-    onPersistenceNeeded: useCallback(async (planDag: PlanDag) => {
-      try {
-        await mutations.updatePlanDag(planDag)
-        setIsDirty(false)
-      } catch (error) {
-        console.error('Failed to save Plan DAG:', error)
-        throw error
-      }
-    }, [mutations]),
+    onValidationNeeded: stableOnValidationNeeded,
+    onPersistenceNeeded: stableOnPersistenceNeeded,
 
     debounceMs: 500,
     throttleMs: 1000,
@@ -227,34 +235,49 @@ export const usePlanDagState = (options: UsePlanDagStateOptions): PlanDagStateRe
   const [nodes, setNodes, onNodesChange] = useNodesState(reactFlowData.nodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(reactFlowData.edges)
 
-  // Sync ReactFlow state when data changes - FIXED: prevent infinite loop
+  // External data change detection to prevent circular dependencies
+  const reactFlowDataChange = useExternalDataChangeDetector(reactFlowData)
+
+  // Sync ReactFlow state when external data changes - FIXED: prevent infinite loop
   useEffect(() => {
-    // Only sync when we have new data and the current state is empty or different
-    const hasNewData = reactFlowData.nodes.length > 0 || reactFlowData.edges.length > 0
-    const isCurrentEmpty = nodes.length === 0 && edges.length === 0
-    const isDifferentLength = reactFlowData.nodes.length !== nodes.length || reactFlowData.edges.length !== edges.length
+    // Only sync when external reactFlowData has actually changed
+    if (reactFlowDataChange.hasChanged) {
+      const hasNewData = reactFlowData.nodes.length > 0 || reactFlowData.edges.length > 0
+      const isCurrentEmpty = nodes.length === 0 && edges.length === 0
+      const isDifferentLength = reactFlowData.nodes.length !== nodes.length || reactFlowData.edges.length !== edges.length
 
-    const shouldSync = hasNewData && (isCurrentEmpty || isDifferentLength)
+      const shouldSync = hasNewData && (isCurrentEmpty || isDifferentLength)
 
-    if (shouldSync) {
-      console.log('Syncing ReactFlow state:', {
-        newNodes: reactFlowData.nodes.length,
-        newEdges: reactFlowData.edges.length,
-        currentNodes: nodes.length,
-        currentEdges: edges.length
-      })
-      setNodes(reactFlowData.nodes)
-      setEdges(reactFlowData.edges)
+      if (shouldSync) {
+        console.log('[usePlanDagState] Syncing ReactFlow state from external data change:', {
+          changeId: reactFlowDataChange.changeId,
+          newNodes: reactFlowData.nodes.length,
+          newEdges: reactFlowData.edges.length,
+          currentNodes: nodes.length,
+          currentEdges: edges.length
+        })
+        setNodes(reactFlowData.nodes)
+        setEdges(reactFlowData.edges)
+      }
     }
-  }, [reactFlowData.nodes.length, reactFlowData.edges.length, nodes.length, edges.length, setNodes, setEdges])
+    // Only depend on external data change detection, not local state
+  }, [reactFlowDataChange.changeId, reactFlowData.nodes.length, reactFlowData.edges.length])
 
-  // Handle real-time changes
+  // Handle real-time changes with subscription filtering
   useEffect(() => {
     if (lastChange && stablePlanDag) {
-      performanceMonitor.trackEvent('websocketMessages')
-      updateManager.scheduleStructuralUpdate(stablePlanDag, 'real-time-change')
+      // Filter out updates from this client to prevent circular updates
+      const filteredChange = filterSubscriptionData(lastChange)
+
+      if (filteredChange) {
+        console.log('[usePlanDagState] Processing filtered real-time change:', filteredChange)
+        performanceMonitor.trackEvent('websocketMessages')
+        updateManager.scheduleStructuralUpdate(stablePlanDag, 'real-time-change')
+      } else {
+        console.log('[usePlanDagState] Filtered out own subscription update')
+      }
     }
-  }, [lastChange, stablePlanDag, updateManager, performanceMonitor])
+  }, [lastChange, stablePlanDag, updateManager, performanceMonitor, filterSubscriptionData])
 
   // Actions
   const savePlanDag = useCallback(async () => {
