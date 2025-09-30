@@ -9,6 +9,7 @@ pub mod plan_execution;
 pub mod database;
 pub mod server;
 pub mod services;
+pub mod collaboration;
 
 #[cfg(debug_assertions)]
 pub mod dev_utils;

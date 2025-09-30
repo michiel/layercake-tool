@@ -14,6 +14,9 @@ mod services;
 #[cfg(feature = "graphql")]
 mod graphql;
 
+#[cfg(feature = "graphql")]
+mod collaboration;
+
 #[cfg(feature = "mcp")]
 mod mcp;
 

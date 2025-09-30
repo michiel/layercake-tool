@@ -18,7 +18,9 @@ use crate::graphql::{GraphQLContext, GraphQLSchema, queries::Query, mutations::M
 #[cfg(feature = "graphql")]
 use crate::services::{ImportService, ExportService, GraphService};
 #[cfg(feature = "graphql")]
-use crate::server::websocket::{SessionManager, websocket_handler};
+use crate::server::websocket::websocket_handler;
+#[cfg(feature = "graphql")]
+use crate::collaboration::{CollaborationCoordinator, CoordinatorHandle};
 
 use super::handlers::health;
 
@@ -29,29 +31,19 @@ pub struct AppState {
     #[cfg(feature = "graphql")]
     pub graphql_schema: GraphQLSchema,
     #[cfg(feature = "graphql")]
-    pub session_manager: Arc<SessionManager>,
+    pub coordinator_handle: CoordinatorHandle,
 }
 
 
 pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Result<Router> {
     #[cfg(feature = "graphql")]
-    let (graphql_schema, session_manager) = {
+    let (graphql_schema, coordinator_handle) = {
         let import_service = Arc::new(ImportService::new(db.clone()));
         let export_service = Arc::new(ExportService::new(db.clone()));
         let graph_service = Arc::new(GraphService::new(db.clone()));
-        let session_manager = Arc::new(SessionManager::new());
 
-        // WARNING: DO NOT RE-ENABLE PERIODIC CLEANUP!
-        //
-        // Periodic cleanup causes COMPLETE SERVER DEADLOCK after a few requests.
-        // Even /health endpoint hangs. Root cause: cleanup_inactive_sessions()
-        // synchronously iterates DashMaps while async tasks modify them.
-        // spawn_blocking doesn't help - the iteration still causes conflicts.
-        //
-        // Dead connections are cleaned up on send failure in session.rs broadcast
-        // functions. This is sufficient for now.
-        //
-        // DO NOT UNCOMMENT THIS CODE UNTIL THE METHOD IS REDESIGNED AS FULLY ASYNC.
+        // Initialize actor-based collaboration coordinator
+        let coordinator_handle = CollaborationCoordinator::spawn();
 
         let graphql_context = GraphQLContext::new(
             db.clone(),
@@ -68,7 +60,7 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
         .data(graphql_context)
         .finish();
 
-        (schema, session_manager)
+        (schema, coordinator_handle)
     };
 
     let state = AppState {
@@ -76,7 +68,7 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
         #[cfg(feature = "graphql")]
         graphql_schema,
         #[cfg(feature = "graphql")]
-        session_manager,
+        coordinator_handle,
     };
 
     let cors = match cors_origin {

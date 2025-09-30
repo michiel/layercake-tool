@@ -4,15 +4,12 @@ use axum::{
 };
 use futures_util::{sink::SinkExt, stream::StreamExt};
 use serde::Deserialize;
-use std::sync::Arc;
 use tokio::sync::mpsc;
 use tracing::{error, info, warn};
 
 use crate::server::app::AppState;
-use super::{
-    session::SessionManager,
-    types::{ClientMessage, ServerMessage},
-};
+use crate::collaboration::CoordinatorHandle;
+use super::types::{ClientMessage, ServerMessage};
 
 #[derive(Debug, Deserialize)]
 pub struct WebSocketQuery {
@@ -35,18 +32,18 @@ pub async fn websocket_handler(
         params.project_id
     );
 
-    // CRITICAL FIX: Explicitly spawn handle_socket onto its own Tokio task
+    // Spawn handle_socket onto its own Tokio task
     // to ensure it doesn't block the HTTP upgrade handler
     ws.on_upgrade(move |socket| async move {
-        tokio::spawn(handle_socket(socket, params.project_id, app_state.session_manager));
+        tokio::spawn(handle_socket(socket, params.project_id, app_state.coordinator_handle));
     })
 }
 
-async fn handle_socket(socket: WebSocket, project_id: i32, session_manager: Arc<SessionManager>) {
+async fn handle_socket(socket: WebSocket, project_id: i32, coordinator: CoordinatorHandle) {
     let (mut sender, mut receiver) = socket.split();
 
-    // Create a channel for this connection
-    let (tx, mut rx) = mpsc::unbounded_channel::<ServerMessage>();
+    // Create a BOUNDED channel for this connection
+    let (tx, mut rx) = mpsc::channel::<ServerMessage>(100);
 
     // Spawn a task to handle outgoing messages with heartbeat
     let _tx_clone = tx.clone();
@@ -105,7 +102,7 @@ async fn handle_socket(socket: WebSocket, project_id: i32, session_manager: Arc<
                     let error_msg = ServerMessage::Error {
                         message: "Rate limit exceeded".to_string(),
                     };
-                    if let Err(_) = tx.send(error_msg) {
+                    if let Err(_) = tx.send(error_msg).await {
                         break;
                     }
                     continue;
@@ -117,7 +114,7 @@ async fn handle_socket(socket: WebSocket, project_id: i32, session_manager: Arc<
                         if let Err(e) = handle_client_message(
                             client_msg,
                             project_id,
-                            &session_manager,
+                            &coordinator,
                             &tx,
                             &mut user_id,
                         ).await {
@@ -125,7 +122,7 @@ async fn handle_socket(socket: WebSocket, project_id: i32, session_manager: Arc<
                             let error_msg = ServerMessage::Error {
                                 message: format!("Error processing message: {}", e),
                             };
-                            if let Err(_) = tx.send(error_msg) {
+                            if let Err(_) = tx.send(error_msg).await {
                                 break;
                             }
                         }
@@ -135,7 +132,7 @@ async fn handle_socket(socket: WebSocket, project_id: i32, session_manager: Arc<
                         let error_msg = ServerMessage::Error {
                             message: "Invalid message format".to_string(),
                         };
-                        if let Err(_) = tx.send(error_msg) {
+                        if let Err(_) = tx.send(error_msg).await {
                             break;
                         }
                     }
@@ -166,7 +163,7 @@ async fn handle_socket(socket: WebSocket, project_id: i32, session_manager: Arc<
 
     // Clean up on disconnect
     if let Some(uid) = user_id {
-        if let Err(e) = session_manager.leave_project_session(project_id, &uid) {
+        if let Err(e) = coordinator.leave_project(project_id, uid.clone()).await {
             error!("Error during cleanup: {}", e);
         }
         info!("User {} disconnected from project {}", uid, project_id);
@@ -179,8 +176,8 @@ async fn handle_socket(socket: WebSocket, project_id: i32, session_manager: Arc<
 async fn handle_client_message(
     message: ClientMessage,
     project_id: i32,
-    session_manager: &SessionManager,
-    tx: &mpsc::UnboundedSender<ServerMessage>,
+    coordinator: &CoordinatorHandle,
+    tx: &mpsc::Sender<ServerMessage>,
     current_user_id: &mut Option<String>,
 ) -> Result<(), String> {
     match message {
@@ -190,27 +187,27 @@ async fn handle_client_message(
                 return Err("User ID and name cannot be empty".to_string());
             }
 
-            // Join the project session
-            session_manager.join_project_session(
+            // Join the project via coordinator
+            coordinator.join_project(
                 project_id,
                 data.user_id.clone(),
                 data.user_name,
-                data.avatar_color,
+                Some(data.avatar_color),
                 tx.clone(),
-            )?;
+            ).await?;
 
             *current_user_id = Some(data.user_id.clone());
 
-            // If joining a specific document, join that too
+            // If joining a specific document, switch to it
             if let Some(doc_id) = data.document_id {
                 // For now, assume it's a canvas document type
                 // TODO: Get document type from database or client
-                session_manager.join_document(
+                coordinator.switch_document(
                     project_id,
-                    &data.user_id,
+                    data.user_id.clone(),
                     doc_id,
                     super::types::DocumentType::Canvas,
-                )?;
+                ).await;
             }
 
             info!("User {} joined project {}", data.user_id, project_id);
@@ -223,13 +220,13 @@ async fn handle_client_message(
                     return Err("Invalid cursor position values".to_string());
                 }
 
-                session_manager.update_cursor_position(
+                coordinator.update_cursor(
                     project_id,
-                    user_id,
-                    &data.document_id,
+                    user_id.clone(),
+                    data.document_id,
                     data.position,
                     data.selected_node_id,
-                )?;
+                ).await;
             } else {
                 return Err("Must join session before updating cursor".to_string());
             }
@@ -237,12 +234,12 @@ async fn handle_client_message(
 
         ClientMessage::SwitchDocument { data } => {
             if let Some(user_id) = current_user_id {
-                session_manager.join_document(
+                coordinator.switch_document(
                     project_id,
-                    user_id,
+                    user_id.clone(),
                     data.document_id,
                     data.document_type,
-                )?;
+                ).await;
             } else {
                 return Err("Must join session before switching documents".to_string());
             }
@@ -250,7 +247,7 @@ async fn handle_client_message(
 
         ClientMessage::LeaveSession { data: _ } => {
             if let Some(user_id) = current_user_id {
-                session_manager.leave_project_session(project_id, user_id)?;
+                coordinator.leave_project(project_id, user_id.clone()).await?;
                 *current_user_id = None;
             }
         }
