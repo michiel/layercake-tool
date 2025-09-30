@@ -41,26 +41,17 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
         let graph_service = Arc::new(GraphService::new(db.clone()));
         let session_manager = Arc::new(SessionManager::new());
 
-        // TODO: Periodic cleanup disabled - causes deadlock with DashMap iteration
-        // The cleanup_inactive_sessions method synchronously iterates DashMaps while
-        // async tasks may be modifying them, causing hangs. Need to redesign as async
-        // or use a channel-based cleanup approach.
+        // WARNING: DO NOT RE-ENABLE PERIODIC CLEANUP!
         //
-        // {
-        //     let session_manager_clone = session_manager.clone();
-        //     tokio::spawn(async move {
-        //         let mut interval = tokio::time::interval(std::time::Duration::from_secs(300));
-        //         interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-        //         interval.tick().await;
-        //         loop {
-        //             interval.tick().await;
-        //             let sm = session_manager_clone.clone();
-        //             tokio::task::spawn_blocking(move || {
-        //                 sm.cleanup_inactive_sessions(std::time::Duration::from_secs(3600));
-        //             }).await.ok();
-        //         }
-        //     });
-        // }
+        // Periodic cleanup causes COMPLETE SERVER DEADLOCK after a few requests.
+        // Even /health endpoint hangs. Root cause: cleanup_inactive_sessions()
+        // synchronously iterates DashMaps while async tasks modify them.
+        // spawn_blocking doesn't help - the iteration still causes conflicts.
+        //
+        // Dead connections are cleaned up on send failure in session.rs broadcast
+        // functions. This is sufficient for now.
+        //
+        // DO NOT UNCOMMENT THIS CODE UNTIL THE METHOD IS REDESIGNED AS FULLY ASYNC.
 
         let graphql_context = GraphQLContext::new(
             db.clone(),

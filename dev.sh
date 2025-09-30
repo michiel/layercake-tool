@@ -3,7 +3,7 @@
 # Layercake Development Script
 # Runs both frontend and backend in development mode
 
-set -e
+set -exo
 
 # Colors for output
 RED='\033[0;31m'
