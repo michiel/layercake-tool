@@ -1,6 +1,7 @@
 use std::time::Instant;
 use chrono::{DateTime, Utc};
 use dashmap::mapref::one::Ref;
+use tokio::sync::mpsc;
 
 use super::types::{
     CollaborationState, ProjectSession, UserPresence, DocumentSession, DocumentUserState,
@@ -55,8 +56,17 @@ impl SessionManager {
             project.connections.remove(user_id);
 
             // Remove user from all documents
-            for doc in project.documents.iter_mut() {
-                doc.active_users.remove(user_id);
+            // CRITICAL FIX: Collect document IDs first to avoid holding DashMap iterator
+            let document_ids: Vec<String> = project
+                .documents
+                .iter()
+                .map(|entry| entry.key().clone())
+                .collect();
+
+            for doc_id in document_ids {
+                if let Some(mut doc) = project.documents.get_mut(&doc_id) {
+                    doc.active_users.remove(user_id);
+                }
             }
 
             // Broadcast updated presence
@@ -153,21 +163,30 @@ impl SessionManager {
     ) -> Result<(), String> {
         let presence_data = self.collect_user_presence_data(project);
 
+        // CRITICAL FIX: Collect all connections into a Vec FIRST to avoid holding
+        // DashMap iterator while performing async operations. The old pattern of
+        // iterating directly over project.connections.iter() causes complete server
+        // deadlock when async tasks modify the map concurrently.
+        let connections: Vec<(String, mpsc::UnboundedSender<ServerMessage>)> = project
+            .connections
+            .iter()
+            .filter(|entry| entry.key() != changed_user_id)
+            .map(|entry| (entry.key().clone(), entry.value().clone()))
+            .collect();
+
         // Collect dead connections for cleanup
         let mut dead_connections = Vec::new();
 
         // Send to all connected users except the one who changed
-        for connection in project.connections.iter() {
-            if connection.key() != changed_user_id {
-                let message = ServerMessage::BulkPresence {
-                    data: presence_data.clone(),
-                };
+        for (user_id, sender) in connections {
+            let message = ServerMessage::BulkPresence {
+                data: presence_data.clone(),
+            };
 
-                if let Err(_) = connection.value().send(message) {
-                    // Connection is dead, mark for cleanup
-                    tracing::warn!("Dead connection detected for user {}, scheduling removal", connection.key());
-                    dead_connections.push(connection.key().clone());
-                }
+            if let Err(_) = sender.send(message) {
+                // Connection is dead, mark for cleanup
+                tracing::warn!("Dead connection detected for user {}, scheduling removal", user_id);
+                dead_connections.push(user_id);
             }
         }
 
@@ -211,15 +230,25 @@ impl SessionManager {
                 data: activity_data,
             };
 
+            // CRITICAL FIX: Collect all connections into a Vec FIRST to avoid holding
+            // DashMap iterator while performing async operations. The old pattern of
+            // iterating directly over project.connections.iter() causes complete server
+            // deadlock when async tasks modify the map concurrently.
+            let connections: Vec<(String, mpsc::UnboundedSender<ServerMessage>)> = project
+                .connections
+                .iter()
+                .map(|entry| (entry.key().clone(), entry.value().clone()))
+                .collect();
+
             // Collect dead connections for cleanup
             let mut dead_connections = Vec::new();
 
             // Send to all connected users in the project
-            for connection in project.connections.iter() {
-                if let Err(_) = connection.value().send(message.clone()) {
+            for (user_id, sender) in connections {
+                if let Err(_) = sender.send(message.clone()) {
                     // Connection is dead, mark for cleanup
-                    tracing::warn!("Dead connection detected for user {} (document activity), scheduling removal", connection.key());
-                    dead_connections.push(connection.key().clone());
+                    tracing::warn!("Dead connection detected for user {} (document activity), scheduling removal", user_id);
+                    dead_connections.push(user_id);
                 }
             }
 
@@ -235,15 +264,29 @@ impl SessionManager {
 
     /// Collect user presence data for a project
     fn collect_user_presence_data(&self, project: &Ref<i32, ProjectSession>) -> Vec<UserPresenceData> {
-        project.users
+        // CRITICAL FIX: This method had nested DashMap iterations causing deadlock!
+        // The old pattern: project.users.iter() -> map -> project.documents.iter()
+        // was holding iterators across both maps simultaneously.
+        //
+        // Solution: Collect all users first, then collect all documents, avoiding nested iterations.
+
+        // First pass: Collect all user data (clone values to release iterator quickly)
+        let users_snapshot: Vec<(String, UserPresence)> = project
+            .users
             .iter()
-            .map(|entry| {
-                let user = entry.value();
+            .map(|entry| (entry.key().clone(), entry.value().clone()))
+            .collect();
+
+        // Second pass: For each user, collect their document presence
+        users_snapshot
+            .into_iter()
+            .map(|(user_id, user)| {
                 let mut documents = std::collections::HashMap::new();
 
                 // Collect document presence for this user
+                // Now we're not holding any iterators when we do this lookup
                 for doc_entry in project.documents.iter() {
-                    if let Some(user_state) = doc_entry.active_users.get(entry.key()) {
+                    if let Some(user_state) = doc_entry.active_users.get(&user_id) {
                         documents.insert(
                             doc_entry.key().clone(),
                             DocumentPresence {
