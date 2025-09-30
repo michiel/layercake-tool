@@ -258,22 +258,25 @@ lazy_static::lazy_static! {
 
 /// Get or create a broadcaster for a specific plan
 async fn get_plan_broadcaster(plan_id: &str) -> broadcast::Sender<CollaborationEvent> {
-    let broadcasters = PLAN_BROADCASTERS.read().await;
+    // Fast path: Try read lock first and immediately release
+    {
+        let broadcasters = PLAN_BROADCASTERS.read().await;
+        if let Some(sender) = broadcasters.get(plan_id) {
+            return sender.clone();
+        }
+        // Lock automatically dropped here
+    }
 
+    // Slow path: Need to create broadcaster with write lock
+    let mut broadcasters = PLAN_BROADCASTERS.write().await;
+
+    // Double-check pattern to avoid race conditions
     if let Some(sender) = broadcasters.get(plan_id) {
         sender.clone()
     } else {
-        drop(broadcasters);
-        let mut broadcasters = PLAN_BROADCASTERS.write().await;
-
-        // Double-check pattern to avoid race conditions
-        if let Some(sender) = broadcasters.get(plan_id) {
-            sender.clone()
-        } else {
-            let (sender, _) = broadcast::channel(1000); // Buffer size of 1000 events
-            broadcasters.insert(plan_id.to_string(), sender.clone());
-            sender
-        }
+        let (sender, _) = broadcast::channel(1000); // Buffer size of 1000 events
+        broadcasters.insert(plan_id.to_string(), sender.clone());
+        sender
     }
 }
 

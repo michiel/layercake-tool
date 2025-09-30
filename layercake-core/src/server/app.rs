@@ -71,12 +71,22 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
         Some(origin) => CorsLayer::new()
             .allow_origin(origin.parse::<axum::http::HeaderValue>()
                 .map_err(|e| anyhow!("Invalid CORS origin: {}", e))?)
-            .allow_methods(Any)
-            .allow_headers(Any),
+            .allow_methods([
+                axum::http::Method::GET,
+                axum::http::Method::POST,
+                axum::http::Method::OPTIONS,
+            ])
+            .allow_headers(Any)
+            .allow_credentials(false),
         None => CorsLayer::new()
             .allow_origin(Any)
-            .allow_methods(Any)
-            .allow_headers(Any),
+            .allow_methods([
+                axum::http::Method::GET,
+                axum::http::Method::POST,
+                axum::http::Method::OPTIONS,
+            ])
+            .allow_headers(Any)
+            .allow_credentials(false),
     };
 
     let mut app = Router::new()
@@ -87,7 +97,10 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
     #[cfg(feature = "graphql")]
     {
         app = app
-            .route("/graphql", get(graphql_playground).post(graphql_handler))
+            .route("/graphql",
+                get(graphql_playground)
+                    .post(graphql_handler)
+                    .options(|| async { axum::http::StatusCode::OK }))
             .route("/graphql/ws", get(graphql_ws_handler))
             .route("/ws/collaboration", get(websocket_handler));
     }
