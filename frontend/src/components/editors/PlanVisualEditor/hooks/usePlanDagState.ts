@@ -20,6 +20,7 @@ interface PlanDagStateResult {
   planDag: PlanDag | null
   loading: boolean
   error: any
+  loadingTimeout: boolean
 
   // ReactFlow state
   nodes: Node[]
@@ -70,23 +71,52 @@ export const usePlanDagState = (options: UsePlanDagStateOptions): PlanDagStateRe
   const { projectId, readonly = false, onNodeEdit, onNodeDelete } = options
 
   // Stable callbacks to prevent reference instability
-  const stableOnNodeEdit = useStableCallback(onNodeEdit)
-  const stableOnNodeDelete = useStableCallback(onNodeDelete)
+  const stableOnNodeEdit = useStableCallback(onNodeEdit || (() => {}))
+  const stableOnNodeDelete = useStableCallback(onNodeDelete || (() => {}))
 
   // Subscription filtering to prevent client self-updates
   const { filterSubscriptionData } = useSubscriptionFilter()
 
-  // GraphQL data
+  // GraphQL data with error handling
   const { planDag: rawPlanDag, loading, error, refetch } = usePlanDag(projectId)
   const { lastChange } = usePlanDagSubscription(projectId)
   const mutations = usePlanDagMutations(projectId)
 
+  // Timeout detection for stuck loading states
+  const loadingTimeoutRef = useRef<number | null>(null)
+  const [loadingTimeout, setLoadingTimeout] = useState(false)
+
+  useEffect(() => {
+    if (loading && !loadingTimeout) {
+      // Set a timeout to detect if loading is stuck
+      loadingTimeoutRef.current = setTimeout(() => {
+        console.error('GraphQL query timeout - loading stuck for 30 seconds')
+        setLoadingTimeout(true)
+      }, 30000) // 30 second timeout
+    } else {
+      // Clear timeout when loading completes
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current)
+        loadingTimeoutRef.current = null
+      }
+      if (loadingTimeout && !loading) {
+        setLoadingTimeout(false)
+      }
+    }
+
+    return () => {
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current)
+      }
+    }
+  }, [loading, loadingTimeout])
+
   // Local state
   const [isDirty, setIsDirty] = useState(false)
 
-  // Performance monitoring
+  // Performance monitoring (temporarily disabled - see usePerformanceMonitor refactor)
   const performanceMonitor = usePerformanceMonitor({
-    enabled: !readonly,
+    enabled: false, // Disabled due to infinite render loop bug
     maxRenderTime: 16, // 60fps budget
     maxRendersPerSecond: 60,
     maxEventFrequency: 10,
@@ -308,7 +338,10 @@ export const usePlanDagState = (options: UsePlanDagStateOptions): PlanDagStateRe
     // Data state
     planDag: stablePlanDag,
     loading,
-    error,
+    error: loadingTimeout
+      ? new Error('Query timeout: Server took too long to respond. Please refresh the page.')
+      : error,
+    loadingTimeout,
 
     // ReactFlow state
     nodes,

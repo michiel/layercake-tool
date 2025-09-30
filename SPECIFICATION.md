@@ -146,6 +146,8 @@ NC
    * OutputNodes can have only one input (of GraphNode type) and MUST have one input to be in configured state
    * These node connection rules also serve as part of Plan DAG validation on the backend
  - Edges can be selected and then deleted OR changed OR disconnected and reconnected
+ - The raw websocket is used for bidirectional, ephemeral presence and cursor data. graphql is used for data queries and mutations. keep these separate, and review the current state on frontend and backend to ensure they are separate. a data mutation performed by the client should not result in a subsequent render update based on a subscription update for that specific mutation, as it was initiated by the same client (other clients on that subscriptions SHOULD receive and respond to the update)
+
 
 
 ### Artefacts

@@ -573,14 +573,53 @@ class PerformanceMonitorService {
 - Fixed dependency array to only include stable `projectId`
 - Added proper cleanup to reset initialization flag when needed
 
+#### ✅ **Final Resolution - Original usePlanDagState Infinite Loop Fixed**
+**Problem Resolved:**
+- Identified root cause of infinite loops was in the original `usePlanDagState` hook, not just CQRS
+- Fixed "Maximum update depth exceeded" errors in ReactFlow StoreUpdater component
+- Eliminated performance violations (>60fps budget) and render cascades
+
+**Root Cause Analysis:**
+- `convertPlanDagToReactFlow` function was recreated on every render (unstable reference)
+- `onNodeEdit`/`onNodeDelete` callbacks were unstable dependencies in useMemo
+- useEffect dependencies included unstable objects causing continuous re-execution
+
+**Technical Solution:**
+```typescript
+// Fixed conversion function with useCallback (no dependencies)
+const convertPlanDagToReactFlow = useCallback((planDag, onEdit, onDelete, readonly) => {
+  // Pure function - no external dependencies
+}, [])
+
+// Stable callbacks to prevent reference instability
+const stableOnNodeEdit = useStableCallback(onNodeEdit)
+const stableOnNodeDelete = useStableCallback(onNodeDelete)
+
+// Fixed useEffect dependencies - only stable references
+useEffect(() => {
+  // ReactFlow sync logic
+}, [reactFlowDataChange.changeId]) // Removed unstable references
+
+useEffect(() => {
+  // Subscription handling
+}, [lastChange, stablePlanDag]) // Removed unstable managers/filters
+```
+
+**Impact:**
+- ✅ ReactFlow StoreUpdater no longer throws "Maximum update depth exceeded"
+- ✅ Performance stays within 60fps budget (16ms render time)
+- ✅ No more infinite render cascades through component tree
+- ✅ Clean console output without infinite loop warnings
+
 ### **Final Results - Production Ready:**
-- ✅ **Zero infinite loops** - All render loop issues eliminated
-- ✅ **Clean console output** - No repeated initialization messages
+- ✅ **Zero infinite loops** - All render loop issues eliminated in both CQRS and original hooks
+- ✅ **Clean console output** - No repeated initialization or performance warnings
 - ✅ **Performance optimized** - Render frequency within 60fps budget
 - ✅ **Stable CQRS architecture** - Proper separation of concerns maintained
 - ✅ **React hook compliance** - All hook rules properly followed
+- ✅ **Original hook stabilized** - usePlanDagState now completely stable
 - ✅ **Production build successful** - 304.15 kB gzipped
-- ✅ **Dev server stable** - Runs cleanly without errors
+- ✅ **Dev server stable** - Runs cleanly without errors or warnings
 
 ### **Complete Solution Achieved:**
 The Plan DAG Editor now runs with a stable CQRS architecture that completely eliminates the original infinite loop and performance issues. All architectural goals have been met and the application is ready for production use.

@@ -370,7 +370,7 @@ const ProjectsPage = () => {
 const ProjectDetailPage = () => {
   const navigate = useNavigate()
   const { projectId } = useParams<{ projectId: string }>()
-  const { data: projectsData } = useQuery<{
+  const { data: projectsData, loading: projectsLoading } = useQuery<{
     projects: Array<{
       id: number
       name: string
@@ -387,7 +387,17 @@ const ProjectDetailPage = () => {
     navigate(route)
   }
 
-  if (!selectedProject) {
+  // Show loading state while projects are being fetched
+  if (projectsLoading) {
+    return (
+      <Container size="xl">
+        <Text>Loading project...</Text>
+      </Container>
+    )
+  }
+
+  // Only show "not found" if loading is complete and project doesn't exist
+  if (!selectedProject && !projectsLoading) {
     return (
       <Container size="xl">
         <Title order={1}>Project Not Found</Title>
@@ -511,7 +521,7 @@ const ProjectDetailPage = () => {
 const PlanEditorPage = () => {
   const navigate = useNavigate()
   const { projectId } = useParams<{ projectId: string }>()
-  const { data: projectsData } = useQuery<{
+  const { data: projectsData, loading: projectsLoading } = useQuery<{
     projects: Array<{
       id: number
       name: string
@@ -528,7 +538,17 @@ const PlanEditorPage = () => {
     navigate(route)
   }
 
-  if (!selectedProject) {
+  // Show loading state while projects are being fetched
+  if (projectsLoading) {
+    return (
+      <Container size="xl">
+        <Text>Loading project...</Text>
+      </Container>
+    )
+  }
+
+  // Only show "not found" if loading is complete and project doesn't exist
+  if (!selectedProject && !projectsLoading) {
     return (
       <Container size="xl">
         <Title order={1}>Project Not Found</Title>
@@ -566,7 +586,7 @@ const PlanEditorPage = () => {
 const GraphEditorPage = () => {
   const navigate = useNavigate()
   const { projectId } = useParams<{ projectId: string }>()
-  const { data: projectsData } = useQuery<{
+  const { data: projectsData, loading: projectsLoading } = useQuery<{
     projects: Array<{
       id: number
       name: string
@@ -583,7 +603,17 @@ const GraphEditorPage = () => {
     navigate(route)
   }
 
-  if (!selectedProject) {
+  // Show loading state while projects are being fetched
+  if (projectsLoading) {
+    return (
+      <Container size="xl">
+        <Text>Loading project...</Text>
+      </Container>
+    )
+  }
+
+  // Only show "not found" if loading is complete and project doesn't exist
+  if (!selectedProject && !projectsLoading) {
     return (
       <Container size="xl">
         <Title order={1}>Project Not Found</Title>

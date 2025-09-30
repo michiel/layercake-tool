@@ -109,27 +109,37 @@ impl Query {
 
     /// Get Plan DAG for a project
     async fn get_plan_dag(&self, ctx: &Context<'_>, project_id: i32) -> Result<Option<PlanDag>> {
+        tracing::info!("getPlanDag called for project_id: {}", project_id);
+
         let context = ctx.data::<GraphQLContext>()?;
+        tracing::debug!("Got GraphQL context");
 
         // Verify project exists
+        tracing::debug!("Querying project by id...");
         let project = projects::Entity::find_by_id(project_id)
             .one(&context.db)
             .await?
             .ok_or_else(|| Error::new("Project not found"))?;
+        tracing::debug!("Project found: {}", project.name);
 
         // Get nodes from the project's graph data
+        tracing::debug!("Querying nodes for project...");
         let graph_nodes = nodes::Entity::find()
             .filter(nodes::Column::ProjectId.eq(project_id))
             .all(&context.db)
             .await?;
+        tracing::debug!("Found {} nodes", graph_nodes.len());
 
         // Get edges from the project's graph data
+        tracing::debug!("Querying edges for project...");
         let graph_edges = edges::Entity::find()
             .filter(edges::Column::ProjectId.eq(project_id))
             .all(&context.db)
             .await?;
+        tracing::debug!("Found {} edges", graph_edges.len());
 
         // Convert graph nodes to Plan DAG nodes
+        tracing::debug!("Converting {} nodes to PlanDag format...", graph_nodes.len());
         let nodes: Vec<PlanDagNode> = graph_nodes.into_iter().map(|node| {
             PlanDagNode {
                 id: node.node_id.clone(), // Use node_id instead of id
@@ -147,8 +157,10 @@ impl Query {
                 updated_at: chrono::Utc::now(),
             }
         }).collect();
+        tracing::debug!("Converted {} nodes", nodes.len());
 
         // Convert graph edges to Plan DAG edges
+        tracing::debug!("Converting {} edges to PlanDag format...", graph_edges.len());
         let edges: Vec<PlanDagEdge> = graph_edges.into_iter().map(|edge| {
             PlanDagEdge {
                 id: edge.id.to_string(), // Convert i32 id to string
@@ -162,8 +174,10 @@ impl Query {
                 updated_at: chrono::Utc::now(),
             }
         }).collect();
+        tracing::debug!("Converted {} edges", edges.len());
 
         // Create default metadata using project information
+        tracing::debug!("Creating metadata...");
         let metadata = PlanDagMetadata {
             version: "1.0".to_string(),
             name: Some(format!("{} Plan DAG", project.name)),
@@ -173,6 +187,7 @@ impl Query {
             author: None,
         };
 
+        tracing::info!("getPlanDag completed successfully for project_id: {}", project_id);
         Ok(Some(PlanDag {
             version: metadata.version.clone(),
             nodes,

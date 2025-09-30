@@ -3,6 +3,7 @@ out/
 .DS_Store
 *.db
 tmp/
+*log
 
 # Development logs
 backend.log

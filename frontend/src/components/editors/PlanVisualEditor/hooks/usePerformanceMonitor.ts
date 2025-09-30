@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useRef, useCallback, useEffect } from 'react'
 
 interface PerformanceMetrics {
   renderCount: number
@@ -49,7 +49,8 @@ export const usePerformanceMonitor = (options: UsePerformanceMonitorOptions = {}
     memoryWarningThreshold = 100 // MB
   } = options
 
-  const [metrics, setMetrics] = useState<PerformanceMetrics>({
+  // Use refs to store metrics instead of state to avoid render loops
+  const metricsRef = useRef<PerformanceMetrics>({
     renderCount: 0,
     averageRenderTime: 0,
     lastRenderTime: 0,
@@ -130,14 +131,14 @@ export const usePerformanceMonitor = (options: UsePerformanceMonitorOptions = {}
       console.warn('Performance violation:', violation.message)
     }
 
-    // Update metrics
-    setMetrics(prev => ({
-      ...prev,
+    // Update metrics ref (no setState, no re-render)
+    metricsRef.current = {
+      ...metricsRef.current,
       renderCount: renderCountRef.current,
       averageRenderTime,
       lastRenderTime: renderTime,
       violations: violationsRef.current.slice(-10).map(v => v.message), // Keep last 10 violations
-    }))
+    }
 
     lastRenderTimeRef.current = performance.now()
   }, [enabled, maxRenderTime, maxRendersPerSecond])
@@ -169,14 +170,14 @@ export const usePerformanceMonitor = (options: UsePerformanceMonitorOptions = {}
       console.warn('Performance violation:', violation.message)
     }
 
-    // Update event counts
-    setMetrics(prev => ({
-      ...prev,
+    // Update event counts in ref (no setState, no re-render)
+    metricsRef.current = {
+      ...metricsRef.current,
       eventCounts: {
-        ...prev.eventCounts,
-        [eventType]: prev.eventCounts[eventType] + 1,
+        ...metricsRef.current.eventCounts,
+        [eventType]: metricsRef.current.eventCounts[eventType] + 1,
       },
-    }))
+    }
   }, [enabled, maxEventFrequency])
 
   // Monitor memory usage
@@ -204,11 +205,17 @@ export const usePerformanceMonitor = (options: UsePerformanceMonitorOptions = {}
       console.warn('Performance violation:', violation.message)
     }
 
-    setMetrics(prev => ({
-      ...prev,
+    // Update memory usage in ref (no setState, no re-render)
+    metricsRef.current = {
+      ...metricsRef.current,
       memoryUsage,
-    }))
+    }
   }, [enabled, memoryWarningThreshold])
+
+  // Get current metrics snapshot
+  const getMetrics = useCallback((): PerformanceMetrics => {
+    return { ...metricsRef.current }
+  }, [])
 
   // Reset all metrics
   const resetMetrics = useCallback(() => {
@@ -223,7 +230,7 @@ export const usePerformanceMonitor = (options: UsePerformanceMonitorOptions = {}
     }
     violationsRef.current = []
 
-    setMetrics({
+    metricsRef.current = {
       renderCount: 0,
       averageRenderTime: 0,
       lastRenderTime: 0,
@@ -241,7 +248,7 @@ export const usePerformanceMonitor = (options: UsePerformanceMonitorOptions = {}
         maxEventFrequency,
       },
       violations: [],
-    })
+    }
   }, [maxRenderTime, maxRendersPerSecond, maxEventFrequency])
 
   // Get performance summary
@@ -250,15 +257,17 @@ export const usePerformanceMonitor = (options: UsePerformanceMonitorOptions = {}
       v => v.timestamp.getTime() > Date.now() - 60000 // Last minute
     )
 
+    const currentMetrics = metricsRef.current
+
     return {
       isHealthy: recentViolations.length === 0,
       recentViolations: recentViolations.length,
-      averageRenderTime: metrics.averageRenderTime,
-      totalRenders: metrics.renderCount,
-      memoryUsageMB: metrics.memoryUsage ? metrics.memoryUsage.usedJSHeapSize / 1024 / 1024 : 0,
-      recommendations: generateRecommendations(recentViolations, metrics),
+      averageRenderTime: currentMetrics.averageRenderTime,
+      totalRenders: currentMetrics.renderCount,
+      memoryUsageMB: currentMetrics.memoryUsage ? currentMetrics.memoryUsage.usedJSHeapSize / 1024 / 1024 : 0,
+      recommendations: generateRecommendations(recentViolations, currentMetrics),
     }
-  }, [metrics])
+  }, [])
 
   // Periodic memory monitoring
   useEffect(() => {
@@ -268,16 +277,12 @@ export const usePerformanceMonitor = (options: UsePerformanceMonitorOptions = {}
     return () => clearInterval(interval)
   }, [enabled, updateMemoryUsage])
 
-  // Track renders automatically
-  useEffect(() => {
-    if (enabled) {
-      trackRender()
-    }
-  })
+  // REMOVED: Automatic render tracking that caused infinite loop
+  // Components should explicitly call trackRender() when needed
 
   return {
-    // Metrics
-    metrics,
+    // Metrics (use getMetrics() to get current snapshot)
+    getMetrics,
 
     // Tracking functions
     trackRender,
@@ -322,7 +327,7 @@ const generateRecommendations = (
 
   if (memoryViolations.length > 0) {
     recommendations.push('Check for memory leaks in event listeners or subscriptions')
-    recommendations.push('Clear unused references and optimize data structures')
+    recommendations.push('Clear unused references and optimise data structures')
   }
 
   if (metrics.averageRenderTime > 10) {

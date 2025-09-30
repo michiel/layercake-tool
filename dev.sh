@@ -96,23 +96,39 @@ if [[ ! -f "layercake.db" ]]; then
 fi
 
 # Start backend server
-print_status "Starting backend server..."
+print_status "Starting backend server (this may take a moment to compile)..."
 cd "$BACKEND_DIR"
-cargo run --bin layercake --features graphql -- serve --port $BACKEND_PORT --log-level $LOG_LEVEL --cors-origin "http://localhost:$FRONTEND_PORT" > backend.log 2>&1 &
+cargo run --bin layercake -- serve --port $BACKEND_PORT --log-level $LOG_LEVEL --cors-origin "http://localhost:$FRONTEND_PORT" > backend.log 2>&1 &
 BACKEND_PID=$!
-cd .
+cd - > /dev/null
 
-# Wait a moment for backend to start
-sleep 3
+# Wait for backend to compile and start (with progress indicator)
+print_status "Waiting for backend to compile and start..."
+BACKEND_WAIT=0
+BACKEND_MAX_WAIT=60
+while [ $BACKEND_WAIT -lt $BACKEND_MAX_WAIT ]; do
+    # Check if process is still alive
+    if ! kill -0 $BACKEND_PID 2>/dev/null; then
+        print_error "Backend process died. Check backend.log for details:"
+        tail -30 backend.log
+        exit 1
+    fi
 
-# Check if backend started successfully
-if ! kill -0 $BACKEND_PID 2>/dev/null; then
-    print_error "Backend failed to start. Check backend.log for details:"
-    tail -20 backend.log
-    exit 1
-fi
+    # Check if server is responding
+    if curl -s -f http://localhost:$BACKEND_PORT/health > /dev/null 2>&1; then
+        print_success "Backend server started and responding (PID: $BACKEND_PID)"
+        break
+    fi
 
-print_success "Backend server started (PID: $BACKEND_PID)"
+    sleep 2
+    BACKEND_WAIT=$((BACKEND_WAIT + 2))
+
+    if [ $BACKEND_WAIT -ge $BACKEND_MAX_WAIT ]; then
+        print_error "Backend failed to start within ${BACKEND_MAX_WAIT}s. Check backend.log for details:"
+        tail -30 backend.log
+        exit 1
+    fi
+done
 
 # Start frontend server
 print_status "Starting frontend server..."
@@ -129,19 +145,35 @@ echo "VITE_API_BASE_URL=http://localhost:$BACKEND_PORT" > .env.development.local
 
 npm run dev -- --port $FRONTEND_PORT > ../frontend.log 2>&1 &
 FRONTEND_PID=$!
-cd ..
+cd - > /dev/null
 
-# Wait a moment for frontend to start
-sleep 3
+# Wait for frontend to start (with progress indicator)
+print_status "Waiting for frontend to start..."
+FRONTEND_WAIT=0
+FRONTEND_MAX_WAIT=30
+while [ $FRONTEND_WAIT -lt $FRONTEND_MAX_WAIT ]; do
+    # Check if process is still alive
+    if ! kill -0 $FRONTEND_PID 2>/dev/null; then
+        print_error "Frontend process died. Check frontend.log for details:"
+        tail -30 frontend.log
+        exit 1
+    fi
 
-# Check if frontend started successfully
-if ! kill -0 $FRONTEND_PID 2>/dev/null; then
-    print_error "Frontend failed to start. Check frontend.log for details:"
-    tail -20 frontend.log
-    exit 1
-fi
+    # Check if server is responding (look for Vite's ready message in log)
+    if grep -q "Local:.*localhost:$FRONTEND_PORT" frontend.log 2>/dev/null; then
+        print_success "Frontend server started and responding (PID: $FRONTEND_PID)"
+        break
+    fi
 
-print_success "Frontend server started (PID: $FRONTEND_PID)"
+    sleep 2
+    FRONTEND_WAIT=$((FRONTEND_WAIT + 2))
+
+    if [ $FRONTEND_WAIT -ge $FRONTEND_MAX_WAIT ]; then
+        print_error "Frontend failed to start within ${FRONTEND_MAX_WAIT}s. Check frontend.log for details:"
+        tail -30 frontend.log
+        exit 1
+    fi
+done
 
 # Display connection info
 echo ""

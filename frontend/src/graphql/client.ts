@@ -19,10 +19,23 @@ const getGraphQLEndpoints = () => {
 
 const { httpUrl, wsUrl } = getGraphQLEndpoints()
 
-// HTTP Link for queries and mutations
+// HTTP Link for queries and mutations with timeout using AbortController
 const httpLink = createHttpLink({
   uri: httpUrl,
   credentials: 'omit',
+  fetch: (uri, options) => {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => {
+      controller.abort()
+    }, 30000) // 30 second timeout
+
+    return fetch(uri, {
+      ...options,
+      signal: controller.signal,
+    }).finally(() => {
+      clearTimeout(timeout)
+    })
+  },
 })
 
 // WebSocket Link for subscriptions (real-time collaboration)
