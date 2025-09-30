@@ -41,7 +41,7 @@ impl McpClient {
             "params": params
         });
 
-        let message = Message::Text(serde_json::to_string(&request)?);
+        let message = Message::Text(serde_json::to_string(&request)?.into());
         self.sender.send(message).await?;
 
         // Read response

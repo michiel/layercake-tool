@@ -41,6 +41,32 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
         let graph_service = Arc::new(GraphService::new(db.clone()));
         let session_manager = Arc::new(SessionManager::new());
 
+        // Spawn periodic cleanup task for inactive sessions
+        {
+            let session_manager_clone = session_manager.clone();
+            tokio::spawn(async move {
+                let mut interval = tokio::time::interval(std::time::Duration::from_secs(300)); // 5 minutes
+                interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
+                // Skip the first immediate tick to avoid blocking startup
+                interval.tick().await;
+
+                loop {
+                    interval.tick().await;
+
+                    // Run cleanup in a blocking task to avoid holding the async runtime
+                    let session_manager_for_cleanup = session_manager_clone.clone();
+                    tokio::task::spawn_blocking(move || {
+                        tracing::debug!("Running periodic session cleanup");
+                        session_manager_for_cleanup.cleanup_inactive_sessions(std::time::Duration::from_secs(3600)); // 1 hour inactivity
+                        tracing::debug!("Periodic session cleanup completed");
+                    }).await.unwrap_or_else(|e| {
+                        tracing::error!("Session cleanup task failed: {}", e);
+                    });
+                }
+            });
+        }
+
         let graphql_context = GraphQLContext::new(
             db.clone(),
             import_service,
@@ -148,7 +174,9 @@ async fn graphql_handler(
     State(state): State<AppState>,
     Json(req): Json<Request>,
 ) -> Json<GraphQLResponse> {
+    tracing::debug!("GraphQL request received");
     let response = state.graphql_schema.execute(req).await;
+    tracing::debug!("GraphQL request completed");
     Json(response)
 }
 

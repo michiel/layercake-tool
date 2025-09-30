@@ -153,6 +153,9 @@ impl SessionManager {
     ) -> Result<(), String> {
         let presence_data = self.collect_user_presence_data(project);
 
+        // Collect dead connections for cleanup
+        let mut dead_connections = Vec::new();
+
         // Send to all connected users except the one who changed
         for connection in project.connections.iter() {
             if connection.key() != changed_user_id {
@@ -161,10 +164,17 @@ impl SessionManager {
                 };
 
                 if let Err(_) = connection.value().send(message) {
-                    // Connection is dead, will be cleaned up later
-                    tracing::warn!("Failed to send message to user {}", connection.key());
+                    // Connection is dead, mark for cleanup
+                    tracing::warn!("Dead connection detected for user {}, scheduling removal", connection.key());
+                    dead_connections.push(connection.key().clone());
                 }
             }
+        }
+
+        // Remove dead connections immediately
+        for user_id in dead_connections {
+            tracing::info!("Removing dead connection for user {}", user_id);
+            project.connections.remove(&user_id);
         }
 
         Ok(())
@@ -201,11 +211,22 @@ impl SessionManager {
                 data: activity_data,
             };
 
+            // Collect dead connections for cleanup
+            let mut dead_connections = Vec::new();
+
             // Send to all connected users in the project
             for connection in project.connections.iter() {
                 if let Err(_) = connection.value().send(message.clone()) {
-                    tracing::warn!("Failed to send document activity to user {}", connection.key());
+                    // Connection is dead, mark for cleanup
+                    tracing::warn!("Dead connection detected for user {} (document activity), scheduling removal", connection.key());
+                    dead_connections.push(connection.key().clone());
                 }
+            }
+
+            // Remove dead connections immediately
+            for user_id in dead_connections {
+                tracing::info!("Removing dead connection for user {}", user_id);
+                project.connections.remove(&user_id);
             }
         }
 

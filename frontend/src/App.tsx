@@ -397,7 +397,7 @@ const ProjectDetailPage = () => {
   }
 
   // Only show "not found" if loading is complete and project doesn't exist
-  if (!selectedProject && !projectsLoading) {
+  if (!selectedProject) {
     return (
       <Container size="xl">
         <Title order={1}>Project Not Found</Title>
@@ -548,7 +548,7 @@ const PlanEditorPage = () => {
   }
 
   // Only show "not found" if loading is complete and project doesn't exist
-  if (!selectedProject && !projectsLoading) {
+  if (!selectedProject) {
     return (
       <Container size="xl">
         <Title order={1}>Project Not Found</Title>
@@ -613,7 +613,7 @@ const GraphEditorPage = () => {
   }
 
   // Only show "not found" if loading is complete and project doesn't exist
-  if (!selectedProject && !projectsLoading) {
+  if (!selectedProject) {
     return (
       <Container size="xl">
         <Title order={1}>Project Not Found</Title>

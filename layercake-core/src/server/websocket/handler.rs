@@ -44,19 +44,33 @@ async fn handle_socket(socket: WebSocket, project_id: i32, session_manager: Arc<
     // Create a channel for this connection
     let (tx, mut rx) = mpsc::unbounded_channel::<ServerMessage>();
 
-    // Spawn a task to handle outgoing messages
+    // Spawn a task to handle outgoing messages with heartbeat
     let _tx_clone = tx.clone();
     let sender_task = tokio::spawn(async move {
-        while let Some(msg) = rx.recv().await {
-            match serde_json::to_string(&msg) {
-                Ok(json) => {
-                    if let Err(e) = sender.send(axum::extract::ws::Message::Text(json.into())).await {
-                        error!("Failed to send WebSocket message: {}", e);
-                        break;
+        let mut heartbeat_interval = tokio::time::interval(std::time::Duration::from_secs(30));
+        heartbeat_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
+        loop {
+            tokio::select! {
+                Some(msg) = rx.recv() => {
+                    match serde_json::to_string(&msg) {
+                        Ok(json) => {
+                            if let Err(e) = sender.send(axum::extract::ws::Message::Text(json.into())).await {
+                                error!("Failed to send WebSocket message: {}", e);
+                                break;
+                            }
+                        }
+                        Err(e) => {
+                            error!("Failed to serialize message: {}", e);
+                        }
                     }
                 }
-                Err(e) => {
-                    error!("Failed to serialize message: {}", e);
+                _ = heartbeat_interval.tick() => {
+                    // Send ping to keep connection alive
+                    if let Err(e) = sender.send(axum::extract::ws::Message::Ping(vec![].into())).await {
+                        error!("Failed to send heartbeat ping: {}", e);
+                        break;
+                    }
                 }
             }
         }
@@ -64,11 +78,23 @@ async fn handle_socket(socket: WebSocket, project_id: i32, session_manager: Arc<
 
     let mut user_id: Option<String> = None;
     let mut rate_limiter = RateLimiter::new(20, std::time::Duration::from_secs(1)); // 20 messages per second
+    let mut last_activity = std::time::Instant::now();
+    let connection_timeout = std::time::Duration::from_secs(90); // 90 seconds timeout
 
     // Handle incoming messages
     while let Some(msg) = receiver.next().await {
+        // Check for connection timeout
+        if last_activity.elapsed() > connection_timeout {
+            warn!("WebSocket connection timeout for project {} (no activity for {} seconds)",
+                  project_id, connection_timeout.as_secs());
+            break;
+        }
+
         match msg {
             Ok(axum::extract::ws::Message::Text(text)) => {
+                // Update activity timestamp
+                last_activity = std::time::Instant::now();
+
                 // Apply rate limiting
                 if !rate_limiter.allow() {
                     warn!("Rate limit exceeded for project {}", project_id);
@@ -116,13 +142,13 @@ async fn handle_socket(socket: WebSocket, project_id: i32, session_manager: Arc<
                 break;
             }
             Ok(axum::extract::ws::Message::Ping(_data)) => {
-                // Respond to ping with pong - use tx channel instead of direct sender
-                let pong_msg = ServerMessage::Error {
-                    message: "pong".to_string(),
-                };
-                if let Err(_) = tx.send(pong_msg) {
-                    break;
-                }
+                // Update activity timestamp on ping
+                last_activity = std::time::Instant::now();
+                // Note: Axum handles pong responses automatically
+            }
+            Ok(axum::extract::ws::Message::Pong(_data)) => {
+                // Update activity timestamp on pong response
+                last_activity = std::time::Instant::now();
             }
             Ok(_) => {
                 // Ignore other message types

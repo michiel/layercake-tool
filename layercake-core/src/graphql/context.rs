@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use std::sync::Arc;
+use std::sync::atomic::{AtomicI32, Ordering};
 use std::collections::HashMap;
 use tokio::sync::RwLock;
 use sea_orm::DatabaseConnection;
@@ -19,7 +20,7 @@ pub struct GraphQLContext {
 #[derive(Debug)]
 pub struct SessionManager {
     sessions: RwLock<HashMap<String, SessionInfo>>,
-    next_user_id: RwLock<i32>,
+    next_user_id: AtomicI32,
 }
 
 #[derive(Debug, Clone)]
@@ -34,7 +35,7 @@ impl SessionManager {
     pub fn new() -> Self {
         Self {
             sessions: RwLock::new(HashMap::new()),
-            next_user_id: RwLock::new(100), // Start from 100 to differentiate from real users
+            next_user_id: AtomicI32::new(100), // Start from 100 to differentiate from real users
         }
     }
 
@@ -50,15 +51,14 @@ impl SessionManager {
 
         // Create new session
         let mut sessions = self.sessions.write().await;
-        let mut next_id = self.next_user_id.write().await;
 
         // Double-check after acquiring write lock
         if let Some(session) = sessions.get(session_id) {
             return session.clone();
         }
 
-        let user_id = *next_id;
-        *next_id += 1;
+        // Atomically fetch and increment the user ID
+        let user_id = self.next_user_id.fetch_add(1, Ordering::SeqCst);
 
         // Generate avatar colors
         let colors = [

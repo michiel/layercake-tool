@@ -17,7 +17,7 @@ BACKEND_PORT=3001
 FRONTEND_PORT=1422
 BACKEND_DIR="."
 FRONTEND_DIR="frontend"
-LOG_LEVEL="${LOG_LEVEL:-info}"
+LOG_LEVEL="${LOG_LEVEL:-debug}"
 
 # Function to print colored output
 print_status() {

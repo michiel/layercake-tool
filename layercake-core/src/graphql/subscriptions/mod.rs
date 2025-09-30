@@ -234,11 +234,30 @@ impl Subscription {
         let broadcaster = get_plan_broadcaster(&plan_id).await;
         let mut receiver = broadcaster.subscribe();
 
-        // Stream all events for this plan
+        // Stream all events for this plan with lag detection
+        let plan_id_clone = plan_id.clone();
         let stream = async_stream::stream! {
-            while let Ok(event) = receiver.recv().await {
-                if event.plan_id == plan_id {
-                    yield event;
+            loop {
+                match receiver.recv().await {
+                    Ok(event) => {
+                        if event.plan_id == plan_id_clone {
+                            yield event;
+                        }
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(skipped)) => {
+                        // Receiver fell behind and missed messages
+                        tracing::warn!(
+                            "Broadcast receiver lagged for plan {}, skipped {} messages",
+                            plan_id_clone,
+                            skipped
+                        );
+                        // Continue receiving after lag
+                        continue;
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                        tracing::info!("Broadcast channel closed for plan {}", plan_id_clone);
+                        break;
+                    }
                 }
             }
         };
@@ -284,11 +303,31 @@ async fn get_plan_broadcaster(plan_id: &str) -> broadcast::Sender<CollaborationE
 pub async fn publish_collaboration_event(event: CollaborationEvent) -> Result<(), String> {
     let broadcaster = get_plan_broadcaster(&event.plan_id).await;
 
-    if let Err(_) = broadcaster.send(event.clone()) {
-        return Err("Failed to broadcast collaboration event".to_string());
+    // Check buffer utilisation for lag detection
+    let receiver_count = broadcaster.receiver_count();
+    if receiver_count > 0 {
+        // Note: tokio broadcast channel doesn't expose buffer usage directly
+        // We can only detect lag when a send fails or receiver reports lag
+        // This is a best-effort warning based on receiver count
+        if receiver_count > 50 {
+            tracing::warn!(
+                "High subscriber count ({}) for plan {}, potential lag risk",
+                receiver_count,
+                event.plan_id
+            );
+        }
     }
 
-    Ok(())
+    match broadcaster.send(event.clone()) {
+        Ok(_) => Ok(()),
+        Err(_) => {
+            tracing::error!(
+                "Failed to broadcast collaboration event for plan {} - no active receivers",
+                event.plan_id
+            );
+            Err("Failed to broadcast collaboration event".to_string())
+        }
+    }
 }
 
 /// Helper function to create collaboration events
