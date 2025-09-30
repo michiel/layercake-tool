@@ -35,7 +35,11 @@ pub async fn websocket_handler(
         params.project_id
     );
 
-    ws.on_upgrade(move |socket| handle_socket(socket, params.project_id, app_state.session_manager))
+    // CRITICAL FIX: Explicitly spawn handle_socket onto its own Tokio task
+    // to ensure it doesn't block the HTTP upgrade handler
+    ws.on_upgrade(move |socket| async move {
+        tokio::spawn(handle_socket(socket, params.project_id, app_state.session_manager));
+    })
 }
 
 async fn handle_socket(socket: WebSocket, project_id: i32, session_manager: Arc<SessionManager>) {
