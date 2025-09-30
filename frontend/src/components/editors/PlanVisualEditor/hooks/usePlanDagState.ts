@@ -65,77 +65,13 @@ const planDagEqual = (a: PlanDag | null, b: PlanDag | null): boolean => {
   }
 }
 
-// Optimised conversion functions
-const convertPlanDagToReactFlow = (
-  planDag: PlanDag,
-  onEdit?: (nodeId: string) => void,
-  onDelete?: (nodeId: string) => void,
-  readonly?: boolean
-): { nodes: Node[]; edges: Edge[] } => {
-  if (!planDag.edges || !Array.isArray(planDag.edges)) {
-    return { nodes: [], edges: [] }
-  }
-
-  const edges: Edge[] = planDag.edges.map((edge: any) => ({
-    id: String(edge.id),
-    source: String(edge.source),
-    target: String(edge.target),
-    sourceHandle: edge.sourceHandle || null,
-    targetHandle: edge.targetHandle || null,
-    type: 'smoothstep',
-    animated: false,
-    label: edge.metadata?.label || 'Data',
-    metadata: edge.metadata || { label: 'Data', dataType: 'GraphData' },
-    style: {
-      stroke: edge.metadata?.dataType === 'GraphReference' ? '#228be6' : '#868e96',
-      strokeWidth: 2,
-    },
-    labelStyle: {
-      fontSize: 12,
-      fontWeight: 500,
-    },
-  }))
-
-  const nodes: Node[] = planDag.nodes.map((node: any) => {
-    const nodeType = typeof node.nodeType === 'string' &&
-      (Object.values(PlanDagNodeType) as string[]).includes(node.nodeType) ?
-      node.nodeType as PlanDagNodeType : PlanDagNodeType.DATA_SOURCE
-
-    const hasValidConfig = node.config &&
-      (typeof node.config === 'object' ||
-       (typeof node.config === 'string' && node.config.trim() !== '{}' && node.config.trim() !== ''))
-
-    return {
-      id: node.id,
-      position: node.position,
-      type: nodeType,
-      data: {
-        label: node.metadata.label,
-        nodeType,
-        config: typeof node.config === 'string' ? (() => {
-          try {
-            return JSON.parse(node.config)
-          } catch (e) {
-            return {}
-          }
-        })() : node.config,
-        metadata: node.metadata,
-        onEdit,
-        onDelete,
-        readonly,
-        edges,
-        hasValidConfig,
-      },
-      draggable: true,
-      selectable: true,
-    }
-  })
-
-  return { nodes, edges }
-}
 
 export const usePlanDagState = (options: UsePlanDagStateOptions): PlanDagStateResult => {
   const { projectId, readonly = false, onNodeEdit, onNodeDelete } = options
+
+  // Stable callbacks to prevent reference instability
+  const stableOnNodeEdit = useStableCallback(onNodeEdit)
+  const stableOnNodeDelete = useStableCallback(onNodeDelete)
 
   // Subscription filtering to prevent client self-updates
   const { filterSubscriptionData } = useSubscriptionFilter()
@@ -160,6 +96,75 @@ export const usePlanDagState = (options: UsePlanDagStateOptions): PlanDagStateRe
   // Refs for stable comparisons
   const previousPlanDagRef = useRef<PlanDag | null>(null)
   const stablePlanDagRef = useRef<PlanDag | null>(null)
+
+  // Stable conversion function to prevent infinite loops
+  const convertPlanDagToReactFlow = useCallback((
+    planDag: PlanDag,
+    onEdit?: (nodeId: string) => void,
+    onDelete?: (nodeId: string) => void,
+    readonly?: boolean
+  ): { nodes: Node[]; edges: Edge[] } => {
+    if (!planDag.edges || !Array.isArray(planDag.edges)) {
+      return { nodes: [], edges: [] }
+    }
+
+    const edges: Edge[] = planDag.edges.map((edge: any) => ({
+      id: String(edge.id),
+      source: String(edge.source),
+      target: String(edge.target),
+      sourceHandle: edge.sourceHandle || null,
+      targetHandle: edge.targetHandle || null,
+      type: 'smoothstep',
+      animated: false,
+      label: edge.metadata?.label || 'Data',
+      metadata: edge.metadata || { label: 'Data', dataType: 'GraphData' },
+      style: {
+        stroke: edge.metadata?.dataType === 'GraphReference' ? '#228be6' : '#868e96',
+        strokeWidth: 2,
+      },
+      labelStyle: {
+        fontSize: 12,
+        fontWeight: 500,
+      },
+    }))
+
+    const nodes: Node[] = planDag.nodes.map((node: any) => {
+      const nodeType = typeof node.nodeType === 'string' &&
+        (Object.values(PlanDagNodeType) as string[]).includes(node.nodeType) ?
+        node.nodeType as PlanDagNodeType : PlanDagNodeType.DATA_SOURCE
+
+      const hasValidConfig = node.config &&
+        (typeof node.config === 'object' ||
+         (typeof node.config === 'string' && node.config.trim() !== '{}' && node.config.trim() !== ''))
+
+      return {
+        id: node.id,
+        position: node.position,
+        type: nodeType,
+        data: {
+          label: node.metadata.label,
+          nodeType,
+          config: typeof node.config === 'string' ? (() => {
+            try {
+              return JSON.parse(node.config)
+            } catch (e) {
+              return {}
+            }
+          })() : node.config,
+          metadata: node.metadata,
+          onEdit,
+          onDelete,
+          readonly,
+          edges,
+          hasValidConfig,
+        },
+        draggable: true,
+        selectable: true,
+      }
+    })
+
+    return { nodes, edges }
+  }, []) // No dependencies - this function is pure
 
   // Convert raw GraphQL data to properly typed PlanDag
   const convertRawPlanDag = useCallback((raw: any): PlanDag | null => {
@@ -223,13 +228,13 @@ export const usePlanDagState = (options: UsePlanDagStateOptions): PlanDagStateRe
     throttleMs: 1000,
   })
 
-  // ReactFlow conversion
+  // ReactFlow conversion with stable callbacks
   const reactFlowData = useMemo(() => {
     if (!stablePlanDag) {
       return { nodes: [], edges: [] }
     }
-    return convertPlanDagToReactFlow(stablePlanDag, onNodeEdit, onNodeDelete, readonly)
-  }, [stablePlanDag, onNodeEdit, onNodeDelete, readonly])
+    return convertPlanDagToReactFlow(stablePlanDag, stableOnNodeEdit, stableOnNodeDelete, readonly)
+  }, [stablePlanDag, stableOnNodeEdit, stableOnNodeDelete, readonly, convertPlanDagToReactFlow])
 
   // ReactFlow state
   const [nodes, setNodes, onNodesChange] = useNodesState(reactFlowData.nodes)
@@ -260,8 +265,8 @@ export const usePlanDagState = (options: UsePlanDagStateOptions): PlanDagStateRe
         setEdges(reactFlowData.edges)
       }
     }
-    // Only depend on external data change detection, not local state
-  }, [reactFlowDataChange.changeId, reactFlowData.nodes.length, reactFlowData.edges.length])
+    // Only depend on stable change detection ID, not objects that can cause infinite loops
+  }, [reactFlowDataChange.changeId])
 
   // Handle real-time changes with subscription filtering
   useEffect(() => {
@@ -277,7 +282,8 @@ export const usePlanDagState = (options: UsePlanDagStateOptions): PlanDagStateRe
         console.log('[usePlanDagState] Filtered out own subscription update')
       }
     }
-  }, [lastChange, stablePlanDag, updateManager, performanceMonitor, filterSubscriptionData])
+    // Only depend on stable data, not objects that change on every render
+  }, [lastChange, stablePlanDag])
 
   // Actions
   const savePlanDag = useCallback(async () => {
