@@ -15,7 +15,13 @@ import {
   IconAlignCenter,
   IconLayoutDistributeHorizontal,
   IconLayoutDistributeVertical,
+  IconDatabase,
+  IconNetwork,
+  IconTransform,
+  IconGitMerge,
+  IconFileExport
 } from '@tabler/icons-react';
+import { PlanDagNodeType } from '../../../../types/plan-dag';
 
 interface AdvancedToolbarProps {
   selectedNodeCount: number;
@@ -24,6 +30,7 @@ interface AdvancedToolbarProps {
   canAlign: boolean;
   canDistribute: boolean;
   readonly?: boolean;
+  onNodeDragStart: (event: React.DragEvent, nodeType: PlanDagNodeType) => void;
   onDuplicate: () => void;
   onCopy: () => void;
   onPaste: () => void;
@@ -48,6 +55,7 @@ export const AdvancedToolbar: React.FC<AdvancedToolbarProps> = ({
   canAlign,
   canDistribute,
   readonly = false,
+  onNodeDragStart,
   onDuplicate,
   onCopy,
   onPaste,
@@ -66,8 +74,71 @@ export const AdvancedToolbar: React.FC<AdvancedToolbarProps> = ({
 }) => {
   if (readonly) return null;
 
+  const nodeTypes = [
+    {
+      type: PlanDagNodeType.DATA_SOURCE,
+      label: 'Data Source',
+      icon: <IconDatabase size="0.7rem" />,
+      color: '#51cf66'
+    },
+    {
+      type: PlanDagNodeType.GRAPH,
+      label: 'Graph',
+      icon: <IconNetwork size="0.7rem" />,
+      color: '#339af0'
+    },
+    {
+      type: PlanDagNodeType.TRANSFORM,
+      label: 'Transform',
+      icon: <IconTransform size="0.7rem" />,
+      color: '#ff8cc8'
+    },
+    {
+      type: PlanDagNodeType.MERGE,
+      label: 'Merge',
+      icon: <IconGitMerge size="0.7rem" />,
+      color: '#ffd43b'
+    },
+    {
+      type: PlanDagNodeType.COPY,
+      label: 'Copy',
+      icon: <IconCopy size="0.7rem" />,
+      color: '#74c0fc'
+    },
+    {
+      type: PlanDagNodeType.OUTPUT,
+      label: 'Output',
+      icon: <IconFileExport size="0.7rem" />,
+      color: '#ff6b6b'
+    }
+  ];
+
+  const handleNodeDragStart = (event: React.DragEvent, nodeType: PlanDagNodeType) => {
+    onNodeDragStart(event, nodeType);
+  };
+
   return (
     <Group gap="xs" p="md" style={{ borderBottom: '1px solid #e9ecef' }}>
+      {/* Node Palette */}
+      <Group gap={4}>
+        <Text size="xs" fw={500} c="gray.6">Nodes:</Text>
+        {nodeTypes.map((nodeType) => (
+          <Tooltip key={nodeType.type} label={`Drag to add ${nodeType.label}`}>
+            <ActionIcon
+              size="sm"
+              variant="light"
+              style={{ backgroundColor: nodeType.color, color: 'white', cursor: 'grab' }}
+              draggable
+              onDragStart={(event) => handleNodeDragStart(event, nodeType.type)}
+            >
+              {nodeType.icon}
+            </ActionIcon>
+          </Tooltip>
+        ))}
+      </Group>
+
+      <Divider orientation="vertical" />
+
       {/* Selection Info */}
       {selectedNodeCount > 0 && (
         <>

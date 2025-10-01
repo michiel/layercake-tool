@@ -14,12 +14,11 @@ import ReactFlow, {
   useReactFlow,
   ReactFlowProvider
 } from 'reactflow'
-import { Stack, Title, Alert, Loader, Text, ActionIcon, Tooltip, Group } from '@mantine/core'
+import { Stack, Title, Alert, Loader, Text, Tooltip, Group, Badge } from '@mantine/core'
 import {
   IconAlertCircle,
-  IconEye,
-  IconSettings,
-  IconPlayerPlay
+  IconNetwork,
+  IconNetworkOff
 } from '@tabler/icons-react'
 
 import { useCollaborationV2 } from '../../../hooks/useCollaborationV2'
@@ -38,10 +37,8 @@ import { NodeConfigDialog } from './NodeConfigDialog'
 import { EdgeConfigDialog } from './EdgeConfigDialog'
 
 // Import extracted components and hooks
-import { ControlPanel } from './components/ControlPanel'
 import { AdvancedToolbar } from './components/AdvancedToolbar'
 import { ContextMenu } from './components/ContextMenu'
-// import { CollaborationManager } from './components/CollaborationManager'
 import { usePlanDagCQRS } from './hooks/usePlanDagCQRS'
 import { useAdvancedOperations } from './hooks/useAdvancedOperations'
 import { generateNodeId, getDefaultNodeConfig, getDefaultNodeMetadata } from './utils/nodeDefaults'
@@ -102,12 +99,8 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     setEdges,
     onNodesChange,
     onEdgesChange,
-    validationErrors,
-    validationLoading,
-    lastValidation,
     isDirty,
     updateManager,
-    validatePlanDag: handleValidate,
     cqrsService,
   } = planDagState
 
@@ -659,6 +652,16 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
       <Group justify="space-between" p="md" bg="gray.0">
         <Group gap="md">
           <Title order={3}>Plan DAG Editor</Title>
+          {/* Online Users Status */}
+          <Tooltip label={`Collaboration: ${collaboration.connectionState}`}>
+            <Badge
+              variant="light"
+              color={collaboration.connected ? "green" : "gray"}
+              leftSection={collaboration.connected ? <IconNetwork size="0.7rem" /> : <IconNetworkOff size="0.7rem" />}
+            >
+              {onlineUsers.length} online
+            </Badge>
+          </Tooltip>
         </Group>
         <Group gap="xs">
           {isDirty && (
@@ -666,21 +669,6 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
               Unsaved changes
             </Text>
           )}
-          <Tooltip label="Preview execution">
-            <ActionIcon variant="light" color="blue">
-              <IconEye size="1rem" />
-            </ActionIcon>
-          </Tooltip>
-          <Tooltip label="Run plan">
-            <ActionIcon variant="light" color="green">
-              <IconPlayerPlay size="1rem" />
-            </ActionIcon>
-          </Tooltip>
-          <Tooltip label="Settings">
-            <ActionIcon variant="light" color="gray">
-              <IconSettings size="1rem" />
-            </ActionIcon>
-          </Tooltip>
         </Group>
       </Group>
 
@@ -693,6 +681,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         canAlign={advancedOps.canAlign}
         canDistribute={advancedOps.canDistribute}
         readonly={readonly}
+        onNodeDragStart={handleNodeDragStart}
         onDuplicate={advancedOps.handleDuplicate}
         onCopy={advancedOps.handleCopy}
         onPaste={advancedOps.handlePaste}
@@ -742,23 +731,6 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
           <Controls />
           <MiniMap nodeColor={miniMapNodeColor} />
 
-          <ControlPanel
-            validationLoading={validationLoading}
-            validationErrors={validationErrors}
-            lastValidation={lastValidation}
-            onValidate={handleValidate}
-            updatesPaused={false}
-            pendingUpdates={0}
-            onPauseUpdates={() => {}}
-            onResumeUpdates={() => {}}
-            isConnected={collaboration.connected}
-            collaborationStatus={collaboration.connectionState}
-            hasError={!!collaboration.error}
-            onlineUsers={onlineUsers}
-            onNodeDragStart={handleNodeDragStart}
-            readonly={readonly}
-          />
-
           {/* Empty state overlay when no nodes exist */}
           {nodes.length === 0 && (
             <div
@@ -779,7 +751,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
                   color="blue"
                   style={{ maxWidth: '400px', pointerEvents: 'auto' }}
                 >
-                  Drag nodes from the toolbar on the left to begin creating your data transformation workflow.
+                  Drag nodes from the toolbar above to begin creating your data transformation workflow.
                 </Alert>
                 <Text size="sm" c="dimmed" ta="center" style={{ maxWidth: '350px' }}>
                   Create connections between nodes to define how data flows through your pipeline.
