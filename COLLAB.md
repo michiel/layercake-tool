@@ -758,7 +758,7 @@ The system will migrate directly to delta-based updates:
 
 ### 9.2 Implementation Progress
 
-**Status**: ✅ Phase 1 Complete
+**Status**: ✅ Phase 1 Complete - Delta Subscriptions Active
 
 | Task | Status | Notes |
 |------|--------|-------|
@@ -768,8 +768,10 @@ The system will migrate directly to delta-based updates:
 | Update mutations to broadcast patches | ✅ Complete | All CRUD mutations generate & broadcast deltas (5cd03ef8) |
 | Install fast-json-patch | ⚠️ Pending | Added to package.json v3.1.1 (978e94e3) - **npm install needed** |
 | Implement subscription handler | ✅ Complete | PlanDagQueryService.subscribeToPlanDagDeltas (978e94e3) |
-| Wire up delta subscription in UI | ✅ Complete | usePlanDagCQRS now uses delta updates (ddb37449) |
+| Wire up delta subscription in CQRS | ✅ Complete | usePlanDagCQRS now uses delta updates (ddb37449) |
+| **Migrate UI to CQRS hook** | ✅ Complete | PlanVisualEditor now uses usePlanDagCQRS (a4eec31c) |
 | Disable bulk mutations | ✅ Complete | Removed duplicate updateManager calls (814b35aa) |
+| Remove verbose logging | ✅ Complete | Cleaned up duplicate logs from old hook (29fc75d8) |
 | Add conflict detection | ⏳ Optional | Can add version checking later if needed |
 | Testing | ⏳ Pending | Manual and integration tests |
 
@@ -779,9 +781,16 @@ The system will migrate directly to delta-based updates:
 - `978e94e3`: Frontend delta subscription handler (fast-json-patch integration)
 - `ddb37449`: Frontend CQRS hook integration (wire up delta subscription)
 - `814b35aa`: Frontend fix duplicate mutations (disable bulk updateManager calls)
+- `29fc75d8`: Frontend logging cleanup (remove duplicate console logs)
+- `a4eec31c`: **Frontend CQRS migration** (PlanVisualEditor now uses delta subscriptions)
+
+**Architecture Change**:
+The UI has been fully migrated from the old hook system to CQRS:
+- **Old**: `usePlanDagState` → `usePlanDag` + `usePlanDagMutations` + `usePlanDagSubscription` (full state sync)
+- **New**: `usePlanDagCQRS` (delta-based sync via JSON Patch)
 
 **Known Issues**:
-1. **npm install required**: fast-json-patch is in package.json but not yet installed in node_modules due to read-only filesystem during automated install. User must run `npm install` manually in frontend/ directory.
+1. **npm install required**: fast-json-patch is in package.json but not yet installed in node_modules due to read-only filesystem during automated install. User must run `npm install` manually in frontend/ directory before testing.
 2. **Testing needed**: Delta updates should be tested with multiple concurrent clients to verify patch application and data consistency.
 
 ### 9.3 Rollback Plan
