@@ -79,15 +79,8 @@ export const usePlanDag = (projectId: number) => {
 
   const planDag = useMemo(() => {
     const result = data?.getPlanDag || null
-    if (result) {
-      console.log('usePlanDag - GraphQL data received:', {
-        version: result.version,
-        nodesCount: result.nodes?.length || 0,
-        edgesCount: result.edges?.length || 0,
-        actualEdges: result.edges,
-        metadata: result.metadata
-      })
-    }
+    // Note: Verbose logging removed - multiple instances of this hook cause duplicate logs
+    // This hook is part of the old state management system, being phased out in favor of usePlanDagCQRS
     return result
   }, [data])
 
