@@ -1,7 +1,7 @@
 use async_graphql::*;
 use sea_orm::{EntityTrait, ColumnTrait, QueryFilter};
 
-use crate::database::entities::{projects, plans, nodes, edges, layers, users, user_sessions, project_collaborators, data_sources};
+use crate::database::entities::{projects, plans, nodes, edges, layers, users, user_sessions, project_collaborators, data_sources, plan_dag_nodes, plan_dag_edges};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::{Project, Plan, Node, Edge, Layer, PlanDag, PlanDagNode, PlanDagEdge, ValidationResult, PlanDagInput, User, ProjectCollaborator, DataSource, PlanDagMetadata, UserSession};
 use crate::graphql::types::plan_dag::DataSourceReference;
@@ -122,68 +122,69 @@ impl Query {
             .ok_or_else(|| Error::new("Project not found"))?;
         tracing::debug!("Project found: {}", project.name);
 
-        // Get nodes from the project's graph data
-        tracing::debug!("Querying nodes for project...");
-        let graph_nodes = nodes::Entity::find()
-            .filter(nodes::Column::ProjectId.eq(project_id))
-            .all(&context.db)
-            .await?;
-        tracing::debug!("Found {} nodes", graph_nodes.len());
-
-        // Get edges from the project's graph data
-        tracing::debug!("Querying edges for project...");
-        let graph_edges = edges::Entity::find()
-            .filter(edges::Column::ProjectId.eq(project_id))
-            .all(&context.db)
-            .await?;
-        tracing::debug!("Found {} edges", graph_edges.len());
-
-        // Convert graph nodes to Plan DAG nodes
-        tracing::debug!("Converting {} nodes to PlanDag format...", graph_nodes.len());
-        let nodes: Vec<PlanDagNode> = graph_nodes.into_iter().map(|node| {
-            PlanDagNode {
-                id: node.node_id.clone(), // Use node_id instead of id
-                node_type: crate::graphql::types::plan_dag::PlanDagNodeType::DataSource, // Use the enum
-                position: crate::graphql::types::Position {
-                    x: 0.0, // Default position since nodes table doesn't have x,y
-                    y: 0.0,
-                },
-                metadata: crate::graphql::types::NodeMetadata {
-                    label: node.label.clone(),
-                    description: None,
-                },
-                config: "{}".to_string(), // Default empty config
-                created_at: chrono::Utc::now(),
-                updated_at: chrono::Utc::now(),
+        // Find or create a plan for this project
+        let plan = match plans::Entity::find()
+            .filter(plans::Column::ProjectId.eq(project_id))
+            .one(&context.db)
+            .await? {
+            Some(plan) => plan,
+            None => {
+                // No plan exists yet - return empty Plan DAG
+                tracing::debug!("No plan found for project, returning empty Plan DAG");
+                let metadata = PlanDagMetadata {
+                    version: "1.0".to_string(),
+                    name: Some(format!("{} Plan DAG", project.name)),
+                    description: project.description.clone(),
+                    created: Some(project.created_at.to_rfc3339()),
+                    last_modified: Some(project.updated_at.to_rfc3339()),
+                    author: None,
+                };
+                return Ok(Some(PlanDag {
+                    version: metadata.version.clone(),
+                    nodes: vec![],
+                    edges: vec![],
+                    metadata,
+                }));
             }
-        }).collect();
+        };
+
+        // Get Plan DAG nodes (not graph nodes!)
+        tracing::debug!("Querying Plan DAG nodes for plan_id: {}...", plan.id);
+        let dag_nodes = plan_dag_nodes::Entity::find()
+            .filter(plan_dag_nodes::Column::PlanId.eq(plan.id))
+            .all(&context.db)
+            .await?;
+        tracing::debug!("Found {} Plan DAG nodes", dag_nodes.len());
+
+        // Get Plan DAG edges (not graph edges!)
+        tracing::debug!("Querying Plan DAG edges for plan_id: {}...", plan.id);
+        let dag_edges = plan_dag_edges::Entity::find()
+            .filter(plan_dag_edges::Column::PlanId.eq(plan.id))
+            .all(&context.db)
+            .await?;
+        tracing::debug!("Found {} Plan DAG edges", dag_edges.len());
+
+        // Convert database models to GraphQL types
+        tracing::debug!("Converting {} nodes to GraphQL format...", dag_nodes.len());
+        let nodes: Vec<PlanDagNode> = dag_nodes.into_iter()
+            .map(|node| PlanDagNode::from(node))
+            .collect();
         tracing::debug!("Converted {} nodes", nodes.len());
 
-        // Convert graph edges to Plan DAG edges
-        tracing::debug!("Converting {} edges to PlanDag format...", graph_edges.len());
-        let edges: Vec<PlanDagEdge> = graph_edges.into_iter().map(|edge| {
-            PlanDagEdge {
-                id: edge.id.to_string(), // Convert i32 id to string
-                source: edge.source_node_id.clone(), // Use source_node_id
-                target: edge.target_node_id.clone(), // Use target_node_id
-                metadata: crate::graphql::types::EdgeMetadata {
-                    label: Some("Connection".to_string()), // Default label since edges don't have labels
-                    data_type: crate::graphql::types::DataType::GraphData,
-                },
-                created_at: chrono::Utc::now(),
-                updated_at: chrono::Utc::now(),
-            }
-        }).collect();
+        tracing::debug!("Converting {} edges to GraphQL format...", dag_edges.len());
+        let edges: Vec<PlanDagEdge> = dag_edges.into_iter()
+            .map(|edge| PlanDagEdge::from(edge))
+            .collect();
         tracing::debug!("Converted {} edges", edges.len());
 
-        // Create default metadata using project information
+        // Create metadata
         tracing::debug!("Creating metadata...");
         let metadata = PlanDagMetadata {
-            version: "1.0".to_string(),
-            name: Some(format!("{} Plan DAG", project.name)),
-            description: project.description.clone(),
-            created: Some(project.created_at.to_rfc3339()),
-            last_modified: Some(project.updated_at.to_rfc3339()),
+            version: plan.version.to_string(),
+            name: Some(plan.name.clone()),
+            description: None,
+            created: Some(plan.created_at.to_rfc3339()),
+            last_modified: Some(plan.updated_at.to_rfc3339()),
             author: None,
         };
 
