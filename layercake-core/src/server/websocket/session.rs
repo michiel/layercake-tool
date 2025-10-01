@@ -64,7 +64,7 @@ impl SessionManager {
                 .collect();
 
             for doc_id in document_ids {
-                if let Some(mut doc) = project.documents.get_mut(&doc_id) {
+                if let Some(doc) = project.documents.get_mut(&doc_id) {
                     doc.active_users.remove(user_id);
                 }
             }

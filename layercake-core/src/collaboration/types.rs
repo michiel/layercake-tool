@@ -76,7 +76,9 @@ pub enum ProjectCommand {
 }
 
 /// Health report for a project
+/// Fields currently unused but kept for future monitoring/observability features
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct ProjectHealthReport {
     pub project_id: i32,
     pub active_users: usize,

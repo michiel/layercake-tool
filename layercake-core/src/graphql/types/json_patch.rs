@@ -104,6 +104,8 @@ pub struct PatchConflict {
 }
 
 /// Helper function to convert json-patch operations to our GraphQL types
+/// Currently unused but kept for potential future use with manual patch construction
+#[allow(dead_code)]
 pub fn convert_json_patch_to_operations(patch: &json_patch::Patch) -> Vec<PatchOperation> {
     patch.0.iter().map(|op| {
         match op {
@@ -148,6 +150,8 @@ pub fn convert_json_patch_to_operations(patch: &json_patch::Patch) -> Vec<PatchO
 }
 
 /// Helper function to convert our GraphQL types to json-patch operations
+/// Currently unused but kept for potential future use with manual patch construction
+#[allow(dead_code)]
 pub fn convert_operations_to_json_patch(operations: Vec<PatchOperation>) -> Result<json_patch::Patch, String> {
     let patch_ops: Result<Vec<json_patch::PatchOperation>, String> = operations.into_iter().map(|op| {
         match op.op {
