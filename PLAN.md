@@ -1159,10 +1159,10 @@ $ find frontend/src -name "*.spec.ts*"
 **Deliverable**: Clean codebase, no breaking changes
 
 ### Phase 2: GraphQL Improvements (Week 2-3)
-- [ ] Remove response wrappers
-- [ ] Implement `movePlanDagNode` mutation
-- [ ] Remove or document `updatePlanDag`
-- [ ] Update frontend to match new API
+- [x] Remove response wrappers - commits 95278f51, da7ca426
+- [x] Implement `movePlanDagNode` mutation - commit 95278f51
+- [x] Remove or document `updatePlanDag` - commit 95278f51 (documented as DEPRECATED)
+- [x] Update frontend to match new API - commit da7ca426
 
 **Deliverable**: Cleaner API, improved performance
 
