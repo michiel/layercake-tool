@@ -14,8 +14,8 @@ use crate::graphql::types::{
     CreateProjectInput, UpdateProjectInput,
     CreatePlanInput, UpdatePlanInput,
     CreateNodeInput, CreateEdgeInput, CreateLayerInput,
-    PlanDagInput, PlanDagResponse, PlanDagNodeInput, PlanDagEdgeInput,
-    PlanDagNodeUpdateInput, NodeResponse, EdgeResponse, Position,
+    PlanDagInput, PlanDagNodeInput, PlanDagEdgeInput,
+    PlanDagNodeUpdateInput, Position,
     PlanDag, PlanDagNode, PlanDagEdge,
     User, ProjectCollaborator,
     RegisterUserInput, LoginInput, UpdateUserInput, LoginResponse, RegisterResponse,
@@ -227,7 +227,11 @@ impl Mutation {
     }
 
     /// Update a complete Plan DAG
-    async fn update_plan_dag(&self, ctx: &Context<'_>, project_id: i32, plan_dag: PlanDagInput) -> Result<PlanDagResponse> {
+    ///
+    /// **DEPRECATED**: This bulk replace operation conflicts with delta-based updates.
+    /// Use individual node/edge mutations instead for better real-time collaboration.
+    /// See PLAN.md Phase 2 for migration strategy.
+    async fn update_plan_dag(&self, ctx: &Context<'_>, project_id: i32, plan_dag: PlanDagInput) -> Result<Option<PlanDag>> {
         let context = ctx.data::<GraphQLContext>()?;
 
         // Verify project exists
@@ -306,20 +310,16 @@ impl Mutation {
         let nodes: Vec<PlanDagNode> = dag_nodes.into_iter().map(PlanDagNode::from).collect();
         let edges: Vec<PlanDagEdge> = dag_edges.into_iter().map(PlanDagEdge::from).collect();
 
-        Ok(PlanDagResponse {
-            success: true,
-            errors: vec![],
-            plan_dag: Some(PlanDag {
-                version: plan_dag.version,
-                nodes,
-                edges,
-                metadata: plan_dag.metadata,
-            }),
-        })
+        Ok(Some(PlanDag {
+            version: plan_dag.version,
+            nodes,
+            edges,
+            metadata: plan_dag.metadata,
+        }))
     }
 
     /// Add a single Plan DAG node
-    async fn add_plan_dag_node(&self, ctx: &Context<'_>, project_id: i32, node: PlanDagNodeInput) -> Result<NodeResponse> {
+    async fn add_plan_dag_node(&self, ctx: &Context<'_>, project_id: i32, node: PlanDagNodeInput) -> Result<Option<PlanDagNode>> {
         let context = ctx.data::<GraphQLContext>()?;
 
         // Verify project exists
@@ -397,15 +397,11 @@ impl Mutation {
             vec![patch_op],
         ).await.ok(); // Non-fatal if broadcast fails
 
-        Ok(NodeResponse {
-            success: true,
-            errors: vec![],
-            node: Some(result_node),
-        })
+        Ok(Some(result_node))
     }
 
     /// Update a Plan DAG node
-    async fn update_plan_dag_node(&self, ctx: &Context<'_>, project_id: i32, node_id: String, updates: PlanDagNodeUpdateInput) -> Result<NodeResponse> {
+    async fn update_plan_dag_node(&self, ctx: &Context<'_>, project_id: i32, node_id: String, updates: PlanDagNodeUpdateInput) -> Result<Option<PlanDagNode>> {
         let context = ctx.data::<GraphQLContext>()?;
 
         // Find or create a plan for this project
@@ -509,15 +505,11 @@ impl Mutation {
             ).await.ok(); // Non-fatal if broadcast fails
         }
 
-        Ok(NodeResponse {
-            success: true,
-            errors: vec![],
-            node: Some(result_node),
-        })
+        Ok(Some(result_node))
     }
 
     /// Delete a Plan DAG node
-    async fn delete_plan_dag_node(&self, ctx: &Context<'_>, project_id: i32, node_id: String) -> Result<NodeResponse> {
+    async fn delete_plan_dag_node(&self, ctx: &Context<'_>, project_id: i32, node_id: String) -> Result<Option<PlanDagNode>> {
         let context = ctx.data::<GraphQLContext>()?;
 
         // Find the plan for this project
@@ -581,22 +573,14 @@ impl Mutation {
                 ).await.ok(); // Non-fatal if broadcast fails
             }
 
-            Ok(NodeResponse {
-                success: true,
-                errors: vec![],
-                node: None,
-            })
+            Ok(None)
         } else {
-            Ok(NodeResponse {
-                success: false,
-                errors: vec!["Node not found".to_string()],
-                node: None,
-            })
+            Err(Error::new("Node not found"))
         }
     }
 
     /// Add a Plan DAG edge
-    async fn add_plan_dag_edge(&self, ctx: &Context<'_>, project_id: i32, edge: PlanDagEdgeInput) -> Result<EdgeResponse> {
+    async fn add_plan_dag_edge(&self, ctx: &Context<'_>, project_id: i32, edge: PlanDagEdgeInput) -> Result<Option<PlanDagEdge>> {
         let context = ctx.data::<GraphQLContext>()?;
 
         // Find or create a plan for this project
@@ -657,15 +641,11 @@ impl Mutation {
             vec![patch_op],
         ).await.ok(); // Non-fatal if broadcast fails
 
-        Ok(EdgeResponse {
-            success: true,
-            errors: vec![],
-            edge: Some(result_edge),
-        })
+        Ok(Some(result_edge))
     }
 
     /// Delete a Plan DAG edge
-    async fn delete_plan_dag_edge(&self, ctx: &Context<'_>, project_id: i32, edge_id: String) -> Result<EdgeResponse> {
+    async fn delete_plan_dag_edge(&self, ctx: &Context<'_>, project_id: i32, edge_id: String) -> Result<Option<PlanDagEdge>> {
         let context = ctx.data::<GraphQLContext>()?;
 
         // Find the plan for this project
@@ -706,22 +686,14 @@ impl Mutation {
                 ).await.ok(); // Non-fatal if broadcast fails
             }
 
-            Ok(EdgeResponse {
-                success: true,
-                errors: vec![],
-                edge: None,
-            })
+            Ok(None)
         } else {
-            Ok(EdgeResponse {
-                success: false,
-                errors: vec!["Edge not found".to_string()],
-                edge: None,
-            })
+            Err(Error::new("Edge not found"))
         }
     }
 
     /// Move a Plan DAG node (update position)
-    async fn move_plan_dag_node(&self, ctx: &Context<'_>, project_id: i32, node_id: String, position: Position) -> Result<NodeResponse> {
+    async fn move_plan_dag_node(&self, ctx: &Context<'_>, project_id: i32, node_id: String, position: Position) -> Result<Option<PlanDagNode>> {
         let updates = PlanDagNodeUpdateInput {
             position: Some(position),
             metadata: None,

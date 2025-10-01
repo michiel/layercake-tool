@@ -332,29 +332,6 @@ pub struct PlanDagNodeUpdateInput {
     pub config: Option<String>,
 }
 
-// Response types
-#[derive(SimpleObject, Clone, Debug)]
-pub struct PlanDagResponse {
-    pub success: bool,
-    pub errors: Vec<String>,
-    #[graphql(name = "planDag")]
-    pub plan_dag: Option<PlanDag>,
-}
-
-#[derive(SimpleObject, Clone, Debug)]
-pub struct NodeResponse {
-    pub success: bool,
-    pub errors: Vec<String>,
-    pub node: Option<PlanDagNode>,
-}
-
-#[derive(SimpleObject, Clone, Debug)]
-pub struct EdgeResponse {
-    pub success: bool,
-    pub errors: Vec<String>,
-    pub edge: Option<PlanDagEdge>,
-}
-
 // Validation types
 #[derive(SimpleObject, Clone, Debug)]
 pub struct ValidationResult {
