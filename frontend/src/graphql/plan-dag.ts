@@ -63,51 +63,8 @@ export const VALIDATE_PLAN_DAG = gql`
 export const UPDATE_PLAN_DAG = gql`
   mutation UpdatePlanDag($projectId: Int!, $planDag: PlanDagInput!) {
     updatePlanDag(projectId: $projectId, planDag: $planDag) {
-      success
-      errors
-      planDag {
-        version
-        nodes {
-          id
-          nodeType
-          position {
-            x
-            y
-          }
-          metadata {
-            label
-            description
-          }
-          config
-        }
-        edges {
-          id
-          source
-          target
-          metadata {
-            label
-            dataType
-          }
-        }
-        metadata {
-          version
-          name
-          description
-          created
-          lastModified
-          author
-        }
-      }
-    }
-  }
-`
-
-export const ADD_PLAN_DAG_NODE = gql`
-  mutation AddPlanDagNode($projectId: Int!, $node: PlanDagNodeInput!) {
-    addPlanDagNode(projectId: $projectId, node: $node) {
-      success
-      errors
-      node {
+      version
+      nodes {
         id
         nodeType
         position {
@@ -120,48 +77,7 @@ export const ADD_PLAN_DAG_NODE = gql`
         }
         config
       }
-    }
-  }
-`
-
-export const UPDATE_PLAN_DAG_NODE = gql`
-  mutation UpdatePlanDagNode($projectId: Int!, $nodeId: String!, $updates: PlanDagNodeUpdateInput!) {
-    updatePlanDagNode(projectId: $projectId, nodeId: $nodeId, updates: $updates) {
-      success
-      errors
-      node {
-        id
-        nodeType
-        position {
-          x
-          y
-        }
-        metadata {
-          label
-          description
-        }
-        config
-      }
-    }
-  }
-`
-
-export const DELETE_PLAN_DAG_NODE = gql`
-  mutation DeletePlanDagNode($projectId: Int!, $nodeId: String!) {
-    deletePlanDagNode(projectId: $projectId, nodeId: $nodeId) {
-      success
-      errors
-      deletedNodeId
-    }
-  }
-`
-
-export const ADD_PLAN_DAG_EDGE = gql`
-  mutation AddPlanDagEdge($projectId: Int!, $edge: PlanDagEdgeInput!) {
-    addPlanDagEdge(projectId: $projectId, edge: $edge) {
-      success
-      errors
-      edge {
+      edges {
         id
         source
         target
@@ -170,6 +86,72 @@ export const ADD_PLAN_DAG_EDGE = gql`
           dataType
         }
       }
+      metadata {
+        version
+        name
+        description
+        created
+        lastModified
+        author
+      }
+    }
+  }
+`
+
+export const ADD_PLAN_DAG_NODE = gql`
+  mutation AddPlanDagNode($projectId: Int!, $node: PlanDagNodeInput!) {
+    addPlanDagNode(projectId: $projectId, node: $node) {
+      id
+      nodeType
+      position {
+        x
+        y
+      }
+      metadata {
+        label
+        description
+      }
+      config
+    }
+  }
+`
+
+export const UPDATE_PLAN_DAG_NODE = gql`
+  mutation UpdatePlanDagNode($projectId: Int!, $nodeId: String!, $updates: PlanDagNodeUpdateInput!) {
+    updatePlanDagNode(projectId: $projectId, nodeId: $nodeId, updates: $updates) {
+      id
+      nodeType
+      position {
+        x
+        y
+      }
+      metadata {
+        label
+        description
+      }
+      config
+    }
+  }
+`
+
+export const DELETE_PLAN_DAG_NODE = gql`
+  mutation DeletePlanDagNode($projectId: Int!, $nodeId: String!) {
+    deletePlanDagNode(projectId: $projectId, nodeId: $nodeId) {
+      id
+    }
+  }
+`
+
+export const ADD_PLAN_DAG_EDGE = gql`
+  mutation AddPlanDagEdge($projectId: Int!, $edge: PlanDagEdgeInput!) {
+    addPlanDagEdge(projectId: $projectId, edge: $edge) {
+      id
+      source
+      target
+      metadata {
+        label
+        dataType
+      }
     }
   }
 `
@@ -177,9 +159,7 @@ export const ADD_PLAN_DAG_EDGE = gql`
 export const DELETE_PLAN_DAG_EDGE = gql`
   mutation DeletePlanDagEdge($projectId: Int!, $edgeId: String!) {
     deletePlanDagEdge(projectId: $projectId, edgeId: $edgeId) {
-      success
-      errors
-      deletedEdgeId
+      id
     }
   }
 `
@@ -187,14 +167,10 @@ export const DELETE_PLAN_DAG_EDGE = gql`
 export const MOVE_PLAN_DAG_NODE = gql`
   mutation MovePlanDagNode($projectId: Int!, $nodeId: String!, $position: PositionInput!) {
     movePlanDagNode(projectId: $projectId, nodeId: $nodeId, position: $position) {
-      success
-      errors
-      node {
-        id
-        position {
-          x
-          y
-        }
+      id
+      position {
+        x
+        y
       }
     }
   }

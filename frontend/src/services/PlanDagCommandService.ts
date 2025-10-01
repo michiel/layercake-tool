@@ -28,12 +28,11 @@ export class PlanDagCommandService {
         context: createMutationContext(this.clientId)
       })
 
-      const response = (result.data as any)?.addPlanDagNode
-      if (!response?.success) {
-        throw new Error(`Failed to create node: ${response?.errors?.join(', ') || 'Unknown error'}`)
+      const createdNode = (result.data as any)?.addPlanDagNode
+      if (!createdNode) {
+        throw new Error('Failed to create node: No data returned')
       }
-      const createdNode = response.node
-      console.log('[PlanDagCommandService] Node created successfully:', createdNode?.id)
+      console.log('[PlanDagCommandService] Node created successfully:', createdNode.id)
       return createdNode
     } catch (error) {
       console.error('[PlanDagCommandService] Failed to create node:', error)
@@ -55,11 +54,10 @@ export class PlanDagCommandService {
         context: createMutationContext(this.clientId)
       })
 
-      const response = (result.data as any)?.updatePlanDagNode
-      if (!response?.success) {
-        throw new Error(`Failed to update node: ${response?.errors?.join(', ') || 'Unknown error'}`)
+      const updatedNode = (result.data as any)?.updatePlanDagNode
+      if (!updatedNode) {
+        throw new Error('Failed to update node: No data returned')
       }
-      const updatedNode = response.node
       console.log('[PlanDagCommandService] Node updated successfully')
       return updatedNode
     } catch (error) {
@@ -81,9 +79,9 @@ export class PlanDagCommandService {
         context: createMutationContext(this.clientId)
       })
 
-      const success = (result.data as any)?.deletePlanDagNode || false
+      const deletedNode = (result.data as any)?.deletePlanDagNode
       console.log('[PlanDagCommandService] Node deleted successfully')
-      return success
+      return !!deletedNode
     } catch (error) {
       console.error('[PlanDagCommandService] Failed to delete node:', error)
       throw error
@@ -101,14 +99,11 @@ export class PlanDagCommandService {
           nodeId: command.nodeId,
           position: command.position
         },
-        context: createMutationContext(this.clientId),
-        // Position updates are frequent - use optimistic response
-        optimisticResponse: {
-          movePlanDagNode: true
-        }
+        context: createMutationContext(this.clientId)
       })
 
-      return (result.data as any)?.movePlanDagNode || false
+      const movedNode = (result.data as any)?.movePlanDagNode
+      return !!movedNode
     } catch (error) {
       console.error('[PlanDagCommandService] Failed to move node:', error)
       throw error
@@ -129,12 +124,11 @@ export class PlanDagCommandService {
         context: createMutationContext(this.clientId)
       })
 
-      const response = (result.data as any)?.addPlanDagEdge
-      if (!response?.success) {
-        throw new Error(`Failed to create edge: ${response?.errors?.join(', ') || 'Unknown error'}`)
+      const createdEdge = (result.data as any)?.addPlanDagEdge
+      if (!createdEdge) {
+        throw new Error('Failed to create edge: No data returned')
       }
-      const createdEdge = response.edge
-      console.log('[PlanDagCommandService] Edge created successfully:', createdEdge?.id)
+      console.log('[PlanDagCommandService] Edge created successfully:', createdEdge.id)
       return createdEdge
     } catch (error) {
       console.error('[PlanDagCommandService] Failed to create edge:', error)
@@ -155,9 +149,9 @@ export class PlanDagCommandService {
         context: createMutationContext(this.clientId)
       })
 
-      const success = (result.data as any)?.deletePlanDagEdge || false
+      const deletedEdge = (result.data as any)?.deletePlanDagEdge
       console.log('[PlanDagCommandService] Edge deleted successfully')
-      return success
+      return !!deletedEdge
     } catch (error) {
       console.error('[PlanDagCommandService] Failed to delete edge:', error)
       throw error
