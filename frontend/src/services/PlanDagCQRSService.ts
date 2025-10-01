@@ -111,7 +111,7 @@ export class PlanDagCQRSService {
         targetHandle,
         metadata: {
           label: '',
-          dataType: 'GraphData' as any
+          dataType: 'GRAPH_DATA' as any
         }
       }
     })

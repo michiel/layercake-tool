@@ -13,7 +13,7 @@ interface EdgeConfigDialogProps {
 
 interface EdgeFormData {
   label: string
-  dataType: 'GraphData' | 'GraphReference'
+  dataType: 'GRAPH_DATA' | 'GRAPH_REFERENCE'
 }
 
 export const EdgeConfigDialog = ({
@@ -28,7 +28,7 @@ export const EdgeConfigDialog = ({
   const form = useForm<EdgeFormData>({
     initialValues: {
       label: '',
-      dataType: 'GraphData'
+      dataType: 'GRAPH_DATA'
     },
     validate: {
       label: (value) => value.trim().length === 0 ? 'Label is required' : null
@@ -40,7 +40,7 @@ export const EdgeConfigDialog = ({
     if (edge) {
       form.setValues({
         label: edge.label || '',
-        dataType: edge.metadata?.dataType || 'GraphData'
+        dataType: edge.metadata?.dataType || 'GRAPH_DATA'
       })
     }
   }, [edge])
@@ -60,7 +60,7 @@ export const EdgeConfigDialog = ({
         },
         style: {
           ...edge.style,
-          stroke: values.dataType === 'GraphReference' ? '#228be6' : '#868e96'
+          stroke: values.dataType === 'GRAPH_REFERENCE' ? '#228be6' : '#868e96'
         }
       }
 
@@ -105,8 +105,8 @@ export const EdgeConfigDialog = ({
             label="Data Type"
             placeholder="Select data type"
             data={[
-              { value: 'GraphData', label: 'Graph Data' },
-              { value: 'GraphReference', label: 'Graph Reference' }
+              { value: 'GRAPH_DATA', label: 'Graph Data' },
+              { value: 'GRAPH_REFERENCE', label: 'Graph Reference' }
             ]}
             {...form.getInputProps('dataType')}
             disabled={readonly || loading}

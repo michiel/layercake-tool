@@ -19,7 +19,7 @@ export interface NodeMetadata {
 
 export interface EdgeMetadata {
   label?: string;
-  dataType: 'GraphData' | 'GraphReference';
+  dataType: 'GRAPH_DATA' | 'GRAPH_REFERENCE';
 }
 
 // Plan DAG Node Types
@@ -130,6 +130,8 @@ export interface PlanDagEdge {
   id: string;
   source: string;
   target: string;
+  sourceHandle?: string | null;
+  targetHandle?: string | null;
   metadata: EdgeMetadata;
 }
 

@@ -288,6 +288,8 @@ impl Mutation {
                 plan_id: Set(project_id), // Use project_id directly
                 source_node_id: Set(edge.source.clone()),
                 target_node_id: Set(edge.target.clone()),
+                source_handle: Set(edge.source_handle.clone()),
+                target_handle: Set(edge.target_handle.clone()),
                 metadata_json: Set(metadata_json),
                 created_at: Set(Utc::now()),
                 updated_at: Set(Utc::now()),
@@ -618,6 +620,8 @@ impl Mutation {
             plan_id: Set(plan.id),
             source_node_id: Set(edge.source.clone()),
             target_node_id: Set(edge.target.clone()),
+            source_handle: Set(edge.source_handle.clone()),
+            target_handle: Set(edge.target_handle.clone()),
             metadata_json: Set(metadata_json),
             created_at: Set(Utc::now()),
             updated_at: Set(Utc::now()),

@@ -143,6 +143,9 @@ export class ReactFlowAdapter {
    * Convert Plan DAG edge to ReactFlow edge
    */
   private static convertPlanDagEdgeToReactFlow(edge: ReactFlowEdge): Edge {
+    // FIX: Ensure metadata exists with defaults to prevent invisible edges
+    const metadata = edge.metadata || { label: 'Data', dataType: 'GRAPH_DATA' }
+
     return {
       id: edge.id,
       source: edge.source,
@@ -151,9 +154,9 @@ export class ReactFlowAdapter {
       targetHandle: edge.targetHandle || null,
       type: 'smoothstep',
       animated: false,
-      label: edge.metadata?.label || 'Data',
+      label: metadata.label || 'Data',
       style: {
-        stroke: edge.metadata?.dataType === 'GraphReference' ? '#228be6' : '#868e96',
+        stroke: metadata.dataType === 'GRAPH_REFERENCE' ? '#228be6' : '#868e96',
         strokeWidth: 2,
       },
       labelStyle: {
@@ -163,7 +166,7 @@ export class ReactFlowAdapter {
       data: {
         // Original edge data for round-trip consistency
         originalEdge: edge,
-        metadata: edge.metadata || { label: 'Data', dataType: 'GraphData' }
+        metadata: metadata
       }
     }
   }
@@ -192,15 +195,28 @@ export class ReactFlowAdapter {
    */
   private static mapNodeTypeToReactFlow(nodeType: string): string {
     const typeMap: Record<string, string> = {
+      // Database format (snake_case)
       'data_source': 'DataSourceNode',
       'transform': 'TransformNode',
       'merge': 'MergeNode',
       'output': 'OutputNode',
       'copy': 'CopyNode',
-      'graph': 'GraphNode'
+      'graph': 'GraphNode',
+      // TypeScript enum format (PascalCase) - pass through
+      'DataSourceNode': 'DataSourceNode',
+      'TransformNode': 'TransformNode',
+      'MergeNode': 'MergeNode',
+      'OutputNode': 'OutputNode',
+      'CopyNode': 'CopyNode',
+      'GraphNode': 'GraphNode'
     }
 
-    return typeMap[nodeType] || 'default'
+    const mapped = typeMap[nodeType]
+    if (!mapped) {
+      console.error(`[ReactFlowAdapter] Unknown node type: ${nodeType}, falling back to DataSourceNode`)
+      return 'DataSourceNode' // Better than 'default' which won't match NODE_TYPES
+    }
+    return mapped
   }
 
   /**

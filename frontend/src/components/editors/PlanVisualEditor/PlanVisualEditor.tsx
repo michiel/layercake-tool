@@ -356,9 +356,9 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         targetHandle: connection.targetHandle || null, // Preserve specific handle used
         type: 'smoothstep',
         animated: false,
-        label: isValid.dataType === 'GraphReference' ? 'Graph Ref' : 'Data',
+        label: isValid.dataType === 'GRAPH_REFERENCE' ? 'Graph Ref' : 'Data',
         style: {
-          stroke: isValid.dataType === 'GraphReference' ? '#228be6' : '#868e96',
+          stroke: isValid.dataType === 'GRAPH_REFERENCE' ? '#228be6' : '#868e96',
           strokeWidth: 2,
         },
         labelStyle: {
@@ -367,7 +367,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         },
         data: {
           metadata: {
-            label: isValid.dataType === 'GraphReference' ? 'Graph Ref' : 'Data',
+            label: isValid.dataType === 'GRAPH_REFERENCE' ? 'Graph Ref' : 'Data',
             dataType: isValid.dataType,
           }
         }

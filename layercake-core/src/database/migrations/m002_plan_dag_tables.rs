@@ -31,6 +31,14 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(PlanDagNodes::ConfigJson).text().not_null())
                     .col(ColumnDef::new(PlanDagNodes::CreatedAt).text().not_null())
                     .col(ColumnDef::new(PlanDagNodes::UpdatedAt).text().not_null())
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_plan_dag_nodes_plan_id")
+                            .from(PlanDagNodes::Table, PlanDagNodes::PlanId)
+                            .to(Plans::Table, Plans::Id)
+                            .on_delete(ForeignKeyAction::Cascade)
+                            .on_update(ForeignKeyAction::Cascade),
+                    )
                     .to_owned(),
             )
             .await?;
@@ -48,6 +56,14 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(PlanDagEdges::MetadataJson).text().not_null())
                     .col(ColumnDef::new(PlanDagEdges::CreatedAt).text().not_null())
                     .col(ColumnDef::new(PlanDagEdges::UpdatedAt).text().not_null())
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_plan_dag_edges_plan_id")
+                            .from(PlanDagEdges::Table, PlanDagEdges::PlanId)
+                            .to(Plans::Table, Plans::Id)
+                            .on_delete(ForeignKeyAction::Cascade)
+                            .on_update(ForeignKeyAction::Cascade),
+                    )
                     .to_owned(),
             )
             .await?;

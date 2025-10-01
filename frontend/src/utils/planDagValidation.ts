@@ -47,17 +47,17 @@ export const validateConnection = (
   const isValid = allowedTargets.includes(targetType)
 
   // Determine data type based on source node
-  const getDataType = (source: PlanDagNodeType): 'GraphData' | 'GraphReference' => {
+  const getDataType = (source: PlanDagNodeType): 'GRAPH_DATA' | 'GRAPH_REFERENCE' => {
     switch (source) {
       case PlanDagNodeType.GRAPH:
-        return 'GraphReference'
+        return 'GRAPH_REFERENCE'
       case PlanDagNodeType.DATA_SOURCE:
       case PlanDagNodeType.TRANSFORM:
       case PlanDagNodeType.MERGE:
       case PlanDagNodeType.COPY:
-        return 'GraphData'
+        return 'GRAPH_DATA'
       default:
-        return 'GraphData'
+        return 'GRAPH_DATA'
     }
   }
 

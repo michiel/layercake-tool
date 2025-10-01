@@ -269,6 +269,10 @@ pub struct PlanDagEdge {
     pub id: String,
     pub source: String,
     pub target: String,
+    #[graphql(name = "sourceHandle")]
+    pub source_handle: Option<String>,
+    #[graphql(name = "targetHandle")]
+    pub target_handle: Option<String>,
     pub metadata: EdgeMetadata,
     #[graphql(name = "createdAt")]
     pub created_at: DateTime<Utc>,
@@ -322,6 +326,10 @@ pub struct PlanDagEdgeInput {
     pub id: String,
     pub source: String,
     pub target: String,
+    #[graphql(name = "sourceHandle")]
+    pub source_handle: Option<String>,
+    #[graphql(name = "targetHandle")]
+    pub target_handle: Option<String>,
     pub metadata: EdgeMetadata,
 }
 
@@ -421,6 +429,8 @@ impl From<plan_dag_edges::Model> for PlanDagEdge {
             id: model.id,
             source: model.source_node_id,
             target: model.target_node_id,
+            source_handle: model.source_handle,
+            target_handle: model.target_handle,
             metadata,
             created_at: model.created_at,
             updated_at: model.updated_at,

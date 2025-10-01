@@ -103,6 +103,8 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
   const stablePlanDagRef = useRef<PlanDag | null>(null)
   const subscriptionRef = useRef<any>(null)
   const initializedRef = useRef(false)
+  const previousChangeIdRef = useRef<number>(0)
+  const isSyncingFromExternalRef = useRef<boolean>(false)
 
   // Stable plan DAG with change detection
   const stablePlanDag = useMemo(() => {
@@ -149,7 +151,10 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
     throttleMs: 1000,
   })
 
-  // ReactFlow conversion using new adapter
+  // ReactFlow conversion using new adapter with stable callback references
+  const stableOnNodeEdit = useStableCallback(onNodeEdit || (() => {}))
+  const stableOnNodeDelete = useStableCallback(onNodeDelete || (() => {}))
+
   const reactFlowData = useMemo(() => {
     if (!stablePlanDag) {
       return { nodes: [], edges: [] }
@@ -163,8 +168,8 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
       ...node,
       data: {
         ...node.data,
-        onEdit: onNodeEdit,
-        onDelete: onNodeDelete,
+        onEdit: stableOnNodeEdit,
+        onDelete: stableOnNodeDelete,
         readonly,
         edges: converted.edges, // Add edges for node validation/display
         hasValidConfig: node.data.originalNode?.config &&
@@ -173,7 +178,7 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
     }))
 
     return { nodes: nodesWithCallbacks, edges: converted.edges }
-  }, [stablePlanDag, onNodeEdit, onNodeDelete, readonly])
+  }, [stablePlanDag, stableOnNodeEdit, stableOnNodeDelete, readonly])
 
   // ReactFlow state
   const [nodes, setNodes, onNodesChange] = useNodesState(reactFlowData.nodes)
@@ -184,12 +189,19 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
 
   // Sync ReactFlow state when external data changes - FIXED: prevent infinite loop
   useEffect(() => {
+    // Skip if we're currently syncing from external changes (prevents React 18 double render issues)
+    if (isSyncingFromExternalRef.current) {
+      return
+    }
+
     // Only sync when external reactFlowData has actually changed
     if (reactFlowDataChange.hasChanged) {
       const hasNewData = reactFlowData.nodes.length > 0 || reactFlowData.edges.length > 0
       const isCurrentEmpty = nodes.length === 0 && edges.length === 0
       const isDifferentLength = reactFlowData.nodes.length !== nodes.length || reactFlowData.edges.length !== edges.length
 
+      // Only sync when the data structure actually changed (length difference or first load)
+      // Don't sync on every changeId change as that happens even for cosmetic updates
       const shouldSync = hasNewData && (isCurrentEmpty || isDifferentLength)
 
       if (shouldSync) {
@@ -198,14 +210,21 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
           newNodes: reactFlowData.nodes.length,
           newEdges: reactFlowData.edges.length,
           currentNodes: nodes.length,
-          currentEdges: edges.length
+          currentEdges: edges.length,
+          reason: isCurrentEmpty ? 'empty' : 'length-changed'
         })
+        isSyncingFromExternalRef.current = true
         setNodes(reactFlowData.nodes)
         setEdges(reactFlowData.edges)
+        previousChangeIdRef.current = reactFlowDataChange.changeId
+        // Use setTimeout to clear the flag after state updates have propagated
+        setTimeout(() => {
+          isSyncingFromExternalRef.current = false
+        }, 0)
       }
     }
-    // Only depend on external data change detection, not local state
-  }, [reactFlowDataChange.changeId, reactFlowData.nodes.length, reactFlowData.edges.length])
+    // Only depend on lengths to prevent unnecessary syncs
+  }, [reactFlowData.nodes.length, reactFlowData.edges.length])
 
   // Load initial data and setup subscription - FIXED: prevent infinite loop
   useEffect(() => {

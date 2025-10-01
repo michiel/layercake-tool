@@ -5,8 +5,8 @@ mod m002_plan_dag_tables;
 mod m003_user_authentication;
 mod m004_create_data_sources;
 mod m005_add_plan_dag_version;
-mod m006_add_plan_dag_constraints;
 mod m007_remove_unused_plan_dag_json;
+mod m008_add_edge_handles;
 
 pub struct Migrator;
 
@@ -19,8 +19,8 @@ impl MigratorTrait for Migrator {
             Box::new(m003_user_authentication::Migration),
             Box::new(m004_create_data_sources::Migration),
             Box::new(m005_add_plan_dag_version::Migration),
-            Box::new(m006_add_plan_dag_constraints::Migration),
             Box::new(m007_remove_unused_plan_dag_json::Migration),
+            Box::new(m008_add_edge_handles::Migration),
         ]
     }
 }
