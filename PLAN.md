@@ -1154,7 +1154,7 @@ $ find frontend/src -name "*.spec.ts*"
 - [x] Delete dead code (~1,667 lines) - commit 1aaeb3f7
 - [x] Add database constraints - commit 491aff92
 - [x] Document architecture - commit cec70022
-- [ ] Remove unused columns
+- [x] Remove unused columns - commit 8c994934
 
 **Deliverable**: Clean codebase, no breaking changes
 
