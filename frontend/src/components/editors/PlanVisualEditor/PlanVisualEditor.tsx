@@ -26,13 +26,8 @@ import { useCollaborationV2 } from '../../../hooks/useCollaborationV2'
 import { PlanDagNodeType, NodeConfig, NodeMetadata, DataSourceNodeConfig, ReactFlowEdge, PlanDagNode } from '../../../types/plan-dag'
 import { validateConnectionWithCycleDetection } from '../../../utils/planDagValidation'
 
-// Import custom node types
-import { DataSourceNode } from './nodes/DataSourceNode'
-import { GraphNode } from './nodes/GraphNode'
-import { TransformNode } from './nodes/TransformNode'
-import { MergeNode } from './nodes/MergeNode'
-import { CopyNode } from './nodes/CopyNode'
-import { OutputNode } from './nodes/OutputNode'
+// Import node types constant
+import { NODE_TYPES } from './nodeTypes'
 
 // Import collaboration components
 import { CollaborativeCursors } from '../../collaboration/CollaborativeCursors'
@@ -60,20 +55,6 @@ interface PlanVisualEditorProps {
   onEdgeSelect?: (edgeId: string | null) => void
   readonly?: boolean
 }
-
-// Define stable nodeTypes outside component to prevent recreation
-// Use literal keys to ensure complete stability and prevent ReactFlow warnings
-const NODE_TYPES = Object.freeze({
-  'DataSourceNode': DataSourceNode,
-  'GraphNode': GraphNode,
-  'TransformNode': TransformNode,
-  'MergeNode': MergeNode,
-  'CopyNode': CopyNode,
-  'OutputNode': OutputNode,
-});
-
-
-
 
 const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly = false }: PlanVisualEditorProps) => {
 
