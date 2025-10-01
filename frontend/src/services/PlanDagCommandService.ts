@@ -28,7 +28,11 @@ export class PlanDagCommandService {
         context: createMutationContext(this.clientId)
       })
 
-      const createdNode = (result.data as any)?.addPlanDagNode || null
+      const response = (result.data as any)?.addPlanDagNode
+      if (!response?.success) {
+        throw new Error(`Failed to create node: ${response?.errors?.join(', ') || 'Unknown error'}`)
+      }
+      const createdNode = response.node
       console.log('[PlanDagCommandService] Node created successfully:', createdNode?.id)
       return createdNode
     } catch (error) {
@@ -51,7 +55,11 @@ export class PlanDagCommandService {
         context: createMutationContext(this.clientId)
       })
 
-      const updatedNode = (result.data as any)?.updatePlanDagNode || null
+      const response = (result.data as any)?.updatePlanDagNode
+      if (!response?.success) {
+        throw new Error(`Failed to update node: ${response?.errors?.join(', ') || 'Unknown error'}`)
+      }
+      const updatedNode = response.node
       console.log('[PlanDagCommandService] Node updated successfully')
       return updatedNode
     } catch (error) {
@@ -121,7 +129,11 @@ export class PlanDagCommandService {
         context: createMutationContext(this.clientId)
       })
 
-      const createdEdge = (result.data as any)?.addPlanDagEdge || null
+      const response = (result.data as any)?.addPlanDagEdge
+      if (!response?.success) {
+        throw new Error(`Failed to create edge: ${response?.errors?.join(', ') || 'Unknown error'}`)
+      }
+      const createdEdge = response.edge
       console.log('[PlanDagCommandService] Edge created successfully:', createdEdge?.id)
       return createdEdge
     } catch (error) {
