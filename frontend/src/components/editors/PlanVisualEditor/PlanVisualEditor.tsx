@@ -22,7 +22,6 @@ import {
   IconPlayerPlay
 } from '@tabler/icons-react'
 
-import { usePlanDagMutations } from '../../../hooks/usePlanDag'
 import { useCollaborationV2 } from '../../../hooks/useCollaborationV2'
 import { PlanDagNodeType, NodeConfig, NodeMetadata, DataSourceNodeConfig, ReactFlowEdge, PlanDagNode } from '../../../types/plan-dag'
 import { validateConnectionWithCycleDetection } from '../../../utils/planDagValidation'
@@ -48,7 +47,7 @@ import { ControlPanel } from './components/ControlPanel'
 import { AdvancedToolbar } from './components/AdvancedToolbar'
 import { ContextMenu } from './components/ContextMenu'
 // import { CollaborationManager } from './components/CollaborationManager'
-import { usePlanDagState } from './hooks/usePlanDagState'
+import { usePlanDagCQRS } from './hooks/usePlanDagCQRS'
 import { useAdvancedOperations } from './hooks/useAdvancedOperations'
 import { generateNodeId, getDefaultNodeConfig, getDefaultNodeMetadata } from './utils/nodeDefaults'
 
@@ -103,8 +102,8 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     // Will be implemented via callback from planDagState
   }, [])
 
-  // Use Plan DAG state management with fixes
-  const planDagState = usePlanDagState({
+  // Use Plan DAG CQRS state management with delta subscriptions
+  const planDagState = usePlanDagCQRS({
     projectId,
     readonly,
     onNodeEdit: handleNodeEdit,
@@ -128,10 +127,27 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     isDirty,
     updateManager,
     validatePlanDag: handleValidate,
+    cqrsService,
   } = planDagState
 
-  // Get mutations for remaining operations
-  const mutations = usePlanDagMutations(projectId)
+  // Get mutations from CQRS service (includes delta generation)
+  // Adapt CQRS command interface to match old mutation interface
+  const mutations = {
+    addNode: (node: Partial<PlanDagNode>) =>
+      cqrsService.commands.createNode({ projectId, nodeType: node.nodeType || 'DataSource', node }),
+    addEdge: (edge: Partial<any>) =>
+      cqrsService.commands.createEdge({ projectId, edge: edge as any }),
+    updateNode: (nodeId: string, updates: Partial<PlanDagNode>) =>
+      cqrsService.commands.updateNode({ projectId, nodeId, updates }),
+    deleteNode: (nodeId: string) =>
+      cqrsService.commands.deleteNode({ projectId, nodeId }),
+    deleteEdge: (edgeId: string) =>
+      cqrsService.commands.deleteEdge({ projectId, edgeId }),
+    moveNode: (nodeId: string, position: { x: number; y: number }) =>
+      cqrsService.commands.moveNode({ projectId, nodeId, position }),
+    updatePlanDag: (planDag: any) =>
+      cqrsService.commands.updatePlanDag({ projectId, planDag }),
+  }
 
   // Collaboration setup
   const currentUserId: string | undefined = undefined
