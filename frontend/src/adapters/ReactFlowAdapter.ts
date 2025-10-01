@@ -71,18 +71,35 @@ export class ReactFlowAdapter {
    * Stable conversion with consistent positioning
    */
   private static convertPlanDagNodeToReactFlow(node: PlanDagNode): Node {
+    // Parse config if it's a string
+    const parsedConfig = typeof node.config === 'string' ? (() => {
+      try {
+        return JSON.parse(node.config)
+      } catch (e) {
+        return {}
+      }
+    })() : (node.config || {})
+
+    // Check if config is valid
+    const hasValidConfig = node.config &&
+      (typeof node.config === 'object' ||
+       (typeof node.config === 'string' && node.config.trim() !== '{}' && node.config.trim() !== ''))
+
     return {
       id: node.id,
       type: this.mapNodeTypeToReactFlow(node.nodeType),
       position: {
-        x: node.position?.x || 0,
-        y: node.position?.y || 0
+        x: node.position?.x ?? 0,
+        y: node.position?.y ?? 0
       },
       data: {
         // ReactFlow-specific data
         label: node.metadata?.label || node.id,
         description: node.metadata?.description || '',
         nodeType: node.nodeType,
+        config: parsedConfig,
+        metadata: node.metadata,
+        hasValidConfig,
 
         // Original Plan DAG data for round-trip consistency
         originalNode: {
@@ -130,15 +147,23 @@ export class ReactFlowAdapter {
       id: edge.id,
       source: edge.source,
       target: edge.target,
-      sourceHandle: edge.sourceHandle,
-      targetHandle: edge.targetHandle,
-      type: 'default',
+      sourceHandle: edge.sourceHandle || null,
+      targetHandle: edge.targetHandle || null,
+      type: 'smoothstep',
       animated: false,
-      style: this.getEdgeStyle(edge.metadata?.dataType),
-      label: edge.metadata?.label,
+      label: edge.metadata?.label || 'Data',
+      style: {
+        stroke: edge.metadata?.dataType === 'GraphReference' ? '#228be6' : '#868e96',
+        strokeWidth: 2,
+      },
+      labelStyle: {
+        fontSize: 12,
+        fontWeight: 500,
+      },
       data: {
         // Original edge data for round-trip consistency
-        originalEdge: edge
+        originalEdge: edge,
+        metadata: edge.metadata || { label: 'Data', dataType: 'GraphData' }
       }
     }
   }
@@ -244,24 +269,6 @@ export class ReactFlowAdapter {
     return typeStyles[nodeType] || baseStyle
   }
 
-  /**
-   * Get ReactFlow edge styling based on data type
-   */
-  private static getEdgeStyle(dataType?: string): Record<string, any> {
-    const baseStyle = {
-      strokeWidth: 2,
-      stroke: '#64748b'
-    }
-
-    const typeStyles: Record<string, any> = {
-      'csv': { ...baseStyle, stroke: '#3b82f6', strokeDasharray: '5,5' },
-      'json': { ...baseStyle, stroke: '#10b981' },
-      'parquet': { ...baseStyle, stroke: '#f59e0b' },
-      'stream': { ...baseStyle, stroke: '#ef4444', strokeWidth: 3 }
-    }
-
-    return typeStyles[dataType || 'unknown'] || baseStyle
-  }
 
   /**
    * Validate ReactFlow data integrity

@@ -162,7 +162,7 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
     console.log('[usePlanDagCQRS] Converting Plan DAG to ReactFlow format via adapter')
     const converted = ReactFlowAdapter.planDagToReactFlow(stablePlanDag)
 
-    // Add node callbacks to converted nodes
+    // Add node callbacks and edge list to converted nodes
     const nodesWithCallbacks = converted.nodes.map(node => ({
       ...node,
       data: {
@@ -170,6 +170,7 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
         onEdit: onNodeEdit,
         onDelete: onNodeDelete,
         readonly,
+        edges: converted.edges, // Add edges for node validation/display
         hasValidConfig: node.data.originalNode?.config &&
           Object.keys(node.data.originalNode.config).length > 0
       }
