@@ -448,4 +448,143 @@ mod tests {
         assert!(ValidationService::validate_collaboration_role("admin").is_err());
         assert!(ValidationService::validate_collaboration_role("").is_err());
     }
+
+    // ===== Plan DAG Validation Tests =====
+
+    #[test]
+    fn test_plan_dag_node_type_validation() {
+        // Valid node types
+        assert!(ValidationService::validate_plan_dag_node_type("DataSourceNode").is_ok());
+        assert!(ValidationService::validate_plan_dag_node_type("GraphNode").is_ok());
+        assert!(ValidationService::validate_plan_dag_node_type("TransformNode").is_ok());
+        assert!(ValidationService::validate_plan_dag_node_type("MergeNode").is_ok());
+        assert!(ValidationService::validate_plan_dag_node_type("CopyNode").is_ok());
+        assert!(ValidationService::validate_plan_dag_node_type("OutputNode").is_ok());
+
+        // Invalid node types
+        assert!(ValidationService::validate_plan_dag_node_type("InvalidNode").is_err());
+        assert!(ValidationService::validate_plan_dag_node_type("").is_err());
+        assert!(ValidationService::validate_plan_dag_node_type("dataSourceNode").is_err()); // Wrong case
+    }
+
+    #[test]
+    fn test_plan_dag_position_validation() {
+        // Valid positions
+        assert!(ValidationService::validate_plan_dag_position(0.0, 0.0).is_ok());
+        assert!(ValidationService::validate_plan_dag_position(100.0, 200.0).is_ok());
+        assert!(ValidationService::validate_plan_dag_position(-100.0, -200.0).is_ok());
+        assert!(ValidationService::validate_plan_dag_position(99_999.0, 99_999.0).is_ok());
+
+        // Invalid positions - out of bounds
+        assert!(ValidationService::validate_plan_dag_position(100_001.0, 0.0).is_err());
+        assert!(ValidationService::validate_plan_dag_position(0.0, -100_001.0).is_err());
+
+        // Invalid positions - non-finite
+        assert!(ValidationService::validate_plan_dag_position(f64::INFINITY, 0.0).is_err());
+        assert!(ValidationService::validate_plan_dag_position(0.0, f64::NAN).is_err());
+    }
+
+    #[test]
+    fn test_edge_self_loop_validation() {
+        // Valid edges (different nodes)
+        assert!(ValidationService::validate_edge_no_self_loop("node1", "node2").is_ok());
+        assert!(ValidationService::validate_edge_no_self_loop("a", "b").is_ok());
+
+        // Invalid edges (self-loops)
+        assert!(ValidationService::validate_edge_no_self_loop("node1", "node1").is_err());
+        assert!(ValidationService::validate_edge_no_self_loop("same", "same").is_err());
+    }
+
+    #[test]
+    fn test_plan_dag_metadata_validation() {
+        // Valid metadata
+        assert!(ValidationService::validate_plan_dag_metadata("{}").is_ok());
+        assert!(ValidationService::validate_plan_dag_metadata(r#"{"key": "value"}"#).is_ok());
+        assert!(ValidationService::validate_plan_dag_metadata("").is_ok()); // Empty is valid
+
+        // Invalid metadata - not an object
+        assert!(ValidationService::validate_plan_dag_metadata("[]").is_err());
+        assert!(ValidationService::validate_plan_dag_metadata(r#""string""#).is_err());
+        assert!(ValidationService::validate_plan_dag_metadata("123").is_err());
+
+        // Invalid metadata - malformed JSON
+        assert!(ValidationService::validate_plan_dag_metadata("{invalid}").is_err());
+
+        // Invalid metadata - too large (>50KB)
+        let large_json = format!(r#"{{"data": "{}"}}"#, "x".repeat(50_000));
+        assert!(ValidationService::validate_plan_dag_metadata(&large_json).is_err());
+    }
+
+    #[test]
+    fn test_plan_dag_config_validation() {
+        // Valid config
+        assert!(ValidationService::validate_plan_dag_config("{}").is_ok());
+        assert!(ValidationService::validate_plan_dag_config(r#"{"setting": true}"#).is_ok());
+        assert!(ValidationService::validate_plan_dag_config("").is_ok()); // Empty is valid
+
+        // Invalid config - not an object
+        assert!(ValidationService::validate_plan_dag_config("[]").is_err());
+        assert!(ValidationService::validate_plan_dag_config("null").is_err());
+
+        // Invalid config - malformed JSON
+        assert!(ValidationService::validate_plan_dag_config("{bad json}").is_err());
+
+        // Invalid config - too large (>100KB)
+        let large_json = format!(r#"{{"config": "{}"}}"#, "x".repeat(100_000));
+        assert!(ValidationService::validate_plan_dag_config(&large_json).is_err());
+    }
+
+    #[test]
+    fn test_plan_dag_limits_validation() {
+        // Valid limits
+        assert!(ValidationService::validate_plan_dag_limits(0, 0).is_ok());
+        assert!(ValidationService::validate_plan_dag_limits(100, 500).is_ok());
+        assert!(ValidationService::validate_plan_dag_limits(1000, 5000).is_ok()); // At max
+
+        // Invalid limits - too many nodes
+        assert!(ValidationService::validate_plan_dag_limits(1001, 0).is_err());
+        assert!(ValidationService::validate_plan_dag_limits(10_000, 0).is_err());
+
+        // Invalid limits - too many edges
+        assert!(ValidationService::validate_plan_dag_limits(0, 5001).is_err());
+        assert!(ValidationService::validate_plan_dag_limits(0, 10_000).is_err());
+
+        // Invalid limits - both exceeded
+        assert!(ValidationService::validate_plan_dag_limits(1001, 5001).is_err());
+    }
+
+    #[test]
+    fn test_plan_dag_metadata_size_limits() {
+        // Test exact boundary cases
+        let almost_50kb = "x".repeat(49_900);
+        let metadata_49kb = format!(r#"{{"data": "{}"}}"#, almost_50kb);
+        assert!(ValidationService::validate_plan_dag_metadata(&metadata_49kb).is_ok());
+
+        let over_50kb = "x".repeat(50_100);
+        let metadata_over = format!(r#"{{"data": "{}"}}"#, over_50kb);
+        assert!(ValidationService::validate_plan_dag_metadata(&metadata_over).is_err());
+    }
+
+    #[test]
+    fn test_plan_dag_config_size_limits() {
+        // Test exact boundary cases
+        let almost_100kb = "x".repeat(99_900);
+        let config_99kb = format!(r#"{{"data": "{}"}}"#, almost_100kb);
+        assert!(ValidationService::validate_plan_dag_config(&config_99kb).is_ok());
+
+        let over_100kb = "x".repeat(100_100);
+        let config_over = format!(r#"{{"data": "{}"}}"#, over_100kb);
+        assert!(ValidationService::validate_plan_dag_config(&config_over).is_err());
+    }
+
+    #[test]
+    fn test_plan_dag_position_boundary_values() {
+        // Test exact boundary values
+        assert!(ValidationService::validate_plan_dag_position(100_000.0, 100_000.0).is_ok());
+        assert!(ValidationService::validate_plan_dag_position(-100_000.0, -100_000.0).is_ok());
+
+        // Just over boundary
+        assert!(ValidationService::validate_plan_dag_position(100_000.1, 0.0).is_err());
+        assert!(ValidationService::validate_plan_dag_position(0.0, -100_000.1).is_err());
+    }
 }
