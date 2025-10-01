@@ -184,14 +184,15 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
 
       onNodesChange(changes)
 
+      // DELTA MIGRATION: Disabled bulk update - granular mutations generate deltas
       // Handle structural changes with unified update manager
-      const hasStructuralChanges = changes.some(change =>
-        change.type !== 'position' && change.type !== 'select'
-      )
+      // const hasStructuralChanges = changes.some(change =>
+      //   change.type !== 'position' && change.type !== 'select'
+      // )
 
-      if (hasStructuralChanges && planDag) {
-        updateManager.scheduleStructuralUpdate(planDag, 'node-structural-change')
-      }
+      // if (hasStructuralChanges && planDag) {
+      //   updateManager.scheduleStructuralUpdate(planDag, 'node-structural-change')
+      // }
 
       // Handle selection changes
       changes.forEach((change) => {
@@ -231,10 +232,10 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
             // Track performance for position updates
             planDagState.performanceMonitor.trackEvent('positionUpdates')
 
-            // Use unified update manager for position changes (cosmetic updates)
-            updateManager.scheduleCosmeticUpdate(planDag!, 'node-position-change')
+            // DELTA MIGRATION: Disabled bulk update - granular moveNode mutation generates deltas
+            // updateManager.scheduleCosmeticUpdate(planDag!, 'node-position-change')
 
-            // Also update via mutation for immediate backend sync
+            // Update via granular mutation for delta-based sync
             mutations.moveNode(node.id, node.position)
             console.log('Node position saved:', node.id, node.position)
           } else {
@@ -302,10 +303,11 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
 
       onEdgesChange(changes)
 
+      // DELTA MIGRATION: Disabled bulk update - granular mutations generate deltas
       // Use unified update manager for edge changes
-      if (planDag) {
-        updateManager.scheduleStructuralUpdate(planDag, 'edge-change')
-      }
+      // if (planDag) {
+      //   updateManager.scheduleStructuralUpdate(planDag, 'edge-change')
+      // }
 
       changes.forEach((change) => {
         if (change.type === 'remove' && !readonly) {
