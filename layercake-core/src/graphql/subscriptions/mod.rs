@@ -7,7 +7,7 @@ use tokio::sync::RwLock;
 use std::pin::Pin;
 
 use crate::graphql::context::GraphQLContext;
-use crate::graphql::types::{PlanDagNode, PlanDagEdge};
+use crate::graphql::types::{PlanDagNode, PlanDagEdge, PlanDagDeltaEvent};
 // REMOVED: CursorPosition import - user presence now handled via WebSocket only
 
 pub struct Subscription;
@@ -267,11 +267,54 @@ impl Subscription {
 
     // REMOVED: user_presence_changed subscription - user presence now handled via WebSocket only
     // Real-time presence data is available through the WebSocket collaboration system at /ws/collaboration
+
+    /// Subscribe to Plan DAG delta changes (JSON Patch format) for efficient updates
+    async fn plan_dag_delta_changed(
+        &self,
+        ctx: &Context<'_>,
+        project_id: i32,
+    ) -> Result<Pin<Box<dyn Stream<Item = PlanDagDeltaEvent> + Send>>> {
+        let _context = ctx.data::<GraphQLContext>()?;
+
+        // Get or create broadcaster for this project
+        let broadcaster = get_delta_broadcaster(project_id).await;
+        let mut receiver = broadcaster.subscribe();
+
+        // Stream delta events for this project
+        let stream = async_stream::stream! {
+            loop {
+                match receiver.recv().await {
+                    Ok(event) => {
+                        if event.project_id == project_id {
+                            yield event;
+                        }
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(skipped)) => {
+                        tracing::warn!(
+                            "Delta broadcast receiver lagged for project {}, skipped {} messages",
+                            project_id,
+                            skipped
+                        );
+                        continue;
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                        tracing::info!("Delta broadcast channel closed for project {}", project_id);
+                        break;
+                    }
+                }
+            }
+        };
+
+        Ok(Box::pin(stream))
+    }
 }
 
 // Global storage for plan broadcasters
 lazy_static::lazy_static! {
     static ref PLAN_BROADCASTERS: Arc<RwLock<HashMap<String, broadcast::Sender<CollaborationEvent>>>> =
+        Arc::new(RwLock::new(HashMap::new()));
+
+    static ref DELTA_BROADCASTERS: Arc<RwLock<HashMap<i32, broadcast::Sender<PlanDagDeltaEvent>>>> =
         Arc::new(RwLock::new(HashMap::new()));
 }
 
@@ -357,5 +400,44 @@ pub fn create_user_event_data(
         user_id,
         user_name,
         avatar_color,
+    }
+}
+
+/// Get or create a delta broadcaster for a specific project
+async fn get_delta_broadcaster(project_id: i32) -> broadcast::Sender<PlanDagDeltaEvent> {
+    // Fast path: Try read lock first
+    {
+        let broadcasters = DELTA_BROADCASTERS.read().await;
+        if let Some(sender) = broadcasters.get(&project_id) {
+            return sender.clone();
+        }
+    }
+
+    // Slow path: Create broadcaster with write lock
+    let mut broadcasters = DELTA_BROADCASTERS.write().await;
+
+    // Double-check pattern
+    if let Some(sender) = broadcasters.get(&project_id) {
+        sender.clone()
+    } else {
+        let (sender, _) = broadcast::channel(1000);
+        broadcasters.insert(project_id, sender.clone());
+        sender
+    }
+}
+
+/// Publish a delta event to all subscribers of a project
+pub async fn publish_delta_event(event: PlanDagDeltaEvent) -> Result<(), String> {
+    let broadcaster = get_delta_broadcaster(event.project_id).await;
+
+    match broadcaster.send(event.clone()) {
+        Ok(_) => Ok(()),
+        Err(_) => {
+            tracing::error!(
+                "Failed to broadcast delta event for project {} - no active receivers",
+                event.project_id
+            );
+            Err("Failed to broadcast delta event".to_string())
+        }
     }
 }
