@@ -248,7 +248,7 @@ pub enum NodeConfig {
 }
 
 // Plan DAG Node Structure
-#[derive(SimpleObject, Clone, Debug)]
+#[derive(SimpleObject, Clone, Debug, Serialize, Deserialize)]
 #[graphql(complex)]
 pub struct PlanDagNode {
     pub id: String,
@@ -264,7 +264,7 @@ pub struct PlanDagNode {
 }
 
 // Plan DAG Edge Structure
-#[derive(SimpleObject, Clone, Debug)]
+#[derive(SimpleObject, Clone, Debug, Serialize, Deserialize)]
 pub struct PlanDagEdge {
     pub id: String,
     pub source: String,

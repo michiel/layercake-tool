@@ -1,3 +1,5 @@
+mod plan_dag_delta;
+
 use async_graphql::*;
 use sea_orm::{ActiveModelTrait, EntityTrait, Set, ColumnTrait, QueryFilter};
 use chrono::Utc;
@@ -336,19 +338,24 @@ impl Mutation {
                 // Auto-create a plan if one doesn't exist
                 let now = chrono::Utc::now();
                 let new_plan = plans::ActiveModel {
+                    id: sea_orm::ActiveValue::NotSet,
                     project_id: Set(project_id),
                     name: Set(format!("Plan for Project {}", project_id)),
                     yaml_content: Set("".to_string()),
                     dependencies: Set(None),
                     status: Set("draft".to_string()),
                     plan_dag_json: Set(None),
+                    version: Set(1),
                     created_at: Set(now),
                     updated_at: Set(now),
-                    ..Default::default()
                 };
                 new_plan.insert(&context.db).await?
             }
         };
+
+        // Fetch current state to determine node index
+        let (current_nodes, _) = plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
+        let node_index = current_nodes.len();
 
         let node_type_str = match node.node_type {
             crate::graphql::types::PlanDagNodeType::DataSource => "DataSourceNode",
@@ -374,11 +381,27 @@ impl Mutation {
         };
 
         let inserted_node = dag_node.insert(&context.db).await?;
+        let result_node = PlanDagNode::from(inserted_node);
+
+        // Generate JSON Patch delta for node addition
+        let patch_op = plan_dag_delta::generate_node_add_patch(&result_node, node_index);
+
+        // Increment plan version
+        let new_version = plan_dag_delta::increment_plan_version(&context.db, plan.id).await?;
+
+        // Broadcast delta event
+        let user_id = "demo_user".to_string(); // TODO: Get from auth context
+        plan_dag_delta::publish_plan_dag_delta(
+            project_id,
+            new_version,
+            user_id,
+            vec![patch_op],
+        ).await.ok(); // Non-fatal if broadcast fails
 
         Ok(NodeResponse {
             success: true,
             errors: vec![],
-            node: Some(PlanDagNode::from(inserted_node)),
+            node: Some(result_node),
         })
     }
 
@@ -396,19 +419,23 @@ impl Mutation {
                 // Auto-create a plan if one doesn't exist
                 let now = chrono::Utc::now();
                 let new_plan = plans::ActiveModel {
+                    id: sea_orm::ActiveValue::NotSet,
                     project_id: Set(project_id),
                     name: Set(format!("Plan for Project {}", project_id)),
                     yaml_content: Set("".to_string()),
                     dependencies: Set(None),
                     status: Set("draft".to_string()),
                     plan_dag_json: Set(None),
+                    version: Set(1),
                     created_at: Set(now),
                     updated_at: Set(now),
-                    ..Default::default()
                 };
                 new_plan.insert(&context.db).await?
             }
         };
+
+        // Fetch current state for delta generation
+        let (current_nodes, _) = plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
 
         // Find the node
         let node = plan_dag_nodes::Entity::find()
@@ -421,30 +448,73 @@ impl Mutation {
             .ok_or_else(|| Error::new("Node not found"))?;
 
         let mut node_active: plan_dag_nodes::ActiveModel = node.into();
+        let mut patch_ops = Vec::new();
 
         // Update position if provided
         if let Some(position) = updates.position {
             node_active.position_x = Set(position.x);
             node_active.position_y = Set(position.y);
+
+            // Generate position delta
+            patch_ops.extend(plan_dag_delta::generate_node_position_patch(
+                &node_id,
+                position.x,
+                position.y,
+                &current_nodes,
+            ));
         }
 
         // Update metadata if provided
         if let Some(metadata) = updates.metadata {
-            node_active.metadata_json = Set(serde_json::to_string(&metadata)?);
+            let metadata_json_str = serde_json::to_string(&metadata)?;
+            node_active.metadata_json = Set(metadata_json_str.clone());
+
+            // Generate metadata delta
+            if let Some(patch) = plan_dag_delta::generate_node_update_patch(
+                &node_id,
+                "metadata",
+                serde_json::from_str(&metadata_json_str).unwrap_or(serde_json::Value::Null),
+                &current_nodes,
+            ) {
+                patch_ops.push(patch);
+            }
         }
 
         // Update config if provided
         if let Some(config) = updates.config {
-            node_active.config_json = Set(config);
+            node_active.config_json = Set(config.clone());
+
+            // Generate config delta
+            if let Some(patch) = plan_dag_delta::generate_node_update_patch(
+                &node_id,
+                "config",
+                serde_json::from_str(&config).unwrap_or(serde_json::Value::Null),
+                &current_nodes,
+            ) {
+                patch_ops.push(patch);
+            }
         }
 
         node_active.updated_at = Set(Utc::now());
         let updated_node = node_active.update(&context.db).await?;
+        let result_node = PlanDagNode::from(updated_node);
+
+        // Increment plan version and broadcast delta
+        if !patch_ops.is_empty() {
+            let new_version = plan_dag_delta::increment_plan_version(&context.db, plan.id).await?;
+            let user_id = "demo_user".to_string(); // TODO: Get from auth context
+            plan_dag_delta::publish_plan_dag_delta(
+                project_id,
+                new_version,
+                user_id,
+                patch_ops,
+            ).await.ok(); // Non-fatal if broadcast fails
+        }
 
         Ok(NodeResponse {
             success: true,
             errors: vec![],
-            node: Some(PlanDagNode::from(updated_node)),
+            node: Some(result_node),
         })
     }
 
@@ -458,6 +528,26 @@ impl Mutation {
             .one(&context.db)
             .await?
             .ok_or_else(|| Error::new("Plan not found for project"))?;
+
+        // Fetch current state for delta generation
+        let (current_nodes, current_edges) = plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
+
+        // Generate delta for node deletion
+        let mut patch_ops = Vec::new();
+        if let Some(patch) = plan_dag_delta::generate_node_delete_patch(&node_id, &current_nodes) {
+            patch_ops.push(patch);
+        }
+
+        // Find and delete connected edges, generating deltas for each
+        let connected_edges: Vec<&PlanDagEdge> = current_edges.iter()
+            .filter(|e| e.source == node_id || e.target == node_id)
+            .collect();
+
+        for edge in &connected_edges {
+            if let Some(patch) = plan_dag_delta::generate_edge_delete_patch(&edge.id, &current_edges) {
+                patch_ops.push(patch);
+            }
+        }
 
         // Delete edges connected to this node first
         plan_dag_edges::Entity::delete_many()
@@ -481,6 +571,18 @@ impl Mutation {
             .await?;
 
         if result.rows_affected > 0 {
+            // Increment plan version and broadcast delta
+            if !patch_ops.is_empty() {
+                let new_version = plan_dag_delta::increment_plan_version(&context.db, plan.id).await?;
+                let user_id = "demo_user".to_string(); // TODO: Get from auth context
+                plan_dag_delta::publish_plan_dag_delta(
+                    project_id,
+                    new_version,
+                    user_id,
+                    patch_ops,
+                ).await.ok(); // Non-fatal if broadcast fails
+            }
+
             Ok(NodeResponse {
                 success: true,
                 errors: vec![],
@@ -509,19 +611,24 @@ impl Mutation {
                 // Auto-create a plan if one doesn't exist
                 let now = chrono::Utc::now();
                 let new_plan = plans::ActiveModel {
+                    id: sea_orm::ActiveValue::NotSet,
                     project_id: Set(project_id),
                     name: Set(format!("Plan for Project {}", project_id)),
                     yaml_content: Set("".to_string()),
                     dependencies: Set(None),
                     status: Set("draft".to_string()),
                     plan_dag_json: Set(None),
+                    version: Set(1),
                     created_at: Set(now),
                     updated_at: Set(now),
-                    ..Default::default()
                 };
                 new_plan.insert(&context.db).await?
             }
         };
+
+        // Fetch current state to determine edge index
+        let (_, current_edges) = plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
+        let edge_index = current_edges.len();
 
         let metadata_json = serde_json::to_string(&edge.metadata)?;
 
@@ -536,11 +643,27 @@ impl Mutation {
         };
 
         let inserted_edge = dag_edge.insert(&context.db).await?;
+        let result_edge = PlanDagEdge::from(inserted_edge);
+
+        // Generate JSON Patch delta for edge addition
+        let patch_op = plan_dag_delta::generate_edge_add_patch(&result_edge, edge_index);
+
+        // Increment plan version
+        let new_version = plan_dag_delta::increment_plan_version(&context.db, plan.id).await?;
+
+        // Broadcast delta event
+        let user_id = "demo_user".to_string(); // TODO: Get from auth context
+        plan_dag_delta::publish_plan_dag_delta(
+            project_id,
+            new_version,
+            user_id,
+            vec![patch_op],
+        ).await.ok(); // Non-fatal if broadcast fails
 
         Ok(EdgeResponse {
             success: true,
             errors: vec![],
-            edge: Some(PlanDagEdge::from(inserted_edge)),
+            edge: Some(result_edge),
         })
     }
 
@@ -555,6 +678,15 @@ impl Mutation {
             .await?
             .ok_or_else(|| Error::new("Plan not found for project"))?;
 
+        // Fetch current state for delta generation
+        let (_, current_edges) = plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
+
+        // Generate delta for edge deletion
+        let mut patch_ops = Vec::new();
+        if let Some(patch) = plan_dag_delta::generate_edge_delete_patch(&edge_id, &current_edges) {
+            patch_ops.push(patch);
+        }
+
         // Delete the edge
         let result = plan_dag_edges::Entity::delete_many()
             .filter(
@@ -565,6 +697,18 @@ impl Mutation {
             .await?;
 
         if result.rows_affected > 0 {
+            // Increment plan version and broadcast delta
+            if !patch_ops.is_empty() {
+                let new_version = plan_dag_delta::increment_plan_version(&context.db, plan.id).await?;
+                let user_id = "demo_user".to_string(); // TODO: Get from auth context
+                plan_dag_delta::publish_plan_dag_delta(
+                    project_id,
+                    new_version,
+                    user_id,
+                    patch_ops,
+                ).await.ok(); // Non-fatal if broadcast fails
+            }
+
             Ok(EdgeResponse {
                 success: true,
                 errors: vec![],

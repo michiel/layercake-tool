@@ -762,10 +762,10 @@ The system will migrate directly to delta-based updates:
 
 | Task | Status | Notes |
 |------|--------|-------|
-| Add version column to database | ✅ Complete | m005 migration added |
-| Implement JSON Patch types | ✅ Complete | json_patch.rs created |
-| Add delta subscription | ✅ Complete | plan_dag_delta_changed added |
-| Update mutations to broadcast patches | ⏳ In Progress | Backend logic |
+| Add version column to database | ✅ Complete | m005 migration added, plans entity updated |
+| Implement JSON Patch types | ✅ Complete | json_patch.rs with RFC 6902 compliance |
+| Add delta subscription | ✅ Complete | plan_dag_delta_changed subscription added |
+| Update mutations to broadcast patches | ✅ Complete | All CRUD mutations now generate & broadcast deltas |
 | Install fast-json-patch | ⏳ Pending | Frontend dependency |
 | Implement subscription handler | ⏳ Pending | Frontend logic |
 | Replace bulk mutations | ⏳ Pending | Frontend refactor |
