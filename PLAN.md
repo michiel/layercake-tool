@@ -1167,7 +1167,12 @@ $ find frontend/src -name "*.spec.ts*"
 **Deliverable**: Cleaner API, improved performance
 
 ### Phase 3: Architecture Refactor (Week 4-6)
-- [ ] Extract backend service layer
+- [x] Extract backend service layer - commit fcd38ed2
+  - Created `PlanDagService` with CRUD operations for nodes/edges
+  - Encapsulated business logic: plan management, delta generation, version control
+  - Integrated service into GraphQLContext
+  - Made plan_dag_delta module public for service access
+  - **Note**: GraphQL mutations not yet refactored to use service (follow-up task)
 - [ ] Add validation layer
 - [ ] Implement type-safe node configs
 - [ ] Add comprehensive tests
