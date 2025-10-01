@@ -1173,7 +1173,12 @@ $ find frontend/src -name "*.spec.ts*"
   - Integrated service into GraphQLContext
   - Made plan_dag_delta module public for service access
   - **Note**: GraphQL mutations not yet refactored to use service (follow-up task)
-- [ ] Add validation layer
+- [x] Add validation layer - commit 626eb0d3
+  - Added Plan DAG-specific validation methods (node type, position, metadata, config)
+  - Integrated validation into `PlanDagService` create operations
+  - Added size limits for JSON (metadata: 50KB, config: 100KB)
+  - Added DAG size limits (max 1000 nodes, 5000 edges)
+  - Prevents self-loops and validates canvas bounds
 - [ ] Implement type-safe node configs
 - [ ] Add comprehensive tests
 
