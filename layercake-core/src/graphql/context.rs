@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicI32, Ordering};
 use std::collections::HashMap;
 use tokio::sync::RwLock;
 use sea_orm::DatabaseConnection;
-use crate::services::{ImportService, ExportService, GraphService};
+use crate::services::{ImportService, ExportService, GraphService, PlanDagService};
 
 #[derive(Clone)]
 pub struct GraphQLContext {
@@ -13,6 +13,7 @@ pub struct GraphQLContext {
     pub import_service: Arc<ImportService>,
     pub export_service: Arc<ExportService>,
     pub graph_service: Arc<GraphService>,
+    pub plan_dag_service: Arc<PlanDagService>,
     pub session_manager: Arc<SessionManager>,
 }
 
@@ -98,12 +99,14 @@ impl GraphQLContext {
         import_service: Arc<ImportService>,
         export_service: Arc<ExportService>,
         graph_service: Arc<GraphService>,
+        plan_dag_service: Arc<PlanDagService>,
     ) -> Self {
         Self {
             db,
             import_service,
             export_service,
             graph_service,
+            plan_dag_service,
             session_manager: Arc::new(SessionManager::new()),
         }
     }

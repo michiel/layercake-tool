@@ -1,4 +1,4 @@
-mod plan_dag_delta;
+pub mod plan_dag_delta;
 
 use async_graphql::*;
 use sea_orm::{ActiveModelTrait, EntityTrait, Set, ColumnTrait, QueryFilter};

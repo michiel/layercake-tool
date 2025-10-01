@@ -16,7 +16,7 @@ use async_graphql::{Schema, Request, Response as GraphQLResponse};
 #[cfg(feature = "graphql")]
 use crate::graphql::{GraphQLContext, GraphQLSchema, queries::Query, mutations::Mutation, subscriptions::Subscription};
 #[cfg(feature = "graphql")]
-use crate::services::{ImportService, ExportService, GraphService};
+use crate::services::{ImportService, ExportService, GraphService, PlanDagService};
 #[cfg(feature = "graphql")]
 use crate::server::websocket::websocket_handler;
 #[cfg(feature = "graphql")]
@@ -41,6 +41,7 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
         let import_service = Arc::new(ImportService::new(db.clone()));
         let export_service = Arc::new(ExportService::new(db.clone()));
         let graph_service = Arc::new(GraphService::new(db.clone()));
+        let plan_dag_service = Arc::new(PlanDagService::new(db.clone()));
 
         // Initialize actor-based collaboration coordinator
         let coordinator_handle = CollaborationCoordinator::spawn();
@@ -50,6 +51,7 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
             import_service,
             export_service,
             graph_service,
+            plan_dag_service,
         );
 
         let schema = Schema::build(
