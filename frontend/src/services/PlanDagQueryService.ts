@@ -1,6 +1,7 @@
 import { ApolloClient } from '@apollo/client'
 import * as PlanDagGraphQL from '../graphql/plan-dag'
 import { PlanDag } from '../types/plan-dag'
+import { applyPatch, Operation } from 'fast-json-patch'
 
 /**
  * CQRS Query Service - Handles all queries and subscriptions (reads)
@@ -70,6 +71,84 @@ export class PlanDagQueryService {
       },
       error: (error: any) => {
         console.error('[PlanDagQueryService] Subscription error:', error)
+        onError?.(error)
+      }
+    })
+  }
+
+  // Delta-based subscription using JSON Patch for efficient updates
+  subscribeToPlanDagDeltas(
+    query: SubscribeToPlanDagQuery,
+    currentPlanDag: PlanDag | null,
+    onUpdate: (planDag: PlanDag) => void,
+    onError?: (error: Error) => void
+  ) {
+    console.log('[PlanDagQueryService] Setting up delta subscription for project:', query.projectId)
+
+    let localPlanDag = currentPlanDag
+
+    const subscription = this.apollo.subscribe({
+      query: PlanDagGraphQL.PLAN_DAG_DELTA_SUBSCRIPTION,
+      variables: { projectId: query.projectId }
+    })
+
+    return subscription.subscribe({
+      next: (result: any) => {
+        const deltaData = result.data?.planDagDeltaChanged
+
+        if (deltaData) {
+          console.log('[PlanDagQueryService] Received delta update:', {
+            version: deltaData.version,
+            operations: deltaData.operations.length,
+            userId: deltaData.userId
+          })
+
+          if (!localPlanDag) {
+            console.warn('[PlanDagQueryService] No local Plan DAG to apply patch to, skipping')
+            return
+          }
+
+          try {
+            // Convert GraphQL operations to fast-json-patch format
+            const operations: Operation[] = deltaData.operations.map((op: any) => ({
+              op: op.op.toLowerCase(),
+              path: op.path,
+              ...(op.value !== null && op.value !== undefined ? { value: op.value } : {}),
+              ...(op.from ? { from: op.from } : {})
+            }))
+
+            // Apply JSON Patch to local state
+            const patchResult = applyPatch(
+              JSON.parse(JSON.stringify(localPlanDag)),
+              operations,
+              true, // validate
+              false // mutate (we want a new object)
+            )
+
+            if (patchResult.newDocument) {
+              const updatedPlanDag = patchResult.newDocument as PlanDag
+              updatedPlanDag.version = deltaData.version
+
+              console.log('[PlanDagQueryService] Successfully applied delta patch:', {
+                oldVersion: localPlanDag.version,
+                newVersion: updatedPlanDag.version,
+                operations: operations.length
+              })
+
+              localPlanDag = updatedPlanDag
+              onUpdate(updatedPlanDag)
+            } else {
+              console.error('[PlanDagQueryService] Patch application failed')
+            }
+          } catch (error) {
+            console.error('[PlanDagQueryService] Error applying JSON Patch:', error)
+            // On patch error, trigger a full refresh
+            onError?.(error as Error)
+          }
+        }
+      },
+      error: (error: any) => {
+        console.error('[PlanDagQueryService] Delta subscription error:', error)
         onError?.(error)
       }
     })

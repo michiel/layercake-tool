@@ -270,6 +270,24 @@ export const USER_PRESENCE_SUBSCRIPTION = gql`
   }
 `
 
+// Delta-based subscription for JSON Patch updates
+export const PLAN_DAG_DELTA_SUBSCRIPTION = gql`
+  subscription PlanDagDeltaChanged($projectId: Int!) {
+    planDagDeltaChanged(projectId: $projectId) {
+      projectId
+      version
+      userId
+      timestamp
+      operations {
+        op
+        path
+        value
+        from
+      }
+    }
+  }
+`
+
 // Collaboration Mutations
 
 export const JOIN_PROJECT_COLLABORATION = gql`

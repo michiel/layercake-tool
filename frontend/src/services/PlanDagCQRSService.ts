@@ -42,6 +42,7 @@ export class PlanDagCQRSService {
     return {
       getPlanDag: this.queryService.getPlanDag.bind(this.queryService),
       subscribeToPlanDagChanges: this.queryService.subscribeToPlanDagChanges.bind(this.queryService),
+      subscribeToPlanDagDeltas: this.queryService.subscribeToPlanDagDeltas.bind(this.queryService),
       watchPlanDag: this.queryService.watchPlanDag.bind(this.queryService),
       invalidateCache: this.queryService.invalidateCache.bind(this.queryService)
     }
@@ -156,6 +157,23 @@ export class PlanDagCQRSService {
         const { nodes, edges } = this.adapter.planDagToReactFlow(planDag)
         onUpdate(nodes, edges)
       },
+      onError
+    )
+  }
+
+  // Delta-based subscription with ReactFlow adapter (efficient updates)
+  subscribeToDeltaUpdates(
+    projectId: number,
+    currentPlanDag: any | null,
+    onUpdate: (planDag: any) => void,
+    onError?: (error: Error) => void
+  ) {
+    console.log('[PlanDagCQRSService] Setting up delta subscription')
+
+    return this.queries.subscribeToPlanDagDeltas(
+      { projectId },
+      currentPlanDag,
+      onUpdate,
       onError
     )
   }

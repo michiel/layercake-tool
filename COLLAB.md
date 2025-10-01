@@ -766,8 +766,8 @@ The system will migrate directly to delta-based updates:
 | Implement JSON Patch types | ✅ Complete | json_patch.rs with RFC 6902 compliance |
 | Add delta subscription | ✅ Complete | plan_dag_delta_changed subscription added |
 | Update mutations to broadcast patches | ✅ Complete | All CRUD mutations now generate & broadcast deltas |
-| Install fast-json-patch | ⏳ Pending | Frontend dependency |
-| Implement subscription handler | ⏳ Pending | Frontend logic |
+| Install fast-json-patch | ✅ Complete | Added to package.json v3.1.1 |
+| Implement subscription handler | ✅ Complete | PlanDagQueryService.subscribeToPlanDagDeltas |
 | Replace bulk mutations | ⏳ Pending | Frontend refactor |
 | Add conflict detection | ⏳ Pending | Version checking |
 | Testing | ⏳ Pending | Integration tests |
