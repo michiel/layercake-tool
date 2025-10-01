@@ -192,12 +192,12 @@ export class ReactFlowAdapter {
    */
   private static mapNodeTypeToReactFlow(nodeType: string): string {
     const typeMap: Record<string, string> = {
-      'data_source': 'dataSourceNode',
-      'transform': 'transformNode',
-      'merge': 'mergeNode',
-      'output': 'outputNode',
-      'copy': 'copyNode',
-      'graph': 'graphNode'
+      'data_source': 'DataSourceNode',
+      'transform': 'TransformNode',
+      'merge': 'MergeNode',
+      'output': 'OutputNode',
+      'copy': 'CopyNode',
+      'graph': 'GraphNode'
     }
 
     return typeMap[nodeType] || 'default'
@@ -208,12 +208,12 @@ export class ReactFlowAdapter {
    */
   private static mapReactFlowTypeToNodeType(reactFlowType: string | undefined): string {
     const typeMap: Record<string, string> = {
-      'dataSourceNode': 'data_source',
-      'transformNode': 'transform',
-      'mergeNode': 'merge',
-      'outputNode': 'output',
-      'copyNode': 'copy',
-      'graphNode': 'graph'
+      'DataSourceNode': 'data_source',
+      'TransformNode': 'transform',
+      'MergeNode': 'merge',
+      'OutputNode': 'output',
+      'CopyNode': 'copy',
+      'GraphNode': 'graph'
     }
 
     return typeMap[reactFlowType || 'default'] || 'unknown'
