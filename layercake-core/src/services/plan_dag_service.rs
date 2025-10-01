@@ -8,6 +8,7 @@ use chrono::Utc;
 use crate::database::entities::{plans, plan_dag_nodes, plan_dag_edges};
 use crate::graphql::mutations::plan_dag_delta;
 use crate::graphql::types::{PlanDagNode, PlanDagEdge, Position};
+use crate::services::ValidationService;
 
 /// Service layer for Plan DAG operations
 /// Separates business logic from GraphQL mutation layer
@@ -59,23 +60,33 @@ impl PlanDagService {
         metadata_json: String,
         config_json: String,
     ) -> Result<PlanDagNode> {
+        // Validate inputs
+        let validated_id = ValidationService::validate_node_id(&node_id)?;
+        let validated_type = ValidationService::validate_plan_dag_node_type(&node_type)?;
+        let (validated_x, validated_y) = ValidationService::validate_plan_dag_position(position.x, position.y)?;
+        let validated_metadata = ValidationService::validate_plan_dag_metadata(&metadata_json)?;
+        let validated_config = ValidationService::validate_plan_dag_config(&config_json)?;
+
         let plan = self.get_or_create_plan(project_id).await?;
 
-        // Fetch current state for delta generation
-        let (current_nodes, _) = plan_dag_delta::fetch_current_plan_dag(&self.db, plan.id)
+        // Fetch current state for delta generation and validation
+        let (current_nodes, current_edges) = plan_dag_delta::fetch_current_plan_dag(&self.db, plan.id)
             .await
             .map_err(|e| anyhow!("Failed to fetch current state: {}", e))?;
 
-        // Create the node
+        // Validate DAG limits
+        ValidationService::validate_plan_dag_limits(current_nodes.len() + 1, current_edges.len())?;
+
+        // Create the node with validated values
         let now = Utc::now();
         let node = plan_dag_nodes::ActiveModel {
-            id: Set(node_id),
+            id: Set(validated_id),
             plan_id: Set(plan.id),
-            node_type: Set(node_type),
-            position_x: Set(position.x),
-            position_y: Set(position.y),
-            metadata_json: Set(metadata_json),
-            config_json: Set(config_json),
+            node_type: Set(validated_type),
+            position_x: Set(validated_x),
+            position_y: Set(validated_y),
+            metadata_json: Set(serde_json::to_string(&validated_metadata)?),
+            config_json: Set(serde_json::to_string(&validated_config)?),
             created_at: Set(now),
             updated_at: Set(now),
         };
@@ -303,21 +314,33 @@ impl PlanDagService {
         target_node_id: String,
         metadata_json: String,
     ) -> Result<PlanDagEdge> {
+        // Validate inputs
+        let validated_edge_id = ValidationService::validate_node_id(&edge_id)?;
+        let validated_source = ValidationService::validate_node_id(&source_node_id)?;
+        let validated_target = ValidationService::validate_node_id(&target_node_id)?;
+        let validated_metadata = ValidationService::validate_plan_dag_metadata(&metadata_json)?;
+
+        // Validate no self-loop
+        ValidationService::validate_edge_no_self_loop(&validated_source, &validated_target)?;
+
         let plan = self.get_or_create_plan(project_id).await?;
 
-        // Fetch current state for delta generation
-        let (_, current_edges) = plan_dag_delta::fetch_current_plan_dag(&self.db, plan.id)
+        // Fetch current state for delta generation and validation
+        let (current_nodes, current_edges) = plan_dag_delta::fetch_current_plan_dag(&self.db, plan.id)
             .await
             .map_err(|e| anyhow!("Failed to fetch current state: {}", e))?;
 
-        // Create the edge
+        // Validate DAG limits
+        ValidationService::validate_plan_dag_limits(current_nodes.len(), current_edges.len() + 1)?;
+
+        // Create the edge with validated values
         let now = Utc::now();
         let edge = plan_dag_edges::ActiveModel {
-            id: Set(edge_id),
+            id: Set(validated_edge_id),
             plan_id: Set(plan.id),
-            source_node_id: Set(source_node_id),
-            target_node_id: Set(target_node_id),
-            metadata_json: Set(metadata_json),
+            source_node_id: Set(validated_source),
+            target_node_id: Set(validated_target),
+            metadata_json: Set(serde_json::to_string(&validated_metadata)?),
             created_at: Set(now),
             updated_at: Set(now),
         };

@@ -259,6 +259,117 @@ impl ValidationService {
 
         Ok(status_lower)
     }
+
+    // ===== Plan DAG Validation Methods =====
+
+    /// Validate Plan DAG node type
+    pub fn validate_plan_dag_node_type(node_type: &str) -> Result<String> {
+        let valid_types = [
+            "DataSourceNode",
+            "GraphNode",
+            "TransformNode",
+            "MergeNode",
+            "CopyNode",
+            "OutputNode",
+        ];
+
+        if !valid_types.contains(&node_type) {
+            return Err(anyhow!(
+                "Invalid node type '{}'. Must be one of: {}",
+                node_type,
+                valid_types.join(", ")
+            ));
+        }
+
+        Ok(node_type.to_string())
+    }
+
+    /// Validate Plan DAG node position
+    pub fn validate_plan_dag_position(x: f64, y: f64) -> Result<(f64, f64)> {
+        // Reasonable canvas bounds to prevent extreme values
+        const MAX_COORDINATE: f64 = 100_000.0;
+        const MIN_COORDINATE: f64 = -100_000.0;
+
+        if !x.is_finite() || x > MAX_COORDINATE || x < MIN_COORDINATE {
+            return Err(anyhow!("Invalid X coordinate: must be between {} and {}", MIN_COORDINATE, MAX_COORDINATE));
+        }
+
+        if !y.is_finite() || y > MAX_COORDINATE || y < MIN_COORDINATE {
+            return Err(anyhow!("Invalid Y coordinate: must be between {} and {}", MIN_COORDINATE, MAX_COORDINATE));
+        }
+
+        Ok((x, y))
+    }
+
+    /// Validate edge doesn't create self-loop
+    pub fn validate_edge_no_self_loop(source: &str, target: &str) -> Result<()> {
+        if source == target {
+            return Err(anyhow!("Edge cannot connect a node to itself (self-loop detected)"));
+        }
+        Ok(())
+    }
+
+    /// Validate metadata JSON for Plan DAG nodes
+    pub fn validate_plan_dag_metadata(metadata_json: &str) -> Result<Value> {
+        if metadata_json.trim().is_empty() {
+            return Ok(Value::Object(serde_json::Map::new()));
+        }
+
+        let value: Value = serde_json::from_str(metadata_json)
+            .map_err(|e| anyhow!("Invalid metadata JSON: {}", e))?;
+
+        // Check if it's an object
+        if !value.is_object() {
+            return Err(anyhow!("Metadata must be a JSON object"));
+        }
+
+        // Check JSON size (prevent excessively large metadata)
+        let serialized = serde_json::to_string(&value)?;
+        if serialized.len() > 50_000 {
+            return Err(anyhow!("Metadata JSON is too large (max 50KB)"));
+        }
+
+        Ok(value)
+    }
+
+    /// Validate config JSON for Plan DAG nodes
+    pub fn validate_plan_dag_config(config_json: &str) -> Result<Value> {
+        if config_json.trim().is_empty() {
+            return Ok(Value::Object(serde_json::Map::new()));
+        }
+
+        let value: Value = serde_json::from_str(config_json)
+            .map_err(|e| anyhow!("Invalid config JSON: {}", e))?;
+
+        // Check if it's an object
+        if !value.is_object() {
+            return Err(anyhow!("Config must be a JSON object"));
+        }
+
+        // Check JSON size (prevent excessively large configs)
+        let serialized = serde_json::to_string(&value)?;
+        if serialized.len() > 100_000 {
+            return Err(anyhow!("Config JSON is too large (max 100KB)"));
+        }
+
+        Ok(value)
+    }
+
+    /// Validate Plan DAG doesn't exceed reasonable limits
+    pub fn validate_plan_dag_limits(node_count: usize, edge_count: usize) -> Result<()> {
+        const MAX_NODES: usize = 1000;
+        const MAX_EDGES: usize = 5000;
+
+        if node_count > MAX_NODES {
+            return Err(anyhow!("Plan DAG has too many nodes ({} > max {})", node_count, MAX_NODES));
+        }
+
+        if edge_count > MAX_EDGES {
+            return Err(anyhow!("Plan DAG has too many edges ({} > max {})", edge_count, MAX_EDGES));
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
