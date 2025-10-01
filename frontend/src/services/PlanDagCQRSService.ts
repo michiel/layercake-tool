@@ -164,7 +164,7 @@ export class PlanDagCQRSService {
   // Delta-based subscription with ReactFlow adapter (efficient updates)
   subscribeToDeltaUpdates(
     projectId: number,
-    currentPlanDag: any | null,
+    getCurrentPlanDag: () => any | null,
     onUpdate: (planDag: any) => void,
     onError?: (error: Error) => void
   ) {
@@ -172,7 +172,7 @@ export class PlanDagCQRSService {
 
     return this.queries.subscribeToPlanDagDeltas(
       { projectId },
-      currentPlanDag,
+      getCurrentPlanDag,
       onUpdate,
       onError
     )

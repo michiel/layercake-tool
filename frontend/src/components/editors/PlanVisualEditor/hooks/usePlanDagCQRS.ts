@@ -243,20 +243,25 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
       }
     }
 
-    // Setup real-time subscription using CQRS query service
-    const subscription = cqrsService.subscribeToReactFlowUpdates(
+    // Setup delta-based subscription for efficient real-time updates
+    const subscription = cqrsService.subscribeToDeltaUpdates(
       projectId,
-      (nodes, edges) => {
-        console.log('[usePlanDagCQRS] Received real-time update via CQRS subscription')
+      () => stablePlanDagRef.current, // Get current Plan DAG for patch application
+      (updatedPlanDag) => {
+        console.log('[usePlanDagCQRS] Received delta update via JSON Patch subscription')
         performanceMonitor.trackEvent('websocketMessages')
-
-        // Convert ReactFlow data back to Plan DAG using adapter
-        const updatedPlanDag = ReactFlowAdapter.reactFlowToPlanDag(nodes, edges)
         setPlanDag(updatedPlanDag)
       },
       (error) => {
-        console.error('[usePlanDagCQRS] Subscription error:', error)
-        setError(error)
+        console.error('[usePlanDagCQRS] Delta subscription error, triggering full refresh:', error)
+        // On delta error, refresh full state
+        cqrsService.queries.getPlanDag({ projectId, fresh: true })
+          .then(refreshedData => {
+            if (refreshedData) {
+              setPlanDag(refreshedData)
+            }
+          })
+          .catch(err => setError(err))
       }
     )
 

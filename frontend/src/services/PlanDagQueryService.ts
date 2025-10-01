@@ -79,13 +79,11 @@ export class PlanDagQueryService {
   // Delta-based subscription using JSON Patch for efficient updates
   subscribeToPlanDagDeltas(
     query: SubscribeToPlanDagQuery,
-    currentPlanDag: PlanDag | null,
+    getCurrentPlanDag: () => PlanDag | null, // Function to get current state
     onUpdate: (planDag: PlanDag) => void,
     onError?: (error: Error) => void
   ) {
     console.log('[PlanDagQueryService] Setting up delta subscription for project:', query.projectId)
-
-    let localPlanDag = currentPlanDag
 
     const subscription = this.apollo.subscribe({
       query: PlanDagGraphQL.PLAN_DAG_DELTA_SUBSCRIPTION,
@@ -102,6 +100,9 @@ export class PlanDagQueryService {
             operations: deltaData.operations.length,
             userId: deltaData.userId
           })
+
+          // Get current Plan DAG from the callback
+          const localPlanDag = getCurrentPlanDag()
 
           if (!localPlanDag) {
             console.warn('[PlanDagQueryService] No local Plan DAG to apply patch to, skipping')
@@ -135,7 +136,6 @@ export class PlanDagQueryService {
                 operations: operations.length
               })
 
-              localPlanDag = updatedPlanDag
               onUpdate(updatedPlanDag)
             } else {
               console.error('[PlanDagQueryService] Patch application failed')

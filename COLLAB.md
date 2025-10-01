@@ -768,9 +768,10 @@ The system will migrate directly to delta-based updates:
 | Update mutations to broadcast patches | ✅ Complete | All CRUD mutations now generate & broadcast deltas |
 | Install fast-json-patch | ✅ Complete | Added to package.json v3.1.1 |
 | Implement subscription handler | ✅ Complete | PlanDagQueryService.subscribeToPlanDagDeltas |
-| Replace bulk mutations | ⏳ Pending | Frontend refactor |
-| Add conflict detection | ⏳ Pending | Version checking |
-| Testing | ⏳ Pending | Integration tests |
+| Wire up delta subscription in UI | ✅ Complete | usePlanDagCQRS now uses delta updates |
+| Replace bulk mutations | N/A | Granular mutations already emit deltas |
+| Add conflict detection | ⏳ Optional | Can add version checking later if needed |
+| Testing | ⏳ Pending | Manual and integration tests |
 
 ### 9.3 Rollback Plan
 
