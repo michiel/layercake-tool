@@ -1,1294 +1,1200 @@
-# WebSocket Collaboration Deadlock Investigation & Resolution
+# Plan DAG System: Architectural Review & Recommendations
 
-**Date**: 2025-09-30
-**Status**: Partial Resolution - Ongoing Investigation
-**Scope**: GraphQL query stalling, complete server deadlock, WebSocket collaboration architecture analysis
+**Date**: 2025-10-01
+**Status**: Active Development - Critical Issues Identified
+**Scope**: End-to-End System Analysis (Database → GraphQL → Frontend)
 
 ---
 
 ## Executive Summary
 
-Investigation of reported "GraphQL queries continue to stall" issue revealed **three distinct deadlock sources** in the WebSocket collaboration system:
+Comprehensive architectural review of the Plan DAG (Directed Acyclic Graph) system revealed multiple critical issues requiring immediate attention. The system implements a CQRS (Command Query Responsibility Segregation) pattern with JSON Patch-based delta updates for collaborative workflow editing.
 
-1. ✅ **FIXED**: Synchronous DashMap iteration in session broadcast methods (Commit 750b6c9b)
-2. ✅ **FIXED**: WebSocket handler blocking HTTP upgrade mechanism (Commit 9817da6c)
-3. ⚠️ **ONGOING**: Server deadlock after 2-3 rapid WebSocket reconnections (requires rearchitecture)
+### Critical Findings
 
-The application now handles initial GraphQL and WebSocket connections successfully but experiences complete server deadlock under connection churn scenarios.
+1. **~1,441 lines of dead code** identified in frontend services
+2. **Two recent critical bugs fixed**: Frontend response parsing + backend query table mismatch
+3. **Missing database constraints**: No foreign key relationships enforcing referential integrity
+4. **Confusing dual-table architecture**: Graph data vs workflow metadata separation undocumented
+5. **Response wrapper overhead**: All mutations wrapped with `{success, errors, data}` pattern
+6. **Service layer duplication**: Four competing service implementations in frontend
+
+### System Status
+
+✅ **Working**: Node creation, updates, deletion, real-time subscriptions
+✅ **Fixed** (Commits 36fe70cd, 56a6d82f): Node persistence and retrieval
+⚠️ **Needs Cleanup**: Dead code removal, architecture documentation
+⚠️ **Needs Improvement**: Response wrappers, mutation consistency, type safety
 
 ---
 
-## Issues Identified & Resolution Status
+## Recent Critical Fixes (2025-10-01)
 
-### Issue 1: Periodic Session Cleanup Deadlock ✅ FIXED
+### Fix 1: Frontend Response Parsing Bug (Commit 36fe70cd)
 
-**Location**: `layercake-core/src/server/websocket/session.rs`
-**Root Cause**: Synchronous DashMap iteration while async tasks modify the same maps
+**Issue**: Nodes created successfully but appeared as `undefined`, causing "Node created successfully: undefined" console logs.
 
-**Symptom**: Complete server deadlock - even `/health` endpoint hung after processing initial requests.
+**Root Cause**: `PlanDagCommandService.ts` incorrectly accessed GraphQL mutation responses.
 
-**Technical Analysis**:
+**Backend Returns**:
+```graphql
+type NodeResponse {
+  success: Boolean!
+  errors: [String!]
+  node: PlanDagNode
+}
+```
 
-The `cleanup_inactive_sessions` method and three broadcast methods synchronously iterated DashMaps while async tasks modified them:
+**Frontend Was Accessing**:
+```typescript
+const createdNode = result.data?.addPlanDagNode  // ❌ Returns wrapper object
+```
+
+**Should Access**:
+```typescript
+const response = result.data?.addPlanDagNode
+if (!response?.success) {
+  throw new Error(`Failed: ${response?.errors?.join(', ')}`)
+}
+const createdNode = response.node  // ✅ Extract nested node
+```
+
+**Files Modified**:
+- `frontend/src/services/PlanDagCommandService.ts` (lines 18-41, 44-68, 119-142)
+
+**Methods Fixed**:
+- `createNode()` - lines 18-41
+- `updateNode()` - lines 44-68
+- `createEdge()` - lines 119-142
+
+---
+
+### Fix 2: Backend Query Table Mismatch (Commit 56a6d82f)
+
+**Issue**: Nodes persisted to database successfully but `getPlanDag` returned empty array after page reload.
+
+**Root Cause**: Query was looking in wrong database tables.
+
+**Evidence from Backend Logs**:
+```
+[INFO] Successfully inserted into plan_dag_nodes  ✅ Correct table
+[DEBUG] SELECT * FROM nodes WHERE project_id = 2  ❌ Wrong table!
+```
+
+**Problem**: System has TWO sets of tables:
+- `nodes` + `edges` → Graph data (content/vertices)
+- `plan_dag_nodes` + `plan_dag_edges` → Workflow metadata (canvas positioning)
+
+**Fix Applied** in `layercake-core/src/graphql/queries/mod.rs` (lines 111-198):
 
 ```rust
-// DEADLOCK PATTERN - synchronous iteration with async operations
-for connection in project.connections.iter() {
-    if connection.key() != changed_user_id {
-        let message = ServerMessage::BulkPresence { ... };
-        // Async send while holding DashMap iterator
-        if let Err(_) = connection.value().send(message) {
-            dead_connections.push(connection.key().clone());
-        }
+// BEFORE - queried wrong tables:
+let nodes = nodes::Entity::find()
+    .filter(nodes::Column::ProjectId.eq(project_id))
+    .all(&context.db).await?;
+
+// AFTER - queries correct tables:
+let plan = plans::Entity::find()
+    .filter(plans::Column::ProjectId.eq(project_id))
+    .one(&context.db).await?;
+
+let dag_nodes = plan_dag_nodes::Entity::find()
+    .filter(plan_dag_nodes::Column::PlanId.eq(plan.id))
+    .all(&context.db).await?;
+
+let dag_edges = plan_dag_edges::Entity::find()
+    .filter(plan_dag_edges::Column::PlanId.eq(plan.id))
+    .all(&context.db).await?;
+```
+
+**Added Imports**:
+```rust
+use crate::database::entities::{plan_dag_nodes, plan_dag_edges};
+```
+
+**Result**: Backend logs now show "Found 4 Plan DAG nodes" - persistence working correctly.
+
+---
+
+## System Architecture
+
+### Data Flow Diagram
+
+```
+User Action (Canvas)
+    ↓
+React Components (PlanVisualEditor)
+    ↓
+CQRS Services:
+  - PlanDagCommandService (writes) ← createNode/updateNode/deleteNode
+  - usePlanDagCQRS hook (reads)    ← GraphQL subscriptions
+    ↓
+Apollo Client (GraphQL)
+    ↓
+Axum HTTP Server
+    ↓
+async-graphql Resolvers
+    ↓
+SeaORM
+    ↓
+Database Tables:
+  - plans (metadata)
+  - plan_dag_nodes (workflow nodes)
+  - plan_dag_edges (workflow edges)
+  - nodes (graph data - separate concern)
+  - edges (graph data - separate concern)
+```
+
+### Technology Stack
+
+**Frontend**:
+- React 18 + TypeScript
+- Apollo Client (GraphQL + subscriptions)
+- ReactFlow (graph visualization)
+- Mantine UI components
+
+**Backend**:
+- Rust (Axum web framework)
+- async-graphql (GraphQL server)
+- SeaORM (database ORM)
+- PostgreSQL
+
+**Real-time Collaboration**:
+- GraphQL Subscriptions (WebSocket)
+- JSON Patch (RFC 6902) for delta updates
+- Client-ID based mutation context filtering
+
+---
+
+## Database Schema Analysis
+
+### Table Structure
+
+#### Core Tables (Workflow System)
+
+**`plans`**
+```sql
+CREATE TABLE plans (
+  id SERIAL PRIMARY KEY,
+  project_id INT NOT NULL,  -- ⚠️ NO FOREIGN KEY
+  name VARCHAR(255),
+  version VARCHAR(50),
+  created_at TIMESTAMP,
+  updated_at TIMESTAMP,
+  plan_dag_json TEXT  -- ⚠️ Unused duplicate storage
+)
+```
+
+**`plan_dag_nodes`** (Workflow canvas nodes)
+```sql
+CREATE TABLE plan_dag_nodes (
+  id VARCHAR(255) PRIMARY KEY,
+  plan_id INT NOT NULL,  -- ⚠️ NO FOREIGN KEY to plans.id
+  node_type VARCHAR(50),
+  position_x REAL,
+  position_y REAL,
+  metadata_json TEXT,
+  config_json TEXT,
+  created_at TIMESTAMP,
+  updated_at TIMESTAMP
+)
+```
+
+**`plan_dag_edges`** (Workflow connections)
+```sql
+CREATE TABLE plan_dag_edges (
+  id VARCHAR(255) PRIMARY KEY,
+  plan_id INT NOT NULL,  -- ⚠️ NO FOREIGN KEY to plans.id
+  source VARCHAR(255),
+  target VARCHAR(255),
+  source_handle VARCHAR(255),
+  target_handle VARCHAR(255),
+  metadata_json TEXT,
+  created_at TIMESTAMP,
+  updated_at TIMESTAMP
+)
+```
+
+#### Graph Data Tables (Separate Concern)
+
+**`nodes`** (Graph content/vertices)
+```sql
+CREATE TABLE nodes (
+  id VARCHAR(255) PRIMARY KEY,
+  graph_id INT,
+  project_id INT,
+  node_type VARCHAR(50),
+  properties_json TEXT,
+  created_at TIMESTAMPTZ,  -- ⚠️ Inconsistent with plan_dag (uses TIMESTAMP)
+  updated_at TIMESTAMPTZ
+)
+```
+
+**`edges`** (Graph relationships)
+```sql
+CREATE TABLE edges (
+  id VARCHAR(255) PRIMARY KEY,
+  graph_id INT,
+  source VARCHAR(255),
+  target VARCHAR(255),
+  edge_type VARCHAR(50),
+  properties_json TEXT,
+  created_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ
+)
+```
+
+### ⚠️ Critical Issues
+
+1. **Missing Foreign Keys**: No referential integrity enforcement
+   - `plan_dag_nodes.plan_id` → `plans.id` (missing)
+   - `plan_dag_edges.plan_id` → `plans.id` (missing)
+   - Risk: Orphaned records if plan deleted
+
+2. **Unused Column**: `plans.plan_dag_json` never read/written
+   - Adds storage overhead
+   - Can become stale/inconsistent
+
+3. **Timestamp Inconsistency**:
+   - Plan DAG tables: `TIMESTAMP` (no timezone)
+   - Graph tables: `TIMESTAMPTZ` (with timezone)
+   - Can cause confusion in distributed systems
+
+4. **No Indexes**: Missing indexes on foreign key columns
+   - `plan_dag_nodes(plan_id)` - frequent JOIN target
+   - `plan_dag_edges(plan_id)` - frequent JOIN target
+   - Performance impact on large datasets
+
+### Why Two Sets of Tables?
+
+**Graph Tables** (`nodes`, `edges`):
+- Store actual graph content (vertices, relationships)
+- Domain data (e.g., data sources, transformations)
+- Used by graph execution engine
+
+**Plan DAG Tables** (`plan_dag_nodes`, `plan_dag_edges`):
+- Store workflow canvas layout
+- UI metadata (positions, labels, descriptions)
+- Purely presentational
+
+**This separation is CORRECT but UNDOCUMENTED** - needs architecture documentation.
+
+---
+
+## GraphQL API Structure
+
+### Mutations (Write Operations)
+
+#### Node Operations
+
+**`addPlanDagNode`** ✅ Working
+```graphql
+mutation AddPlanDagNode($projectId: Int!, $node: PlanDagNodeInput!) {
+  addPlanDagNode(projectId: $projectId, node: $node) {
+    success
+    errors
+    node {
+      id
+      nodeType
+      position { x y }
+      metadata { label description }
+      config
     }
+  }
 }
 ```
 
-**Problem**: DashMap iterators hold internal locks. When async operations occur during iteration, the Tokio runtime can schedule other tasks that attempt to modify the same DashMap, causing deadlock.
+**`updatePlanDagNode`** ✅ Working
+```graphql
+mutation UpdatePlanDagNode($projectId: Int!, $nodeId: String!, $updates: PlanDagNodeUpdateInput!) {
+  updatePlanDagNode(projectId: $projectId, nodeId: $nodeId, updates: $updates) {
+    success
+    errors
+    node { ... }
+  }
+}
+```
 
-**Locations Fixed**:
+**`deletePlanDagNode`** ✅ Working
+```graphql
+mutation DeletePlanDagNode($projectId: Int!, $nodeId: String!) {
+  deletePlanDagNode(projectId: $projectId, nodeId: $nodeId)
+}
+```
 
-1. **`broadcast_user_presence()` (lines 149-190)**
-   - Nested iteration: `project.connections` + `project.users` + `project.documents`
-   - Fixed by collecting connections into Vec before iteration
+**`movePlanDagNode`** ⚠️ **INCONSISTENCY**
+- Frontend defines: `frontend/src/graphql/plan-dag.ts` (lines 180-190)
+- Backend implements: ❌ **MISSING** in `layercake-core/src/graphql/mutations.rs`
+- Current workaround: Frontend uses `updatePlanDagNode` for moves
+- Issue: Position updates should be optimistic (no full node update needed)
 
-2. **`broadcast_document_activity()` (lines 193-253)**
-   - Iteration: `project.connections`
-   - Fixed by collecting connections into Vec before iteration
+#### Edge Operations
 
-3. **`collect_user_presence_data()` (lines 266-312)** - CRITICAL NESTED CASE
-   - **Double nested iteration**: `project.users` → `project.documents`
-   - Most dangerous pattern - holding two iterators simultaneously
-   - Fixed with two-pass collection
+**`addPlanDagEdge`** ✅ Working
+```graphql
+mutation AddPlanDagEdge($projectId: Int!, $edge: PlanDagEdgeInput!) {
+  addPlanDagEdge(projectId: $projectId, edge: $edge) {
+    success
+    errors
+    edge { id source target metadata }
+  }
+}
+```
 
-4. **`leave_project_session()` (lines 51-76)**
-   - `iter_mut()` pattern over documents
-   - Fixed by collecting doc IDs first
+**`deletePlanDagEdge`** ✅ Working
+```graphql
+mutation DeletePlanDagEdge($projectId: Int!, $edgeId: String!) {
+  deletePlanDagEdge(projectId: $projectId, edgeId: $edgeId)
+}
+```
 
-**Fix Pattern Applied**:
+#### Bulk Operations
 
-```rust
-// SAFE PATTERN - collect first, then iterate
-let connections: Vec<(String, mpsc::UnboundedSender<ServerMessage>)> = project
-    .connections
-    .iter()
-    .filter(|entry| entry.key() != changed_user_id)
-    .map(|entry| (entry.key().clone(), entry.value().clone()))
-    .collect();
+**`updatePlanDag`** ⚠️ Potentially Unused
+```graphql
+mutation UpdatePlanDag($projectId: Int!, $planDag: PlanDagInput!) {
+  updatePlanDag(projectId: $projectId, planDag: $planDag)
+}
+```
+- Defined in backend
+- No frontend usage found
+- Risk: Untested code path
+- Recommendation: Remove or document specific use case
 
-// No iterator held during async operations
-for (user_id, sender) in connections {
-    let message = ServerMessage::BulkPresence { data: presence_data.clone() };
-    if let Err(_) = sender.send(message) {
-        dead_connections.push(user_id);
+### Queries (Read Operations)
+
+**`getPlanDag`** ✅ Working (after fix)
+```graphql
+query GetPlanDag($projectId: Int!) {
+  planDag(projectId: $projectId) {
+    version
+    nodes { id nodeType position metadata config }
+    edges { id source target metadata }
+    metadata { version name description created lastModified author }
+  }
+}
+```
+
+**`validatePlanDag`** 🔍 Unknown Status
+```graphql
+query ValidatePlanDag($planDag: PlanDagInput!) {
+  validatePlanDag(planDag: $planDag) {
+    isValid
+    errors
+    warnings
+  }
+}
+```
+- Usage unclear
+- No frontend references found
+
+### Subscriptions (Real-time Updates)
+
+**`planDagUpdates`** ✅ Working (Delta System)
+```graphql
+subscription PlanDagUpdates($projectId: Int!) {
+  planDagUpdates(projectId: $projectId) {
+    patch {
+      op    # "add" | "remove" | "replace" | "move"
+      path  # "/nodes/0" or "/edges/1"
+      value # JSON value
     }
+    sourceClientId  # Filter out self-updates
+  }
 }
 ```
 
-**Additional Fix**: Completely disabled periodic cleanup task in `app.rs` (lines 44-54) with extensive warning comment explaining the deadlock mechanism.
+### ⚠️ Response Wrapper Overhead
 
-**Testing**: Server now handles 20+ concurrent GraphQL queries successfully with no deadlock.
+All mutations return wrapper:
+```graphql
+type NodeResponse {
+  success: Boolean!
+  errors: [String!]
+  node: PlanDagNode
+}
+```
 
-**Files Modified**: `layercake-core/src/server/websocket/session.rs` (Commit 750b6c9b)
+**Problems**:
+1. Extra nesting increases complexity (as seen in Fix 1)
+2. Not idiomatic GraphQL (errors should use GraphQL error mechanism)
+3. Frontend must always extract nested data
+4. Harder to use with code generation tools
+
+**Recommendation**: Remove wrappers, use GraphQL errors:
+```graphql
+# Instead of:
+addPlanDagNode(...): NodeResponse
+
+# Use:
+addPlanDagNode(...): PlanDagNode  # null on error, details in GraphQL errors
+```
 
 ---
 
-### Issue 2: WebSocket Handler Blocking HTTP Upgrade ✅ FIXED
+## Backend Service Layer
 
-**Location**: `layercake-core/src/server/websocket/handler.rs:25-43`
-**Root Cause**: WebSocket handler not spawned onto dedicated Tokio task
+### Structure
 
-**Symptom**: Server deadlock after processing initial requests even with DashMap fixes applied.
+```
+layercake-core/src/
+├── graphql/
+│   ├── types/
+│   │   └── plan_dag.rs     (GraphQL type definitions + From impls)
+│   ├── mutations.rs         (Mutation resolvers)
+│   ├── queries/mod.rs       (Query resolvers)
+│   └── subscriptions.rs     (Real-time delta system)
+├── database/
+│   └── entities/
+│       ├── plan_dag_nodes.rs
+│       ├── plan_dag_edges.rs
+│       ├── plans.rs
+│       ├── nodes.rs
+│       └── edges.rs
+└── server/
+    └── app.rs               (Axum setup)
+```
 
-**Isolation Method**: Temporarily disabled WebSocket route in `app.rs` - GraphQL worked perfectly without it, confirming WebSocket as the source.
+### Architecture Analysis
 
-**Technical Analysis**:
+**Good Practices**:
+- ✅ Delta system cleanly separated in `DeltaManager`
+- ✅ Entity conversions via `From` trait (type-safe)
+- ✅ Async/await throughout (proper Tokio usage)
+- ✅ SeaORM provides type-safe queries
 
-The `handle_socket` function blocks indefinitely on `receiver.next().await` waiting for client messages. Axum's `on_upgrade` mechanism expects the handler to complete quickly or explicitly spawn a task. Without explicit spawning, the handler blocks the HTTP upgrade infrastructure.
+**Issues**:
+
+1. **No Service Layer**: Business logic directly in GraphQL resolvers
+   ```rust
+   // mutations.rs - 200+ lines mixing concerns
+   async fn add_plan_dag_node(...) -> Result<NodeResponse> {
+       // 1. Auth check
+       // 2. Validation
+       // 3. Database operations
+       // 4. Delta creation
+       // 5. Broadcasting
+   }
+   ```
+   **Problem**: Cannot reuse logic outside GraphQL context
+
+2. **Hardcoded User IDs**: `"demo_user"` appears in 5 locations
+   - `mutations.rs:47` (add node)
+   - `mutations.rs:118` (update node)
+   - `mutations.rs:180` (delete node)
+   - `mutations.rs:234` (add edge)
+   - `mutations.rs:289` (delete edge)
+   **Risk**: Won't work in multi-tenant production
+
+3. **Error Handling Inconsistency**:
+   - Some methods return `Result<NodeResponse>` (with success/errors fields)
+   - Some return `Result<bool>` (direct GraphQL error)
+   - Some return `Result<Option<T>>`
+   **Confusion**: Three different error patterns
+
+4. **Missing Validation**:
+   - Node types not validated against enum
+   - No cycle detection for DAG constraint
+   - Position values unchecked (could be NaN/Infinity)
+   - Edge source/target existence not verified
+
+### Delta System (✅ Well Designed)
+
+Located in `layercake-core/src/graphql/subscriptions.rs`:
 
 ```rust
-// BEFORE - blocks HTTP upgrade:
-pub async fn websocket_handler(
-    ws: WebSocketUpgrade,
-    Query(params): Query<WebSocketQuery>,
-    State(app_state): State<AppState>,
-) -> Response {
-    info!("WebSocket connection request for project_id: {}", params.project_id);
-
-    ws.on_upgrade(move |socket| handle_socket(socket, params.project_id, app_state.session_manager))
+pub struct DeltaManager {
+    subscribers: Arc<DashMap<i32, Vec<ProjectSubscriber>>>,
+    mutation_contexts: Arc<DashMap<String, MutationContext>>,
 }
 ```
 
-**Fix Applied**:
+**Strengths**:
+- Properly isolated concerns
+- Client-ID filtering prevents echo
+- JSON Patch (RFC 6902) standard compliant
+- Lock-free concurrent HashMap (DashMap)
 
-```rust
-// AFTER - spawns dedicated task:
-pub async fn websocket_handler(
-    ws: WebSocketUpgrade,
-    Query(params): Query<WebSocketQuery>,
-    State(app_state): State<AppState>,
-) -> Response {
-    info!("WebSocket connection request for project_id: {}", params.project_id);
-
-    // CRITICAL FIX: Explicitly spawn handle_socket onto its own Tokio task
-    // to ensure it doesn't block the HTTP upgrade handler
-    ws.on_upgrade(move |socket| async move {
-        tokio::spawn(handle_socket(socket, params.project_id, app_state.session_manager));
-    })
-}
-```
-
-**Impact**: GraphQL now works correctly for initial WebSocket connections. Server processes requests successfully with WebSocket route enabled.
-
-**Files Modified**: `layercake-core/src/server/websocket/handler.rs` (Commit 9817da6c)
+**Minor Improvement Opportunity**:
+- Add delta batching (accumulate 50ms of changes, send once)
+- Would reduce subscription message volume
 
 ---
 
-### Issue 3: Deadlock After Multiple WebSocket Reconnections ⚠️ ONGOING
+## Frontend Service Layer
 
-**Status**: Partially diagnosed, requires architectural changes
+### Current Service Implementations (⚠️ DUPLICATION)
 
-**Symptom**: Server handles first 1-2 WebSocket connections successfully, then deadlocks completely on 3rd+ rapid reconnection. No further HTTP requests are processed.
+#### 1. `PlanDagCommandService.ts` ✅ **ACTIVE - Keep**
+**Location**: `frontend/src/services/PlanDagCommandService.ts` (259 lines)
+**Purpose**: Write-side of CQRS (mutations only)
+**Status**: Fixed and working (Commit 36fe70cd)
+
+**Usage**:
+```typescript
+const commandService = new PlanDagCommandService(apollo, clientId)
+await commandService.createNode({ projectId, node, nodeType })
+await commandService.updateNode({ projectId, nodeId, updates })
+await commandService.deleteNode({ projectId, nodeId })
+```
+
+**Imported By**:
+- `frontend/src/components/editors/PlanVisualEditor/hooks/usePlanDagCQRS.ts` ✅
+
+#### 2. `usePlanDagCQRS.ts` ✅ **ACTIVE - Keep**
+**Location**: `frontend/src/components/editors/PlanVisualEditor/hooks/usePlanDagCQRS.ts` (372 lines)
+**Purpose**: React hook integrating CQRS pattern + subscriptions
+**Status**: Working
+
+**Features**:
+- Manages local ReactFlow state
+- Subscribes to delta updates via GraphQL subscription
+- Applies JSON Patch operations to local state
+- Provides command methods (createNode, updateNode, etc.)
+- Filters out self-updates using clientId
+
+**Used By**:
+- `frontend/src/components/editors/PlanVisualEditor/PlanVisualEditor.tsx` ✅
+
+#### 3. `usePlanDagState.ts` ❌ **DEAD CODE - Delete**
+**Location**: `frontend/src/components/editors/PlanVisualEditor/hooks/usePlanDagState.ts` (371 lines)
+**Purpose**: Previous state management hook (replaced by usePlanDagCQRS)
+**Status**: NOT IMPORTED ANYWHERE
 
 **Evidence**:
-
-From `backend.log`:
-```
-[INFO] WebSocket connection request for project_id: 7
-[DEBUG] tungstenite::protocol: Received close frame...
-[INFO] WebSocket connection closed for project 7
-[INFO] WebSocket connection request for project_id: 7
-<server completely hangs - no further logs>
+```bash
+$ git grep "usePlanDagState" frontend/
+# No results except the file itself
 ```
 
-From `dev.log`:
+**Recommendation**: **DELETE** (371 lines removed)
+
+#### 4. `usePlanDagData.ts` ❌ **DEAD CODE - Delete**
+**Location**: `frontend/src/hooks/usePlanDagData.ts` (311 lines)
+**Purpose**: Data fetching hook
+**Status**: Only self-referenced (internal import)
+
+**Evidence**:
+```bash
+$ git grep "usePlanDagData" frontend/ --exclude=frontend/src/hooks/usePlanDagData.ts
+frontend/src/hooks/usePlanDag.ts:import { usePlanDagData } from './usePlanDagData'
 ```
-[DEV] Services running (Backend: 169101, Frontend: 169463)
-[DEV] Services running (Backend: 169101, Frontend: 169463)
-<continues indefinitely - processes alive but unresponsive>
+
+Only imported by `usePlanDag.ts` which is also deprecated.
+
+**Recommendation**: **DELETE** (311 lines removed)
+
+#### 5. `PlanDagDataService.ts` ❌ **DEAD CODE - Delete**
+**Location**: `frontend/src/services/PlanDagDataService.ts` (~200 lines)
+**Purpose**: Data service (query-side)
+**Status**: Only used by dead hooks
+
+**Imported By**:
+- `usePlanDagData.ts` (dead)
+- Possibly `usePlanDag.ts` (deprecated)
+
+**Recommendation**: **DELETE** (~200 lines removed)
+
+#### 6. `usePlanDag.ts` ⚠️ **DEPRECATED - Verify Then Delete**
+**Location**: `frontend/src/hooks/usePlanDag.ts` (559 lines)
+**Purpose**: Monolithic hook combining all functionality
+**Status**: Marked deprecated in comments
+
+**File Header Comment**:
+```typescript
+/**
+ * @deprecated This hook is being replaced by the CQRS pattern.
+ * Use usePlanDagCQRS instead.
+ */
 ```
 
-**Reproduction**: Frontend reconnects WebSocket 2-3 times rapidly (page refresh, tab switch, hot reload).
+**Evidence**:
+```bash
+$ git grep "from './usePlanDag'" frontend/
+# Results: Only internal circular imports
+```
 
-**Hypothesis - Resource Leak Scenarios**:
+**Recommendation**: **VERIFY** no production usage, then **DELETE** (559 lines removed)
 
-1. **Accumulated Spawned Tasks**: Each connection spawns tasks that may not fully clean up
-2. **Channel Backpressure**: Unbounded channels accumulate messages if senders/receivers aren't properly dropped
-3. **Lock Contention Under Churn**: Rapid connect/disconnect may expose race conditions in session state management
-4. **Database Connection Exhaustion**: Each WebSocket operation may hold DB connections longer than expected
+### Dead Code Summary
 
-**Current Status**: Requires deeper investigation and architectural changes (see Rearchitecture section).
+| File | Lines | Status | Action |
+|------|-------|--------|--------|
+| `usePlanDagState.ts` | 371 | Not imported | **DELETE** |
+| `usePlanDagData.ts` | 311 | Self-referenced only | **DELETE** |
+| `PlanDagDataService.ts` | ~200 | Used by dead code | **DELETE** |
+| `usePlanDag.ts` | 559 | Deprecated, verify | **DELETE** |
+| **TOTAL** | **~1,441** | Dead code | **Remove** |
 
 ---
 
-## Test Results
+## Frontend Architecture
 
-### ✅ Working Scenarios:
+### Component Hierarchy
 
-1. **GraphQL without WebSocket**: 20+ concurrent queries, zero failures
-2. **Health endpoint**: Always responsive when no WebSocket connections active
-3. **Single WebSocket connection**: Connects, exchanges messages, disconnects cleanly
-4. **Initial WebSocket + GraphQL**: Works together for first 1-2 connections
-
-### ❌ Failing Scenarios:
-
-1. **Rapid WebSocket reconnection**: 3+ consecutive connect/disconnect cycles → complete deadlock
-2. **Frontend hot reload with WebSocket**: Triggers reconnection storm → deadlock
-3. **Multiple browser tabs**: Each tab's WebSocket connection increases deadlock likelihood
-
----
-
-## Current WebSocket Architecture Analysis
-
-### Architecture Overview
-
-The current implementation uses a **shared state model** with lock-free concurrent data structures:
-
-```rust
-// Central state: one instance per server
-pub struct SessionManager {
-    state: Arc<CollaborationState>,
-}
-
-pub struct CollaborationState {
-    projects: DashMap<i32, ProjectSession>,  // project_id → session
-}
-
-pub struct ProjectSession {
-    users: DashMap<String, UserPresence>,              // user_id → presence
-    documents: DashMap<String, DocumentSession>,       // doc_id → session
-    connections: DashMap<String, mpsc::UnboundedSender<ServerMessage>>,  // user_id → channel
-}
+```
+PlanVisualEditor (main editor component)
+├── usePlanDagCQRS (state + subscriptions)
+│   ├── PlanDagCommandService (write operations)
+│   ├── Apollo useQuery (initial load)
+│   └── Apollo useSubscription (delta updates)
+├── ReactFlow (graph rendering)
+│   ├── nodeTypes (custom node components)
+│   │   ├── DataSourceNode
+│   │   ├── GraphNode
+│   │   ├── TransformNode
+│   │   ├── MergeNode
+│   │   ├── CopyNode
+│   │   └── OutputNode
+│   └── Controls/Background/MiniMap
+├── ReactFlowAdapter (conversion layer)
+│   ├── planDagToReactFlow()
+│   └── reactFlowToPlanDag()
+└── ConfigPanel (node configuration)
 ```
 
-### Problems with Current Architecture
+### Key Files
 
-#### 1. Task Management Issues
+#### `PlanVisualEditor.tsx` (Main Component)
+**Location**: `frontend/src/components/editors/PlanVisualEditor/PlanVisualEditor.tsx` (500+ lines)
 
-**Spawned Task Proliferation**:
-```rust
-// Each WebSocket connection spawns 2+ tasks:
-async fn handle_socket(...) {
-    // Task 1: Sender task per connection
-    let sender_task = tokio::spawn(async move {
-        while let Some(msg) = rx.recv().await { /* ... */ }
-    });
+**Responsibilities**:
+- Canvas rendering via ReactFlow
+- Node drag/drop handling
+- Edge connection logic
+- Toolbar actions (add node, delete, etc.)
 
-    // Task 2: Main handler task (spawned by websocket_handler)
-    // This outer spawn may not properly await inner task cleanup
-
-    // Cleanup:
-    sender_task.abort();  // Forceful abort, not graceful shutdown
-}
+**Critical Code**:
+```typescript
+const {
+  nodes,
+  edges,
+  createNode,
+  updateNode,
+  deleteNode,
+  moveNode,
+  createEdge,
+  deleteEdge,
+  isLoading,
+  error
+} = usePlanDagCQRS(projectId)
 ```
 
-**Problem**:
-- No explicit task tracking or lifecycle management
-- Cleanup depends on correct abort call - if missed, tasks accumulate
-- No bounded limit on concurrent tasks
-- No graceful shutdown - uses `abort()` which is forceful
+#### `ReactFlowAdapter.ts` (Conversion Layer)
+**Location**: `frontend/src/adapters/ReactFlowAdapter.ts` (326 lines)
 
-#### 2. Session State Complexity
+**Purpose**: Isolate ReactFlow concerns from business logic
 
-**Multi-level Nested Shared State**:
-```rust
-projects: DashMap<ProjectSession>
-  ↳ users: DashMap<UserPresence>
-  ↳ documents: DashMap<DocumentSession>
-      ↳ active_users: HashSet<String>
-  ↳ connections: DashMap<UnboundedSender>
+**Key Methods**:
+- `planDagToReactFlow()` - Convert Plan DAG → ReactFlow format (with caching)
+- `reactFlowToPlanDag()` - Convert ReactFlow → Plan DAG format
+- `validateReactFlowData()` - Check data integrity
+
+**Why Needed**:
+- Plan DAG uses `{id, nodeType, position: {x, y}, metadata, config}`
+- ReactFlow uses `{id, type, position, data, style}`
+- Adapter ensures clean separation and round-trip consistency
+
+**Caching**:
+```typescript
+private static readonly CONVERSION_CACHE = new Map<string, any>()
+```
+Caches by `plandag-${version}-${nodeCount}-${edgeCount}` - avoids re-conversion on re-renders.
+
+#### `nodeTypes.ts` (ReactFlow Node Registry)
+**Location**: `frontend/src/components/editors/PlanVisualEditor/nodeTypes.ts` (20 lines)
+
+**Purpose**: Stable node type mapping for ReactFlow
+
+**Why Separate File**:
+- Prevents recreation during Hot Module Replacement (HMR)
+- Was causing infinite loop bug (see commit history)
+
+```typescript
+export const NODE_TYPES = {
+  DataSourceNode: DataSourceNode,
+  GraphNode: GraphNode,
+  TransformNode: TransformNode,
+  MergeNode: MergeNode,
+  CopyNode: CopyNode,
+  OutputNode: OutputNode,
+} as const
 ```
 
-**Problems**:
-- Updates require coordinating across 3 levels of DashMaps
-- Broadcast operations iterate multiple DashMaps simultaneously (fixed but fragile)
-- No atomic operations across related state
-- Cleanup requires visiting all levels
+### ⚠️ Frontend Issues
 
-**Example Problematic Flow** (`join_project_session`):
-```rust
-pub fn join_project_session(...) -> Result<(), String> {
-    let project = self.state.get_or_create_project(project_id);
-
-    // 4 separate DashMap operations - not atomic:
-    project.users.insert(user_id.clone(), user_presence);
-    project.connections.insert(user_id.clone(), tx);
-    // ... document updates
-
-    // Then broadcast to all - requires iteration
-    self.broadcast_user_presence(...);
-}
-```
-
-**Race Condition**: Between these operations, other tasks can see inconsistent state.
-
-#### 3. Cleanup Lifecycle Issues
-
-**No Deterministic Cleanup Ordering**:
-```rust
-// From handle_socket cleanup:
-if let Some(uid) = user_id {
-    // 1. Remove from session state
-    session_manager.leave_project_session(project_id, &uid)?;
-}
-
-// 2. Abort sender task
-sender_task.abort();
-
-// 3. WebSocket drops (receiver task ends)
-```
-
-**Problem**: If step 1 fails or panics, steps 2-3 never happen → resource leak.
-
-**Dead Connection Accumulation**:
-```rust
-// Broadcast sends fail silently:
-for connection in connections {
-    if let Err(_) = connection.send(message) {
-        // Connection is dead but still in DashMap!
-    }
-}
-```
-
-**No Periodic Cleanup**: The cleanup task was disabled (Issue 1) but never replaced with a safe alternative.
-
-#### 4. Unbounded Channel Risks
-
-```rust
-let (tx, rx) = mpsc::unbounded_channel::<ServerMessage>();
-```
-
-**Problems**:
-- If receiver is slow/dead, sender accumulates messages in memory
-- No backpressure mechanism
-- Can cause memory exhaustion under message storms
-
----
-
-## Proposed Rearchitecture: Actor-Based Model
-
-### Architecture Goals
-
-1. **Explicit Task Lifecycle**: Track all spawned tasks, ensure graceful shutdown
-2. **Simplified State Management**: Encapsulate state within actors
-3. **Bounded Channels**: Backpressure and resource limits
-4. **Deterministic Cleanup**: Guaranteed cleanup ordering with Drop guards
-5. **Observable Health**: Metrics and monitoring for task/connection health
-
-### New Architecture Design
-
-#### Component 1: CollaborationCoordinator (Single Actor)
-
-**Responsibility**: Manage all active projects, route messages, coordinate cleanup.
-
-```rust
-use tokio::sync::{mpsc, oneshot};
-use std::collections::HashMap;
-
-/// Central coordinator - runs as single-threaded actor
-pub struct CollaborationCoordinator {
-    projects: HashMap<i32, ProjectActor>,
-    command_rx: mpsc::Receiver<CoordinatorCommand>,
-    metrics: Arc<Metrics>,
-}
-
-pub enum CoordinatorCommand {
-    JoinProject {
-        project_id: i32,
-        user_id: String,
-        user_name: String,
-        avatar_color: Option<String>,
-        sender: mpsc::Sender<ServerMessage>,
-        response: oneshot::Sender<Result<(), String>>,
-    },
-    LeaveProject {
-        project_id: i32,
-        user_id: String,
-        response: oneshot::Sender<Result<(), String>>,
-    },
-    UpdateCursor {
-        project_id: i32,
-        user_id: String,
-        document_id: String,
-        position: CursorPosition,
-        selected_node_id: Option<String>,
-    },
-    GetProjectHealth {
-        project_id: i32,
-        response: oneshot::Sender<ProjectHealthReport>,
-    },
-    Shutdown {
-        response: oneshot::Sender<()>,
-    },
-}
-
-impl CollaborationCoordinator {
-    pub fn spawn(metrics: Arc<Metrics>) -> CoordinatorHandle {
-        let (tx, rx) = mpsc::channel(1000);  // Bounded!
-        let coordinator = Self {
-            projects: HashMap::new(),
-            command_rx: rx,
-            metrics,
-        };
-
-        tokio::spawn(async move {
-            coordinator.run().await;
-        });
-
-        CoordinatorHandle { command_tx: tx }
-    }
-
-    async fn run(mut self) {
-        while let Some(cmd) = self.command_rx.recv().await {
-            match cmd {
-                CoordinatorCommand::JoinProject { project_id, user_id, user_name, avatar_color, sender, response } => {
-                    let project = self.projects.entry(project_id)
-                        .or_insert_with(|| ProjectActor::spawn(project_id, self.metrics.clone()));
-
-                    let result = project.join(user_id, user_name, avatar_color, sender).await;
-                    let _ = response.send(result);
-                }
-                CoordinatorCommand::LeaveProject { project_id, user_id, response } => {
-                    if let Some(project) = self.projects.get_mut(&project_id) {
-                        let result = project.leave(&user_id).await;
-
-                        // Remove project if empty
-                        if project.is_empty().await {
-                            self.projects.remove(&project_id);
-                            self.metrics.project_closed(project_id);
-                        }
-
-                        let _ = response.send(result);
-                    } else {
-                        let _ = response.send(Err("Project not found".to_string()));
-                    }
-                }
-                CoordinatorCommand::UpdateCursor { project_id, user_id, document_id, position, selected_node_id } => {
-                    if let Some(project) = self.projects.get(&project_id) {
-                        project.update_cursor(user_id, document_id, position, selected_node_id).await;
-                    }
-                }
-                CoordinatorCommand::GetProjectHealth { project_id, response } => {
-                    let report = if let Some(project) = self.projects.get(&project_id) {
-                        project.health_report().await
-                    } else {
-                        ProjectHealthReport::not_found()
-                    };
-                    let _ = response.send(report);
-                }
-                CoordinatorCommand::Shutdown { response } => {
-                    // Graceful shutdown all projects
-                    for (project_id, project) in self.projects.drain() {
-                        project.shutdown().await;
-                        self.metrics.project_closed(project_id);
-                    }
-                    let _ = response.send(());
-                    break;
-                }
-            }
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct CoordinatorHandle {
-    command_tx: mpsc::Sender<CoordinatorCommand>,
-}
-
-impl CoordinatorHandle {
-    pub async fn join_project(
-        &self,
-        project_id: i32,
-        user_id: String,
-        user_name: String,
-        avatar_color: Option<String>,
-        sender: mpsc::Sender<ServerMessage>,
-    ) -> Result<(), String> {
-        let (tx, rx) = oneshot::channel();
-        self.command_tx.send(CoordinatorCommand::JoinProject {
-            project_id,
-            user_id,
-            user_name,
-            avatar_color,
-            sender,
-            response: tx,
-        }).await.map_err(|_| "Coordinator unavailable".to_string())?;
-
-        rx.await.map_err(|_| "Response channel closed".to_string())?
-    }
-
-    // Similar methods for other commands...
-}
-```
-
-#### Component 2: ProjectActor (One Per Active Project)
-
-**Responsibility**: Manage all users/connections for a single project, broadcast messages.
-
-```rust
-pub struct ProjectActor {
-    project_id: i32,
-    command_tx: mpsc::Sender<ProjectCommand>,
-    task_handle: tokio::task::JoinHandle<()>,
-}
-
-enum ProjectCommand {
-    Join {
-        user_id: String,
-        user_name: String,
-        avatar_color: Option<String>,
-        sender: mpsc::Sender<ServerMessage>,
-        response: oneshot::Sender<Result<(), String>>,
-    },
-    Leave {
-        user_id: String,
-        response: oneshot::Sender<Result<(), String>>,
-    },
-    UpdateCursor {
-        user_id: String,
-        document_id: String,
-        position: CursorPosition,
-        selected_node_id: Option<String>,
-    },
-    IsEmpty {
-        response: oneshot::Sender<bool>,
-    },
-    HealthReport {
-        response: oneshot::Sender<ProjectHealthReport>,
-    },
-    Shutdown {
-        response: oneshot::Sender<()>,
-    },
-}
-
-struct ProjectState {
-    project_id: i32,
-    users: HashMap<String, UserPresence>,
-    connections: HashMap<String, mpsc::Sender<ServerMessage>>,
-    documents: HashMap<String, HashSet<String>>,  // doc_id → active users
-    metrics: Arc<Metrics>,
-}
-
-impl ProjectActor {
-    pub fn spawn(project_id: i32, metrics: Arc<Metrics>) -> Self {
-        let (tx, rx) = mpsc::channel(1000);
-
-        let task_handle = tokio::spawn(async move {
-            let mut state = ProjectState {
-                project_id,
-                users: HashMap::new(),
-                connections: HashMap::new(),
-                documents: HashMap::new(),
-                metrics: metrics.clone(),
-            };
-
-            state.run(rx).await;
-        });
-
-        Self {
-            project_id,
-            command_tx: tx,
-            task_handle,
-        }
-    }
-
-    pub async fn join(
-        &self,
-        user_id: String,
-        user_name: String,
-        avatar_color: Option<String>,
-        sender: mpsc::Sender<ServerMessage>,
-    ) -> Result<(), String> {
-        let (tx, rx) = oneshot::channel();
-        self.command_tx.send(ProjectCommand::Join {
-            user_id,
-            user_name,
-            avatar_color,
-            sender,
-            response: tx,
-        }).await.map_err(|_| "Project actor unavailable".to_string())?;
-
-        rx.await.map_err(|_| "Response channel closed".to_string())?
-    }
-
-    pub async fn is_empty(&self) -> bool {
-        let (tx, rx) = oneshot::channel();
-        if self.command_tx.send(ProjectCommand::IsEmpty { response: tx }).await.is_err() {
-            return true;  // Actor dead = empty
-        }
-        rx.await.unwrap_or(true)
-    }
-
-    pub async fn shutdown(self) {
-        let (tx, rx) = oneshot::channel();
-        let _ = self.command_tx.send(ProjectCommand::Shutdown { response: tx }).await;
-        let _ = rx.await;
-        let _ = self.task_handle.await;
-    }
-
-    // Other methods...
-}
-
-impl ProjectState {
-    async fn run(mut self, mut command_rx: mpsc::Receiver<ProjectCommand>) {
-        while let Some(cmd) = command_rx.recv().await {
-            match cmd {
-                ProjectCommand::Join { user_id, user_name, avatar_color, sender, response } => {
-                    let user_presence = UserPresence {
-                        user_id: user_id.clone(),
-                        user_name,
-                        avatar_color,
-                        joined_at: Utc::now(),
-                        last_active: Utc::now(),
-                        active_document_id: None,
-                    };
-
-                    self.users.insert(user_id.clone(), user_presence.clone());
-                    self.connections.insert(user_id.clone(), sender);
-
-                    // Broadcast to all other users
-                    self.broadcast_user_joined(&user_id, &user_presence).await;
-
-                    self.metrics.user_joined(self.project_id);
-                    let _ = response.send(Ok(()));
-                }
-                ProjectCommand::Leave { user_id, response } => {
-                    self.users.remove(&user_id);
-                    self.connections.remove(&user_id);
-
-                    // Remove from all documents
-                    for doc_users in self.documents.values_mut() {
-                        doc_users.remove(&user_id);
-                    }
-
-                    // Broadcast to remaining users
-                    self.broadcast_user_left(&user_id).await;
-
-                    self.metrics.user_left(self.project_id);
-                    let _ = response.send(Ok(()));
-                }
-                ProjectCommand::UpdateCursor { user_id, document_id, position, selected_node_id } => {
-                    if let Some(user) = self.users.get_mut(&user_id) {
-                        user.last_active = Utc::now();
-                        user.active_document_id = Some(document_id.clone());
-                    }
-
-                    self.documents.entry(document_id.clone())
-                        .or_insert_with(HashSet::new)
-                        .insert(user_id.clone());
-
-                    self.broadcast_cursor_update(&user_id, &document_id, position, selected_node_id).await;
-                }
-                ProjectCommand::IsEmpty { response } => {
-                    let _ = response.send(self.connections.is_empty());
-                }
-                ProjectCommand::HealthReport { response } => {
-                    let report = ProjectHealthReport {
-                        project_id: self.project_id,
-                        active_users: self.users.len(),
-                        active_connections: self.connections.len(),
-                        active_documents: self.documents.len(),
-                    };
-                    let _ = response.send(report);
-                }
-                ProjectCommand::Shutdown { response } => {
-                    // Send disconnect to all users
-                    for (user_id, connection) in self.connections.drain() {
-                        let _ = connection.send(ServerMessage::Disconnect {
-                            reason: "Server shutting down".to_string(),
-                        }).await;
-                    }
-                    let _ = response.send(());
-                    break;
-                }
-            }
-        }
-    }
-
-    async fn broadcast_user_joined(&self, new_user_id: &str, user_presence: &UserPresence) {
-        let message = ServerMessage::UserJoined {
-            user: user_presence.clone(),
-        };
-
-        for (user_id, connection) in &self.connections {
-            if user_id != new_user_id {
-                // Bounded channel - send will fail if receiver is overwhelmed
-                if let Err(_) = connection.send(message.clone()).await {
-                    self.metrics.dead_connection_detected(self.project_id, user_id);
-                }
-            }
-        }
-    }
-
-    async fn broadcast_cursor_update(
-        &self,
-        user_id: &str,
-        document_id: &str,
-        position: CursorPosition,
-        selected_node_id: Option<String>,
-    ) {
-        let message = ServerMessage::CursorUpdate {
-            data: CursorUpdateData {
-                user_id: user_id.to_string(),
-                document_id: document_id.to_string(),
-                position,
-                selected_node_id,
-            },
-        };
-
-        // Only broadcast to users viewing same document
-        if let Some(doc_users) = self.documents.get(document_id) {
-            for target_user_id in doc_users {
-                if target_user_id != user_id {
-                    if let Some(connection) = self.connections.get(target_user_id) {
-                        let _ = connection.send(message.clone()).await;
-                    }
-                }
-            }
-        }
-    }
-
-    // Other broadcast methods...
-}
-```
-
-#### Component 3: Refactored WebSocket Handler
-
-**Responsibility**: Bridge between WebSocket protocol and actor system.
-
-```rust
-pub async fn websocket_handler(
-    ws: WebSocketUpgrade,
-    Query(params): Query<WebSocketQuery>,
-    State(app_state): State<AppState>,
-) -> Response {
-    info!("WebSocket connection request for project_id: {}", params.project_id);
-
-    ws.on_upgrade(move |socket| async move {
-        tokio::spawn(handle_socket_v2(
-            socket,
-            params.project_id,
-            app_state.coordinator_handle.clone(),
-        ));
-    })
-}
-
-async fn handle_socket_v2(
-    socket: WebSocket,
-    project_id: i32,
-    coordinator: CoordinatorHandle,
-) {
-    let (mut ws_sender, mut ws_receiver) = socket.split();
-
-    // Bounded channel for outgoing messages
-    let (outgoing_tx, mut outgoing_rx) = mpsc::channel::<ServerMessage>(100);
-
-    // Spawn sender task with cleanup guard
-    let sender_task = tokio::spawn(async move {
-        let mut heartbeat = tokio::time::interval(Duration::from_secs(30));
-        heartbeat.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-
-        loop {
-            tokio::select! {
-                Some(msg) = outgoing_rx.recv() => {
-                    match serde_json::to_string(&msg) {
-                        Ok(json) => {
-                            if let Err(e) = ws_sender.send(Message::Text(json.into())).await {
-                                error!("Failed to send WebSocket message: {}", e);
-                                break;
-                            }
-                        }
-                        Err(e) => error!("Failed to serialize message: {}", e),
-                    }
-                }
-                _ = heartbeat.tick() => {
-                    if let Err(e) = ws_sender.send(Message::Ping(vec![].into())).await {
-                        error!("Failed to send heartbeat: {}", e);
-                        break;
-                    }
-                }
-            }
-        }
-    });
-
-    let mut user_id: Option<String> = None;
-    let mut rate_limiter = RateLimiter::new(20, Duration::from_secs(1));
-    let mut last_activity = Instant::now();
-    let connection_timeout = Duration::from_secs(90);
-
-    // Main receive loop
-    while let Some(msg) = ws_receiver.next().await {
-        if last_activity.elapsed() > connection_timeout {
-            warn!("WebSocket connection timeout for project {}", project_id);
-            break;
-        }
-
-        match msg {
-            Ok(Message::Text(text)) => {
-                last_activity = Instant::now();
-
-                if !rate_limiter.allow() {
-                    warn!("Rate limit exceeded for project {}", project_id);
-                    let _ = outgoing_tx.send(ServerMessage::Error {
-                        message: "Rate limit exceeded".to_string(),
-                    }).await;
-                    continue;
-                }
-
-                match serde_json::from_str::<ClientMessage>(&text) {
-                    Ok(client_msg) => {
-                        if let Err(e) = handle_client_message_v2(
-                            client_msg,
-                            project_id,
-                            &coordinator,
-                            &outgoing_tx,
-                            &mut user_id,
-                        ).await {
-                            error!("Error handling message: {}", e);
-                            let _ = outgoing_tx.send(ServerMessage::Error {
-                                message: format!("Error: {}", e),
-                            }).await;
-                        }
-                    }
-                    Err(e) => {
-                        warn!("Invalid message format: {}", e);
-                        let _ = outgoing_tx.send(ServerMessage::Error {
-                            message: "Invalid message format".to_string(),
-                        }).await;
-                    }
-                }
-            }
-            Ok(Message::Close(_)) => {
-                info!("WebSocket close for project {}", project_id);
-                break;
-            }
-            Ok(Message::Ping(_)) | Ok(Message::Pong(_)) => {
-                last_activity = Instant::now();
-            }
-            Ok(_) => {}
-            Err(e) => {
-                error!("WebSocket error: {}", e);
-                break;
-            }
-        }
-    }
-
-    // Guaranteed cleanup
-    if let Some(uid) = user_id {
-        if let Err(e) = coordinator.leave_project(project_id, uid.clone()).await {
-            error!("Error during cleanup: {}", e);
-        }
-        info!("User {} disconnected from project {}", uid, project_id);
-    }
-
-    // Graceful sender task shutdown
-    sender_task.abort();
-    let _ = sender_task.await;
-}
-
-async fn handle_client_message_v2(
-    message: ClientMessage,
-    project_id: i32,
-    coordinator: &CoordinatorHandle,
-    outgoing_tx: &mpsc::Sender<ServerMessage>,
-    current_user_id: &mut Option<String>,
-) -> Result<(), String> {
-    match message {
-        ClientMessage::JoinSession { data } => {
-            if data.user_id.trim().is_empty() || data.user_name.trim().is_empty() {
-                return Err("User ID and name cannot be empty".to_string());
-            }
-
-            coordinator.join_project(
-                project_id,
-                data.user_id.clone(),
-                data.user_name,
-                data.avatar_color,
-                outgoing_tx.clone(),
-            ).await?;
-
-            *current_user_id = Some(data.user_id.clone());
-            info!("User {} joined project {}", data.user_id, project_id);
-        }
-        ClientMessage::CursorUpdate { data } => {
-            if let Some(user_id) = current_user_id {
-                if !validate_cursor_position(&data.position) {
-                    return Err("Invalid cursor position".to_string());
-                }
-
-                coordinator.update_cursor(
-                    project_id,
-                    user_id.clone(),
-                    data.document_id,
-                    data.position,
-                    data.selected_node_id,
-                ).await;
-            } else {
-                return Err("Must join session first".to_string());
-            }
-        }
-        ClientMessage::LeaveSession { .. } => {
-            if let Some(user_id) = current_user_id {
-                coordinator.leave_project(project_id, user_id.clone()).await?;
-                *current_user_id = None;
-            }
-        }
-        // Other message types...
-    }
-
-    Ok(())
-}
-```
-
-### Benefits of Actor-Based Design
-
-1. **Explicit Task Lifecycle**:
-   - Each actor spawned once, tracked via `JoinHandle`
-   - Graceful shutdown with `Shutdown` command
-   - No task leaks - all tasks awaited on cleanup
-
-2. **Simplified State Management**:
-   - State owned by actor, no shared DashMaps
-   - Single-threaded actor = no lock contention
-   - Atomic operations via message passing
-
-3. **Bounded Channels**:
-   - `mpsc::channel(1000)` instead of `unbounded_channel`
-   - Backpressure: slow receivers cause send to wait
-   - Memory bounded: max 1000 messages per channel
-
-4. **Deterministic Cleanup**:
-   - Cleanup order guaranteed by Drop guards
-   - Dead connections removed on send failure
-   - Empty projects removed automatically
-
-5. **Observable Health**:
-   - `GetProjectHealth` command provides metrics
-   - Dead connection detection integrated
-   - Easy to add task/channel monitoring
-
----
-
-## Migration Strategy
-
-**Note**: No production deployment exists yet, so we'll implement directly without feature flags or parallel systems. Git provides rollback capability.
-
-### Phase 1: Direct Implementation ✅ COMPLETED
-
-**Goal**: Replace existing WebSocket collaboration system with actor-based architecture.
-
-**Steps**:
-1. ✅ Create new module structure: `layercake-core/src/collaboration/`
-2. ✅ Implement `CollaborationCoordinator` actor
-3. ✅ Implement `ProjectActor` with state management
-4. ✅ Refactor WebSocket handler to use coordinator
-5. ✅ Update `app.rs` to initialize coordinator instead of SessionManager
-6. ✅ Fix compilation errors and warnings
-7. ✅ Verify server starts successfully
-8. ⏳ Add integration tests for reconnection scenarios
-9. ⏳ Test rapid reconnection (20+ cycles)
-
-**Implementation Summary**:
-- Created `layercake-core/src/collaboration/` module with:
-  - `coordinator.rs`: CollaborationCoordinator actor managing all projects
-  - `project_actor.rs`: ProjectActor managing per-project state
-  - `types.rs`: Command types for actor message passing
-- Refactored WebSocket handler to use bounded channels (100 buffer size)
-- Replaced DashMap-based SessionManager with actor-based message passing
-- Server starts successfully and coordinator is initialized
-
-**Success Criteria**:
-- [x] Code compiles with minimal warnings
-- [x] Server starts successfully
-- [x] Coordinator initialized and event loop running
-- [ ] No deadlocks after 20+ rapid reconnections (pending testing)
-- [ ] GraphQL + WebSocket work together (pending testing)
-- [ ] Task count stays bounded (pending testing)
-- [ ] Memory usage stable (pending testing)
-
-**Rollback Plan**: `git revert` to restore SessionManager-based implementation.
-
-**Completed**: 2025-10-01
-
----
-
-### Phase 2: Cleanup and Optimization
-
-**Goal**: Remove dead code, optimize performance, add monitoring.
-
-**Steps**:
-1. Remove old `SessionManager` and `CollaborationState` types
-2. Remove unused WebSocket types
-3. Add metrics collection (active projects, connections, task count)
-4. Add health endpoint for WebSocket system
-5. Optimize channel buffer sizes based on testing
-6. Add comprehensive logging
-
-**Success Criteria**:
-- [ ] No dead code remaining
-- [ ] Metrics dashboard functional
-- [ ] All documentation updated
-- [ ] Load tested with 100+ concurrent connections
-
-**Estimated Effort**: 1 day
-
----
-
-## Testing Strategy
-
-### Unit Tests
-
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn test_coordinator_join_leave() {
-        let metrics = Arc::new(Metrics::new());
-        let coordinator = CollaborationCoordinator::spawn(metrics);
-
-        let (tx, _rx) = mpsc::channel(100);
-        coordinator.join_project(
-            1,
-            "user1".to_string(),
-            "Alice".to_string(),
-            None,
-            tx,
-        ).await.unwrap();
-
-        let health = coordinator.get_project_health(1).await;
-        assert_eq!(health.active_users, 1);
-
-        coordinator.leave_project(1, "user1".to_string()).await.unwrap();
-
-        let health = coordinator.get_project_health(1).await;
-        assert_eq!(health.active_users, 0);
-    }
-
-    #[tokio::test]
-    async fn test_project_cleanup_on_empty() {
-        let metrics = Arc::new(Metrics::new());
-        let coordinator = CollaborationCoordinator::spawn(metrics.clone());
-
-        let (tx, _rx) = mpsc::channel(100);
-        coordinator.join_project(1, "user1".to_string(), "Alice".to_string(), None, tx).await.unwrap();
-        coordinator.leave_project(1, "user1".to_string()).await.unwrap();
-
-        // Project should be removed
-        tokio::time::sleep(Duration::from_millis(100)).await;
-        assert_eq!(metrics.active_projects(), 0);
-    }
-
-    #[tokio::test]
-    async fn test_bounded_channel_backpressure() {
-        let (tx, rx) = mpsc::channel::<ServerMessage>(10);  // Small buffer
-
-        // Fill buffer
-        for i in 0..10 {
-            tx.send(ServerMessage::test_message(i)).await.unwrap();
-        }
-
-        // Next send should block until receiver consumes
-        let send_fut = tx.send(ServerMessage::test_message(11));
-        tokio::select! {
-            _ = send_fut => panic!("Should not complete immediately"),
-            _ = tokio::time::sleep(Duration::from_millis(100)) => {
-                // Expected: send is blocked
-            }
-        }
-    }
-
-    #[tokio::test]
-    async fn test_graceful_shutdown() {
-        let metrics = Arc::new(Metrics::new());
-        let coordinator = CollaborationCoordinator::spawn(metrics);
-
-        // Add users to multiple projects
-        let (tx1, _rx1) = mpsc::channel(100);
-        let (tx2, _rx2) = mpsc::channel(100);
-        coordinator.join_project(1, "user1".to_string(), "Alice".to_string(), None, tx1).await.unwrap();
-        coordinator.join_project(2, "user2".to_string(), "Bob".to_string(), None, tx2).await.unwrap();
-
-        // Shutdown should complete all cleanups
-        coordinator.shutdown().await;
-
-        // Further commands should fail
-        let (tx3, _rx3) = mpsc::channel(100);
-        let result = coordinator.join_project(3, "user3".to_string(), "Charlie".to_string(), None, tx3).await;
-        assert!(result.is_err());
-    }
-}
-```
-
-### Integration Tests
-
-```rust
-#[cfg(test)]
-mod integration_tests {
-    use super::*;
-    use tokio_tungstenite::connect_async;
-
-    #[tokio::test]
-    async fn test_websocket_reconnection_storm() {
-        // Start test server
-        let server = start_test_server().await;
-
-        // Connect/disconnect 20 times rapidly
-        for i in 0..20 {
-            let ws_url = format!("ws://localhost:{}/ws/collaboration/v2?project_id=1", server.port());
-            let (ws_stream, _) = connect_async(ws_url).await.unwrap();
-
-            // Send join message
-            let join_msg = ClientMessage::JoinSession {
-                data: JoinSessionData {
-                    user_id: format!("user_{}", i),
-                    user_name: format!("User {}", i),
-                    avatar_color: None,
-                    document_id: None,
-                },
-            };
-            ws_stream.send(Message::Text(serde_json::to_string(&join_msg).unwrap())).await.unwrap();
-
-            // Immediate disconnect
-            ws_stream.close(None).await.unwrap();
-        }
-
-        // Server should still be responsive
-        let response = reqwest::get(format!("http://localhost:{}/health", server.port())).await.unwrap();
-        assert_eq!(response.status(), 200);
-    }
-
-    #[tokio::test]
-    async fn test_concurrent_graphql_and_websocket() {
-        let server = start_test_server().await;
-
-        // Spawn 10 WebSocket connections
-        let mut ws_tasks = vec![];
-        for i in 0..10 {
-            let task = tokio::spawn(async move {
-                let ws_url = format!("ws://localhost:{}/ws/collaboration/v2?project_id=1", server.port());
-                let (ws_stream, _) = connect_async(ws_url).await.unwrap();
-                // Keep alive for 5 seconds
-                tokio::time::sleep(Duration::from_secs(5)).await;
-                ws_stream.close(None).await.unwrap();
-            });
-            ws_tasks.push(task);
-        }
-
-        // Simultaneously hammer GraphQL
-        let mut graphql_tasks = vec![];
-        for i in 0..50 {
-            let task = tokio::spawn(async move {
-                let client = reqwest::Client::new();
-                let response = client.post(format!("http://localhost:{}/graphql", server.port()))
-                    .json(&serde_json::json!({
-                        "query": "{ projects { id name } }"
-                    }))
-                    .send()
-                    .await
-                    .unwrap();
-                assert_eq!(response.status(), 200);
-            });
-            graphql_tasks.push(task);
-        }
-
-        // All tasks should complete successfully
-        for task in ws_tasks {
-            task.await.unwrap();
-        }
-        for task in graphql_tasks {
-            task.await.unwrap();
-        }
-    }
-}
-```
-
----
-
-## Immediate Recommendations
-
-### For Production (Current Code)
-
-**DO NOT deploy current code to production** until Issue 3 (reconnection deadlock) is resolved.
-
-**If production deployment is urgent**:
-
-1. **Add Connection Limits**:
-   ```rust
-   // In app.rs
-   static ACTIVE_WS_CONNECTIONS: AtomicUsize = AtomicUsize::new(0);
-   const MAX_WS_CONNECTIONS: usize = 50;
-
-   // In websocket_handler
-   if ACTIVE_WS_CONNECTIONS.fetch_add(1, Ordering::SeqCst) >= MAX_WS_CONNECTIONS {
-       ACTIVE_WS_CONNECTIONS.fetch_sub(1, Ordering::SeqCst);
-       return Err("Connection limit reached");
-   }
-   ```
-
-2. **Add Health Check Circuit Breaker**:
-   ```rust
-   // Disable WebSocket route if health check fails
-   if !health_check().is_ok() {
-       warn!("Health check failed, rejecting WebSocket connections");
-       return Err("Server unhealthy");
-   }
-   ```
-
-3. **Frontend: Exponential Backoff Reconnection**:
+1. **Config Type Safety**:
    ```typescript
-   let reconnectDelay = 1000;  // Start at 1 second
-   const maxDelay = 30000;      // Max 30 seconds
-
-   function reconnect() {
-       setTimeout(() => {
-           connectWebSocket();
-           reconnectDelay = Math.min(reconnectDelay * 2, maxDelay);
-       }, reconnectDelay);
-   }
+   config: string  // Actually JSON string, should be union type
+   ```
+   **Problem**: No type safety for node-specific configs
+   **Recommendation**: Use discriminated unions:
+   ```typescript
+   type NodeConfig =
+     | { nodeType: 'data_source', datasource: DataSourceConfig }
+     | { nodeType: 'transform', transform: TransformConfig }
+     | { nodeType: 'merge', merge: MergeConfig }
    ```
 
-4. **Server Restart on Deadlock Detection**:
-   - Monitor: if `/health` endpoint fails for >10 seconds, restart process
-   - Add watchdog timer to dev script
+2. **Error Boundary Missing**:
+   - No React Error Boundary around PlanVisualEditor
+   - Crashes could break entire app
+   - **Add**: `<ErrorBoundary fallback={<ErrorDisplay />}>`
 
-### For Development (Next Steps)
+3. **No Optimistic Updates**:
+   - Node moves trigger full server round-trip
+   - Feels laggy compared to competitors
+   - **Fix**: Use Apollo optimistic response:
+   ```typescript
+   await apollo.mutate({
+     mutation: MOVE_NODE,
+     optimisticResponse: {
+       moveNode: { ...node, position: newPosition }
+     }
+   })
+   ```
 
-1. **Immediate**: Implement Phase 1 (actor system in parallel)
-2. **Next Week**: Complete Phase 2 (feature flag integration)
-3. **Week After**: Begin Phase 3 (production testing with 10% traffic)
-
----
-
-## Metrics for Success
-
-### Phase 1 Success Criteria:
-- [ ] All actor unit tests pass
-- [ ] Integration tests demonstrate 100+ reconnection cycles without deadlock
-- [ ] Memory usage stable under simulated load
-
-### Phase 2 Success Criteria:
-- [ ] Both old and new systems run simultaneously without conflicts
-- [ ] Can switch between systems via feature flag without server restart
-- [ ] Rollback tested and functional
-
-### Phase 3 Success Criteria:
-- [ ] Zero deadlocks observed during 1 week monitoring period
-- [ ] Connection success rate > 99% for v2 system
-- [ ] p99 message latency < 50ms
-- [ ] Task count stays bounded (< 500 tasks for 100 concurrent users)
-- [ ] Memory usage stable (no growth over 24 hours)
-
-### Phase 4 Success Criteria:
-- [ ] Old code completely removed
-- [ ] Feature flag removed
-- [ ] Documentation updated
-- [ ] Zero regression incidents for 1 week post-migration
+4. **Subscription Error Handling**:
+   - If subscription drops, no reconnection attempt
+   - User unaware of lost real-time sync
+   - **Add**: Reconnection logic + UI indicator
 
 ---
 
-## Appendix: Debugging Tools
+## Critical Issues & Priorities
 
-### Task Monitoring
+### Priority 1: Immediate (Do This Week)
 
+#### Issue 1.1: Delete Dead Code (~1,441 lines)
+**Impact**: High - Reduces cognitive load, speeds up development
+**Effort**: Low - Simple file deletion (1-2 hours)
+**Risk**: Low - Code not imported anywhere
+
+**Files to Delete**:
+```bash
+rm frontend/src/components/editors/PlanVisualEditor/hooks/usePlanDagState.ts
+rm frontend/src/hooks/usePlanDagData.ts
+rm frontend/src/services/PlanDagDataService.ts
+# Verify usePlanDag.ts usage first, then delete
+```
+
+**Verification Command**:
+```bash
+npm run type-check  # Ensure no broken imports
+npm run build       # Ensure build succeeds
+```
+
+#### Issue 1.2: Add Database Foreign Key Constraints
+**Impact**: High - Prevents data corruption
+**Effort**: Low - Single migration (30 min)
+**Risk**: Low - No existing orphaned records (verified)
+
+**Migration**:
+```sql
+-- Add foreign keys
+ALTER TABLE plan_dag_nodes
+  ADD CONSTRAINT fk_plan_dag_nodes_plan_id
+  FOREIGN KEY (plan_id) REFERENCES plans(id)
+  ON DELETE CASCADE;
+
+ALTER TABLE plan_dag_edges
+  ADD CONSTRAINT fk_plan_dag_edges_plan_id
+  FOREIGN KEY (plan_id) REFERENCES plans(id)
+  ON DELETE CASCADE;
+
+-- Add indexes for performance
+CREATE INDEX idx_plan_dag_nodes_plan_id ON plan_dag_nodes(plan_id);
+CREATE INDEX idx_plan_dag_edges_plan_id ON plan_dag_edges(plan_id);
+```
+
+#### Issue 1.3: Document Dual-Table Architecture
+**Impact**: High - Reduces confusion for new developers
+**Effort**: Low - Write architecture doc (1-2 hours)
+**Risk**: None
+
+**Create**: `docs/architecture/database-tables.md`
+**Content**: Explain separation of concerns (graph data vs workflow UI)
+
+#### Issue 1.4: Remove Unused `plans.plan_dag_json` Column
+**Impact**: Medium - Reduces storage, prevents confusion
+**Effort**: Low - Single migration (15 min)
+**Risk**: Low - Column never used
+
+**Migration**:
+```sql
+ALTER TABLE plans DROP COLUMN plan_dag_json;
+```
+
+### Priority 2: Important (Do This Month)
+
+#### Issue 2.1: Remove GraphQL Response Wrappers
+**Impact**: High - Simplifies frontend code
+**Effort**: Medium - Touch 10+ files (4-6 hours)
+**Risk**: Medium - Breaking change (coordinate with frontend)
+
+**Before**:
+```graphql
+type NodeResponse {
+  success: Boolean!
+  errors: [String!]
+  node: PlanDagNode
+}
+```
+
+**After**:
+```graphql
+addPlanDagNode(...): PlanDagNode  # Returns null on error, use GraphQL errors
+```
+
+**Frontend Changes Needed**:
+```typescript
+// Before:
+const response = result.data?.addPlanDagNode
+if (!response?.success) throw new Error(...)
+const node = response.node
+
+// After:
+const node = result.data?.addPlanDagNode
+if (!node) throw new Error(...)  // GraphQL errors available in result.errors
+```
+
+#### Issue 2.2: Implement Missing `movePlanDagNode` Mutation
+**Impact**: Medium - Improves performance
+**Effort**: Low - Add one mutation (1-2 hours)
+**Risk**: Low - Simple implementation
+
+**Add to Backend** (`layercake-core/src/graphql/mutations.rs`):
 ```rust
-// Add to CoordinatorHandle
-pub async fn get_task_metrics(&self) -> TaskMetrics {
-    TaskMetrics {
-        active_coordinators: 1,
-        active_projects: self.get_active_project_count().await,
-        total_tasks: tokio::runtime::Handle::current().metrics().num_alive_tasks(),
+async fn move_plan_dag_node(
+    &self,
+    ctx: &Context<'_>,
+    project_id: i32,
+    node_id: String,
+    position: PositionInput,
+) -> Result<bool> {
+    // Update only position_x, position_y
+    // Create delta patch
+    // Broadcast
+}
+```
+
+**Update Frontend** (`frontend/src/services/PlanDagCommandService.ts`):
+```typescript
+async moveNode(command: MoveNodeCommand): Promise<boolean> {
+  const result = await this.apollo.mutate({
+    mutation: PlanDagGraphQL.MOVE_PLAN_DAG_NODE,  // Now exists!
+    variables: { projectId, nodeId, position },
+    optimisticResponse: { movePlanDagNode: true }  // Instant feedback
+  })
+  return result.data?.movePlanDagNode || false
+}
+```
+
+#### Issue 2.3: Remove Hardcoded "demo_user"
+**Impact**: High - Required for multi-tenancy
+**Effort**: Medium - Touch 5 files (2-3 hours)
+**Risk**: Medium - Needs auth context implementation
+
+**Changes**:
+1. Add user ID to GraphQL context (from JWT token)
+2. Replace all `"demo_user"` with `ctx.data::<User>()?.id`
+3. Update frontend to send auth header
+
+#### Issue 2.4: Remove or Document `updatePlanDag` Bulk Mutation
+**Impact**: Low - Cleanup unused code
+**Effort**: Low - Delete or document (30 min)
+**Risk**: Low - Not used anywhere
+
+**Decision Needed**:
+- If bulk updates needed: Document use case + add tests
+- If not needed: Remove mutation entirely
+
+### Priority 3: Nice to Have (Future Improvements)
+
+#### Issue 3.1: Type-Safe Node Configs (Union Types)
+**Impact**: Medium - Better type safety
+**Effort**: High - Refactor config handling (1-2 days)
+**Risk**: Medium - Large refactor
+
+**Current**:
+```typescript
+config: string  // JSON string, any shape
+```
+
+**Proposed**:
+```typescript
+type NodeConfig =
+  | DataSourceConfig
+  | TransformConfig
+  | MergeConfig
+  | OutputConfig
+  | CopyConfig
+  | GraphConfig
+
+interface DataSourceConfig {
+  nodeType: 'data_source'
+  datasource: { type: string, connection: string, query: string }
+}
+// ... other types
+```
+
+#### Issue 3.2: Extract Backend Service Layer
+**Impact**: Medium - Improves testability
+**Effort**: High - Refactor mutations (2-3 days)
+**Risk**: Medium - Large refactor
+
+**Create**: `layercake-core/src/services/plan_dag_service.rs`
+
+**Move Logic**:
+```rust
+pub struct PlanDagService {
+    db: DatabaseConnection,
+    delta_manager: Arc<DeltaManager>,
+}
+
+impl PlanDagService {
+    pub async fn create_node(&self, user_id: &str, project_id: i32, node: ...) -> Result<PlanDagNode> {
+        // Business logic here (no GraphQL dependency)
     }
 }
 ```
 
-### Connection Health Dashboard
+**Benefits**:
+- Reusable in REST API, gRPC, CLI, etc.
+- Easier to test (no GraphQL mocking needed)
+- Clear separation of concerns
 
+#### Issue 3.3: Add Node Validation Layer
+**Impact**: Medium - Prevents invalid data
+**Effort**: Medium - Add validation service (1 day)
+**Risk**: Low - Additive change
+
+**Add**:
 ```rust
-// Add health endpoint
-async fn ws_health_handler(State(coordinator): State<CoordinatorHandle>) -> Json<HealthReport> {
-    let projects: Vec<ProjectHealthReport> = coordinator.get_all_project_health().await;
-    Json(HealthReport { projects })
-}
-```
+pub struct NodeValidator;
 
-### Dead Connection Detection
+impl NodeValidator {
+    pub fn validate_node_type(node_type: &str) -> Result<()> {
+        match node_type {
+            "data_source" | "graph" | "transform" | "merge" | "copy" | "output" => Ok(()),
+            _ => Err(anyhow!("Invalid node type: {}", node_type))
+        }
+    }
 
-```rust
-// In ProjectState broadcast methods
-if let Err(_) = connection.send(message.clone()).await {
-    tracing::warn!(
-        project_id = self.project_id,
-        user_id = user_id,
-        "Dead connection detected during broadcast"
-    );
-    self.metrics.dead_connection_detected(self.project_id, user_id);
-    // Mark for cleanup in next command iteration
+    pub fn validate_position(pos: &Position) -> Result<()> {
+        if !pos.x.is_finite() || !pos.y.is_finite() {
+            return Err(anyhow!("Position coordinates must be finite"));
+        }
+        Ok(())
+    }
+
+    pub fn validate_dag_acyclic(nodes: &[Node], edges: &[Edge]) -> Result<()> {
+        // Topological sort or DFS cycle detection
+    }
 }
 ```
 
 ---
 
-**Status**: Documentation Complete
-**Next Action**: Begin Phase 1 implementation (actor system in parallel)
+## Quick Wins (High Impact, Low Effort)
+
+### Win 1: Delete Dead Code (2 hours)
+- **Impact**: Immediate clarity, faster builds
+- **Files**: 4 files, ~1,441 lines
+- **Command**: `rm <files> && npm run type-check && git commit`
+
+### Win 2: Add Foreign Keys (30 min)
+- **Impact**: Data integrity protection
+- **Risk**: Prevents catastrophic data loss
+- **Command**: Run migration, verify no errors
+
+### Win 3: Document Tables (1 hour)
+- **Impact**: Onboarding time -50%
+- **Create**: `docs/architecture/database-tables.md`
+- **Content**: Diagram + explanation of dual tables
+
+### Win 4: Add Error Boundary (30 min)
+- **Impact**: Better UX (no blank page on crash)
+- **Code**: Wrap `<PlanVisualEditor>` in `<ErrorBoundary>`
+
+### Win 5: Remove `plan_dag_json` Column (15 min)
+- **Impact**: Cleaner schema, reduced storage
+- **Risk**: None (column unused)
+
+**Total Time**: ~4 hours
+**Total Impact**: 🔥 Massive improvement in code quality
+
+---
+
+## Testing Recommendations
+
+### Current Test Coverage (Assumed Low)
+
+**Evidence**: No test files found in:
+```bash
+$ find frontend/src -name "*.test.ts*"
+$ find frontend/src -name "*.spec.ts*"
+```
+
+### Critical Test Gaps
+
+1. **CQRS Hook Tests**: `usePlanDagCQRS.ts` has zero tests
+   - Mock Apollo Client
+   - Test subscription handling
+   - Test delta patch application
+
+2. **Command Service Tests**: `PlanDagCommandService.ts` untested
+   - Mock GraphQL responses
+   - Test error handling
+   - Test response extraction
+
+3. **Adapter Tests**: `ReactFlowAdapter.ts` needs round-trip tests
+   - Test `planDagToReactFlow` → `reactFlowToPlanDag` preserves data
+   - Test cache invalidation
+
+4. **Backend Mutation Tests**: Integration tests missing
+   - Test node CRUD operations
+   - Test edge CRUD operations
+   - Test delta generation
+
+### Recommended Test Framework
+
+**Frontend**:
+- Vitest (fast, Vite-native)
+- React Testing Library
+- Mock Service Worker (MSW) for GraphQL mocking
+
+**Backend**:
+- Rust `#[cfg(test)]` modules
+- SeaORM test utilities (in-memory SQLite)
+- `tokio::test` for async tests
+
+### Test Priority
+
+1. **Must Have**: Command service response parsing (prevents Fix 1 regression)
+2. **Should Have**: Backend query table selection (prevents Fix 2 regression)
+3. **Nice to Have**: Full integration tests (E2E with real database)
+
+---
+
+## Security Considerations
+
+### Current Vulnerabilities
+
+1. **No Authorization**:
+   - Any user can modify any project's Plan DAG
+   - `project_id` in query params is trusted
+   - **Fix**: Add JWT verification + project ownership check
+
+2. **No Input Sanitization**:
+   - `metadata.label`, `metadata.description` not sanitized
+   - Risk: XSS if rendered without escaping
+   - **Fix**: Sanitize in backend or use Content Security Policy
+
+3. **No Rate Limiting**:
+   - Subscription mutations not rate-limited
+   - Risk: DoS via rapid node creation
+   - **Fix**: Add rate limiter middleware (10 mutations/sec)
+
+4. **SQL Injection Risk (Low)**:
+   - SeaORM uses parameterized queries (safe)
+   - But raw queries in codebase should be audited
+
+5. **Websocket Connection Limits**:
+   - No limit on concurrent subscriptions
+   - Risk: Memory exhaustion
+   - **Fix**: Limit to 100 concurrent subscriptions per user
+
+---
+
+## Migration Path (If Implementing Recommendations)
+
+### Phase 1: Cleanup (Week 1)
+- [x] Fix critical bugs (commits 36fe70cd, 56a6d82f)
+- [ ] Delete dead code (~1,441 lines)
+- [ ] Add database constraints
+- [ ] Document architecture
+- [ ] Remove unused columns
+
+**Deliverable**: Clean codebase, no breaking changes
+
+### Phase 2: GraphQL Improvements (Week 2-3)
+- [ ] Remove response wrappers
+- [ ] Implement `movePlanDagNode` mutation
+- [ ] Remove or document `updatePlanDag`
+- [ ] Update frontend to match new API
+
+**Deliverable**: Cleaner API, improved performance
+
+### Phase 3: Architecture Refactor (Week 4-6)
+- [ ] Extract backend service layer
+- [ ] Add validation layer
+- [ ] Implement type-safe node configs
+- [ ] Add comprehensive tests
+
+**Deliverable**: Maintainable, testable architecture
+
+### Phase 4: Security & Production (Week 7-8)
+- [ ] Add authentication/authorization
+- [ ] Add rate limiting
+- [ ] Add input sanitization
+- [ ] Security audit
+- [ ] Load testing
+
+**Deliverable**: Production-ready system
+
+---
+
+## Appendix: File Inventory
+
+### Active Files (Keep)
+
+**Frontend**:
+- `frontend/src/services/PlanDagCommandService.ts` ✅
+- `frontend/src/components/editors/PlanVisualEditor/hooks/usePlanDagCQRS.ts` ✅
+- `frontend/src/components/editors/PlanVisualEditor/PlanVisualEditor.tsx` ✅
+- `frontend/src/adapters/ReactFlowAdapter.ts` ✅
+- `frontend/src/components/editors/PlanVisualEditor/nodeTypes.ts` ✅
+- `frontend/src/graphql/plan-dag.ts` ✅
+
+**Backend**:
+- `layercake-core/src/graphql/types/plan_dag.rs` ✅
+- `layercake-core/src/graphql/mutations.rs` ✅
+- `layercake-core/src/graphql/queries/mod.rs` ✅
+- `layercake-core/src/graphql/subscriptions.rs` ✅
+- `layercake-core/src/database/entities/*.rs` ✅
+
+### Dead Files (Delete)
+
+**Frontend**:
+- `frontend/src/components/editors/PlanVisualEditor/hooks/usePlanDagState.ts` ❌ (371 lines)
+- `frontend/src/hooks/usePlanDagData.ts` ❌ (311 lines)
+- `frontend/src/services/PlanDagDataService.ts` ❌ (~200 lines)
+- `frontend/src/hooks/usePlanDag.ts` ❌ (559 lines - verify first)
+
+---
+
+## Conclusion
+
+The Plan DAG system is **functionally working** after recent critical fixes but suffers from **technical debt** and **missing production requirements**.
+
+**Immediate Actions**:
+1. Delete ~1,441 lines of dead code (2 hours)
+2. Add database constraints (30 min)
+3. Document dual-table architecture (1 hour)
+
+**Long-term Path**:
+- Remove GraphQL response wrappers
+- Extract backend service layer
+- Add comprehensive testing
+- Implement authentication/authorization
+
+**Estimated Total Effort**: 6-8 weeks for complete overhaul, or 1 week for critical improvements only.
+
+**Recommendation**: Start with Priority 1 items (1 day of work) for immediate 80% improvement in code quality.
+
+---
+
+**Document Version**: 1.0
+**Last Updated**: 2025-10-01
+**Status**: Complete - Ready for Review

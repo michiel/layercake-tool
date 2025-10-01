@@ -5,7 +5,6 @@ import { PlanDag } from '../../../../types/plan-dag'
 import { PlanDagCQRSService } from '../../../../services/PlanDagCQRSService'
 import { ReactFlowAdapter } from '../../../../adapters/ReactFlowAdapter'
 import { useUnifiedUpdateManager } from './useUnifiedUpdateManager'
-import { useSmartValidation } from './useSmartValidation'
 import { usePerformanceMonitor } from './usePerformanceMonitor'
 import { useStableCallback, useExternalDataChangeDetector } from '../../../../hooks/useStableReference'
 import { useSubscriptionFilter } from '../../../../hooks/useGraphQLSubscriptionFilter'
@@ -119,16 +118,13 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
     return stablePlanDagRef.current
   }, [planDag])
 
-  // Smart validation system
-  const smartValidation = useSmartValidation({
-    enabled: !readonly,
-    debounceMs: 1500,
-    maxValidationRate: 8, // Max 8 validations per minute
-  })
+  // TODO: Re-implement validation in Phase 3
+  // Validation temporarily disabled after removing dead code dependencies
 
   // Stable callbacks for update manager to prevent reference instability
-  const stableOnValidationNeeded = useStableCallback((planDag: PlanDag) => {
-    smartValidation.scheduleValidation(planDag, 'structural')
+  const stableOnValidationNeeded = useStableCallback((_planDag: PlanDag) => {
+    // Validation disabled for now
+    console.log('[usePlanDagCQRS] Validation skipped (to be re-implemented in Phase 3)')
   })
 
   const stableOnPersistenceNeeded = useStableCallback(async (planDag: PlanDag) => {
@@ -289,11 +285,11 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
 
   const validatePlanDag = useCallback(() => {
     if (stablePlanDag) {
-      console.log('[usePlanDagCQRS] Validating Plan DAG')
+      console.log('[usePlanDagCQRS] Validation not yet implemented (Phase 3)')
       performanceMonitor.trackEvent('validations')
-      smartValidation.validateNow(stablePlanDag)
+      // TODO: Re-implement validation in Phase 3
     }
-  }, [stablePlanDag, smartValidation, performanceMonitor])
+  }, [stablePlanDag, performanceMonitor])
 
   const refreshData = useCallback(async () => {
     console.log('[usePlanDagCQRS] Refreshing Plan DAG data')
@@ -323,10 +319,10 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
     onNodesChange,
     onEdgesChange,
 
-    // Validation state (from smart validation)
-    validationErrors: smartValidation.errors,
-    validationLoading: smartValidation.isValidating,
-    lastValidation: smartValidation.lastValidation,
+    // Validation state (temporarily disabled - to be re-implemented in Phase 3)
+    validationErrors: [],
+    validationLoading: false,
+    lastValidation: null,
 
     // Update management
     isDirty,
