@@ -265,19 +265,51 @@ CREATE TABLE edges (
    - `plan_dag_edges(plan_id)` - frequent JOIN target
    - Performance impact on large datasets
 
-### Why Two Sets of Tables?
+### Why Two Sets of Tables? (✅ ARCHITECTURE VALIDATED)
 
-**Graph Tables** (`nodes`, `edges`):
-- Store actual graph content (vertices, relationships)
-- Domain data (e.g., data sources, transformations)
-- Used by graph execution engine
+**CONCLUSION**: After comprehensive code review, the dual-table architecture is **CORRECT and NECESSARY**. Tables serve completely different purposes and should **NOT** be consolidated.
+
+**Graph Tables** (`nodes`, `edges`, `layers`):
+- **Purpose**: Store actual graph domain data (vertices, edges, layers)
+- **Schema**: Simple relational structure (id, project_id, node_id, label, properties)
+- **Usage**:
+  - CSV import (`layercake-core/src/services/graph_service.rs`)
+  - Graph execution engine (`build_graph_from_project`)
+  - GraphQL queries (`nodes`, `edges`, `searchNodes`)
+  - Export generation (used by layercake renderer)
+- **Lifecycle**: Created from CSV/JSON imports, referenced in plan DAG nodes
+- **Data Flow**: CSV → `nodes`/`edges` → Graph execution → Export
 
 **Plan DAG Tables** (`plan_dag_nodes`, `plan_dag_edges`):
-- Store workflow canvas layout
-- UI metadata (positions, labels, descriptions)
-- Purely presentational
+- **Purpose**: Store workflow editor canvas metadata (visual DAG representation)
+- **Schema**: Rich metadata structure (id, plan_id, node_type, position_x, position_y, metadata_json, config_json)
+- **Usage**:
+  - ReactFlow visual editor (`frontend/src/components/editors/PlanVisualEditor`)
+  - Real-time collaboration (GraphQL subscriptions + JSON Patch)
+  - CQRS pattern (mutations + delta updates)
+  - Workflow orchestration (node connections, data flow)
+- **Lifecycle**: Created/modified by visual editor, references graph data nodes
+- **Data Flow**: User canvas actions → `plan_dag_nodes`/`plan_dag_edges` → ReactFlow → Real-time sync
 
-**This separation is CORRECT but UNDOCUMENTED** - needs architecture documentation.
+**Key Differences**:
+| Aspect | Graph Tables | Plan DAG Tables |
+|--------|--------------|-----------------|
+| **Domain** | Graph data (what to process) | Workflow metadata (how to process) |
+| **Structure** | Simple relational | Complex metadata with positions |
+| **Primary Key** | Auto-increment integer | String UUID |
+| **Timestamps** | `TIMESTAMPTZ` | `TIMESTAMP` (inconsistent) |
+| **Mutability** | Rarely changed (import-once) | Frequently changed (drag/drop, config edits) |
+| **Real-time** | No subscriptions | JSON Patch delta subscriptions |
+| **Relationships** | node_id references between tables | Visual connections on canvas |
+
+**Why Separation is Correct**:
+1. **Separation of Concerns**: Domain data vs presentation layer
+2. **Performance**: Plan DAG updates don't trigger graph re-execution
+3. **Scalability**: Canvas with 100 nodes doesn't require loading all graph data
+4. **Collaboration**: Multiple users edit workflow without conflicting with domain data
+5. **Versioning**: Plan DAG changes can be versioned independently of graph data
+
+**Actual Issue**: **Lack of documentation**, not architectural flaw. Users confused because relationship between tables not explained.
 
 ---
 
@@ -807,13 +839,21 @@ CREATE INDEX idx_plan_dag_nodes_plan_id ON plan_dag_nodes(plan_id);
 CREATE INDEX idx_plan_dag_edges_plan_id ON plan_dag_edges(plan_id);
 ```
 
-#### Issue 1.3: Document Dual-Table Architecture
+#### Issue 1.3: Document Dual-Table Architecture ✅ **UPDATED**
 **Impact**: High - Reduces confusion for new developers
 **Effort**: Low - Write architecture doc (1-2 hours)
 **Risk**: None
 
+**Status**: Architecture validated - dual tables are CORRECT design (see "Why Two Sets of Tables?" section above)
+
+**Action**: Create comprehensive documentation explaining:
+1. **Graph tables** (`nodes`, `edges`, `layers`) - domain data for execution
+2. **Plan DAG tables** (`plan_dag_nodes`, `plan_dag_edges`) - workflow UI metadata
+3. Data flow diagrams showing how tables interact
+4. Example workflows: CSV import → graph data → Plan DAG references → execution
+
 **Create**: `docs/architecture/database-tables.md`
-**Content**: Explain separation of concerns (graph data vs workflow UI)
+**Content**: See detailed comparison table and rationale in "Why Two Sets of Tables?" section
 
 #### Issue 1.4: Remove Unused `plans.plan_dag_json` Column
 **Impact**: Medium - Reduces storage, prevents confusion
@@ -1111,7 +1151,7 @@ $ find frontend/src -name "*.spec.ts*"
 
 ### Phase 1: Cleanup (Week 1)
 - [x] Fix critical bugs (commits 36fe70cd, 56a6d82f)
-- [ ] Delete dead code (~1,441 lines)
+- [x] Delete dead code (~1,667 lines) - commit 1aaeb3f7
 - [ ] Add database constraints
 - [ ] Document architecture
 - [ ] Remove unused columns
