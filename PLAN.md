@@ -1152,8 +1152,8 @@ $ find frontend/src -name "*.spec.ts*"
 ### Phase 1: Cleanup (Week 1)
 - [x] Fix critical bugs (commits 36fe70cd, 56a6d82f)
 - [x] Delete dead code (~1,667 lines) - commit 1aaeb3f7
-- [ ] Add database constraints
-- [ ] Document architecture
+- [x] Add database constraints - commit 491aff92
+- [x] Document architecture - commit cec70022
 - [ ] Remove unused columns
 
 **Deliverable**: Clean codebase, no breaking changes
