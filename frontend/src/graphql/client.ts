@@ -50,6 +50,12 @@ const wsLink = new GraphQLWsLink(
       // Retry connection on network errors
       return true
     },
+    on: {
+      connected: () => console.log('[GraphQL WebSocket] Connected to', wsUrl),
+      connecting: () => console.log('[GraphQL WebSocket] Connecting to', wsUrl),
+      closed: (event) => console.log('[GraphQL WebSocket] Closed', event),
+      error: (error) => console.error('[GraphQL WebSocket] Error', error),
+    },
   })
 )
 
@@ -88,12 +94,12 @@ const splitLink = split(
     )
   },
   wsLink,
-  httpLink
+  from([errorLink, httpLink]) // Apply error handling only to HTTP link
 )
 
 // Apollo Client with enhanced cache configuration for real-time collaboration
 export const apolloClient = new ApolloClient({
-  link: from([errorLink, splitLink]),
+  link: splitLink,
   cache: new InMemoryCache({
     typePolicies: {
       Project: {

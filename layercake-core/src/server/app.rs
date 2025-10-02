@@ -180,85 +180,52 @@ async fn graphql_ws_handler(
 
 #[cfg(feature = "graphql")]
 async fn handle_graphql_ws(
-    mut socket: axum::extract::ws::WebSocket,
+    socket: axum::extract::ws::WebSocket,
     schema: crate::graphql::GraphQLSchema,
 ) {
-    use axum::extract::ws::Message;
-    use serde_json::{json, Value};
-    use std::collections::HashMap;
-    use tokio::sync::mpsc;
+    use futures_util::{StreamExt, SinkExt};
 
-    let mut subscriptions: HashMap<String, mpsc::UnboundedSender<()>> = HashMap::new();
-    let mut connection_ack_sent = false;
+    let (mut sink, mut stream) = socket.split();
 
-    // Handle graphql-transport-ws protocol
-    while let Some(msg) = socket.recv().await {
-        if let Ok(Message::Text(text)) = msg {
-            if let Ok(payload) = serde_json::from_str::<Value>(&text) {
+    while let Some(Ok(msg)) = stream.next().await {
+        if let axum::extract::ws::Message::Text(text) = msg {
+            if let Ok(payload) = serde_json::from_str::<serde_json::Value>(&text) {
                 let msg_type = payload.get("type").and_then(|t| t.as_str()).unwrap_or("");
 
                 match msg_type {
                     "connection_init" => {
-                        if !connection_ack_sent {
-                            let ack = json!({
-                                "type": "connection_ack"
-                            });
-                            if socket.send(Message::Text(ack.to_string().into())).await.is_err() {
-                                break;
-                            }
-                            connection_ack_sent = true;
-                        }
+                        let ack = serde_json::json!({"type": "connection_ack"});
+                        let _ = sink.send(axum::extract::ws::Message::Text(ack.to_string().into())).await;
                     }
                     "subscribe" => {
                         if let Some(id) = payload.get("id").and_then(|i| i.as_str()) {
                             if let Some(query_payload) = payload.get("payload") {
                                 if let Ok(request) = serde_json::from_value::<async_graphql::Request>(query_payload.clone()) {
-                                    // Execute the subscription immediately and send first response
-                                    let response = schema.execute(request).await;
-                                    let next_msg = json!({
-                                        "id": id,
-                                        "type": "next",
-                                        "payload": response
-                                    });
-                                    if socket.send(Message::Text(next_msg.to_string().into())).await.is_err() {
-                                        break;
+                                    let mut response_stream = schema.execute_stream(request);
+
+                                    // Send subscription responses as they arrive
+                                    while let Some(response) = response_stream.next().await {
+                                        let next_msg = serde_json::json!({
+                                            "id": id,
+                                            "type": "next",
+                                            "payload": response
+                                        });
+                                        if sink.send(axum::extract::ws::Message::Text(next_msg.to_string().into())).await.is_err() {
+                                            return;
+                                        }
                                     }
 
-                                    // For now, immediately complete the subscription
-                                    // In a real implementation, we'd manage ongoing subscriptions
-                                    let complete_msg = json!({
-                                        "id": id,
-                                        "type": "complete"
-                                    });
-                                    if socket.send(Message::Text(complete_msg.to_string().into())).await.is_err() {
-                                        break;
-                                    }
+                                    // Send complete when subscription ends
+                                    let complete_msg = serde_json::json!({"id": id, "type": "complete"});
+                                    let _ = sink.send(axum::extract::ws::Message::Text(complete_msg.to_string().into())).await;
                                 }
                             }
                         }
                     }
-                    "complete" => {
-                        // Handle subscription stop
-                        if let Some(id) = payload.get("id").and_then(|i| i.as_str()) {
-                            if let Some(cancel_tx) = subscriptions.remove(id) {
-                                let _ = cancel_tx.send(());
-                            }
-                        }
-                    }
-                    "pong" => {
-                        // Client responded to ping - do nothing
-                    }
                     _ => {}
                 }
             }
-        } else if let Ok(Message::Close(_)) = msg {
-            break;
         }
-    }
-
-    // Clean up any remaining subscriptions
-    for (_, cancel_tx) in subscriptions {
-        let _ = cancel_tx.send(());
     }
 }
 
