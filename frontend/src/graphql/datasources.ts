@@ -9,6 +9,8 @@ export const GET_DATASOURCES = gql`
       name
       description
       sourceType
+      fileFormat
+      dataType
       filename
       graphJson
       status
@@ -30,6 +32,8 @@ export const GET_DATASOURCE = gql`
       name
       description
       sourceType
+      fileFormat
+      dataType
       filename
       graphJson
       status
@@ -51,6 +55,8 @@ export const CREATE_DATASOURCE_FROM_FILE = gql`
       name
       description
       sourceType
+      fileFormat
+      dataType
       filename
       graphJson
       status
@@ -72,6 +78,8 @@ export const UPDATE_DATASOURCE = gql`
       name
       description
       sourceType
+      fileFormat
+      dataType
       filename
       graphJson
       status
@@ -100,6 +108,8 @@ export const REPROCESS_DATASOURCE = gql`
       name
       description
       sourceType
+      fileFormat
+      dataType
       filename
       graphJson
       status
@@ -121,6 +131,8 @@ export const DATASOURCE_UPDATED = gql`
       name
       description
       sourceType
+      fileFormat
+      dataType
       filename
       graphJson
       status
@@ -133,13 +145,30 @@ export const DATASOURCE_UPDATED = gql`
   }
 `
 
+// File format enum (physical representation)
+export enum FileFormat {
+  CSV = 'CSV',
+  TSV = 'TSV',
+  JSON = 'JSON',
+}
+
+// Data type enum (semantic meaning)
+export enum DataType {
+  NODES = 'NODES',
+  EDGES = 'EDGES',
+  LAYERS = 'LAYERS',
+  GRAPH = 'GRAPH',
+}
+
 // TypeScript interfaces for the GraphQL types
 export interface DataSource {
   id: number
   projectId: number
   name: string
   description?: string
-  sourceType: 'csv_nodes' | 'csv_edges' | 'csv_layers' | 'json_graph'
+  sourceType: 'csv_nodes' | 'csv_edges' | 'csv_layers' | 'json_graph' // DEPRECATED
+  fileFormat: string
+  dataType: string
   filename: string
   graphJson: string
   status: 'active' | 'processing' | 'error'
@@ -156,6 +185,8 @@ export interface CreateDataSourceInput {
   description?: string
   filename: string
   fileContent: string // Base64 encoded file content
+  fileFormat: FileFormat
+  dataType: DataType
 }
 
 export interface UpdateDataSourceInput {
@@ -178,7 +209,44 @@ export const formatFileSize = (bytes: number): string => {
   }
 }
 
-// Helper function to get data source type display name
+// Helper function to get file format display name
+export const getFileFormatDisplayName = (format: string): string => {
+  switch (format) {
+    case 'CSV':
+    case 'csv':
+      return 'CSV'
+    case 'TSV':
+    case 'tsv':
+      return 'TSV'
+    case 'JSON':
+    case 'json':
+      return 'JSON'
+    default:
+      return 'Unknown'
+  }
+}
+
+// Helper function to get data type display name
+export const getDataTypeDisplayName = (dataType: string): string => {
+  switch (dataType) {
+    case 'NODES':
+    case 'nodes':
+      return 'Nodes'
+    case 'EDGES':
+    case 'edges':
+      return 'Edges'
+    case 'LAYERS':
+    case 'layers':
+      return 'Layers'
+    case 'GRAPH':
+    case 'graph':
+      return 'Graph'
+    default:
+      return 'Unknown'
+  }
+}
+
+// Helper function to get data source type display name (DEPRECATED)
 export const getDataSourceTypeDisplayName = (sourceType: DataSource['sourceType']): string => {
   switch (sourceType) {
     case 'csv_nodes':
@@ -192,6 +260,27 @@ export const getDataSourceTypeDisplayName = (sourceType: DataSource['sourceType'
     default:
       return 'Unknown'
   }
+}
+
+// Helper function to detect file format from filename
+export const detectFileFormat = (filename: string): FileFormat | null => {
+  const lower = filename.toLowerCase()
+  if (lower.endsWith('.csv')) return FileFormat.CSV
+  if (lower.endsWith('.tsv')) return FileFormat.TSV
+  if (lower.endsWith('.json')) return FileFormat.JSON
+  return null
+}
+
+// Helper function to check if format/type combination is valid
+export const isValidFormatTypeCombination = (format: FileFormat, type: DataType): boolean => {
+  if ((format === FileFormat.CSV || format === FileFormat.TSV) &&
+      (type === DataType.NODES || type === DataType.EDGES || type === DataType.LAYERS)) {
+    return true
+  }
+  if (format === FileFormat.JSON && type === DataType.GRAPH) {
+    return true
+  }
+  return false
 }
 
 // Helper function to get status color for badges

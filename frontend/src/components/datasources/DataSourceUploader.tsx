@@ -13,7 +13,8 @@ import {
   Alert,
   Progress,
   ActionIcon,
-  Center
+  Center,
+  Select
 } from '@mantine/core'
 import {
   IconUpload,
@@ -30,7 +31,11 @@ import { useForm } from '@mantine/form'
 import {
   CREATE_DATASOURCE_FROM_FILE,
   CreateDataSourceInput,
-  getDataSourceTypeDisplayName,
+  FileFormat,
+  DataType,
+  getFileFormatDisplayName,
+  getDataTypeDisplayName,
+  detectFileFormat,
   formatFileSize
 } from '../../graphql/datasources'
 
@@ -44,7 +49,7 @@ interface DataSourceUploaderProps {
 interface FileInfo {
   file: File
   name: string
-  type: 'csv_nodes' | 'csv_edges' | 'csv_layers' | 'json_graph' | 'unknown'
+  format: FileFormat | null
   preview?: string
 }
 
@@ -66,21 +71,25 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
   const form = useForm({
     initialValues: {
       name: '',
-      description: ''
+      description: '',
+      dataType: '' as string
     },
     validate: {
-      name: (value) => (value.trim().length > 0 ? null : 'Name is required')
+      name: (value) => (value.trim().length > 0 ? null : 'Name is required'),
+      dataType: (value) => (value ? null : 'Data type is required')
     }
   })
 
-  // Determine file type from filename
-  const determineFileType = (filename: string): FileInfo['type'] => {
-    const lower = filename.toLowerCase()
-    if (lower.includes('node') && lower.endsWith('.csv')) return 'csv_nodes'
-    if (lower.includes('edge') && lower.endsWith('.csv')) return 'csv_edges'
-    if (lower.includes('layer') && lower.endsWith('.csv')) return 'csv_layers'
-    if (lower.endsWith('.json')) return 'json_graph'
-    return 'unknown'
+  // Get available data types based on file format
+  const getAvailableDataTypes = (format: FileFormat | null): DataType[] => {
+    if (!format) return []
+    if (format === FileFormat.CSV || format === FileFormat.TSV) {
+      return [DataType.NODES, DataType.EDGES, DataType.LAYERS]
+    }
+    if (format === FileFormat.JSON) {
+      return [DataType.GRAPH]
+    }
+    return []
   }
 
   // Generate preview of file content
@@ -101,13 +110,13 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
     const file = files[0]
     if (!file) return
 
-    const fileType = determineFileType(file.name)
+    const format = detectFileFormat(file.name)
     const preview = await generatePreview(file)
 
     const fileInfo: FileInfo = {
       file,
       name: file.name.replace(/\.[^/.]+$/, ''), // Remove extension for default name
-      type: fileType,
+      format,
       preview
     }
 
@@ -116,6 +125,14 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
 
     // Auto-populate form name
     form.setFieldValue('name', fileInfo.name)
+
+    // Auto-select data type if only one option (JSON -> GRAPH)
+    const availableTypes = getAvailableDataTypes(format)
+    if (availableTypes.length === 1) {
+      form.setFieldValue('dataType', availableTypes[0])
+    } else {
+      form.setFieldValue('dataType', '')
+    }
   }
 
   const handleManualFileSelect = () => {
@@ -152,8 +169,8 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
     })
   }
 
-  const handleSubmit = async (values: { name: string; description: string }) => {
-    if (!selectedFile) return
+  const handleSubmit = async (values: { name: string; description: string; dataType: string }) => {
+    if (!selectedFile || !selectedFile.format) return
 
     try {
       setUploadProgress(10)
@@ -167,7 +184,9 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
         name: values.name,
         description: values.description || undefined,
         filename: selectedFile.file.name,
-        fileContent
+        fileContent,
+        fileFormat: selectedFile.format,
+        dataType: values.dataType as DataType
       }
 
       setUploadProgress(50)
@@ -205,20 +224,21 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
     onClose()
   }
 
-  const getFileIcon = (type: FileInfo['type']) => {
-    switch (type) {
-      case 'csv_nodes':
-      case 'csv_edges':
-      case 'csv_layers':
+  const getFileIcon = (format: FileFormat | null) => {
+    if (!format) return <IconFile size={24} color="gray" />
+    switch (format) {
+      case FileFormat.CSV:
+      case FileFormat.TSV:
         return <IconFileTypeCsv size={24} color="green" />
-      case 'json_graph':
+      case FileFormat.JSON:
         return <IconFileText size={24} color="blue" />
       default:
         return <IconFile size={24} color="gray" />
     }
   }
 
-  const isValidFileType = selectedFile?.type !== 'unknown'
+  const isValidFileFormat = selectedFile?.format !== null
+  const availableDataTypes = selectedFile ? getAvailableDataTypes(selectedFile.format) : []
 
   return (
     <>
@@ -250,16 +270,16 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
                         Click to select files
                       </Text>
                       <Text size="sm" c="dimmed" inline mt={7}>
-                        Upload CSV or JSON files for your data source
+                        Upload CSV, TSV, or JSON files for your data source
                       </Text>
                       <Text size="xs" c="dimmed" mt="md">
                         Supported formats:
                       </Text>
                       <ul style={{ fontSize: '12px', color: 'var(--mantine-color-dimmed)', margin: '4px 0' }}>
-                        <li>CSV Nodes (nodes.csv) - id, label, layer, x, y, ...</li>
-                        <li>CSV Edges (edges.csv) - id, source, target, label, ...</li>
-                        <li>CSV Layers (layers.csv) - id, label, color, ...</li>
-                        <li>JSON Graph (graph.json) - {'{nodes: [], edges: [], layers: []}'}</li>
+                        <li>CSV/TSV Nodes - id, label, layer, x, y, ...</li>
+                        <li>CSV/TSV Edges - id, source, target, label, ...</li>
+                        <li>CSV/TSV Layers - id, label, color, ...</li>
+                        <li>JSON Graph - {'{nodes: [], edges: [], layers: []}'}</li>
                       </ul>
                     </div>
                   </Group>
@@ -282,18 +302,18 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
               <Card withBorder>
                 <Group justify="space-between" align="flex-start">
                   <Group>
-                    {getFileIcon(selectedFile.type)}
+                    {getFileIcon(selectedFile.format)}
                     <div>
                       <Text fw={500}>{selectedFile.file.name}</Text>
                       <Group gap="xs" mt="xs">
                         <Badge
                           variant="light"
-                          color={isValidFileType ? 'blue' : 'red'}
+                          color={isValidFileFormat ? 'blue' : 'red'}
                           size="sm"
                         >
-                          {isValidFileType && selectedFile.type !== 'unknown'
-                            ? getDataSourceTypeDisplayName(selectedFile.type as any)
-                            : 'Unknown Type'
+                          {isValidFileFormat && selectedFile.format
+                            ? getFileFormatDisplayName(selectedFile.format)
+                            : 'Unknown Format'
                           }
                         </Badge>
                         <Text size="sm" c="dimmed">
@@ -311,18 +331,18 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
                   </ActionIcon>
                 </Group>
 
-                {!isValidFileType && (
+                {!isValidFileFormat && (
                   <Alert
                     icon={<IconAlertCircle size={16} />}
-                    title="Unsupported File Type"
+                    title="Unsupported File Format"
                     color="orange"
                     mt="md"
                   >
-                    Please upload a CSV file with 'node', 'edge', or 'layer' in the filename, or a JSON file.
+                    Please upload a CSV (.csv), TSV (.tsv), or JSON (.json) file.
                   </Alert>
                 )}
 
-                {previewData && isValidFileType && (
+                {previewData && isValidFileFormat && (
                   <div style={{ marginTop: '12px' }}>
                     <Text size="sm" fw={500} mb="xs">Preview:</Text>
                     <Text
@@ -345,8 +365,24 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
             )}
 
             {/* Form Fields */}
-            {selectedFile && isValidFileType && (
+            {selectedFile && isValidFileFormat && (
               <>
+                <Select
+                  label="Data Type"
+                  placeholder="Select what kind of data this file contains"
+                  required
+                  data={availableDataTypes.map(type => ({
+                    value: type,
+                    label: getDataTypeDisplayName(type)
+                  }))}
+                  {...form.getInputProps('dataType')}
+                  description={
+                    selectedFile.format === FileFormat.JSON
+                      ? 'JSON files must contain a complete graph structure'
+                      : 'Choose whether this file contains nodes, edges, or layers'
+                  }
+                />
+
                 <TextInput
                   label="Name"
                   placeholder="Enter a name for this data source"
@@ -387,7 +423,7 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
               <Button
                 type="submit"
                 loading={createLoading}
-                disabled={!selectedFile || !isValidFileType}
+                disabled={!selectedFile || !isValidFileFormat}
                 leftSection={uploadProgress === 100 ? <IconCheck size={16} /> : <IconUpload size={16} />}
               >
                 {uploadProgress === 100 ? 'Complete!' : 'Upload Data Source'}
@@ -401,7 +437,7 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
       <input
         ref={fileInputRef}
         type="file"
-        accept=".csv,.json"
+        accept=".csv,.tsv,.json"
         style={{ display: 'none' }}
         onChange={handleFileInputChange}
       />
