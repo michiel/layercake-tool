@@ -178,7 +178,7 @@ pub struct DocumentSession {
 pub struct ProjectSession {
     pub users: dashmap::DashMap<String, UserPresence>,
     pub documents: dashmap::DashMap<String, DocumentSession>,
-    pub connections: dashmap::DashMap<String, tokio::sync::mpsc::UnboundedSender<ServerMessage>>,
+    pub connections: dashmap::DashMap<String, tokio::sync::mpsc::Sender<ServerMessage>>,
 }
 
 /// Global collaboration state (memory-only)

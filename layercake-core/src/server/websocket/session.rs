@@ -21,13 +21,13 @@ impl SessionManager {
     }
 
     /// Join a project session
-    pub fn join_project_session(
+    pub async fn join_project_session(
         &self,
         project_id: i32,
         user_id: String,
         user_name: String,
         avatar_color: String,
-        tx: tokio::sync::mpsc::UnboundedSender<ServerMessage>,
+        tx: tokio::sync::mpsc::Sender<ServerMessage>,
     ) -> Result<(), String> {
         let project = self.state.get_or_create_project(project_id);
 
@@ -44,13 +44,13 @@ impl SessionManager {
         project.connections.insert(user_id.clone(), tx);
 
         // Broadcast user presence to all other users in the project
-        self.broadcast_user_presence(&project, &user_id)?;
+        self.broadcast_user_presence(&project, &user_id).await?;
 
         Ok(())
     }
 
     /// Leave a project session
-    pub fn leave_project_session(&self, project_id: i32, user_id: &str) -> Result<(), String> {
+    pub async fn leave_project_session(&self, project_id: i32, user_id: &str) -> Result<(), String> {
         if let Some(project) = self.state.projects.get(&project_id) {
             project.users.remove(user_id);
             project.connections.remove(user_id);
@@ -70,14 +70,14 @@ impl SessionManager {
             }
 
             // Broadcast updated presence
-            self.broadcast_user_presence(&project, user_id)?;
+            self.broadcast_user_presence(&project, user_id).await?;
         }
 
         Ok(())
     }
 
     /// Join or switch to a document within a project
-    pub fn join_document(
+    pub async fn join_document(
         &self,
         project_id: i32,
         user_id: &str,
@@ -109,13 +109,13 @@ impl SessionManager {
         }
 
         // Broadcast document activity
-        self.broadcast_document_activity(&project, &document_id)?;
+        self.broadcast_document_activity(&project, &document_id).await?;
 
         Ok(())
     }
 
     /// Update cursor position for a user in a document
-    pub fn update_cursor_position(
+    pub async fn update_cursor_position(
         &self,
         project_id: i32,
         user_id: &str,
@@ -140,7 +140,7 @@ impl SessionManager {
         }
 
         // Broadcast updated document activity
-        self.broadcast_document_activity(&project, document_id)?;
+        self.broadcast_document_activity(&project, document_id).await?;
 
         Ok(())
     }
@@ -156,9 +156,9 @@ impl SessionManager {
     }
 
     /// Broadcast user presence to all connections in a project
-    fn broadcast_user_presence(
+    async fn broadcast_user_presence<'a>(
         &self,
-        project: &Ref<i32, ProjectSession>,
+        project: &Ref<'a, i32, ProjectSession>,
         changed_user_id: &str,
     ) -> Result<(), String> {
         let presence_data = self.collect_user_presence_data(project);
@@ -167,7 +167,7 @@ impl SessionManager {
         // DashMap iterator while performing async operations. The old pattern of
         // iterating directly over project.connections.iter() causes complete server
         // deadlock when async tasks modify the map concurrently.
-        let connections: Vec<(String, mpsc::UnboundedSender<ServerMessage>)> = project
+        let connections: Vec<(String, mpsc::Sender<ServerMessage>)> = project
             .connections
             .iter()
             .filter(|entry| entry.key() != changed_user_id)
@@ -183,7 +183,7 @@ impl SessionManager {
                 data: presence_data.clone(),
             };
 
-            if let Err(_) = sender.send(message) {
+            if let Err(_) = sender.send(message).await {
                 // Connection is dead, mark for cleanup
                 tracing::warn!("Dead connection detected for user {}, scheduling removal", user_id);
                 dead_connections.push(user_id);
@@ -200,9 +200,9 @@ impl SessionManager {
     }
 
     /// Broadcast document activity to all users in the project
-    fn broadcast_document_activity(
+    async fn broadcast_document_activity<'a>(
         &self,
-        project: &Ref<i32, ProjectSession>,
+        project: &Ref<'a, i32, ProjectSession>,
         document_id: &str,
     ) -> Result<(), String> {
         if let Some(doc) = project.documents.get(document_id) {
@@ -234,7 +234,7 @@ impl SessionManager {
             // DashMap iterator while performing async operations. The old pattern of
             // iterating directly over project.connections.iter() causes complete server
             // deadlock when async tasks modify the map concurrently.
-            let connections: Vec<(String, mpsc::UnboundedSender<ServerMessage>)> = project
+            let connections: Vec<(String, mpsc::Sender<ServerMessage>)> = project
                 .connections
                 .iter()
                 .map(|entry| (entry.key().clone(), entry.value().clone()))
@@ -245,7 +245,7 @@ impl SessionManager {
 
             // Send to all connected users in the project
             for (user_id, sender) in connections {
-                if let Err(_) = sender.send(message.clone()) {
+                if let Err(_) = sender.send(message.clone()).await {
                     // Connection is dead, mark for cleanup
                     tracing::warn!("Dead connection detected for user {} (document activity), scheduling removal", user_id);
                     dead_connections.push(user_id);

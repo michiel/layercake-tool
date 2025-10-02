@@ -32,6 +32,8 @@ export function useWebSocketCollaboration(
 
   const serviceRef = useRef<WebSocketCollaborationService | null>(null);
   const isInitializedRef = useRef(false);
+  const effectRunCountRef = useRef(0);
+  const isCleanedUpRef = useRef(false);
 
   // Get server URL from environment or use provided
   const getServerUrl = useCallback(() => {
@@ -47,7 +49,31 @@ export function useWebSocketCollaboration(
 
   // Initialize service
   useEffect(() => {
-    if (!enabled || isInitializedRef.current) return;
+    if (!enabled) {
+      console.log('[useWebSocketCollaboration] Disabled, skipping initialization');
+      return;
+    }
+
+    // Track effect invocations
+    effectRunCountRef.current += 1;
+    const currentRun = effectRunCountRef.current;
+
+    console.log(`[useWebSocketCollaboration] Effect run #${currentRun}`);
+
+    // Only initialize on first run, skip StrictMode double-invocation
+    if (currentRun > 1 && !isCleanedUpRef.current) {
+      console.log('[useWebSocketCollaboration] Skipping re-initialization (StrictMode double-invocation)');
+      return;
+    }
+
+    // Check if already initialized
+    if (serviceRef.current) {
+      console.log('[useWebSocketCollaboration] Service already exists, skipping re-initialization');
+      return;
+    }
+
+    console.log('[useWebSocketCollaboration] Initializing WebSocket service for project:', projectId);
+    isCleanedUpRef.current = false;
 
     const config: WebSocketConfig = {
       url: getServerUrl(),
@@ -102,8 +128,13 @@ export function useWebSocketCollaboration(
 
     // Cleanup on unmount
     return () => {
-      service.destroy();
-      serviceRef.current = null;
+      console.log(`[useWebSocketCollaboration] Cleanup for run #${currentRun}`);
+      isCleanedUpRef.current = true;
+
+      if (serviceRef.current) {
+        serviceRef.current.destroy();
+        serviceRef.current = null;
+      }
       isInitializedRef.current = false;
     };
   }, [enabled, projectId, getServerUrl, token, options.maxReconnectAttempts, options.reconnectInterval]);

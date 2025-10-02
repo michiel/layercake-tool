@@ -84,7 +84,10 @@ export class WebSocketCollaborationService {
     this.clearHeartbeatTimer();
 
     if (this.ws) {
-      this.ws.close(1000, 'Client disconnect');
+      // Only close if WebSocket is in a state that allows closing
+      if (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING) {
+        this.ws.close(1000, 'Client disconnect');
+      }
       this.ws = null;
     }
 
