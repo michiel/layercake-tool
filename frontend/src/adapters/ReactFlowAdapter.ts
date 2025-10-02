@@ -14,14 +14,19 @@ export class ReactFlowAdapter {
    * Pure transformation with memoization for performance
    */
   static planDagToReactFlow(planDag: PlanDag): { nodes: Node[], edges: Edge[] } {
-    const cacheKey = `plandag-${planDag.version ?? 'unknown'}-${planDag.nodes.length}-${planDag.edges.length}`
+    // Create a more reliable cache key that includes node positions
+    const positionHash = planDag.nodes
+      .map(n => `${n.id}:${n.position.x},${n.position.y}`)
+      .join('|')
+      .substring(0, 50) // Limit length
+    const cacheKey = `plandag-${planDag.version}-${planDag.nodes.length}-${planDag.edges.length}-${positionHash}`
 
     if (this.CONVERSION_CACHE.has(cacheKey)) {
-      console.log('[ReactFlowAdapter] Using cached ReactFlow conversion')
+      console.log('[ReactFlowAdapter] Using cached ReactFlow conversion for version', planDag.version)
       return this.CONVERSION_CACHE.get(cacheKey)
     }
 
-    console.log('[ReactFlowAdapter] Converting Plan DAG to ReactFlow format')
+    console.log('[ReactFlowAdapter] Converting Plan DAG to ReactFlow format, version:', planDag.version)
 
     const result = {
       nodes: planDag.nodes.map(node => this.convertPlanDagNodeToReactFlow(node)),

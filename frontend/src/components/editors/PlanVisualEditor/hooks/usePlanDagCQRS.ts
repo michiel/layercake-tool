@@ -200,18 +200,36 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
       const isCurrentEmpty = nodes.length === 0 && edges.length === 0
       const isDifferentLength = reactFlowData.nodes.length !== nodes.length || reactFlowData.edges.length !== edges.length
 
-      // Only sync when the data structure actually changed (length difference or first load)
-      // Don't sync on every changeId change as that happens even for cosmetic updates
-      const shouldSync = hasNewData && (isCurrentEmpty || isDifferentLength)
+      // Check if node positions or data have changed (for real-time collaboration)
+      const hasNodeChanges = reactFlowData.nodes.some((newNode, idx) => {
+        const currentNode = nodes[idx]
+        if (!currentNode) return true
+
+        // Check position changes
+        const posChanged = newNode.position.x !== currentNode.position.x ||
+                          newNode.position.y !== currentNode.position.y
+
+        // Check if node IDs are different (reordering/replacement)
+        const idChanged = newNode.id !== currentNode.id
+
+        return posChanged || idChanged
+      })
+
+      // Only sync when the data structure actually changed (length, position, or first load)
+      const shouldSync = hasNewData && (isCurrentEmpty || isDifferentLength || hasNodeChanges)
 
       if (shouldSync) {
+        const reason = isCurrentEmpty ? 'empty' :
+                      isDifferentLength ? 'length-changed' :
+                      hasNodeChanges ? 'node-changed' : 'unknown'
+
         console.log('[usePlanDagCQRS] Syncing ReactFlow state from external data change:', {
           changeId: reactFlowDataChange.changeId,
           newNodes: reactFlowData.nodes.length,
           newEdges: reactFlowData.edges.length,
           currentNodes: nodes.length,
           currentEdges: edges.length,
-          reason: isCurrentEmpty ? 'empty' : 'length-changed'
+          reason
         })
         isSyncingFromExternalRef.current = true
         setNodes(reactFlowData.nodes)
@@ -223,8 +241,8 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
         }, 0)
       }
     }
-    // Only depend on lengths to prevent unnecessary syncs
-  }, [reactFlowData.nodes.length, reactFlowData.edges.length])
+    // Depend on reactFlowDataChange to detect all changes (positions, length, etc.)
+  }, [reactFlowDataChange, reactFlowData, nodes, edges])
 
   // Load initial data and setup subscription - FIXED: prevent infinite loop
   useEffect(() => {
