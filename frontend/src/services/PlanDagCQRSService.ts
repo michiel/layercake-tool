@@ -62,6 +62,9 @@ export class PlanDagCQRSService {
   ) {
     console.log('[PlanDagCQRSService] Creating node with ReactFlow data')
 
+    // Mark that a mutation occurred to suppress subscription echo
+    this.queries.markMutationOccurred()
+
     return this.commands.createNode({
       projectId,
       nodeType,
@@ -84,6 +87,9 @@ export class PlanDagCQRSService {
     position: { x: number; y: number }
   ) {
     console.log('[PlanDagCQRSService] Updating node position')
+
+    // Mark that a mutation occurred to suppress subscription echo
+    this.queries.markMutationOccurred()
 
     return this.commands.moveNode({
       projectId,

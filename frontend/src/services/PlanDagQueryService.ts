@@ -9,10 +9,18 @@ import { applyPatch, Operation } from 'fast-json-patch'
  * Only listens to subscriptions, never triggers mutations
  */
 export class PlanDagQueryService {
+  private lastMutationTimestamp = 0
+  private readonly MUTATION_ECHO_WINDOW_MS = 500 // Ignore subscription echos for 500ms after mutation
+
   constructor(
     private apollo: ApolloClient,
     private clientId: string
   ) {}
+
+  // Call this method after any mutation to suppress echo
+  markMutationOccurred(): void {
+    this.lastMutationTimestamp = Date.now()
+  }
 
   // Query Operations
   async getPlanDag(query: GetPlanDagQuery): Promise<PlanDag | null> {
@@ -104,6 +112,16 @@ export class PlanDagQueryService {
             userId: deltaData.userId,
             clientId: this.clientId
           })
+
+          // Skip subscription updates shortly after own mutations to prevent echo
+          const timeSinceLastMutation = Date.now() - this.lastMutationTimestamp
+          if (timeSinceLastMutation < this.MUTATION_ECHO_WINDOW_MS) {
+            console.log('[PlanDagQueryService] Skipping subscription update (recent mutation echo):', {
+              timeSinceLastMutation: `${timeSinceLastMutation}ms`,
+              window: `${this.MUTATION_ECHO_WINDOW_MS}ms`
+            })
+            return
+          }
 
           // Get current Plan DAG from the callback
           const localPlanDag = getCurrentPlanDag()
