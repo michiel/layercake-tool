@@ -671,6 +671,13 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
 
   return (
     <Stack h="100%" gap={0}>
+      <style>{`
+        .react-flow__node {
+          border: none !important;
+          padding: 0 !important;
+          background: transparent !important;
+        }
+      `}</style>
       <Group justify="space-between" p="md" bg="gray.0">
         <Group gap="md">
           <Title order={3}>Plan DAG Editor</Title>
