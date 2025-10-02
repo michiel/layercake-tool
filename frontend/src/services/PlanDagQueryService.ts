@@ -83,22 +83,26 @@ export class PlanDagQueryService {
     onUpdate: (planDag: PlanDag) => void,
     onError?: (error: Error) => void
   ) {
-    console.log('[PlanDagQueryService] Setting up delta subscription for project:', query.projectId)
+    console.log('[PlanDagQueryService] Setting up delta subscription for project:', query.projectId, 'clientId:', this.clientId)
 
     const subscription = this.apollo.subscribe({
       query: PlanDagGraphQL.PLAN_DAG_DELTA_SUBSCRIPTION,
       variables: { projectId: query.projectId }
     })
 
+    console.log('[PlanDagQueryService] Delta subscription created, waiting for updates...')
+
     return subscription.subscribe({
       next: (result: any) => {
+        console.log('[PlanDagQueryService] Raw subscription result:', result)
         const deltaData = result.data?.planDagDeltaChanged
 
         if (deltaData) {
           console.log('[PlanDagQueryService] Received delta update:', {
             version: deltaData.version,
             operations: deltaData.operations.length,
-            userId: deltaData.userId
+            userId: deltaData.userId,
+            clientId: this.clientId
           })
 
           // Get current Plan DAG from the callback
