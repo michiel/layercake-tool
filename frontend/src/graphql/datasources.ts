@@ -153,6 +153,7 @@ export enum FileFormat {
 }
 
 // Data type enum (semantic meaning)
+// Note: GraphQL name is DataSourceDataType to avoid conflict with Plan DAG DataType
 export enum DataType {
   NODES = 'NODES',
   EDGES = 'EDGES',

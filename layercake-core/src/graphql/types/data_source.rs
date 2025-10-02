@@ -113,7 +113,7 @@ pub struct CreateDataSourceInput {
     #[graphql(name = "fileFormat")]
     pub file_format: FileFormat,
     #[graphql(name = "dataType")]
-    pub data_type: DataType,
+    pub data_type: DataSourceDataType,
 }
 
 #[derive(InputObject)]
@@ -155,31 +155,32 @@ impl From<FileFormat> for crate::database::entities::data_sources::FileFormat {
 
 // Data type enum (semantic meaning)
 #[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
-pub enum DataType {
+#[graphql(name = "DataSourceDataType")]
+pub enum DataSourceDataType {
     NODES,
     EDGES,
     LAYERS,
     GRAPH,
 }
 
-impl From<crate::database::entities::data_sources::DataType> for DataType {
+impl From<crate::database::entities::data_sources::DataType> for DataSourceDataType {
     fn from(db_type: crate::database::entities::data_sources::DataType) -> Self {
         match db_type {
-            crate::database::entities::data_sources::DataType::Nodes => DataType::NODES,
-            crate::database::entities::data_sources::DataType::Edges => DataType::EDGES,
-            crate::database::entities::data_sources::DataType::Layers => DataType::LAYERS,
-            crate::database::entities::data_sources::DataType::Graph => DataType::GRAPH,
+            crate::database::entities::data_sources::DataType::Nodes => DataSourceDataType::NODES,
+            crate::database::entities::data_sources::DataType::Edges => DataSourceDataType::EDGES,
+            crate::database::entities::data_sources::DataType::Layers => DataSourceDataType::LAYERS,
+            crate::database::entities::data_sources::DataType::Graph => DataSourceDataType::GRAPH,
         }
     }
 }
 
-impl From<DataType> for crate::database::entities::data_sources::DataType {
-    fn from(gql_type: DataType) -> Self {
+impl From<DataSourceDataType> for crate::database::entities::data_sources::DataType {
+    fn from(gql_type: DataSourceDataType) -> Self {
         match gql_type {
-            DataType::NODES => crate::database::entities::data_sources::DataType::Nodes,
-            DataType::EDGES => crate::database::entities::data_sources::DataType::Edges,
-            DataType::LAYERS => crate::database::entities::data_sources::DataType::Layers,
-            DataType::GRAPH => crate::database::entities::data_sources::DataType::Graph,
+            DataSourceDataType::NODES => crate::database::entities::data_sources::DataType::Nodes,
+            DataSourceDataType::EDGES => crate::database::entities::data_sources::DataType::Edges,
+            DataSourceDataType::LAYERS => crate::database::entities::data_sources::DataType::Layers,
+            DataSourceDataType::GRAPH => crate::database::entities::data_sources::DataType::Graph,
         }
     }
 }
