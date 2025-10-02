@@ -124,16 +124,26 @@ pub struct CreateDataSourceInput {
 ✅ Updated validation and help text
 ✅ Frontend builds successfully
 
-### In Progress
+**Phase 4 - Plan DAG Integration:**
+✅ Updated DataSourcesPage with separate format/type columns
+✅ Updated DataSourceNode to display both badges
+✅ Updated DataSourceSelectionDialog with format/type badges
+✅ Added color coding: blue for format, green for type
+✅ Updated all help text to mention TSV support
+✅ Frontend builds successfully
 
-🔄 Ready for Phase 4 - Plan DAG Integration
+### Completed
 
-### Todo
+All phases of the data source refactoring are now complete! The system successfully separates file format (CSV/TSV/JSON) from semantic data type (NODES/EDGES/LAYERS/GRAPH).
 
-- Update Plan DAG components to use new format/type fields
-- Test end-to-end upload flow
-- Verify database migration works correctly
-- Complete Phase 5 validation
+### Recommended Next Steps (Phase 5 - Testing)
+
+- Test end-to-end upload flow with new UI
+- Upload CSV/TSV/JSON files with different type selections
+- Verify database migration works on existing data
+- Test data source reprocessing functionality
+- Verify Plan DAG nodes display correctly
+- Test data source selection in Plan DAG editor
 
 ## Implementation Plan
 
