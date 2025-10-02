@@ -11,7 +11,9 @@ pub struct Model {
     pub name: String,
     pub description: Option<String>,
     #[sea_orm(column_type = "Text")]
-    pub source_type: String, // 'csv_nodes', 'csv_edges', 'csv_layers', 'json_graph'
+    pub source_type: String, // DEPRECATED: kept for migration compatibility
+    pub file_format: String, // 'csv', 'tsv', 'json'
+    pub data_type: String, // 'nodes', 'edges', 'layers', 'graph'
     pub filename: String,
     #[sea_orm(column_type = "Binary(BlobSize::Blob(None))")]
     pub blob: Vec<u8>,
@@ -50,7 +52,9 @@ impl ActiveModel {
             project_id: ActiveValue::NotSet,
             name: ActiveValue::NotSet,
             description: ActiveValue::NotSet,
-            source_type: ActiveValue::NotSet,
+            source_type: Set("".to_string()), // DEPRECATED
+            file_format: ActiveValue::NotSet,
+            data_type: ActiveValue::NotSet,
             filename: ActiveValue::NotSet,
             blob: ActiveValue::NotSet,
             graph_json: Set("{}".to_string()), // Default empty JSON
@@ -83,13 +87,23 @@ impl ActiveModel {
 
 // Helper methods for the Model
 impl Model {
-    /// Get the DataSource type as an enum for type safety
-    pub fn get_source_type(&self) -> Option<DataSourceType> {
-        match self.source_type.as_str() {
-            "csv_nodes" => Some(DataSourceType::CsvNodes),
-            "csv_edges" => Some(DataSourceType::CsvEdges),
-            "csv_layers" => Some(DataSourceType::CsvLayers),
-            "json_graph" => Some(DataSourceType::JsonGraph),
+    /// Get the file format as an enum for type safety
+    pub fn get_file_format(&self) -> Option<FileFormat> {
+        match self.file_format.as_str() {
+            "csv" => Some(FileFormat::Csv),
+            "tsv" => Some(FileFormat::Tsv),
+            "json" => Some(FileFormat::Json),
+            _ => None,
+        }
+    }
+
+    /// Get the data type as an enum for type safety
+    pub fn get_data_type(&self) -> Option<DataType> {
+        match self.data_type.as_str() {
+            "nodes" => Some(DataType::Nodes),
+            "edges" => Some(DataType::Edges),
+            "layers" => Some(DataType::Layers),
+            "graph" => Some(DataType::Graph),
             _ => None,
         }
     }
@@ -116,8 +130,131 @@ impl Model {
             format!("{:.1} GB", self.file_size as f64 / (1024.0 * 1024.0 * 1024.0))
         }
     }
+
+    /// Validate that the format and type combination is valid
+    pub fn validate_format_type_combination(&self) -> Result<(), String> {
+        match (self.file_format.as_str(), self.data_type.as_str()) {
+            ("csv", "nodes") | ("csv", "edges") | ("csv", "layers") => Ok(()),
+            ("tsv", "nodes") | ("tsv", "edges") | ("tsv", "layers") => Ok(()),
+            ("json", "graph") => Ok(()),
+            (format, dtype) => Err(format!(
+                "Invalid combination: {} format cannot contain {} data",
+                format, dtype
+            )),
+        }
+    }
 }
 
+// File format enum (physical representation)
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum FileFormat {
+    Csv,
+    Tsv,
+    Json,
+}
+
+impl FileFormat {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            FileFormat::Csv => "csv",
+            FileFormat::Tsv => "tsv",
+            FileFormat::Json => "json",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s.to_lowercase().as_str() {
+            "csv" => Some(FileFormat::Csv),
+            "tsv" => Some(FileFormat::Tsv),
+            "json" => Some(FileFormat::Json),
+            _ => None,
+        }
+    }
+
+    pub fn from_extension(filename: &str) -> Option<Self> {
+        let lower = filename.to_lowercase();
+        if lower.ends_with(".csv") {
+            Some(FileFormat::Csv)
+        } else if lower.ends_with(".tsv") {
+            Some(FileFormat::Tsv)
+        } else if lower.ends_with(".json") {
+            Some(FileFormat::Json)
+        } else {
+            None
+        }
+    }
+
+    pub fn get_delimiter(&self) -> Option<u8> {
+        match self {
+            FileFormat::Csv => Some(b','),
+            FileFormat::Tsv => Some(b'\t'),
+            FileFormat::Json => None,
+        }
+    }
+}
+
+// Data type enum (semantic meaning)
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum DataType {
+    Nodes,
+    Edges,
+    Layers,
+    Graph,
+}
+
+impl DataType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            DataType::Nodes => "nodes",
+            DataType::Edges => "edges",
+            DataType::Layers => "layers",
+            DataType::Graph => "graph",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s.to_lowercase().as_str() {
+            "nodes" => Some(DataType::Nodes),
+            "edges" => Some(DataType::Edges),
+            "layers" => Some(DataType::Layers),
+            "graph" => Some(DataType::Graph),
+            _ => None,
+        }
+    }
+
+    pub fn get_expected_headers(&self) -> Vec<&'static str> {
+        match self {
+            DataType::Nodes => vec!["id", "label"],
+            DataType::Edges => vec!["id", "source", "target"],
+            DataType::Layers => vec!["id", "label"],
+            DataType::Graph => vec![], // JSON doesn't have headers
+        }
+    }
+
+    pub fn get_optional_headers(&self) -> Vec<&'static str> {
+        match self {
+            DataType::Nodes => vec!["layer", "x", "y", "description", "color"],
+            DataType::Edges => vec!["label", "description", "weight", "color"],
+            DataType::Layers => vec!["color", "description", "z_index"],
+            DataType::Graph => vec![],
+        }
+    }
+
+    pub fn is_compatible_with_format(&self, format: &FileFormat) -> bool {
+        match (format, self) {
+            (FileFormat::Csv, DataType::Nodes) |
+            (FileFormat::Csv, DataType::Edges) |
+            (FileFormat::Csv, DataType::Layers) |
+            (FileFormat::Tsv, DataType::Nodes) |
+            (FileFormat::Tsv, DataType::Edges) |
+            (FileFormat::Tsv, DataType::Layers) |
+            (FileFormat::Json, DataType::Graph) => true,
+            _ => false,
+        }
+    }
+}
+
+// DEPRECATED: Keep for backward compatibility during migration
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum DataSourceType {
     CsvNodes,
@@ -136,36 +273,12 @@ impl DataSourceType {
         }
     }
 
-    pub fn from_filename(filename: &str) -> Option<Self> {
-        let lower_filename = filename.to_lowercase();
-        if lower_filename.contains("node") && lower_filename.ends_with(".csv") {
-            Some(DataSourceType::CsvNodes)
-        } else if lower_filename.contains("edge") && lower_filename.ends_with(".csv") {
-            Some(DataSourceType::CsvEdges)
-        } else if lower_filename.contains("layer") && lower_filename.ends_with(".csv") {
-            Some(DataSourceType::CsvLayers)
-        } else if lower_filename.ends_with(".json") {
-            Some(DataSourceType::JsonGraph)
-        } else {
-            None
-        }
-    }
-
-    pub fn get_expected_headers(&self) -> Vec<&'static str> {
+    pub fn to_format_and_type(&self) -> (FileFormat, DataType) {
         match self {
-            DataSourceType::CsvNodes => vec!["id", "label"],
-            DataSourceType::CsvEdges => vec!["id", "source", "target"],
-            DataSourceType::CsvLayers => vec!["id", "label"],
-            DataSourceType::JsonGraph => vec![], // JSON doesn't have headers
-        }
-    }
-
-    pub fn get_optional_headers(&self) -> Vec<&'static str> {
-        match self {
-            DataSourceType::CsvNodes => vec!["layer", "x", "y", "description", "color"],
-            DataSourceType::CsvEdges => vec!["label", "description", "weight", "color"],
-            DataSourceType::CsvLayers => vec!["color", "description", "z_index"],
-            DataSourceType::JsonGraph => vec![],
+            DataSourceType::CsvNodes => (FileFormat::Csv, DataType::Nodes),
+            DataSourceType::CsvEdges => (FileFormat::Csv, DataType::Edges),
+            DataSourceType::CsvLayers => (FileFormat::Csv, DataType::Layers),
+            DataSourceType::JsonGraph => (FileFormat::Json, DataType::Graph),
         }
     }
 }
@@ -175,19 +288,59 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_data_source_type_from_filename() {
-        assert_eq!(DataSourceType::from_filename("nodes.csv"), Some(DataSourceType::CsvNodes));
-        assert_eq!(DataSourceType::from_filename("edges.csv"), Some(DataSourceType::CsvEdges));
-        assert_eq!(DataSourceType::from_filename("layers.csv"), Some(DataSourceType::CsvLayers));
-        assert_eq!(DataSourceType::from_filename("graph.json"), Some(DataSourceType::JsonGraph));
-        assert_eq!(DataSourceType::from_filename("unknown.txt"), None);
+    fn test_file_format_from_extension() {
+        assert_eq!(FileFormat::from_extension("test.csv"), Some(FileFormat::Csv));
+        assert_eq!(FileFormat::from_extension("test.tsv"), Some(FileFormat::Tsv));
+        assert_eq!(FileFormat::from_extension("test.json"), Some(FileFormat::Json));
+        assert_eq!(FileFormat::from_extension("test.txt"), None);
     }
 
     #[test]
-    fn test_data_source_type_headers() {
-        let node_type = DataSourceType::CsvNodes;
+    fn test_data_type_headers() {
+        let node_type = DataType::Nodes;
         assert_eq!(node_type.get_expected_headers(), vec!["id", "label"]);
         assert!(node_type.get_optional_headers().contains(&"layer"));
+    }
+
+    #[test]
+    fn test_format_type_compatibility() {
+        assert!(DataType::Nodes.is_compatible_with_format(&FileFormat::Csv));
+        assert!(DataType::Edges.is_compatible_with_format(&FileFormat::Tsv));
+        assert!(DataType::Graph.is_compatible_with_format(&FileFormat::Json));
+        assert!(!DataType::Graph.is_compatible_with_format(&FileFormat::Csv));
+        assert!(!DataType::Nodes.is_compatible_with_format(&FileFormat::Json));
+    }
+
+    #[test]
+    fn test_model_validation() {
+        let model = Model {
+            id: 1,
+            project_id: 1,
+            name: "Test".to_string(),
+            description: None,
+            source_type: "".to_string(),
+            file_format: "csv".to_string(),
+            data_type: "nodes".to_string(),
+            filename: "test.csv".to_string(),
+            blob: vec![],
+            graph_json: "{}".to_string(),
+            status: "active".to_string(),
+            error_message: None,
+            file_size: 1024,
+            processed_at: Some(chrono::Utc::now()),
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        };
+
+        assert!(model.validate_format_type_combination().is_ok());
+
+        let invalid_model = Model {
+            file_format: "json".to_string(),
+            data_type: "nodes".to_string(),
+            ..model.clone()
+        };
+
+        assert!(invalid_model.validate_format_type_combination().is_err());
     }
 
     #[test]
@@ -197,7 +350,9 @@ mod tests {
             project_id: 1,
             name: "Test".to_string(),
             description: None,
-            source_type: "csv_nodes".to_string(),
+            source_type: "".to_string(),
+            file_format: "csv".to_string(),
+            data_type: "nodes".to_string(),
             filename: "test.csv".to_string(),
             blob: vec![],
             graph_json: "{}".to_string(),
@@ -224,7 +379,9 @@ mod tests {
             project_id: 1,
             name: "Test".to_string(),
             description: None,
-            source_type: "csv_nodes".to_string(),
+            source_type: "".to_string(),
+            file_format: "csv".to_string(),
+            data_type: "nodes".to_string(),
             filename: "test.csv".to_string(),
             blob: vec![],
             graph_json: "{}".to_string(),

@@ -4,7 +4,7 @@ use sea_orm::{DatabaseConnection, EntityTrait, ColumnTrait, QueryFilter, Set, Ac
 use serde_json::{json, Value};
 use std::collections::HashMap;
 
-use crate::database::entities::data_sources::{self, DataSourceType};
+use crate::database::entities::data_sources::{self, FileFormat, DataType};
 use crate::database::entities::projects;
 
 /// Service for managing DataSources with file processing capabilities
@@ -18,6 +18,35 @@ impl DataSourceService {
         Self { db }
     }
 
+    /// DEPRECATED: Create a new DataSource from uploaded file data (old signature for compatibility)
+    pub async fn create_from_file_legacy(
+        &self,
+        project_id: i32,
+        name: String,
+        description: Option<String>,
+        filename: String,
+        file_data: Vec<u8>,
+    ) -> Result<data_sources::Model> {
+        // Auto-detect format from filename
+        let file_format = FileFormat::from_extension(&filename)
+            .ok_or_else(|| anyhow!("Unsupported file extension: {}", filename))?;
+
+        // Auto-detect type from filename (old behavior)
+        let data_type = if filename.to_lowercase().contains("node") {
+            DataType::Nodes
+        } else if filename.to_lowercase().contains("edge") {
+            DataType::Edges
+        } else if filename.to_lowercase().contains("layer") {
+            DataType::Layers
+        } else if filename.to_lowercase().ends_with(".json") {
+            DataType::Graph
+        } else {
+            return Err(anyhow!("Cannot determine data type from filename: {}", filename));
+        };
+
+        self.create_from_file(project_id, name, description, filename, file_format, data_type, file_data).await
+    }
+
     /// Create a new DataSource from uploaded file data
     pub async fn create_from_file(
         &self,
@@ -25,6 +54,8 @@ impl DataSourceService {
         name: String,
         description: Option<String>,
         filename: String,
+        file_format: FileFormat,
+        data_type: DataType,
         file_data: Vec<u8>,
     ) -> Result<data_sources::Model> {
         // Validate project exists
@@ -33,16 +64,34 @@ impl DataSourceService {
             .await?
             .ok_or_else(|| anyhow!("Project not found"))?;
 
-        // Determine source type from filename
-        let source_type = DataSourceType::from_filename(&filename)
-            .ok_or_else(|| anyhow!("Unsupported file type: {}", filename))?;
+        // Validate format and type combination
+        if !data_type.is_compatible_with_format(&file_format) {
+            return Err(anyhow!(
+                "Invalid combination: {} format cannot contain {} data",
+                file_format.as_str(),
+                data_type.as_str()
+            ));
+        }
+
+        // Validate file extension matches declared format
+        let detected_format = FileFormat::from_extension(&filename)
+            .ok_or_else(|| anyhow!("Unsupported file extension: {}", filename))?;
+        if detected_format != file_format {
+            return Err(anyhow!(
+                "File extension doesn't match declared format. Expected {}, got {}",
+                file_format.as_str(),
+                detected_format.as_str()
+            ));
+        }
 
         // Create initial DataSource record
         let data_source = data_sources::ActiveModel {
             project_id: Set(project_id),
             name: Set(name),
             description: Set(description),
-            source_type: Set(source_type.as_str().to_string()),
+            source_type: Set(format!("{}_{}", file_format.as_str(), data_type.as_str())), // Compatibility
+            file_format: Set(file_format.as_str().to_string()),
+            data_type: Set(data_type.as_str().to_string()),
             filename: Set(filename),
             blob: Set(file_data.clone()),
             file_size: Set(file_data.len() as i64),
@@ -54,7 +103,7 @@ impl DataSourceService {
         let data_source = data_source.insert(&self.db).await?;
 
         // Process the file
-        let updated_data_source = match self.process_file(&source_type, &file_data).await {
+        let updated_data_source = match self.process_file(&file_format, &data_type, &file_data).await {
             Ok(graph_json) => {
                 // Update with successful processing
                 let mut active_model: data_sources::ActiveModel = data_source.into();
@@ -132,16 +181,29 @@ impl DataSourceService {
         let data_source = self.get_by_id(id).await?
             .ok_or_else(|| anyhow!("DataSource not found"))?;
 
-        // Determine source type from new filename
-        let source_type = DataSourceType::from_filename(&filename)
-            .ok_or_else(|| anyhow!("Unsupported file type: {}", filename))?;
+        // Detect format from filename extension
+        let file_format = FileFormat::from_extension(&filename)
+            .ok_or_else(|| anyhow!("Unsupported file extension: {}", filename))?;
+
+        // Get existing data type from the data source
+        let data_type = data_source.get_data_type()
+            .ok_or_else(|| anyhow!("Invalid data type in existing data source"))?;
+
+        // Validate format/type combination
+        if !data_type.is_compatible_with_format(&file_format) {
+            return Err(anyhow!(
+                "Invalid combination: {} format cannot contain {} data",
+                file_format.as_str(),
+                data_type.as_str()
+            ));
+        }
 
         // Update with new file data
         let mut active_model: data_sources::ActiveModel = data_source.into();
         active_model.filename = Set(filename);
         active_model.blob = Set(file_data.clone());
         active_model.file_size = Set(file_data.len() as i64);
-        active_model.source_type = Set(source_type.as_str().to_string());
+        active_model.file_format = Set(file_format.as_str().to_string());
         active_model.status = Set("processing".to_string());
         active_model.error_message = Set(None);
         active_model.updated_at = Set(chrono::Utc::now());
@@ -149,7 +211,7 @@ impl DataSourceService {
         let data_source = active_model.update(&self.db).await?;
 
         // Process the new file
-        let updated_data_source = match self.process_file(&source_type, &file_data).await {
+        let updated_data_source = match self.process_file(&file_format, &data_type, &file_data).await {
             Ok(graph_json) => {
                 let mut active_model: data_sources::ActiveModel = data_source.into();
                 active_model.graph_json = Set(graph_json);
@@ -190,8 +252,10 @@ impl DataSourceService {
         let data_source = self.get_by_id(id).await?
             .ok_or_else(|| anyhow!("DataSource not found"))?;
 
-        let source_type = data_source.get_source_type()
-            .ok_or_else(|| anyhow!("Invalid source type"))?;
+        let file_format = data_source.get_file_format()
+            .ok_or_else(|| anyhow!("Invalid file format"))?;
+        let data_type = data_source.get_data_type()
+            .ok_or_else(|| anyhow!("Invalid data type"))?;
 
         // Set to processing status
         let mut active_model: data_sources::ActiveModel = data_source.into();
@@ -202,7 +266,7 @@ impl DataSourceService {
         let data_source = active_model.update(&self.db).await?;
 
         // Process the file
-        let updated_data_source = match self.process_file(&source_type, &data_source.blob).await {
+        let updated_data_source = match self.process_file(&file_format, &data_type, &data_source.blob).await {
             Ok(graph_json) => {
                 let mut active_model: data_sources::ActiveModel = data_source.into();
                 active_model.graph_json = Set(graph_json);
@@ -227,20 +291,25 @@ impl DataSourceService {
     }
 
     /// Process uploaded file data into graph JSON
-    async fn process_file(&self, source_type: &DataSourceType, file_data: &[u8]) -> Result<String> {
-        match source_type {
-            DataSourceType::CsvNodes => self.process_csv_nodes(file_data).await,
-            DataSourceType::CsvEdges => self.process_csv_edges(file_data).await,
-            DataSourceType::CsvLayers => self.process_csv_layers(file_data).await,
-            DataSourceType::JsonGraph => self.process_json_graph(file_data).await,
+    async fn process_file(&self, file_format: &FileFormat, data_type: &DataType, file_data: &[u8]) -> Result<String> {
+        match (file_format, data_type) {
+            (FileFormat::Csv, DataType::Nodes) => self.process_delimited_nodes(file_data, b',').await,
+            (FileFormat::Csv, DataType::Edges) => self.process_delimited_edges(file_data, b',').await,
+            (FileFormat::Csv, DataType::Layers) => self.process_delimited_layers(file_data, b',').await,
+            (FileFormat::Tsv, DataType::Nodes) => self.process_delimited_nodes(file_data, b'\t').await,
+            (FileFormat::Tsv, DataType::Edges) => self.process_delimited_edges(file_data, b'\t').await,
+            (FileFormat::Tsv, DataType::Layers) => self.process_delimited_layers(file_data, b'\t').await,
+            (FileFormat::Json, DataType::Graph) => self.process_json_graph(file_data).await,
+            _ => Err(anyhow!("Invalid format/type combination")),
         }
     }
 
-    /// Process CSV nodes file
-    async fn process_csv_nodes(&self, file_data: &[u8]) -> Result<String> {
+    /// Process delimited nodes file (CSV or TSV)
+    async fn process_delimited_nodes(&self, file_data: &[u8], delimiter: u8) -> Result<String> {
         let content = String::from_utf8(file_data.to_vec())?;
         let mut reader = ReaderBuilder::new()
             .has_headers(true)
+            .delimiter(delimiter)
             .from_reader(content.as_bytes());
 
         let headers = reader.headers()?.clone();
@@ -292,11 +361,12 @@ impl DataSourceService {
         Ok(serde_json::to_string(&graph_json)?)
     }
 
-    /// Process CSV edges file
-    async fn process_csv_edges(&self, file_data: &[u8]) -> Result<String> {
+    /// Process delimited edges file (CSV or TSV)
+    async fn process_delimited_edges(&self, file_data: &[u8], delimiter: u8) -> Result<String> {
         let content = String::from_utf8(file_data.to_vec())?;
         let mut reader = ReaderBuilder::new()
             .has_headers(true)
+            .delimiter(delimiter)
             .from_reader(content.as_bytes());
 
         let headers = reader.headers()?.clone();
@@ -344,11 +414,12 @@ impl DataSourceService {
         Ok(serde_json::to_string(&graph_json)?)
     }
 
-    /// Process CSV layers file
-    async fn process_csv_layers(&self, file_data: &[u8]) -> Result<String> {
+    /// Process delimited layers file (CSV or TSV)
+    async fn process_delimited_layers(&self, file_data: &[u8], delimiter: u8) -> Result<String> {
         let content = String::from_utf8(file_data.to_vec())?;
         let mut reader = ReaderBuilder::new()
             .has_headers(true)
+            .delimiter(delimiter)
             .from_reader(content.as_bytes());
 
         let headers = reader.headers()?.clone();
@@ -440,11 +511,18 @@ mod tests {
     }
 
     #[test]
-    fn test_data_source_type_validation() {
-        assert_eq!(DataSourceType::from_filename("nodes.csv"), Some(DataSourceType::CsvNodes));
-        assert_eq!(DataSourceType::from_filename("test_nodes.csv"), Some(DataSourceType::CsvNodes));
-        assert_eq!(DataSourceType::from_filename("edges.csv"), Some(DataSourceType::CsvEdges));
-        assert_eq!(DataSourceType::from_filename("graph.json"), Some(DataSourceType::JsonGraph));
-        assert_eq!(DataSourceType::from_filename("unknown.txt"), None);
+    fn test_file_format_detection() {
+        assert_eq!(FileFormat::from_extension("test.csv"), Some(FileFormat::Csv));
+        assert_eq!(FileFormat::from_extension("test.tsv"), Some(FileFormat::Tsv));
+        assert_eq!(FileFormat::from_extension("test.json"), Some(FileFormat::Json));
+        assert_eq!(FileFormat::from_extension("unknown.txt"), None);
+    }
+
+    #[test]
+    fn test_data_type_compatibility() {
+        assert!(DataType::Nodes.is_compatible_with_format(&FileFormat::Csv));
+        assert!(DataType::Edges.is_compatible_with_format(&FileFormat::Tsv));
+        assert!(DataType::Graph.is_compatible_with_format(&FileFormat::Json));
+        assert!(!DataType::Graph.is_compatible_with_format(&FileFormat::Csv));
     }
 }

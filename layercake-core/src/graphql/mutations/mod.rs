@@ -1082,12 +1082,18 @@ impl Mutation {
         let file_content = base64::engine::general_purpose::STANDARD.decode(&input.file_content)
             .map_err(|e| Error::new(format!("Failed to decode base64 file content: {}", e)))?;
 
+        // Convert GraphQL enums to database enums
+        let file_format = input.file_format.into();
+        let data_type = input.data_type.into();
+
         let data_source = data_source_service
             .create_from_file(
                 input.project_id,
                 input.name,
                 input.description,
                 input.filename,
+                file_format,
+                data_type,
                 file_content,
             )
             .await

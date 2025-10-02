@@ -7,6 +7,7 @@ mod m004_create_data_sources;
 mod m005_add_plan_dag_version;
 mod m007_remove_unused_plan_dag_json;
 mod m008_add_edge_handles;
+mod m009_refactor_data_source_types;
 
 pub struct Migrator;
 
@@ -21,6 +22,7 @@ impl MigratorTrait for Migrator {
             Box::new(m005_add_plan_dag_version::Migration),
             Box::new(m007_remove_unused_plan_dag_json::Migration),
             Box::new(m008_add_edge_handles::Migration),
+            Box::new(m009_refactor_data_source_types::Migration),
         ]
     }
 }

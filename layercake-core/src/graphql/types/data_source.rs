@@ -13,7 +13,11 @@ pub struct DataSource {
     pub name: String,
     pub description: Option<String>,
     #[graphql(name = "sourceType")]
-    pub source_type: String,
+    pub source_type: String, // DEPRECATED: kept for backward compatibility
+    #[graphql(name = "fileFormat")]
+    pub file_format: String,
+    #[graphql(name = "dataType")]
+    pub data_type: String,
     pub filename: String,
     #[graphql(name = "graphJson")]
     pub graph_json: String,
@@ -83,6 +87,8 @@ impl From<crate::database::entities::data_sources::Model> for DataSource {
             name: model.name,
             description: model.description,
             source_type: model.source_type,
+            file_format: model.file_format,
+            data_type: model.data_type,
             filename: model.filename,
             graph_json: model.graph_json,
             status: model.status,
@@ -104,6 +110,10 @@ pub struct CreateDataSourceInput {
     pub filename: String,
     #[graphql(name = "fileContent")]
     pub file_content: String, // Base64 encoded file content
+    #[graphql(name = "fileFormat")]
+    pub file_format: FileFormat,
+    #[graphql(name = "dataType")]
+    pub data_type: DataType,
 }
 
 #[derive(InputObject)]
@@ -115,7 +125,66 @@ pub struct UpdateDataSourceInput {
     pub file_content: Option<String>, // Base64 encoded file content
 }
 
-// Data source type enum
+// File format enum (physical representation)
+#[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
+pub enum FileFormat {
+    CSV,
+    TSV,
+    JSON,
+}
+
+impl From<crate::database::entities::data_sources::FileFormat> for FileFormat {
+    fn from(db_format: crate::database::entities::data_sources::FileFormat) -> Self {
+        match db_format {
+            crate::database::entities::data_sources::FileFormat::Csv => FileFormat::CSV,
+            crate::database::entities::data_sources::FileFormat::Tsv => FileFormat::TSV,
+            crate::database::entities::data_sources::FileFormat::Json => FileFormat::JSON,
+        }
+    }
+}
+
+impl From<FileFormat> for crate::database::entities::data_sources::FileFormat {
+    fn from(gql_format: FileFormat) -> Self {
+        match gql_format {
+            FileFormat::CSV => crate::database::entities::data_sources::FileFormat::Csv,
+            FileFormat::TSV => crate::database::entities::data_sources::FileFormat::Tsv,
+            FileFormat::JSON => crate::database::entities::data_sources::FileFormat::Json,
+        }
+    }
+}
+
+// Data type enum (semantic meaning)
+#[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
+pub enum DataType {
+    NODES,
+    EDGES,
+    LAYERS,
+    GRAPH,
+}
+
+impl From<crate::database::entities::data_sources::DataType> for DataType {
+    fn from(db_type: crate::database::entities::data_sources::DataType) -> Self {
+        match db_type {
+            crate::database::entities::data_sources::DataType::Nodes => DataType::NODES,
+            crate::database::entities::data_sources::DataType::Edges => DataType::EDGES,
+            crate::database::entities::data_sources::DataType::Layers => DataType::LAYERS,
+            crate::database::entities::data_sources::DataType::Graph => DataType::GRAPH,
+        }
+    }
+}
+
+impl From<DataType> for crate::database::entities::data_sources::DataType {
+    fn from(gql_type: DataType) -> Self {
+        match gql_type {
+            DataType::NODES => crate::database::entities::data_sources::DataType::Nodes,
+            DataType::EDGES => crate::database::entities::data_sources::DataType::Edges,
+            DataType::LAYERS => crate::database::entities::data_sources::DataType::Layers,
+            DataType::GRAPH => crate::database::entities::data_sources::DataType::Graph,
+        }
+    }
+}
+
+// DEPRECATED: Data source type enum (kept for backward compatibility)
 #[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub enum DataSourceType {
     #[graphql(name = "csv_nodes")]
