@@ -188,10 +188,21 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
   // Handle node changes (position, selection, etc.)
   const handleNodesChange = useCallback(
     (changes: NodeChange[]) => {
-      // Track performance for node changes
-      planDagState.performanceMonitor.trackEvent('nodeChanges')
-
+      // Always apply changes to ReactFlow for visual updates
       onNodesChange(changes)
+
+      // Skip performance tracking and side effects during drag
+      // Position changes during drag are cosmetic only - actual save happens in handleNodeDragStop
+      if (isDragging.current) {
+        const hasNonPositionChanges = changes.some(change => change.type !== 'position')
+        if (!hasNonPositionChanges) {
+          // All changes are position updates during drag - skip side effects
+          return
+        }
+      }
+
+      // Track performance for significant changes only (not position updates during drag)
+      planDagState.performanceMonitor.trackEvent('nodeChanges')
 
       // DELTA MIGRATION: Disabled bulk update - granular mutations generate deltas
       // Handle structural changes with unified update manager
@@ -217,10 +228,12 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
 
   // Track initial positions when drag starts
   const dragStartPositions = useRef<Record<string, { x: number; y: number }>>({})
+  const isDragging = useRef(false)
 
   // Handle flow node drag start - track initial position
   const handleFlowNodeDragStart = useCallback(
     (_event: React.MouseEvent, node: Node) => {
+      isDragging.current = true
       dragStartPositions.current[node.id] = { ...node.position }
     },
     []
@@ -229,6 +242,8 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
   // Handle node drag end - save position only when position actually changed
   const handleNodeDragStop = useCallback(
     (_event: React.MouseEvent, node: Node) => {
+      isDragging.current = false
+
       if (!readonly) {
         const initialPosition = dragStartPositions.current[node.id]
         if (initialPosition) {
@@ -256,7 +271,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         }
       }
     },
-    [mutations, readonly, updateManager, planDag]
+    [mutations, readonly, updateManager, planDag, planDagState.performanceMonitor]
   )
 
   // Note: Node editing is handled by individual icon clicks within node components
