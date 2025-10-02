@@ -91,10 +91,11 @@ pub struct CreateDataSourceInput {
 
 ## Implementation Status
 
-**Current Progress**: Phase 1 - Backend Schema (Completed)
+**Current Progress**: Phase 3 - Frontend UI Updates (Completed)
 
 ### Completed Tasks
 
+**Phase 1 - Backend Schema:**
 ✅ Migration m009 created with new columns
 ✅ Entity model updated with file_format and data_type fields
 ✅ New FileFormat and DataType enums created
@@ -106,16 +107,33 @@ pub struct CreateDataSourceInput {
 ✅ All call sites updated (update_file, reprocess)
 ✅ Backend compiles successfully
 
+**Phase 2 - Backend Service Layer:**
+✅ Updated create_from_file() to accept file_format and data_type
+✅ Added format/type validation
+✅ Added TSV support via delimiter parameter
+✅ Updated update_file() and reprocess() methods
+✅ Maintained backward compatibility with create_from_file_legacy()
+
+**Phase 3 - Frontend UI:**
+✅ Updated GraphQL queries/mutations with new fields
+✅ Added FileFormat and DataType enums
+✅ Updated DataSourceUploader with format auto-detection
+✅ Added data type selector dropdown (required field)
+✅ Auto-selects GRAPH for JSON files
+✅ Shows format badge and available types
+✅ Updated validation and help text
+✅ Frontend builds successfully
+
 ### In Progress
 
-🔄 Phase 3 - Frontend UI Updates
+🔄 Ready for Phase 4 - Plan DAG Integration
 
 ### Todo
 
-- Update frontend DataSourceUploader.tsx with format detection and type dropdown
-- Update frontend GraphQL mutations
-- Update Plan DAG integration components
-- Complete Phase 4 and 5
+- Update Plan DAG components to use new format/type fields
+- Test end-to-end upload flow
+- Verify database migration works correctly
+- Complete Phase 5 validation
 
 ## Implementation Plan
 
