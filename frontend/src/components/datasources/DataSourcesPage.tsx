@@ -39,7 +39,8 @@ import {
   REPROCESS_DATASOURCE,
   DataSource,
   formatFileSize,
-  getDataSourceTypeDisplayName,
+  getFileFormatDisplayName,
+  getDataTypeDisplayName,
   getStatusColor
 } from '../../graphql/datasources'
 
@@ -199,7 +200,7 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
           <div>
             <Title order={1}>Data Sources</Title>
             <Text size="sm" c="dimmed" mt="xs">
-              Manage CSV and JSON files that serve as input data for your Plan DAGs
+              Manage CSV, TSV, and JSON files that serve as input data for your Plan DAGs
             </Text>
           </div>
           <Button
@@ -230,7 +231,7 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
               <div style={{ textAlign: 'center' }}>
                 <Title order={3}>No Data Sources</Title>
                 <Text c="dimmed" mb="md">
-                  Upload CSV or JSON files to create your first data source.
+                  Upload CSV, TSV, or JSON files to create your first data source.
                 </Text>
                 <Button
                   leftSection={<IconPlus size={16} />}
@@ -246,7 +247,8 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
                 <Table.Thead>
                   <Table.Tr>
                     <Table.Th>Name</Table.Th>
-                    <Table.Th>Type</Table.Th>
+                    <Table.Th>Format</Table.Th>
+                    <Table.Th>Data Type</Table.Th>
                     <Table.Th>Status</Table.Th>
                     <Table.Th>File</Table.Th>
                     <Table.Th>Size</Table.Th>
@@ -268,8 +270,13 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
                         </div>
                       </Table.Td>
                       <Table.Td>
-                        <Badge variant="light" size="sm">
-                          {getDataSourceTypeDisplayName(dataSource.sourceType)}
+                        <Badge variant="light" color="blue" size="sm">
+                          {getFileFormatDisplayName(dataSource.fileFormat)}
+                        </Badge>
+                      </Table.Td>
+                      <Table.Td>
+                        <Badge variant="light" color="green" size="sm">
+                          {getDataTypeDisplayName(dataSource.dataType)}
                         </Badge>
                       </Table.Td>
                       <Table.Td>

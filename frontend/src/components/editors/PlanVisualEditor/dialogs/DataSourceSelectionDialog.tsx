@@ -28,7 +28,8 @@ import {
 import {
   GET_DATASOURCES,
   DataSource,
-  getDataSourceTypeDisplayName,
+  getFileFormatDisplayName,
+  getDataTypeDisplayName,
   formatFileSize,
   getStatusColor
 } from '../../../../graphql/datasources'
@@ -198,8 +199,11 @@ export const DataSourceSelectionDialog: React.FC<DataSourceSelectionDialogProps>
                         >
                           {dataSource.status}
                         </Badge>
-                        <Badge variant="outline" size="sm">
-                          {getDataSourceTypeDisplayName(dataSource.sourceType)}
+                        <Badge variant="outline" size="sm" color="blue">
+                          {getFileFormatDisplayName(dataSource.fileFormat)}
+                        </Badge>
+                        <Badge variant="outline" size="sm" color="green">
+                          {getDataTypeDisplayName(dataSource.dataType)}
                         </Badge>
                       </Group>
 

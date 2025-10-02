@@ -5,7 +5,7 @@ import { Paper, Text, Group, ActionIcon, Tooltip, Badge, Stack, Loader } from '@
 import { IconSettings, IconTrash, IconFile, IconAlertCircle, IconCheck, IconClock, IconX } from '@tabler/icons-react'
 import { PlanDagNodeType, DataSourceNodeConfig } from '../../../../types/plan-dag'
 import { getNodeTypeColor, isNodeConfigured } from '../../../../utils/planDagValidation'
-import { GET_DATASOURCE, DataSource, getDataSourceTypeDisplayName, formatFileSize, getStatusColor } from '../../../../graphql/datasources'
+import { GET_DATASOURCE, DataSource, getFileFormatDisplayName, getDataTypeDisplayName, formatFileSize, getStatusColor } from '../../../../graphql/datasources'
 
 // Helper function to get data freshness information
 const getDataFreshness = (dataSource: DataSource) => {
@@ -103,8 +103,11 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
               >
                 {dataSourceInfo.status}
               </Badge>
-              <Badge variant="outline" size="xs">
-                {getDataSourceTypeDisplayName(dataSourceInfo.sourceType)}
+              <Badge variant="outline" size="xs" color="blue">
+                {getFileFormatDisplayName(dataSourceInfo.fileFormat)}
+              </Badge>
+              <Badge variant="outline" size="xs" color="green">
+                {getDataTypeDisplayName(dataSourceInfo.dataType)}
               </Badge>
             </Group>
 
