@@ -79,37 +79,37 @@ export const AdvancedToolbar: React.FC<AdvancedToolbarProps> = ({
       type: PlanDagNodeType.DATA_SOURCE,
       label: 'Data Source',
       icon: <IconDatabase size="0.7rem" />,
-      color: '#51cf66'
+      color: '#10b981' // Emerald-500
     },
     {
       type: PlanDagNodeType.GRAPH,
       label: 'Graph',
       icon: <IconNetwork size="0.7rem" />,
-      color: '#339af0'
+      color: '#3b82f6' // Blue-500
     },
     {
       type: PlanDagNodeType.TRANSFORM,
       label: 'Transform',
       icon: <IconTransform size="0.7rem" />,
-      color: '#ff8cc8'
+      color: '#8b5cf6' // Violet-500
     },
     {
       type: PlanDagNodeType.MERGE,
       label: 'Merge',
       icon: <IconGitMerge size="0.7rem" />,
-      color: '#ffd43b'
+      color: '#8b5cf6' // Violet-500
     },
     {
       type: PlanDagNodeType.COPY,
       label: 'Copy',
       icon: <IconCopy size="0.7rem" />,
-      color: '#74c0fc'
+      color: '#8b5cf6' // Violet-500
     },
     {
       type: PlanDagNodeType.OUTPUT,
       label: 'Output',
       icon: <IconFileExport size="0.7rem" />,
-      color: '#ff6b6b'
+      color: '#f59e0b' // Amber-500
     }
   ];
 

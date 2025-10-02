@@ -2,9 +2,10 @@ import { memo, useState, useEffect } from 'react'
 import { NodeProps, Handle, Position } from 'reactflow'
 import { useQuery } from '@apollo/client/react'
 import { Paper, Text, Group, ActionIcon, Tooltip, Badge, Stack, Loader } from '@mantine/core'
-import { IconSettings, IconTrash, IconFile, IconAlertCircle, IconCheck, IconClock, IconX } from '@tabler/icons-react'
+import { IconSettings, IconTrash, IconAlertCircle, IconCheck, IconClock, IconX } from '@tabler/icons-react'
 import { PlanDagNodeType, DataSourceNodeConfig } from '../../../../types/plan-dag'
-import { getNodeTypeColor, isNodeConfigured } from '../../../../utils/planDagValidation'
+import { isNodeConfigured } from '../../../../utils/planDagValidation'
+import { getNodeColor, getNodeIcon, getNodeTypeLabel } from '../../../../utils/nodeStyles'
 import { GET_DATASOURCE, DataSource, getFileFormatDisplayName, getDataTypeDisplayName, formatFileSize, getStatusColor } from '../../../../graphql/datasources'
 
 // Helper function to get data freshness information
@@ -43,9 +44,9 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
   const [dataSourceInfo, setDataSourceInfo] = useState<DataSource | null>(null)
 
   const config = data.config as DataSourceNodeConfig
-  const color = getNodeTypeColor(PlanDagNodeType.DATA_SOURCE)
+  const color = getNodeColor(PlanDagNodeType.DATA_SOURCE)
 
-  // Check if node is configured according to SPECIFICATION.md
+  // Check if node is configured
   const edges = data.edges || []
   const hasValidConfig = data.hasValidConfig !== false
   const isConfigured = isNodeConfigured(PlanDagNodeType.DATA_SOURCE, props.id, edges, hasValidConfig)
@@ -91,27 +92,33 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
 
       return (
         <Stack gap="xs">
-          <Group gap="xs" justify="space-between">
-            <Group gap="xs">
-              <Badge
-                size="xs"
-                color={getStatusColor(dataSourceInfo.status)}
-                leftSection={getStatusIcon(dataSourceInfo.status)}
-                style={{
-                  animation: dataSourceInfo.status === 'processing' ? 'pulse 2s infinite' : undefined
-                }}
-              >
-                {dataSourceInfo.status}
-              </Badge>
-              <Badge variant="outline" size="xs" color="blue">
-                {getFileFormatDisplayName(dataSourceInfo.fileFormat)}
-              </Badge>
-              <Badge variant="outline" size="xs" color="green">
-                {getDataTypeDisplayName(dataSourceInfo.dataType)}
-              </Badge>
-            </Group>
+          <Group gap="xs" wrap="wrap">
+            <Badge
+              size="xs"
+              color={getStatusColor(dataSourceInfo.status)}
+              leftSection={getStatusIcon(dataSourceInfo.status)}
+              style={{
+                animation: dataSourceInfo.status === 'processing' ? 'pulse 2s infinite' : undefined
+              }}
+            >
+              {dataSourceInfo.status}
+            </Badge>
+            <Badge variant="outline" size="xs" color="blue">
+              {getFileFormatDisplayName(dataSourceInfo.fileFormat)}
+            </Badge>
+            <Badge variant="outline" size="xs" color="green">
+              {getDataTypeDisplayName(dataSourceInfo.dataType)}
+            </Badge>
+          </Group>
 
-            {/* Data freshness indicator */}
+          <Text size="xs" c="dimmed" ff="monospace" lineClamp={1}>
+            {dataSourceInfo.filename}
+          </Text>
+
+          <Group gap="xs" justify="space-between" wrap="wrap">
+            <Text size="xs" c="dimmed">
+              {formatFileSize(dataSourceInfo.fileSize)}
+            </Text>
             <Tooltip label={`Last processed: ${dataSourceInfo.processedAt ? new Date(dataSourceInfo.processedAt).toLocaleString() : 'Never'}`}>
               <Badge
                 size="xs"
@@ -122,19 +129,6 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
                 {freshness.text}
               </Badge>
             </Tooltip>
-          </Group>
-
-          <Text size="xs" c="dimmed" ff="monospace" lineClamp={1}>
-            {dataSourceInfo.filename}
-          </Text>
-
-          <Group gap="xs" justify="space-between">
-            <Text size="xs" c="dimmed">
-              {formatFileSize(dataSourceInfo.fileSize)}
-            </Text>
-            <Text size="xs" c="dimmed">
-              {new Date(dataSourceInfo.updatedAt).toLocaleDateString()}
-            </Text>
           </Group>
 
           {dataSourceInfo.status === 'error' && dataSourceInfo.errorMessage && (
@@ -165,21 +159,15 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
 
     // No DataSource configured
     return (
-      <Stack gap="xs">
-        <Badge variant="outline" size="xs" color="orange">
-          Not Configured
-        </Badge>
-        <Text size="xs" c="dimmed">
-          Click to select DataSource
-        </Text>
-      </Stack>
+      <Text size="xs" c="dimmed">
+        Click edit to select a data source
+      </Text>
     )
   }
 
   return (
     <>
       {/* Output Handles - DataSource nodes only have outputs, no inputs */}
-      {/* Right Output Handle */}
       <Handle
         type="source"
         position={Position.Right}
@@ -189,11 +177,9 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
           border: `2px solid ${color}`,
           width: 12,
           height: 12,
-          borderRadius: '0', // Square for outputs
+          borderRadius: '0',
         }}
       />
-
-      {/* Bottom Output Handle */}
       <Handle
         type="source"
         position={Position.Bottom}
@@ -203,36 +189,87 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
           border: `2px solid ${color}`,
           width: 12,
           height: 12,
-          borderRadius: '0', // Square for outputs
+          borderRadius: '0',
         }}
       />
 
       {/* Node Content */}
       <Paper
         shadow={selected ? "md" : "sm"}
-        p="sm"
+        p="md"
         style={{
-          border: selected
-            ? `2px solid ${color}`
-            : !isConfigured
-              ? `2px solid #fd7e14` // Orange outline for unconfigured nodes
-              : `1px solid #e9ecef`,
+          border: `2px solid ${color}`,
           borderRadius: 8,
           minWidth: 200,
           maxWidth: 280,
           background: '#fff',
-          cursor: 'default', // Remove pointer cursor since we don't want click-to-edit
+          cursor: 'default',
         }}
       >
-        <Group justify="space-between" mb="xs">
-          <Group gap="xs">
-            <IconFile size={14} />
+        {/* Top right: Edit and Delete icons */}
+        {!readonly && (
+          <Group gap={4} style={{ position: 'absolute', top: 8, right: 8 }}>
+            <Tooltip label="Edit data source">
+              <ActionIcon
+                size="sm"
+                variant="subtle"
+                color="gray"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onEdit?.(props.id)
+                }}
+              >
+                <IconSettings size="0.8rem" />
+              </ActionIcon>
+            </Tooltip>
+            <Tooltip label="Delete node">
+              <ActionIcon
+                size="sm"
+                variant="subtle"
+                color="red"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onDelete?.(props.id)
+                }}
+              >
+                <IconTrash size="0.8rem" />
+              </ActionIcon>
+            </Tooltip>
+          </Group>
+        )}
+
+        {/* Middle: Icon and Label */}
+        <Group gap="sm" mb="sm" wrap="nowrap" style={{ paddingRight: !readonly ? 60 : 0 }}>
+          <div style={{
+            color,
+            display: 'flex',
+            alignItems: 'center',
+            flexShrink: 0
+          }}>
+            {getNodeIcon(PlanDagNodeType.DATA_SOURCE, '1.4rem')}
+          </div>
+          <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
+            <Text size="sm" fw={600} lineClamp={2} style={{ wordBreak: 'break-word' }}>
+              {data.metadata.label}
+            </Text>
+            {data.metadata.description && (
+              <Text size="xs" c="dimmed" lineClamp={2} style={{ wordBreak: 'break-word' }}>
+                {data.metadata.description}
+              </Text>
+            )}
+          </Stack>
+        </Group>
+
+        {/* Bottom: Labels and data source details */}
+        <Stack gap="xs">
+          <Group gap="xs" wrap="wrap">
             <Badge
-              color={color}
               variant="light"
-              size="sm"
+              color={color}
+              size="xs"
+              style={{ textTransform: 'none' }}
             >
-              Data Source
+              {getNodeTypeLabel(PlanDagNodeType.DATA_SOURCE)}
             </Badge>
             {!isConfigured && (
               <Badge variant="outline" size="xs" color="orange">
@@ -241,52 +278,9 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
             )}
           </Group>
 
-          {!readonly && (
-            <Group gap="xs">
-              <Tooltip label="Edit DataSource">
-                <ActionIcon
-                  size="sm"
-                  variant="subtle"
-                  color="gray"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onEdit?.(props.id)
-                  }}
-                >
-                  <IconSettings size="0.8rem" />
-                </ActionIcon>
-              </Tooltip>
-              <Tooltip label="Delete node">
-                <ActionIcon
-                  size="sm"
-                  variant="subtle"
-                  color="red"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onDelete?.(props.id)
-                  }}
-                >
-                  <IconTrash size="0.8rem" />
-                </ActionIcon>
-              </Tooltip>
-            </Group>
-          )}
-        </Group>
-
-        <Text size="sm" fw={500} mb="xs">
-          {data.metadata.label}
-        </Text>
-
-        {data.metadata.description && (
-          <Text size="xs" c="dimmed" lineClamp={2} mb="xs">
-            {data.metadata.description}
-          </Text>
-        )}
-
-        {/* DataSource-specific content */}
-        <div style={{ marginTop: 8 }}>
+          {/* DataSource-specific content */}
           {renderDataSourceContent()}
-        </div>
+        </Stack>
       </Paper>
     </>
   )

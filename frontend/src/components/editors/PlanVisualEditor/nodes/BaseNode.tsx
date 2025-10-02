@@ -1,9 +1,10 @@
 import { memo } from 'react'
 import { Handle, Position, NodeProps } from 'reactflow'
-import { Paper, Text, Group, ActionIcon, Tooltip, Badge } from '@mantine/core'
+import { Paper, Text, Group, ActionIcon, Tooltip, Badge, Stack } from '@mantine/core'
 import { IconSettings, IconTrash } from '@tabler/icons-react'
 import { PlanDagNodeType, NodeConfig, NodeMetadata } from '../../../../types/plan-dag'
-import { getNodeTypeColor, getRequiredInputCount, canHaveMultipleOutputs, isNodeConfigured } from '../../../../utils/planDagValidation'
+import { getRequiredInputCount, canHaveMultipleOutputs, isNodeConfigured } from '../../../../utils/planDagValidation'
+import { getNodeColor, getNodeIcon, getNodeTypeLabel } from '../../../../utils/nodeStyles'
 
 interface BaseNodeProps extends NodeProps {
   nodeType: PlanDagNodeType
@@ -12,13 +13,13 @@ interface BaseNodeProps extends NodeProps {
   onEdit?: () => void
   onDelete?: () => void
   readonly?: boolean
-  edges?: any[] // Add edges for configuration validation
-  hasValidConfig?: boolean // Add configuration validation flag
+  edges?: any[]
+  hasValidConfig?: boolean
+  children?: React.ReactNode
 }
 
 export const BaseNode = memo(({
   nodeType,
-  config,
   metadata,
   selected,
   onEdit,
@@ -26,33 +27,21 @@ export const BaseNode = memo(({
   readonly = false,
   edges = [],
   hasValidConfig = true,
-  id
+  id,
+  children
 }: BaseNodeProps) => {
-  const color = getNodeTypeColor(nodeType)
+  const color = getNodeColor(nodeType)
   const requiredInputs = getRequiredInputCount(nodeType)
   const canHaveOutputs = canHaveMultipleOutputs(nodeType)
 
-  // Check if node is configured according to SPECIFICATION.md
+  // Check if node is configured
   const isConfigured = isNodeConfigured(nodeType, id || '', edges, hasValidConfig)
-
-  const getTypeLabel = (type: PlanDagNodeType): string => {
-    switch (type) {
-      case PlanDagNodeType.DATA_SOURCE: return 'Data Source'
-      case PlanDagNodeType.GRAPH: return 'Graph'
-      case PlanDagNodeType.TRANSFORM: return 'Transform'
-      case PlanDagNodeType.MERGE: return 'Merge'
-      case PlanDagNodeType.COPY: return 'Copy'
-      case PlanDagNodeType.OUTPUT: return 'Output'
-      default: return 'Unknown'
-    }
-  }
 
   return (
     <>
       {/* Input Handles - Left and Top sides */}
       {requiredInputs > 0 && (
         <>
-          {/* Left Input Handle */}
           <Handle
             type="target"
             position={Position.Left}
@@ -62,11 +51,9 @@ export const BaseNode = memo(({
               border: `2px solid ${color}`,
               width: 12,
               height: 12,
-              borderRadius: '50%', // Round for inputs
+              borderRadius: '50%',
             }}
           />
-
-          {/* Top Input Handle */}
           <Handle
             type="target"
             position={Position.Top}
@@ -76,7 +63,7 @@ export const BaseNode = memo(({
               border: `2px solid ${color}`,
               width: 12,
               height: 12,
-              borderRadius: '50%', // Round for inputs
+              borderRadius: '50%',
             }}
           />
         </>
@@ -85,28 +72,80 @@ export const BaseNode = memo(({
       {/* Node Content */}
       <Paper
         shadow={selected ? "md" : "sm"}
-        p="sm"
+        p="md"
         style={{
-          border: selected
-            ? `2px solid ${color}`
-            : !isConfigured
-              ? `2px solid #fd7e14` // Orange outline for unconfigured nodes
-              : `1px solid #e9ecef`,
+          border: `2px solid ${color}`,
           borderRadius: 8,
-          minWidth: 180,
-          maxWidth: 250,
+          minWidth: 200,
+          maxWidth: 280,
           background: '#fff',
-          cursor: 'default', // Remove pointer cursor since we don't want click-to-edit
+          cursor: 'default',
         }}
       >
-        <Group justify="space-between" mb="xs">
-          <Group gap="xs">
+        {/* Top right: Edit and Delete icons */}
+        {!readonly && (
+          <Group gap={4} style={{ position: 'absolute', top: 8, right: 8 }}>
+            <Tooltip label="Edit node">
+              <ActionIcon
+                size="sm"
+                variant="subtle"
+                color="gray"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onEdit?.()
+                }}
+              >
+                <IconSettings size="0.8rem" />
+              </ActionIcon>
+            </Tooltip>
+            <Tooltip label="Delete node">
+              <ActionIcon
+                size="sm"
+                variant="subtle"
+                color="red"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onDelete?.()
+                }}
+              >
+                <IconTrash size="0.8rem" />
+              </ActionIcon>
+            </Tooltip>
+          </Group>
+        )}
+
+        {/* Middle: Icon and Label */}
+        <Group gap="sm" mb="sm" wrap="nowrap" style={{ paddingRight: !readonly ? 60 : 0 }}>
+          <div style={{
+            color,
+            display: 'flex',
+            alignItems: 'center',
+            flexShrink: 0
+          }}>
+            {getNodeIcon(nodeType, '1.4rem')}
+          </div>
+          <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
+            <Text size="sm" fw={600} lineClamp={2} style={{ wordBreak: 'break-word' }}>
+              {metadata.label}
+            </Text>
+            {metadata.description && (
+              <Text size="xs" c="dimmed" lineClamp={2} style={{ wordBreak: 'break-word' }}>
+                {metadata.description}
+              </Text>
+            )}
+          </Stack>
+        </Group>
+
+        {/* Bottom: Labels and node-specific content */}
+        <Stack gap="xs">
+          <Group gap="xs" wrap="wrap">
             <Badge
-              color={color}
               variant="light"
-              size="sm"
+              color={color}
+              size="xs"
+              style={{ textTransform: 'none' }}
             >
-              {getTypeLabel(nodeType)}
+              {getNodeTypeLabel(nodeType)}
             </Badge>
             {!isConfigured && (
               <Badge variant="outline" size="xs" color="orange">
@@ -115,58 +154,14 @@ export const BaseNode = memo(({
             )}
           </Group>
 
-          {!readonly && (
-            <Group gap="xs">
-              <Tooltip label="Edit node">
-                <ActionIcon
-                  size="sm"
-                  variant="subtle"
-                  color="gray"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onEdit?.()
-                  }}
-                >
-                  <IconSettings size="0.8rem" />
-                </ActionIcon>
-              </Tooltip>
-              <Tooltip label="Delete node">
-                <ActionIcon
-                  size="sm"
-                  variant="subtle"
-                  color="red"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onDelete?.()
-                  }}
-                >
-                  <IconTrash size="0.8rem" />
-                </ActionIcon>
-              </Tooltip>
-            </Group>
-          )}
-        </Group>
-
-        <Text size="sm" fw={500} mb="xs">
-          {metadata.label}
-        </Text>
-
-        {metadata.description && (
-          <Text size="xs" c="dimmed" lineClamp={2}>
-            {metadata.description}
-          </Text>
-        )}
-
-        {/* Node-specific content */}
-        <div style={{ marginTop: 8 }}>
-          {renderNodeSpecificContent(nodeType, config)}
-        </div>
+          {/* Node-specific content */}
+          {children}
+        </Stack>
       </Paper>
 
       {/* Output Handles - Right and Bottom sides */}
       {canHaveOutputs && (
         <>
-          {/* Right Output Handle */}
           <Handle
             type="source"
             position={Position.Right}
@@ -176,11 +171,9 @@ export const BaseNode = memo(({
               border: `2px solid ${color}`,
               width: 12,
               height: 12,
-              borderRadius: '0', // Square for outputs
+              borderRadius: '0',
             }}
           />
-
-          {/* Bottom Output Handle */}
           <Handle
             type="source"
             position={Position.Bottom}
@@ -190,7 +183,7 @@ export const BaseNode = memo(({
               border: `2px solid ${color}`,
               width: 12,
               height: 12,
-              borderRadius: '0', // Square for outputs
+              borderRadius: '0',
             }}
           />
         </>
@@ -200,59 +193,3 @@ export const BaseNode = memo(({
 })
 
 BaseNode.displayName = 'BaseNode'
-
-// Render node-specific configuration details
-const renderNodeSpecificContent = (nodeType: PlanDagNodeType, config: NodeConfig) => {
-  switch (nodeType) {
-    case PlanDagNodeType.DATA_SOURCE:
-      const dataSourceConfig = config as any
-      return (
-        <Text size="xs" c="dimmed">
-          {dataSourceConfig.dataType}: {dataSourceConfig.source}
-        </Text>
-      )
-
-    case PlanDagNodeType.GRAPH:
-      const graphConfig = config as any
-      return (
-        <Text size="xs" c="dimmed">
-          Graph ID: {graphConfig.graphId}
-        </Text>
-      )
-
-    case PlanDagNodeType.TRANSFORM:
-      const transformConfig = config as any
-      return (
-        <Text size="xs" c="dimmed">
-          {transformConfig.transformType}
-        </Text>
-      )
-
-    case PlanDagNodeType.MERGE:
-      const mergeConfig = config as any
-      return (
-        <Text size="xs" c="dimmed">
-          Strategy: {mergeConfig.mergeStrategy}
-        </Text>
-      )
-
-    case PlanDagNodeType.COPY:
-      const copyConfig = config as any
-      return (
-        <Text size="xs" c="dimmed">
-          Type: {copyConfig.copyType}
-        </Text>
-      )
-
-    case PlanDagNodeType.OUTPUT:
-      const outputConfig = config as any
-      return (
-        <Text size="xs" c="dimmed">
-          Format: {outputConfig.renderTarget}
-        </Text>
-      )
-
-    default:
-      return null
-  }
-}
