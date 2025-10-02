@@ -80,18 +80,22 @@ export const BaseNode = memo(({
           maxWidth: 280,
           background: '#fff',
           cursor: 'default',
+          pointerEvents: 'all',
         }}
       >
         {/* Top right: Edit and Delete icons */}
         {!readonly && (
-          <Group gap={4} style={{ position: 'absolute', top: 8, right: 8 }}>
+          <Group gap={4} style={{ position: 'absolute', top: 8, right: 8, pointerEvents: 'auto', zIndex: 10 }}>
             <Tooltip label="Edit node">
               <ActionIcon
                 size="sm"
                 variant="subtle"
                 color="gray"
-                onClick={(e) => {
+                data-action-icon="edit"
+                onMouseDown={(e) => {
                   e.stopPropagation()
+                  e.preventDefault()
+                  console.log('Edit icon mousedown, calling onEdit')
                   onEdit?.()
                 }}
               >
@@ -103,8 +107,11 @@ export const BaseNode = memo(({
                 size="sm"
                 variant="subtle"
                 color="red"
-                onClick={(e) => {
+                data-action-icon="delete"
+                onMouseDown={(e) => {
                   e.stopPropagation()
+                  e.preventDefault()
+                  console.log('Delete icon mousedown, calling onDelete')
                   onDelete?.()
                 }}
               >

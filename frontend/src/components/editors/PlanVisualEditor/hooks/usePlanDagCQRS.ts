@@ -168,8 +168,8 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
       ...node,
       data: {
         ...node.data,
-        onEdit: stableOnNodeEdit,
-        onDelete: stableOnNodeDelete,
+        onEdit: () => stableOnNodeEdit(node.id),
+        onDelete: () => stableOnNodeDelete(node.id),
         readonly,
         edges: converted.edges, // Add edges for node validation/display
         hasValidConfig: node.data.originalNode?.config &&

@@ -204,18 +204,22 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
           maxWidth: 280,
           background: '#fff',
           cursor: 'default',
+          pointerEvents: 'all',
         }}
       >
         {/* Top right: Edit and Delete icons */}
         {!readonly && (
-          <Group gap={4} style={{ position: 'absolute', top: 8, right: 8 }}>
+          <Group gap={4} style={{ position: 'absolute', top: 8, right: 8, pointerEvents: 'auto', zIndex: 10 }}>
             <Tooltip label="Edit data source">
               <ActionIcon
                 size="sm"
                 variant="subtle"
                 color="gray"
-                onClick={(e) => {
+                data-action-icon="edit"
+                onMouseDown={(e) => {
                   e.stopPropagation()
+                  e.preventDefault()
+                  console.log('Edit icon mousedown for data source, calling onEdit')
                   onEdit?.(props.id)
                 }}
               >
@@ -227,8 +231,11 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
                 size="sm"
                 variant="subtle"
                 color="red"
-                onClick={(e) => {
+                data-action-icon="delete"
+                onMouseDown={(e) => {
                   e.stopPropagation()
+                  e.preventDefault()
+                  console.log('Delete icon mousedown for data source, calling onDelete')
                   onDelete?.(props.id)
                 }}
               >

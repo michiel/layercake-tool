@@ -414,8 +414,8 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
                 config,
                 metadata,
                 label: metadata.label, // Update the label for ReactFlow
-                onEdit: handleNodeEdit,
-                onDelete: handleNodeDelete,
+                onEdit: () => handleNodeEdit(nodeId),
+                onDelete: () => handleNodeDelete(nodeId),
               },
             }
           : node
@@ -721,6 +721,25 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
           onNodeDragStart={handleFlowNodeDragStart}
           onNodeDragStop={handleNodeDragStop}
           onEdgeDoubleClick={handleEdgeDoubleClick}
+          onNodeClick={(event, node) => {
+            // Prevent selection when clicking on action icons (edit/delete)
+            const target = event.target as HTMLElement
+            const isActionIcon = target.closest('[data-action-icon]')
+            console.log('onNodeClick - target:', target, 'isActionIcon:', isActionIcon, 'node:', node)
+            if (isActionIcon) {
+              event.stopPropagation()
+              event.preventDefault()
+              // Manually trigger the appropriate handler
+              const actionType = isActionIcon.getAttribute('data-action-icon')
+              console.log('Action icon clicked:', actionType, 'nodeId:', node.id)
+              if (actionType === 'edit') {
+                handleNodeEdit(node.id)
+              } else if (actionType === 'delete') {
+                handleNodeDelete(node.id)
+              }
+              return
+            }
+          }}
           nodeTypes={NODE_TYPES}
           connectionMode={ConnectionMode.Loose}
           fitView
