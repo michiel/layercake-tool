@@ -192,11 +192,13 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
       onNodesChange(changes)
 
       // Skip performance tracking and side effects during drag
-      // Position changes during drag are cosmetic only - actual save happens in handleNodeDragStop
+      // Position and dimension changes during drag are cosmetic only - actual save happens in handleNodeDragStop
       if (isDragging.current) {
-        const hasNonPositionChanges = changes.some(change => change.type !== 'position')
-        if (!hasNonPositionChanges) {
-          // All changes are position updates during drag - skip side effects
+        const hasSignificantChanges = changes.some(change =>
+          change.type !== 'position' && change.type !== 'dimensions'
+        )
+        if (!hasSignificantChanges) {
+          // All changes are position/dimension updates during drag - skip side effects
           return
         }
       }
