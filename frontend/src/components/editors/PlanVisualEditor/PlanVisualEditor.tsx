@@ -58,20 +58,34 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
   // Configuration dialog state - needs to be defined early
   const [configDialogOpen, setConfigDialogOpen] = useState(false)
   const [configNodeId, setConfigNodeId] = useState<string>('')
-  const [configNodeType] = useState<PlanDagNodeType>(PlanDagNodeType.DATA_SOURCE)
-  const [configNodeConfig] = useState<NodeConfig>({
+  const [configNodeType, setConfigNodeType] = useState<PlanDagNodeType>(PlanDagNodeType.DATA_SOURCE)
+  const [configNodeConfig, setConfigNodeConfig] = useState<NodeConfig>({
     inputType: 'CSVNodesFromFile',
     source: '',
     dataType: 'Nodes',
     outputGraphRef: ''
   } as DataSourceNodeConfig)
-  const [configNodeMetadata] = useState<NodeMetadata>({ label: '', description: '' })
+  const [configNodeMetadata, setConfigNodeMetadata] = useState<NodeMetadata>({ label: '', description: '' })
+
+  // Ref to store nodes for handleNodeEdit (to avoid circular dependency)
+  const nodesRef = useRef<Node[]>([])
 
   // Node action handlers (defined with stable references)
   const handleNodeEdit = useCallback((nodeId: string) => {
     console.log('Edit node triggered:', nodeId)
     setConfigNodeId(nodeId)
-    // Will access nodes via callback to avoid dependency
+
+    // Find the node and populate config dialog state
+    const node = nodesRef.current.find(n => n.id === nodeId)
+    if (node) {
+      console.log('Found node:', node)
+      setConfigNodeType(node.data.nodeType || PlanDagNodeType.DATA_SOURCE)
+      setConfigNodeConfig(node.data.config || {})
+      setConfigNodeMetadata(node.data.metadata || { label: '', description: '' })
+    } else {
+      console.warn('Node not found:', nodeId)
+    }
+
     setConfigDialogOpen(true)
   }, [])
 
@@ -103,6 +117,11 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     updateManager,
     cqrsService,
   } = planDagState
+
+  // Keep nodesRef updated for handleNodeEdit
+  useEffect(() => {
+    nodesRef.current = nodes
+  }, [nodes])
 
   // Get mutations from CQRS service (includes delta generation)
   // Adapt CQRS command interface to match old mutation interface
@@ -422,7 +441,10 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
       )
     )
     // Save changes to backend
-    mutations.updateNode(nodeId, { config, metadata })
+    mutations.updateNode(nodeId, {
+      config: JSON.stringify(config),
+      metadata
+    })
     console.log('Node configuration updated:', nodeId, config, metadata)
   }, [setNodes, handleNodeEdit, handleNodeDelete, mutations])
 
