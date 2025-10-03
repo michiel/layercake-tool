@@ -80,7 +80,9 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     const node = nodesRef.current.find(n => n.id === nodeId)
     if (node) {
       console.log('Found node:', node)
-      setConfigNodeType(node.data.nodeType || PlanDagNodeType.DATA_SOURCE)
+      // Use node.type which is the ReactFlow type (DataSourceNode, OutputNode, etc.)
+      // node.data.nodeType might be the backend format (DataSource, Output, etc.)
+      setConfigNodeType(node.type as PlanDagNodeType || PlanDagNodeType.DATA_SOURCE)
       setConfigNodeConfig(node.data.config || {})
       setConfigNodeMetadata(node.data.metadata || { label: '', description: '' })
     } else {
