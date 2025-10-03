@@ -196,7 +196,6 @@ function getConfigDefaults(nodeType: PlanDagNodeType, config: NodeConfig): Recor
         // New DataSource system
         dataSourceId: dataSourceConfig.dataSourceId || null,
         displayMode: dataSourceConfig.displayMode || 'summary',
-        outputGraphRef: dataSourceConfig.outputGraphRef || '',
 
         // Legacy support (backward compatibility)
         inputType: dataSourceConfig.inputType || 'CSVNodesFromFile',
@@ -207,15 +206,12 @@ function getConfigDefaults(nodeType: PlanDagNodeType, config: NodeConfig): Recor
     case PlanDagNodeType.GRAPH:
       const graphConfig = config as any
       return {
-        graphId: graphConfig.graphId || '',
         graphSource: graphConfig.graphSource || 'create',
       }
 
     case PlanDagNodeType.TRANSFORM:
       const transformConfig = config as any
       return {
-        inputGraphRef: transformConfig.inputGraphRef || '',
-        outputGraphRef: transformConfig.outputGraphRef || '',
         transformType: transformConfig.transformType || 'FilterNodes',
         transformConfig: JSON.stringify(transformConfig.transformConfig || {}, null, 2),
       }
@@ -514,9 +510,7 @@ function renderNodeSpecificFields(
 function buildConfigFromForm(nodeType: PlanDagNodeType, values: FormData): NodeConfig {
   switch (nodeType) {
     case PlanDagNodeType.DATA_SOURCE:
-      const dataSourceConfig: DataSourceNodeConfig = {
-        outputGraphRef: values.outputGraphRef,
-      }
+      const dataSourceConfig: DataSourceNodeConfig = {}
 
       // Add new DataSource system properties if available
       if (values.dataSourceId) {
@@ -535,7 +529,6 @@ function buildConfigFromForm(nodeType: PlanDagNodeType, values: FormData): NodeC
 
     case PlanDagNodeType.GRAPH:
       return {
-        graphId: values.graphId ? parseInt(values.graphId) : 0,
         isReference: values.isReference || false,
         metadata: {
           nodeCount: values.nodeCount ? parseInt(values.nodeCount) : undefined,
@@ -551,24 +544,18 @@ function buildConfigFromForm(nodeType: PlanDagNodeType, values: FormData): NodeC
         transformConfig = {}
       }
       return {
-        inputGraphRef: values.inputGraphRef,
-        outputGraphRef: values.outputGraphRef,
         transformType: values.transformType,
         transformConfig,
       }
 
     case PlanDagNodeType.MERGE:
       return {
-        inputRefs: values.inputGraphRefs.split(',').map((ref: string) => ref.trim()).filter(Boolean),
-        outputGraphRef: values.outputGraphRef,
         mergeStrategy: values.mergeStrategy,
         conflictResolution: values.conflictResolution || 'PreferFirst',
       }
 
     case PlanDagNodeType.COPY:
       return {
-        sourceGraphRef: values.sourceGraphRef,
-        outputGraphRef: values.outputGraphRef,
         copyType: values.copyType,
         preserveMetadata: values.preserveMetadata !== undefined ? values.preserveMetadata : true,
       }
@@ -581,7 +568,6 @@ function buildConfigFromForm(nodeType: PlanDagNodeType, values: FormData): NodeC
         renderConfig = {}
       }
       return {
-        sourceGraphRef: values.sourceGraphRef,
         renderTarget: values.renderTarget,
         outputPath: values.outputPath,
         renderConfig,

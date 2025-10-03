@@ -36,7 +36,7 @@ export enum PlanDagNodeType {
 export interface DataSourceNodeConfig {
   dataSourceId?: number; // Reference to DataSource entity (new)
   displayMode?: 'summary' | 'detailed' | 'preview'; // Optional for backward compatibility
-  outputGraphRef: string;
+  // Removed: outputGraphRef - output connections handled by visual edges in DAG
 
   // Legacy support (to be deprecated after migration)
   inputType?: 'CSVNodesFromFile' | 'CSVEdgesFromFile' | 'CSVLayersFromFile';
@@ -46,7 +46,7 @@ export interface DataSourceNodeConfig {
 
 // Graph Node Configuration
 export interface GraphNodeConfig {
-  graphId: number;
+  // Removed: graphId - graph connections handled by visual edges in DAG
   isReference: boolean;
   metadata: {
     nodeCount?: number;
@@ -57,8 +57,8 @@ export interface GraphNodeConfig {
 
 // Transform Node Configuration
 export interface TransformNodeConfig {
-  inputGraphRef: string;
-  outputGraphRef: string;
+  // Removed: inputGraphRef - input connections handled by incoming edges
+  // Removed: outputGraphRef - output connections handled by outgoing edges
   transformType: 'PartitionDepthLimit' | 'InvertGraph' | 'FilterNodes' | 'FilterEdges';
   transformConfig: {
     maxPartitionDepth?: number;
@@ -72,23 +72,23 @@ export interface TransformNodeConfig {
 
 // Merge Node Configuration
 export interface MergeNodeConfig {
-  inputRefs: string[];
-  outputGraphRef: string;
+  // Removed: inputRefs - inputs come from incoming edges
+  // Removed: outputGraphRef - output goes to outgoing edge
   mergeStrategy: 'Union' | 'Intersection' | 'Difference';
   conflictResolution: 'PreferFirst' | 'PreferLast' | 'Manual';
 }
 
 // Copy Node Configuration
 export interface CopyNodeConfig {
-  sourceGraphRef: string;
-  outputGraphRef: string;
+  // Removed: sourceGraphRef - source comes from incoming edge
+  // Removed: outputGraphRef - output goes to outgoing edge
   copyType: 'DeepCopy' | 'ShallowCopy' | 'Reference';
   preserveMetadata: boolean;
 }
 
 // Output Node Configuration
 export interface OutputNodeConfig {
-  sourceGraphRef: string;
+  // Removed: sourceGraphRef - source comes from incoming edge connection
   renderTarget: 'DOT' | 'GML' | 'JSON' | 'PlantUML' | 'CSVNodes' | 'CSVEdges' | 'Mermaid' | 'Custom';
   outputPath: string;
   renderConfig?: {

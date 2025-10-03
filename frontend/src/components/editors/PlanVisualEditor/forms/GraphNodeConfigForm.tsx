@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Stack, NumberInput, Switch, Alert, Text } from '@mantine/core';
+import { Stack, Switch, Alert, Text } from '@mantine/core';
 import { IconInfoCircle } from '@tabler/icons-react';
 import { GraphNodeConfig } from '../../../../types/plan-dag';
 
@@ -18,7 +18,6 @@ export const GraphNodeConfigForm: React.FC<GraphNodeConfigFormProps> = ({
 }) => {
   const [localConfig, setLocalConfig] = useState<GraphNodeConfig>({
     ...config,
-    graphId: config.graphId ?? 0,
     isReference: config.isReference ?? false,
     metadata: config.metadata || {},
   });
@@ -28,22 +27,17 @@ export const GraphNodeConfigForm: React.FC<GraphNodeConfigFormProps> = ({
   }, [localConfig, setConfig]);
 
   useEffect(() => {
-    setIsValid(localConfig.graphId > 0);
+    // Always valid - graph source comes from incoming edge
+    setIsValid(true);
   }, [localConfig, setIsValid]);
 
   return (
     <Stack gap="md">
       <Alert icon={<IconInfoCircle size="1rem" />} color="blue" title="Graph Node Configuration">
-        <Text size="sm">Graph node configuration form will be implemented in a future update.</Text>
+        <Text size="sm">
+          Configure graph node behavior. Graph source is determined by edge connections in the DAG.
+        </Text>
       </Alert>
-
-      <NumberInput
-        label="Graph ID"
-        placeholder="Enter graph ID"
-        value={localConfig.graphId}
-        onChange={(value) => setLocalConfig(prev => ({ ...prev, graphId: Number(value) || 0 }))}
-        required
-      />
 
       <Switch
         label="Is Reference"

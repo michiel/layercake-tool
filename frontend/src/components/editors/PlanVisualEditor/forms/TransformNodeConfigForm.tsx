@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Stack, Select, TextInput, NumberInput, Switch, Textarea, Alert, Text } from '@mantine/core';
+import { Stack, Select, NumberInput, Switch, Textarea, Alert, Text } from '@mantine/core';
 import { IconInfoCircle } from '@tabler/icons-react';
 import { TransformNodeConfig } from '../../../../types/plan-dag';
 
@@ -18,8 +18,6 @@ export const TransformNodeConfigForm: React.FC<TransformNodeConfigFormProps> = (
 }) => {
   const [localConfig, setLocalConfig] = useState<TransformNodeConfig>({
     ...config,
-    inputGraphRef: config.inputGraphRef || '',
-    outputGraphRef: config.outputGraphRef || '',
     transformType: config.transformType || 'PartitionDepthLimit',
     transformConfig: config.transformConfig || {},
   });
@@ -31,27 +29,10 @@ export const TransformNodeConfigForm: React.FC<TransformNodeConfigFormProps> = (
 
   // Validate configuration
   useEffect(() => {
-    const isValid = !!(
-      localConfig.inputGraphRef.trim() &&
-      localConfig.outputGraphRef.trim() &&
-      localConfig.transformType
-    );
+    // Valid if transform type is selected (connections handled by edges)
+    const isValid = !!localConfig.transformType;
     setIsValid(isValid);
   }, [localConfig, setIsValid]);
-
-  const handleInputGraphRefChange = (value: string) => {
-    setLocalConfig(prev => ({
-      ...prev,
-      inputGraphRef: value,
-    }));
-  };
-
-  const handleOutputGraphRefChange = (value: string) => {
-    setLocalConfig(prev => ({
-      ...prev,
-      outputGraphRef: value,
-    }));
-  };
 
   const handleTransformTypeChange = (value: string | null) => {
     if (value) {
@@ -172,23 +153,11 @@ export const TransformNodeConfigForm: React.FC<TransformNodeConfigFormProps> = (
 
   return (
     <Stack gap="md">
-      <TextInput
-        label="Input Graph Reference"
-        placeholder="Enter the reference to the input graph"
-        description="Reference to the graph that will be transformed"
-        value={localConfig.inputGraphRef}
-        onChange={(event) => handleInputGraphRefChange(event.currentTarget.value)}
-        required
-      />
-
-      <TextInput
-        label="Output Graph Reference"
-        placeholder="Enter a reference name for the transformed graph"
-        description="This reference will be used by other nodes to connect to the transformed graph"
-        value={localConfig.outputGraphRef}
-        onChange={(event) => handleOutputGraphRefChange(event.currentTarget.value)}
-        required
-      />
+      <Alert icon={<IconInfoCircle size="1rem" />} color="blue" title="Transform Node Configuration">
+        <Text size="sm">
+          Configure transformation options. Input and output are determined by edge connections in the DAG.
+        </Text>
+      </Alert>
 
       <Select
         label="Transform Type"

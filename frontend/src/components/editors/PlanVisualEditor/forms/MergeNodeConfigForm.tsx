@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Stack, Select, Textarea, Alert, Text } from '@mantine/core';
+import { Stack, Select, Alert, Text } from '@mantine/core';
 import { IconInfoCircle } from '@tabler/icons-react';
 import { MergeNodeConfig } from '../../../../types/plan-dag';
 
@@ -18,8 +18,6 @@ export const MergeNodeConfigForm: React.FC<MergeNodeConfigFormProps> = ({
 }) => {
   const [localConfig, setLocalConfig] = useState<MergeNodeConfig>({
     ...config,
-    inputRefs: config.inputRefs || [],
-    outputGraphRef: config.outputGraphRef || '',
     mergeStrategy: config.mergeStrategy || 'Union',
     conflictResolution: config.conflictResolution || 'PreferFirst',
   });
@@ -29,23 +27,17 @@ export const MergeNodeConfigForm: React.FC<MergeNodeConfigFormProps> = ({
   }, [localConfig, setConfig]);
 
   useEffect(() => {
-    setIsValid(localConfig.inputRefs.length > 0 && localConfig.outputGraphRef.trim().length > 0);
+    // Always valid - connections handled by edges
+    setIsValid(true);
   }, [localConfig, setIsValid]);
 
   return (
     <Stack gap="md">
       <Alert icon={<IconInfoCircle size="1rem" />} color="blue" title="Merge Node Configuration">
-        <Text size="sm">Merge node configuration form will be implemented in a future update.</Text>
+        <Text size="sm">
+          Configure merge behavior. Inputs and output are determined by edge connections in the DAG.
+        </Text>
       </Alert>
-
-      <Textarea
-        label="Input References"
-        placeholder="Enter input graph references (one per line)"
-        value={localConfig.inputRefs.join('\n')}
-        onChange={(event) => setLocalConfig(prev => ({ ...prev, inputRefs: event.currentTarget.value.split('\n').filter(r => r.trim()) }))}
-        rows={3}
-        required
-      />
 
       <Select
         label="Merge Strategy"

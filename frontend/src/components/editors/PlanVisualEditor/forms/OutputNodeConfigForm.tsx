@@ -18,7 +18,6 @@ export const OutputNodeConfigForm: React.FC<OutputNodeConfigFormProps> = ({
 }) => {
   const [localConfig, setLocalConfig] = useState<OutputNodeConfig>({
     ...config,
-    sourceGraphRef: config.sourceGraphRef || '',
     renderTarget: config.renderTarget || 'DOT',
     outputPath: config.outputPath || '',
     renderConfig: config.renderConfig || {},
@@ -30,22 +29,17 @@ export const OutputNodeConfigForm: React.FC<OutputNodeConfigFormProps> = ({
   }, [localConfig, setConfig]);
 
   useEffect(() => {
-    setIsValid(localConfig.sourceGraphRef.trim().length > 0 && localConfig.outputPath.trim().length > 0);
+    // Valid if output path is specified (source comes from incoming edge)
+    setIsValid(localConfig.outputPath.trim().length > 0);
   }, [localConfig, setIsValid]);
 
   return (
     <Stack gap="md">
       <Alert icon={<IconInfoCircle size="1rem" />} color="blue" title="Output Node Configuration">
-        <Text size="sm">Output node configuration form will be implemented in a future update.</Text>
+        <Text size="sm">
+          Configure output rendering options. Source graph comes from incoming edge connection.
+        </Text>
       </Alert>
-
-      <TextInput
-        label="Source Graph Reference"
-        placeholder="Enter source graph reference"
-        value={localConfig.sourceGraphRef}
-        onChange={(event) => setLocalConfig(prev => ({ ...prev, sourceGraphRef: event.currentTarget.value }))}
-        required
-      />
 
       <Select
         label="Render Target"

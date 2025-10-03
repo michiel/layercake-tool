@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Stack, TextInput, Select, Switch, Alert, Text } from '@mantine/core';
+import { Stack, Select, Switch, Alert, Text } from '@mantine/core';
 import { IconInfoCircle } from '@tabler/icons-react';
 import { CopyNodeConfig } from '../../../../types/plan-dag';
 
@@ -18,8 +18,6 @@ export const CopyNodeConfigForm: React.FC<CopyNodeConfigFormProps> = ({
 }) => {
   const [localConfig, setLocalConfig] = useState<CopyNodeConfig>({
     ...config,
-    sourceGraphRef: config.sourceGraphRef || '',
-    outputGraphRef: config.outputGraphRef || '',
     copyType: config.copyType || 'DeepCopy',
     preserveMetadata: config.preserveMetadata ?? true,
   });
@@ -29,30 +27,17 @@ export const CopyNodeConfigForm: React.FC<CopyNodeConfigFormProps> = ({
   }, [localConfig, setConfig]);
 
   useEffect(() => {
-    setIsValid(localConfig.sourceGraphRef.trim().length > 0 && localConfig.outputGraphRef.trim().length > 0);
+    // Always valid - connections handled by edges
+    setIsValid(true);
   }, [localConfig, setIsValid]);
 
   return (
     <Stack gap="md">
       <Alert icon={<IconInfoCircle size="1rem" />} color="blue" title="Copy Node Configuration">
-        <Text size="sm">Copy node configuration form will be implemented in a future update.</Text>
+        <Text size="sm">
+          Configure copy behavior. Source and output are determined by edge connections in the DAG.
+        </Text>
       </Alert>
-
-      <TextInput
-        label="Source Graph Reference"
-        placeholder="Enter source graph reference"
-        value={localConfig.sourceGraphRef}
-        onChange={(event) => setLocalConfig(prev => ({ ...prev, sourceGraphRef: event.currentTarget.value }))}
-        required
-      />
-
-      <TextInput
-        label="Output Graph Reference"
-        placeholder="Enter output graph reference"
-        value={localConfig.outputGraphRef}
-        onChange={(event) => setLocalConfig(prev => ({ ...prev, outputGraphRef: event.currentTarget.value }))}
-        required
-      />
 
       <Select
         label="Copy Type"

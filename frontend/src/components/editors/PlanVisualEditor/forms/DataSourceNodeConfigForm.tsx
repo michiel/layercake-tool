@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Stack, Select, TextInput, Loader, Alert, Text } from '@mantine/core';
+import { Stack, Select, Loader, Alert, Text } from '@mantine/core';
 import { IconAlertCircle } from '@tabler/icons-react';
 import { useQuery } from '@apollo/client/react';
 import { gql } from '@apollo/client';
@@ -45,7 +45,6 @@ export const DataSourceNodeConfigForm: React.FC<DataSourceNodeConfigFormProps> =
 }) => {
   const [localConfig, setLocalConfig] = useState<DataSourceNodeConfig>({
     ...config,
-    outputGraphRef: config.outputGraphRef || '',
   });
 
   const { data, loading, error } = useQuery<GetAvailableDataSourcesData>(GET_AVAILABLE_DATA_SOURCES, {
@@ -60,25 +59,18 @@ export const DataSourceNodeConfigForm: React.FC<DataSourceNodeConfigFormProps> =
 
   // Validate configuration
   useEffect(() => {
-    const isValid = !!(
-      localConfig.dataSourceId &&
-      localConfig.outputGraphRef.trim()
-    );
+    // Valid if data source is selected (output goes to outgoing edge)
+    const isValid = !!localConfig.dataSourceId;
     setIsValid(isValid);
   }, [localConfig, setIsValid]);
 
   const handleDataSourceChange = (value: string | null) => {
     if (value) {
       const dataSourceId = parseInt(value, 10);
-      const selectedDataSource = data?.dataSources?.find(
-        (ds: DataSourceReference) => ds.id === dataSourceId
-      );
 
       setLocalConfig(prev => ({
         ...prev,
         dataSourceId,
-        // Auto-generate output graph reference if not set
-        outputGraphRef: prev.outputGraphRef || `graph_from_${selectedDataSource?.name?.toLowerCase()?.replace(/[^a-z0-9]/g, '_')}`,
       }));
     } else {
       setLocalConfig(prev => ({
@@ -86,13 +78,6 @@ export const DataSourceNodeConfigForm: React.FC<DataSourceNodeConfigFormProps> =
         dataSourceId: undefined,
       }));
     }
-  };
-
-  const handleOutputGraphRefChange = (value: string) => {
-    setLocalConfig(prev => ({
-      ...prev,
-      outputGraphRef: value,
-    }));
   };
 
   const handleDisplayModeChange = (value: string | null) => {
@@ -162,15 +147,6 @@ export const DataSourceNodeConfigForm: React.FC<DataSourceNodeConfigFormProps> =
           </Stack>
         </Alert>
       )}
-
-      <TextInput
-        label="Output Graph Reference"
-        placeholder="Enter a reference name for the output graph"
-        description="This reference will be used by other nodes to connect to this data source"
-        value={localConfig.outputGraphRef}
-        onChange={(event) => handleOutputGraphRefChange(event.currentTarget.value)}
-        required
-      />
 
       <Select
         label="Display Mode"

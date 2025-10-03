@@ -60,7 +60,7 @@ pub struct DataSourceNodeConfig {
     pub input_type: InputType,
     pub source: String,
     pub data_type: InputDataType,
-    pub output_graph_ref: String,
+    // Removed: output_graph_ref - output connections handled by visual edges in DAG
 }
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
@@ -103,7 +103,7 @@ impl From<data_sources::Model> for DataSourceReference {
 #[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
 #[graphql(input_name = "GraphNodeConfigInput")]
 pub struct GraphNodeConfig {
-    pub graph_id: i32,
+    // Removed: graph_id - graph connections handled by visual edges in DAG
     pub is_reference: bool,
     pub metadata: GraphNodeMetadata,
 }
@@ -121,8 +121,8 @@ pub struct GraphNodeMetadata {
 #[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
 #[graphql(input_name = "TransformNodeConfigInput")]
 pub struct TransformNodeConfig {
-    pub input_graph_ref: String,
-    pub output_graph_ref: String,
+    // Removed: input_graph_ref - input connections handled by incoming edges
+    // Removed: output_graph_ref - output connections handled by outgoing edges
     pub transform_type: TransformType,
     pub transform_config: TransformConfig,
 }
@@ -150,8 +150,8 @@ pub struct TransformConfig {
 #[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
 #[graphql(input_name = "MergeNodeConfigInput")]
 pub struct MergeNodeConfig {
-    pub input_refs: Vec<String>,
-    pub output_graph_ref: String,
+    // Removed: input_refs - inputs come from incoming edges
+    // Removed: output_graph_ref - output goes to outgoing edge
     pub merge_strategy: MergeStrategy,
     pub conflict_resolution: ConflictResolution,
 }
@@ -174,8 +174,8 @@ pub enum ConflictResolution {
 #[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
 #[graphql(input_name = "CopyNodeConfigInput")]
 pub struct CopyNodeConfig {
-    pub source_graph_ref: String,
-    pub output_graph_ref: String,
+    // Removed: source_graph_ref - source comes from incoming edge
+    // Removed: output_graph_ref - output goes to outgoing edge
     pub copy_type: CopyType,
     pub preserve_metadata: bool,
 }
@@ -191,7 +191,7 @@ pub enum CopyType {
 #[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
 #[graphql(input_name = "OutputNodeConfigInput")]
 pub struct OutputNodeConfig {
-    pub source_graph_ref: String,
+    // Removed: source_graph_ref - source comes from incoming edge connection
     pub render_target: RenderTarget,
     pub output_path: String,
     pub render_config: Option<RenderConfig>,

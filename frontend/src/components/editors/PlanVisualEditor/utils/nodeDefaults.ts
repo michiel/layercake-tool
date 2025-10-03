@@ -11,44 +11,35 @@ export const getDefaultNodeConfig = (type: PlanDagNodeType): NodeConfig => {
   switch (type) {
     case PlanDagNodeType.DATA_SOURCE:
       return {
-        dataSourceId: 0,
-        outputGraphRef: ''
+        dataSourceId: 0
       };
 
     case PlanDagNodeType.GRAPH:
       return {
-        graphId: 0,
         isReference: false,
         metadata: {}
       };
 
     case PlanDagNodeType.TRANSFORM:
       return {
-        inputGraphRef: '',
-        outputGraphRef: '',
         transformType: 'PartitionDepthLimit',
         transformConfig: {}
       };
 
     case PlanDagNodeType.MERGE:
       return {
-        inputRefs: [],
-        outputGraphRef: '',
         mergeStrategy: 'Union',
         conflictResolution: 'PreferFirst'
       };
 
     case PlanDagNodeType.COPY:
       return {
-        sourceGraphRef: '',
-        outputGraphRef: '',
         copyType: 'DeepCopy',
         preserveMetadata: true
       };
 
     case PlanDagNodeType.OUTPUT:
       return {
-        sourceGraphRef: '',
         renderTarget: 'DOT',
         outputPath: '',
         renderConfig: {},
