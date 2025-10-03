@@ -90,9 +90,12 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     setConfigDialogOpen(true)
   }, [])
 
+  // Use ref for delete handler since it needs access to state/mutations defined later
+  const deleteHandlerRef = useRef<((nodeId: string) => void) | null>(null)
+
   const handleNodeDelete = useCallback((nodeId: string) => {
     console.log('Node delete triggered:', nodeId)
-    // Will be implemented via callback from planDagState
+    deleteHandlerRef.current?.(nodeId)
   }, [])
 
   // Use Plan DAG CQRS state management with delta subscriptions
@@ -143,6 +146,33 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     updatePlanDag: (planDag: any) =>
       cqrsService.commands.updatePlanDag({ projectId, planDag }),
   }
+
+  // Setup delete handler with access to mutations
+  useEffect(() => {
+    deleteHandlerRef.current = (nodeId: string) => {
+      console.log('Executing delete for node:', nodeId)
+
+      // Remove node from local state optimistically
+      setNodes((nds) => nds.filter(node => node.id !== nodeId))
+
+      // Remove edges connected to this node
+      const edgesToDelete: string[] = []
+      setEdges((eds) => {
+        const filtered = eds.filter(edge => {
+          if (edge.source === nodeId || edge.target === nodeId) {
+            edgesToDelete.push(edge.id)
+            return false
+          }
+          return true
+        })
+        return filtered
+      })
+
+      // Persist deletions to backend
+      mutations.deleteNode(nodeId)
+      edgesToDelete.forEach(edgeId => mutations.deleteEdge(edgeId))
+    }
+  }, [setNodes, setEdges, mutations])
 
   // Collaboration setup
   const currentUserId: string | undefined = undefined
