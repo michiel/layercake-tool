@@ -21,6 +21,8 @@ interface UseAdvancedOperationsProps {
   setNodes: (nodes: Node[] | ((nodes: Node[]) => Node[])) => void;
   setEdges: (edges: Edge[] | ((edges: Edge[]) => Edge[])) => void;
   readonly?: boolean;
+  onDeleteNodes?: (nodeIds: string[]) => void;
+  onDeleteEdges?: (edgeIds: string[]) => void;
 }
 
 export const useAdvancedOperations = ({
@@ -28,7 +30,9 @@ export const useAdvancedOperations = ({
   edges,
   setNodes,
   setEdges,
-  readonly = false
+  readonly = false,
+  onDeleteNodes,
+  onDeleteEdges
 }: UseAdvancedOperationsProps) => {
   const keysPressedRef = useRef(new Set<string>());
 
@@ -194,11 +198,25 @@ export const useAdvancedOperations = ({
 
     const { nodes: newNodes, edges: newEdges } = deleteSelectedNodes(nodes, edges, selectedNodeIds);
 
+    // Get IDs of edges that will be deleted
+    const deletedEdgeIds = edges
+      .filter(edge => !newEdges.find(e => e.id === edge.id))
+      .map(edge => edge.id);
+
+    // Update local state optimistically
     setNodes(newNodes);
     setEdges(newEdges);
 
-    // Successfully deleted nodes and connections
-  }, [readonly, selectedNodes, nodes, edges, selectedNodeIds, setNodes, setEdges]);
+    // Persist deletions to backend
+    if (onDeleteNodes && selectedNodeIds.length > 0) {
+      onDeleteNodes(selectedNodeIds);
+    }
+    if (onDeleteEdges && deletedEdgeIds.length > 0) {
+      onDeleteEdges(deletedEdgeIds);
+    }
+
+    console.log(`Deleted ${selectedNodeIds.length} node(s) and ${deletedEdgeIds.length} edge(s)`);
+  }, [readonly, selectedNodes, nodes, edges, selectedNodeIds, setNodes, setEdges, onDeleteNodes, onDeleteEdges]);
 
   const handleSelectAll = useCallback(() => {
     if (readonly) return;

@@ -177,13 +177,23 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     position: { x: number; y: number };
   }>({ opened: false, position: { x: 0, y: 0 } })
 
-  // Advanced operations hook
+  // Advanced operations hook with delete callbacks
+  const handleBulkDeleteNodes = useCallback((nodeIds: string[]) => {
+    nodeIds.forEach(nodeId => mutations.deleteNode(nodeId))
+  }, [mutations])
+
+  const handleBulkDeleteEdges = useCallback((edgeIds: string[]) => {
+    edgeIds.forEach(edgeId => mutations.deleteEdge(edgeId))
+  }, [mutations])
+
   const advancedOps = useAdvancedOperations({
     nodes,
     edges,
     setNodes,
     setEdges,
     readonly,
+    onDeleteNodes: handleBulkDeleteNodes,
+    onDeleteEdges: handleBulkDeleteEdges,
   })
 
   // Handle node changes (position, selection, etc.)
@@ -828,6 +838,11 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
             animated: false,
             style: { stroke: '#868e96', strokeWidth: 2 }
           }}
+          multiSelectionKeyCode="Control"
+          selectionKeyCode="Shift"
+          deleteKeyCode={null}
+          panOnDrag={[1, 2]}
+          selectionOnDrag={true}
           fitView
           attributionPosition="top-right"
           proOptions={{ hideAttribution: true }}
