@@ -49,6 +49,7 @@ interface PlanDagCQRSResult {
   savePlanDag: () => Promise<void>
   validatePlanDag: () => void
   refreshData: () => void
+  setDragging: (dragging: boolean) => void
 }
 
 // Deep equality check for Plan DAG objects with performance optimisation
@@ -105,6 +106,7 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
   const initializedRef = useRef(false)
   const previousChangeIdRef = useRef<number>(0)
   const isSyncingFromExternalRef = useRef<boolean>(false)
+  const isDraggingRef = useRef<boolean>(false)
 
   // Stable plan DAG with change detection
   const stablePlanDag = useMemo(() => {
@@ -181,8 +183,25 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
   }, [stablePlanDag, stableOnNodeEdit, stableOnNodeDelete, readonly])
 
   // ReactFlow state
-  const [nodes, setNodes, onNodesChange] = useNodesState(reactFlowData.nodes)
+  const [nodes, setNodes, onNodesChangeInternal] = useNodesState(reactFlowData.nodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(reactFlowData.edges)
+
+  // Wrap onNodesChange to filter position updates during drag
+  const onNodesChange = useCallback((changes: any[]) => {
+    // During drag, filter out position changes to prevent unnecessary state updates
+    if (isDraggingRef.current) {
+      const nonPositionChanges = changes.filter(
+        change => change.type !== 'position' && change.type !== 'dimensions'
+      )
+      if (nonPositionChanges.length > 0) {
+        onNodesChangeInternal(nonPositionChanges)
+      }
+      // Silently ignore position changes during drag - ReactFlow handles visual updates
+      return
+    }
+    // When not dragging, process all changes normally
+    onNodesChangeInternal(changes)
+  }, [onNodesChangeInternal])
 
   // External data change detection to prevent circular dependencies
   const reactFlowDataChange = useExternalDataChangeDetector(reactFlowData)
@@ -193,6 +212,9 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
     if (isSyncingFromExternalRef.current) {
       return
     }
+
+    // Note: No need to check isDraggingRef here anymore because position changes during drag
+    // are filtered out in onNodesChange, preventing unnecessary state updates and re-renders
 
     // Only sync when external reactFlowData has actually changed
     if (reactFlowDataChange.hasChanged) {
@@ -342,6 +364,11 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
     }
   }, [cqrsService, projectId])
 
+  // Drag state control
+  const setDragging = useCallback((dragging: boolean) => {
+    isDraggingRef.current = dragging
+  }, [])
+
   return {
     // Data state
     planDag: stablePlanDag,
@@ -375,5 +402,6 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
     savePlanDag,
     validatePlanDag,
     refreshData,
+    setDragging, // Control drag state to suppress external syncs
   }
 }

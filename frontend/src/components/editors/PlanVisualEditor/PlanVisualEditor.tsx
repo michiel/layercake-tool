@@ -116,6 +116,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     isDirty,
     updateManager,
     cqrsService,
+    setDragging,
   } = planDagState
 
   // Keep nodesRef updated for handleNodeEdit
@@ -236,15 +237,17 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
   const handleFlowNodeDragStart = useCallback(
     (_event: React.MouseEvent, node: Node) => {
       isDragging.current = true
+      setDragging(true) // Suppress external syncs during drag
       dragStartPositions.current[node.id] = { ...node.position }
     },
-    []
+    [setDragging]
   )
 
   // Handle node drag end - save position only when position actually changed
   const handleNodeDragStop = useCallback(
     (_event: React.MouseEvent, node: Node) => {
       isDragging.current = false
+      setDragging(false) // Re-enable external syncs after drag
 
       if (!readonly) {
         const initialPosition = dragStartPositions.current[node.id]
@@ -273,7 +276,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         }
       }
     },
-    [mutations, readonly, updateManager, planDag, planDagState.performanceMonitor]
+    [mutations, readonly, updateManager, planDag, planDagState.performanceMonitor, setDragging]
   )
 
   // Note: Node editing is handled by individual icon clicks within node components
@@ -512,8 +515,11 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
 
       const nodeType = event.dataTransfer.getData('application/reactflow') as PlanDagNodeType;
 
+      console.log('[PlanVisualEditor] Node dropped:', { nodeType, allTypes: Object.values(PlanDagNodeType) });
+
       // Check if the dropped element is a valid node type
       if (!nodeType || !Object.values(PlanDagNodeType).includes(nodeType)) {
+        console.warn('[PlanVisualEditor] Invalid node type dropped:', nodeType);
         return;
       }
 
