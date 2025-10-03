@@ -82,6 +82,9 @@ export class PlanDagCommandService {
     try {
       console.log('[PlanDagCommandService] Deleting node:', command.nodeId)
 
+      // Mark mutation to suppress subscription echo
+      this.markMutationOccurred()
+
       const result = await this.apollo.mutate({
         mutation: PlanDagGraphQL.DELETE_PLAN_DAG_NODE,
         variables: {
@@ -154,6 +157,9 @@ export class PlanDagCommandService {
   async deleteEdge(command: DeleteEdgeCommand): Promise<boolean> {
     try {
       console.log('[PlanDagCommandService] Deleting edge:', command.edgeId)
+
+      // Mark mutation to suppress subscription echo
+      this.markMutationOccurred()
 
       const result = await this.apollo.mutate({
         mutation: PlanDagGraphQL.DELETE_PLAN_DAG_EDGE,
