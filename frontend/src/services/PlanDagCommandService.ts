@@ -9,10 +9,22 @@ import { createMutationContext } from '../hooks/useGraphQLSubscriptionFilter'
  * Does not listen to subscriptions - only executes commands
  */
 export class PlanDagCommandService {
+  private lastMutationTimestamp: number = 0
+
   constructor(
     private apollo: ApolloClient,
     private clientId: string
   ) {}
+
+  // Mark that a mutation occurred to help query service suppress echo
+  private markMutationOccurred(): void {
+    this.lastMutationTimestamp = Date.now()
+  }
+
+  // Get timestamp for coordination with query service
+  getLastMutationTimestamp(): number {
+    return this.lastMutationTimestamp
+  }
 
   // Core Plan DAG Commands
   async createNode(command: CreateNodeCommand): Promise<PlanDagNode> {
@@ -114,6 +126,9 @@ export class PlanDagCommandService {
   async createEdge(command: CreateEdgeCommand): Promise<ReactFlowEdge> {
     try {
       console.log('[PlanDagCommandService] Creating edge:', command.edge.source, '->', command.edge.target)
+
+      // Mark mutation to suppress subscription echo
+      this.markMutationOccurred()
 
       const result = await this.apollo.mutate({
         mutation: PlanDagGraphQL.ADD_PLAN_DAG_EDGE,

@@ -355,13 +355,26 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
   // Handle new connections
   const onConnect = useCallback(
     (connection: Connection) => {
-      if (readonly) return
+      console.log('[PlanVisualEditor] onConnect called:', connection)
+
+      if (readonly) {
+        console.log('[PlanVisualEditor] Connection blocked: readonly mode')
+        return
+      }
 
       // Validate the connection
       const sourceNode = nodes.find((n) => n.id === connection.source)
       const targetNode = nodes.find((n) => n.id === connection.target)
 
-      if (!sourceNode || !targetNode) return
+      if (!sourceNode || !targetNode) {
+        console.error('[PlanVisualEditor] Connection failed: source or target node not found', {
+          source: connection.source,
+          target: connection.target,
+          sourceNode: !!sourceNode,
+          targetNode: !!targetNode
+        })
+        return
+      }
 
       // Use enhanced validation with cycle detection
       const isValid = validateConnectionWithCycleDetection(
@@ -379,6 +392,13 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         alert(`Connection Error: ${isValid.errorMessage}`)
         return
       }
+
+      console.log('[PlanVisualEditor] Creating edge with handles:', {
+        sourceHandle: connection.sourceHandle,
+        targetHandle: connection.targetHandle,
+        source: connection.source,
+        target: connection.target
+      })
 
       const newEdge = {
         id: `edge-${Date.now()}`,
@@ -405,9 +425,10 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         }
       }
 
+      // Optimistic update - add edge immediately for instant feedback
       setEdges((eds) => addEdge(newEdge, eds))
 
-      // Convert to GraphQL edge format for mutation
+      // Persist to backend - subscription will confirm or correct
       const graphqlEdge: ReactFlowEdge = {
         id: newEdge.id,
         source: newEdge.source,
@@ -416,7 +437,14 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         targetHandle: newEdge.targetHandle,
         metadata: newEdge.data.metadata
       }
-      mutations.addEdge(graphqlEdge)
+
+      // Don't suppress sync during edge creation - we need to see updates
+      mutations.addEdge(graphqlEdge).catch(err => {
+        console.error('[PlanVisualEditor] Failed to create edge:', err)
+        // Remove optimistic edge on failure
+        setEdges((eds) => eds.filter(e => e.id !== newEdge.id))
+        alert(`Failed to create connection: ${err.message}`)
+      })
     },
 [nodes, edges, readonly, mutations, setEdges]
   )
@@ -794,6 +822,12 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
           }}
           nodeTypes={NODE_TYPES}
           connectionMode={ConnectionMode.Loose}
+          connectionLineStyle={{ stroke: '#868e96', strokeWidth: 2 }}
+          defaultEdgeOptions={{
+            type: 'smoothstep',
+            animated: false,
+            style: { stroke: '#868e96', strokeWidth: 2 }
+          }}
           fitView
           attributionPosition="top-right"
           proOptions={{ hideAttribution: true }}

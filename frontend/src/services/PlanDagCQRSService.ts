@@ -20,7 +20,17 @@ export class PlanDagCQRSService {
     this.commandService = new PlanDagCommandService(apollo, this.clientId)
     this.queryService = new PlanDagQueryService(apollo, this.clientId)
 
+    // Coordinate mutation timestamps between command and query services
+    this.setupMutationEchoSuppression()
+
     console.log('[PlanDagCQRSService] Initialized with client ID:', this.clientId)
+  }
+
+  // Setup coordination between command and query services to suppress subscription echo
+  private setupMutationEchoSuppression() {
+    // Override query service's timestamp check to use command service's timestamp
+    const originalGetTimestamp = () => this.commandService.getLastMutationTimestamp()
+    ;(this.queryService as any).getCommandTimestamp = originalGetTimestamp
   }
 
   // Command Operations (Write)

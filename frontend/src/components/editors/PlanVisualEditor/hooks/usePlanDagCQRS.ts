@@ -209,7 +209,6 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
     if (reactFlowDataChange.hasChanged) {
       const hasNewData = reactFlowData.nodes.length > 0 || reactFlowData.edges.length > 0
       const isCurrentEmpty = nodes.length === 0 && edges.length === 0
-      const isDifferentLength = reactFlowData.nodes.length !== nodes.length || reactFlowData.edges.length !== edges.length
 
       // Check if node positions or data have changed (for real-time collaboration)
       const hasNodeChanges = reactFlowData.nodes.some((newNode, idx) => {
@@ -226,12 +225,28 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
         return posChanged || idChanged
       })
 
-      // Only sync when the data structure actually changed (length, position, or first load)
-      const shouldSync = hasNewData && (isCurrentEmpty || isDifferentLength || hasNodeChanges)
+      // Check if external data has MORE items (additions from other users)
+      // Don't sync when external data has FEWER items (we may have optimistic local changes)
+      const hasMoreNodes = reactFlowData.nodes.length > nodes.length
+      const hasMoreEdges = reactFlowData.edges.length > edges.length
+      const hasSameOrMoreItems = reactFlowData.nodes.length >= nodes.length &&
+                                 reactFlowData.edges.length >= edges.length
+
+      // Only sync when:
+      // 1. First load (empty)
+      // 2. External data has more items (additions from other users)
+      // 3. Same count but content changed (updates from other users)
+      const shouldSync = hasNewData && (
+        isCurrentEmpty ||
+        hasMoreNodes ||
+        hasMoreEdges ||
+        (hasSameOrMoreItems && hasNodeChanges)
+      )
 
       if (shouldSync) {
         const reason = isCurrentEmpty ? 'empty' :
-                      isDifferentLength ? 'length-changed' :
+                      hasMoreNodes ? 'nodes-added' :
+                      hasMoreEdges ? 'edges-added' :
                       hasNodeChanges ? 'node-changed' : 'unknown'
 
         console.log('[usePlanDagCQRS] Syncing ReactFlow state from external data change:', {

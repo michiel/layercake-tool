@@ -114,11 +114,14 @@ export class PlanDagQueryService {
           })
 
           // Skip subscription updates shortly after own mutations to prevent echo
-          const timeSinceLastMutation = Date.now() - this.lastMutationTimestamp
+          // Use command service timestamp if available (coordinated via CQRS service)
+          const commandTimestamp = (this as any).getCommandTimestamp?.() || this.lastMutationTimestamp
+          const timeSinceLastMutation = Date.now() - commandTimestamp
           if (timeSinceLastMutation < this.MUTATION_ECHO_WINDOW_MS) {
             console.log('[PlanDagQueryService] Skipping subscription update (recent mutation echo):', {
               timeSinceLastMutation: `${timeSinceLastMutation}ms`,
-              window: `${this.MUTATION_ECHO_WINDOW_MS}ms`
+              window: `${this.MUTATION_ECHO_WINDOW_MS}ms`,
+              usingCommandTimestamp: !!(this as any).getCommandTimestamp
             })
             return
           }

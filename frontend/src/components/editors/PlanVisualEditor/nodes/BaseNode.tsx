@@ -46,6 +46,7 @@ export const BaseNode = memo(({
             type="target"
             position={Position.Left}
             id="input-left"
+            isConnectable={!readonly}
             style={{
               background: '#fff',
               border: `2px solid ${color}`,
@@ -58,6 +59,7 @@ export const BaseNode = memo(({
             type="target"
             position={Position.Top}
             id="input-top"
+            isConnectable={!readonly}
             style={{
               background: '#fff',
               border: `2px solid ${color}`,
@@ -173,24 +175,26 @@ export const BaseNode = memo(({
             type="source"
             position={Position.Right}
             id="output-right"
+            isConnectable={!readonly}
             style={{
               background: '#fff',
               border: `2px solid ${color}`,
               width: 12,
               height: 12,
-              borderRadius: '0',
+              borderRadius: '3px',
             }}
           />
           <Handle
             type="source"
             position={Position.Bottom}
             id="output-bottom"
+            isConnectable={!readonly}
             style={{
               background: '#fff',
               border: `2px solid ${color}`,
               width: 12,
               height: 12,
-              borderRadius: '0',
+              borderRadius: '3px',
             }}
           />
         </>
