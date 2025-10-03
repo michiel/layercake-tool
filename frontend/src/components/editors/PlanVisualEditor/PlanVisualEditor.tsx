@@ -14,7 +14,7 @@ import ReactFlow, {
   useReactFlow,
   ReactFlowProvider
 } from 'reactflow'
-import { Stack, Title, Alert, Loader, Text, Tooltip, Group, Badge } from '@mantine/core'
+import { Stack, Title, Alert, Loader, Text, Tooltip, Group, Badge, ActionIcon } from '@mantine/core'
 import {
   IconAlertCircle,
   IconNetwork,
@@ -24,6 +24,7 @@ import {
 import { useCollaborationV2 } from '../../../hooks/useCollaborationV2'
 import { PlanDagNodeType, NodeConfig, NodeMetadata, DataSourceNodeConfig, ReactFlowEdge, PlanDagNode } from '../../../types/plan-dag'
 import { validateConnectionWithCycleDetection } from '../../../utils/planDagValidation'
+import { IconDownload } from '@tabler/icons-react'
 
 // Import node types constant
 import { NODE_TYPES } from './nodeTypes'
@@ -700,6 +701,112 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     }
   }, [])
 
+  // Download Plan DAG as YAML
+  const handleDownloadYAML = useCallback(() => {
+    if (!planDag) return
+
+    // Convert Plan DAG to YAML-like structure
+    const yamlContent = convertPlanDagToYAML(planDag)
+
+    // Create filename from plan name
+    const planName = planDag.metadata?.name || 'plan'
+    const escapedName = planName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+    const filename = `${escapedName}-plan.yaml`
+
+    // Create and download file
+    const blob = new Blob([yamlContent], { type: 'text/yaml;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+
+    console.log(`Downloaded Plan DAG as ${filename}`)
+  }, [planDag])
+
+  // Simple YAML converter
+  const convertPlanDagToYAML = (dag: any): string => {
+    const indent = (level: number) => '  '.repeat(level)
+
+    const serializeValue = (value: any, level: number): string => {
+      if (value === null || value === undefined) return 'null'
+      if (typeof value === 'string') return `"${value.replace(/"/g, '\\"')}"`
+      if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+      if (Array.isArray(value)) {
+        if (value.length === 0) return '[]'
+        return '\n' + value.map(item =>
+          `${indent(level)}- ${serializeValue(item, level + 1).trim()}`
+        ).join('\n')
+      }
+      if (typeof value === 'object') {
+        const entries = Object.entries(value)
+        if (entries.length === 0) return '{}'
+        return '\n' + entries.map(([key, val]) =>
+          `${indent(level)}${key}: ${serializeValue(val, level + 1).trim()}`
+        ).join('\n')
+      }
+      return String(value)
+    }
+
+    let yaml = '# Plan DAG Configuration\n'
+    yaml += `# Generated on ${new Date().toISOString()}\n\n`
+    yaml += `version: "${dag.version || '1.0.0'}"\n\n`
+
+    if (dag.metadata) {
+      yaml += 'metadata:\n'
+      Object.entries(dag.metadata).forEach(([key, value]) => {
+        yaml += `  ${key}: ${serializeValue(value, 2).trim()}\n`
+      })
+      yaml += '\n'
+    }
+
+    yaml += 'nodes:\n'
+    dag.nodes.forEach((node: any) => {
+      yaml += `  - id: "${node.id}"\n`
+      yaml += `    nodeType: "${node.nodeType}"\n`
+      if (node.position) {
+        yaml += `    position:\n`
+        yaml += `      x: ${node.position.x}\n`
+        yaml += `      y: ${node.position.y}\n`
+      }
+      if (node.metadata) {
+        yaml += `    metadata:\n`
+        Object.entries(node.metadata).forEach(([key, value]) => {
+          yaml += `      ${key}: ${serializeValue(value, 3).trim()}\n`
+        })
+      }
+      if (node.config) {
+        const config = typeof node.config === 'string' ? JSON.parse(node.config) : node.config
+        yaml += `    config:\n`
+        Object.entries(config).forEach(([key, value]) => {
+          yaml += `      ${key}: ${serializeValue(value, 3).trim()}\n`
+        })
+      }
+      yaml += '\n'
+    })
+
+    yaml += 'edges:\n'
+    dag.edges.forEach((edge: any) => {
+      yaml += `  - id: "${edge.id}"\n`
+      yaml += `    source: "${edge.source}"\n`
+      yaml += `    target: "${edge.target}"\n`
+      if (edge.sourceHandle) yaml += `    sourceHandle: "${edge.sourceHandle}"\n`
+      if (edge.targetHandle) yaml += `    targetHandle: "${edge.targetHandle}"\n`
+      if (edge.metadata) {
+        yaml += `    metadata:\n`
+        Object.entries(edge.metadata).forEach(([key, value]) => {
+          yaml += `      ${key}: ${serializeValue(value, 3).trim()}\n`
+        })
+      }
+      yaml += '\n'
+    })
+
+    return yaml
+  }
+
   if (loading) {
     return (
       <Stack align="center" justify="center" h="100%" gap="md">
@@ -759,6 +866,15 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
               Unsaved changes
             </Text>
           )}
+          <Tooltip label="Download Plan DAG as YAML">
+            <ActionIcon
+              variant="subtle"
+              onClick={handleDownloadYAML}
+              disabled={!planDag}
+            >
+              <IconDownload size="1.2rem" />
+            </ActionIcon>
+          </Tooltip>
         </Group>
       </Group>
 
