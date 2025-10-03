@@ -76,46 +76,57 @@ export class ReactFlowAdapter {
    * Stable conversion with consistent positioning
    */
   private static convertPlanDagNodeToReactFlow(node: PlanDagNode): Node {
+    // Normalize field names: GraphQL may return snake_case from backend
+    const normalizedNode = {
+      ...node,
+      nodeType: node.nodeType || (node as any).node_type
+    }
+
+    // Debug undefined nodeType
+    if (!normalizedNode.nodeType) {
+      console.error('[ReactFlowAdapter] Node has undefined nodeType:', JSON.stringify(node, null, 2))
+    }
+
     // Parse config if it's a string
-    const parsedConfig = typeof node.config === 'string' ? (() => {
+    const parsedConfig = typeof normalizedNode.config === 'string' ? (() => {
       try {
-        return JSON.parse(node.config)
+        return JSON.parse(normalizedNode.config)
       } catch (e) {
         return {}
       }
-    })() : (node.config || {})
+    })() : (normalizedNode.config || {})
 
     // Check if config is valid
-    const hasValidConfig = node.config &&
-      (typeof node.config === 'object' ||
-       (typeof node.config === 'string' && node.config.trim() !== '{}' && node.config.trim() !== ''))
+    const hasValidConfig = normalizedNode.config &&
+      (typeof normalizedNode.config === 'object' ||
+       (typeof normalizedNode.config === 'string' && normalizedNode.config.trim() !== '{}' && normalizedNode.config.trim() !== ''))
 
     return {
-      id: node.id,
-      type: this.mapNodeTypeToReactFlow(node.nodeType),
+      id: normalizedNode.id,
+      type: this.mapNodeTypeToReactFlow(normalizedNode.nodeType),
       position: {
-        x: node.position?.x ?? 0,
-        y: node.position?.y ?? 0
+        x: normalizedNode.position?.x ?? 0,
+        y: normalizedNode.position?.y ?? 0
       },
       data: {
         // ReactFlow-specific data
-        label: node.metadata?.label || node.id,
-        description: node.metadata?.description || '',
-        nodeType: node.nodeType,
+        label: normalizedNode.metadata?.label || normalizedNode.id,
+        description: normalizedNode.metadata?.description || '',
+        nodeType: normalizedNode.nodeType,
         config: parsedConfig,
-        metadata: node.metadata,
+        metadata: normalizedNode.metadata,
         hasValidConfig,
 
         // Original Plan DAG data for round-trip consistency
         originalNode: {
-          id: node.id,
-          nodeType: node.nodeType,
-          metadata: node.metadata,
-          config: node.config
+          id: normalizedNode.id,
+          nodeType: normalizedNode.nodeType,
+          metadata: normalizedNode.metadata,
+          config: normalizedNode.config
         }
       },
       // ReactFlow styling
-      style: this.getNodeStyle(node.nodeType),
+      style: this.getNodeStyle(normalizedNode.nodeType),
       draggable: true,
       selectable: true,
       deletable: true
@@ -207,6 +218,13 @@ export class ReactFlowAdapter {
       'output': 'OutputNode',
       'copy': 'CopyNode',
       'graph': 'GraphNode',
+      // Backend may return capitalized variants
+      'DataSource': 'DataSourceNode',
+      'Transform': 'TransformNode',
+      'Merge': 'MergeNode',
+      'Output': 'OutputNode',
+      'Copy': 'CopyNode',
+      'Graph': 'GraphNode',
       // TypeScript enum format (PascalCase) - pass through
       'DataSourceNode': 'DataSourceNode',
       'TransformNode': 'TransformNode',
