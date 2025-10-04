@@ -375,6 +375,16 @@ CREATE INDEX idx_graph_edges_graph ON graph_edges(graph_id);
 
 **Estimated effort**: 20-28 hours
 
+**Status**: ✅ COMPLETED
+
+Core pipeline implementation is done:
+- DatasourceImporter handles CSV (nodes/edges) and JSON (graph) imports
+- GraphBuilder constructs graphs from multiple upstream datasources
+- DagExecutor performs topological sort and manages execution order
+- Lifecycle hook structure added to GraphQL mutations (TODO markers in place)
+
+Note: Actual lifecycle hook execution will be activated in Phase 3.
+
 ### Phase 3: Node Lifecycle Hooks
 
 **Files**:

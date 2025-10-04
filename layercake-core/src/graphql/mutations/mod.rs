@@ -382,7 +382,7 @@ impl Mutation {
         };
 
         let inserted_node = dag_node.insert(&context.db).await?;
-        let result_node = PlanDagNode::from(inserted_node);
+        let result_node = PlanDagNode::from(inserted_node.clone());
 
         // Generate JSON Patch delta for node addition
         let patch_op = plan_dag_delta::generate_node_add_patch(&result_node, node_index);
@@ -398,6 +398,12 @@ impl Mutation {
             user_id,
             vec![patch_op],
         ).await.ok(); // Non-fatal if broadcast fails
+
+        // TODO: Trigger pipeline execution if node is configured
+        // Will be implemented after Phase 2 completion
+        // if should_execute_node(&inserted_node) {
+        //     trigger_async_execution(context.db.clone(), project_id, result_node.id.clone());
+        // }
 
         Ok(Some(result_node))
     }
@@ -445,6 +451,7 @@ impl Mutation {
 
         let mut node_active: plan_dag_nodes::ActiveModel = node.into();
         let mut patch_ops = Vec::new();
+        let mut config_updated = false;
 
         // Update position if provided
         if let Some(position) = updates.position {
@@ -478,6 +485,7 @@ impl Mutation {
 
         // Update config if provided
         if let Some(config) = updates.config {
+            config_updated = true;
             node_active.config_json = Set(config.clone());
 
             // Generate config delta
@@ -493,7 +501,7 @@ impl Mutation {
 
         node_active.updated_at = Set(Utc::now());
         let updated_node = node_active.update(&context.db).await?;
-        let result_node = PlanDagNode::from(updated_node);
+        let result_node = PlanDagNode::from(updated_node.clone());
 
         // Increment plan version and broadcast delta
         if !patch_ops.is_empty() {
@@ -506,6 +514,11 @@ impl Mutation {
                 patch_ops,
             ).await.ok(); // Non-fatal if broadcast fails
         }
+
+        // TODO: Trigger pipeline re-execution if config was updated
+        // if config_updated && should_execute_node(&updated_node) {
+        //     trigger_async_execution(context.db.clone(), project_id, result_node.id.clone());
+        // }
 
         Ok(Some(result_node))
     }
@@ -645,6 +658,10 @@ impl Mutation {
             vec![patch_op],
         ).await.ok(); // Non-fatal if broadcast fails
 
+        // TODO: Trigger pipeline execution for affected nodes (target and downstream)
+        // The target node needs to be recomputed because it has a new upstream dependency
+        // trigger_async_affected_execution(context.db.clone(), project_id, result_edge.target.clone());
+
         Ok(Some(result_edge))
     }
 
@@ -661,6 +678,12 @@ impl Mutation {
 
         // Fetch current state for delta generation
         let (_, current_edges) = plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
+
+        // Find the edge to get its target node before deletion
+        let deleted_edge_target = current_edges
+            .iter()
+            .find(|e| e.id == edge_id)
+            .map(|e| e.target.clone());
 
         // Generate delta for edge deletion
         let mut patch_ops = Vec::new();
@@ -689,6 +712,12 @@ impl Mutation {
                     patch_ops,
                 ).await.ok(); // Non-fatal if broadcast fails
             }
+
+            // TODO: Trigger pipeline re-execution for affected nodes (target and downstream)
+            // The target node needs to be recomputed because it lost an upstream dependency
+            // if let Some(target_node_id) = deleted_edge_target {
+            //     trigger_async_affected_execution(context.db.clone(), project_id, target_node_id);
+            // }
 
             Ok(None)
         } else {
