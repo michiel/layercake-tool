@@ -705,58 +705,43 @@ Implemented frontend GraphQL integration:
 
 **Estimated effort**: 2-3 hours
 
-### Phase 6: Frontend Components - DataSource Preview
+### Phase 6: Frontend Components - DataSource Preview ✅ COMPLETED
 
-**Files**:
-- `frontend/src/components/visualization/DataSourcePreview.tsx` (new)
-- `frontend/src/components/visualization/DataSourcePreviewDialog.tsx` (new)
-- `frontend/src/components/editors/PlanVisualEditor/nodes/DataSourceNode.tsx` (extend)
+**Status**: ✅ COMPLETED
 
-**Tasks**:
+**Implementation**: Reused existing GraphPreview component for datasource visualization
+instead of creating table components. Since pipeline processes datasource files into
+graph format (nodes/edges), the force-graph visualization works for both node types.
 
-1. **Create DataSourcePreview Component**
-   - Mantine Table with virtualized scrolling
-   - Sticky column headers
-   - Display execution state badge
-   - Show loading skeleton while fetching
-   - Show error message if import failed
-   - Show "Processing..." if state is pending/processing
+**Files Modified**:
+- `frontend/src/components/editors/PlanVisualEditor/nodes/DataSourceNode.tsx`
+  - Added preview button (play icon) when node is configured
+  - Integrated useGraphPreview hook
+  - Transform pipeline data to force-graph format
+  - Show GraphPreviewDialog on button click
 
-2. **Create DataSourcePreviewDialog Component**
-   - Modal with table preview
-   - Header: filename, row count, column count, import date
-   - Status indicator: execution state badge
-   - Footer: pagination controls
-   - Error alert if errorMessage present
+**Key Changes**:
+- Added `useGraphPreview` hook to fetch pipeline datasource data
+- Transform to GraphData format: `{ nodes: [...], links: [...] }`
+- Reuse GraphPreviewDialog with title "Data Preview: [node name]"
+- Works for graph.json datasources imported by pipeline
 
-3. **Update DataSourceNode**
-   - Add centered play button (IconTable or IconPlayerPlay)
-   - Add state management for preview dialog
-   - Query on preview open
-   - Handle all execution states
+### Phase 7: Frontend Components - Graph Preview Enhancement ✅ COMPLETED
 
-**Estimated effort**: 5-7 hours
+**Status**: ✅ COMPLETED
 
-### Phase 7: Frontend Components - Graph Preview Enhancement
+**Files Modified**:
+- `frontend/src/components/editors/PlanVisualEditor/nodes/GraphNode.tsx`
+  - Replaced old GET_GRAPH_DATA query with useGraphPreview hook
+  - Now queries pipeline graphs table via graphPreview(projectId, nodeId)
+  - Transform pipeline data to force-graph format
+  - Maintains existing preview dialog UI
 
-**Files**:
-- `frontend/src/components/editors/PlanVisualEditor/nodes/GraphNode.tsx` (update)
-- `frontend/src/components/visualization/GraphPreview.tsx` (update)
-
-**Tasks**:
-
-1. **Update GraphNode Query**
-   - Change to use GET_GRAPH_PREVIEW
-   - Use node ID for lookup
-   - Handle execution states
-
-2. **Update GraphPreview Component**
-   - Use data from graph entity
-   - Handle empty graphs
-   - Show execution state
-   - Show processing indicator if computing
-
-**Estimated effort**: 2-3 hours
+**Key Changes**:
+- Query: `graphPreview(projectId, nodeId)` from pipeline tables
+- Returns graph_nodes and graph_edges created by pipeline
+- Transform to GraphData format with attrs spread
+- Graceful handling when preview data not yet available
 
 ### Phase 8: Execution State UI Indicators
 
