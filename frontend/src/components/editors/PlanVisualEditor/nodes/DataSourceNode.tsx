@@ -255,16 +255,9 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
           }}>
             {getNodeIcon(PlanDagNodeType.DATA_SOURCE, '1.4rem')}
           </div>
-          <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
-            <Text size="sm" fw={600} lineClamp={2} style={{ wordBreak: 'break-word' }}>
-              {data.metadata.label}
-            </Text>
-            {data.metadata.description && (
-              <Text size="xs" c="dimmed" lineClamp={2} style={{ wordBreak: 'break-word' }}>
-                {data.metadata.description}
-              </Text>
-            )}
-          </Stack>
+          <Text size="sm" fw={600} lineClamp={2} style={{ wordBreak: 'break-word', flex: 1, minWidth: 0 }}>
+            {data.metadata.label}
+          </Text>
         </Group>
 
         {/* Bottom: Labels and data source details */}

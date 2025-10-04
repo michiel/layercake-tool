@@ -133,16 +133,9 @@ export const BaseNode = memo(({
           }}>
             {getNodeIcon(nodeType, '1.4rem')}
           </div>
-          <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
-            <Text size="sm" fw={600} lineClamp={2} style={{ wordBreak: 'break-word' }}>
-              {metadata.label}
-            </Text>
-            {metadata.description && (
-              <Text size="xs" c="dimmed" lineClamp={2} style={{ wordBreak: 'break-word' }}>
-                {metadata.description}
-              </Text>
-            )}
-          </Stack>
+          <Text size="sm" fw={600} lineClamp={2} style={{ wordBreak: 'break-word', flex: 1, minWidth: 0 }}>
+            {metadata.label}
+          </Text>
         </Group>
 
         {/* Bottom: Labels and node-specific content */}

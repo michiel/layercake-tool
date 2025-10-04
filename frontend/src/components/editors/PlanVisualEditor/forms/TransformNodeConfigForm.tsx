@@ -153,7 +153,7 @@ export const TransformNodeConfigForm: React.FC<TransformNodeConfigFormProps> = (
 
   return (
     <Stack gap="md">
-      <Alert icon={<IconInfoCircle size="1rem" />} color="blue" title="Transform Node Configuration">
+      <Alert icon={<IconInfoCircle size="1rem" />} color="blue" title="Transform Configuration">
         <Text size="sm">
           Configure transformation options. Input and output are determined by edge connections in the DAG.
         </Text>

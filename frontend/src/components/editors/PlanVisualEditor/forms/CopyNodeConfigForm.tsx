@@ -33,7 +33,7 @@ export const CopyNodeConfigForm: React.FC<CopyNodeConfigFormProps> = ({
 
   return (
     <Stack gap="md">
-      <Alert icon={<IconInfoCircle size="1rem" />} color="blue" title="Copy Node Configuration">
+      <Alert icon={<IconInfoCircle size="1rem" />} color="blue" title="Copy Configuration">
         <Text size="sm">
           Configure copy behavior. Source and output are determined by edge connections in the DAG.
         </Text>

@@ -105,13 +105,13 @@ export const NodeConfigDialog = ({
 
   const getNodeTypeLabel = (type: PlanDagNodeType): string => {
     switch (type) {
-      case PlanDagNodeType.DATA_SOURCE: return 'Data Source Node'
-      case PlanDagNodeType.GRAPH: return 'Graph Node'
-      case PlanDagNodeType.TRANSFORM: return 'Transform Node'
-      case PlanDagNodeType.MERGE: return 'Merge Node'
-      case PlanDagNodeType.COPY: return 'Copy Node'
-      case PlanDagNodeType.OUTPUT: return 'Output Node'
-      default: return 'Node'
+      case PlanDagNodeType.DATA_SOURCE: return 'Data Source'
+      case PlanDagNodeType.GRAPH: return 'Graph'
+      case PlanDagNodeType.TRANSFORM: return 'Transform'
+      case PlanDagNodeType.MERGE: return 'Merge'
+      case PlanDagNodeType.COPY: return 'Copy'
+      case PlanDagNodeType.OUTPUT: return 'Output'
+      default: return 'Unknown'
     }
   }
 

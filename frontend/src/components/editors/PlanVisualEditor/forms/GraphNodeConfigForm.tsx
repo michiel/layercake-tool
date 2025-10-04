@@ -33,7 +33,7 @@ export const GraphNodeConfigForm: React.FC<GraphNodeConfigFormProps> = ({
 
   return (
     <Stack gap="md">
-      <Alert icon={<IconInfoCircle size="1rem" />} color="blue" title="Graph Node Configuration">
+      <Alert icon={<IconInfoCircle size="1rem" />} color="blue" title="Graph Configuration">
         <Text size="sm">
           Configure graph node behavior. Graph source is determined by edge connections in the DAG.
         </Text>

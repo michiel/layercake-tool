@@ -35,7 +35,7 @@ export const OutputNodeConfigForm: React.FC<OutputNodeConfigFormProps> = ({
 
   return (
     <Stack gap="md">
-      <Alert icon={<IconInfoCircle size="1rem" />} color="blue" title="Output Node Configuration">
+      <Alert icon={<IconInfoCircle size="1rem" />} color="blue" title="Output Configuration">
         <Text size="sm">
           Configure output rendering options. Source graph comes from incoming edge connection.
         </Text>

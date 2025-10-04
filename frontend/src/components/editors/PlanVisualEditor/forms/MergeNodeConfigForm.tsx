@@ -33,7 +33,7 @@ export const MergeNodeConfigForm: React.FC<MergeNodeConfigFormProps> = ({
 
   return (
     <Stack gap="md">
-      <Alert icon={<IconInfoCircle size="1rem" />} color="blue" title="Merge Node Configuration">
+      <Alert icon={<IconInfoCircle size="1rem" />} color="blue" title="Merge Configuration">
         <Text size="sm">
           Configure merge behavior. Inputs and output are determined by edge connections in the DAG.
         </Text>

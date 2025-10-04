@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useRef } from 'react'
+import { useCallback, useEffect, useState, useRef, useMemo } from 'react'
 import ReactFlow, {
   Background,
   Controls,
@@ -13,7 +13,8 @@ import ReactFlow, {
   Viewport,
   useReactFlow,
   ReactFlowProvider,
-  Edge
+  Edge,
+  MarkerType
 } from 'reactflow'
 import { Stack, Title, Alert, Loader, Text, Tooltip, Group, Badge, ActionIcon } from '@mantine/core'
 import {
@@ -156,6 +157,9 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     deleteHandlerRef.current = (nodeId: string) => {
       console.log('Executing delete for node:', nodeId)
 
+      // Suppress external syncs during delete operations
+      setDragging(true)
+
       // Remove node from local state optimistically
       setNodes((nds) => nds.filter(node => node.id !== nodeId))
 
@@ -175,8 +179,11 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
       // Persist deletions to backend
       mutations.deleteNode(nodeId)
       edgesToDelete.forEach(edgeId => mutations.deleteEdge(edgeId))
+
+      // Re-enable external syncs after a short delay to allow mutations to complete
+      setTimeout(() => setDragging(false), 100)
     }
-  }, [setNodes, setEdges, mutations])
+  }, [setNodes, setEdges, mutations, setDragging])
 
   // Collaboration setup
   const currentUserId: string | undefined = undefined
@@ -292,7 +299,6 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
   const handleNodeDragStop = useCallback(
     (_event: React.MouseEvent, node: Node) => {
       isDragging.current = false
-      setDragging(false) // Re-enable external syncs after drag
 
       if (!readonly) {
         const initialPosition = dragStartPositions.current[node.id]
@@ -312,13 +318,24 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
             // Update via granular mutation for delta-based sync
             mutations.moveNode(node.id, node.position)
             console.log('Node position saved:', node.id, node.position)
+
+            // Re-enable external syncs after a short delay to allow mutation to complete
+            setTimeout(() => setDragging(false), 100)
           } else {
             console.log('Node not moved significantly, skipping position save:', node.id)
+            // Re-enable external syncs immediately if no mutation was sent
+            setDragging(false)
           }
 
           // Clean up tracking
           delete dragStartPositions.current[node.id]
+        } else {
+          // Re-enable external syncs if no initial position was tracked
+          setDragging(false)
         }
+      } else {
+        // Re-enable external syncs if readonly
+        setDragging(false)
       }
     },
     [mutations, readonly, updateManager, planDag, planDagState.performanceMonitor, setDragging]
@@ -793,6 +810,9 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
 
   // Auto-layout handlers
   const handleAutoLayoutHorizontal = useCallback(async () => {
+    // Suppress external syncs during layout operations
+    setDragging(true);
+
     const layoutedNodes = await autoLayout(nodes, edges, {
       direction: 'horizontal',
       nodeSpacing: 50,
@@ -805,9 +825,15 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     layoutedNodes.forEach(node => {
       mutations.moveNode(node.id, node.position);
     });
-  }, [nodes, edges, setNodes, mutations]);
+
+    // Re-enable external syncs after layout completes
+    setDragging(false);
+  }, [nodes, edges, setNodes, mutations, setDragging]);
 
   const handleAutoLayoutVertical = useCallback(async () => {
+    // Suppress external syncs during layout operations
+    setDragging(true);
+
     const layoutedNodes = await autoLayout(nodes, edges, {
       direction: 'vertical',
       nodeSpacing: 100,
@@ -820,7 +846,10 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     layoutedNodes.forEach(node => {
       mutations.moveNode(node.id, node.position);
     });
-  }, [nodes, edges, setNodes, mutations]);
+
+    // Re-enable external syncs after layout completes
+    setDragging(false);
+  }, [nodes, edges, setNodes, mutations, setDragging]);
 
   // Use stable nodeTypes reference directly
 
@@ -966,6 +995,64 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     return yaml
   }
 
+  // Helper function to check if all upstream nodes are configured
+  // Must be defined before any early returns to follow Rules of Hooks
+  const areAllUpstreamNodesConfigured = useCallback((targetNodeId: string): boolean => {
+    // Find all edges that point to this node
+    const incomingEdges = edges.filter(edge => edge.target === targetNodeId)
+
+    // Check if all source nodes are configured
+    return incomingEdges.every(edge => {
+      const sourceNode = nodes.find(node => node.id === edge.source)
+      if (!sourceNode) return true // Skip if node not found
+
+      // Check if node has valid configuration
+      const hasValidConfig = sourceNode.data?.hasValidConfig !== false
+      const isNotUnconfigured = sourceNode.data?.isUnconfigured !== true
+
+      return hasValidConfig && isNotUnconfigured
+    })
+  }, [nodes, edges])
+
+  // Inject current edges into node data for configuration validation
+  // Must be defined before any early returns to follow Rules of Hooks
+  const nodesWithEdges = useMemo(() => {
+    return nodes.map(node => ({
+      ...node,
+      data: {
+        ...node.data,
+        edges: edges // Inject current edges for validation
+      }
+    }))
+  }, [nodes, edges])
+
+  // Enhance edges with markers and styling based on upstream node configuration status
+  // Must be defined before any early returns to follow Rules of Hooks
+  const edgesWithMarkers = useMemo(() => {
+    return edges.map(edge => {
+      // Check if all upstream nodes of the target are configured
+      const allUpstreamConfigured = areAllUpstreamNodesConfigured(edge.target)
+
+      // Determine color: blue for all configured, orange for any unconfigured
+      const edgeColor = allUpstreamConfigured ? '#228be6' : '#fd7e14'
+
+      return {
+        ...edge,
+        style: {
+          ...(edge.style || {}),
+          stroke: edgeColor,
+          strokeWidth: 2
+        },
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color: edgeColor,
+          width: 20,
+          height: 20
+        }
+      }
+    })
+  }, [edges, areAllUpstreamNodesConfigured])
+
   if (loading) {
     return (
       <Stack align="center" justify="center" h="100%" gap="md">
@@ -1075,8 +1162,8 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         onClick={handleCanvasClick}
       >
         <ReactFlow
-          nodes={nodes}
-          edges={edges}
+          nodes={nodesWithEdges}
+          edges={edgesWithMarkers}
           onNodesChange={handleNodesChange}
           onEdgesChange={(changes) => {
             console.log('ReactFlow onEdgesChange called:', changes)
