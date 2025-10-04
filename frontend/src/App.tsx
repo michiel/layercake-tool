@@ -1,8 +1,8 @@
 import React, { useState } from 'react'
 import { Routes, Route, useNavigate, useParams, useLocation } from 'react-router-dom'
 import { AppShell, Group, Title, Stack, Button, Container, Text, Card, Badge, Alert } from '@mantine/core'
-import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconPlayerPlay, IconAlertCircle, IconFileDatabase } from '@tabler/icons-react'
-import { useQuery } from '@apollo/client/react'
+import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconPlayerPlay, IconAlertCircle, IconFileDatabase, IconTrash } from '@tabler/icons-react'
+import { useQuery, useMutation } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import { Breadcrumbs } from './components/common/Breadcrumbs'
 import { PlanVisualEditor } from './components/editors/PlanVisualEditor/PlanVisualEditor'
@@ -34,6 +34,13 @@ const GET_PROJECTS = gql`
       createdAt
       updatedAt
     }
+  }
+`
+
+// Mutation to delete a project
+const DELETE_PROJECT = gql`
+  mutation DeleteProject($id: ID!) {
+    deleteProject(id: $id)
   }
 `
 
@@ -248,6 +255,10 @@ const ProjectsPage = () => {
 
   const projects = projectsData?.projects || []
 
+  const [deleteProject] = useMutation(DELETE_PROJECT, {
+    refetchQueries: [{ query: GET_PROJECTS }],
+  });
+
   const handleNavigate = (route: string) => {
     navigate(route)
   }
@@ -264,6 +275,12 @@ const ProjectsPage = () => {
     refetch() // Refresh the projects list
     navigate(`/projects/${project.id}`) // Navigate to the new project
   }
+
+  const handleDeleteProject = (projectId: number) => {
+    if (window.confirm('Are you sure you want to delete this project? This action cannot be undone.')) {
+      deleteProject({ variables: { id: projectId } });
+    }
+  };
 
   return (
     <Container size="xl">
@@ -338,6 +355,18 @@ const ProjectsPage = () => {
                     }}
                   >
                     Plan Editor
+                  </Button>
+                  <Button
+                    variant="light"
+                    size="sm"
+                    color="red"
+                    leftSection={<IconTrash size={14} />}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteProject(project.id);
+                    }}
+                  >
+                    Delete
                   </Button>
                   <Button
                     variant="light"
