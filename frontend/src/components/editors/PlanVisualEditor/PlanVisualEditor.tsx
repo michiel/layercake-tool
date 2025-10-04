@@ -43,6 +43,7 @@ import { ContextMenu } from './components/ContextMenu'
 import { usePlanDagCQRS } from './hooks/usePlanDagCQRS'
 import { useAdvancedOperations } from './hooks/useAdvancedOperations'
 import { generateNodeId, getDefaultNodeConfig, getDefaultNodeMetadata } from './utils/nodeDefaults'
+import { autoLayout } from './utils/autoLayout'
 
 // Import ReactFlow styles
 import 'reactflow/dist/style.css'
@@ -695,6 +696,37 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     }
   }, [contextMenu.opened, handleCloseContextMenu]);
 
+  // Auto-layout handlers
+  const handleAutoLayoutHorizontal = useCallback(() => {
+    const layoutedNodes = autoLayout(nodes, edges, {
+      direction: 'horizontal',
+      nodeSpacing: 50,
+      rankSpacing: 250
+    });
+
+    setNodes(layoutedNodes);
+
+    // Persist position changes to backend
+    layoutedNodes.forEach(node => {
+      mutations.moveNode(node.id, node.position);
+    });
+  }, [nodes, edges, setNodes, mutations]);
+
+  const handleAutoLayoutVertical = useCallback(() => {
+    const layoutedNodes = autoLayout(nodes, edges, {
+      direction: 'vertical',
+      nodeSpacing: 100,
+      rankSpacing: 150
+    });
+
+    setNodes(layoutedNodes);
+
+    // Persist position changes to backend
+    layoutedNodes.forEach(node => {
+      mutations.moveNode(node.id, node.position);
+    });
+  }, [nodes, edges, setNodes, mutations]);
+
   // Use stable nodeTypes reference directly
 
 
@@ -935,6 +967,8 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         onAlignCenterVertical={() => advancedOps.handleAlignCenter('vertical')}
         onDistributeHorizontal={() => advancedOps.handleDistribute('horizontal')}
         onDistributeVertical={() => advancedOps.handleDistribute('vertical')}
+        onAutoLayoutHorizontal={handleAutoLayoutHorizontal}
+        onAutoLayoutVertical={handleAutoLayoutVertical}
       />
 
       <div

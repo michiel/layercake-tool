@@ -19,7 +19,9 @@ import {
   IconNetwork,
   IconTransform,
   IconGitMerge,
-  IconFileExport
+  IconFileExport,
+  IconArrowRight,
+  IconArrowDown
 } from '@tabler/icons-react';
 import { PlanDagNodeType } from '../../../../types/plan-dag';
 
@@ -46,6 +48,8 @@ interface AdvancedToolbarProps {
   onAlignCenterVertical: () => void;
   onDistributeHorizontal: () => void;
   onDistributeVertical: () => void;
+  onAutoLayoutHorizontal: () => void;
+  onAutoLayoutVertical: () => void;
 }
 
 export const AdvancedToolbar: React.FC<AdvancedToolbarProps> = ({
@@ -71,6 +75,8 @@ export const AdvancedToolbar: React.FC<AdvancedToolbarProps> = ({
   onAlignCenterVertical,
   onDistributeHorizontal,
   onDistributeVertical,
+  onAutoLayoutHorizontal,
+  onAutoLayoutVertical,
 }) => {
   if (readonly) return null;
 
@@ -297,6 +303,23 @@ export const AdvancedToolbar: React.FC<AdvancedToolbarProps> = ({
           </Group>
         </>
       )}
+
+      {/* Auto-Layout Operations */}
+      <Divider orientation="vertical" />
+      <Text size="xs" c="dimmed">Auto-layout:</Text>
+      <Group gap="xs">
+        <Tooltip label="Auto-layout Horizontal (Left to Right)" position="bottom">
+          <ActionIcon variant="subtle" color="blue" onClick={onAutoLayoutHorizontal}>
+            <IconArrowRight size="1rem" />
+          </ActionIcon>
+        </Tooltip>
+
+        <Tooltip label="Auto-layout Vertical (Top to Bottom)" position="bottom">
+          <ActionIcon variant="subtle" color="blue" onClick={onAutoLayoutVertical}>
+            <IconArrowDown size="1rem" />
+          </ActionIcon>
+        </Tooltip>
+      </Group>
     </Group>
   );
 };
