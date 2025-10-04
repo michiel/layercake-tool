@@ -2,11 +2,10 @@ import { memo, useState } from 'react'
 import { NodeProps, Handle, Position } from 'reactflow'
 import { Paper, Text, Group, ActionIcon, Tooltip, Badge, Stack } from '@mantine/core'
 import { IconSettings, IconTrash, IconPlayerPlay } from '@tabler/icons-react'
-import { useQuery } from '@apollo/client/react'
 import { PlanDagNodeType, GraphNodeConfig } from '../../../../types/plan-dag'
 import { isNodeConfigured } from '../../../../utils/planDagValidation'
 import { getNodeColor, getNodeIcon, getNodeTypeLabel } from '../../../../utils/nodeStyles'
-import { GET_GRAPH_DATA, GraphDataResponse } from '../../../../graphql/graphs'
+import { useGraphPreview } from '../../../../hooks/usePreview'
 import { GraphPreviewDialog } from '../../../visualization/GraphPreviewDialog'
 import { GraphData } from '../../../visualization/GraphPreview'
 
@@ -28,40 +27,40 @@ export const GraphNode = memo((props: GraphNodeProps) => {
   const hasValidConfig = data.hasValidConfig !== false
   const isConfigured = isNodeConfigured(PlanDagNodeType.GRAPH, props.id, edges, hasValidConfig)
 
-  // Get project ID from context (assuming it's available in data or from parent)
+  // Get project ID from context
   const projectId = data.projectId as number | undefined
 
-  // Query graph data for preview
-  // Note: Graph can always be previewed, even if empty (unconfigured graphs show empty preview)
-  const { data: graphData } = useQuery<{ graphData: GraphDataResponse }>(GET_GRAPH_DATA, {
-    variables: { projectId: projectId || 0 },
-    skip: !showPreview,
-  })
+  // Query pipeline graph preview
+  const { preview: graphPreview } = useGraphPreview(
+    projectId || 0,
+    props.id,
+    { skip: !showPreview || !projectId }
+  )
 
-  // Transform graph data for force-graph format
+  // Transform pipeline graph preview to force-graph format
   const getGraphPreviewData = (): GraphData | null => {
-    if (!graphData?.graphData) return null
+    if (!graphPreview) return null
 
     return {
-      nodes: graphData.graphData.nodes.map((node: GraphDataResponse['nodes'][0]) => ({
+      nodes: graphPreview.nodes.map((node) => ({
         id: node.id,
-        name: node.label,
-        layer: node.layer,
+        name: node.label || node.id,
+        layer: node.layer || 'default',
         attrs: {
           is_partition: node.isPartition.toString(),
-          weight: node.weight.toString(),
-          type: node.layer,
+          weight: (node.weight || 0).toString(),
+          ...node.attrs,
         },
       })),
-      links: graphData.graphData.edges.map((edge: GraphDataResponse['edges'][0]) => ({
+      links: graphPreview.edges.map((edge) => ({
         id: edge.id,
         source: edge.source,
         target: edge.target,
-        name: edge.label,
-        layer: edge.layer,
+        name: edge.label || '',
+        layer: edge.layer || 'default',
         attrs: {
-          weight: edge.weight.toString(),
-          type: edge.layer,
+          weight: (edge.weight || 0).toString(),
+          ...edge.attrs,
         },
       })),
     }

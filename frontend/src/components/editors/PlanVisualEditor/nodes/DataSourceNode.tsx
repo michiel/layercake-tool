@@ -2,11 +2,14 @@ import { memo, useState, useEffect } from 'react'
 import { NodeProps, Handle, Position } from 'reactflow'
 import { useQuery } from '@apollo/client/react'
 import { Paper, Text, Group, ActionIcon, Tooltip, Badge, Stack, Loader } from '@mantine/core'
-import { IconSettings, IconTrash, IconAlertCircle, IconCheck, IconClock, IconX } from '@tabler/icons-react'
+import { IconSettings, IconTrash, IconAlertCircle, IconCheck, IconClock, IconX, IconPlayerPlay } from '@tabler/icons-react'
 import { PlanDagNodeType, DataSourceNodeConfig } from '../../../../types/plan-dag'
 import { isNodeConfigured } from '../../../../utils/planDagValidation'
 import { getNodeColor, getNodeIcon, getNodeTypeLabel } from '../../../../utils/nodeStyles'
 import { GET_DATASOURCE, DataSource, getFileFormatDisplayName, getDataTypeDisplayName, formatFileSize, getStatusColor } from '../../../../graphql/datasources'
+import { useGraphPreview } from '../../../../hooks/usePreview'
+import { GraphPreviewDialog } from '../../../visualization/GraphPreviewDialog'
+import { GraphData } from '../../../visualization/GraphPreview'
 
 // Helper function to get data freshness information
 const getDataFreshness = (dataSource: DataSource) => {
@@ -42,6 +45,7 @@ interface DataSourceNodeProps extends NodeProps {
 export const DataSourceNode = memo((props: DataSourceNodeProps) => {
   const { data, selected, onEdit, onDelete, readonly = false } = props
   const [dataSourceInfo, setDataSourceInfo] = useState<DataSource | null>(null)
+  const [showPreview, setShowPreview] = useState(false)
 
   const config = data.config as DataSourceNodeConfig
   const color = getNodeColor(PlanDagNodeType.DATA_SOURCE)
@@ -51,6 +55,9 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
   const hasValidConfig = data.hasValidConfig !== false
   const isConfigured = isNodeConfigured(PlanDagNodeType.DATA_SOURCE, props.id, edges, hasValidConfig)
 
+  // Get project ID from context
+  const projectId = data.projectId as number | undefined
+
   // Query DataSource details if dataSourceId is available
   const { data: dataSourceData, loading: dataSourceLoading } = useQuery(GET_DATASOURCE, {
     variables: { id: config.dataSourceId || 0 },
@@ -58,11 +65,40 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
     errorPolicy: 'ignore'
   })
 
+  // Query pipeline graph preview (for graph.json datasources)
+  const { preview: graphPreview } = useGraphPreview(
+    projectId || 0,
+    props.id,
+    { skip: !showPreview || !projectId }
+  )
+
   useEffect(() => {
     if ((dataSourceData as any)?.dataSource) {
       setDataSourceInfo((dataSourceData as any).dataSource as DataSource)
     }
   }, [dataSourceData])
+
+  // Transform pipeline graph preview to force-graph format
+  const getGraphPreviewData = (): GraphData | null => {
+    if (!graphPreview) return null
+
+    return {
+      nodes: graphPreview.nodes.map((node) => ({
+        id: node.id,
+        name: node.label || node.id,
+        layer: node.layer || 'default',
+        attrs: node.attrs || {},
+      })),
+      links: graphPreview.edges.map((edge) => ({
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        name: edge.label || '',
+        layer: edge.layer || 'default',
+        attrs: edge.attrs || {},
+      })),
+    }
+  }
 
   const getStatusIcon = (status: DataSource['status']) => {
     switch (status) {
@@ -260,6 +296,28 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
           </Text>
         </Group>
 
+        {/* Center: Play button for graph preview */}
+        {!readonly && isConfigured && (
+          <Group justify="center" mb="md">
+            <Tooltip label="Preview data">
+              <ActionIcon
+                size="xl"
+                variant="light"
+                color="blue"
+                radius="xl"
+                data-action-icon="preview"
+                onMouseDown={(e) => {
+                  e.stopPropagation()
+                  e.preventDefault()
+                  setShowPreview(true)
+                }}
+              >
+                <IconPlayerPlay size="1.5rem" />
+              </ActionIcon>
+            </Tooltip>
+          </Group>
+        )}
+
         {/* Bottom: Labels and data source details */}
         <Stack gap="xs">
           <Group gap="xs" wrap="wrap">
@@ -282,6 +340,14 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
           {renderDataSourceContent()}
         </Stack>
       </Paper>
+
+      {/* Graph Preview Dialog */}
+      <GraphPreviewDialog
+        opened={showPreview}
+        onClose={() => setShowPreview(false)}
+        data={getGraphPreviewData()}
+        title={`Data Preview: ${data.metadata.label}`}
+      />
     </>
   )
 })
