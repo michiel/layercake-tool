@@ -12,7 +12,8 @@ import ReactFlow, {
   OnMove,
   Viewport,
   useReactFlow,
-  ReactFlowProvider
+  ReactFlowProvider,
+  Edge
 } from 'reactflow'
 import { Stack, Title, Alert, Loader, Text, Tooltip, Group, Badge, ActionIcon } from '@mantine/core'
 import {
@@ -366,6 +367,100 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
       }
     },
     [planDag, mutations]
+  )
+
+  // Edge reconnection handlers
+  const edgeReconnectSuccessful = useRef(true)
+
+  const handleReconnectStart = useCallback(() => {
+    edgeReconnectSuccessful.current = false
+  }, [])
+
+  const handleReconnect = useCallback(
+    (oldEdge: Edge, newConnection: Connection) => {
+      if (readonly) return
+
+      edgeReconnectSuccessful.current = true
+
+      // Validate the new connection
+      const sourceNode = nodes.find((n) => n.id === newConnection.source)
+      const targetNode = nodes.find((n) => n.id === newConnection.target)
+
+      if (!sourceNode || !targetNode) {
+        console.error('[handleReconnect] Source or target node not found')
+        return
+      }
+
+      const isValid = validateConnectionWithCycleDetection(
+        sourceNode.data.nodeType,
+        targetNode.data.nodeType,
+        nodes,
+        edges.filter(e => e.id !== oldEdge.id), // Exclude old edge from cycle check
+        { source: newConnection.source!, target: newConnection.target! }
+      )
+
+      if (!isValid.isValid) {
+        console.error('[handleReconnect] Invalid connection:', isValid.errorMessage)
+        alert(`Connection Error: ${isValid.errorMessage}`)
+        return
+      }
+
+      // Generate new edge ID with source, target, and handle information
+      const sourceHandle = newConnection.sourceHandle || 'output'
+      const targetHandle = newConnection.targetHandle || 'input'
+      const newEdgeId = `${newConnection.source}-${newConnection.target}-${sourceHandle}-${targetHandle}`
+
+      // Create the new edge with the updated connection
+      const newEdge: ReactFlowEdge = {
+        id: newEdgeId,
+        source: newConnection.source!,
+        target: newConnection.target!,
+        sourceHandle: newConnection.sourceHandle,
+        targetHandle: newConnection.targetHandle,
+        metadata: {
+          label: isValid.dataType === 'GRAPH_REFERENCE' ? 'Graph Ref' : 'Data',
+          dataType: isValid.dataType,
+        }
+      }
+
+      // Update local state - remove old edge and add new one
+      setEdges((els) => {
+        const filtered = els.filter(e => e.id !== oldEdge.id)
+        return addEdge({
+          ...newEdge,
+          type: 'smoothstep',
+          animated: false,
+          style: {
+            stroke: isValid.dataType === 'GRAPH_REFERENCE' ? '#228be6' : '#868e96',
+            strokeWidth: 2,
+          },
+          data: { metadata: newEdge.metadata }
+        }, filtered)
+      })
+
+      // Persist to backend: delete old edge and create new one
+      // The edge ID in backend is stored in originalEdge.id
+      const oldEdgeId = (oldEdge.data as any)?.originalEdge?.id || oldEdge.id
+      mutations.deleteEdge(oldEdgeId)
+      mutations.addEdge(newEdge)
+
+      console.log('Edge reconnected - deleted:', oldEdgeId, 'created:', newEdge.id)
+    },
+    [readonly, setEdges, mutations, nodes, edges]
+  )
+
+  const handleReconnectEnd = useCallback(
+    (_: MouseEvent | TouchEvent, edge: Edge) => {
+      if (!edgeReconnectSuccessful.current && !readonly) {
+        // Edge was dropped on empty space - delete it
+        const edgeIdToDelete = (edge.data as any)?.originalEdge?.id || edge.id
+        setEdges((eds) => eds.filter((e) => e.id !== edge.id))
+        mutations.deleteEdge(edgeIdToDelete)
+        console.log('Edge deleted on drop:', edgeIdToDelete)
+      }
+      edgeReconnectSuccessful.current = true
+    },
+    [readonly, setEdges, mutations]
   )
 
   // Handle edge changes
@@ -993,6 +1088,9 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
           onNodeDragStart={handleFlowNodeDragStart}
           onNodeDragStop={handleNodeDragStop}
           onEdgeDoubleClick={handleEdgeDoubleClick}
+          onReconnect={handleReconnect}
+          onReconnectStart={handleReconnectStart}
+          onReconnectEnd={handleReconnectEnd}
           onNodeClick={(event, node) => {
             // Prevent selection when clicking on action icons (edit/delete)
             const target = event.target as HTMLElement

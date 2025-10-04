@@ -29,7 +29,8 @@ import {
   IconAlertCircle,
   IconCheck,
   IconClock,
-  IconX
+  IconX,
+  IconTable
 } from '@tabler/icons-react'
 import { useForm } from '@mantine/form'
 import { Breadcrumbs } from '../common/Breadcrumbs'
@@ -37,12 +38,14 @@ import {
   GET_DATASOURCE,
   UPDATE_DATASOURCE,
   REPROCESS_DATASOURCE,
+  UPDATE_GRAPH_JSON,
   DataSource,
   UpdateDataSourceInput,
   formatFileSize,
   getDataSourceTypeDisplayName,
   getStatusColor
 } from '../../graphql/datasources'
+import { GraphSpreadsheetEditor, GraphData } from '../editors/GraphSpreadsheetEditor'
 
 import { gql } from '@apollo/client'
 
@@ -94,6 +97,7 @@ export const DataSourceEditor: React.FC<DataSourceEditorProps> = () => {
   // Mutations
   const [updateDataSource, { loading: updateLoading }] = useMutation(UPDATE_DATASOURCE)
   const [reprocessDataSource, { loading: reprocessLoading }] = useMutation(REPROCESS_DATASOURCE)
+  const [updateGraphJson] = useMutation(UPDATE_GRAPH_JSON)
 
   const dataSource: DataSource | null = (dataSourceData as any)?.dataSource || null
 
@@ -218,6 +222,25 @@ export const DataSourceEditor: React.FC<DataSourceEditorProps> = () => {
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
+  }
+
+  const handleSaveGraphData = async (graphData: GraphData) => {
+    if (!dataSource) return
+
+    try {
+      await updateGraphJson({
+        variables: {
+          id: dataSource.id,
+          graphJson: JSON.stringify(graphData)
+        }
+      })
+      await refetchDataSource()
+      // TODO: Show success notification
+    } catch (error) {
+      console.error('Failed to save graph data:', error)
+      // TODO: Show error notification
+      throw error
+    }
   }
 
   const getStatusIcon = (status: DataSource['status']) => {
@@ -353,6 +376,13 @@ export const DataSourceEditor: React.FC<DataSourceEditorProps> = () => {
           >
             Graph Data
           </Tabs.Tab>
+          <Tabs.Tab
+            value="edit"
+            leftSection={<IconTable size={16} />}
+            disabled={dataSource.status !== 'active'}
+          >
+            Data Edit
+          </Tabs.Tab>
         </Tabs.List>
 
         <Tabs.Panel value="details">
@@ -463,6 +493,32 @@ export const DataSourceEditor: React.FC<DataSourceEditorProps> = () => {
                 The format includes nodes, edges, and layers arrays as defined by the graph schema.
               </Text>
             </Stack>
+          </Card>
+        </Tabs.Panel>
+
+        <Tabs.Panel value="edit">
+          <Card withBorder mt="md">
+            {dataSource.status === 'active' && (() => {
+              try {
+                const graphData: GraphData = JSON.parse(dataSource.graphJson);
+                return (
+                  <GraphSpreadsheetEditor
+                    graphData={graphData}
+                    onSave={handleSaveGraphData}
+                  />
+                );
+              } catch (error) {
+                return (
+                  <Alert
+                    icon={<IconAlertCircle size={16} />}
+                    title="Invalid Graph Data"
+                    color="red"
+                  >
+                    Failed to parse graph JSON data. Please check the data format in the "Graph Data" tab.
+                  </Alert>
+                );
+              }
+            })()}
           </Card>
         </Tabs.Panel>
       </Tabs>
