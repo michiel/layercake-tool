@@ -8,6 +8,7 @@ import { isNodeConfigured } from '../../../../utils/planDagValidation'
 import { getNodeColor, getNodeIcon, getNodeTypeLabel } from '../../../../utils/nodeStyles'
 import { GET_DATASOURCE, DataSource, getFileFormatDisplayName, getDataTypeDisplayName, formatFileSize, getStatusColor } from '../../../../graphql/datasources'
 import { useGraphPreview } from '../../../../hooks/usePreview'
+import { getExecutionStateLabel, getExecutionStateColor, isExecutionComplete, isExecutionInProgress } from '../../../../graphql/preview'
 import { GraphPreviewDialog } from '../../../visualization/GraphPreviewDialog'
 import { GraphData } from '../../../visualization/GraphPreview'
 
@@ -70,6 +71,13 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
     projectId || 0,
     props.id,
     { skip: !showPreview || !projectId }
+  )
+
+  // Query execution state (always fetch to show status)
+  const { preview: executionPreview } = useGraphPreview(
+    projectId || 0,
+    props.id,
+    { skip: !projectId }
   )
 
   useEffect(() => {
@@ -332,6 +340,16 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
             {!isConfigured && (
               <Badge variant="outline" size="xs" color="orange">
                 Not Configured
+              </Badge>
+            )}
+            {executionPreview && (
+              <Badge
+                variant={isExecutionComplete(executionPreview.executionState) ? 'light' : 'filled'}
+                color={getExecutionStateColor(executionPreview.executionState)}
+                size="xs"
+                leftSection={isExecutionInProgress(executionPreview.executionState) ? <Loader size={10} /> : undefined}
+              >
+                {getExecutionStateLabel(executionPreview.executionState)}
               </Badge>
             )}
           </Group>

@@ -1,11 +1,12 @@
 import { memo, useState } from 'react'
 import { NodeProps, Handle, Position } from 'reactflow'
-import { Paper, Text, Group, ActionIcon, Tooltip, Badge, Stack } from '@mantine/core'
+import { Paper, Text, Group, ActionIcon, Tooltip, Badge, Stack, Loader } from '@mantine/core'
 import { IconSettings, IconTrash, IconPlayerPlay } from '@tabler/icons-react'
 import { PlanDagNodeType, GraphNodeConfig } from '../../../../types/plan-dag'
 import { isNodeConfigured } from '../../../../utils/planDagValidation'
 import { getNodeColor, getNodeIcon, getNodeTypeLabel } from '../../../../utils/nodeStyles'
 import { useGraphPreview } from '../../../../hooks/usePreview'
+import { getExecutionStateLabel, getExecutionStateColor, isExecutionComplete, isExecutionInProgress } from '../../../../graphql/preview'
 import { GraphPreviewDialog } from '../../../visualization/GraphPreviewDialog'
 import { GraphData } from '../../../visualization/GraphPreview'
 
@@ -35,6 +36,13 @@ export const GraphNode = memo((props: GraphNodeProps) => {
     projectId || 0,
     props.id,
     { skip: !showPreview || !projectId }
+  )
+
+  // Query execution state (always fetch to show status)
+  const { preview: executionPreview } = useGraphPreview(
+    projectId || 0,
+    props.id,
+    { skip: !projectId }
   )
 
   // Transform pipeline graph preview to force-graph format
@@ -226,6 +234,16 @@ export const GraphNode = memo((props: GraphNodeProps) => {
             {!isConfigured && (
               <Badge variant="outline" size="xs" color="orange">
                 Not Configured
+              </Badge>
+            )}
+            {executionPreview && (
+              <Badge
+                variant={isExecutionComplete(executionPreview.executionState) ? 'light' : 'filled'}
+                color={getExecutionStateColor(executionPreview.executionState)}
+                size="xs"
+                leftSection={isExecutionInProgress(executionPreview.executionState) ? <Loader size={10} /> : undefined}
+              >
+                {getExecutionStateLabel(executionPreview.executionState)}
               </Badge>
             )}
           </Group>
