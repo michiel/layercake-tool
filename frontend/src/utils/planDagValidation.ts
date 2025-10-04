@@ -337,8 +337,9 @@ export const isNodeConfigured = (
 
   switch (nodeType) {
     case PlanDagNodeType.GRAPH:
-      // GraphNodes MUST have at least one input to be configured
-      return inputEdges.length >= 1;
+      // GraphNodes are always configured - they can be empty or have inputs
+      // Empty graphs show empty preview, connected graphs show their data
+      return true;
 
     case PlanDagNodeType.DATA_SOURCE:
       // DataSource nodes MUST have at least one output connected to be configured
@@ -388,7 +389,7 @@ export const getMinimumRequiredInputs = (nodeType: PlanDagNodeType): number => {
     case PlanDagNodeType.DATA_SOURCE:
       return 0; // DataSource nodes don't need inputs
     case PlanDagNodeType.GRAPH:
-      return 1; // GraphNodes MUST have at least one input
+      return 0; // GraphNodes can be empty (will show empty preview)
     case PlanDagNodeType.TRANSFORM:
     case PlanDagNodeType.OUTPUT:
       return 1; // These need exactly one input

@@ -32,9 +32,10 @@ export const GraphNode = memo((props: GraphNodeProps) => {
   const projectId = data.projectId as number | undefined
 
   // Query graph data for preview
+  // Note: Graph can always be previewed, even if empty (unconfigured graphs show empty preview)
   const { data: graphData } = useQuery<{ graphData: GraphDataResponse }>(GET_GRAPH_DATA, {
     variables: { projectId: projectId || 0 },
-    skip: !projectId || !showPreview,
+    skip: !showPreview,
   })
 
   // Transform graph data for force-graph format
@@ -188,20 +189,17 @@ export const GraphNode = memo((props: GraphNodeProps) => {
         {/* Center: Play button */}
         {!readonly && (
           <Group justify="center" mb="md">
-            <Tooltip label={projectId ? "Preview graph" : "Preview graph (project ID required)"}>
+            <Tooltip label="Preview graph">
               <ActionIcon
                 size="xl"
                 variant="light"
                 color="blue"
                 radius="xl"
                 data-action-icon="preview"
-                disabled={!projectId}
                 onMouseDown={(e) => {
                   e.stopPropagation()
                   e.preventDefault()
-                  if (projectId) {
-                    setShowPreview(true)
-                  }
+                  setShowPreview(true)
                 }}
               >
                 <IconPlayerPlay size="1.5rem" />
