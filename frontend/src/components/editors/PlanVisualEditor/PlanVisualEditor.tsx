@@ -697,8 +697,8 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
   }, [contextMenu.opened, handleCloseContextMenu]);
 
   // Auto-layout handlers
-  const handleAutoLayoutHorizontal = useCallback(() => {
-    const layoutedNodes = autoLayout(nodes, edges, {
+  const handleAutoLayoutHorizontal = useCallback(async () => {
+    const layoutedNodes = await autoLayout(nodes, edges, {
       direction: 'horizontal',
       nodeSpacing: 50,
       rankSpacing: 250
@@ -712,8 +712,8 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     });
   }, [nodes, edges, setNodes, mutations]);
 
-  const handleAutoLayoutVertical = useCallback(() => {
-    const layoutedNodes = autoLayout(nodes, edges, {
+  const handleAutoLayoutVertical = useCallback(async () => {
+    const layoutedNodes = await autoLayout(nodes, edges, {
       direction: 'vertical',
       nodeSpacing: 100,
       rankSpacing: 150

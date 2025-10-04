@@ -308,13 +308,13 @@ export const AdvancedToolbar: React.FC<AdvancedToolbarProps> = ({
       <Divider orientation="vertical" />
       <Text size="xs" c="dimmed">Auto-layout:</Text>
       <Group gap="xs">
-        <Tooltip label="Auto-layout Horizontal (Left to Right)" position="bottom">
+        <Tooltip label="Auto-layout Horizontal" position="bottom">
           <ActionIcon variant="subtle" color="blue" onClick={onAutoLayoutHorizontal}>
             <IconArrowRight size="1rem" />
           </ActionIcon>
         </Tooltip>
 
-        <Tooltip label="Auto-layout Vertical (Top to Bottom)" position="bottom">
+        <Tooltip label="Auto-layout Vertical" position="bottom">
           <ActionIcon variant="subtle" color="blue" onClick={onAutoLayoutVertical}>
             <IconArrowDown size="1rem" />
           </ActionIcon>
