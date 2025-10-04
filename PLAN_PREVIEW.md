@@ -588,10 +588,20 @@ Implemented GraphQL queries and types:
 - `layercake-core/src/graphql/queries/mod.rs` (+132 lines)
 - `layercake-core/src/graphql/types/mod.rs` (added preview module)
 
-### Phase 5: Frontend GraphQL Integration
+### Phase 5: Frontend GraphQL Integration ✅ COMPLETED
 
 **Files**:
-- `frontend/src/graphql/preview.ts` (new)
+- `frontend/src/graphql/preview.ts` (created)
+- `frontend/src/hooks/usePreview.ts` (created)
+
+**Status**: ✅ COMPLETED
+
+Implemented frontend GraphQL integration:
+- TypeScript queries: `GET_DATASOURCE_PREVIEW`, `GET_GRAPH_PREVIEW`
+- Complete type definitions for all response data
+- React hooks: `useDataSourcePreview`, `useGraphPreview`
+- Execution state helpers and type guards
+- Cache-and-network fetch policy for real-time updates
 
 **Tasks**:
 
