@@ -62,8 +62,8 @@ export const getDefaultNodeMetadata = (type: PlanDagNodeType): NodeMetadata => {
   };
 
   return {
-    label: `${typeNames[type]} Node`,
-    description: `Unconfigured ${typeNames[type].toLowerCase()} node`
+    label: typeNames[type],
+    description: ''
   };
 };
 

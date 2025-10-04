@@ -58,6 +58,8 @@ interface PlanVisualEditorProps {
 }
 
 const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly = false }: PlanVisualEditorProps) => {
+  // Get ReactFlow instance for fit view
+  const { fitView } = useReactFlow();
 
   // Configuration dialog state - needs to be defined early
   const [configDialogOpen, setConfigDialogOpen] = useState(false)
@@ -851,6 +853,11 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     setDragging(false);
   }, [nodes, edges, setNodes, mutations, setDragging]);
 
+  // Fit view - zoom to see all nodes
+  const handleFitView = useCallback(() => {
+    fitView({ padding: 0.2, includeHiddenNodes: false, duration: 300 });
+  }, [fitView]);
+
   // Use stable nodeTypes reference directly
 
 
@@ -995,24 +1002,24 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     return yaml
   }
 
-  // Helper function to check if all upstream nodes are configured
+  // Helper function to check if a node is configured
   // Must be defined before any early returns to follow Rules of Hooks
-  const areAllUpstreamNodesConfigured = useCallback((targetNodeId: string): boolean => {
-    // Find all edges that point to this node
-    const incomingEdges = edges.filter(edge => edge.target === targetNodeId)
+  const isNodeFullyConfigured = useCallback((nodeId: string): boolean => {
+    const node = nodes.find(n => n.id === nodeId)
+    if (!node) return false
 
-    // Check if all source nodes are configured
-    return incomingEdges.every(edge => {
-      const sourceNode = nodes.find(node => node.id === edge.source)
-      if (!sourceNode) return true // Skip if node not found
+    // Check basic config validity
+    const hasValidConfig = node.data?.hasValidConfig !== false
+    if (!hasValidConfig) return false
 
-      // Check if node has valid configuration
-      const hasValidConfig = sourceNode.data?.hasValidConfig !== false
-      const isNotUnconfigured = sourceNode.data?.isUnconfigured !== true
+    // For DataSource nodes, also check if dataSourceId is set
+    if (node.data?.nodeType === 'DATA_SOURCE') {
+      const config = node.data?.config as any
+      return !!(config?.dataSourceId)
+    }
 
-      return hasValidConfig && isNotUnconfigured
-    })
-  }, [nodes, edges])
+    return true
+  }, [nodes])
 
   // Inject current edges into node data for configuration validation
   // Must be defined before any early returns to follow Rules of Hooks
@@ -1021,20 +1028,21 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
       ...node,
       data: {
         ...node.data,
-        edges: edges // Inject current edges for validation
+        edges: edges, // Inject current edges for validation
+        isUnconfigured: !isNodeFullyConfigured(node.id) // Add unconfigured flag
       }
     }))
-  }, [nodes, edges])
+  }, [nodes, edges, isNodeFullyConfigured])
 
-  // Enhance edges with markers and styling based on upstream node configuration status
+  // Enhance edges with markers and styling based on source node configuration status
   // Must be defined before any early returns to follow Rules of Hooks
   const edgesWithMarkers = useMemo(() => {
     return edges.map(edge => {
-      // Check if all upstream nodes of the target are configured
-      const allUpstreamConfigured = areAllUpstreamNodesConfigured(edge.target)
+      // Check if the source node is fully configured
+      const sourceConfigured = isNodeFullyConfigured(edge.source)
 
-      // Determine color: blue for all configured, orange for any unconfigured
-      const edgeColor = allUpstreamConfigured ? '#228be6' : '#fd7e14'
+      // Determine color: blue for configured source, orange for unconfigured source
+      const edgeColor = sourceConfigured ? '#228be6' : '#fd7e14'
 
       return {
         ...edge,
@@ -1051,7 +1059,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         }
       }
     })
-  }, [edges, areAllUpstreamNodesConfigured])
+  }, [edges, isNodeFullyConfigured])
 
   if (loading) {
     return (
@@ -1151,6 +1159,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         onDistributeVertical={() => advancedOps.handleDistribute('vertical')}
         onAutoLayoutHorizontal={handleAutoLayoutHorizontal}
         onAutoLayoutVertical={handleAutoLayoutVertical}
+        onFitView={handleFitView}
       />
 
       <div
@@ -1210,6 +1219,8 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
           deleteKeyCode={null}
           panOnDrag={[1, 2]}
           selectionOnDrag={true}
+          minZoom={0.1}
+          maxZoom={4}
           fitView
           attributionPosition="top-right"
           proOptions={{ hideAttribution: true }}

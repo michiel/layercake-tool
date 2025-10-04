@@ -21,7 +21,8 @@ import {
   IconGitMerge,
   IconFileExport,
   IconArrowRight,
-  IconArrowDown
+  IconArrowDown,
+  IconZoomScan
 } from '@tabler/icons-react';
 import { PlanDagNodeType } from '../../../../types/plan-dag';
 
@@ -50,6 +51,7 @@ interface AdvancedToolbarProps {
   onDistributeVertical: () => void;
   onAutoLayoutHorizontal: () => void;
   onAutoLayoutVertical: () => void;
+  onFitView: () => void;
 }
 
 export const AdvancedToolbar: React.FC<AdvancedToolbarProps> = ({
@@ -77,6 +79,7 @@ export const AdvancedToolbar: React.FC<AdvancedToolbarProps> = ({
   onDistributeVertical,
   onAutoLayoutHorizontal,
   onAutoLayoutVertical,
+  onFitView,
 }) => {
   if (readonly) return null;
 
@@ -320,6 +323,14 @@ export const AdvancedToolbar: React.FC<AdvancedToolbarProps> = ({
           </ActionIcon>
         </Tooltip>
       </Group>
+
+      {/* Fit View */}
+      <Divider orientation="vertical" />
+      <Tooltip label="Fit View (Zoom to see all nodes)" position="bottom">
+        <ActionIcon variant="subtle" color="gray" onClick={onFitView}>
+          <IconZoomScan size="1rem" />
+        </ActionIcon>
+      </Tooltip>
     </Group>
   );
 };
