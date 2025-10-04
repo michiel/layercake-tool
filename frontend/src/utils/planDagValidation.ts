@@ -32,6 +32,7 @@ export const validateConnection = (
     [PlanDagNodeType.MERGE]: [
       PlanDagNodeType.GRAPH,       // Merges can connect to graphs
       PlanDagNodeType.TRANSFORM,
+      PlanDagNodeType.MERGE,       // Merges can chain to other merges
       PlanDagNodeType.COPY,
       PlanDagNodeType.OUTPUT,
     ],
@@ -93,10 +94,10 @@ export const validateConnection = (
  */
 export const canAcceptMultipleInputs = (nodeType: PlanDagNodeType): boolean => {
   switch (nodeType) {
-    case PlanDagNodeType.GRAPH:     // GraphNodes can have multiple inputs (spec requirement)
-    case PlanDagNodeType.MERGE:     // MergeNodes merge multiple DataSource/Graph inputs
+    case PlanDagNodeType.MERGE:       // MergeNodes merge multiple DataSource/Graph inputs
       return true
     case PlanDagNodeType.DATA_SOURCE: // DataSource nodes cannot have inputs
+    case PlanDagNodeType.GRAPH:       // GraphNodes can have only one input (single DataSource or Merge output)
     case PlanDagNodeType.TRANSFORM:   // TransformNodes can have only one input
     case PlanDagNodeType.COPY:        // CopyNodes can have only one input
     case PlanDagNodeType.OUTPUT:      // OutputNodes can have only one input
@@ -114,8 +115,8 @@ export const canHaveMultipleOutputs = (nodeType: PlanDagNodeType): boolean => {
     case PlanDagNodeType.DATA_SOURCE: // DataSource can have multiple outputs (but not to same target)
     case PlanDagNodeType.GRAPH:       // GraphNodes can have multiple outputs
     case PlanDagNodeType.TRANSFORM:   // TransformNodes can have multiple outputs (but not to same target)
+    case PlanDagNodeType.MERGE:       // MergeNodes output graph data and can connect to multiple targets
       return true
-    case PlanDagNodeType.MERGE:       // MergeNodes output one new GraphNode
     case PlanDagNodeType.COPY:        // CopyNodes output graphs (spec unclear, assuming single)
     case PlanDagNodeType.OUTPUT:      // OutputNodes have no outputs
       return false

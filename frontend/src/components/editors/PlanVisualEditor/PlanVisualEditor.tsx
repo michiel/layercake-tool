@@ -24,8 +24,9 @@ import {
 } from '@tabler/icons-react'
 
 import { useCollaborationV2 } from '../../../hooks/useCollaborationV2'
-import { PlanDagNodeType, NodeConfig, NodeMetadata, DataSourceNodeConfig, ReactFlowEdge, PlanDagNode } from '../../../types/plan-dag'
-import { validateConnectionWithCycleDetection } from '../../../utils/planDagValidation'
+import { PlanDagNodeType, NodeConfig, NodeMetadata, DataSourceNodeConfig, ReactFlowEdge, PlanDagNode, PlanDag } from '../../../types/plan-dag'
+import { validateConnectionWithCycleDetection, canAcceptMultipleInputs } from '../../../utils/planDagValidation'
+import { ReactFlowAdapter } from '../../../adapters/ReactFlowAdapter'
 import { IconDownload } from '@tabler/icons-react'
 
 // Import node types constant
@@ -38,10 +39,12 @@ import { UserPresenceData } from '../../../types/websocket'
 // Import dialogs
 import { NodeConfigDialog } from './NodeConfigDialog'
 import { EdgeConfigDialog } from './EdgeConfigDialog'
+import { NodeTypeSelector } from './dialogs/NodeTypeSelector'
 
 // Import extracted components and hooks
 import { AdvancedToolbar } from './components/AdvancedToolbar'
 import { ContextMenu } from './components/ContextMenu'
+import { ConnectionLine } from './components/ConnectionLine'
 import { usePlanDagCQRS } from './hooks/usePlanDagCQRS'
 import { useAdvancedOperations } from './hooks/useAdvancedOperations'
 import { generateNodeId, getDefaultNodeConfig, getDefaultNodeMetadata } from './utils/nodeDefaults'
@@ -58,8 +61,8 @@ interface PlanVisualEditorProps {
 }
 
 const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly = false }: PlanVisualEditorProps) => {
-  // Get ReactFlow instance for fit view
-  const { fitView } = useReactFlow();
+  // Get ReactFlow instance for fit view and screen position conversion
+  const { fitView, screenToFlowPosition } = useReactFlow();
 
   // Configuration dialog state - needs to be defined early
   const [configDialogOpen, setConfigDialogOpen] = useState(false)
@@ -72,6 +75,11 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     outputGraphRef: ''
   } as DataSourceNodeConfig)
   const [configNodeMetadata, setConfigNodeMetadata] = useState<NodeMetadata>({ label: '', description: '' })
+
+  // Node type selector for edge drop
+  const [showNodeTypeMenu, setShowNodeTypeMenu] = useState(false)
+  const [newNodePosition, setNewNodePosition] = useState<{ x: number; y: number } | null>(null)
+  const connectionSourceRef = useRef<{ nodeId: string; handleId: string } | null>(null)
 
   // Ref to store nodes for handleNodeEdit (to avoid circular dependency)
   const nodesRef = useRef<Node[]>([])
@@ -128,6 +136,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     updateManager,
     cqrsService,
     setDragging,
+    updatePlanDagOptimistically,
   } = planDagState
 
   // Keep nodesRef updated for handleNodeEdit
@@ -321,6 +330,29 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
             mutations.moveNode(node.id, node.position)
             console.log('Node position saved:', node.id, node.position)
 
+            // Optimistically update both ReactFlow nodes AND planDag (prevents stale sync)
+            setNodes((nds) =>
+              nds.map((n) =>
+                n.id === node.id
+                  ? { ...n, position: node.position }
+                  : n
+              )
+            )
+
+            // Also update planDag to prevent sync from overwriting with stale positions
+            updatePlanDagOptimistically((current) => {
+              if (!current) return current
+
+              return {
+                ...current,
+                nodes: current.nodes.map((n) =>
+                  n.id === node.id
+                    ? { ...n, position: node.position }
+                    : n
+                )
+              }
+            })
+
             // Re-enable external syncs after a short delay to allow mutation to complete
             setTimeout(() => setDragging(false), 100)
           } else {
@@ -340,7 +372,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         setDragging(false)
       }
     },
-    [mutations, readonly, updateManager, planDag, planDagState.performanceMonitor, setDragging]
+    [mutations, readonly, updateManager, planDag, planDagState.performanceMonitor, setDragging, setNodes, updatePlanDagOptimistically]
   )
 
   // Note: Node editing is handled by individual icon clicks within node components
@@ -534,6 +566,17 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         return
       }
 
+      // Check if target already has maximum inputs (e.g., GraphNodes can only have one input)
+      const targetInputs = edges.filter(e => e.target === connection.target)
+      const targetCanAcceptMultiple = canAcceptMultipleInputs(targetNode.data.nodeType)
+
+      if (!targetCanAcceptMultiple && targetInputs.length >= 1) {
+        const errorMsg = `${targetNode.data.nodeType} nodes can only have one input connection. Disconnect the existing input first, or use a Merge node to combine multiple sources.`
+        console.error('Invalid connection:', errorMsg)
+        alert(`Connection Error: ${errorMsg}`)
+        return
+      }
+
       // Use enhanced validation with cycle detection
       const isValid = validateConnectionWithCycleDetection(
         sourceNode.data.nodeType,
@@ -692,8 +735,6 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
   }, []);
-
-  const { screenToFlowPosition } = useReactFlow();
 
   const handleDrop = useCallback(
     (event: React.DragEvent) => {
@@ -857,6 +898,179 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
   const handleFitView = useCallback(() => {
     fitView({ padding: 0.2, includeHiddenNodes: false, duration: 300 });
   }, [fitView]);
+
+  // Handle connection start - track source node
+  const handleConnectStart = useCallback(
+    (_event: any, params: { nodeId: string | null; handleId: string | null }) => {
+      if (params.nodeId && params.handleId) {
+        connectionSourceRef.current = {
+          nodeId: params.nodeId,
+          handleId: params.handleId,
+        };
+      }
+    },
+    []
+  );
+
+  // Handle connection end - create node on edge drop
+  const handleConnectEnd = useCallback(
+    (event: MouseEvent | TouchEvent) => {
+      if (readonly) return;
+
+      const targetIsPane = (event.target as Element).classList.contains('react-flow__pane');
+
+      if (targetIsPane && connectionSourceRef.current) {
+        // Calculate position where user dropped
+        const position = screenToFlowPosition({
+          x: (event as MouseEvent).clientX,
+          y: (event as MouseEvent).clientY,
+        });
+
+        // Store connection info for when user selects node type
+        setNewNodePosition(position);
+        setShowNodeTypeMenu(true);
+      }
+    },
+    [readonly, screenToFlowPosition]
+  );
+
+  // Handle node type selection after dropping on canvas
+  const handleNodeTypeSelect = useCallback(
+    async (nodeType: PlanDagNodeType) => {
+      if (!newNodePosition) return;
+
+      setShowNodeTypeMenu(false);
+
+      const sourceConnection = connectionSourceRef.current;
+
+      try {
+        // Generate node ID and get defaults
+        const nodeId = generateNodeId(nodeType);
+        const config = getDefaultNodeConfig(nodeType);
+        const metadata = getDefaultNodeMetadata(nodeType);
+
+        // Create the Plan DAG node at drop position
+        const planDagNode: PlanDagNode = {
+          id: nodeId,
+          nodeType,
+          position: newNodePosition,
+          metadata,
+          config: JSON.stringify(config) as any,
+        };
+
+        // Add via mutation (will trigger subscription update)
+        const createdNode = await mutations.addNode(planDagNode);
+
+        console.log('[PlanVisualEditor] Node created successfully:', nodeId);
+
+        // Optimistically add node to local state (since subscription echo is suppressed)
+        // Create a minimal Plan DAG with just the new node to convert
+        const tempPlanDag: PlanDag = {
+          version: String((parseInt(planDag?.version || '0') || 0) + 1),
+          nodes: [createdNode],
+          edges: [],
+          metadata: planDag?.metadata || {
+            version: '1',
+            name: 'Untitled',
+            description: '',
+            created: new Date().toISOString(),
+            lastModified: new Date().toISOString(),
+            author: 'Unknown'
+          }
+        };
+        const converted = ReactFlowAdapter.planDagToReactFlow(tempPlanDag);
+        const reactFlowNode = converted.nodes[0];
+
+        // Add node-specific data
+        reactFlowNode.data = {
+          ...reactFlowNode.data,
+          onEdit: handleNodeEdit,
+          onDelete: handleNodeDelete,
+          readonly,
+          edges: planDag?.edges || []
+        };
+
+        setNodes((nds) => [...nds, reactFlowNode]);
+
+        // Create edge if we have source connection info
+        if (sourceConnection) {
+          const sourceNode = nodes.find(n => n.id === sourceConnection.nodeId);
+
+          if (sourceNode) {
+            // Check if target already has maximum inputs
+            const targetInputs = edges.filter(e => e.target === nodeId)
+            const targetCanAcceptMultiple = canAcceptMultipleInputs(nodeType)
+
+            if (!targetCanAcceptMultiple && targetInputs.length >= 1) {
+              const errorMsg = `${nodeType} nodes can only have one input connection. Use a Merge node to combine multiple sources.`
+              console.error('[PlanVisualEditor] Connection blocked:', errorMsg)
+              alert(`Connection Error: ${errorMsg}`)
+            } else {
+              // Validate connection
+              const validation = validateConnectionWithCycleDetection(
+                sourceNode.data.nodeType,
+                nodeType,
+                nodes,
+                edges,
+                { source: sourceConnection.nodeId, target: nodeId }
+              );
+
+              if (validation.isValid) {
+              // Determine target handle based on node type
+              const targetHandle = 'input-left'; // Most nodes use input-left
+
+              // Create edge
+              const edgeId = `${sourceConnection.nodeId}-${nodeId}`;
+              const edge: ReactFlowEdge = {
+                id: edgeId,
+                source: sourceConnection.nodeId,
+                target: nodeId,
+                sourceHandle: sourceConnection.handleId,
+                targetHandle: targetHandle,
+                metadata: {
+                  label: validation.dataType === 'GRAPH_REFERENCE' ? 'Graph Ref' : 'Data',
+                  dataType: validation.dataType,
+                },
+              };
+
+              const createdEdge = await mutations.addEdge(edge);
+              console.log('[PlanVisualEditor] Edge created successfully:', edgeId);
+
+              // Optimistically add edge to local state (since subscription echo is suppressed)
+              const tempEdgePlanDag: PlanDag = {
+                version: String((parseInt(planDag?.version || '0') || 0) + 2),
+                nodes: [],
+                edges: [createdEdge],
+                metadata: planDag?.metadata || {
+                  version: '1',
+                  name: 'Untitled',
+                  description: '',
+                  created: new Date().toISOString(),
+                  lastModified: new Date().toISOString(),
+                  author: 'Unknown'
+                }
+              };
+              const convertedEdge = ReactFlowAdapter.planDagToReactFlow(tempEdgePlanDag);
+              const reactFlowEdge = convertedEdge.edges[0];
+
+              setEdges((eds) => [...eds, reactFlowEdge]);
+              } else {
+                console.warn('[PlanVisualEditor] Invalid connection:', validation.errorMessage);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('[PlanVisualEditor] Failed to create node/edge:', error);
+        alert(`Failed to create node: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      } finally {
+        // Clear state
+        setNewNodePosition(null);
+        connectionSourceRef.current = null;
+      }
+    },
+    [newNodePosition, mutations, nodes, edges, planDag, readonly, handleNodeEdit, handleNodeDelete, setNodes, setEdges]
+  );
 
   // Use stable nodeTypes reference directly
 
@@ -1187,6 +1401,8 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
           onReconnect={handleReconnect}
           onReconnectStart={handleReconnectStart}
           onReconnectEnd={handleReconnectEnd}
+          onConnectStart={handleConnectStart}
+          onConnectEnd={handleConnectEnd}
           onNodeClick={(event, node) => {
             // Prevent selection when clicking on action icons (edit/delete)
             const target = event.target as HTMLElement
@@ -1208,7 +1424,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
           }}
           nodeTypes={NODE_TYPES}
           connectionMode={ConnectionMode.Loose}
-          connectionLineStyle={{ stroke: '#868e96', strokeWidth: 2 }}
+          connectionLineComponent={ConnectionLine}
           defaultEdgeOptions={{
             type: 'smoothstep',
             animated: false,
@@ -1284,6 +1500,13 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         onClose={() => setEdgeConfigDialogOpen(false)}
         onSave={handleEdgeUpdate}
         readonly={readonly}
+      />
+
+      {/* Node Type Selector for Edge Drop */}
+      <NodeTypeSelector
+        opened={showNodeTypeMenu}
+        onClose={() => setShowNodeTypeMenu(false)}
+        onSelect={handleNodeTypeSelect}
       />
 
       {/* Context Menu for advanced operations */}

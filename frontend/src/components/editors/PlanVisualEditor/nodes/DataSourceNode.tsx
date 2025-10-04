@@ -246,7 +246,7 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
         )}
 
         {/* Middle: Icon and Label */}
-        <Group gap="sm" mb="sm" wrap="nowrap" style={{ paddingRight: !readonly ? 60 : 0 }}>
+        <Group gap="sm" mb="sm" wrap="nowrap" className="node-header" style={{ paddingRight: !readonly ? 60 : 0, cursor: 'grab' }}>
           <div style={{
             color,
             display: 'flex',

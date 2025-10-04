@@ -129,7 +129,8 @@ export class ReactFlowAdapter {
       style: this.getNodeStyle(normalizedNode.nodeType),
       draggable: true,
       selectable: true,
-      deletable: true
+      deletable: true,
+      dragHandle: '.node-header' // Restrict dragging to header area only
     }
   }
 

@@ -50,6 +50,7 @@ interface PlanDagCQRSResult {
   validatePlanDag: () => void
   refreshData: () => void
   setDragging: (dragging: boolean) => void
+  updatePlanDagOptimistically: (updater: (current: PlanDag | null) => PlanDag | null) => void
 }
 
 // Deep equality check for Plan DAG objects with performance optimisation
@@ -373,6 +374,20 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
     isDraggingRef.current = dragging
   }, [])
 
+  // Optimistic update for planDag (used after mutations to prevent stale data syncs)
+  const updatePlanDagOptimistically = useCallback((updater: (current: PlanDag | null) => PlanDag | null) => {
+    console.log('[usePlanDagCQRS] Applying optimistic update to Plan DAG')
+    setPlanDag(current => {
+      const updated = updater(current)
+      if (updated) {
+        // Update stable ref immediately to prevent sync from using stale data
+        stablePlanDagRef.current = updated
+        previousPlanDagRef.current = updated
+      }
+      return updated
+    })
+  }, [])
+
   return {
     // Data state
     planDag: stablePlanDag,
@@ -407,5 +422,6 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
     validatePlanDag,
     refreshData,
     setDragging, // Control drag state to suppress external syncs
+    updatePlanDagOptimistically, // Optimistic updates to prevent sync overwrites
   }
 }
