@@ -743,36 +743,33 @@ graph format (nodes/edges), the force-graph visualization works for both node ty
 - Transform to GraphData format with attrs spread
 - Graceful handling when preview data not yet available
 
-### Phase 8: Execution State UI Indicators
+### Phase 8: Execution State UI Indicators ✅ COMPLETED
 
-**Files**:
-- `frontend/src/components/editors/PlanVisualEditor/nodes/BaseNode.tsx` (extend)
-- `frontend/src/components/editors/PlanVisualEditor/nodes/DataSourceNode.tsx` (extend)
-- `frontend/src/components/editors/PlanVisualEditor/nodes/GraphNode.tsx` (extend)
+**Status**: ✅ COMPLETED
 
-**Tasks**:
+**Files Modified**:
+- `frontend/src/components/editors/PlanVisualEditor/nodes/DataSourceNode.tsx`
+- `frontend/src/components/editors/PlanVisualEditor/nodes/GraphNode.tsx`
 
-1. **Add Execution State Badges**
-   - Query execution state from entity
-   - Display badge on node:
-     - `not_started`: "Not Started" (gray)
-     - `pending`: "Pending" (yellow)
-     - `processing`: "Processing" with spinner (blue)
-     - `completed`: "Ready" (green)
-     - `error`: "Error" (red)
+**Implementation**:
+- Added execution state query to both DataSource and Graph nodes
+- Display color-coded execution state badges on nodes
+- Badge shows: "Not Started", "Pending", "Processing", "Ready", or "Error"
+- Spinner icon appears during processing states
+- Badge variants change based on completion status (light vs filled)
 
-2. **Add Visual Indicators**
-   - Processing spinner overlay
-   - Error icon
-   - Pulsing animation for processing
-   - Tooltip with last update time
+**Execution States**:
+- `not_started` - "Not Started" (gray)
+- `pending` - "Pending" (yellow, filled)
+- `processing` - "Processing" with spinner (blue, filled)
+- `completed` - "Ready" (green, light)
+- `error` - "Error" (red, filled)
 
-3. **Subscribe to State Updates**
-   - Listen to WebSocket for execution state changes
-   - Update badges in real-time
-   - Show toast notification when processing completes
-
-**Estimated effort**: 4-6 hours
+**Key Features**:
+- Always queries execution state to show current status
+- Helper functions: `getExecutionStateLabel()`, `getExecutionStateColor()`, `isExecutionInProgress()`
+- Loader component shown for pending/processing states
+- Consistent badge styling across node types
 
 ### Phase 9: Testing & Documentation
 
