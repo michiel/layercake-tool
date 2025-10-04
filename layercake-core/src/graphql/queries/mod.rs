@@ -1,9 +1,9 @@
 use async_graphql::*;
-use sea_orm::{EntityTrait, ColumnTrait, QueryFilter};
+use sea_orm::{EntityTrait, ColumnTrait, QueryFilter, QueryOrder};
 
-use crate::database::entities::{projects, plans, nodes, edges, layers, users, user_sessions, project_collaborators, data_sources, plan_dag_nodes, plan_dag_edges};
+use crate::database::entities::{projects, plans, nodes, edges, layers, users, user_sessions, project_collaborators, data_sources, plan_dag_nodes, plan_dag_edges, datasources, datasource_rows, graphs, graph_nodes, graph_edges};
 use crate::graphql::context::GraphQLContext;
-use crate::graphql::types::{Project, Plan, Node, Edge, Layer, PlanDag, PlanDagNode, PlanDagEdge, ValidationResult, PlanDagInput, User, ProjectCollaborator, DataSource, PlanDagMetadata, UserSession};
+use crate::graphql::types::{Project, Plan, Node, Edge, Layer, PlanDag, PlanDagNode, PlanDagEdge, ValidationResult, PlanDagInput, User, ProjectCollaborator, DataSource, PlanDagMetadata, UserSession, DataSourcePreview, GraphPreview, TableRow, TableColumn, GraphNodePreview, GraphEdgePreview};
 use crate::graphql::types::plan_dag::DataSourceReference;
 
 pub struct Query;
@@ -441,6 +441,131 @@ impl Query {
         // Generate a temporary download URL (in a real implementation, this would be a signed URL)
         let download_url = format!("/api/data-sources/{}/download/json", id);
         Ok(download_url)
+    }
+
+    // Pipeline Preview Queries
+
+    /// Get DataSource preview with table data
+    async fn datasource_preview(
+        &self,
+        ctx: &Context<'_>,
+        project_id: i32,
+        node_id: String,
+        #[graphql(default = 100)] limit: u64,
+        #[graphql(default = 0)] offset: u64,
+    ) -> Result<Option<DataSourcePreview>> {
+        use sea_orm::QuerySelect;
+
+        let context = ctx.data::<GraphQLContext>()?;
+
+        // Find datasource by project_id and node_id
+        let datasource = datasources::Entity::find()
+            .filter(datasources::Column::ProjectId.eq(project_id))
+            .filter(datasources::Column::NodeId.eq(&node_id))
+            .one(&context.db)
+            .await?;
+
+        let datasource = match datasource {
+            Some(ds) => ds,
+            None => return Ok(None),
+        };
+
+        // Get rows with pagination
+        let rows = datasource_rows::Entity::find()
+            .filter(datasource_rows::Column::DatasourceId.eq(datasource.id))
+            .order_by_asc(datasource_rows::Column::RowNumber)
+            .limit(limit)
+            .offset(offset)
+            .all(&context.db)
+            .await?;
+
+        // Convert rows to TableRow format
+        let table_rows: Vec<TableRow> = rows
+            .into_iter()
+            .map(|row| TableRow {
+                row_number: row.row_number,
+                data: row.data,
+            })
+            .collect();
+
+        // Parse column_info from JSON
+        let columns: Vec<TableColumn> = if let Some(col_info) = datasource.column_info {
+            serde_json::from_value(col_info).unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+
+        Ok(Some(DataSourcePreview {
+            node_id,
+            datasource_id: datasource.id,
+            name: datasource.name,
+            file_path: datasource.file_path,
+            file_type: datasource.file_type,
+            total_rows: datasource.row_count.unwrap_or(0),
+            columns,
+            rows: table_rows,
+            import_date: datasource.import_date.map(|d| d.to_rfc3339()),
+            execution_state: datasource.execution_state,
+            error_message: datasource.error_message,
+        }))
+    }
+
+    /// Get Graph preview with nodes and edges
+    async fn graph_preview(
+        &self,
+        ctx: &Context<'_>,
+        project_id: i32,
+        node_id: String,
+    ) -> Result<Option<GraphPreview>> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        // Find graph by project_id and node_id
+        let graph = graphs::Entity::find()
+            .filter(graphs::Column::ProjectId.eq(project_id))
+            .filter(graphs::Column::NodeId.eq(&node_id))
+            .one(&context.db)
+            .await?;
+
+        let graph = match graph {
+            Some(g) => g,
+            None => return Ok(None),
+        };
+
+        // Get all nodes for this graph
+        let nodes = graph_nodes::Entity::find()
+            .filter(graph_nodes::Column::GraphId.eq(graph.id))
+            .all(&context.db)
+            .await?;
+
+        // Get all edges for this graph
+        let edges = graph_edges::Entity::find()
+            .filter(graph_edges::Column::GraphId.eq(graph.id))
+            .all(&context.db)
+            .await?;
+
+        // Convert to preview format
+        let node_previews: Vec<GraphNodePreview> = nodes
+            .into_iter()
+            .map(GraphNodePreview::from)
+            .collect();
+
+        let edge_previews: Vec<GraphEdgePreview> = edges
+            .into_iter()
+            .map(GraphEdgePreview::from)
+            .collect();
+
+        Ok(Some(GraphPreview {
+            node_id,
+            graph_id: graph.id,
+            name: graph.name,
+            nodes: node_previews,
+            edges: edge_previews,
+            node_count: graph.node_count,
+            edge_count: graph.edge_count,
+            execution_state: graph.execution_state,
+            computed_date: graph.computed_date.map(|d| d.to_rfc3339()),
+            error_message: graph.error_message,
+        }))
     }
 }
 

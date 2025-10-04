@@ -451,7 +451,7 @@ impl Mutation {
 
         let mut node_active: plan_dag_nodes::ActiveModel = node.into();
         let mut patch_ops = Vec::new();
-        let mut config_updated = false;
+        let _config_updated = false;
 
         // Update position if provided
         if let Some(position) = updates.position {
@@ -485,7 +485,7 @@ impl Mutation {
 
         // Update config if provided
         if let Some(config) = updates.config {
-            config_updated = true;
+            // config_updated = true;
             node_active.config_json = Set(config.clone());
 
             // Generate config delta
@@ -680,7 +680,7 @@ impl Mutation {
         let (_, current_edges) = plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
 
         // Find the edge to get its target node before deletion
-        let deleted_edge_target = current_edges
+        let _deleted_edge_target = current_edges
             .iter()
             .find(|e| e.id == edge_id)
             .map(|e| e.target.clone());
