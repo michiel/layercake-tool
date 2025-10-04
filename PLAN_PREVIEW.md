@@ -185,12 +185,15 @@ CREATE INDEX idx_graph_edges_graph ON graph_edges(graph_id);
 
 ## Implementation Plan
 
-### Phase 1: Database Schema & Migrations
+### Phase 1: Database Schema & Migrations ✅ COMPLETED
 
 **Files**:
-- `backend/migrations/XXXX_add_pipeline_tables.sql` (new)
-- `backend/src/db/models/datasource.rs` (new)
-- `backend/src/db/models/graph.rs` (new)
+- `layercake-core/src/database/migrations/m010_create_pipeline_tables.rs` (created)
+- `layercake-core/src/database/entities/datasources.rs` (created)
+- `layercake-core/src/database/entities/datasource_rows.rs` (created)
+- `layercake-core/src/database/entities/graphs.rs` (created)
+- `layercake-core/src/database/entities/graph_nodes.rs` (created)
+- `layercake-core/src/database/entities/graph_edges.rs` (created)
 
 **Tasks**:
 
