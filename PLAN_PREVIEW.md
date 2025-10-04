@@ -573,6 +573,21 @@ Note: Actual lifecycle hook execution will be activated in Phase 3.
 
 **Estimated effort**: 6-8 hours
 
+**Status**: ✅ COMPLETED
+
+Implemented GraphQL queries and types:
+- DataSourcePreview, GraphPreview, TableColumn, TableRow types
+- datasourcePreview() resolver with pagination (limit/offset)
+- graphPreview() resolver with complete node/edge data
+- Entity lookup via (project_id, node_id) unique constraint
+
+**Files Created**:
+- `layercake-core/src/graphql/types/preview.rs`
+
+**Files Modified**:
+- `layercake-core/src/graphql/queries/mod.rs` (+132 lines)
+- `layercake-core/src/graphql/types/mod.rs` (added preview module)
+
 ### Phase 5: Frontend GraphQL Integration
 
 **Files**:
