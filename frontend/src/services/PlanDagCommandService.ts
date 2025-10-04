@@ -31,6 +31,9 @@ export class PlanDagCommandService {
     try {
       console.log('[PlanDagCommandService] Creating node:', command.nodeType)
 
+      // Mark mutation to suppress subscription echo
+      this.markMutationOccurred()
+
       const result = await this.apollo.mutate({
         mutation: PlanDagGraphQL.ADD_PLAN_DAG_NODE,
         variables: {
@@ -55,6 +58,9 @@ export class PlanDagCommandService {
   async updateNode(command: UpdateNodeCommand): Promise<PlanDagNode> {
     try {
       console.log('[PlanDagCommandService] Updating node:', command.nodeId)
+
+      // Mark mutation to suppress subscription echo
+      this.markMutationOccurred()
 
       const result = await this.apollo.mutate({
         mutation: PlanDagGraphQL.UPDATE_PLAN_DAG_NODE,
@@ -106,6 +112,9 @@ export class PlanDagCommandService {
   async moveNode(command: MoveNodeCommand): Promise<boolean> {
     try {
       console.log('[PlanDagCommandService] Moving node:', command.nodeId, command.position)
+
+      // Mark mutation to suppress subscription echo
+      this.markMutationOccurred()
 
       const result = await this.apollo.mutate({
         mutation: PlanDagGraphQL.MOVE_PLAN_DAG_NODE,
