@@ -281,12 +281,13 @@ CREATE INDEX idx_graph_edges_graph ON graph_edges(graph_id);
 
 **Estimated effort**: 6-8 hours
 
-### Phase 2: Pipeline Extension - Data Import & Transform
+### Phase 2: Pipeline Extension - Data Import & Transform ✅ COMPLETED
 
 **Files**:
-- `backend/src/pipeline/datasource_importer.rs` (new)
-- `backend/src/pipeline/graph_builder.rs` (new)
-- `backend/src/pipeline/dag_executor.rs` (new)
+- `layercake-core/src/pipeline/mod.rs` (created)
+- `layercake-core/src/pipeline/datasource_importer.rs` (created)
+- `layercake-core/src/pipeline/graph_builder.rs` (created)
+- `layercake-core/src/pipeline/dag_executor.rs` (created)
 
 **Tasks**:
 
