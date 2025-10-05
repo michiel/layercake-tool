@@ -689,12 +689,15 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
           : node
       )
     )
+    // Remove __typename from metadata before sending to backend
+    const { __typename, ...cleanedMetadata } = metadata as any;
+
     // Save changes to backend
     mutations.updateNode(nodeId, {
       config: JSON.stringify(config),
-      metadata
+      metadata: cleanedMetadata
     })
-    console.log('Node configuration updated:', nodeId, config, metadata)
+    console.log('Node configuration updated:', nodeId, config, cleanedMetadata)
   }, [setNodes, handleNodeEdit, handleNodeDelete, mutations])
 
   // Handle viewport changes to track current zoom/pan state
