@@ -165,9 +165,28 @@ export const GraphNode = memo((props: GraphNodeProps) => {
           pointerEvents: 'all',
         }}
       >
-        {/* Top right: Edit and Delete icons */}
+        {/* Top right: Execute, Edit and Delete icons */}
         {!readonly && (
           <Group gap={4} style={{ position: 'absolute', top: 8, right: 8, pointerEvents: 'auto', zIndex: 10 }}>
+            {/* Execute button - only show if configured */}
+            {isConfigured && (
+              <Tooltip label="Execute graph (build from upstream data sources)">
+                <ActionIcon
+                  size="sm"
+                  variant="filled"
+                  color="green"
+                  data-action-icon="execute"
+                  loading={executing}
+                  onMouseDown={(e) => {
+                    e.stopPropagation()
+                    e.preventDefault()
+                    handleExecute()
+                  }}
+                >
+                  <IconPlayerPlayFilled size="0.8rem" />
+                </ActionIcon>
+              </Tooltip>
+            )}
             <Tooltip label="Edit graph node">
               <ActionIcon
                 size="sm"
@@ -202,7 +221,7 @@ export const GraphNode = memo((props: GraphNodeProps) => {
         )}
 
         {/* Middle: Icon and Label */}
-        <Group gap="sm" mb="sm" wrap="nowrap" className="node-header" style={{ paddingRight: !readonly ? 60 : 0, cursor: 'grab' }}>
+        <Group gap="sm" mb="sm" wrap="nowrap" className="node-header" style={{ paddingRight: !readonly ? 100 : 0, cursor: 'grab' }}>
           <div style={{
             color,
             display: 'flex',
@@ -216,48 +235,25 @@ export const GraphNode = memo((props: GraphNodeProps) => {
           </Text>
         </Group>
 
-        {/* Center: Execute and Preview buttons */}
-        {!readonly && (
+        {/* Center: Preview button */}
+        {!readonly && executionPreview && isExecutionComplete(executionPreview.executionState) && (
           <Group justify="center" mb="md">
-            {/* Execute button - only show if configured */}
-            {isConfigured && (
-              <Tooltip label="Execute graph (build from upstream data sources)">
-                <ActionIcon
-                  size="xl"
-                  variant="filled"
-                  color="green"
-                  radius="xl"
-                  data-action-icon="execute"
-                  loading={executing}
-                  onMouseDown={(e) => {
-                    e.stopPropagation()
-                    e.preventDefault()
-                    handleExecute()
-                  }}
-                >
-                  <IconPlayerPlayFilled size="1.5rem" />
-                </ActionIcon>
-              </Tooltip>
-            )}
-            {/* Preview button - show if execution is complete */}
-            {executionPreview && isExecutionComplete(executionPreview.executionState) && (
-              <Tooltip label="Preview graph">
-                <ActionIcon
-                  size="xl"
-                  variant="light"
-                  color="blue"
-                  radius="xl"
-                  data-action-icon="preview"
-                  onMouseDown={(e) => {
-                    e.stopPropagation()
-                    e.preventDefault()
-                    setShowPreview(true)
-                  }}
-                >
-                  <IconChartDots size="1.5rem" />
-                </ActionIcon>
-              </Tooltip>
-            )}
+            <Tooltip label="Preview graph">
+              <ActionIcon
+                size="xl"
+                variant="light"
+                color="blue"
+                radius="xl"
+                data-action-icon="preview"
+                onMouseDown={(e) => {
+                  e.stopPropagation()
+                  e.preventDefault()
+                  setShowPreview(true)
+                }}
+              >
+                <IconChartDots size="1.5rem" />
+              </ActionIcon>
+            </Tooltip>
           </Group>
         )}
 
