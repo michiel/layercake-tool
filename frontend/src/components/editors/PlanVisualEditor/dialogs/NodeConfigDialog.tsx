@@ -488,8 +488,9 @@ function renderNodeSpecificFields(
             {...form.getInputProps('renderTarget')}
           />
           <TextInput
-            label="Output Path"
-            placeholder="e.g., output/result.dot"
+            label="Filename"
+            placeholder="e.g., myproject.gml (optional)"
+            description="Optional. If not specified, will use project name and file extension."
             {...form.getInputProps('outputPath')}
           />
           <Textarea
@@ -630,7 +631,7 @@ function validateNodeConfig(nodeType: PlanDagNodeType, values: FormData): string
 
     case PlanDagNodeType.OUTPUT:
       if (!values.sourceGraphRef) errors.push('Source graph reference is required')
-      if (!values.outputPath) errors.push('Output path is required')
+      // outputPath (filename) is optional
       try {
         JSON.parse(values.renderConfig || '{}')
       } catch {
