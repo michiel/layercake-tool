@@ -1,14 +1,14 @@
 # Plan: Direct Graph Execution from Data Sources
 
-## Status: ✅ Implemented (Option A)
+## Status: ✅ Implemented (Option A + Merge Nodes)
 
 ## Overview
 
-Implemented direct graph execution that reads from `data_sources` table without background processing or duplicate data storage. Graph nodes build on-demand when user clicks execute button.
+Implemented direct graph execution that reads from `data_sources` table without background processing or duplicate data storage. Graph nodes build on-demand when user clicks execute button. Merge nodes automatically execute when triggered by downstream Graph nodes, enabling complex data combination workflows.
 
 ## Architecture
 
-### Data Flow
+### Data Flow (Basic)
 
 ```
 Upload CSV → data_sources (graph_json) → DataSource Node (dataSourceId in config)
@@ -28,6 +28,38 @@ Upload CSV → data_sources (graph_json) → DataSource Node (dataSourceId in co
                                       Click Preview Button
                                                ↓
                                     Graph Visualization
+```
+
+### Data Flow (With Merge Node)
+
+```
+DataSource(nodes.csv) → data_sources (graph_json) → DataSource Node A
+                                                            ↓
+DataSource(edges.csv) → data_sources (graph_json) → DataSource Node B
+                                                            ↓
+                                                       Merge Node
+                                                            ↓
+                                                       Graph Node
+                                                            ↓
+                                                  Click Execute Button
+                                                            ↓
+                                              DagExecutor finds upstream nodes
+                                                            ↓
+                                            Execute in topological order:
+                                            1. DataSource A (skipped - already processed)
+                                            2. DataSource B (skipped - already processed)
+                                            3. Merge Node (combines A + B data)
+                                            4. Graph Node (reads from Merge result)
+                                                            ↓
+                               MergeBuilder reads graph_json from DataSource A & B
+                                                            ↓
+                              Combines nodes and edges, stores in graphs table
+                                                            ↓
+                             GraphBuilder reads from graphs table (Merge result)
+                                                            ↓
+                                  Final graph in graphs table with all data
+                                                            ↓
+                                                  Preview available
 ```
 
 ### No Duplicate Data
@@ -53,16 +85,30 @@ Upload CSV → data_sources (graph_json) → DataSource Node (dataSourceId in co
    - Populates `graphs`, `graph_nodes`, `graph_edges` tables
    - Sets `execution_state: "completed"` when done
 
-2. **DagExecutor** (`layercake-core/src/pipeline/dag_executor.rs`)
-   - Updated to accept `plan_id` parameter
-   - Passes plan_id to GraphBuilder for config lookup
-   - Handles topological execution ordering
+2. **MergeBuilder.merge_sources()** (`layercake-core/src/pipeline/merge_builder.rs`)
+   - Combines nodes and edges from multiple upstream sources
+   - Supports reading from:
+     - DataSource nodes: reads `data_sources.graph_json`
+     - Graph nodes: reads `graph_nodes` and `graph_edges` tables
+     - Merge nodes: reads `graph_nodes` and `graph_edges` tables (recursive merging)
+   - Deduplicates nodes and edges by ID
+   - Stores merged result in `graphs` table (reuses Graph infrastructure)
+   - Implements change detection via SHA256 hash of all upstream source IDs
+   - Returns `graphs::Model` with `execution_state: "completed"`
 
-3. **executeNode Mutation** (`layercake-core/src/graphql/mutations/mod.rs`)
+3. **DagExecutor** (`layercake-core/src/pipeline/dag_executor.rs`)
+   - Updated to accept `plan_id` parameter
+   - Passes plan_id to GraphBuilder and MergeBuilder for config lookup
+   - Handles topological execution ordering
+   - **New**: `execute_with_dependencies()` - executes node and all upstream ancestors
+   - **New**: `find_upstream_nodes()` - traverses DAG backwards to find all dependencies
+   - Ensures Merge nodes execute before downstream Graph nodes
+
+4. **executeNode Mutation** (`layercake-core/src/graphql/mutations/mod.rs`)
    - GraphQL mutation: `executeNode(projectId: Int!, nodeId: String!)`
    - Returns `NodeExecutionResult { success, message, nodeId }`
    - Fetches all plan nodes and edges
-   - Calls `DagExecutor.execute_node()`
+   - Calls `DagExecutor.execute_with_dependencies()` (executes upstream dependencies first)
    - Returns success/error to frontend
 
 ### Frontend
@@ -92,7 +138,7 @@ Upload CSV → data_sources (graph_json) → DataSource Node (dataSourceId in co
 
 ## User Workflow
 
-### Step-by-Step Usage
+### Basic Workflow (Direct Graph)
 
 1. **Upload Data Sources**
    - Upload `nodes.csv` → creates data_source (id: 1, data_type: "nodes")
@@ -119,6 +165,37 @@ Upload CSV → data_sources (graph_json) → DataSource Node (dataSourceId in co
    - Blue "Preview" button appears (execution complete)
    - Click Preview → opens dialog
    - Force-graph visualization displays nodes and edges
+
+### Merge Workflow (With Merge Node)
+
+1. **Upload Data Sources**
+   - Upload `nodes.csv` → creates data_source (id: 1, data_type: "nodes")
+   - Upload `edges.csv` → creates data_source (id: 2, data_type: "edges")
+   - Both files processed to `graph_json` format (status: "active")
+
+2. **Create Plan DAG with Merge**
+   - Add DataSource node "Nodes" → assign data_source id: 1
+   - Add DataSource node "Edges" → assign data_source id: 2
+   - Add Merge node "Combined Data"
+   - Add Graph node "My Graph"
+   - Connect "Nodes" → "Combined Data"
+   - Connect "Edges" → "Combined Data"
+   - Connect "Combined Data" → "My Graph"
+
+3. **Execute Graph (Automatic Upstream Execution)**
+   - Graph node shows green "Execute" button
+   - Click Execute → mutation fires
+   - DagExecutor finds all upstream nodes: Nodes, Edges, Combined Data
+   - Executes in topological order:
+     1. DataSource "Nodes" (skipped - already processed on upload)
+     2. DataSource "Edges" (skipped - already processed on upload)
+     3. Merge "Combined Data" (executes - combines nodes and edges)
+     4. Graph "My Graph" (executes - reads from Merge result)
+   - Badge updates to "Ready"
+
+4. **Preview Graph**
+   - Blue "Preview" button appears
+   - Click Preview → visualizes the final merged graph
 
 ## Database Tables
 
@@ -153,12 +230,31 @@ id, graph_id, source, target, label, layer, weight, attrs
 - Populated by GraphBuilder
 - Deleted and recreated on each execution (clear_graph_data)
 
+## Merge Node Implementation
+
+### MergeBuilder
+- **Status**: ✅ Implemented
+- **Purpose**: Combine nodes and edges from multiple upstream sources (DataSource, Graph, or Merge nodes)
+- **Features**:
+  - Reads from `data_sources.graph_json` for DataSource nodes
+  - Reads from `graph_nodes`/`graph_edges` tables for Graph/Merge nodes
+  - Deduplicates nodes and edges by ID
+  - Stores results in `graphs` table (reuses Graph infrastructure)
+  - Implements change detection via SHA256 `source_hash`
+  - Automatic execution when downstream Graph nodes trigger
+
+### Upstream Dependency Execution
+- **Status**: ✅ Implemented
+- **Method**: `execute_with_dependencies()` in DagExecutor
+- **Behavior**: When executing a node, automatically finds and executes all upstream ancestors in topological order
+- **Example**: Click execute on Graph → executes DataSources, then Merge, then Graph
+
 ## What Was NOT Implemented
 
-### Merge Node
+### Transform Node
 - **Status**: Not implemented
-- **Reason**: Graph node can directly read from multiple DataSource nodes
-- **Impact**: Low priority - same functionality achieved via Graph node
+- **Purpose**: Filter or transform data (e.g., filter nodes by layer, map attributes)
+- **Impact**: Medium priority - useful for data manipulation workflows
 
 ### Automatic Lifecycle Hooks
 - **Status**: Not implemented (TODO markers exist in mutations)
@@ -189,17 +285,19 @@ id, graph_id, source, target, label, layer, weight, attrs
 - Poll execution state until complete
 - Show progress updates
 
-### Transform and Merge Nodes
-- Implement `MergeBuilder` to combine sources with custom logic
+### Transform Nodes
 - Implement transformations (filters, mappings, etc.)
 - Chain operations: DataSource → Transform → Merge → Graph
+- Examples: filter by layer, map attributes, compute derived values
 
 ## Files Modified
 
 ### Backend
 - `layercake-core/src/pipeline/graph_builder.rs` - Direct data_sources read
-- `layercake-core/src/pipeline/dag_executor.rs` - Added plan_id parameter
-- `layercake-core/src/graphql/mutations/mod.rs` - Added executeNode mutation
+- `layercake-core/src/pipeline/dag_executor.rs` - Added plan_id parameter, execute_with_dependencies, find_upstream_nodes
+- `layercake-core/src/pipeline/merge_builder.rs` - **NEW** - MergeBuilder implementation
+- `layercake-core/src/pipeline/mod.rs` - Added merge_builder module export
+- `layercake-core/src/graphql/mutations/mod.rs` - Added executeNode mutation with dependency execution
 - `layercake-core/src/graphql/types/plan_dag.rs` - Added dataSourceId to config
 - `layercake-core/src/graphql/queries/mod.rs` - Modified datasource_preview
 
@@ -212,9 +310,16 @@ id, graph_id, source, target, label, layer, weight, attrs
 
 ## Commits
 
+### Initial Implementation (Option A)
 1. `feat: implement on-demand DataSource preview from data_sources table`
 2. `feat: implement direct graph execution from data_sources`
 3. `feat: add execute button to Graph nodes`
+4. `fix: resolve cargo and npm build errors`
+5. `fix: correct node type matching in DagExecutor`
+
+### Merge Node Implementation (Option B)
+6. `feat: implement MergeBuilder for combining data from multiple upstream sources`
+7. `feat: add automatic upstream dependency execution for DAG nodes`
 
 ## Testing Checklist
 
@@ -230,7 +335,14 @@ id, graph_id, source, target, label, layer, weight, attrs
 
 ## Next Steps
 
-1. Test complete workflow end-to-end
-2. Fix any build errors (cargo + npm)
-3. Verify graph execution works with sample data
-4. Document any issues found
+### Immediate Testing
+1. Test basic workflow: DataSource → Graph → Preview
+2. Test merge workflow: DataSource + DataSource → Merge → Graph → Preview
+3. Verify upstream dependency execution works correctly
+4. Test with sample CSV files (nodes.csv + edges.csv)
+
+### Future Work
+1. Implement Transform nodes for data filtering/mapping
+2. Add automatic lifecycle hooks (auto-execute on edge connect)
+3. Implement incremental updates (skip unchanged nodes)
+4. Add background execution with progress tracking
