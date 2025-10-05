@@ -12,45 +12,36 @@ interface NodeConfigDialogProps {
   opened: boolean;
   onClose: () => void;
   nodeType: PlanDagNodeType;
-  currentConfig?: string; // JSON string
   projectId: number;
   onSave: (nodeId: string, config: any, metadata: any) => void;
   nodeId: string;
-  config?: any;
-  metadata?: any;
+  config: any;
+  metadata: any;
 }
 
 export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
   opened,
   onClose,
   nodeType,
-  currentConfig,
   projectId,
   onSave,
   nodeId,
+  config: initialConfig,
+  metadata: initialMetadata,
 }) => {
-  const [config, setConfig] = React.useState<any>({});
+  const [config, setConfig] = React.useState(initialConfig);
+  const [metadata, setMetadata] = React.useState(initialMetadata);
   const [isValid, setIsValid] = React.useState(false);
 
-  // Parse current config when dialog opens
   React.useEffect(() => {
-    if (currentConfig) {
-      try {
-        const parsed = JSON.parse(currentConfig);
-        setConfig(parsed);
-      } catch (e) {
-        console.error('Failed to parse current config:', e);
-        setConfig({});
-      }
-    } else {
-      setConfig({});
+    if (opened) {
+      setConfig(initialConfig);
+      setMetadata(initialMetadata);
     }
-  }, [currentConfig]);
+  }, [opened, initialConfig, initialMetadata]);
 
   const handleSave = () => {
     if (isValid) {
-      // Create dummy metadata for now
-      const metadata = { label: getNodeTypeName(), description: '' };
       onSave(nodeId, config, metadata);
       onClose();
     }

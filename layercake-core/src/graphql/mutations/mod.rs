@@ -1625,7 +1625,7 @@ impl Mutation {
             .ok_or_else(|| Error::new("Plan not found for project"))?;
 
         // Get the output node
-        let node = plan_dag_nodes::Entity::find()
+        let output_node = plan_dag_nodes::Entity::find()
             .filter(
                 plan_dag_nodes::Column::PlanId.eq(plan.id)
                     .and(plan_dag_nodes::Column::Id.eq(&node_id))
@@ -1635,7 +1635,7 @@ impl Mutation {
             .ok_or_else(|| Error::new("Output node not found"))?;
 
         // Parse node config to get renderTarget and outputPath
-        let config: serde_json::Value = serde_json::from_str(&node.config_json)
+        let config: serde_json::Value = serde_json::from_str(&output_node.config_json)
             .map_err(|e| Error::new(format!("Failed to parse node config: {}", e)))?;
 
         let render_target = config.get("renderTarget")
@@ -1657,10 +1657,55 @@ impl Mutation {
             .map(|s| s.to_string())
             .unwrap_or_else(|| format!("{}.{}", project.name, extension));
 
-        // Export using ExportService
-        let export_service = ExportService::new(context.db.clone());
-        let content = export_service.export_graph(project_id, render_target)
+        // Find the upstream GraphNode connected to this OutputNode
+        let edges = plan_dag_edges::Entity::find()
+            .filter(plan_dag_edges::Column::PlanId.eq(plan.id))
+            .all(&context.db)
+            .await?;
+
+        let upstream_node_id = edges
+            .iter()
+            .find(|e| e.target_node_id == node_id)
+            .map(|e| e.source_node_id.clone())
+            .ok_or_else(|| Error::new("No upstream graph connected to output node"))?;
+
+        // Get all nodes and edges for DAG execution
+        let all_nodes = plan_dag_nodes::Entity::find()
+            .filter(plan_dag_nodes::Column::PlanId.eq(plan.id))
+            .all(&context.db)
+            .await?;
+
+        let edge_tuples: Vec<(String, String)> = edges
+            .iter()
+            .map(|e| (e.source_node_id.clone(), e.target_node_id.clone()))
+            .collect();
+
+        // Execute the upstream GraphNode and its dependencies to ensure graph is built
+        let executor = DagExecutor::new(context.db.clone());
+        executor
+            .execute_with_dependencies(project_id, plan.id, &upstream_node_id, &all_nodes, &edge_tuples)
             .await
+            .map_err(|e| Error::new(format!("Failed to execute graph: {}", e)))?;
+
+        // Get the built graph from the graphs table using the GraphNode's ID
+        use crate::database::entities::graphs;
+        let graph_model = graphs::Entity::find()
+            .filter(graphs::Column::ProjectId.eq(project_id))
+            .filter(graphs::Column::NodeId.eq(&upstream_node_id))
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new(format!("Graph not found for node {}", upstream_node_id)))?;
+
+        // Build Graph object from the DAG-built graph
+        use crate::services::GraphService;
+        let graph_service = GraphService::new(context.db.clone());
+        let graph = graph_service.build_graph_from_dag_graph(graph_model.id)
+            .await
+            .map_err(|e| Error::new(format!("Failed to build graph: {}", e)))?;
+
+        // Export the graph
+        let export_service = ExportService::new(context.db.clone());
+        let content = export_service.export_to_string(&graph, &parse_export_format(render_target)?)
             .map_err(|e| Error::new(format!("Export failed: {}", e)))?;
 
         // Encode as base64
@@ -1685,13 +1730,10 @@ fn get_extension_for_format(format: &str) -> &str {
     match format {
         "DOT" => "dot",
         "GML" => "gml",
-        "GraphML" => "graphml",
         "JSON" => "json",
         "CSV" => "csv",
         "CSVNodes" => "csv",
         "CSVEdges" => "csv",
-        "PNG" => "png",
-        "SVG" => "svg",
         "PlantUML" => "puml",
         "Mermaid" => "mermaid",
         _ => "txt",
@@ -1703,15 +1745,28 @@ fn get_mime_type_for_format(format: &str) -> String {
     match format {
         "DOT" => "text/vnd.graphviz",
         "GML" => "text/plain",
-        "GraphML" => "application/xml",
         "JSON" => "application/json",
         "CSV" | "CSVNodes" | "CSVEdges" => "text/csv",
-        "PNG" => "image/png",
-        "SVG" => "image/svg+xml",
         "PlantUML" => "text/plain",
         "Mermaid" => "text/plain",
         _ => "text/plain",
     }.to_string()
+}
+
+// Helper function to parse render target string to ExportFileType enum
+fn parse_export_format(format: &str) -> Result<crate::plan::ExportFileType> {
+    use crate::plan::ExportFileType;
+    match format {
+        "DOT" => Ok(ExportFileType::DOT),
+        "GML" => Ok(ExportFileType::GML),
+        "JSON" => Ok(ExportFileType::JSON),
+        "PlantUML" => Ok(ExportFileType::PlantUML),
+        "Mermaid" => Ok(ExportFileType::Mermaid),
+        "CSVNodes" => Ok(ExportFileType::CSVNodes),
+        "CSVEdges" => Ok(ExportFileType::CSVEdges),
+        "CSV" => Ok(ExportFileType::CSVNodes), // Default CSV to nodes
+        _ => Err(Error::new(format!("Unsupported export format: {}", format))),
+    }
 }
 
 #[derive(SimpleObject)]

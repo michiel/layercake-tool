@@ -5,6 +5,9 @@ use crate::database::entities::{
     nodes::Entity as Nodes,
     edges::Entity as Edges,
     layers::Entity as Layers,
+    graph_nodes, graph_edges,
+    graph_nodes::Entity as GraphNodes,
+    graph_edges::Entity as GraphEdges,
 };
 use crate::graph::{Graph, Node, Edge, Layer};
 
@@ -105,6 +108,82 @@ impl GraphService {
         // Create the Graph with all entities
         Ok(Graph {
             name: format!("Project {}", project_id),
+            nodes: graph_nodes,
+            edges: graph_edges,
+            layers: graph_layers,
+        })
+    }
+
+    /// Build a Graph from a DAG-built graph in the graphs table
+    pub async fn build_graph_from_dag_graph(&self, graph_id: i32) -> Result<Graph> {
+        // Fetch the graph metadata
+        use crate::database::entities::graphs::Entity as Graphs;
+        let graph_meta = Graphs::find_by_id(graph_id)
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Graph {} not found", graph_id))?;
+
+        // Fetch graph nodes
+        let db_graph_nodes = GraphNodes::find()
+            .filter(graph_nodes::Column::GraphId.eq(graph_id))
+            .all(&self.db)
+            .await?;
+
+        // Fetch graph edges
+        let db_graph_edges = GraphEdges::find()
+            .filter(graph_edges::Column::GraphId.eq(graph_id))
+            .all(&self.db)
+            .await?;
+
+        // Get unique layers from nodes
+        use std::collections::HashSet;
+        let unique_layers: HashSet<String> = db_graph_nodes
+            .iter()
+            .filter_map(|n| n.layer.clone())
+            .collect();
+
+        // Create default layers
+        let graph_layers: Vec<Layer> = unique_layers
+            .into_iter()
+            .map(|layer_id| Layer {
+                id: layer_id.clone(),
+                label: layer_id,
+                background_color: "FFFFFF".to_string(),
+                text_color: "000000".to_string(),
+                border_color: "000000".to_string(),
+            })
+            .collect();
+
+        // Convert to Graph Node structs
+        let graph_nodes: Vec<Node> = db_graph_nodes
+            .into_iter()
+            .map(|db_node| Node {
+                id: db_node.id,
+                label: db_node.label.unwrap_or_default(),
+                layer: db_node.layer.unwrap_or_else(|| "default".to_string()),
+                is_partition: db_node.is_partition,
+                belongs_to: None, // Could be extracted from attrs if needed
+                weight: db_node.weight.unwrap_or(1.0) as i32,
+                comment: None, // Could be extracted from attrs if needed
+            })
+            .collect();
+
+        // Convert to Graph Edge structs
+        let graph_edges: Vec<Edge> = db_graph_edges
+            .into_iter()
+            .map(|db_edge| Edge {
+                id: db_edge.id.clone(),
+                source: db_edge.source,
+                target: db_edge.target,
+                label: db_edge.label.unwrap_or_default(),
+                layer: db_edge.layer.unwrap_or_else(|| "default".to_string()),
+                weight: db_edge.weight.unwrap_or(1.0) as i32,
+                comment: None,
+            })
+            .collect();
+
+        Ok(Graph {
+            name: graph_meta.name,
             nodes: graph_nodes,
             edges: graph_edges,
             layers: graph_layers,

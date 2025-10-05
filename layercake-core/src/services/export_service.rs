@@ -33,7 +33,7 @@ impl ExportService {
         self.export_to_string(&graph, &export_format)
     }
 
-    fn export_to_string(&self, graph: &Graph, format: &ExportFileType) -> Result<String> {
+    pub fn export_to_string(&self, graph: &Graph, format: &ExportFileType) -> Result<String> {
         // Default render config
         let render_config = RenderConfig {
             contain_nodes: true,
