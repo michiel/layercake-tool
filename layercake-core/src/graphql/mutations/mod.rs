@@ -1261,10 +1261,18 @@ impl Mutation {
         {
             Some(plan) => plan,
             None => {
-                // Create a new plan for this project
+                // Create a new plan for this project with the YAML content
+                let plan_name = plan_yaml.get("meta")
+                    .and_then(|m| m.get("name"))
+                    .and_then(|n| n.as_str())
+                    .unwrap_or("Imported Plan");
+
                 let new_plan = plans::ActiveModel {
                     project_id: Set(project_id),
-                    name: Set("Imported Plan".to_string()),
+                    name: Set(plan_name.to_string()),
+                    yaml_content: Set(yaml_content.clone()),
+                    status: Set("active".to_string()),
+                    version: Set(1),
                     ..Default::default()
                 };
                 new_plan.insert(&context.db).await?
