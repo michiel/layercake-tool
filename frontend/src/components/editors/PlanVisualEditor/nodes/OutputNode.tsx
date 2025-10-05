@@ -1,10 +1,12 @@
 import { memo, useState } from 'react'
 import { NodeProps, Handle, Position } from 'reactflow'
+import { useMutation } from '@apollo/client/react'
 import { Paper, Text, Group, ActionIcon, Tooltip, Badge, Stack } from '@mantine/core'
 import { IconSettings, IconTrash, IconDownload } from '@tabler/icons-react'
 import { PlanDagNodeType, OutputNodeConfig } from '../../../../types/plan-dag'
 import { isNodeConfigured } from '../../../../utils/planDagValidation'
 import { getNodeColor, getNodeIcon, getNodeTypeLabel } from '../../../../utils/nodeStyles'
+import { EXPORT_NODE_OUTPUT, ExportNodeOutputResult } from '../../../../graphql/export'
 
 interface OutputNodeProps extends NodeProps {
   onEdit?: (nodeId: string) => void
@@ -12,21 +14,21 @@ interface OutputNodeProps extends NodeProps {
   readonly?: boolean
 }
 
-// Map render targets to file extensions
-const getRenderTargetExtension = (renderTarget: string): string => {
-  const extensionMap: Record<string, string> = {
-    'DOT': 'dot',
-    'GraphML': 'graphml',
-    'GML': 'gml',
-    'JSON': 'json',
-    'CSV': 'csv',
-    'PNG': 'png',
-    'SVG': 'svg',
-    'PlantUML': 'puml',
-    'Mermaid': 'mermaid',
-  }
-  return extensionMap[renderTarget] || 'txt'
-}
+// Map render targets to file extensions (currently unused - backend generates filename)
+// const getRenderTargetExtension = (renderTarget: string): string => {
+//   const extensionMap: Record<string, string> = {
+//     'DOT': 'dot',
+//     'GraphML': 'graphml',
+//     'GML': 'gml',
+//     'JSON': 'json',
+//     'CSV': 'csv',
+//     'PNG': 'png',
+//     'SVG': 'svg',
+//     'PlantUML': 'puml',
+//     'Mermaid': 'mermaid',
+//   }
+//   return extensionMap[renderTarget] || 'txt'
+// }
 
 export const OutputNode = memo((props: OutputNodeProps) => {
   const { data, selected, onEdit, onDelete, readonly = false } = props
@@ -40,37 +42,55 @@ export const OutputNode = memo((props: OutputNodeProps) => {
   const hasValidConfig = data.hasValidConfig !== false
   const isConfigured = isNodeConfigured(PlanDagNodeType.OUTPUT, props.id, edges, hasValidConfig)
 
-  // Get project ID and name from context
+  // Get project ID from context
   const projectId = data.projectId as number | undefined
-  const projectName = data.projectName as string | undefined
+
+  // Export mutation
+  const [exportNodeOutput] = useMutation(EXPORT_NODE_OUTPUT, {
+    onCompleted: (data: any) => {
+      const result = data.exportNodeOutput as ExportNodeOutputResult
+      if (result.success) {
+        // Decode base64 content and trigger download
+        try {
+          const binaryString = atob(result.content)
+          const bytes = new Uint8Array(binaryString.length)
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i)
+          }
+          const blob = new Blob([bytes], { type: result.mimeType })
+          const url = window.URL.createObjectURL(blob)
+          const link = document.createElement('a')
+          link.href = url
+          link.download = result.filename
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+          window.URL.revokeObjectURL(url)
+          console.log('Download completed:', result.filename)
+        } catch (error) {
+          console.error('Failed to decode and download:', error)
+        }
+      } else {
+        console.error('Export failed:', result.message)
+      }
+      setDownloading(false)
+    },
+    onError: (error: any) => {
+      console.error('Export failed:', error.message)
+      setDownloading(false)
+    },
+  })
 
   const handleDownload = async () => {
     if (!projectId || !isConfigured) return
 
     setDownloading(true)
-    try {
-      // Generate filename: use config.outputPath if provided, otherwise PROJECT-NAME.EXTENSION
-      const extension = getRenderTargetExtension(config.renderTarget || 'DOT')
-      const defaultFilename = `${projectName || 'export'}.${extension}`
-      const filename = config.outputPath || defaultFilename
-
-      // TODO: Call GraphQL mutation/query to export the graph
-      // For now, just show a placeholder
-      console.log('Download triggered:', {
+    exportNodeOutput({
+      variables: {
         projectId,
         nodeId: props.id,
-        renderTarget: config.renderTarget,
-        filename,
-        renderConfig: config.renderConfig
-      })
-
-      // Placeholder implementation - will be replaced with actual export API call
-      alert(`Download feature coming soon!\n\nWould download: ${filename}\nFormat: ${config.renderTarget || 'DOT'}`)
-    } catch (error) {
-      console.error('Download failed:', error)
-    } finally {
-      setDownloading(false)
-    }
+      },
+    })
   }
 
   return (
