@@ -192,6 +192,23 @@ export function getExecutionStateLabel(state: string): string {
   }
 }
 
+// Execute Node Mutation
+export const EXECUTE_NODE = gql`
+  mutation ExecuteNode($projectId: Int!, $nodeId: String!) {
+    executeNode(projectId: $projectId, nodeId: $nodeId) {
+      success
+      message
+      nodeId
+    }
+  }
+`;
+
+export interface NodeExecutionResult {
+  success: boolean;
+  message: string;
+  nodeId: string;
+}
+
 // Helper to get execution state color
 export function getExecutionStateColor(state: string): string {
   switch (state) {

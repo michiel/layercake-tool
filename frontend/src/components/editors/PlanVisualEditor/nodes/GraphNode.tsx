@@ -1,12 +1,14 @@
 import { memo, useState } from 'react'
 import { NodeProps, Handle, Position } from 'reactflow'
 import { Paper, Text, Group, ActionIcon, Tooltip, Badge, Stack, Loader } from '@mantine/core'
-import { IconSettings, IconTrash, IconPlayerPlay } from '@tabler/icons-react'
+import { IconSettings, IconTrash, IconPlayerPlay, IconPlayerPlayFilled } from '@tabler/icons-react'
+import { useMutation } from '@apollo/client'
+import { notifications } from '@mantine/notifications'
 import { PlanDagNodeType, GraphNodeConfig } from '../../../../types/plan-dag'
 import { isNodeConfigured } from '../../../../utils/planDagValidation'
 import { getNodeColor, getNodeIcon, getNodeTypeLabel } from '../../../../utils/nodeStyles'
 import { useGraphPreview } from '../../../../hooks/usePreview'
-import { getExecutionStateLabel, getExecutionStateColor, isExecutionComplete, isExecutionInProgress } from '../../../../graphql/preview'
+import { getExecutionStateLabel, getExecutionStateColor, isExecutionComplete, isExecutionInProgress, EXECUTE_NODE } from '../../../../graphql/preview'
 import { GraphPreviewDialog } from '../../../visualization/GraphPreviewDialog'
 import { GraphData } from '../../../visualization/GraphPreview'
 
@@ -39,11 +41,41 @@ export const GraphNode = memo((props: GraphNodeProps) => {
   )
 
   // Query execution state (always fetch to show status)
-  const { preview: executionPreview } = useGraphPreview(
+  const { preview: executionPreview, refetch: refetchExecutionState } = useGraphPreview(
     projectId || 0,
     props.id,
     { skip: !projectId }
   )
+
+  // Execute node mutation
+  const [executeNode, { loading: executing }] = useMutation(EXECUTE_NODE, {
+    onCompleted: (data) => {
+      notifications.show({
+        title: 'Success',
+        message: data.executeNode.message,
+        color: 'green',
+      })
+      // Refetch execution state to update badge
+      refetchExecutionState()
+    },
+    onError: (error) => {
+      notifications.show({
+        title: 'Execution Failed',
+        message: error.message,
+        color: 'red',
+      })
+    },
+  })
+
+  const handleExecute = () => {
+    if (!projectId) return
+    executeNode({
+      variables: {
+        projectId,
+        nodeId: props.id,
+      },
+    })
+  }
 
   // Transform pipeline graph preview to force-graph format
   const getGraphPreviewData = (): GraphData | null => {
@@ -193,25 +225,48 @@ export const GraphNode = memo((props: GraphNodeProps) => {
           </Text>
         </Group>
 
-        {/* Center: Play button */}
+        {/* Center: Execute and Preview buttons */}
         {!readonly && (
           <Group justify="center" mb="md">
-            <Tooltip label="Preview graph">
-              <ActionIcon
-                size="xl"
-                variant="light"
-                color="blue"
-                radius="xl"
-                data-action-icon="preview"
-                onMouseDown={(e) => {
-                  e.stopPropagation()
-                  e.preventDefault()
-                  setShowPreview(true)
-                }}
-              >
-                <IconPlayerPlay size="1.5rem" />
-              </ActionIcon>
-            </Tooltip>
+            {/* Execute button - only show if configured */}
+            {isConfigured && (
+              <Tooltip label="Execute graph (build from upstream data sources)">
+                <ActionIcon
+                  size="xl"
+                  variant="filled"
+                  color="green"
+                  radius="xl"
+                  data-action-icon="execute"
+                  loading={executing}
+                  onMouseDown={(e) => {
+                    e.stopPropagation()
+                    e.preventDefault()
+                    handleExecute()
+                  }}
+                >
+                  <IconPlayerPlayFilled size="1.5rem" />
+                </ActionIcon>
+              </Tooltip>
+            )}
+            {/* Preview button - show if execution is complete */}
+            {executionPreview && isExecutionComplete(executionPreview.executionState) && (
+              <Tooltip label="Preview graph">
+                <ActionIcon
+                  size="xl"
+                  variant="light"
+                  color="blue"
+                  radius="xl"
+                  data-action-icon="preview"
+                  onMouseDown={(e) => {
+                    e.stopPropagation()
+                    e.preventDefault()
+                    setShowPreview(true)
+                  }}
+                >
+                  <IconPlayerPlay size="1.5rem" />
+                </ActionIcon>
+              </Tooltip>
+            )}
           </Group>
         )}
 
