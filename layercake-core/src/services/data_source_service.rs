@@ -425,9 +425,12 @@ impl DataSourceService {
         let headers = reader.headers()?.clone();
         let mut layers = Vec::new();
 
-        // Validate required headers
-        if !headers.iter().any(|h| h == "id") || !headers.iter().any(|h| h == "label") {
-            return Err(anyhow!("CSV must contain 'id' and 'label' columns"));
+        // Validate required headers: must have ('id' or 'layer') and 'label'
+        let has_id_col = headers.iter().any(|h| h == "id" || h == "layer");
+        let has_label_col = headers.iter().any(|h| h == "label");
+
+        if !has_id_col || !has_label_col {
+            return Err(anyhow!("CSV must contain 'label' and either 'id' or 'layer' columns"));
         }
 
         for result in reader.records() {
@@ -436,9 +439,10 @@ impl DataSourceService {
 
             for (i, field) in record.iter().enumerate() {
                 if let Some(header) = headers.get(i) {
-                    match header {
+                    let key = if header == "layer" { "id" } else { header };
+                    match key {
                         "id" | "label" | "color" | "description" => {
-                            layer.insert(header.to_string(), json!(field));
+                            layer.insert(key.to_string(), json!(field));
                         },
                         "z_index" => {
                             if let Ok(z) = field.parse::<i32>() {
@@ -446,7 +450,7 @@ impl DataSourceService {
                             }
                         },
                         _ => {
-                            layer.insert(header.to_string(), json!(field));
+                            layer.insert(key.to_string(), json!(field));
                         }
                     };
                 }

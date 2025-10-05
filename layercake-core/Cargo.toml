@@ -107,3 +107,5 @@ dashmap = { workspace = true, optional = true }
 tokio-test = "0.4"
 futures-util = { workspace = true }
 tokio-tungstenite = { workspace = true }
+reqwest = { workspace = true, features = ["json"] }
+serde_json = { workspace = true }

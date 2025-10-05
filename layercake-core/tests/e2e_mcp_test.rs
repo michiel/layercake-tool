@@ -2,32 +2,28 @@
 //! 
 //! This test demonstrates the complete MCP workflow by:
 //! 1. Starting a Layercake server with in-memory SQLite
-//! 2. Connecting via MCP WebSocket
+//! 2. Connecting via MCP HTTP
 //! 3. Creating a project
 //! 4. Adding nodes, edges, and layers
 //! 5. Creating and executing a plan
 //! 6. Exporting to JSON
 
 use tokio::time::{sleep, Duration};
-use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
-use futures_util::{SinkExt, StreamExt};
 use serde_json::{json, Value};
 use std::process::{Command, Stdio};
+use reqwest::Client;
 
 struct McpClient {
-    sender: futures_util::stream::SplitSink<tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>, Message>,
-    receiver: futures_util::stream::SplitStream<tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>>,
+    client: Client,
+    url: String,
     request_id: u32,
 }
 
 impl McpClient {
     async fn new(url: &str) -> Result<Self, Box<dyn std::error::Error>> {
-        let (ws_stream, _) = connect_async(url).await?;
-        let (sender, receiver) = ws_stream.split();
-        
         Ok(Self {
-            sender,
-            receiver,
+            client: Client::new(),
+            url: url.to_string(),
             request_id: 0,
         })
     }
@@ -41,21 +37,24 @@ impl McpClient {
             "params": params
         });
 
-        let message = Message::Text(serde_json::to_string(&request)?.into());
-        self.sender.send(message).await?;
+        let response = self.client.post(&self.url)
+            .json(&request)
+            .send()
+            .await?;
 
-        // Read response
-        if let Some(msg) = self.receiver.next().await {
-            let msg = msg?;
-            if let Message::Text(text) = msg {
-                let response: Value = serde_json::from_str(&text)?;
-                if let Some(error) = response.get("error") {
-                    return Err(format!("MCP error: {}", error).into());
-                }
-                if let Some(result) = response.get("result") {
-                    return Ok(result.clone());
-                }
-            }
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_body = response.text().await?;
+            return Err(format!("MCP request failed with status: {}, body: {}", status, error_body).into());
+        }
+
+        let response_json: Value = response.json().await?;
+
+        if let Some(error) = response_json.get("error") {
+            return Err(format!("MCP error: {}", error).into());
+        }
+        if let Some(result) = response_json.get("result") {
+            return Ok(result.clone());
         }
 
         Err("No valid response received".into())
@@ -85,7 +84,9 @@ async fn start_server() -> Result<std::process::Child, Box<dyn std::error::Error
     
     // Start server using the built binary (use a temporary database file)
     let temp_db = format!("/tmp/layercake_test_{}.db", std::process::id());
-    let child = Command::new("./target/release/layercake")
+    let manifest_dir = env!("CARGO_MANIFEST_DIR");
+    let executable_path = format!("{}/../target/release/layercake", manifest_dir);
+    let child = Command::new(&executable_path)
         .args(&["serve", "--database", &format!("sqlite://{}", temp_db), "--port", "3001"])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -113,24 +114,10 @@ async fn test_mcp_end_to_end_workflow() -> Result<(), Box<dyn std::error::Error>
     // Start the server
     let mut server_process = start_server().await?;
 
-    // Connect to MCP WebSocket
-    println!("Connecting to MCP WebSocket...");
-    let mut client = McpClient::new("ws://127.0.0.1:3001/mcp").await?;
+    // Connect to MCP HTTP endpoint
+    println!("Connecting to MCP HTTP endpoint...");
+    let mut client = McpClient::new("http://127.0.0.1:3001/mcp").await?;
     println!("Connected to MCP");
-
-    // Initialize MCP session
-    println!("Initializing MCP session...");
-    let _init_response = client.send_request("initialize", Some(json!({
-        "protocolVersion": "2024-11-05",
-        "capabilities": {
-            "tools": {}
-        },
-        "clientInfo": {
-            "name": "e2e-test",
-            "version": "1.0.0"
-        }
-    }))).await?;
-    println!("MCP session initialized");
 
     // Step 1: Create a new project
     println!("Creating project...");

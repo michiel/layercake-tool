@@ -55,9 +55,28 @@ impl AuthService {
             return Err(anyhow!("Email cannot be empty"));
         }
 
-        // Basic email validation
-        if !email.contains('@') || !email.contains('.') {
-            return Err(anyhow!("Invalid email format"));
+        let parts: Vec<&str> = email.split('@').collect();
+        if parts.len() != 2 {
+            return Err(anyhow!("Invalid email format: must contain exactly one @"));
+        }
+
+        let local_part = parts[0];
+        let domain_part = parts[1];
+
+        if local_part.is_empty() {
+            return Err(anyhow!("Invalid email format: local part cannot be empty"));
+        }
+
+        if domain_part.is_empty() {
+            return Err(anyhow!("Invalid email format: domain part cannot be empty"));
+        }
+
+        if !domain_part.contains('.') {
+            return Err(anyhow!("Invalid email format: domain must contain a dot"));
+        }
+
+        if domain_part.starts_with('.') || domain_part.ends_with('.') {
+            return Err(anyhow!("Invalid email format: domain cannot start or end with a dot"));
         }
 
         // Check for reasonable length
