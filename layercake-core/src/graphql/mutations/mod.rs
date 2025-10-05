@@ -8,6 +8,7 @@ use crate::database::entities::{projects, plans, nodes, edges, layers, plan_dag_
 use crate::graphql::context::GraphQLContext;
 use crate::services::auth_service::AuthService;
 use crate::services::data_source_service::DataSourceService;
+use crate::pipeline::DagExecutor;
 
 use crate::graphql::types::{
     Project, Plan, Node, Edge, Layer,
@@ -1197,9 +1198,6 @@ impl Mutation {
         project_id: i32,
         node_id: String
     ) -> Result<NodeExecutionResult> {
-        use crate::pipeline::DagExecutor;
-        use sea_orm::{ColumnTrait, QueryFilter};
-
         let context = ctx.data::<GraphQLContext>()?;
 
         // Find the plan for this project

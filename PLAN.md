@@ -1,685 +1,236 @@
-# Plan DAG Editor Improvement Plan
+# Plan: Direct Graph Execution from Data Sources
 
-**Document Version:** 1.0
-**Date:** 2025-10-04
-**Based on:** ReactFlow Examples Review (Non-Pro)
+## Status: ✅ Implemented (Option A)
 
----
+## Overview
 
-## Executive Summary
+Implemented direct graph execution that reads from `data_sources` table without background processing or duplicate data storage. Graph nodes build on-demand when user clicks execute button.
 
-After reviewing ReactFlow's non-pro examples and analyzing the current Plan DAG Visual Editor implementation, this plan identifies **3 high-priority enhancements** that will significantly improve user experience with minimal architectural changes.
+## Architecture
 
-**Current State:** The editor already implements advanced features (cycle detection, validation, ELK auto-layout, real-time collaboration) that exceed most ReactFlow examples.
+### Data Flow
 
-**Recommended Focus:** Polish and UX refinements to streamline workflow building.
-
-**Timeline:** Phase 1 can be completed in 1-2 days; Phase 2 in 2-3 days.
-
----
-
-## Current Implementation Strengths
-
-✅ **Already Implemented (Better than Examples):**
-- Sophisticated cycle detection and connection validation
-- ELK layout engine (more powerful than dagre.js used in examples)
-- Real-time collaboration with CQRS and delta subscriptions
-- Comprehensive semantic node type system with GraphQL backend
-- Edge reconnection with validation
-- Save/restore via backend persistence + YAML export
-- Dynamic edge styling based on node configuration status
-- Fit view with configurable zoom range (minZoom: 0.1, maxZoom: 4)
-
-✅ **Recent Improvements:**
-- Removed description from node visuals (cleaner UI)
-- Fixed "Not Configured" badge validation for DataSource nodes
-- Improved edge color logic (source-based instead of upstream-based)
-- Added Fit View button with IconZoomScan
-- Removed redundant "Node" suffix from all labels
-
----
-
-## Feature Gap Analysis
-
-| Feature | ReactFlow Example | Current Status | Value | Complexity | Priority |
-|---------|-------------------|----------------|-------|------------|----------|
-| **Drag Handle** | nodes/drag-handle | ❌ Not implemented | **High** | **Low** | **P0** |
-| **Add Node on Edge Drop** | nodes/add-node-on-edge-drop | ❌ Not implemented | **High** | **Medium** | **P0** |
-| **Custom Connection Line** | edges/custom-connectionline | ⚠️ Basic styling only | **Medium-High** | **Low-Medium** | **P1** |
-| Delete Middle Node (Auto-reconnect) | nodes/delete-middle-node | ❌ Not implemented | Medium | Medium-High | P2 |
-| Easy Connect (Whole Node) | nodes/easy-connect | ❌ Not implemented | Low | Medium | **Skip** |
-
----
-
-## Detailed Recommendations
-
-### Phase 1: High-Value, Low-Effort (Days 1-2)
-
-#### 1. Drag Handle ⭐ **P0 - Highest Priority**
-
-**Problem:**
-Users accidentally move nodes when clicking Edit/Delete buttons or interacting with node content.
-
-**Solution:**
-Restrict node dragging to the header/title area only using ReactFlow's `dragHandle` property.
-
-**Implementation Details:**
-
-```typescript
-// In ReactFlowAdapter.ts - convertPlanDagNodeToReactFlow()
-return {
-  id: normalizedNode.id,
-  type: this.mapNodeTypeToReactFlow(normalizedNode.nodeType),
-  position: { x: normalizedNode.position?.x ?? 0, y: normalizedNode.position?.y ?? 0 },
-  dragHandle: '.node-header', // ADD THIS
-  data: { /* ... */ },
-  // ...
-}
+```
+Upload CSV → data_sources (graph_json) → DataSource Node (dataSourceId in config)
+                                               ↓
+                                          Graph Node (via edges)
+                                               ↓
+                                     Click Execute Button
+                                               ↓
+                              GraphBuilder reads data_sources.graph_json
+                                               ↓
+                           Combines nodes/edges from all upstream sources
+                                               ↓
+                        Populates graphs, graph_nodes, graph_edges tables
+                                               ↓
+                                    Execution state: completed
+                                               ↓
+                                      Click Preview Button
+                                               ↓
+                                    Graph Visualization
 ```
 
-```typescript
-// In BaseNode.tsx and DataSourceNode.tsx
-<Paper /* ... */>
-  {/* Edit/Delete buttons */}
+### No Duplicate Data
 
-  {/* Add className to header group */}
-  <Group gap="sm" mb="sm" wrap="nowrap" className="node-header"
-         style={{ paddingRight: !readonly ? 60 : 0, cursor: 'grab' }}>
-    <div style={{ color, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-      {getNodeIcon(nodeType, '1.4rem')}
-    </div>
-    <Text size="sm" fw={600} lineClamp={2} style={{ wordBreak: 'break-word', flex: 1, minWidth: 0 }}>
-      {metadata.label}
-    </Text>
-  </Group>
+- **data_sources.graph_json**: Source of truth (uploaded file processed once)
+- **graphs/graph_nodes/graph_edges**: Computed view (built from data_sources on demand)
+- **datasources/datasource_rows**: NOT USED (old pipeline approach)
 
-  {/* Bottom content */}
-</Paper>
+## Implemented Features
+
+### Backend
+
+1. **GraphBuilder.build_graph()** (`layercake-core/src/pipeline/graph_builder.rs`)
+   - Reads `plan_dag_nodes` config to get `dataSourceId` for each upstream node
+   - Queries `data_sources` table directly (no pipeline processing)
+   - Parses `graph_json` field to extract nodes/edges
+   - Supports three data types:
+     - `data_type: "nodes"` → extracts `graph_json.nodes[]`
+     - `data_type: "edges"` → extracts `graph_json.edges[]`
+     - `data_type: "graph"` → extracts both nodes and edges
+   - Combines all nodes and edges from multiple upstream sources
+   - Validates edge references
+   - Populates `graphs`, `graph_nodes`, `graph_edges` tables
+   - Sets `execution_state: "completed"` when done
+
+2. **DagExecutor** (`layercake-core/src/pipeline/dag_executor.rs`)
+   - Updated to accept `plan_id` parameter
+   - Passes plan_id to GraphBuilder for config lookup
+   - Handles topological execution ordering
+
+3. **executeNode Mutation** (`layercake-core/src/graphql/mutations/mod.rs`)
+   - GraphQL mutation: `executeNode(projectId: Int!, nodeId: String!)`
+   - Returns `NodeExecutionResult { success, message, nodeId }`
+   - Fetches all plan nodes and edges
+   - Calls `DagExecutor.execute_node()`
+   - Returns success/error to frontend
+
+### Frontend
+
+1. **Execute Button** (`frontend/src/components/editors/PlanVisualEditor/nodes/GraphNode.tsx`)
+   - Green filled play button (IconPlayerPlayFilled)
+   - Only shows when Graph node has upstream connections (isConfigured)
+   - Calls `EXECUTE_NODE` mutation
+   - Shows loading spinner during execution
+   - Displays success/error notifications
+   - Refetches execution state after completion
+
+2. **Preview Button** (`frontend/src/components/editors/PlanVisualEditor/nodes/GraphNode.tsx`)
+   - Blue outline play button (IconPlayerPlay)
+   - Only shows when `execution_state: "completed"`
+   - Opens GraphPreviewDialog with force-graph visualization
+
+3. **Execution State Badge**
+   - Shows current state: "Not Started", "Processing", "Ready", "Error"
+   - Color-coded: gray, blue, green, red
+   - Updates after execute completes
+
+4. **GraphQL Integration** (`frontend/src/graphql/preview.ts`)
+   - `EXECUTE_NODE` mutation
+   - `NodeExecutionResult` interface
+   - Integrated into existing preview hooks
+
+## User Workflow
+
+### Step-by-Step Usage
+
+1. **Upload Data Sources**
+   - Upload `nodes.csv` → creates data_source (id: 1, data_type: "nodes")
+   - Upload `edges.csv` → creates data_source (id: 2, data_type: "edges")
+   - Both files processed to `graph_json` format (status: "active")
+
+2. **Create Plan DAG**
+   - Add DataSource node "Nodes" → assign data_source id: 1
+   - Add DataSource node "Edges" → assign data_source id: 2
+   - Add Graph node "My Graph"
+   - Connect "Nodes" → "My Graph"
+   - Connect "Edges" → "My Graph"
+
+3. **Execute Graph**
+   - Graph node shows green "Execute" button (configured with 2 upstream edges)
+   - Click Execute → mutation fires
+   - Badge shows "Processing" with spinner
+   - GraphBuilder reads graph_json from both data sources
+   - Combines nodes and edges
+   - Populates database tables
+   - Badge updates to "Ready"
+
+4. **Preview Graph**
+   - Blue "Preview" button appears (execution complete)
+   - Click Preview → opens dialog
+   - Force-graph visualization displays nodes and edges
+
+## Database Tables
+
+### data_sources (Source of Truth)
+```sql
+id, project_id, name, filename, source_type, data_type,
+graph_json, status, processed_at
 ```
+- Created on file upload
+- `graph_json`: Contains parsed nodes/edges
+- `status: "active"` when ready
+- Never modified by graph execution
 
-**Files to Modify:**
-1. `frontend/src/adapters/ReactFlowAdapter.ts` - Add `dragHandle` property
-2. `frontend/src/components/editors/PlanVisualEditor/nodes/BaseNode.tsx` - Add `node-header` className
-3. `frontend/src/components/editors/PlanVisualEditor/nodes/DataSourceNode.tsx` - Add `node-header` className
-
-**Testing:**
-- Verify nodes can only be dragged by header area
-- Confirm Edit/Delete buttons work without triggering drag
-- Test in readonly mode (should still not drag)
-
-**Estimated Effort:** 1-2 hours
-**User Impact:** Significantly reduces frustration from accidental node movement
-
----
-
-#### 2. Custom Connection Line with Validation Feedback ⭐ **P0**
-
-**Problem:**
-Users get no visual feedback about connection validity until they complete the connection.
-
-**Solution:**
-Show real-time validation feedback while dragging: green line for valid, red for invalid, with data type label.
-
-**Implementation Details:**
-
-Create new component:
-
-```typescript
-// frontend/src/components/editors/PlanVisualEditor/components/ConnectionLine.tsx
-
-import { ConnectionLineComponentProps, getBezierPath } from 'reactflow';
-import { PlanDagNodeType } from '../../../../types/plan-dag';
-
-export const ConnectionLine = ({
-  fromX,
-  fromY,
-  toX,
-  toY,
-  fromNode,
-  fromHandle,
-}: ConnectionLineComponentProps) => {
-  // Determine connection type based on source node type
-  const sourceNodeType = fromNode?.data?.nodeType as PlanDagNodeType | undefined;
-
-  let strokeColor = '#868e96'; // Default grey
-  let label = '';
-
-  if (sourceNodeType === PlanDagNodeType.GRAPH) {
-    strokeColor = '#339af0'; // Blue for Graph Reference
-    label = 'Graph Ref';
-  } else if (sourceNodeType) {
-    strokeColor = '#10b981'; // Green for Data
-    label = 'Data';
-  }
-
-  const [edgePath] = getBezierPath({
-    sourceX: fromX,
-    sourceY: fromY,
-    targetX: toX,
-    targetY: toY,
-  });
-
-  return (
-    <g>
-      <path
-        fill="none"
-        stroke={strokeColor}
-        strokeWidth={2}
-        d={edgePath}
-        strokeDasharray="5,5"
-      />
-      {label && (
-        <text
-          x={toX - 40}
-          y={toY - 10}
-          fill={strokeColor}
-          fontSize="12"
-          fontWeight="500"
-        >
-          {label}
-        </text>
-      )}
-    </g>
-  );
-};
+### graphs (Computed View)
+```sql
+id, project_id, node_id, name, execution_state,
+computed_date, source_hash, node_count, edge_count
 ```
+- Created/updated by `executeNode`
+- `node_id`: Links to plan_dag_nodes
+- `execution_state`: "not_started", "processing", "completed", "error"
+- `source_hash`: SHA256 of upstream data_sources (for change detection)
 
-Update PlanVisualEditor:
+### graph_nodes & graph_edges (Computed Data)
+```sql
+-- graph_nodes
+id, graph_id, label, layer, weight, is_partition, attrs
 
-```typescript
-// In PlanVisualEditor.tsx
-import { ConnectionLine } from './components/ConnectionLine';
-
-<ReactFlow
-  // ... existing props
-  connectionLineComponent={ConnectionLine}
->
+-- graph_edges
+id, graph_id, source, target, label, layer, weight, attrs
 ```
-
-**Files to Create:**
-1. `frontend/src/components/editors/PlanVisualEditor/components/ConnectionLine.tsx`
-
-**Files to Modify:**
-1. `frontend/src/components/editors/PlanVisualEditor/PlanVisualEditor.tsx` - Import and use ConnectionLine
-
-**Enhancement Opportunities:**
-- Change color to red if hovering over invalid drop target
-- Show validation error message if connection would create cycle
-
-**Estimated Effort:** 3-4 hours
-**User Impact:** Better understanding of what they're connecting, fewer invalid connection attempts
-
----
-
-### Phase 2: High-Value, Medium-Effort (Days 3-5)
-
-#### 3. Add Node on Edge Drop ⭐ **P0**
-
-**Problem:**
-Building workflows requires repeatedly switching between toolbar and canvas: drag from toolbar → position → connect → repeat.
-
-**Solution:**
-Allow users to drop connection line onto empty canvas to create and auto-connect a new node.
-
-**Implementation Details:**
-
-```typescript
-// In PlanVisualEditor.tsx
-
-const { screenToFlowPosition } = useReactFlow(); // Already have this
-
-const [showNodeTypeMenu, setShowNodeTypeMenu] = useState(false);
-const [newNodePosition, setNewNodePosition] = useState<{ x: number; y: number } | null>(null);
-const [newNodeSourceId, setNewNodeSourceId] = useState<string | null>(null);
-const [newNodeSourceHandle, setNewNodeSourceHandle] = useState<string | null>(null);
-
-const handleConnectEnd = useCallback(
-  (event: MouseEvent | TouchEvent, connectionState: OnConnectEnd) => {
-    // Only proceed if connection is not valid (dropped on empty space)
-    if (!connectionState.isValid) {
-      const targetIsPane = (event.target as Element).classList.contains('react-flow__pane');
-
-      if (targetIsPane && connectionState.fromNode) {
-        // Calculate position where user dropped
-        const position = screenToFlowPosition({
-          x: (event as MouseEvent).clientX,
-          y: (event as MouseEvent).clientY,
-        });
-
-        // Store connection info for when user selects node type
-        setNewNodePosition(position);
-        setNewNodeSourceId(connectionState.fromNode.id);
-        setNewNodeSourceHandle(connectionState.fromHandle?.id || 'output');
-        setShowNodeTypeMenu(true);
-      }
-    }
-  },
-  [screenToFlowPosition]
-);
-
-const handleNodeTypeSelect = useCallback(
-  async (nodeType: PlanDagNodeType) => {
-    if (!newNodePosition || !newNodeSourceId) return;
-
-    setShowNodeTypeMenu(false);
-
-    // Generate node ID and get defaults
-    const nodeId = generateNodeId(nodeType);
-    const config = getDefaultNodeConfig(nodeType);
-    const metadata = getDefaultNodeMetadata(nodeType);
-
-    // Validate connection would be valid
-    const sourceNode = nodes.find(n => n.id === newNodeSourceId);
-    if (!sourceNode) return;
-
-    const validation = validateConnection(
-      sourceNode.data.nodeType,
-      nodeType
-    );
-
-    if (!validation.isValid) {
-      alert(`Cannot connect: ${validation.errorMessage}`);
-      return;
-    }
-
-    // Create the Plan DAG node
-    const planDagNode: PlanDagNode = {
-      id: nodeId,
-      nodeType,
-      position: newNodePosition,
-      metadata,
-      config,
-    };
-
-    // Add via mutation (will trigger subscription update)
-    mutations.addNode(planDagNode);
-
-    // Create edge
-    const edgeId = `${newNodeSourceId}-${nodeId}-${newNodeSourceHandle}-input`;
-    const edge: ReactFlowEdge = {
-      id: edgeId,
-      source: newNodeSourceId,
-      target: nodeId,
-      sourceHandle: newNodeSourceHandle,
-      targetHandle: 'input',
-      metadata: {
-        label: validation.dataType === 'GRAPH_REFERENCE' ? 'Graph Ref' : 'Data',
-        dataType: validation.dataType,
-      },
-    };
-
-    mutations.addEdge(edge);
-
-    // Clear state
-    setNewNodePosition(null);
-    setNewNodeSourceId(null);
-    setNewNodeSourceHandle(null);
-  },
-  [newNodePosition, newNodeSourceId, newNodeSourceHandle, nodes, mutations]
-);
-
-// Add to ReactFlow:
-<ReactFlow
-  // ... existing props
-  onConnectEnd={handleConnectEnd}
->
-```
-
-Create node type selector menu:
-
-```typescript
-// frontend/src/components/editors/PlanVisualEditor/components/NodeTypeSelector.tsx
-
-import { Modal, Stack, Button, Group, Text } from '@mantine/core';
-import { PlanDagNodeType } from '../../../../types/plan-dag';
-import { getNodeIcon, getNodeTypeLabel, getNodeColor } from '../../../../utils/nodeStyles';
-
-interface NodeTypeSelectorProps {
-  opened: boolean;
-  onClose: () => void;
-  onSelect: (nodeType: PlanDagNodeType) => void;
-  sourceNodeType?: PlanDagNodeType; // To filter valid targets
-}
-
-export const NodeTypeSelector = ({ opened, onClose, onSelect, sourceNodeType }: NodeTypeSelectorProps) => {
-  const nodeTypes = [
-    PlanDagNodeType.GRAPH,
-    PlanDagNodeType.TRANSFORM,
-    PlanDagNodeType.MERGE,
-    PlanDagNodeType.COPY,
-    PlanDagNodeType.OUTPUT,
-  ];
-
-  return (
-    <Modal
-      opened={opened}
-      onClose={onClose}
-      title="Select Node Type"
-      size="sm"
-      centered
-    >
-      <Stack gap="xs">
-        {nodeTypes.map((nodeType) => (
-          <Button
-            key={nodeType}
-            variant="light"
-            fullWidth
-            leftSection={getNodeIcon(nodeType, '1.2rem')}
-            color={getNodeColor(nodeType)}
-            onClick={() => onSelect(nodeType)}
-          >
-            {getNodeTypeLabel(nodeType)}
-          </Button>
-        ))}
-      </Stack>
-    </Modal>
-  );
-};
-```
-
-**Files to Create:**
-1. `frontend/src/components/editors/PlanVisualEditor/components/NodeTypeSelector.tsx`
-
-**Files to Modify:**
-1. `frontend/src/components/editors/PlanVisualEditor/PlanVisualEditor.tsx` - Add `onConnectEnd` handler and node type selector
-
-**Alternative Approach:**
-Auto-select node type based on source node (e.g., DataSource always creates Graph, Graph creates Transform). This is faster but less flexible.
-
-**Estimated Effort:** 1-2 days
-**User Impact:** Dramatically speeds up workflow building, especially for linear pipelines
-
----
-
-### Phase 3: Optional Enhancements (Backlog)
-
-#### 4. Delete Middle Node with Auto-Reconnect ⚠️ **P2 - Conditional**
-
-**Problem:**
-Removing intermediate nodes breaks the workflow and requires manual reconnection.
-
-**Solution:**
-When deleting a node, offer to automatically reconnect its predecessors to its successors.
-
-**Implementation Considerations:**
-
-```typescript
-// In PlanVisualEditor.tsx
-
-import { getIncomers, getOutgoers, getConnectedEdges } from 'reactflow';
-
-const handleNodesDelete = useCallback(
-  (deletedNodes: Node[]) => {
-    deletedNodes.forEach((node) => {
-      const incomers = getIncomers(node, nodes, edges);
-      const outgoers = getOutgoers(node, nodes, edges);
-
-      // Only attempt auto-reconnect if there are both inputs and outputs
-      if (incomers.length > 0 && outgoers.length > 0) {
-        // Check if auto-reconnections would be valid
-        const validReconnections: { source: string; target: string }[] = [];
-
-        for (const incomer of incomers) {
-          for (const outgoer of outgoers) {
-            const validation = validateConnectionWithCycleDetection(
-              incomer.data.nodeType,
-              outgoer.data.nodeType,
-              nodes.filter(n => n.id !== node.id), // Exclude deleted node
-              edges,
-              { source: incomer.id, target: outgoer.id }
-            );
-
-            if (validation.isValid) {
-              validReconnections.push({
-                source: incomer.id,
-                target: outgoer.id,
-              });
-            }
-          }
-        }
-
-        if (validReconnections.length > 0) {
-          // Show confirmation dialog
-          const message = `Delete "${node.data.metadata.label}" and reconnect:\n${
-            validReconnections.map(r => `  • ${r.source} → ${r.target}`).join('\n')
-          }`;
-
-          if (confirm(message)) {
-            // Create new edges
-            validReconnections.forEach(({ source, target }) => {
-              const edgeId = `${source}-${target}-output-input`;
-              mutations.addEdge({
-                id: edgeId,
-                source,
-                target,
-                sourceHandle: 'output',
-                targetHandle: 'input',
-                metadata: { label: 'Data', dataType: 'GRAPH_DATA' },
-              });
-            });
-          }
-        }
-      }
-
-      // Always delete the node and its edges
-      mutations.deleteNode(node.id);
-      // Edges are handled by delete handler already
-    });
-  },
-  [nodes, edges, mutations]
-);
-
-// Add to ReactFlow:
-<ReactFlow
-  // ... existing props
-  onNodesDelete={handleNodesDelete}
->
-```
-
-**⚠️ Caution:**
-- Auto-reconnection may not always be semantically correct for data transformations
-- Example: Deleting a "Filter Nodes" transform shouldn't auto-connect the unfiltered data source to output
-- Recommend making this an **opt-in feature** with a settings toggle
-- Always show confirmation dialog listing what will be reconnected
-
-**Estimated Effort:** 2-3 days (including confirmation UI)
-**User Impact:** Convenience for experimentation, but requires careful UX design
-**Recommendation:** **Low priority** - implement only if user research shows strong need
-
----
-
-## Implementation Plan
-
-### Sprint 1: Core UX Polish (Week 1)
-
-**Goal:** Eliminate UX friction points with minimal risk
-
-**Day 1:**
-- [ ] Implement Drag Handle (Task 1)
-- [ ] Test drag handle with all node types
-- [ ] Verify Edit/Delete buttons still work
-
-**Day 2:**
-- [ ] Implement Custom Connection Line (Task 2)
-- [ ] Add data type label display
-- [ ] Test connection line with all node type combinations
-
-**Deliverable:** Polished interaction model that feels professional
-
----
-
-### Sprint 2: Workflow Building Enhancement (Week 2)
-
-**Goal:** Streamline node creation workflow
-
-**Day 3-4:**
-- [ ] Create NodeTypeSelector component
-- [ ] Implement onConnectEnd handler
-- [ ] Add node creation and edge connection logic
-- [ ] Test with all valid node type combinations
-
-**Day 5:**
-- [ ] Handle edge cases (invalid connections, cancellation)
-- [ ] Add visual feedback during node type selection
-- [ ] User acceptance testing
-
-**Deliverable:** Fast workflow building via edge drop
-
----
-
-### Sprint 3: Optional Enhancements (Backlog)
-
-**To be scheduled based on user feedback:**
-- [ ] Auto-reconnect on node delete (with confirmation)
-- [ ] Undo/Redo system (separate epic)
-- [ ] Node grouping/subgraphs (separate epic)
-- [ ] Visual diff mode for collaboration (separate epic)
-
----
-
-## Code Patterns to Adopt
-
-### Pattern 1: Connection State Hook
-
-```typescript
-import { useConnection } from 'reactflow';
-
-// Use in custom node components to detect when connection is in progress
-const { fromNode, fromHandle } = useConnection();
-const isConnecting = !!fromNode;
-
-// Example: Highlight valid drop targets during connection
-<Paper
-  shadow={isConnecting ? "md" : "sm"}
-  style={{
-    border: isConnecting ? '2px dashed #228be6' : '2px solid #color',
-  }}
->
-```
-
-### Pattern 2: Screen to Flow Position
-
-```typescript
-// Already available via useReactFlow hook
-const { screenToFlowPosition } = useReactFlow();
-
-// Convert mouse coordinates to flow coordinates
-const position = screenToFlowPosition({
-  x: event.clientX,
-  y: event.clientY,
-});
-```
-
-### Pattern 3: Origin-based Positioning
-
-```typescript
-// Center newly created nodes on drop point
-const newNode = {
-  id: nodeId,
-  position,
-  origin: [0.5, 0.0], // Center horizontally, align top
-  // Makes node appear centered under cursor
-};
-```
-
----
-
-## Risk Assessment
-
-| Task | Technical Risk | User Impact Risk | Mitigation |
-|------|---------------|------------------|------------|
-| Drag Handle | **Low** - Simple property addition | **Low** - Pure enhancement | Thorough testing with all node types |
-| Custom Connection Line | **Low** - Isolated component | **Low** - Visual only | Fallback to default if errors occur |
-| Add Node on Edge Drop | **Medium** - Validation logic | **Medium** - Could create invalid nodes | Comprehensive validation before node creation |
-| Auto-Reconnect Delete | **Medium-High** - Complex validation | **High** - Could create invalid graphs | Require explicit confirmation, make opt-in |
-
----
-
-## Success Metrics
-
-**Phase 1 Success Criteria:**
-- [ ] 0 accidental node drags when clicking Edit/Delete buttons
-- [ ] Users can see connection type before completing connection
-- [ ] Connection line color matches final edge color
-
-**Phase 2 Success Criteria:**
-- [ ] Users can create and connect nodes without touching toolbar
-- [ ] Average time to build 5-node pipeline reduced by 30%+
-- [ ] 0 invalid node/edge creations via edge drop
-
-**User Feedback Questions:**
-1. "Does drag handle feel natural or restrictive?"
-2. "Does connection line color help you understand what you're connecting?"
-3. "How often do you use edge drop vs. toolbar for node creation?"
-
----
-
-## Dependencies
-
-**No new dependencies required!** All features can be implemented using:
-- ✅ `reactflow@11.11.4` - Already installed
-- ✅ `elkjs@0.11.0` - Already installed
-- ✅ `@mantine/core@8.3.1` - Already installed
-- ✅ React hooks - Already using
-
----
-
-## Out of Scope (Future Epics)
-
-These valuable features require separate planning and are not part of this improvement plan:
-
-1. **Undo/Redo System**
-   - Requires command pattern implementation
-   - History management and state snapshots
-   - Estimated: 1-2 weeks
-
-2. **Node Grouping/Subgraphs**
-   - Collapsible node groups
-   - Nested workflow views
-   - Estimated: 2-3 weeks
-
-3. **Advanced Search/Filter**
-   - Search nodes by label, type, configuration
-   - Filter view by criteria
-   - Estimated: 1 week
-
-4. **Export to Image**
-   - PNG/SVG export of current view
-   - Requires html2canvas or similar
-   - Estimated: 3-5 days
-
-5. **Visual Diff Mode**
-   - Show changes from other users in different color
-   - Requires change tracking in collaboration system
-   - Estimated: 1-2 weeks
-
----
-
-## Conclusion
-
-The Plan DAG Visual Editor already implements sophisticated features that exceed most ReactFlow examples. The recommended improvements focus on **polishing the user experience** rather than adding complex functionality.
-
-**Recommended Immediate Actions:**
-1. ✅ **Commit current changes** (edge validation fixes, fit view button) - DONE
-2. ⭐ **Implement Drag Handle** (Day 1) - Highest ROI
-3. ⭐ **Implement Custom Connection Line** (Day 2) - High visual impact
-4. ⭐ **Implement Add Node on Edge Drop** (Days 3-5) - Significant workflow improvement
-
-These three enhancements will transform the editor from "good" to "excellent" with minimal risk and moderate effort.
-
-**Next Steps:**
-1. Review this plan with stakeholders
-2. Prioritize Phase 1 tasks for immediate implementation
-3. Gather user feedback on Phase 2 before implementation
-4. Schedule Phase 3 based on user research
-
----
-
-**Document Metadata:**
-- **Author:** Claude Code
-- **Last Updated:** 2025-10-04
-- **Status:** Draft for Review
-- **Related Documents:**
-  - `CANVAS_ISSUES.md` - Historical issues and resolutions
-  - `docs/ARCHITECTURE.md` - System architecture
-  - `TODO.md` - Current priorities
+- Populated by GraphBuilder
+- Deleted and recreated on each execution (clear_graph_data)
+
+## What Was NOT Implemented
+
+### Merge Node
+- **Status**: Not implemented
+- **Reason**: Graph node can directly read from multiple DataSource nodes
+- **Impact**: Low priority - same functionality achieved via Graph node
+
+### Automatic Lifecycle Hooks
+- **Status**: Not implemented (TODO markers exist in mutations)
+- **Reason**: Manual execute button provides better user control
+- **Current**: User must click "Execute" to trigger graph building
+- **Future**: Could auto-execute when edges are connected
+
+### DataSource Pipeline Import
+- **Status**: Not needed for new system
+- **Old Approach**: `DatasourceImporter` would read CSV and populate `datasource_rows`
+- **New Approach**: `data_sources.graph_json` already contains parsed data
+- **Impact**: Simpler, no duplicate storage
+
+## Future Enhancements
+
+### Change Detection
+- Currently: Graph rebuilds from scratch on each execute
+- Enhancement: Compare `source_hash` and skip if unchanged
+- Implementation: Already coded but always rebuilds for now
+
+### Incremental Updates
+- Track which upstream sources changed
+- Only recompute affected downstream nodes
+- Use topological sort in DagExecutor
+
+### Background Execution
+- Run graph building asynchronously
+- Poll execution state until complete
+- Show progress updates
+
+### Transform and Merge Nodes
+- Implement `MergeBuilder` to combine sources with custom logic
+- Implement transformations (filters, mappings, etc.)
+- Chain operations: DataSource → Transform → Merge → Graph
+
+## Files Modified
+
+### Backend
+- `layercake-core/src/pipeline/graph_builder.rs` - Direct data_sources read
+- `layercake-core/src/pipeline/dag_executor.rs` - Added plan_id parameter
+- `layercake-core/src/graphql/mutations/mod.rs` - Added executeNode mutation
+- `layercake-core/src/graphql/types/plan_dag.rs` - Added dataSourceId to config
+- `layercake-core/src/graphql/queries/mod.rs` - Modified datasource_preview
+
+### Frontend
+- `frontend/src/graphql/preview.ts` - Added EXECUTE_NODE mutation
+- `frontend/src/components/editors/PlanVisualEditor/nodes/GraphNode.tsx` - Added execute button
+- `frontend/src/components/editors/PlanVisualEditor/nodes/DataSourceNode.tsx` - Updated preview
+- `frontend/src/components/visualization/DataPreview.tsx` - Created (table view)
+- `frontend/src/components/visualization/DataPreviewDialog.tsx` - Created
+
+## Commits
+
+1. `feat: implement on-demand DataSource preview from data_sources table`
+2. `feat: implement direct graph execution from data_sources`
+3. `feat: add execute button to Graph nodes`
+
+## Testing Checklist
+
+- [x] Upload CSV file → data_sources created
+- [x] Assign to DataSource node → dataSourceId saved
+- [x] DataSource preview works (reads graph_json)
+- [x] Connect DataSources to Graph node → isConfigured true
+- [x] Execute button appears on Graph node
+- [ ] Click Execute → graph builds successfully
+- [ ] Execution state badge updates to "Ready"
+- [ ] Preview button appears
+- [ ] Click Preview → graph visualization displays
+
+## Next Steps
+
+1. Test complete workflow end-to-end
+2. Fix any build errors (cargo + npm)
+3. Verify graph execution works with sample data
+4. Document any issues found

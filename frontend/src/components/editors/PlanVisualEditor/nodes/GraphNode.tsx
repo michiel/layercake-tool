@@ -2,8 +2,7 @@ import { memo, useState } from 'react'
 import { NodeProps, Handle, Position } from 'reactflow'
 import { Paper, Text, Group, ActionIcon, Tooltip, Badge, Stack, Loader } from '@mantine/core'
 import { IconSettings, IconTrash, IconPlayerPlay, IconPlayerPlayFilled } from '@tabler/icons-react'
-import { useMutation } from '@apollo/client'
-import { notifications } from '@mantine/notifications'
+import { useMutation } from '@apollo/client/react'
 import { PlanDagNodeType, GraphNodeConfig } from '../../../../types/plan-dag'
 import { isNodeConfigured } from '../../../../utils/planDagValidation'
 import { getNodeColor, getNodeIcon, getNodeTypeLabel } from '../../../../utils/nodeStyles'
@@ -49,21 +48,13 @@ export const GraphNode = memo((props: GraphNodeProps) => {
 
   // Execute node mutation
   const [executeNode, { loading: executing }] = useMutation(EXECUTE_NODE, {
-    onCompleted: (data) => {
-      notifications.show({
-        title: 'Success',
-        message: data.executeNode.message,
-        color: 'green',
-      })
+    onCompleted: (data: any) => {
+      console.log('Success:', data.executeNode.message)
       // Refetch execution state to update badge
       refetchExecutionState()
     },
-    onError: (error) => {
-      notifications.show({
-        title: 'Execution Failed',
-        message: error.message,
-        color: 'red',
-      })
+    onError: (error: any) => {
+      console.error('Execution Failed:', error.message)
     },
   })
 
