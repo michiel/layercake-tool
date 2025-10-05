@@ -1,7 +1,7 @@
 use async_graphql::*;
-use sea_orm::{EntityTrait, ColumnTrait, QueryFilter, QueryOrder};
+use sea_orm::{EntityTrait, ColumnTrait, QueryFilter};
 
-use crate::database::entities::{projects, plans, nodes, edges, layers, users, user_sessions, project_collaborators, data_sources, plan_dag_nodes, plan_dag_edges, datasources, datasource_rows, graphs, graph_nodes, graph_edges};
+use crate::database::entities::{projects, plans, nodes, edges, layers, users, user_sessions, project_collaborators, data_sources, plan_dag_nodes, plan_dag_edges, graphs, graph_nodes, graph_edges};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::{Project, Plan, Node, Edge, Layer, PlanDag, PlanDagNode, PlanDagEdge, ValidationResult, PlanDagInput, User, ProjectCollaborator, DataSource, PlanDagMetadata, UserSession, DataSourcePreview, GraphPreview, TableRow, TableColumn, GraphNodePreview, GraphEdgePreview};
 use crate::graphql::types::plan_dag::DataSourceReference;
@@ -454,59 +454,135 @@ impl Query {
         #[graphql(default = 100)] limit: u64,
         #[graphql(default = 0)] offset: u64,
     ) -> Result<Option<DataSourcePreview>> {
-        use sea_orm::QuerySelect;
-
         let context = ctx.data::<GraphQLContext>()?;
 
-        // Find datasource by project_id and node_id
-        let datasource = datasources::Entity::find()
-            .filter(datasources::Column::ProjectId.eq(project_id))
-            .filter(datasources::Column::NodeId.eq(&node_id))
+        // Find the plan_dag_node to get the config
+        let plan = plans::Entity::find()
+            .filter(plans::Column::ProjectId.eq(project_id))
             .one(&context.db)
-            .await?;
+            .await?
+            .ok_or_else(|| Error::new("Plan not found for project"))?;
 
-        let datasource = match datasource {
-            Some(ds) => ds,
-            None => return Ok(None),
+        let dag_node = plan_dag_nodes::Entity::find_by_id(&node_id)
+            .filter(plan_dag_nodes::Column::PlanId.eq(plan.id))
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Node not found"))?;
+
+        // Parse config to get dataSourceId
+        let config: serde_json::Value = serde_json::from_str(&dag_node.config_json)
+            .map_err(|e| Error::new(format!("Failed to parse node config: {}", e)))?;
+
+        let data_source_id = config.get("dataSourceId")
+            .and_then(|v| v.as_i64())
+            .map(|v| v as i32)
+            .ok_or_else(|| Error::new("Node config does not have dataSourceId"))?;
+
+        // Query the data_sources table
+        let data_source = data_sources::Entity::find_by_id(data_source_id)
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("DataSource not found"))?;
+
+        // Parse the graph_json field
+        let graph_data: serde_json::Value = serde_json::from_str(&data_source.graph_json)
+            .map_err(|e| Error::new(format!("Failed to parse graph JSON: {}", e)))?;
+
+        // Determine what to extract based on data_type
+        let (columns, rows, total_rows) = match data_source.data_type.as_str() {
+            "nodes" => {
+                let nodes_array = graph_data.get("nodes")
+                    .and_then(|v| v.as_array())
+                    .ok_or_else(|| Error::new("Graph JSON does not contain nodes array"))?;
+
+                // Build columns from first node's keys
+                let columns = if let Some(first_node) = nodes_array.first().and_then(|v| v.as_object()) {
+                    first_node.keys().map(|key| TableColumn {
+                        name: key.clone(),
+                        data_type: "string".to_string(),
+                        nullable: true,
+                    }).collect()
+                } else {
+                    vec![]
+                };
+
+                // Build rows from nodes with pagination
+                let paginated_nodes: Vec<&serde_json::Value> = nodes_array
+                    .iter()
+                    .skip(offset as usize)
+                    .take(limit as usize)
+                    .collect();
+
+                let rows: Vec<TableRow> = paginated_nodes
+                    .into_iter()
+                    .enumerate()
+                    .map(|(idx, node)| TableRow {
+                        row_number: (offset as i32) + (idx as i32) + 1,
+                        data: node.clone(),
+                    })
+                    .collect();
+
+                (columns, rows, nodes_array.len() as i32)
+            },
+            "edges" => {
+                let edges_array = graph_data.get("edges")
+                    .and_then(|v| v.as_array())
+                    .ok_or_else(|| Error::new("Graph JSON does not contain edges array"))?;
+
+                // Build columns from first edge's keys
+                let columns = if let Some(first_edge) = edges_array.first().and_then(|v| v.as_object()) {
+                    first_edge.keys().map(|key| TableColumn {
+                        name: key.clone(),
+                        data_type: "string".to_string(),
+                        nullable: true,
+                    }).collect()
+                } else {
+                    vec![]
+                };
+
+                // Build rows from edges with pagination
+                let paginated_edges: Vec<&serde_json::Value> = edges_array
+                    .iter()
+                    .skip(offset as usize)
+                    .take(limit as usize)
+                    .collect();
+
+                let rows: Vec<TableRow> = paginated_edges
+                    .into_iter()
+                    .enumerate()
+                    .map(|(idx, edge)| TableRow {
+                        row_number: (offset as i32) + (idx as i32) + 1,
+                        data: edge.clone(),
+                    })
+                    .collect();
+
+                (columns, rows, edges_array.len() as i32)
+            },
+            _ => {
+                return Err(Error::new(format!("Unsupported data type: {}", data_source.data_type)));
+            }
         };
 
-        // Get rows with pagination
-        let rows = datasource_rows::Entity::find()
-            .filter(datasource_rows::Column::DatasourceId.eq(datasource.id))
-            .order_by_asc(datasource_rows::Column::RowNumber)
-            .limit(limit)
-            .offset(offset)
-            .all(&context.db)
-            .await?;
-
-        // Convert rows to TableRow format
-        let table_rows: Vec<TableRow> = rows
-            .into_iter()
-            .map(|row| TableRow {
-                row_number: row.row_number,
-                data: row.data,
-            })
-            .collect();
-
-        // Parse column_info from JSON
-        let columns: Vec<TableColumn> = if let Some(col_info) = datasource.column_info {
-            serde_json::from_value(col_info).unwrap_or_default()
-        } else {
-            Vec::new()
+        // Determine execution state based on data_source status
+        let execution_state = match data_source.status.as_str() {
+            "active" => "completed",
+            "processing" => "processing",
+            "error" => "error",
+            _ => "not_started",
         };
 
         Ok(Some(DataSourcePreview {
             node_id,
-            datasource_id: datasource.id,
-            name: datasource.name,
-            file_path: datasource.file_path,
-            file_type: datasource.file_type,
-            total_rows: datasource.row_count.unwrap_or(0),
+            datasource_id: data_source.id,
+            name: data_source.name.clone(),
+            file_path: data_source.filename.clone(),
+            file_type: data_source.data_type.clone(),
+            total_rows,
             columns,
-            rows: table_rows,
-            import_date: datasource.import_date.map(|d| d.to_rfc3339()),
-            execution_state: datasource.execution_state,
-            error_message: datasource.error_message,
+            rows,
+            import_date: data_source.processed_at.map(|d| d.to_rfc3339()),
+            execution_state: execution_state.to_string(),
+            error_message: data_source.error_message.clone(),
         }))
     }
 

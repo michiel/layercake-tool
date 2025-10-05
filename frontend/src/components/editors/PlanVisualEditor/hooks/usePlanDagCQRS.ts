@@ -171,6 +171,7 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
       ...node,
       data: {
         ...node.data,
+        projectId, // Add projectId for preview queries
         onEdit: () => stableOnNodeEdit(node.id),
         onDelete: () => stableOnNodeDelete(node.id),
         readonly,
@@ -181,7 +182,7 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
     }))
 
     return { nodes: nodesWithCallbacks, edges: converted.edges }
-  }, [stablePlanDag, stableOnNodeEdit, stableOnNodeDelete, readonly])
+  }, [stablePlanDag, stableOnNodeEdit, stableOnNodeDelete, readonly, projectId])
 
   // ReactFlow state
   const [nodes, setNodes, onNodesChangeInternal] = useNodesState(reactFlowData.nodes)

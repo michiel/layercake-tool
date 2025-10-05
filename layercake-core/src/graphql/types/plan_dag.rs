@@ -57,9 +57,14 @@ pub enum DataType {
 #[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
 #[graphql(input_name = "DataSourceNodeConfigInput")]
 pub struct DataSourceNodeConfig {
-    pub input_type: InputType,
-    pub source: String,
-    pub data_type: InputDataType,
+    #[graphql(name = "dataSourceId")]
+    pub data_source_id: Option<i32>, // Reference to DataSource entity (new)
+    pub display_mode: Option<String>, // 'summary' | 'detailed' | 'preview'
+
+    // Legacy fields (for backward compatibility)
+    pub input_type: Option<InputType>,
+    pub source: Option<String>,
+    pub data_type: Option<InputDataType>,
     // Removed: output_graph_ref - output connections handled by visual edges in DAG
 }
 

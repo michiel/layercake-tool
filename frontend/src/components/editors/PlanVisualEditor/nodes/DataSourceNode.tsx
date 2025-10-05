@@ -7,10 +7,9 @@ import { PlanDagNodeType, DataSourceNodeConfig } from '../../../../types/plan-da
 import { isNodeConfigured } from '../../../../utils/planDagValidation'
 import { getNodeColor, getNodeIcon, getNodeTypeLabel } from '../../../../utils/nodeStyles'
 import { GET_DATASOURCE, DataSource, getFileFormatDisplayName, getDataTypeDisplayName, formatFileSize, getStatusColor } from '../../../../graphql/datasources'
-import { useGraphPreview } from '../../../../hooks/usePreview'
+import { useDataSourcePreview } from '../../../../hooks/usePreview'
 import { getExecutionStateLabel, getExecutionStateColor, isExecutionComplete, isExecutionInProgress } from '../../../../graphql/preview'
-import { GraphPreviewDialog } from '../../../visualization/GraphPreviewDialog'
-import { GraphData } from '../../../visualization/GraphPreview'
+import { DataPreviewDialog } from '../../../visualization/DataPreviewDialog'
 
 // Helper function to get data freshness information
 const getDataFreshness = (dataSource: DataSource) => {
@@ -66,18 +65,18 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
     errorPolicy: 'ignore'
   })
 
-  // Query pipeline graph preview (for graph.json datasources)
-  const { preview: graphPreview } = useGraphPreview(
+  // Query data source preview (for table data)
+  const { preview: dataPreview, loading: previewLoading, error: previewError } = useDataSourcePreview(
     projectId || 0,
     props.id,
     { skip: !showPreview || !projectId }
   )
 
   // Query execution state (always fetch to show status)
-  const { preview: executionPreview } = useGraphPreview(
+  const { preview: executionPreview } = useDataSourcePreview(
     projectId || 0,
     props.id,
-    { skip: !projectId }
+    { skip: !projectId, limit: 0 }
   )
 
   useEffect(() => {
@@ -85,28 +84,6 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
       setDataSourceInfo((dataSourceData as any).dataSource as DataSource)
     }
   }, [dataSourceData])
-
-  // Transform pipeline graph preview to force-graph format
-  const getGraphPreviewData = (): GraphData | null => {
-    if (!graphPreview) return null
-
-    return {
-      nodes: graphPreview.nodes.map((node) => ({
-        id: node.id,
-        name: node.label || node.id,
-        layer: node.layer || 'default',
-        attrs: node.attrs || {},
-      })),
-      links: graphPreview.edges.map((edge) => ({
-        id: edge.id,
-        source: edge.source,
-        target: edge.target,
-        name: edge.label || '',
-        layer: edge.layer || 'default',
-        attrs: edge.attrs || {},
-      })),
-    }
-  }
 
   const getStatusIcon = (status: DataSource['status']) => {
     switch (status) {
@@ -359,11 +336,13 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
         </Stack>
       </Paper>
 
-      {/* Graph Preview Dialog */}
-      <GraphPreviewDialog
+      {/* Data Preview Dialog */}
+      <DataPreviewDialog
         opened={showPreview}
         onClose={() => setShowPreview(false)}
-        data={getGraphPreviewData()}
+        preview={dataPreview || null}
+        loading={previewLoading}
+        error={previewError}
         title={`Data Preview: ${data.metadata.label}`}
       />
     </>
