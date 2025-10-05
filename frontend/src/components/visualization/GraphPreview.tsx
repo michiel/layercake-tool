@@ -60,11 +60,6 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
   useEffect(() => {
     if (!paneContainerRef.current) return;
 
-    // Clear existing pane
-    if (paneRef.current) {
-      paneRef.current.dispose();
-    }
-
     // Create new pane
     const pane = new Pane({
       container: paneContainerRef.current,
@@ -165,7 +160,10 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
     paneRef.current = pane;
 
     return () => {
-      pane.dispose();
+      if (paneRef.current) {
+        paneRef.current.dispose();
+        paneRef.current = null;
+      }
     };
   }, []);
 
