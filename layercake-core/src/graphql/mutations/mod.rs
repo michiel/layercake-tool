@@ -8,6 +8,7 @@ use crate::database::entities::{projects, plans, nodes, edges, layers, plan_dag_
 use crate::graphql::context::GraphQLContext;
 use crate::services::auth_service::AuthService;
 use crate::services::data_source_service::DataSourceService;
+use crate::services::export_service::ExportService;
 use crate::pipeline::DagExecutor;
 
 use crate::graphql::types::{
@@ -1606,6 +1607,111 @@ impl Mutation {
             edge_count: edge_count as i32,
         })
     }
+
+    /// Export a node's output (graph export to various formats)
+    async fn export_node_output(
+        &self,
+        ctx: &Context<'_>,
+        project_id: i32,
+        node_id: String
+    ) -> Result<ExportNodeOutputResult> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        // Find the plan for this project
+        let plan = plans::Entity::find()
+            .filter(plans::Column::ProjectId.eq(project_id))
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Plan not found for project"))?;
+
+        // Get the output node
+        let node = plan_dag_nodes::Entity::find()
+            .filter(
+                plan_dag_nodes::Column::PlanId.eq(plan.id)
+                    .and(plan_dag_nodes::Column::Id.eq(&node_id))
+            )
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Output node not found"))?;
+
+        // Parse node config to get renderTarget and outputPath
+        let config: serde_json::Value = serde_json::from_str(&node.config_json)
+            .map_err(|e| Error::new(format!("Failed to parse node config: {}", e)))?;
+
+        let render_target = config.get("renderTarget")
+            .and_then(|v| v.as_str())
+            .unwrap_or("GML");
+
+        let output_path = config.get("outputPath")
+            .and_then(|v| v.as_str());
+
+        // Get project name for default filename
+        let project = projects::Entity::find_by_id(project_id)
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Project not found"))?;
+
+        // Generate filename
+        let extension = get_extension_for_format(render_target);
+        let filename = output_path
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| format!("{}.{}", project.name, extension));
+
+        // Export using ExportService
+        let export_service = ExportService::new(context.db.clone());
+        let content = export_service.export_graph(project_id, render_target)
+            .await
+            .map_err(|e| Error::new(format!("Export failed: {}", e)))?;
+
+        // Encode as base64
+        use base64::Engine;
+        let encoded_content = base64::engine::general_purpose::STANDARD.encode(content.as_bytes());
+
+        // Get MIME type
+        let mime_type = get_mime_type_for_format(render_target);
+
+        Ok(ExportNodeOutputResult {
+            success: true,
+            message: format!("Successfully exported {} as {}", filename, render_target),
+            content: encoded_content,
+            filename,
+            mime_type,
+        })
+    }
+}
+
+// Helper function to get file extension for render target
+fn get_extension_for_format(format: &str) -> &str {
+    match format {
+        "DOT" => "dot",
+        "GML" => "gml",
+        "GraphML" => "graphml",
+        "JSON" => "json",
+        "CSV" => "csv",
+        "CSVNodes" => "csv",
+        "CSVEdges" => "csv",
+        "PNG" => "png",
+        "SVG" => "svg",
+        "PlantUML" => "puml",
+        "Mermaid" => "mermaid",
+        _ => "txt",
+    }
+}
+
+// Helper function to get MIME type for render target
+fn get_mime_type_for_format(format: &str) -> String {
+    match format {
+        "DOT" => "text/vnd.graphviz",
+        "GML" => "text/plain",
+        "GraphML" => "application/xml",
+        "JSON" => "application/json",
+        "CSV" | "CSVNodes" | "CSVEdges" => "text/csv",
+        "PNG" => "image/png",
+        "SVG" => "image/svg+xml",
+        "PlantUML" => "text/plain",
+        "Mermaid" => "text/plain",
+        _ => "text/plain",
+    }.to_string()
 }
 
 #[derive(SimpleObject)]
@@ -1628,4 +1734,13 @@ pub struct ImportPlanResult {
     pub message: String,
     pub node_count: i32,
     pub edge_count: i32,
+}
+
+#[derive(SimpleObject)]
+pub struct ExportNodeOutputResult {
+    pub success: bool,
+    pub message: String,
+    pub content: String,  // Base64 encoded
+    pub filename: String,
+    pub mime_type: String,
 }
