@@ -1225,17 +1225,17 @@ impl Mutation {
             .map(|e| (e.source_node_id.clone(), e.target_node_id.clone()))
             .collect();
 
-        // Create executor and execute the node
+        // Create executor and execute the node with all its upstream dependencies
         let executor = DagExecutor::new(context.db.clone());
 
         executor
-            .execute_node(project_id, plan.id, &node_id, &nodes, &edges)
+            .execute_with_dependencies(project_id, plan.id, &node_id, &nodes, &edges)
             .await
             .map_err(|e| Error::new(format!("Failed to execute node: {}", e)))?;
 
         Ok(NodeExecutionResult {
             success: true,
-            message: format!("Node {} executed successfully", node_id),
+            message: format!("Node {} and its dependencies executed successfully", node_id),
             node_id,
         })
     }

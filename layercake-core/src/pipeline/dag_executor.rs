@@ -239,6 +239,69 @@ impl DagExecutor {
         visited.into_iter().collect()
     }
 
+    /// Execute a node and all its upstream dependencies
+    /// This ensures upstream nodes (like Merge) are executed before the target node
+    pub async fn execute_with_dependencies(
+        &self,
+        project_id: i32,
+        plan_id: i32,
+        target_node_id: &str,
+        nodes: &[plan_dag_nodes::Model],
+        edges: &[(String, String)],
+    ) -> Result<()> {
+        // Find all upstream nodes (ancestors)
+        let upstream = self.find_upstream_nodes(target_node_id, edges);
+
+        // Include the target node itself
+        let mut all_nodes_to_execute = upstream;
+        all_nodes_to_execute.push(target_node_id.to_string());
+
+        // Filter nodes to only those we need to execute
+        let nodes_to_execute: Vec<_> = nodes
+            .iter()
+            .filter(|n| all_nodes_to_execute.contains(&n.id))
+            .cloned()
+            .collect();
+
+        // Execute in topological order
+        let sorted = self.topological_sort(&nodes_to_execute, edges)?;
+
+        for node_id in sorted {
+            self.execute_node(project_id, plan_id, &node_id, nodes, edges).await?;
+        }
+
+        Ok(())
+    }
+
+    /// Find all upstream nodes (ancestors) from a given node
+    fn find_upstream_nodes(
+        &self,
+        start_node: &str,
+        edges: &[(String, String)],
+    ) -> Vec<String> {
+        let mut visited = HashSet::new();
+        let mut queue = VecDeque::new();
+        queue.push_back(start_node.to_string());
+
+        while let Some(node_id) = queue.pop_front() {
+            if visited.contains(&node_id) {
+                continue;
+            }
+            visited.insert(node_id.clone());
+
+            // Find incoming edges (upstream nodes)
+            for (source, target) in edges {
+                if target == &node_id && !visited.contains(source) {
+                    queue.push_back(source.clone());
+                }
+            }
+        }
+
+        // Remove start node from results
+        visited.remove(start_node);
+        visited.into_iter().collect()
+    }
+
     /// Get upstream node IDs for a given node
     fn get_upstream_nodes(&self, node_id: &str, edges: &[(String, String)]) -> Vec<String> {
         edges
