@@ -1218,24 +1218,45 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     return yaml
   }
 
-  // Helper function to check if a node is configured
-  // Must be defined before any early returns to follow Rules of Hooks
-  const isNodeFullyConfigured = useCallback((nodeId: string): boolean => {
-    const node = nodes.find(n => n.id === nodeId)
-    if (!node) return false
-
-    // Check basic config validity
-    const hasValidConfig = node.data?.hasValidConfig !== false
-    if (!hasValidConfig) return false
-
-    // For DataSource nodes, also check if dataSourceId is set
-    if (node.data?.nodeType === 'DATA_SOURCE') {
-      const config = node.data?.config as any
-      return !!(config?.dataSourceId)
-    }
-
-    return true
+  // Create a stable serialization key for node configuration (excludes position)
+  // This ensures the map only recalculates when configuration changes, not on every drag
+  const nodeConfigKey = useMemo(() => {
+    return nodes.map(node => {
+      // Include only configuration-relevant data, exclude position
+      return `${node.id}:${node.data?.nodeType}:${node.data?.hasValidConfig}:${JSON.stringify(node.data?.config || {})}`
+    }).join('|')
   }, [nodes])
+
+  // Memoized map of node configuration status for O(1) lookups
+  // Only recalculates when node configuration changes, not on position updates
+  const nodeConfigMap = useMemo(() => {
+    const map = new Map<string, boolean>()
+
+    nodes.forEach(node => {
+      // Check basic config validity
+      const hasValidConfig = node.data?.hasValidConfig !== false
+      if (!hasValidConfig) {
+        map.set(node.id, false)
+        return
+      }
+
+      // For DataSource nodes, also check if dataSourceId is set
+      if (node.data?.nodeType === 'DATA_SOURCE') {
+        const config = node.data?.config as any
+        map.set(node.id, !!(config?.dataSourceId))
+        return
+      }
+
+      map.set(node.id, true)
+    })
+
+    return map
+  }, [nodeConfigKey])
+
+  // Fast O(1) lookup helper using the memoized map
+  const isNodeFullyConfigured = useCallback((nodeId: string): boolean => {
+    return nodeConfigMap.get(nodeId) ?? false
+  }, [nodeConfigMap])
 
   // Inject current edges into node data for configuration validation
   // Must be defined before any early returns to follow Rules of Hooks
