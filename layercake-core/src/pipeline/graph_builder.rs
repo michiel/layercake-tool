@@ -35,20 +35,42 @@ impl GraphBuilder {
         active = active.set_state(ExecutionState::Processing);
         let graph = active.update(&self.db).await?;
 
-        // Fetch upstream data_sources by reading plan_dag_nodes configs
+        // Fetch upstream sources by reading plan_dag_nodes
+        // Upstream can be DataSource nodes OR Graph/Merge nodes
         let mut data_sources_list = Vec::new();
         for upstream_id in &upstream_node_ids {
-            let data_source = self.get_upstream_data_source(plan_id, upstream_id).await?;
+            // Get the upstream node to check its type
+            let upstream_node = plan_dag_nodes::Entity::find_by_id(upstream_id)
+                .one(&self.db)
+                .await?
+                .ok_or_else(|| anyhow!("Upstream node not found: {}", upstream_id))?;
 
-            // Check if data source is ready
-            if data_source.status != "active" {
-                return Err(anyhow!(
-                    "Upstream data source {} is not ready (status: {})",
-                    upstream_id,
-                    data_source.status
-                ));
+            match upstream_node.node_type.as_str() {
+                "DataSourceNode" => {
+                    let data_source = self.get_data_source_from_node(&upstream_node).await?;
+
+                    // Check if data source is ready
+                    if data_source.status != "active" {
+                        return Err(anyhow!(
+                            "Upstream data source {} is not ready (status: {})",
+                            upstream_id,
+                            data_source.status
+                        ));
+                    }
+                    data_sources_list.push(data_source);
+                }
+                "GraphNode" | "MergeNode" => {
+                    // Read from graphs table and convert to data_source-like structure
+                    let graph = self.get_upstream_graph(project_id, upstream_id).await?;
+
+                    // Convert graph data to data_source format
+                    let graph_as_data_source = self.graph_to_data_source(&graph).await?;
+                    data_sources_list.push(graph_as_data_source);
+                }
+                _ => {
+                    return Err(anyhow!("Unsupported upstream node type for Graph: {}", upstream_node.node_type));
+                }
             }
-            data_sources_list.push(data_source);
         }
 
         // Compute source hash for change detection
@@ -117,6 +139,100 @@ impl GraphBuilder {
         Ok(graph)
     }
 
+    /// Get data_source from a plan_dag_node
+    async fn get_data_source_from_node(
+        &self,
+        dag_node: &plan_dag_nodes::Model,
+    ) -> Result<data_sources::Model> {
+        // Parse config to get dataSourceId
+        let config: serde_json::Value = serde_json::from_str(&dag_node.config_json)
+            .map_err(|e| anyhow!("Failed to parse node config: {}", e))?;
+
+        let data_source_id = config.get("dataSourceId")
+            .and_then(|v| v.as_i64())
+            .map(|v| v as i32)
+            .ok_or_else(|| anyhow!("Node config does not have dataSourceId: {}", dag_node.id))?;
+
+        // Query the data_sources table
+        data_sources::Entity::find_by_id(data_source_id)
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| anyhow!("DataSource not found with id {}", data_source_id))
+    }
+
+    /// Get upstream graph (from Graph or Merge node)
+    async fn get_upstream_graph(
+        &self,
+        project_id: i32,
+        node_id: &str,
+    ) -> Result<graphs::Model> {
+        use sea_orm::{ColumnTrait, QueryFilter};
+
+        graphs::Entity::find()
+            .filter(graphs::Column::ProjectId.eq(project_id))
+            .filter(graphs::Column::NodeId.eq(node_id))
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| anyhow!("Graph not found for node: {}", node_id))
+    }
+
+    /// Convert a graph to data_source format for consistent processing
+    async fn graph_to_data_source(&self, graph: &graphs::Model) -> Result<data_sources::Model> {
+        use sea_orm::{ColumnTrait, QueryFilter};
+
+        // Read graph nodes and edges from database
+        let nodes = graph_nodes::Entity::find()
+            .filter(graph_nodes::Column::GraphId.eq(graph.id))
+            .all(&self.db)
+            .await?;
+
+        let edges = graph_edges::Entity::find()
+            .filter(graph_edges::Column::GraphId.eq(graph.id))
+            .all(&self.db)
+            .await?;
+
+        // Convert to graph_json format
+        let graph_json = serde_json::json!({
+            "nodes": nodes.iter().map(|n| serde_json::json!({
+                "id": n.id.clone(),
+                "label": n.label.clone(),
+                "layer": n.layer.clone(),
+                "weight": n.weight,
+                "is_partition": n.is_partition,
+                "attrs": n.attrs.clone()
+            })).collect::<Vec<_>>(),
+            "edges": edges.iter().map(|e| serde_json::json!({
+                "id": e.id.clone(),
+                "source": e.source.clone(),
+                "target": e.target.clone(),
+                "label": e.label.clone(),
+                "layer": e.layer.clone(),
+                "weight": e.weight,
+                "attrs": e.attrs.clone()
+            })).collect::<Vec<_>>()
+        });
+
+        // Create a virtual data_source
+        Ok(data_sources::Model {
+            id: graph.id, // Use graph id as virtual data source id
+            project_id: graph.project_id,
+            name: graph.name.clone(),
+            description: Some(format!("Graph from {}", graph.node_id)),
+            source_type: "graph".to_string(),
+            file_format: "json".to_string(),
+            data_type: "graph".to_string(),
+            filename: format!("graph_{}", graph.node_id),
+            blob: vec![], // Empty blob for virtual data source
+            graph_json: serde_json::to_string(&graph_json)?,
+            status: "active".to_string(),
+            error_message: None,
+            file_size: 0,
+            processed_at: Some(chrono::Utc::now()),
+            created_at: graph.created_at,
+            updated_at: graph.updated_at,
+        })
+    }
+
     /// Get upstream data_source by reading plan_dag_node config
     async fn get_upstream_data_source(
         &self,
@@ -132,20 +248,7 @@ impl GraphBuilder {
             .await?
             .ok_or_else(|| anyhow!("Plan DAG node not found: {}", node_id))?;
 
-        // Parse config to get dataSourceId
-        let config: serde_json::Value = serde_json::from_str(&dag_node.config_json)
-            .map_err(|e| anyhow!("Failed to parse node config: {}", e))?;
-
-        let data_source_id = config.get("dataSourceId")
-            .and_then(|v| v.as_i64())
-            .map(|v| v as i32)
-            .ok_or_else(|| anyhow!("Node config does not have dataSourceId: {}", node_id))?;
-
-        // Query the data_sources table
-        data_sources::Entity::find_by_id(data_source_id)
-            .one(&self.db)
-            .await?
-            .ok_or_else(|| anyhow!("DataSource not found with id {}", data_source_id))
+        self.get_data_source_from_node(&dag_node).await
     }
 
     /// Compute hash of upstream data_sources for change detection
