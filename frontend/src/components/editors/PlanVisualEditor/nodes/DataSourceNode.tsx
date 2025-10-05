@@ -2,7 +2,7 @@ import { memo, useState, useEffect } from 'react'
 import { NodeProps, Handle, Position } from 'reactflow'
 import { useQuery } from '@apollo/client/react'
 import { Paper, Text, Group, ActionIcon, Tooltip, Badge, Stack, Loader } from '@mantine/core'
-import { IconSettings, IconTrash, IconAlertCircle, IconCheck, IconClock, IconX, IconPlayerPlay } from '@tabler/icons-react'
+import { IconSettings, IconTrash, IconAlertCircle, IconCheck, IconClock, IconX, IconTable } from '@tabler/icons-react'
 import { PlanDagNodeType, DataSourceNodeConfig } from '../../../../types/plan-dag'
 import { isNodeConfigured } from '../../../../utils/planDagValidation'
 import { getNodeColor, getNodeIcon, getNodeTypeLabel } from '../../../../utils/nodeStyles'
@@ -281,7 +281,7 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
           </Text>
         </Group>
 
-        {/* Center: Play button for graph preview */}
+        {/* Center: Table icon for data preview */}
         {!readonly && isConfigured && (
           <Group justify="center" mb="md">
             <Tooltip label="Preview data">
@@ -297,7 +297,7 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
                   setShowPreview(true)
                 }}
               >
-                <IconPlayerPlay size="1.5rem" />
+                <IconTable size="1.5rem" />
               </ActionIcon>
             </Tooltip>
           </Group>

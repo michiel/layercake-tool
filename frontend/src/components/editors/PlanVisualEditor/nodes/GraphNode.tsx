@@ -1,7 +1,7 @@
 import { memo, useState } from 'react'
 import { NodeProps, Handle, Position } from 'reactflow'
 import { Paper, Text, Group, ActionIcon, Tooltip, Badge, Stack, Loader } from '@mantine/core'
-import { IconSettings, IconTrash, IconPlayerPlay, IconPlayerPlayFilled } from '@tabler/icons-react'
+import { IconSettings, IconTrash, IconPlayerPlayFilled, IconChartDots } from '@tabler/icons-react'
 import { useMutation } from '@apollo/client/react'
 import { PlanDagNodeType, GraphNodeConfig } from '../../../../types/plan-dag'
 import { isNodeConfigured } from '../../../../utils/planDagValidation'
@@ -254,7 +254,7 @@ export const GraphNode = memo((props: GraphNodeProps) => {
                     setShowPreview(true)
                   }}
                 >
-                  <IconPlayerPlay size="1.5rem" />
+                  <IconChartDots size="1.5rem" />
                 </ActionIcon>
               </Tooltip>
             )}
