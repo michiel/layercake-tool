@@ -1254,11 +1254,22 @@ impl Mutation {
             .map_err(|e| Error::new(format!("Failed to parse YAML: {}", e)))?;
 
         // Get or create plan for project
-        let plan = plans::Entity::find()
+        let plan = match plans::Entity::find()
             .filter(plans::Column::ProjectId.eq(project_id))
             .one(&context.db)
             .await?
-            .ok_or_else(|| Error::new("Plan not found for project"))?;
+        {
+            Some(plan) => plan,
+            None => {
+                // Create a new plan for this project
+                let new_plan = plans::ActiveModel {
+                    project_id: Set(project_id),
+                    name: Set("Imported Plan".to_string()),
+                    ..Default::default()
+                };
+                new_plan.insert(&context.db).await?
+            }
+        };
 
         // Generate unique node IDs
         let timestamp = chrono::Utc::now().timestamp_millis();
