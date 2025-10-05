@@ -293,10 +293,15 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
           ctx.restore();
         }
       })
-      .d3Force('charge')?.strength(params.chargeStrength)
-      .d3Force('link')?.distance(params.linkDistance)
       .d3AlphaDecay(params.alphaDecay)
       .d3VelocityDecay(params.velocityDecay);
+
+    // Configure force simulation parameters
+    const chargeForce = graph.d3Force('charge');
+    if (chargeForce) chargeForce.strength(params.chargeStrength);
+
+    const linkForce = graph.d3Force('link');
+    if (linkForce) linkForce.distance(params.linkDistance);
 
     graphRef.current = graph;
 
