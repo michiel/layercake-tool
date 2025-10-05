@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import ForceGraph from 'force-graph';
 
 export interface GraphNode {
@@ -32,18 +32,25 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<any>(null);
 
+  // Initialize graph when data changes
   useEffect(() => {
     if (!containerRef.current) return;
+
+    const currentWidth = width || containerRef.current.clientWidth;
+    const currentHeight = height || containerRef.current.clientHeight;
+
+    if (currentWidth === 0 || currentHeight === 0) return;
 
     // Clear any existing graph
     if (graphRef.current) {
       graphRef.current._destructor();
+      graphRef.current = null;
     }
 
     // Initialize force-graph
     const graph = (ForceGraph as any)()(containerRef.current)
-      .width(width || containerRef.current.clientWidth)
-      .height(height || containerRef.current.clientHeight)
+      .width(currentWidth)
+      .height(currentHeight)
       .graphData(data)
       .nodeId('id')
       .nodeLabel('name')
@@ -155,9 +162,31 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
     return () => {
       if (graphRef.current) {
         graphRef.current._destructor();
+        graphRef.current = null;
       }
     };
   }, [data, width, height]);
+
+  // Handle window resize events
+  useEffect(() => {
+    const handleResize = () => {
+      if (containerRef.current && graphRef.current) {
+        const newWidth = width || containerRef.current.clientWidth;
+        const newHeight = height || containerRef.current.clientHeight;
+
+        // Update graph dimensions directly without recreating
+        graphRef.current
+          .width(newWidth)
+          .height(newHeight);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [width, height]);
 
   return (
     <div
