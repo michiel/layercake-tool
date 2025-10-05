@@ -105,9 +105,8 @@ impl GraphBuilder {
             return Ok(graph);
         }
 
-        // Create new
+        // Create new (let database auto-generate ID)
         let graph = graphs::ActiveModel {
-            id: Set(0),
             project_id: Set(project_id),
             node_id: Set(node_id.to_string()),
             name: Set(name),
