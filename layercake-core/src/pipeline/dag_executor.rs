@@ -54,16 +54,22 @@ impl DagExecutor {
 
         match node.node_type.as_str() {
             "DataSourceNode" => {
-                // Get file path from config
-                let file_path = config["filePath"]
-                    .as_str()
-                    .ok_or_else(|| anyhow!("DataSource node missing filePath in config"))?
-                    .to_string();
-
-                // Import datasource
-                self.datasource_importer
-                    .import_datasource(project_id, node_id.to_string(), node_name, file_path)
-                    .await?;
+                // Check if this is a reference to an existing data_source (has dataSourceId)
+                // or a file import (has filePath)
+                if config["dataSourceId"].is_number() {
+                    // DataSource references existing data_sources entry - no execution needed
+                    // Data is already in data_sources.graph_json from upload
+                    return Ok(());
+                } else if let Some(file_path) = config["filePath"].as_str() {
+                    // Legacy path: import from file
+                    self.datasource_importer
+                        .import_datasource(project_id, node_id.to_string(), node_name, file_path.to_string())
+                        .await?;
+                } else {
+                    return Err(anyhow!(
+                        "DataSource node must have either dataSourceId or filePath in config"
+                    ));
+                }
             }
             "MergeNode" => {
                 // Get upstream node IDs (can be DataSource, Graph, or Merge nodes)
