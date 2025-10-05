@@ -126,8 +126,8 @@ impl GraphBuilder {
         use sea_orm::{ColumnTrait, QueryFilter};
 
         // Find the plan_dag_node to get the config
+        // Note: Node IDs are globally unique, no need to filter by plan_id
         let dag_node = plan_dag_nodes::Entity::find_by_id(node_id)
-            .filter(plan_dag_nodes::Column::PlanId.eq(plan_id))
             .one(&self.db)
             .await?
             .ok_or_else(|| anyhow!("Plan DAG node not found: {}", node_id))?;

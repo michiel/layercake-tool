@@ -38,16 +38,16 @@ impl MergeBuilder {
         let mut data_sources_list = Vec::new();
         for upstream_id in &upstream_node_ids {
             // Check if upstream is a DataSource node or a Graph/Merge node
+            // Note: Node IDs are globally unique, no need to filter by plan_id
             let upstream_node = plan_dag_nodes::Entity::find_by_id(upstream_id)
-                .filter(plan_dag_nodes::Column::PlanId.eq(plan_id))
                 .one(&self.db)
                 .await?
                 .ok_or_else(|| anyhow!("Upstream node not found: {}", upstream_id))?;
 
             match upstream_node.node_type.as_str() {
                 "DataSourceNode" => {
-                    // Read from data_sources table
-                    let data_source = self.get_upstream_data_source(plan_id, upstream_id).await?;
+                    // Read from data_sources table using the node we just found
+                    let data_source = self.get_data_source_from_node(&upstream_node).await?;
                     data_sources_list.push(DataSourceOrGraph::DataSource(data_source));
                 }
                 "GraphNode" | "MergeNode" => {
@@ -127,6 +127,27 @@ impl MergeBuilder {
         Ok(graph)
     }
 
+    /// Get data_source from a plan_dag_node
+    async fn get_data_source_from_node(
+        &self,
+        dag_node: &plan_dag_nodes::Model,
+    ) -> Result<data_sources::Model> {
+        // Parse config to get dataSourceId
+        let config: serde_json::Value = serde_json::from_str(&dag_node.config_json)
+            .map_err(|e| anyhow!("Failed to parse node config: {}", e))?;
+
+        let data_source_id = config.get("dataSourceId")
+            .and_then(|v| v.as_i64())
+            .map(|v| v as i32)
+            .ok_or_else(|| anyhow!("Node config does not have dataSourceId: {}", dag_node.id))?;
+
+        // Query the data_sources table
+        data_sources::Entity::find_by_id(data_source_id)
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| anyhow!("DataSource not found with id {}", data_source_id))
+    }
+
     /// Get upstream data_source by reading plan_dag_node config
     async fn get_upstream_data_source(
         &self,
@@ -142,20 +163,7 @@ impl MergeBuilder {
             .await?
             .ok_or_else(|| anyhow!("Plan DAG node not found: {}", node_id))?;
 
-        // Parse config to get dataSourceId
-        let config: serde_json::Value = serde_json::from_str(&dag_node.config_json)
-            .map_err(|e| anyhow!("Failed to parse node config: {}", e))?;
-
-        let data_source_id = config.get("dataSourceId")
-            .and_then(|v| v.as_i64())
-            .map(|v| v as i32)
-            .ok_or_else(|| anyhow!("Node config does not have dataSourceId: {}", node_id))?;
-
-        // Query the data_sources table
-        data_sources::Entity::find_by_id(data_source_id)
-            .one(&self.db)
-            .await?
-            .ok_or_else(|| anyhow!("DataSource not found with id {}", data_source_id))
+        self.get_data_source_from_node(&dag_node).await
     }
 
     /// Get upstream graph (from Graph or Merge node)
