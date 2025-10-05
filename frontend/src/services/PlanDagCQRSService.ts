@@ -40,6 +40,7 @@ export class PlanDagCQRSService {
       updateNode: this.commandService.updateNode.bind(this.commandService),
       deleteNode: this.commandService.deleteNode.bind(this.commandService),
       moveNode: this.commandService.moveNode.bind(this.commandService),
+      batchMoveNodes: this.commandService.batchMoveNodes.bind(this.commandService),
       createEdge: this.commandService.createEdge.bind(this.commandService),
       deleteEdge: this.commandService.deleteEdge.bind(this.commandService),
       updatePlanDag: this.commandService.updatePlanDag.bind(this.commandService),

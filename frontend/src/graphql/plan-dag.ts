@@ -176,6 +176,18 @@ export const MOVE_PLAN_DAG_NODE = gql`
   }
 `
 
+export const BATCH_MOVE_PLAN_DAG_NODES = gql`
+  mutation BatchMovePlanDagNodes($projectId: Int!, $nodePositions: [NodePositionInput!]!) {
+    batchMovePlanDagNodes(projectId: $projectId, nodePositions: $nodePositions) {
+      id
+      position {
+        x
+        y
+      }
+    }
+  }
+`
+
 // Plan DAG Subscriptions for real-time collaboration
 export const PLAN_DAG_CHANGED_SUBSCRIPTION = gql`
   subscription PlanDagChanged($projectId: Int!) {

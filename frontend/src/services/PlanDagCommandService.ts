@@ -134,6 +134,33 @@ export class PlanDagCommandService {
     }
   }
 
+  async batchMoveNodes(
+    projectId: number,
+    nodePositions: Array<{ nodeId: string; position: { x: number; y: number } }>
+  ): Promise<boolean> {
+    try {
+      console.log('[PlanDagCommandService] Batch moving nodes:', nodePositions.length)
+
+      // Mark mutation to suppress subscription echo
+      this.markMutationOccurred()
+
+      const result = await this.apollo.mutate({
+        mutation: PlanDagGraphQL.BATCH_MOVE_PLAN_DAG_NODES,
+        variables: {
+          projectId,
+          nodePositions
+        },
+        context: createMutationContext(this.clientId)
+      })
+
+      const movedNodes = (result.data as any)?.batchMovePlanDagNodes
+      return !!movedNodes && movedNodes.length > 0
+    } catch (error) {
+      console.error('[PlanDagCommandService] Failed to batch move nodes:', error)
+      throw error
+    }
+  }
+
   // Edge Commands
   async createEdge(command: CreateEdgeCommand): Promise<ReactFlowEdge> {
     try {

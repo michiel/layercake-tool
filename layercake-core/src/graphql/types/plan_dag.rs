@@ -12,6 +12,13 @@ pub struct Position {
     pub y: f64,
 }
 
+// Batch node move input
+#[derive(InputObject, Clone, Debug)]
+pub struct NodePositionInput {
+    pub node_id: String,
+    pub position: Position,
+}
+
 // Node metadata
 #[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
 #[graphql(input_name = "NodeMetadataInput")]

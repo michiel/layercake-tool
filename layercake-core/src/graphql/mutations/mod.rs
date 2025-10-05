@@ -16,7 +16,7 @@ use crate::graphql::types::{
     CreatePlanInput, UpdatePlanInput,
     CreateNodeInput, CreateEdgeInput, CreateLayerInput,
     PlanDagInput, PlanDagNodeInput, PlanDagEdgeInput,
-    PlanDagNodeUpdateInput, Position,
+    PlanDagNodeUpdateInput, Position, NodePositionInput,
     PlanDag, PlanDagNode, PlanDagEdge,
     User, ProjectCollaborator,
     RegisterUserInput, LoginInput, UpdateUserInput, LoginResponse, RegisterResponse,
@@ -735,6 +735,93 @@ impl Mutation {
         };
 
         self.update_plan_dag_node(ctx, project_id, node_id, updates).await
+    }
+
+    /// Batch move multiple nodes at once (optimized for layout operations)
+    async fn batch_move_plan_dag_nodes(
+        &self,
+        ctx: &Context<'_>,
+        project_id: i32,
+        node_positions: Vec<NodePositionInput>
+    ) -> Result<Vec<PlanDagNode>> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        // Find or create a plan for this project
+        let plan = match plans::Entity::find()
+            .filter(plans::Column::ProjectId.eq(project_id))
+            .one(&context.db)
+            .await? {
+            Some(plan) => plan,
+            None => {
+                let now = chrono::Utc::now();
+                let new_plan = plans::ActiveModel {
+                    id: sea_orm::ActiveValue::NotSet,
+                    project_id: Set(project_id),
+                    name: Set(format!("Plan for Project {}", project_id)),
+                    yaml_content: Set("".to_string()),
+                    dependencies: Set(None),
+                    status: Set("draft".to_string()),
+                    version: Set(1),
+                    created_at: Set(now),
+                    updated_at: Set(now),
+                };
+                new_plan.insert(&context.db).await?
+            }
+        };
+
+        // Fetch current state once for all nodes
+        let (current_nodes, _) = plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
+
+        let mut updated_nodes = Vec::new();
+        let mut all_patch_ops = Vec::new();
+
+        // Update all nodes
+        for node_pos in node_positions {
+            // Find the node
+            let node = plan_dag_nodes::Entity::find()
+                .filter(
+                    plan_dag_nodes::Column::PlanId.eq(plan.id)
+                        .and(plan_dag_nodes::Column::Id.eq(&node_pos.node_id))
+                )
+                .one(&context.db)
+                .await?;
+
+            if let Some(node) = node {
+                let mut node_active: plan_dag_nodes::ActiveModel = node.clone().into();
+
+                // Update position
+                node_active.position_x = Set(node_pos.position.x);
+                node_active.position_y = Set(node_pos.position.y);
+                node_active.updated_at = Set(Utc::now());
+
+                // Save to database
+                let updated_node = node_active.update(&context.db).await?;
+
+                // Generate position delta
+                all_patch_ops.extend(plan_dag_delta::generate_node_position_patch(
+                    &node_pos.node_id,
+                    node_pos.position.x,
+                    node_pos.position.y,
+                    &current_nodes,
+                ));
+
+                updated_nodes.push(PlanDagNode::from(updated_node));
+            }
+        }
+
+        // Publish all deltas in a single batch
+        if !all_patch_ops.is_empty() {
+            let new_version = plan_dag_delta::increment_plan_version(&context.db, plan.id).await?;
+            let user_id = "demo_user".to_string(); // TODO: Get from auth context
+            plan_dag_delta::publish_plan_dag_delta(
+                project_id,
+                new_version,
+                user_id,
+                all_patch_ops,
+            ).await?;
+        }
+
+        Ok(updated_nodes)
     }
 
     // Authentication Mutations

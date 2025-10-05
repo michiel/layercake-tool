@@ -5,15 +5,23 @@ const elk = new ELK();
 
 export interface LayoutOptions {
   direction: 'horizontal' | 'vertical';
-  nodeSpacing: number;
-  rankSpacing: number;
+  nodeSpacing?: number;
+  rankSpacing?: number;
   nodeWidth?: number;
   nodeHeight?: number;
 }
 
+// Default layout configuration with improved spacing
+const DEFAULT_NODE_WIDTH = 200;
+const DEFAULT_NODE_HEIGHT = 100;
+const DEFAULT_HORIZONTAL_NODE_SPACING = 150;
+const DEFAULT_HORIZONTAL_RANK_SPACING = 350;
+const DEFAULT_VERTICAL_NODE_SPACING = 120;
+const DEFAULT_VERTICAL_RANK_SPACING = 200;
+
 /**
  * Auto-layout nodes using ELK (Eclipse Layout Kernel)
- * Based on ReactFlow's elkjs example
+ * Optimized for visual clarity with generous spacing
  */
 export async function autoLayout(
   nodes: Node[],
@@ -25,17 +33,40 @@ export async function autoLayout(
   }
 
   const isHorizontal = options.direction === 'horizontal';
-  const nodeWidth = options.nodeWidth || 200;
-  const nodeHeight = options.nodeHeight || 100;
 
-  // Configure ELK options
+  // Use defaults with directional preferences
+  const nodeWidth = options.nodeWidth || DEFAULT_NODE_WIDTH;
+  const nodeHeight = options.nodeHeight || DEFAULT_NODE_HEIGHT;
+  const nodeSpacing = options.nodeSpacing ||
+    (isHorizontal ? DEFAULT_HORIZONTAL_NODE_SPACING : DEFAULT_VERTICAL_NODE_SPACING);
+  const rankSpacing = options.rankSpacing ||
+    (isHorizontal ? DEFAULT_HORIZONTAL_RANK_SPACING : DEFAULT_VERTICAL_RANK_SPACING);
+
+  // Configure ELK options for clean, readable layouts
   const elkOptions = {
     'elk.algorithm': 'layered',
     'elk.direction': isHorizontal ? 'RIGHT' : 'DOWN',
-    'elk.spacing.nodeNode': String(options.nodeSpacing),
-    'elk.layered.spacing.nodeNodeBetweenLayers': String(options.rankSpacing),
+
+    // Spacing configuration
+    'elk.spacing.nodeNode': String(nodeSpacing),
+    'elk.layered.spacing.nodeNodeBetweenLayers': String(rankSpacing),
+    'elk.spacing.edgeNode': String(Math.min(nodeSpacing, rankSpacing) * 0.5),
+    'elk.spacing.edgeEdge': '30',
+
+    // Layout strategy for better visual organization
     'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
-    'elk.layered.nodePlacement.strategy': 'SIMPLE',
+    'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
+    'elk.layered.cycleBreaking.strategy': 'GREEDY',
+
+    // Edge routing for cleaner connections
+    'elk.edgeRouting': 'ORTHOGONAL',
+    'elk.layered.unnecessaryBendpoints': 'true',
+
+    // Hierarchical layout for better organization
+    'elk.hierarchyHandling': 'INCLUDE_CHILDREN',
+
+    // Padding around the layout
+    'elk.padding': '[top=20,left=20,bottom=20,right=20]',
   };
 
   // Build ELK graph structure
@@ -58,7 +89,7 @@ export async function autoLayout(
     // Perform layout
     const layoutedGraph = await elk.layout(graph);
 
-    // Map layouted positions back to nodes
+    // Map layouted positions back to nodes with proper handle positions
     const layoutedNodes = layoutedGraph.children?.map((layoutedNode) => {
       const originalNode = nodes.find((n) => n.id === layoutedNode.id);
       if (!originalNode) return null;

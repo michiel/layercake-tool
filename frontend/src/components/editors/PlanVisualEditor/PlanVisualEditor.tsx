@@ -857,42 +857,44 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     setDragging(true);
 
     const layoutedNodes = await autoLayout(nodes, edges, {
-      direction: 'horizontal',
-      nodeSpacing: 50,
-      rankSpacing: 250
+      direction: 'horizontal'
     });
 
     setNodes(layoutedNodes);
 
-    // Persist position changes to backend
-    layoutedNodes.forEach(node => {
-      mutations.moveNode(node.id, node.position);
-    });
+    // Persist position changes to backend in a single batch operation
+    const nodePositions = layoutedNodes.map(node => ({
+      nodeId: node.id,
+      position: node.position
+    }));
+
+    await cqrsService.commands.batchMoveNodes(projectId, nodePositions);
 
     // Re-enable external syncs after layout completes
     setDragging(false);
-  }, [nodes, edges, setNodes, mutations, setDragging]);
+  }, [nodes, edges, setNodes, cqrsService, projectId, setDragging]);
 
   const handleAutoLayoutVertical = useCallback(async () => {
     // Suppress external syncs during layout operations
     setDragging(true);
 
     const layoutedNodes = await autoLayout(nodes, edges, {
-      direction: 'vertical',
-      nodeSpacing: 100,
-      rankSpacing: 150
+      direction: 'vertical'
     });
 
     setNodes(layoutedNodes);
 
-    // Persist position changes to backend
-    layoutedNodes.forEach(node => {
-      mutations.moveNode(node.id, node.position);
-    });
+    // Persist position changes to backend in a single batch operation
+    const nodePositions = layoutedNodes.map(node => ({
+      nodeId: node.id,
+      position: node.position
+    }));
+
+    await cqrsService.commands.batchMoveNodes(projectId, nodePositions);
 
     // Re-enable external syncs after layout completes
     setDragging(false);
-  }, [nodes, edges, setNodes, mutations, setDragging]);
+  }, [nodes, edges, setNodes, cqrsService, projectId, setDragging]);
 
   // Fit view - zoom to see all nodes
   const handleFitView = useCallback(() => {
