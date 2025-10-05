@@ -49,7 +49,7 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
 
     // Force simulation settings
     chargeStrength: -30,
-    linkDistance: 30,
+    linkDistance: 100,
     alphaDecay: 0.02,
     velocityDecay: 0.3,
   });
@@ -115,7 +115,7 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
     forceFolder.addBinding(params, 'linkDistance', {
       label: 'Link Distance',
       min: 10,
-      max: 200,
+      max: 400,
       step: 5
     });
     forceFolder.addBinding(params, 'alphaDecay', {
