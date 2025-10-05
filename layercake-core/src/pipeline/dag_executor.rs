@@ -50,7 +50,7 @@ impl DagExecutor {
             .to_string();
 
         match node.node_type.as_str() {
-            "DataSource" => {
+            "DataSourceNode" => {
                 // Get file path from config
                 let file_path = config["filePath"]
                     .as_str()
@@ -62,7 +62,7 @@ impl DagExecutor {
                     .import_datasource(project_id, node_id.to_string(), node_name, file_path)
                     .await?;
             }
-            "Graph" => {
+            "GraphNode" => {
                 // Get upstream datasource node IDs
                 let upstream_ids = self.get_upstream_nodes(node_id, edges);
 
@@ -71,7 +71,7 @@ impl DagExecutor {
                     .build_graph(project_id, plan_id, node_id.to_string(), node_name, upstream_ids)
                     .await?;
             }
-            "Merge" | "Transform" | "Copy" => {
+            "MergeNode" | "TransformNode" | "CopyNode" => {
                 // TODO: Implement these node types in future phases
                 return Err(anyhow!(
                     "Node type {} not yet implemented",
