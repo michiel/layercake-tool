@@ -3,24 +3,27 @@ use sea_orm::DatabaseConnection;
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::database::entities::plan_dag_nodes;
-use crate::pipeline::{DatasourceImporter, GraphBuilder};
+use crate::pipeline::{DatasourceImporter, GraphBuilder, MergeBuilder};
 
 /// DAG executor that processes nodes in topological order
 pub struct DagExecutor {
     db: DatabaseConnection,
     datasource_importer: DatasourceImporter,
     graph_builder: GraphBuilder,
+    merge_builder: MergeBuilder,
 }
 
 impl DagExecutor {
     pub fn new(db: DatabaseConnection) -> Self {
         let datasource_importer = DatasourceImporter::new(db.clone());
         let graph_builder = GraphBuilder::new(db.clone());
+        let merge_builder = MergeBuilder::new(db.clone());
 
         Self {
             db,
             datasource_importer,
             graph_builder,
+            merge_builder,
         }
     }
 
@@ -62,8 +65,17 @@ impl DagExecutor {
                     .import_datasource(project_id, node_id.to_string(), node_name, file_path)
                     .await?;
             }
+            "MergeNode" => {
+                // Get upstream node IDs (can be DataSource, Graph, or Merge nodes)
+                let upstream_ids = self.get_upstream_nodes(node_id, edges);
+
+                // Merge data from upstream sources
+                self.merge_builder
+                    .merge_sources(project_id, plan_id, node_id.to_string(), node_name, upstream_ids)
+                    .await?;
+            }
             "GraphNode" => {
-                // Get upstream datasource node IDs
+                // Get upstream node IDs
                 let upstream_ids = self.get_upstream_nodes(node_id, edges);
 
                 // Build graph from upstream datasources (reads from data_sources table)
@@ -71,7 +83,7 @@ impl DagExecutor {
                     .build_graph(project_id, plan_id, node_id.to_string(), node_name, upstream_ids)
                     .await?;
             }
-            "MergeNode" | "TransformNode" | "CopyNode" => {
+            "TransformNode" | "CopyNode" => {
                 // TODO: Implement these node types in future phases
                 return Err(anyhow!(
                     "Node type {} not yet implemented",
