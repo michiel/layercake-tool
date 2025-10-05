@@ -1248,6 +1248,7 @@ impl Mutation {
         yaml_content: String,
     ) -> Result<ImportPlanResult> {
         let context = ctx.data::<GraphQLContext>()?;
+        let now = chrono::Utc::now();
 
         // Parse YAML
         let plan_yaml: serde_yaml::Value = serde_yaml::from_str(&yaml_content)
@@ -1273,6 +1274,8 @@ impl Mutation {
                     yaml_content: Set(yaml_content.clone()),
                     status: Set("active".to_string()),
                     version: Set(1),
+                    created_at: Set(now),
+                    updated_at: Set(now),
                     ..Default::default()
                 };
                 new_plan.insert(&context.db).await?
@@ -1310,6 +1313,8 @@ impl Mutation {
                             "filename": filename,
                             "dataType": filetype.to_lowercase()
                         }).to_string()),
+                        created_at: Set(now),
+                        updated_at: Set(now),
                         ..Default::default()
                     };
 
@@ -1330,6 +1335,8 @@ impl Mutation {
             position_y: Set(200.0),
             metadata_json: Set(serde_json::json!({ "label": "Combined Data" }).to_string()),
             config_json: Set("{}".to_string()),
+            created_at: Set(now),
+            updated_at: Set(now),
             ..Default::default()
         };
         merge_node.insert(&context.db).await?;
@@ -1343,6 +1350,9 @@ impl Mutation {
                 plan_id: Set(plan.id),
                 source_node_id: Set(ds_id.clone()),
                 target_node_id: Set(merge_node_id.clone()),
+                metadata_json: Set("{}".to_string()),
+                created_at: Set(now),
+                updated_at: Set(now),
                 ..Default::default()
             };
             edge.insert(&context.db).await?;
@@ -1359,6 +1369,8 @@ impl Mutation {
             position_y: Set(200.0),
             metadata_json: Set(serde_json::json!({ "label": "Base Graph" }).to_string()),
             config_json: Set("{}".to_string()),
+            created_at: Set(now),
+            updated_at: Set(now),
             ..Default::default()
         };
         base_graph.insert(&context.db).await?;
@@ -1370,6 +1382,9 @@ impl Mutation {
             plan_id: Set(plan.id),
             source_node_id: Set(merge_node_id.clone()),
             target_node_id: Set(base_graph_id.clone()),
+            metadata_json: Set("{}".to_string()),
+            created_at: Set(now),
+            updated_at: Set(now),
             ..Default::default()
         };
         edge.insert(&context.db).await?;
@@ -1402,6 +1417,8 @@ impl Mutation {
                             config_json: Set(serde_json::json!({
                                 "graphConfig": graph_config
                             }).to_string()),
+                            created_at: Set(now),
+                            updated_at: Set(now),
                             ..Default::default()
                         };
                         transform_node.insert(&context.db).await?;
@@ -1413,6 +1430,9 @@ impl Mutation {
                             plan_id: Set(plan.id),
                             source_node_id: Set(base_graph_id.clone()),
                             target_node_id: Set(transform_id.clone()),
+                            metadata_json: Set("{}".to_string()),
+                            created_at: Set(now),
+                            updated_at: Set(now),
                             ..Default::default()
                         };
                         edge.insert(&context.db).await?;
@@ -1429,6 +1449,8 @@ impl Mutation {
                             position_y: Set(100.0 + (variation_idx as f64 * 150.0)),
                             metadata_json: Set(serde_json::json!({ "label": graph_label }).to_string()),
                             config_json: Set("{}".to_string()),
+                            created_at: Set(now),
+                            updated_at: Set(now),
                             ..Default::default()
                         };
                         graph_node.insert(&context.db).await?;
@@ -1440,6 +1462,9 @@ impl Mutation {
                             plan_id: Set(plan.id),
                             source_node_id: Set(transform_id.clone()),
                             target_node_id: Set(graph_id.clone()),
+                            metadata_json: Set("{}".to_string()),
+                            created_at: Set(now),
+                            updated_at: Set(now),
                             ..Default::default()
                         };
                         edge.insert(&context.db).await?;
@@ -1460,6 +1485,8 @@ impl Mutation {
                                 "exporter": exporter,
                                 "renderConfig": profile.get("render_config").cloned()
                             }).to_string()),
+                            created_at: Set(now),
+                            updated_at: Set(now),
                             ..Default::default()
                         };
                         output_node.insert(&context.db).await?;
@@ -1471,6 +1498,9 @@ impl Mutation {
                             plan_id: Set(plan.id),
                             source_node_id: Set(graph_id),
                             target_node_id: Set(output_id),
+                            metadata_json: Set("{}".to_string()),
+                            created_at: Set(now),
+                            updated_at: Set(now),
                             ..Default::default()
                         };
                         edge.insert(&context.db).await?;
