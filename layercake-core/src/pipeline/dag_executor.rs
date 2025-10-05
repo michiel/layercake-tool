@@ -29,6 +29,7 @@ impl DagExecutor {
     pub async fn execute_node(
         &self,
         project_id: i32,
+        plan_id: i32,
         node_id: &str,
         nodes: &[plan_dag_nodes::Model],
         edges: &[(String, String)], // (source, target) pairs
@@ -65,9 +66,9 @@ impl DagExecutor {
                 // Get upstream datasource node IDs
                 let upstream_ids = self.get_upstream_nodes(node_id, edges);
 
-                // Build graph from upstream datasources
+                // Build graph from upstream datasources (reads from data_sources table)
                 self.graph_builder
-                    .build_graph(project_id, node_id.to_string(), node_name, upstream_ids)
+                    .build_graph(project_id, plan_id, node_id.to_string(), node_name, upstream_ids)
                     .await?;
             }
             "Merge" | "Transform" | "Copy" => {
@@ -90,6 +91,7 @@ impl DagExecutor {
     pub async fn execute_dag(
         &self,
         project_id: i32,
+        plan_id: i32,
         nodes: &[plan_dag_nodes::Model],
         edges: &[(String, String)],
     ) -> Result<()> {
@@ -98,7 +100,7 @@ impl DagExecutor {
 
         // Execute nodes in order
         for node_id in sorted_nodes {
-            self.execute_node(project_id, &node_id, nodes, edges).await?;
+            self.execute_node(project_id, plan_id, &node_id, nodes, edges).await?;
         }
 
         Ok(())
@@ -109,6 +111,7 @@ impl DagExecutor {
     pub async fn execute_affected_nodes(
         &self,
         project_id: i32,
+        plan_id: i32,
         changed_node_id: &str,
         nodes: &[plan_dag_nodes::Model],
         edges: &[(String, String)],
@@ -131,7 +134,7 @@ impl DagExecutor {
         let sorted = self.topological_sort(&affected_nodes, edges)?;
 
         for node_id in sorted {
-            self.execute_node(project_id, &node_id, nodes, edges).await?;
+            self.execute_node(project_id, plan_id, &node_id, nodes, edges).await?;
         }
 
         Ok(())

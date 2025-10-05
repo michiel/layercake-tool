@@ -1189,6 +1189,58 @@ impl Mutation {
 
         Ok(DataSource::from(data_source))
     }
+
+    /// Execute a DAG node (builds graph from upstream data sources)
+    async fn execute_node(
+        &self,
+        ctx: &Context<'_>,
+        project_id: i32,
+        node_id: String
+    ) -> Result<NodeExecutionResult> {
+        use crate::pipeline::DagExecutor;
+        use sea_orm::{ColumnTrait, QueryFilter};
+
+        let context = ctx.data::<GraphQLContext>()?;
+
+        // Find the plan for this project
+        let plan = plans::Entity::find()
+            .filter(plans::Column::ProjectId.eq(project_id))
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Plan not found for project"))?;
+
+        // Get all nodes in the plan
+        let nodes = plan_dag_nodes::Entity::find()
+            .filter(plan_dag_nodes::Column::PlanId.eq(plan.id))
+            .all(&context.db)
+            .await?;
+
+        // Get all edges in the plan
+        let edges_models = plan_dag_edges::Entity::find()
+            .filter(plan_dag_edges::Column::PlanId.eq(plan.id))
+            .all(&context.db)
+            .await?;
+
+        // Convert edges to (source, target) tuples
+        let edges: Vec<(String, String)> = edges_models
+            .iter()
+            .map(|e| (e.source_node_id.clone(), e.target_node_id.clone()))
+            .collect();
+
+        // Create executor and execute the node
+        let executor = DagExecutor::new(context.db.clone());
+
+        executor
+            .execute_node(project_id, plan.id, &node_id, &nodes, &edges)
+            .await
+            .map_err(|e| Error::new(format!("Failed to execute node: {}", e)))?;
+
+        Ok(NodeExecutionResult {
+            success: true,
+            message: format!("Node {} executed successfully", node_id),
+            node_id,
+        })
+    }
 }
 
 #[derive(SimpleObject)]
@@ -1196,4 +1248,11 @@ pub struct PlanExecutionResult {
     pub success: bool,
     pub message: String,
     pub output_files: Vec<String>,
+}
+
+#[derive(SimpleObject)]
+pub struct NodeExecutionResult {
+    pub success: bool,
+    pub message: String,
+    pub node_id: String,
 }

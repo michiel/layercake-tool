@@ -3,7 +3,7 @@ use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, Set};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 
-use crate::database::entities::{datasources, graph_edges, graph_nodes, graphs};
+use crate::database::entities::{data_sources, datasources, graph_edges, graph_nodes, graphs, plan_dag_nodes};
 use crate::database::entities::datasources::ExecutionState;
 
 /// Service for building graphs from datasources
@@ -18,9 +18,11 @@ impl GraphBuilder {
 
     /// Build a graph from upstream datasources
     /// Returns the created/updated graph entity
+    /// Reads directly from data_sources table (no pipeline processing needed)
     pub async fn build_graph(
         &self,
         project_id: i32,
+        plan_id: i32,
         node_id: String,
         name: String,
         upstream_node_ids: Vec<String>,
@@ -33,22 +35,24 @@ impl GraphBuilder {
         active = active.set_state(ExecutionState::Processing);
         let graph = active.update(&self.db).await?;
 
-        // Fetch upstream datasources
-        let mut datasources_list = Vec::new();
+        // Fetch upstream data_sources by reading plan_dag_nodes configs
+        let mut data_sources_list = Vec::new();
         for upstream_id in &upstream_node_ids {
-            let ds = self.get_datasource(project_id, upstream_id).await?;
-            if !ds.is_ready() {
+            let data_source = self.get_upstream_data_source(plan_id, upstream_id).await?;
+
+            // Check if data source is ready
+            if data_source.status != "active" {
                 return Err(anyhow!(
-                    "Upstream datasource {} is not ready (state: {})",
+                    "Upstream data source {} is not ready (status: {})",
                     upstream_id,
-                    ds.execution_state
+                    data_source.status
                 ));
             }
-            datasources_list.push(ds);
+            data_sources_list.push(data_source);
         }
 
         // Compute source hash for change detection
-        let source_hash = self.compute_source_hash(&datasources_list)?;
+        let source_hash = self.compute_data_source_hash(&data_sources_list)?;
 
         // Check if recomputation is needed
         if let Some(existing_hash) = &graph.source_hash {
@@ -58,9 +62,9 @@ impl GraphBuilder {
             }
         }
 
-        // Build graph data from datasources
+        // Build graph data from data_sources
         let result = self
-            .build_graph_from_datasources(&graph, &datasources_list)
+            .build_graph_from_data_sources(&graph, &data_sources_list)
             .await;
 
         match result {
@@ -114,35 +118,49 @@ impl GraphBuilder {
         Ok(graph)
     }
 
-    /// Get datasource by node ID
-    async fn get_datasource(
+    /// Get upstream data_source by reading plan_dag_node config
+    async fn get_upstream_data_source(
         &self,
-        project_id: i32,
+        plan_id: i32,
         node_id: &str,
-    ) -> Result<datasources::Model> {
-        use crate::database::entities::datasources::{Column, Entity};
+    ) -> Result<data_sources::Model> {
         use sea_orm::{ColumnTrait, QueryFilter};
 
-        Entity::find()
-            .filter(Column::ProjectId.eq(project_id))
-            .filter(Column::NodeId.eq(node_id))
+        // Find the plan_dag_node to get the config
+        let dag_node = plan_dag_nodes::Entity::find_by_id(node_id)
+            .filter(plan_dag_nodes::Column::PlanId.eq(plan_id))
             .one(&self.db)
             .await?
-            .ok_or_else(|| anyhow!("Datasource not found for node {}", node_id))
+            .ok_or_else(|| anyhow!("Plan DAG node not found: {}", node_id))?;
+
+        // Parse config to get dataSourceId
+        let config: serde_json::Value = serde_json::from_str(&dag_node.config_json)
+            .map_err(|e| anyhow!("Failed to parse node config: {}", e))?;
+
+        let data_source_id = config.get("dataSourceId")
+            .and_then(|v| v.as_i64())
+            .map(|v| v as i32)
+            .ok_or_else(|| anyhow!("Node config does not have dataSourceId: {}", node_id))?;
+
+        // Query the data_sources table
+        data_sources::Entity::find_by_id(data_source_id)
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| anyhow!("DataSource not found with id {}", data_source_id))
     }
 
-    /// Compute hash of upstream datasources for change detection
-    fn compute_source_hash(&self, datasources: &[datasources::Model]) -> Result<String> {
+    /// Compute hash of upstream data_sources for change detection
+    fn compute_data_source_hash(&self, data_sources: &[data_sources::Model]) -> Result<String> {
         use sha2::{Digest, Sha256};
 
         let mut hasher = Sha256::new();
 
-        for ds in datasources {
-            // Hash datasource ID, file path, and import date
+        for ds in data_sources {
+            // Hash data source ID, filename, and processed_at timestamp
             hasher.update(ds.id.to_string().as_bytes());
-            hasher.update(ds.file_path.as_bytes());
-            if let Some(import_date) = &ds.import_date {
-                hasher.update(import_date.to_rfc3339().as_bytes());
+            hasher.update(ds.filename.as_bytes());
+            if let Some(processed_at) = &ds.processed_at {
+                hasher.update(processed_at.to_rfc3339().as_bytes());
             }
         }
 
@@ -150,55 +168,132 @@ impl GraphBuilder {
         Ok(hash)
     }
 
-    /// Build graph from datasources
-    async fn build_graph_from_datasources(
+    /// Build graph from data_sources (reads graph_json directly)
+    async fn build_graph_from_data_sources(
         &self,
         graph: &graphs::Model,
-        datasources: &[datasources::Model],
+        data_sources: &[data_sources::Model],
     ) -> Result<(usize, usize)> {
         // Clear existing graph data
         self.clear_graph_data(graph.id).await?;
 
-        // Separate datasources by type
-        let mut nodes_sources = Vec::new();
-        let mut edges_sources = Vec::new();
-        let mut graph_sources = Vec::new();
-
-        for ds in datasources {
-            match ds.file_type.as_str() {
-                "nodes" => nodes_sources.push(ds),
-                "edges" => edges_sources.push(ds),
-                "graph" => graph_sources.push(ds),
-                _ => {
-                    return Err(anyhow!("Unknown datasource file type: {}", ds.file_type))
-                }
-            }
-        }
-
         let mut all_nodes = HashMap::new();
         let mut all_edges = Vec::new();
 
-        // Process JSON graph sources first (they contain both nodes and edges)
-        for ds in graph_sources {
-            let (nodes, edges) = self.extract_graph_from_json(ds).await?;
-            for (id, node) in nodes {
-                all_nodes.insert(id, node);
-            }
-            all_edges.extend(edges);
-        }
+        // Process each data source
+        for ds in data_sources {
+            // Parse graph_json
+            let graph_data: serde_json::Value = serde_json::from_str(&ds.graph_json)
+                .map_err(|e| anyhow!("Failed to parse graph JSON for {}: {}", ds.name, e))?;
 
-        // Process node datasources
-        for ds in nodes_sources {
-            let nodes = self.extract_nodes_from_datasource(ds).await?;
-            for (id, node) in nodes {
-                all_nodes.insert(id, node);
-            }
-        }
+            // Extract based on data_type
+            match ds.data_type.as_str() {
+                "nodes" => {
+                    // Extract nodes from graph_json.nodes array
+                    if let Some(nodes_array) = graph_data.get("nodes").and_then(|v| v.as_array()) {
+                        for node_val in nodes_array {
+                            let id = node_val["id"]
+                                .as_str()
+                                .ok_or_else(|| anyhow!("Node missing 'id' field"))?
+                                .to_string();
 
-        // Process edge datasources
-        for ds in edges_sources {
-            let edges = self.extract_edges_from_datasource(ds).await?;
-            all_edges.extend(edges);
+                            let node = NodeData {
+                                label: node_val["label"].as_str().map(|s| s.to_string()),
+                                layer: node_val["layer"].as_str().map(|s| s.to_string()),
+                                weight: node_val["weight"].as_f64(),
+                                is_partition: node_val["is_partition"].as_bool().unwrap_or(false),
+                                attrs: Some(node_val.clone()),
+                            };
+
+                            all_nodes.insert(id, node);
+                        }
+                    }
+                }
+                "edges" => {
+                    // Extract edges from graph_json.edges array
+                    if let Some(edges_array) = graph_data.get("edges").and_then(|v| v.as_array()) {
+                        for edge_val in edges_array {
+                            let id = edge_val["id"]
+                                .as_str()
+                                .ok_or_else(|| anyhow!("Edge missing 'id' field"))?
+                                .to_string();
+                            let source = edge_val["source"]
+                                .as_str()
+                                .ok_or_else(|| anyhow!("Edge missing 'source' field"))?
+                                .to_string();
+                            let target = edge_val["target"]
+                                .as_str()
+                                .ok_or_else(|| anyhow!("Edge missing 'target' field"))?
+                                .to_string();
+
+                            let edge = EdgeData {
+                                id,
+                                source,
+                                target,
+                                label: edge_val["label"].as_str().map(|s| s.to_string()),
+                                layer: edge_val["layer"].as_str().map(|s| s.to_string()),
+                                weight: edge_val["weight"].as_f64(),
+                                attrs: Some(edge_val.clone()),
+                            };
+
+                            all_edges.push(edge);
+                        }
+                    }
+                }
+                "graph" => {
+                    // Extract both nodes and edges from full graph JSON
+                    if let Some(nodes_array) = graph_data.get("nodes").and_then(|v| v.as_array()) {
+                        for node_val in nodes_array {
+                            let id = node_val["id"]
+                                .as_str()
+                                .ok_or_else(|| anyhow!("Node missing 'id' field"))?
+                                .to_string();
+
+                            let node = NodeData {
+                                label: node_val["label"].as_str().map(|s| s.to_string()),
+                                layer: node_val["layer"].as_str().map(|s| s.to_string()),
+                                weight: node_val["weight"].as_f64(),
+                                is_partition: node_val["is_partition"].as_bool().unwrap_or(false),
+                                attrs: Some(node_val.clone()),
+                            };
+
+                            all_nodes.insert(id, node);
+                        }
+                    }
+
+                    if let Some(edges_array) = graph_data.get("edges").and_then(|v| v.as_array()) {
+                        for edge_val in edges_array {
+                            let id = edge_val["id"]
+                                .as_str()
+                                .ok_or_else(|| anyhow!("Edge missing 'id' field"))?
+                                .to_string();
+                            let source = edge_val["source"]
+                                .as_str()
+                                .ok_or_else(|| anyhow!("Edge missing 'source' field"))?
+                                .to_string();
+                            let target = edge_val["target"]
+                                .as_str()
+                                .ok_or_else(|| anyhow!("Edge missing 'target' field"))?
+                                .to_string();
+
+                            let edge = EdgeData {
+                                id,
+                                source,
+                                target,
+                                label: edge_val["label"].as_str().map(|s| s.to_string()),
+                                layer: edge_val["layer"].as_str().map(|s| s.to_string()),
+                                weight: edge_val["weight"].as_f64(),
+                                attrs: Some(edge_val.clone()),
+                            };
+
+                            all_edges.push(edge);
+                        }
+                    }
+                }
+                _ => {
+                    return Err(anyhow!("Unknown data type: {}", ds.data_type));
+                }
+            }
         }
 
         // Validate edges reference existing nodes
