@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Routes, Route, useNavigate, useParams, useLocation } from 'react-router-dom'
 import { AppShell, Group, Title, Stack, Button, Container, Text, Card, Badge, Alert, Modal, Select, FileButton } from '@mantine/core'
-import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconPlayerPlay, IconAlertCircle, IconFileDatabase, IconTrash, IconFileImport } from '@tabler/icons-react'
+import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconFileImport } from '@tabler/icons-react'
 import { useQuery, useMutation } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import { Breadcrumbs } from './components/common/Breadcrumbs'
@@ -590,13 +590,6 @@ const ProjectDetailPage = () => {
       description: 'Manage graph entities for this project',
       icon: <IconDatabase size={20} />,
       onClick: () => navigate(`/projects/${projectId}/graphs`),
-    },
-    {
-      title: 'Execute Plans',
-      description: 'Run Plan DAG transformations and generate outputs',
-      icon: <IconPlayerPlay size={20} />,
-      onClick: () => {},
-      disabled: true, // Coming in Phase 3
     },
     {
       title: 'Project Settings',

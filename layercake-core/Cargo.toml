@@ -81,7 +81,7 @@ tower-http = { workspace = true, optional = true }
 sea-orm = { workspace = true, optional = true }
 sea-orm-migration = { workspace = true, optional = true }
 chrono = { workspace = true, optional = true }
-uuid = { workspace = true, optional = true }
+uuid = { version = "1.0", features = ["v4"], optional = true }
 
 # GraphQL dependencies (optional)
 async-graphql = { workspace = true, optional = true }

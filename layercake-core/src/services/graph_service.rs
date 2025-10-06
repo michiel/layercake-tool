@@ -194,10 +194,12 @@ impl GraphService {
         &self,
         project_id: i32,
         name: String,
-        node_id: String,
     ) -> Result<crate::database::entities::graphs::Model> {
         use crate::database::entities::graphs;
         use sea_orm::{Set, ActiveModelTrait};
+
+        // Generate a placeholder node_id for now
+        let node_id = format!("graphnode_{}", uuid::Uuid::new_v4().to_string());
 
         let graph = graphs::ActiveModel {
             project_id: Set(project_id),

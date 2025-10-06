@@ -8,32 +8,24 @@ import {
   Button,
   Stack,
   Card,
-  Badge,
   Text,
   ActionIcon,
   Modal,
   Alert,
   Table,
-  Menu,
   LoadingOverlay,
-  TextInput,
-  Textarea
+  TextInput
 } from '@mantine/core'
 import {
   IconPlus,
   IconGraph,
   IconEdit,
   IconTrash,
-  IconDots,
   IconAlertCircle
 } from '@tabler/icons-react'
-import { useQuery as useProjectsQuery } from '@apollo/client/react'
-import { Breadcrumbs } from '../common/Breadcrumbs'
-import { GET_GRAPHS, CREATE_GRAPH, UPDATE_GRAPH, DELETE_GRAPH, Graph } from '../../graphql/graphs'
 import { gql } from '@apollo/client'
-
-import { GET_PLAN_DAG } from '../../graphql/plan-dag';
-import { Select } from '@mantine/core';
+import { Breadcrumbs } from '../common/Breadcrumbs'
+import { Graph, GET_GRAPHS, CREATE_GRAPH, UPDATE_GRAPH, DELETE_GRAPH } from '../../graphql/graphs'
 
 const GET_PROJECTS = gql`
   query GetProjects {
@@ -53,19 +45,13 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedGraph, setSelectedGraph] = useState<Graph | null>(null);
 
-  const { data: projectsData } = useProjectsQuery<{ projects: Array<{ id: number; name: string }> }>(GET_PROJECTS);
-  const selectedProject = projectsData?.projects.find(p => p.id === parseInt(projectId || '0'));
+  const { data: projectsData } = useQuery<{ projects: Array<{ id: number; name: string }> }>(GET_PROJECTS);
+  const selectedProject = projectsData?.projects.find((p: { id: number; name: string }) => p.id === parseInt(projectId || '0'));
 
-  const { data, loading, error, refetch } = useQuery(GET_GRAPHS, {
+  const { data, loading, error } = useQuery<{ graphs: Graph[] }>(GET_GRAPHS, {
     variables: { projectId: parseInt(projectId || '0') },
     fetchPolicy: 'cache-and-network'
   });
-
-  const { data: planDagData } = useQuery(GET_PLAN_DAG, {
-    variables: { projectId: parseInt(projectId || '0') },
-  });
-
-  const graphNodes = planDagData?.getPlanDag?.nodes.filter((n: any) => n.nodeType === 'Graph') || [];
 
   const [createGraph, { loading: createLoading }] = useMutation(CREATE_GRAPH, {
     refetchQueries: [{ query: GET_GRAPHS, variables: { projectId: parseInt(projectId || '0') } }]
@@ -108,11 +94,13 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
     }
   };
 
-  const handleSave = async (values: { name: string; description: string; nodeId: string }) => {
+  const handleSave = async (values: { name: string }) => {
     if (selectedGraph) {
-      await updateGraph({ variables: { id: parseInt(selectedGraph.id), input: { name: values.name, description: values.description } } });
+      await updateGraph({ variables: { id: parseInt(selectedGraph.id), input: { name: values.name } } });
     } else {
-      await createGraph({ variables: { input: { ...values, projectId: parseInt(projectId || '0') } } });
+      // For creation, we need to generate a nodeId internally or derive it.
+      // For now, we'll use a placeholder. This will be handled by the backend.
+      await createGraph({ variables: { input: { name: values.name, projectId: parseInt(projectId || '0'), nodeId: 'generated-node-id' } } });
     }
     setEditModalOpen(false);
     setSelectedGraph(null);
@@ -247,7 +235,6 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
       >
         <EditGraphForm
           graph={selectedGraph}
-          graphNodes={graphNodes}
           onSave={handleSave}
           onCancel={() => setEditModalOpen(false)}
           loading={createLoading || updateLoading}
@@ -259,20 +246,17 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
 
 interface EditGraphFormProps {
   graph: Graph | null
-  graphNodes: any[]
-  onSave: (values: { name: string; description: string; nodeId: string }) => void
+  onSave: (values: { name: string }) => void
   onCancel: () => void
   loading: boolean
 }
 
-const EditGraphForm: React.FC<EditGraphFormProps> = ({ graph, graphNodes, onSave, onCancel, loading }) => {
+const EditGraphForm: React.FC<EditGraphFormProps> = ({ graph, onSave, onCancel, loading }) => {
   const [name, setName] = useState(graph?.name || '')
-  const [description, setDescription] = useState(graph?.description || '')
-  const [nodeId, setNodeId] = useState(graph?.nodeId || '')
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    onSave({ name, description, nodeId })
+    onSave({ name })
   }
 
   return (
@@ -282,19 +266,6 @@ const EditGraphForm: React.FC<EditGraphFormProps> = ({ graph, graphNodes, onSave
           label="Name"
           value={name}
           onChange={(e) => setName(e.currentTarget.value)}
-          required
-        />
-        <Textarea
-          label="Description"
-          value={description}
-          onChange={(e) => setDescription(e.currentTarget.value)}
-        />
-        <Select
-          label="Graph Node"
-          placeholder="Select a graph node"
-          data={graphNodes.map(n => ({ value: n.id, label: n.metadata.label }))}
-          value={nodeId}
-          onChange={(value) => setNodeId(value || '')}
           required
         />
         <Group justify="flex-end" mt="md">

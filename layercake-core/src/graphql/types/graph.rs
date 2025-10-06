@@ -68,7 +68,6 @@ pub struct CreateGraphInput {
     #[graphql(name = "projectId")]
     pub project_id: i32,
     pub name: String,
-    pub node_id: String,
 }
 
 #[derive(InputObject)]

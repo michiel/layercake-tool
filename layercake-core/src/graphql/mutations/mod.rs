@@ -1292,7 +1292,6 @@ impl Mutation {
             .create_graph(
                 input.project_id,
                 input.name,
-                input.node_id,
             )
             .await
             .map_err(|e| Error::new(format!("Failed to create Graph: {}", e)))?;

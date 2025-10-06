@@ -396,6 +396,17 @@ impl Query {
         Ok(data_source.map(DataSource::from))
     }
 
+    /// Get all DataSources for a project
+    async fn data_sources(&self, ctx: &Context<'_>, project_id: i32) -> Result<Vec<DataSource>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let data_sources_list = data_sources::Entity::find()
+            .filter(data_sources::Column::ProjectId.eq(project_id))
+            .all(&context.db)
+            .await?;
+
+        Ok(data_sources_list.into_iter().map(DataSource::from).collect())
+    }
+
     /// Get all Graphs for a project
     async fn graphs(&self, ctx: &Context<'_>, project_id: i32) -> Result<Vec<Graph>> {
         let context = ctx.data::<GraphQLContext>()?;
