@@ -1,57 +1,49 @@
-import { gql } from '@apollo/client';
+import { gql } from '@apollo/client'
 
-export const GET_GRAPH_DATA = gql`
-  query GetGraphData($projectId: Int!) {
-    graphData(projectId: $projectId) {
-      nodes {
-        id
-        label
-        layer
-        isPartition
-        weight
-      }
-      edges {
-        id
-        source
-        target
-        label
-        layer
-        weight
-      }
-      layers {
-        id
-        name
-        color
-      }
+export interface Graph {
+  id: string
+  name: string
+  nodeId: string
+  executionState: string
+  nodeCount: number
+  edgeCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+export const GET_GRAPHS = gql`
+  query GetGraphs($projectId: Int!) {
+    graphs(projectId: $projectId) {
+      id
+      name
+      nodeId
+      executionState
+      nodeCount
+      edgeCount
+      createdAt
+      updatedAt
     }
   }
-`;
+`
 
-export interface GraphNode {
-  id: string;
-  label: string;
-  layer: string;
-  isPartition: boolean;
-  weight: number;
-}
+export const CREATE_GRAPH = gql`
+  mutation CreateGraph($input: CreateGraphInput!) {
+    createGraph(input: $input) {
+      id
+    }
+  }
+`
 
-export interface GraphEdge {
-  id: string;
-  source: string;
-  target: string;
-  label: string;
-  layer: string;
-  weight: number;
-}
+export const UPDATE_GRAPH = gql`
+  mutation UpdateGraph($id: Int!, $input: UpdateGraphInput!) {
+    updateGraph(id: $id, input: $input) {
+      id
+    }
+  }
+`
 
-export interface GraphLayer {
-  id: string;
-  name: string;
-  color: string;
-}
-
-export interface GraphDataResponse {
-  nodes: GraphNode[];
-  edges: GraphEdge[];
-  layers: GraphLayer[];
-}
+export const DELETE_GRAPH = gql`
+  mutation DeleteGraph($id: Int!) {
+    deleteGraph(id: $id)
+  }
+`

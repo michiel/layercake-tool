@@ -7,6 +7,8 @@ use chrono::Utc;
 use crate::database::entities::{projects, plans, nodes, edges, layers, plan_dag_nodes, plan_dag_edges, users, user_sessions, project_collaborators};
 use crate::graphql::context::GraphQLContext;
 use crate::services::auth_service::AuthService;
+
+use crate::services::graph_service::GraphService;
 use crate::services::data_source_service::DataSourceService;
 use crate::services::export_service::ExportService;
 use crate::pipeline::DagExecutor;
@@ -22,8 +24,10 @@ use crate::graphql::types::{
     User, ProjectCollaborator,
     RegisterUserInput, LoginInput, UpdateUserInput, LoginResponse, RegisterResponse,
     InviteCollaboratorInput, UpdateCollaboratorRoleInput,
-    DataSource, CreateDataSourceInput, UpdateDataSourceInput,
+    DataSource, CreateDataSourceInput, UpdateDataSourceInput
 };
+
+use crate::graphql::types::graph::{Graph, CreateGraphInput, UpdateGraphInput};
 
 pub struct Mutation;
 
@@ -1278,6 +1282,56 @@ impl Mutation {
 
         Ok(DataSource::from(data_source))
     }
+
+    /// Create a new Graph
+    async fn create_graph(&self, ctx: &Context<'_>, input: CreateGraphInput) -> Result<Graph> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let graph_service = GraphService::new(context.db.clone());
+
+        let graph = graph_service
+            .create_graph(
+                input.project_id,
+                input.name,
+                input.node_id,
+            )
+            .await
+            .map_err(|e| Error::new(format!("Failed to create Graph: {}", e)))?;
+
+        Ok(Graph::from(graph))
+    }
+
+    /// Update Graph metadata
+    async fn update_graph(
+        &self,
+        ctx: &Context<'_>,
+        id: i32,
+        input: UpdateGraphInput
+    ) -> Result<Graph> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let graph_service = GraphService::new(context.db.clone());
+
+        let graph = graph_service
+            .update_graph(id, input.name)
+            .await
+            .map_err(|e| Error::new(format!("Failed to update Graph: {}", e)))?;
+
+        Ok(Graph::from(graph))
+    }
+
+    /// Delete Graph
+    async fn delete_graph(&self, ctx: &Context<'_>, id: i32) -> Result<bool> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let graph_service = GraphService::new(context.db.clone());
+
+        graph_service
+            .delete_graph(id)
+            .await
+            .map_err(|e| Error::new(format!("Failed to delete Graph: {}", e)))?;
+
+        Ok(true)
+    }
+
+
 
     /// Execute a DAG node (builds graph from upstream data sources)
     async fn execute_node(

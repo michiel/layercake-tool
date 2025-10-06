@@ -6,6 +6,7 @@ pub mod edge;
 pub mod layer;
 pub mod scalars;
 pub mod user;
+pub mod graph;
 pub mod data_source;
 pub mod json_patch;
 pub mod preview;

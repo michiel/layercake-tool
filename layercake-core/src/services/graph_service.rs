@@ -189,4 +189,64 @@ impl GraphService {
             layers: graph_layers,
         })
     }
+
+    pub async fn create_graph(
+        &self,
+        project_id: i32,
+        name: String,
+        node_id: String,
+    ) -> Result<crate::database::entities::graphs::Model> {
+        use crate::database::entities::graphs;
+        use sea_orm::{Set, ActiveModelTrait};
+
+        let graph = graphs::ActiveModel {
+            project_id: Set(project_id),
+            name: Set(name),
+            node_id: Set(node_id),
+            ..Default::default()
+        };
+
+        let graph = graph.insert(&self.db).await?;
+
+        Ok(graph)
+    }
+
+    pub async fn update_graph(
+        &self,
+        id: i32,
+        name: Option<String>,
+    ) -> Result<crate::database::entities::graphs::Model> {
+        use crate::database::entities::graphs;
+        use sea_orm::{Set, ActiveModelTrait};
+
+        let graph = graphs::Entity::find_by_id(id)
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Graph not found"))?;
+
+        let mut active_model: graphs::ActiveModel = graph.into();
+
+        if let Some(name) = name {
+            active_model.name = Set(name);
+        }
+        active_model.updated_at = Set(chrono::Utc::now());
+
+        let updated = active_model.update(&self.db).await?;
+        Ok(updated)
+    }
+
+    pub async fn delete_graph(&self, id: i32) -> Result<()> {
+        use crate::database::entities::graphs;
+
+        let graph = graphs::Entity::find_by_id(id)
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Graph not found"))?;
+
+        graphs::Entity::delete_by_id(graph.id)
+            .exec(&self.db)
+            .await?;
+
+        Ok(())
+    }
 }

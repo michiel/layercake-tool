@@ -1,0 +1,311 @@
+import React, { useState } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { useQuery, useMutation } from '@apollo/client/react'
+import {
+  Container,
+  Title,
+  Group,
+  Button,
+  Stack,
+  Card,
+  Badge,
+  Text,
+  ActionIcon,
+  Modal,
+  Alert,
+  Table,
+  Menu,
+  LoadingOverlay,
+  TextInput,
+  Textarea
+} from '@mantine/core'
+import {
+  IconPlus,
+  IconGraph,
+  IconEdit,
+  IconTrash,
+  IconDots,
+  IconAlertCircle
+} from '@tabler/icons-react'
+import { useQuery as useProjectsQuery } from '@apollo/client/react'
+import { Breadcrumbs } from '../common/Breadcrumbs'
+import { GET_GRAPHS, CREATE_GRAPH, UPDATE_GRAPH, DELETE_GRAPH, Graph } from '../../graphql/graphs'
+import { gql } from '@apollo/client'
+
+import { GET_PLAN_DAG } from '../../graphql/plan-dag';
+import { Select } from '@mantine/core';
+
+const GET_PROJECTS = gql`
+  query GetProjects {
+    projects {
+      id
+      name
+    }
+  }
+`
+
+interface GraphsPageProps {}
+
+export const GraphsPage: React.FC<GraphsPageProps> = () => {
+  const navigate = useNavigate();
+  const { projectId } = useParams<{ projectId: string }>();
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [selectedGraph, setSelectedGraph] = useState<Graph | null>(null);
+
+  const { data: projectsData } = useProjectsQuery<{ projects: Array<{ id: number; name: string }> }>(GET_PROJECTS);
+  const selectedProject = projectsData?.projects.find(p => p.id === parseInt(projectId || '0'));
+
+  const { data, loading, error, refetch } = useQuery(GET_GRAPHS, {
+    variables: { projectId: parseInt(projectId || '0') },
+    fetchPolicy: 'cache-and-network'
+  });
+
+  const { data: planDagData } = useQuery(GET_PLAN_DAG, {
+    variables: { projectId: parseInt(projectId || '0') },
+  });
+
+  const graphNodes = planDagData?.getPlanDag?.nodes.filter((n: any) => n.nodeType === 'Graph') || [];
+
+  const [createGraph, { loading: createLoading }] = useMutation(CREATE_GRAPH, {
+    refetchQueries: [{ query: GET_GRAPHS, variables: { projectId: parseInt(projectId || '0') } }]
+  });
+
+  const [updateGraph, { loading: updateLoading }] = useMutation(UPDATE_GRAPH, {
+    refetchQueries: [{ query: GET_GRAPHS, variables: { projectId: parseInt(projectId || '0') } }]
+  });
+
+  const [deleteGraph, { loading: deleteLoading }] = useMutation(DELETE_GRAPH, {
+    refetchQueries: [{ query: GET_GRAPHS, variables: { projectId: parseInt(projectId || '0') } }]
+  });
+
+  const graphs: Graph[] = data?.graphs || [];
+
+  const handleNavigate = (route: string) => {
+    navigate(route);
+  };
+
+  const handleCreate = () => {
+    setSelectedGraph(null);
+    setEditModalOpen(true);
+  };
+
+  const handleEdit = (graph: Graph) => {
+    setSelectedGraph(graph);
+    setEditModalOpen(true);
+  };
+
+  const handleDelete = (graph: Graph) => {
+    setSelectedGraph(graph);
+    setDeleteModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (selectedGraph) {
+      await deleteGraph({ variables: { id: parseInt(selectedGraph.id) } });
+      setDeleteModalOpen(false);
+      setSelectedGraph(null);
+    }
+  };
+
+  const handleSave = async (values: { name: string; description: string; nodeId: string }) => {
+    if (selectedGraph) {
+      await updateGraph({ variables: { id: parseInt(selectedGraph.id), input: { name: values.name, description: values.description } } });
+    } else {
+      await createGraph({ variables: { input: { ...values, projectId: parseInt(projectId || '0') } } });
+    }
+    setEditModalOpen(false);
+    setSelectedGraph(null);
+  };
+
+  if (!selectedProject) {
+    return (
+      <Container size="xl">
+        <Title order={1}>Project Not Found</Title>
+        <Button onClick={() => navigate('/projects')} mt="md">
+          Back to Projects
+        </Button>
+      </Container>
+    )
+  }
+
+  return (
+    <>
+      <Container size="xl">
+        <Breadcrumbs
+          projectName={selectedProject.name}
+          projectId={selectedProject.id}
+          currentPage="Graphs"
+          onNavigate={handleNavigate}
+        />
+
+        <Group justify="space-between" mb="md">
+          <div>
+            <Title order={1}>Graphs</Title>
+            <Text size="sm" c="dimmed" mt="xs">
+              Manage graph entities for this project
+            </Text>
+          </div>
+          <Button
+            leftSection={<IconPlus size={16} />}
+            onClick={handleCreate}
+          >
+            New Graph
+          </Button>
+        </Group>
+
+        {error && (
+          <Alert icon={<IconAlertCircle size={16} />} title="Error" color="red" mb="md">
+            {error.message}
+          </Alert>
+        )}
+
+        <Card withBorder>
+          <LoadingOverlay visible={loading} />
+          {graphs.length === 0 && !loading ? (
+            <Stack align="center" py="xl" gap="md">
+              <IconGraph size={48} color="gray" />
+              <div style={{ textAlign: 'center' }}>
+                <Title order={3}>No Graphs</Title>
+                <Text c="dimmed" mb="md">
+                  Create your first graph.
+                </Text>
+                <Button
+                  leftSection={<IconPlus size={16} />}
+                  onClick={handleCreate}
+                >
+                  Create First Graph
+                </Button>
+              </div>
+            </Stack>
+          ) : (
+            <Table.ScrollContainer minWidth={800}>
+              <Table striped highlightOnHover>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>Name</Table.Th>
+                    <Table.Th>Node ID</Table.Th>
+                    <Table.Th>Execution State</Table.Th>
+                    <Table.Th>Nodes</Table.Th>
+                    <Table.Th>Edges</Table.Th>
+                    <Table.Th>Created</Table.Th>
+                    <Table.Th>Updated</Table.Th>
+                    <Table.Th>Actions</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {graphs.map((graph) => (
+                    <Table.Tr key={graph.id}>
+                      <Table.Td>{graph.name}</Table.Td>
+                      <Table.Td>{graph.nodeId}</Table.Td>
+                      <Table.Td>{graph.executionState}</Table.Td>
+                      <Table.Td>{graph.nodeCount}</Table.Td>
+                      <Table.Td>{graph.edgeCount}</Table.Td>
+                      <Table.Td>{new Date(graph.createdAt).toLocaleDateString()}</Table.Td>
+                      <Table.Td>{new Date(graph.updatedAt).toLocaleDateString()}</Table.Td>
+                      <Table.Td>
+                        <Group gap="xs">
+                          <ActionIcon onClick={() => handleEdit(graph)}><IconEdit size={16} /></ActionIcon>
+                          <ActionIcon onClick={() => handleDelete(graph)} color="red"><IconTrash size={16} /></ActionIcon>
+                        </Group>
+                      </Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            </Table.ScrollContainer>
+          )}
+        </Card>
+      </Container>
+
+      <Modal
+        opened={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        title="Delete Graph"
+      >
+        <Text mb="md">
+          Are you sure you want to delete "{selectedGraph?.name}"? This action cannot be undone.
+        </Text>
+        <Group justify="flex-end" gap="sm">
+          <Button variant="light" onClick={() => setDeleteModalOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            color="red"
+            loading={deleteLoading}
+            onClick={confirmDelete}
+          >
+            Delete
+          </Button>
+        </Group>
+      </Modal>
+
+      <Modal
+        opened={editModalOpen}
+        onClose={() => setEditModalOpen(false)}
+        title={selectedGraph ? 'Edit Graph' : 'Create Graph'}
+      >
+        <EditGraphForm
+          graph={selectedGraph}
+          graphNodes={graphNodes}
+          onSave={handleSave}
+          onCancel={() => setEditModalOpen(false)}
+          loading={createLoading || updateLoading}
+        />
+      </Modal>
+    </>
+  )
+}
+
+interface EditGraphFormProps {
+  graph: Graph | null
+  graphNodes: any[]
+  onSave: (values: { name: string; description: string; nodeId: string }) => void
+  onCancel: () => void
+  loading: boolean
+}
+
+const EditGraphForm: React.FC<EditGraphFormProps> = ({ graph, graphNodes, onSave, onCancel, loading }) => {
+  const [name, setName] = useState(graph?.name || '')
+  const [description, setDescription] = useState(graph?.description || '')
+  const [nodeId, setNodeId] = useState(graph?.nodeId || '')
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    onSave({ name, description, nodeId })
+  }
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <Stack>
+        <TextInput
+          label="Name"
+          value={name}
+          onChange={(e) => setName(e.currentTarget.value)}
+          required
+        />
+        <Textarea
+          label="Description"
+          value={description}
+          onChange={(e) => setDescription(e.currentTarget.value)}
+        />
+        <Select
+          label="Graph Node"
+          placeholder="Select a graph node"
+          data={graphNodes.map(n => ({ value: n.id, label: n.metadata.label }))}
+          value={nodeId}
+          onChange={(value) => setNodeId(value || '')}
+          required
+        />
+        <Group justify="flex-end" mt="md">
+          <Button variant="light" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button type="submit" loading={loading}>
+            Save
+          </Button>
+        </Group>
+      </Stack>
+    </form>
+  )
+}

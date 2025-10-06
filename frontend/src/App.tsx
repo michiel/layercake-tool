@@ -135,13 +135,12 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                 Data Sources
               </Button>
               <Button
-                variant={isActiveRoute(`/projects/${projectId}/graph`) ? 'filled' : 'light'}
+                variant={isActiveRoute(`/projects/${projectId}/graphs`) ? 'filled' : 'light'}
                 fullWidth
                 leftSection={<IconGraph size={16} />}
-                onClick={() => navigate(`/projects/${projectId}/graph`)}
-                disabled
+                onClick={() => navigate(`/projects/${projectId}/graphs`)}
               >
-                Graph Editor
+                Graphs
               </Button>
             </>
           )}
@@ -587,11 +586,10 @@ const ProjectDetailPage = () => {
       onClick: () => navigate(`/projects/${projectId}/datasources`),
     },
     {
-      title: 'Graph Editor',
-      description: 'Visualize and edit graph data structures',
+      title: 'Graphs',
+      description: 'Manage graph entities for this project',
       icon: <IconDatabase size={20} />,
-      onClick: () => navigate(`/projects/${projectId}/graph`),
-      disabled: true, // Coming in Phase 3
+      onClick: () => navigate(`/projects/${projectId}/graphs`),
     },
     {
       title: 'Execute Plans',
@@ -746,82 +744,7 @@ const PlanEditorPage = () => {
   )
 }
 
-// Graph editor page component (placeholder)
-const GraphEditorPage = () => {
-  const navigate = useNavigate()
-  const { projectId } = useParams<{ projectId: string }>()
-  const { data: projectsData, loading: projectsLoading } = useQuery<{
-    projects: Array<{
-      id: number
-      name: string
-      description: string
-      createdAt: string
-      updatedAt: string
-    }>
-  }>(GET_PROJECTS)
-
-  const projects = projectsData?.projects || []
-  const selectedProject = projects.find((p: any) => p.id === parseInt(projectId || '0'))
-
-  const handleNavigate = (route: string) => {
-    navigate(route)
-  }
-
-  // Show loading state while projects are being fetched
-  if (projectsLoading) {
-    return (
-      <Container size="xl">
-        <Text>Loading project...</Text>
-      </Container>
-    )
-  }
-
-  // Only show "not found" if loading is complete and project doesn't exist
-  if (!selectedProject) {
-    return (
-      <Container size="xl">
-        <Title order={1}>Project Not Found</Title>
-        <Button onClick={() => navigate('/projects')} mt="md">
-          Back to Projects
-        </Button>
-      </Container>
-    )
-  }
-
-  return (
-    <Container size="xl">
-      <Breadcrumbs
-        projectName={selectedProject.name}
-        projectId={selectedProject.id}
-        currentPage="Graph Editor"
-        onNavigate={handleNavigate}
-      />
-
-      <Title order={1} mb="md">Graph Editor</Title>
-
-      <Alert
-        icon={<IconAlertCircle size={16} />}
-        title="Coming Soon"
-        color="blue"
-        mb="md"
-      >
-        The Graph Editor will be available in Phase 3 of the development roadmap.
-        This will include graph visualization, interactive editing, and advanced graph operations.
-      </Alert>
-
-      <Text c="dimmed">
-        Future features will include:
-      </Text>
-      <ul>
-        <li>Interactive graph visualization</li>
-        <li>Node and edge editing capabilities</li>
-        <li>Graph layout algorithms</li>
-        <li>Import/export functionality</li>
-        <li>Collaborative editing</li>
-      </ul>
-    </Container>
-  )
-}
+import { GraphsPage } from './components/graphs/GraphsPage'
 
 // Main App component with routing
 function App() {
@@ -849,9 +772,9 @@ function App() {
               <PlanEditorPage />
             </ErrorBoundary>
           } />
-          <Route path="/projects/:projectId/graph" element={
+          <Route path="/projects/:projectId/graphs" element={
             <ErrorBoundary>
-              <GraphEditorPage />
+              <GraphsPage />
             </ErrorBoundary>
           } />
           <Route path="/projects/:projectId/datasources" element={

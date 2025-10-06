@@ -423,6 +423,7 @@ impl DataSourceService {
             .from_reader(content.as_bytes());
 
         let headers = reader.headers()?.clone();
+        println!("CSV Headers: {:?}", headers);
         let mut layers = Vec::new();
 
         // Validate required headers: must have ('id' or 'layer') and 'label'
@@ -435,14 +436,18 @@ impl DataSourceService {
 
         for result in reader.records() {
             let record = result?;
+            println!("CSV Record: {:?}", record);
             let mut layer = HashMap::new();
 
             for (i, field) in record.iter().enumerate() {
                 if let Some(header) = headers.get(i) {
                     let key = if header == "layer" { "id" } else { header };
                     match key {
-                        "id" | "label" | "color" | "description" => {
+                        "id" | "label" | "description" => {
                             layer.insert(key.to_string(), json!(field));
+                        },
+                        "color" => {
+                            layer.insert("background_color".to_string(), json!(field));
                         },
                         "z_index" => {
                             if let Ok(z) = field.parse::<i32>() {

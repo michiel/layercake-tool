@@ -3,6 +3,7 @@ use sea_orm::{EntityTrait, ColumnTrait, QueryFilter};
 
 use crate::database::entities::{projects, plans, nodes, edges, layers, users, user_sessions, project_collaborators, data_sources, plan_dag_nodes, plan_dag_edges, graphs, graph_nodes, graph_edges};
 use crate::graphql::context::GraphQLContext;
+use crate::graphql::types::graph::Graph;
 use crate::graphql::types::{Project, Plan, Node, Edge, Layer, PlanDag, PlanDagNode, PlanDagEdge, ValidationResult, PlanDagInput, User, ProjectCollaborator, DataSource, PlanDagMetadata, UserSession, DataSourcePreview, GraphPreview, TableRow, TableColumn, GraphNodePreview, GraphEdgePreview};
 use crate::graphql::types::plan_dag::DataSourceReference;
 
@@ -395,15 +396,25 @@ impl Query {
         Ok(data_source.map(DataSource::from))
     }
 
-    /// Get all DataSources for a project
-    async fn data_sources(&self, ctx: &Context<'_>, project_id: i32) -> Result<Vec<DataSource>> {
+    /// Get all Graphs for a project
+    async fn graphs(&self, ctx: &Context<'_>, project_id: i32) -> Result<Vec<Graph>> {
         let context = ctx.data::<GraphQLContext>()?;
-        let data_sources_list = data_sources::Entity::find()
-            .filter(data_sources::Column::ProjectId.eq(project_id))
+        let graphs_list = graphs::Entity::find()
+            .filter(graphs::Column::ProjectId.eq(project_id))
             .all(&context.db)
             .await?;
 
-        Ok(data_sources_list.into_iter().map(DataSource::from).collect())
+        Ok(graphs_list.into_iter().map(Graph::from).collect())
+    }
+
+    /// Get Graph by ID
+    async fn graph(&self, ctx: &Context<'_>, id: i32) -> Result<Option<Graph>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let graph = graphs::Entity::find_by_id(id)
+            .one(&context.db)
+            .await?;
+
+        Ok(graph.map(Graph::from))
     }
 
     /// Get available DataSources for selection in DAG editor
