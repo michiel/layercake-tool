@@ -392,6 +392,9 @@ impl GraphBuilder {
                         }
                     }
                 }
+                "layers" => {
+                    // Layers data source, ignore for building graph
+                }
                 _ => {
                     return Err(anyhow!("Unknown data type: {}", ds.data_type));
                 }

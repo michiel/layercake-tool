@@ -407,6 +407,9 @@ impl MergeBuilder {
                     }
                 }
             }
+            "layers" => {
+                // Layers data source, ignore for merging nodes and edges
+            }
             _ => {
                 return Err(anyhow!("Unknown data type: {}", data_type));
             }
