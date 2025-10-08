@@ -1,13 +1,32 @@
 import { gql } from '@apollo/client'
 
 export interface Layer {
-  id: string;
+  id: number;
   name: string;
-  color: string;
+  color?: string;
+}
+
+export interface GraphNode {
+  id: string;
+  label?: string;
+  layer?: string;
+  weight?: number;
+  isPartition: boolean;
+  attrs?: any;
+}
+
+export interface GraphEdge {
+  id: string;
+  source: string;
+  target: string;
+  label?: string;
+  layer?: string;
+  weight?: number;
+  attrs?: any;
 }
 
 export interface Graph {
-  id: string
+  id: number
   name: string
   nodeId: string
   executionState: string
@@ -16,6 +35,8 @@ export interface Graph {
   createdAt: string
   updatedAt: string
   layers: Layer[];
+  graphNodes: GraphNode[];
+  graphEdges: GraphEdge[];
 }
 
 export const GET_GRAPHS = gql`
@@ -33,6 +54,43 @@ export const GET_GRAPHS = gql`
         id
         name
         color
+      }
+    }
+  }
+`
+
+export const GET_GRAPH_DETAILS = gql`
+  query GetGraphDetails($id: Int!) {
+    graph(id: $id) {
+      id
+      name
+      nodeId
+      executionState
+      nodeCount
+      edgeCount
+      createdAt
+      updatedAt
+      layers {
+        id
+        name
+        color
+      }
+      graphNodes {
+        id
+        label
+        layer
+        weight
+        isPartition
+        attrs
+      }
+      graphEdges {
+        id
+        source
+        target
+        label
+        layer
+        weight
+        attrs
       }
     }
   }

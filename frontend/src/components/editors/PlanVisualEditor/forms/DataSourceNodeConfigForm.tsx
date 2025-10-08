@@ -109,7 +109,7 @@ export const DataSourceNodeConfigForm: React.FC<DataSourceNodeConfigFormProps> =
   const dataSourceOptions = data?.dataSources?.map((ds: DataSourceReference) => ({
     value: ds.id.toString(),
     label: ds.name,
-    description: ds.description || `Type: ${ds.sourceType}`,
+    description: ds.description || `Type: ${ds.fileFormat}/${ds.dataType}`,
   })) || [];
 
   const selectedDataSource = data?.dataSources?.find(
@@ -136,7 +136,7 @@ export const DataSourceNodeConfigForm: React.FC<DataSourceNodeConfigFormProps> =
           <Stack gap="xs">
             <Text size="sm" fw={500}>Selected Data Source Details:</Text>
             <Text size="xs" c="dimmed">
-              <strong>Type:</strong> {selectedDataSource.sourceType}
+              <strong>Type:</strong> {selectedDataSource.fileFormat}/{selectedDataSource.dataType}
             </Text>
             {selectedDataSource.description && (
               <Text size="xs" c="dimmed">

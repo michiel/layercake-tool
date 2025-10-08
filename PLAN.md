@@ -1,77 +1,97 @@
-# Data Model Refactoring Plan
+# LayercakeGraphEditor Implementation Plan
 
-This plan outlines the steps to refactor the database entities to match the desired data model relationships.
+This plan outlines the steps to implement the `LayercakeGraphEditor` component, integrate it into the frontend, and provide a way to edit individual graphs.
 
-## 1. Project to PlanDAG (One-to-One)
+## 1. Implement LayercakeGraphEditor Component
 
-The current relationship is one-to-many (a project can have multiple plans). The desired relationship is one-to-one (a project has one plan).
+**Location:** `frontend/src/components/graphs/LayercakeGraphEditor.tsx`
 
-**File to modify:** `layercake-core/src/database/entities/projects.rs`
+**Description:** This component will visualize an `LcGraph` object using `xyflow/react-flow`.
 
-- **Change:** In `projects.rs`, the `Relation::Plans` will be changed from `has_many` to `has_one`.
+**Key Features:**
+-   **React Flow Setup:** Initialize `ReactFlowProvider` and `ReactFlow` component.
+-   **Graph Rendering:**
+    -   Take an `LcGraph` object as input.
+    -   Convert `LcGraph` nodes and edges into `react-flow` compatible nodes and edges.
+    -   Handle `belongs_to` relationships by creating nested sub-flows. This will involve dynamically creating parent nodes for each `belongs_to` group and nesting child nodes within them.
+    -   Render edges with arrows indicating direction (source to target).
+-   **Dynamic Layout:**
+    -   Utilize a layout algorithm (e.g., `dagre` or `elkjs`) to arrange nodes and edges automatically.
+    -   The layout should prioritize a top-to-bottom direction.
+    -   Ensure sufficient spacing between nodes for readability.
+    -   The layout should be performed on the initial render of the graph.
+-   **Interactivity:**
+    -   Enable basic `react-flow` interactivity (panning, zooming).
+    -   (Future consideration) Allow node dragging within sub-flows.
+-   **Styling:** Apply basic styling for nodes, edges, and sub-flows.
 
-**File to modify:** `layercake-core/src/database/entities/plans.rs`
+## 2. Add "Edit Graph" Button to GraphsPage
 
-- **Change:** In `plans.rs`, the `project_id` column should be made unique to enforce the one-to-one relationship at the database level.
+**Location:** `frontend/src/components/graphs/GraphsPage.tsx`
 
-## 2. LayercakeGraph to LcLayer (One-to-Many)
+**Description:** Add an "Edit Graph" button to the actions column of the graphs table.
 
-The current relationship is Project -> LcLayer. The desired relationship is LayercakeGraph -> LcLayer.
+**Changes:**
+-   Modify the `Table.Td` for actions to include a new `ActionIcon` with an "Edit" icon.
+-   This button will navigate to the new graph editing route (e.g., `/projects/:projectId/graphs/:graphId/edit`).
 
-**File to modify:** `layercake-core/src/database/entities/layers.rs`
+## 3. Create New Route for Graph Editing
 
-- **Change:** In `layers.rs`, the `project_id` field will be replaced with a `graph_id` field.
-- **Change:** The `Relation::Projects` will be removed and a new `Relation::Graphs` will be added, linking to `graphs::Entity`.
+**Location:** `frontend/src/App.tsx` (or relevant routing configuration)
 
-**File to modify:** `layercake-core/src/database/entities/graphs.rs`
+**Description:** Define a new route that will render the `GraphEditorPage` component.
 
-- **Change:** In `graphs.rs`, a new `Relation::Layers` will be added as `has_many = "super::layers::Entity"`.
+**Changes:**
+-   Add a new `Route` entry: `<Route path="/projects/:projectId/graphs/:graphId/edit" element={<GraphEditorPage />} />`.
 
-## 3. Remove Unwanted Relationships from Project
+## 4. Implement GraphEditorPage Component
 
-The `Project` entity currently has relationships to `Nodes` and `Edges` which are not in the desired data model.
+**Location:** `frontend/src/pages/GraphEditorPage.tsx` (new file)
 
-**File to modify:** `layercake-core/src/database/entities/projects.rs`
+**Description:** This page will fetch the `LcGraph` data and render the `LayercakeGraphEditor`.
 
-- **Change:** In `projects.rs`, the `Relation::Nodes` and `Relation::Edges` will be removed.
+**Key Features:**
+-   **Route Parameter Handling:** Extract `projectId` and `graphId` from the URL parameters.
+-   **Data Fetching:**
+    -   Use `useQuery` to fetch the `LcGraph` data using a new GraphQL query (e.g., `GET_GRAPH_DETAILS`).
+    -   Handle loading and error states.
+-   **Component Rendering:** Pass the fetched `LcGraph` data to the `LayercakeGraphEditor` component.
+-   **Breadcrumbs:** Integrate breadcrumbs for navigation.
+-   **Basic UI:** Provide a title and potentially a "Save" button (initially non-functional, for future implementation).
 
-## 4. Create Migrations
+## 5. Define New GraphQL Query for Graph Details
 
-After applying the entity changes, new database migrations will need to be created and applied to update the database schema accordingly. This will involve:
-- Dropping foreign keys.
-- Modifying columns (e.g., making `project_id` in `plans` unique, changing `project_id` to `graph_id` in `layers`).
-- Creating new foreign keys.
+**Location:** `frontend/src/graphql/graphs.ts`
 
-## 5. Service Layer Implementation Plan
+**Description:** Add a new GraphQL query to fetch the detailed `LcGraph` object, including its nodes, edges, and layers.
 
-The service layer will need to be updated to reflect the new data model.
+**Changes:**
+-   Add `GET_GRAPH_DETAILS` query that fetches `id`, `name`, `nodeId`, `executionState`, `nodeCount`, `edgeCount`, `createdAt`, `updatedAt`, and importantly, `layers`, `graphNodes`, and `graphEdges`.
+-   Define corresponding TypeScript interfaces for `GraphNode` and `GraphEdge` if not already present.
 
-- **File to modify:** `layercake-core/src/services/project_service.rs` (and any other relevant services)
-    - **Change:** Update functions that currently fetch multiple plans for a project to fetch a single plan.
-    - **Change:** Remove functions that fetch layers directly from a project.
-    - **Change:** Update any logic that relies on the old relationships.
+## 6. Backend GraphQL Resolver for Graph Details
 
-- **File to modify:** `layercake-core/src/services/graph_service.rs` (and any other relevant services)
-    - **Change:** Add functions to fetch layers associated with a graph.
-    - **Change:** Update any logic that relies on the old relationships.
+**Location:** `layercake-core/src/graphql/queries/mod.rs` and `layercake-core/src/graphql/types/graph.rs`
 
-## 6. GraphQL Schema Implementation Plan
+**Description:** Implement resolvers to fetch `graphNodes` and `graphEdges` for the `Graph` type.
 
-The GraphQL schema will need to be updated to reflect the new data model.
+**Changes:**
+-   In `layercake-core/src/graphql/types/graph.rs`, add `graphNodes` and `graphEdges` fields to the `Graph` struct.
+-   Implement resolvers for these fields to fetch data from `graph_nodes::Entity` and `graph_edges::Entity` respectively, filtering by `graph_id`.
 
-- **File to modify:** `layercake-core/src/graphql/schema.rs` (or wherever the schema is defined)
-    - **Change:** In the `Project` type, change the `plans` field from `Vec<Plan>` to `Option<Plan>`.
-    - **Change:** In the `Project` type, remove the `layers` field.
-    - **Change:** In the `LayercakeGraph` type, add a `layers` field of type `Vec<Layer>`.
-    - **Change:** Update all resolvers that are affected by these changes.
+## 7. Frontend Styling and Utilities
 
-## 7. Frontend Implementation Plan
+**Location:** `frontend/src/styles/reactFlow.css` (new file) and `frontend/src/utils/graphUtils.ts` (new file)
 
-The frontend will need to be updated to work with the new GraphQL schema.
+**Description:** Add necessary styling for React Flow and utility functions for graph manipulation.
 
-- **Files to modify:** `frontend/src/graphql/queries.ts`, `frontend/src/graphql/mutations.ts`, etc.
-    - **Change:** Update all GraphQL queries, mutations, and subscriptions to match the new schema. For example, queries that previously fetched `project.plans` will now fetch `project.plan`. Queries that fetched `project.layers` will now need to fetch `project.graph.layers`.
+**Changes:**
+-   `reactFlow.css`: Basic styles for React Flow elements.
+-   `graphUtils.ts`: Helper functions for converting `LcGraph` data to `react-flow` elements, handling sub-flows, and performing layout.
 
-- **Files to modify:** `frontend/src/components/**/*.tsx`
-    - **Change:** Update all components that use the modified queries. This will likely involve changing how data is accessed and passed down to child components.
-    - **Change:** For example, a component that was displaying a list of plans for a project will now only display a single plan. A component that was displaying layers will now need to get them from a graph object instead of a project object.
+## 8. Verification
+
+-   Run `cargo check` and `npm run dev` to ensure no compilation errors.
+-   Navigate to the `/projects/:projectId/graphs` page and verify the "Edit Graph" button is present.
+-   Click the "Edit Graph" button and verify that the `GraphEditorPage` loads and displays the graph correctly.
+-   Check the browser console for any errors related to GraphQL queries or React Flow rendering.

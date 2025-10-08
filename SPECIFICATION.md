@@ -175,6 +175,15 @@ NC
  - The raw websocket is used for bidirectional, ephemeral presence and cursor data. graphql is used for data queries and mutations. keep these separate, and review the current state on frontend and backend to ensure they are separate. a data mutation performed by the client should not result in a subsequent render update based on a subscription update for that specific mutation, as it was initiated by the same client (other clients on that subscriptions SHOULD receive and respond to the update)
 
 
+#### LayercakeGraph Editor
+
+ - The LayercakeGraphEditor is based on the same library as the DAG Plan Editor component xyflow / react-flow
+ - The LayercakeGraphEditor takes a LcGraph object and renders it
+ - The edges have an arrow for direction (source to target)
+ - The belongs_to relationships are the (nested) groupings for which the component uses sub flows (https://reactflow.dev/examples/grouping/sub-flows )
+ - The layout of the graph is performed dynamically on first render, there is sufficient spacing between the nodes for readability and the top to bottom preference is used for layout
+
+
 
 ### Artefacts
 

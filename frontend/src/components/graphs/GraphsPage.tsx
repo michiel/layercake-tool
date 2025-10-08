@@ -88,7 +88,7 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
 
   const confirmDelete = async () => {
     if (selectedGraph) {
-      await deleteGraph({ variables: { id: parseInt(selectedGraph.id) } });
+      await deleteGraph({ variables: { id: selectedGraph.id } });
       setDeleteModalOpen(false);
       setSelectedGraph(null);
     }
@@ -96,7 +96,7 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
 
   const handleSave = async (values: { name: string }) => {
     if (selectedGraph) {
-      await updateGraph({ variables: { id: parseInt(selectedGraph.id), input: { name: values.name } } });
+      await updateGraph({ variables: { id: selectedGraph.id, input: { name: values.name } } });
     } else {
       // For creation, we need to generate a nodeId internally or derive it.
       // For now, we'll use a placeholder. This will be handled by the backend.
@@ -195,6 +195,7 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
                       <Table.Td>{new Date(graph.updatedAt).toLocaleDateString()}</Table.Td>
                       <Table.Td>
                         <Group gap="xs">
+                          <ActionIcon onClick={() => navigate(`/projects/${projectId}/graphs/${graph.id}/edit`)}><IconGraph size={16} /></ActionIcon>
                           <ActionIcon onClick={() => handleEdit(graph)}><IconEdit size={16} /></ActionIcon>
                           <ActionIcon onClick={() => handleDelete(graph)} color="red"><IconTrash size={16} /></ActionIcon>
                         </Group>

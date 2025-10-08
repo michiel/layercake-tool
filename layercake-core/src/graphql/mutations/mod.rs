@@ -13,19 +13,10 @@ use crate::services::data_source_service::DataSourceService;
 use crate::services::export_service::ExportService;
 use crate::pipeline::DagExecutor;
 
-use crate::graphql::types::{
-    Project, Plan,
-    CreateProjectInput, UpdateProjectInput,
-    CreatePlanInput, UpdatePlanInput,
-    PlanDagInput, PlanDagNodeInput, PlanDagEdgeInput,
-    PlanDagNodeUpdateInput, Position, NodePositionInput,
-    PlanDag, PlanDagNode, PlanDagEdge,
-    User, ProjectCollaborator,
-    RegisterUserInput, LoginInput, UpdateUserInput, LoginResponse, RegisterResponse,
-    InviteCollaboratorInput, UpdateCollaboratorRoleInput,
-    DataSource, CreateDataSourceInput, UpdateDataSourceInput
-};
-
+use crate::graphql::types::project::{Project, CreateProjectInput, UpdateProjectInput};
+use crate::graphql::types::plan::{Plan, CreatePlanInput, UpdatePlanInput};
+use crate::graphql::types::plan_dag::{PlanDag, PlanDagNode, PlanDagEdge, PlanDagInput, PlanDagNodeInput, PlanDagEdgeInput, PlanDagNodeUpdateInput, Position, NodePositionInput};
+use crate::graphql::types::{User, ProjectCollaborator, RegisterUserInput, LoginInput, UpdateUserInput, LoginResponse, RegisterResponse, InviteCollaboratorInput, UpdateCollaboratorRoleInput, DataSource, CreateDataSourceInput, UpdateDataSourceInput};
 use crate::graphql::types::graph::{Graph, CreateGraphInput, UpdateGraphInput};
 
 pub struct Mutation;

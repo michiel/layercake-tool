@@ -10,6 +10,8 @@ pub mod graph;
 pub mod data_source;
 pub mod json_patch;
 pub mod preview;
+pub mod graph_node;
+pub mod graph_edge;
 
 pub use project::*;
 pub use plan::*;
@@ -22,3 +24,5 @@ pub use user::*;
 pub use data_source::*;
 pub use json_patch::*;
 pub use preview::*;
+pub use graph_node::*;
+pub use graph_edge::*;

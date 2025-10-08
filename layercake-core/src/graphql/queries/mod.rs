@@ -4,7 +4,10 @@ use sea_orm::{EntityTrait, ColumnTrait, QueryFilter};
 use crate::database::entities::{projects, plans, users, user_sessions, project_collaborators, data_sources, plan_dag_nodes, plan_dag_edges, graphs, graph_nodes, graph_edges};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::graph::Graph;
-use crate::graphql::types::{Project, Plan, PlanDag, PlanDagNode, PlanDagEdge, ValidationResult, PlanDagInput, User, ProjectCollaborator, DataSource, PlanDagMetadata, UserSession, DataSourcePreview, GraphPreview, TableRow, TableColumn, GraphNodePreview, GraphEdgePreview};
+use crate::graphql::types::project::Project;
+use crate::graphql::types::plan::Plan;
+use crate::graphql::types::plan_dag::{PlanDag, PlanDagNode, PlanDagEdge, PlanDagInput, PlanDagMetadata, ValidationResult};
+use crate::graphql::types::{User, ProjectCollaborator, DataSource, UserSession, DataSourcePreview, GraphPreview, TableRow, TableColumn, GraphNodePreview, GraphEdgePreview};
 use crate::graphql::types::plan_dag::DataSourceReference;
 
 pub struct Query;
@@ -190,7 +193,7 @@ impl Query {
             }
         }
 
-        Ok(ValidationResult {
+        Ok(crate::graphql::types::plan_dag::ValidationResult {
             is_valid: errors.is_empty(),
             errors,
             warnings,

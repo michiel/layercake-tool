@@ -19,4 +19,9 @@ export default defineConfig({
   define: {
     global: 'globalThis',
   },
+  resolve: {
+    alias: {
+      'web-worker': './src/utils/dummy-web-worker.js',
+    },
+  },
 })

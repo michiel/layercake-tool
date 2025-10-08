@@ -1,9 +1,11 @@
 use async_graphql::*;
 use sea_orm::{EntityTrait, ColumnTrait, QueryFilter};
 
-use crate::database::entities::layers;
+use crate::database::entities::{layers, graph_nodes, graph_edges};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::{Layer, Project};
+use crate::graphql::types::graph_node::GraphNode;
+use crate::graphql::types::graph_edge::GraphEdge;
 
 #[derive(SimpleObject)]
 #[graphql(complex)]
@@ -52,6 +54,26 @@ impl Graph {
             .await?;
         
         Ok(layers.into_iter().map(Layer::from).collect())
+    }
+
+    async fn graph_nodes(&self, ctx: &Context<'_>) -> Result<Vec<GraphNode>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let nodes = graph_nodes::Entity::find()
+            .filter(graph_nodes::Column::GraphId.eq(self.id))
+            .all(&context.db)
+            .await?;
+
+        Ok(nodes.into_iter().map(GraphNode::from).collect())
+    }
+
+    async fn graph_edges(&self, ctx: &Context<'_>) -> Result<Vec<GraphEdge>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let edges = graph_edges::Entity::find()
+            .filter(graph_edges::Column::GraphId.eq(self.id))
+            .all(&context.db)
+            .await?;
+
+        Ok(edges.into_iter().map(GraphEdge::from).collect())
     }
 }
 

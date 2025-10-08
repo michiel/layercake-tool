@@ -83,6 +83,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
       header={{ height: 60 }}
       navbar={{ width: 250, breakpoint: 'sm' }}
       padding="md"
+      h="100vh"
     >
       <AppShell.Header>
         <TopBar
@@ -147,7 +148,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
         </Stack>
       </AppShell.Navbar>
 
-      <AppShell.Main>
+      <AppShell.Main style={{ flex: 1 }}>
         {children}
       </AppShell.Main>
     </AppShell>
@@ -738,6 +739,7 @@ const PlanEditorPage = () => {
 }
 
 import { GraphsPage } from './components/graphs/GraphsPage'
+import { GraphEditorPage } from './pages/GraphEditorPage'
 
 // Main App component with routing
 function App() {
@@ -768,6 +770,11 @@ function App() {
           <Route path="/projects/:projectId/graphs" element={
             <ErrorBoundary>
               <GraphsPage />
+            </ErrorBoundary>
+          } />
+          <Route path="/projects/:projectId/graphs/:graphId/edit" element={
+            <ErrorBoundary>
+              <GraphEditorPage />
             </ErrorBoundary>
           } />
           <Route path="/projects/:projectId/datasources" element={
