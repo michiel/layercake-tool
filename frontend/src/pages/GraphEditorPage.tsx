@@ -118,7 +118,7 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
   }
 
   return (
-    <Stack h="100%" gap={0}>
+    <Stack gap={0} style={{ height: 'calc(100vh - 60px)', width: '100%', margin: '-16px' }}>
       <div style={{ padding: '16px', borderBottom: '1px solid #e9ecef' }}>
         <Breadcrumbs
           projectName={selectedProject.name}
