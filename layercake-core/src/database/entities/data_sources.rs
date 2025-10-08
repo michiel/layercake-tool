@@ -10,8 +10,7 @@ pub struct Model {
     pub project_id: i32,
     pub name: String,
     pub description: Option<String>,
-    #[sea_orm(column_type = "Text")]
-    pub source_type: String, // DEPRECATED: kept for migration compatibility
+
     pub file_format: String, // 'csv', 'tsv', 'json'
     pub data_type: String, // 'nodes', 'edges', 'layers', 'graph'
     pub filename: String,
@@ -52,7 +51,7 @@ impl ActiveModel {
             project_id: ActiveValue::NotSet,
             name: ActiveValue::NotSet,
             description: ActiveValue::NotSet,
-            source_type: Set("".to_string()), // DEPRECATED
+
             file_format: ActiveValue::NotSet,
             data_type: ActiveValue::NotSet,
             filename: ActiveValue::NotSet,
@@ -254,34 +253,7 @@ impl DataType {
     }
 }
 
-// DEPRECATED: Keep for backward compatibility during migration
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub enum DataSourceType {
-    CsvNodes,
-    CsvEdges,
-    CsvLayers,
-    JsonGraph,
-}
 
-impl DataSourceType {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            DataSourceType::CsvNodes => "csv_nodes",
-            DataSourceType::CsvEdges => "csv_edges",
-            DataSourceType::CsvLayers => "csv_layers",
-            DataSourceType::JsonGraph => "json_graph",
-        }
-    }
-
-    pub fn to_format_and_type(&self) -> (FileFormat, DataType) {
-        match self {
-            DataSourceType::CsvNodes => (FileFormat::Csv, DataType::Nodes),
-            DataSourceType::CsvEdges => (FileFormat::Csv, DataType::Edges),
-            DataSourceType::CsvLayers => (FileFormat::Csv, DataType::Layers),
-            DataSourceType::JsonGraph => (FileFormat::Json, DataType::Graph),
-        }
-    }
-}
 
 #[cfg(test)]
 mod tests {
@@ -318,15 +290,7 @@ mod tests {
             project_id: 1,
             name: "Test".to_string(),
             description: None,
-            source_type: "".to_string(),
             file_format: "csv".to_string(),
-            data_type: "nodes".to_string(),
-            filename: "test.csv".to_string(),
-            blob: vec![],
-            graph_json: "{}".to_string(),
-            status: "active".to_string(),
-            error_message: None,
-            file_size: 1024,
             processed_at: Some(chrono::Utc::now()),
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
@@ -350,7 +314,6 @@ mod tests {
             project_id: 1,
             name: "Test".to_string(),
             description: None,
-            source_type: "".to_string(),
             file_format: "csv".to_string(),
             data_type: "nodes".to_string(),
             filename: "test.csv".to_string(),
@@ -379,7 +342,6 @@ mod tests {
             project_id: 1,
             name: "Test".to_string(),
             description: None,
-            source_type: "".to_string(),
             file_format: "csv".to_string(),
             data_type: "nodes".to_string(),
             filename: "test.csv".to_string(),

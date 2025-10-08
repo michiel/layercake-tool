@@ -1,15 +1,16 @@
 use async_graphql::*;
 use sea_orm::EntityTrait;
 
-use crate::database::entities::{layers, projects};
+use crate::database::entities::{layers, graphs};
 use crate::graphql::context::GraphQLContext;
-use crate::graphql::types::{Project, JSON};
+use crate::graphql::types::graph::Graph;
+use crate::graphql::types::scalars::JSON;
 
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct Layer {
     pub id: i32,
-    pub project_id: i32,
+    pub graph_id: i32,
     pub layer_id: String,
     pub name: String,
     pub color: Option<String>,
@@ -23,7 +24,7 @@ impl From<layers::Model> for Layer {
         
         Self {
             id: model.id,
-            project_id: model.project_id,
+            graph_id: model.graph_id,
             layer_id: model.layer_id,
             name: model.name,
             color: model.color,
@@ -34,20 +35,12 @@ impl From<layers::Model> for Layer {
 
 #[ComplexObject]
 impl Layer {
-    async fn project(&self, ctx: &Context<'_>) -> Result<Option<Project>> {
+    async fn graph(&self, ctx: &Context<'_>) -> Result<Option<Graph>> {
         let context = ctx.data::<GraphQLContext>()?;
-        let project = projects::Entity::find_by_id(self.project_id)
+        let graph = graphs::Entity::find_by_id(self.graph_id)
             .one(&context.db)
             .await?;
         
-        Ok(project.map(Project::from))
+        Ok(graph.map(Graph::from))
     }
-}
-
-#[derive(InputObject)]
-pub struct CreateLayerInput {
-    pub layer_id: String,
-    pub name: String,
-    pub color: Option<String>,
-    pub properties: Option<JSON>,
 }

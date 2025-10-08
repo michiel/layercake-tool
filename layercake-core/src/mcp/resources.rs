@@ -93,75 +93,8 @@ impl LayercakeResourceRegistry {
 
     /// Get graph export resource
     async fn get_graph_resource(&self, project_id: i32, format: &str) -> McpResult<Resource> {
-        let graph_service = GraphService::new(self.db.clone());
-        
-        // Get graph data
-        let nodes = graph_service.get_nodes_for_project(project_id)
-            .await
-            .map_err(|e| McpError::Internal {
-                message: format!("Failed to get nodes: {}", e),
-            })?;
-            
-        let edges = graph_service.get_edges_for_project(project_id)
-            .await
-            .map_err(|e| McpError::Internal {
-                message: format!("Failed to get edges: {}", e),
-            })?;
-
-        let (content, mime_type) = match format {
-            "json" => {
-                let graph_data = json!({
-                    "project_id": project_id,
-                    "nodes": nodes.iter().map(|n| json!({
-                        "id": n.node_id,
-                        "label": n.label,
-                        "layer_id": n.layer_id,
-                        "properties": n.properties
-                    })).collect::<Vec<_>>(),
-                    "edges": edges.iter().map(|e| json!({
-                        "source": e.source_node_id,
-                        "target": e.target_node_id,
-                        "properties": e.properties
-                    })).collect::<Vec<_>>()
-                });
-                (serde_json::to_string_pretty(&graph_data).unwrap(), "application/json")
-            },
-            "dot" => {
-                let mut dot = String::from("digraph {\n");
-                for edge in &edges {
-                    dot.push_str(&format!("  \"{}\" -> \"{}\";\n", edge.source_node_id, edge.target_node_id));
-                }
-                dot.push_str("}\n");
-                (dot, "text/vnd.graphviz")
-            },
-            "mermaid" => {
-                let mut mermaid = String::from("graph TD\n");
-                for edge in &edges {
-                    mermaid.push_str(&format!("  {} --> {}\n", edge.source_node_id, edge.target_node_id));
-                }
-                (mermaid, "text/plain")
-            },
-            _ => return Err(McpError::Validation {
-                message: format!("Unsupported export format: {}", format),
-            }),
-        };
-
-        Ok(Resource {
-            uri: format!("layercake://graphs/{}/{}", project_id, format),
-            name: format!("Graph Export - {} ({})", project_id, format.to_uppercase()),
-            description: Some(format!("Graph data exported in {} format", format)),
-            mime_type: Some(mime_type.to_string()),
-            content: ResourceContent::Text { text: content },
-            metadata: {
-                let mut meta = HashMap::new();
-                meta.insert("project_id".to_string(), json!(project_id));
-                meta.insert("export_format".to_string(), json!(format));
-                meta.insert("resource_type".to_string(), json!("graph_export"));
-                meta.insert("node_count".to_string(), json!(nodes.len()));
-                meta.insert("edge_count".to_string(), json!(edges.len()));
-                meta
-            },
-        })
+        // TODO: Fix this function after data model refactoring
+        Err(McpError::Internal { message: "get_graph_resource is not implemented yet".to_string() })
     }
 
     /// Get analysis resource

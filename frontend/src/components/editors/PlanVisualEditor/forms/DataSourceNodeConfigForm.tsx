@@ -12,7 +12,8 @@ const GET_AVAILABLE_DATA_SOURCES = gql`
       id
       name
       description
-      sourceType
+      fileFormat
+      dataType
       createdAt
     }
   }
@@ -22,7 +23,8 @@ interface DataSourceReference {
   id: number;
   name: string;
   description?: string;
-  sourceType: string;
+  fileFormat: string;
+  dataType: string;
   createdAt: string;
 }
 

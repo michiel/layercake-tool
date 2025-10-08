@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
-    pub project_id: i32,
+    pub graph_id: i32,
     pub layer_id: String,
     pub name: String,
     pub color: Option<String>,
@@ -16,24 +16,16 @@ pub struct Model {
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
     #[sea_orm(
-        belongs_to = "super::projects::Entity",
-        from = "Column::ProjectId",
-        to = "super::projects::Column::Id"
+        belongs_to = "super::graphs::Entity",
+        from = "Column::GraphId",
+        to = "super::graphs::Column::Id"
     )]
-    Projects,
-    #[sea_orm(has_many = "super::nodes::Entity")]
-    Nodes,
+    Graphs,
 }
 
-impl Related<super::projects::Entity> for Entity {
+impl Related<super::graphs::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::Projects.def()
-    }
-}
-
-impl Related<super::nodes::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::Nodes.def()
+        Relation::Graphs.def()
     }
 }
 

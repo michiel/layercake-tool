@@ -4,7 +4,7 @@ use async_graphql::*;
 use sea_orm::{ActiveModelTrait, EntityTrait, Set, ColumnTrait, QueryFilter};
 use chrono::Utc;
 
-use crate::database::entities::{projects, plans, nodes, edges, layers, plan_dag_nodes, plan_dag_edges, users, user_sessions, project_collaborators};
+use crate::database::entities::{projects, plans, plan_dag_nodes, plan_dag_edges, users, user_sessions, project_collaborators};
 use crate::graphql::context::GraphQLContext;
 use crate::services::auth_service::AuthService;
 
@@ -14,10 +14,9 @@ use crate::services::export_service::ExportService;
 use crate::pipeline::DagExecutor;
 
 use crate::graphql::types::{
-    Project, Plan, Node, Edge, Layer,
+    Project, Plan,
     CreateProjectInput, UpdateProjectInput,
     CreatePlanInput, UpdatePlanInput,
-    CreateNodeInput, CreateEdgeInput, CreateLayerInput,
     PlanDagInput, PlanDagNodeInput, PlanDagEdgeInput,
     PlanDagNodeUpdateInput, Position, NodePositionInput,
     PlanDag, PlanDagNode, PlanDagEdge,
@@ -153,83 +152,6 @@ impl Mutation {
             message: "Plan execution not yet implemented".to_string(),
             output_files: vec![],
         })
-    }
-
-    /// Create multiple nodes
-    async fn create_nodes(&self, ctx: &Context<'_>, project_id: i32, nodes: Vec<CreateNodeInput>) -> Result<Vec<Node>> {
-        let context = ctx.data::<GraphQLContext>()?;
-        let mut results = Vec::new();
-
-        for node_input in nodes {
-            let properties_json = node_input.properties
-                .map(|props| serde_json::to_string(&props))
-                .transpose()?;
-            
-            let node = nodes::ActiveModel {
-                project_id: Set(project_id),
-                node_id: Set(node_input.node_id),
-                label: Set(node_input.label),
-                layer_id: Set(node_input.layer_id),
-                properties: Set(properties_json),
-                ..Default::default()
-            };
-
-            let node = node.insert(&context.db).await?;
-            results.push(Node::from(node));
-        }
-
-        Ok(results)
-    }
-
-    /// Create multiple edges
-    async fn create_edges(&self, ctx: &Context<'_>, project_id: i32, edges: Vec<CreateEdgeInput>) -> Result<Vec<Edge>> {
-        let context = ctx.data::<GraphQLContext>()?;
-        let mut results = Vec::new();
-
-        for edge_input in edges {
-            let properties_json = edge_input.properties
-                .map(|props| serde_json::to_string(&props))
-                .transpose()?;
-            
-            let edge = edges::ActiveModel {
-                project_id: Set(project_id),
-                source_node_id: Set(edge_input.source_node_id),
-                target_node_id: Set(edge_input.target_node_id),
-                properties: Set(properties_json),
-                ..Default::default()
-            };
-
-            let edge = edge.insert(&context.db).await?;
-            results.push(Edge::from(edge));
-        }
-
-        Ok(results)
-    }
-
-    /// Create multiple layers
-    async fn create_layers(&self, ctx: &Context<'_>, project_id: i32, layers: Vec<CreateLayerInput>) -> Result<Vec<Layer>> {
-        let context = ctx.data::<GraphQLContext>()?;
-        let mut results = Vec::new();
-
-        for layer_input in layers {
-            let properties_json = layer_input.properties
-                .map(|props| serde_json::to_string(&props))
-                .transpose()?;
-            
-            let layer = layers::ActiveModel {
-                project_id: Set(project_id),
-                layer_id: Set(layer_input.layer_id),
-                name: Set(layer_input.name),
-                color: Set(layer_input.color),
-                properties: Set(properties_json),
-                ..Default::default()
-            };
-
-            let layer = layer.insert(&context.db).await?;
-            results.push(Layer::from(layer));
-        }
-
-        Ok(results)
     }
 
     /// Update a complete Plan DAG

@@ -8,7 +8,6 @@ export const GET_DATASOURCES = gql`
       projectId
       name
       description
-      sourceType
       fileFormat
       dataType
       filename
@@ -31,7 +30,6 @@ export const GET_DATASOURCE = gql`
       projectId
       name
       description
-      sourceType
       fileFormat
       dataType
       filename
@@ -54,7 +52,6 @@ export const CREATE_DATASOURCE_FROM_FILE = gql`
       projectId
       name
       description
-      sourceType
       fileFormat
       dataType
       filename
@@ -77,7 +74,6 @@ export const UPDATE_DATASOURCE = gql`
       projectId
       name
       description
-      sourceType
       fileFormat
       dataType
       filename
@@ -107,7 +103,6 @@ export const REPROCESS_DATASOURCE = gql`
       projectId
       name
       description
-      sourceType
       fileFormat
       dataType
       filename
@@ -130,7 +125,6 @@ export const UPDATE_GRAPH_JSON = gql`
       projectId
       name
       description
-      sourceType
       fileFormat
       dataType
       filename
@@ -153,7 +147,6 @@ export const DATASOURCE_UPDATED = gql`
       projectId
       name
       description
-      sourceType
       fileFormat
       dataType
       filename
@@ -190,7 +183,6 @@ export interface DataSource {
   projectId: number
   name: string
   description?: string
-  sourceType: 'csv_nodes' | 'csv_edges' | 'csv_layers' | 'json_graph' // DEPRECATED
   fileFormat: string
   dataType: string
   filename: string
@@ -265,22 +257,6 @@ export const getDataTypeDisplayName = (dataType: string): string => {
     case 'GRAPH':
     case 'graph':
       return 'Graph'
-    default:
-      return 'Unknown'
-  }
-}
-
-// Helper function to get data source type display name (DEPRECATED)
-export const getDataSourceTypeDisplayName = (sourceType: DataSource['sourceType']): string => {
-  switch (sourceType) {
-    case 'csv_nodes':
-      return 'CSV Nodes'
-    case 'csv_edges':
-      return 'CSV Edges'
-    case 'csv_layers':
-      return 'CSV Layers'
-    case 'json_graph':
-      return 'JSON Graph'
     default:
       return 'Unknown'
   }

@@ -42,7 +42,8 @@ import {
   DataSource,
   UpdateDataSourceInput,
   formatFileSize,
-  getDataSourceTypeDisplayName,
+  getDataTypeDisplayName,
+  getFileFormatDisplayName,
   getStatusColor
 } from '../../graphql/datasources'
 import { GraphSpreadsheetEditor, GraphData } from '../editors/GraphSpreadsheetEditor'
@@ -312,7 +313,7 @@ export const DataSourceEditor: React.FC<DataSourceEditorProps> = () => {
             <Title order={1}>{dataSource.name}</Title>
             <Group gap="xs" mt="xs">
               <Badge variant="light" size="sm">
-                {getDataSourceTypeDisplayName(dataSource.sourceType)}
+                {getFileFormatDisplayName(dataSource.fileFormat)}/{getDataTypeDisplayName(dataSource.dataType)}
               </Badge>
               <Badge
                 variant="light"

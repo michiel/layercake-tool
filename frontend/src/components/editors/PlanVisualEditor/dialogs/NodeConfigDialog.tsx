@@ -5,7 +5,7 @@ import { IconAlertCircle, IconCheck, IconFile, IconPlus } from '@tabler/icons-re
 import { PlanDagNodeType, NodeConfig, NodeMetadata, DataSourceNodeConfig } from '../../../../types/plan-dag'
 import { DataSourceSelectionDialog } from './DataSourceSelectionDialog'
 import { useQuery } from '@apollo/client/react'
-import { GET_DATASOURCE, DataSource, getDataSourceTypeDisplayName } from '../../../../graphql/datasources'
+import { GET_DATASOURCE, DataSource, getDataTypeDisplayName, getFileFormatDisplayName } from '../../../../graphql/datasources'
 
 interface NodeConfigDialogProps {
   opened: boolean
@@ -270,10 +270,9 @@ function renderNodeSpecificFields(
                     <Group gap="xs" mb="xs">
                       <IconFile size={16} />
                       <Text fw={500} size="sm">{selectedDataSource.name}</Text>
-                      <Badge variant="outline" size="xs">
-                        {getDataSourceTypeDisplayName(selectedDataSource.sourceType)}
-                      </Badge>
-                    </Group>
+                                              <Badge variant="outline" size="xs">
+                                                {getFileFormatDisplayName(selectedDataSource.fileFormat)}/{getDataTypeDisplayName(selectedDataSource.dataType)}
+                                              </Badge>                    </Group>
 
                     {selectedDataSource.description && (
                       <Text size="xs" c="dimmed" mb="xs">

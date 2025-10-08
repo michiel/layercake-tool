@@ -176,6 +176,7 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
                     <Table.Th>Execution State</Table.Th>
                     <Table.Th>Nodes</Table.Th>
                     <Table.Th>Edges</Table.Th>
+                    <Table.Th>Layers</Table.Th>
                     <Table.Th>Created</Table.Th>
                     <Table.Th>Updated</Table.Th>
                     <Table.Th>Actions</Table.Th>
@@ -189,6 +190,7 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
                       <Table.Td>{graph.executionState}</Table.Td>
                       <Table.Td>{graph.nodeCount}</Table.Td>
                       <Table.Td>{graph.edgeCount}</Table.Td>
+                      <Table.Td>{graph.layers.length}</Table.Td>
                       <Table.Td>{new Date(graph.createdAt).toLocaleDateString()}</Table.Td>
                       <Table.Td>{new Date(graph.updatedAt).toLocaleDateString()}</Table.Td>
                       <Table.Td>

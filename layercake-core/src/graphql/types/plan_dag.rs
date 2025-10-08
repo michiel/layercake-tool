@@ -105,7 +105,7 @@ impl From<data_sources::Model> for DataSourceReference {
             id: model.id,
             name: model.name,
             description: model.description,
-            data_type: model.source_type,
+            data_type: model.data_type,
             created_at: model.created_at,
         }
     }

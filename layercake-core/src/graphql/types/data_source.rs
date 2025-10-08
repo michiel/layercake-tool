@@ -12,8 +12,7 @@ pub struct DataSource {
     pub project_id: i32,
     pub name: String,
     pub description: Option<String>,
-    #[graphql(name = "sourceType")]
-    pub source_type: String, // DEPRECATED: kept for backward compatibility
+
     #[graphql(name = "fileFormat")]
     pub file_format: String,
     #[graphql(name = "dataType")]
@@ -86,7 +85,7 @@ impl From<crate::database::entities::data_sources::Model> for DataSource {
             project_id: model.project_id,
             name: model.name,
             description: model.description,
-            source_type: model.source_type,
+
             file_format: model.file_format,
             data_type: model.data_type,
             filename: model.filename,
@@ -185,29 +184,6 @@ impl From<DataSourceDataType> for crate::database::entities::data_sources::DataT
     }
 }
 
-// DEPRECATED: Data source type enum (kept for backward compatibility)
-#[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
-pub enum DataSourceType {
-    #[graphql(name = "csv_nodes")]
-    CsvNodes,
-    #[graphql(name = "csv_edges")]
-    CsvEdges,
-    #[graphql(name = "csv_layers")]
-    CsvLayers,
-    #[graphql(name = "json_graph")]
-    JsonGraph,
-}
-
-impl From<crate::database::entities::data_sources::DataSourceType> for DataSourceType {
-    fn from(db_type: crate::database::entities::data_sources::DataSourceType) -> Self {
-        match db_type {
-            crate::database::entities::data_sources::DataSourceType::CsvNodes => DataSourceType::CsvNodes,
-            crate::database::entities::data_sources::DataSourceType::CsvEdges => DataSourceType::CsvEdges,
-            crate::database::entities::data_sources::DataSourceType::CsvLayers => DataSourceType::CsvLayers,
-            crate::database::entities::data_sources::DataSourceType::JsonGraph => DataSourceType::JsonGraph,
-        }
-    }
-}
 
 
 // Response types for download URLs

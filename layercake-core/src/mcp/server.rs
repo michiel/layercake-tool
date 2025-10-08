@@ -407,9 +407,10 @@ impl ToolRegistry for LayercakeToolRegistry {
             "get_plan_status" => super::tools::plans::get_plan_status(context.arguments, &self.db).await,
             
             // Graph data tools
-            "import_csv" => super::tools::graph_data::import_csv(context.arguments, &self.db).await,
-            "export_graph" => super::tools::graph_data::export_graph(context.arguments, &self.db).await,
-            "get_graph_data" => super::tools::graph_data::get_graph_data(context.arguments, &self.db).await,
+            // TODO: Implement these tools
+            // "import_csv" => super::tools::graph_data::import_csv(context.arguments, &self.db).await,
+            // "export_graph" => super::tools::graph_data::export_graph(context.arguments, &self.db).await,
+            // "get_graph_data" => super::tools::graph_data::get_graph_data(context.arguments, &self.db).await,
             
             // Analysis tools
             "analyze_connectivity" => super::tools::analysis::analyze_connectivity(context.arguments, &self.db).await,

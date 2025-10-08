@@ -153,24 +153,7 @@ export interface PlanDag {
   metadata: PlanDagMetadata;
 }
 
-// DataSource types (new)
-export type DataSourceType = 'csv_nodes' | 'csv_edges' | 'csv_layers' | 'json_graph';
 
-export interface DataSource {
-  id: number;
-  projectId: number;
-  name: string;
-  description?: string;
-  sourceType: DataSourceType;
-  filename: string;
-  graphJson: string;
-  status: 'active' | 'processing' | 'error';
-  errorMessage?: string;
-  fileSize: number;
-  processedAt?: string;
-  createdAt: string;
-  updatedAt: string;
-}
 
 export interface ProcessedGraphData {
   nodes: any[]; // Will be properly typed when we have GraphNode interface

@@ -1,7 +1,9 @@
 use async_graphql::*;
+use sea_orm::{EntityTrait, ColumnTrait, QueryFilter};
 
+use crate::database::entities::layers;
 use crate::graphql::context::GraphQLContext;
-use crate::graphql::types::Project;
+use crate::graphql::types::{Layer, Project};
 
 #[derive(SimpleObject)]
 #[graphql(complex)]
@@ -40,6 +42,16 @@ impl Graph {
             .ok_or_else(|| Error::new("Project not found"))?;
 
         Ok(Project::from(project))
+    }
+
+    async fn layers(&self, ctx: &Context<'_>) -> Result<Vec<Layer>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let layers = layers::Entity::find()
+            .filter(layers::Column::GraphId.eq(self.id))
+            .all(&context.db)
+            .await?;
+        
+        Ok(layers.into_iter().map(Layer::from).collect())
     }
 }
 

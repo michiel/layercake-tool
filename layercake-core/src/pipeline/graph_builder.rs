@@ -218,7 +218,7 @@ impl GraphBuilder {
             project_id: graph.project_id,
             name: graph.name.clone(),
             description: Some(format!("Graph from {}", graph.node_id)),
-            source_type: "graph".to_string(),
+
             file_format: "json".to_string(),
             data_type: "graph".to_string(),
             filename: format!("graph_{}", graph.node_id),

@@ -89,7 +89,7 @@ impl DataSourceService {
             project_id: Set(project_id),
             name: Set(name),
             description: Set(description),
-            source_type: Set(format!("{}_{}", file_format.as_str(), data_type.as_str())), // Compatibility
+
             file_format: Set(file_format.as_str().to_string()),
             data_type: Set(data_type.as_str().to_string()),
             filename: Set(filename),

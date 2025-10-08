@@ -16,14 +16,8 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(has_many = "super::plans::Entity")]
+    #[sea_orm(has_one = "super::plans::Entity")]
     Plans,
-    #[sea_orm(has_many = "super::nodes::Entity")]
-    Nodes,
-    #[sea_orm(has_many = "super::edges::Entity")]
-    Edges,
-    #[sea_orm(has_many = "super::layers::Entity")]
-    Layers,
     #[sea_orm(has_many = "super::data_sources::Entity")]
     DataSources,
 }
@@ -31,24 +25,6 @@ pub enum Relation {
 impl Related<super::plans::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Plans.def()
-    }
-}
-
-impl Related<super::nodes::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::Nodes.def()
-    }
-}
-
-impl Related<super::edges::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::Edges.def()
-    }
-}
-
-impl Related<super::layers::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::Layers.def()
     }
 }
 

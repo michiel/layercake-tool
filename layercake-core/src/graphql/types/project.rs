@@ -2,9 +2,9 @@ use async_graphql::*;
 use chrono::{DateTime, Utc};
 use sea_orm::{EntityTrait, ColumnTrait, QueryFilter};
 
-use crate::database::entities::{projects, plans, nodes, edges, layers};
+use crate::database::entities::{projects, plans};
 use crate::graphql::context::GraphQLContext;
-use crate::graphql::types::{Plan, Node, Edge, Layer};
+use crate::graphql::types::{Plan};
 
 #[derive(SimpleObject)]
 #[graphql(complex)]
@@ -32,44 +32,14 @@ impl From<projects::Model> for Project {
 
 #[ComplexObject]
 impl Project {
-    async fn plans(&self, ctx: &Context<'_>) -> Result<Vec<Plan>> {
+    async fn plan(&self, ctx: &Context<'_>) -> Result<Option<Plan>> {
         let context = ctx.data::<GraphQLContext>()?;
-        let plans = plans::Entity::find()
+        let plan = plans::Entity::find()
             .filter(plans::Column::ProjectId.eq(self.id))
-            .all(&context.db)
+            .one(&context.db)
             .await?;
         
-        Ok(plans.into_iter().map(Plan::from).collect())
-    }
-
-    async fn nodes(&self, ctx: &Context<'_>) -> Result<Vec<Node>> {
-        let context = ctx.data::<GraphQLContext>()?;
-        let nodes = nodes::Entity::find()
-            .filter(nodes::Column::ProjectId.eq(self.id))
-            .all(&context.db)
-            .await?;
-        
-        Ok(nodes.into_iter().map(Node::from).collect())
-    }
-
-    async fn edges(&self, ctx: &Context<'_>) -> Result<Vec<Edge>> {
-        let context = ctx.data::<GraphQLContext>()?;
-        let edges = edges::Entity::find()
-            .filter(edges::Column::ProjectId.eq(self.id))
-            .all(&context.db)
-            .await?;
-        
-        Ok(edges.into_iter().map(Edge::from).collect())
-    }
-
-    async fn layers(&self, ctx: &Context<'_>) -> Result<Vec<Layer>> {
-        let context = ctx.data::<GraphQLContext>()?;
-        let layers = layers::Entity::find()
-            .filter(layers::Column::ProjectId.eq(self.id))
-            .all(&context.db)
-            .await?;
-        
-        Ok(layers.into_iter().map(Layer::from).collect())
+        Ok(plan.map(Plan::from))
     }
 }
 

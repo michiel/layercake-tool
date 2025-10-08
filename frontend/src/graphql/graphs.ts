@@ -1,5 +1,11 @@
 import { gql } from '@apollo/client'
 
+export interface Layer {
+  id: string;
+  name: string;
+  color: string;
+}
+
 export interface Graph {
   id: string
   name: string
@@ -9,6 +15,7 @@ export interface Graph {
   edgeCount: number
   createdAt: string
   updatedAt: string
+  layers: Layer[];
 }
 
 export const GET_GRAPHS = gql`
@@ -22,6 +29,11 @@ export const GET_GRAPHS = gql`
       edgeCount
       createdAt
       updatedAt
+      layers {
+        id
+        name
+        color
+      }
     }
   }
 `

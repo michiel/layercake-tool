@@ -8,6 +8,32 @@ Agentic AI with tooling exposed via Model Context Protocol for agentic collabora
 
 Building this as a distributed and collaborative graph editing platform is a later goal and not a priority for version 1.0.0
 
+## Data model relationships between entities
+
+### Project
+
+One project has one,
+ - PlanDAG
+
+One project has many,
+ - Datasource
+ - LayercakeGraph
+
+### PlanDAG
+
+One PlanDAG has many,
+ - PlanNode
+ - PlanEdge
+
+### LayercakeGraph
+
+One LayercakeGraph has many,
+ - LcEdge
+ - LcNode
+ - LcLayer
+
+## Details
+
 ### Layercake plans and graphs
 
  - All aspected of the layercake process from ingestion to transformation to renderings are stored as a DAG. This is the layercake plan. If an upstream node (e.g. representing ingestion of a CSV as a nodeset) changes, all downstream nodes are updated
