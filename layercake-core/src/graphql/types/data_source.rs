@@ -124,6 +124,16 @@ pub struct UpdateDataSourceInput {
     pub file_content: Option<String>, // Base64 encoded file content
 }
 
+/// Input for bulk upload - file format and data type are auto-detected
+#[derive(InputObject)]
+pub struct BulkUploadDataSourceInput {
+    pub name: String,
+    pub description: Option<String>,
+    pub filename: String,
+    #[graphql(name = "fileContent")]
+    pub file_content: String, // Base64 encoded file content
+}
+
 // File format enum (physical representation)
 #[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub enum FileFormat {

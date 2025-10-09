@@ -359,7 +359,9 @@ impl MergeBuilder {
                             layer: node_val["layer"].as_str().map(|s| s.to_string()),
                             weight: node_val["weight"].as_f64(),
                             is_partition: parse_is_partition(&node_val["is_partition"]),
-                            belongs_to: node_val["belongs_to"].as_str().map(|s| s.to_string()),
+                            belongs_to: node_val["belongs_to"].as_str()
+                                .filter(|s| !s.is_empty())
+                                .map(|s| s.to_string()),
                             attrs: Some(node_val.clone()),
                         };
 
@@ -411,7 +413,9 @@ impl MergeBuilder {
                             layer: node_val["layer"].as_str().map(|s| s.to_string()),
                             weight: node_val["weight"].as_f64(),
                             is_partition: parse_is_partition(&node_val["is_partition"]),
-                            belongs_to: node_val["belongs_to"].as_str().map(|s| s.to_string()),
+                            belongs_to: node_val["belongs_to"].as_str()
+                                .filter(|s| !s.is_empty())
+                                .map(|s| s.to_string()),
                             attrs: Some(node_val.clone()),
                         };
 

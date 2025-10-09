@@ -28,12 +28,16 @@ export const getLayoutedElements = async (
   lcGraph.graphNodes.forEach(node => nodeMap.set(node.id, node));
 
   // Debug: Log nodes to verify belongsTo and isPartition values
-  console.log('Graph nodes:', lcGraph.graphNodes.map(n => ({
-    id: n.id,
-    label: n.label,
-    isPartition: n.isPartition,
-    belongsTo: n.belongsTo
-  })));
+  console.log('=== ALL GRAPH NODES (total: ' + lcGraph.graphNodes.length + ') ===');
+  lcGraph.graphNodes.forEach(n => {
+    console.log(`  ${n.id}: isPartition=${n.isPartition}, belongsTo=${n.belongsTo || 'null'}, label="${n.label}"`);
+  });
+
+  console.log('\n=== PARTITION NODES ===');
+  lcGraph.graphNodes.filter(n => n.isPartition).forEach(n => {
+    const children = lcGraph.graphNodes.filter(c => c.belongsTo === n.id);
+    console.log(`  ${n.id} (${n.label}): ${children.length} children - [${children.map(c => c.id).join(', ')}]`);
+  });
 
   // Build ELK graph structure recursively
   const buildElkNode = (nodeId: string): ElkNode | null => {
@@ -136,17 +140,49 @@ export const getLayoutedElements = async (
 
     if (node?.isPartition) {
       // This is a subflow (group node)
+      const groupLabel = elkNode.labels?.[0]?.text || elkNode.id;
+
       reactFlowNodes.push({
         id: elkNode.id,
         position: { x: elkNode.x || 0, y: elkNode.y || 0 },
-        data: { label: elkNode.labels?.[0]?.text || elkNode.id },
+        data: {
+          label: groupLabel,
+        },
         type: 'group',
         style: {
           width: elkNode.width || undefined,
           height: elkNode.height || undefined,
-          zIndex: -depth, // Containing subflows have lower z-index
+          backgroundColor: 'rgba(240, 240, 240, 0.5)',
+          border: '2px solid #999',
+          borderRadius: '8px',
+          zIndex: -depth - 1, // Lower z-index for deeper nesting, below edges
         },
+        className: 'layercake-group-node',
         ...(parentId ? { parentNode: parentId, extent: 'parent' as const } : {}),
+      });
+
+      // Add label as a separate node with high z-index
+      reactFlowNodes.push({
+        id: `${elkNode.id}-label`,
+        position: { x: 10, y: 6 },
+        data: { label: groupLabel },
+        draggable: false,
+        selectable: false,
+        connectable: false,
+        style: {
+          background: 'transparent',
+          border: 'none',
+          fontSize: '11px',
+          fontWeight: '500',
+          color: '#666',
+          padding: 0,
+          pointerEvents: 'none',
+          zIndex: 100,
+          minWidth: 'auto',
+          width: 'auto',
+          height: 'auto',
+        },
+        parentNode: elkNode.id,
       });
 
       // Process children if any
@@ -162,7 +198,7 @@ export const getLayoutedElements = async (
         position: { x: elkNode.x || 0, y: elkNode.y || 0 },
         data: { label: elkNode.labels?.[0]?.text || elkNode.id },
         style: {
-          zIndex: 1, // Regular nodes always on top
+          zIndex: 50, // Regular nodes above edges (10) and groups (negative)
         },
         ...(parentId ? { parentNode: parentId, extent: 'parent' as const } : {}),
       });
@@ -177,10 +213,12 @@ export const getLayoutedElements = async (
       source: edge.sources && edge.sources.length > 0 ? edge.sources[0] : '',
       target: edge.targets && edge.targets.length > 0 ? edge.targets[0] : '',
       label: edge.labels?.[0]?.text || '',
-      type: 'default',
+      type: 'floating',
       markerEnd: { type: MarkerType.ArrowClosed },
       style: {
-        zIndex: 0, // Edges between nodes and subflows
+        zIndex: 10, // Edges above group backgrounds but below nodes
+        strokeWidth: 2,
+        stroke: '#b1b1b7',
       },
     });
   });

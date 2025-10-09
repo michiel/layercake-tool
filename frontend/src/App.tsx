@@ -574,7 +574,7 @@ const ProjectDetailPage = () => {
 
   const projectActions = [
     {
-      title: 'Plan Editor',
+      title: 'Plan',
       description: 'Create and edit Plan DAGs with visual node-based interface',
       icon: <IconGraph size={20} />,
       onClick: () => navigate(`/projects/${projectId}/plan`),

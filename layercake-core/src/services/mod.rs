@@ -8,6 +8,7 @@ pub mod project_service;
 pub mod collaboration_service;
 pub mod data_source_service;
 pub mod plan_dag_service;
+pub mod file_type_detection;
 
 pub use graph_service::*;
 pub use import_service::*;

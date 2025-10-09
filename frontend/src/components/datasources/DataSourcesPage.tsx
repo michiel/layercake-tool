@@ -33,6 +33,7 @@ import {
 import { useQuery as useProjectsQuery } from '@apollo/client/react'
 import { Breadcrumbs } from '../common/Breadcrumbs'
 import { DataSourceUploader } from './DataSourceUploader'
+import { BulkDataSourceUploader } from './BulkDataSourceUploader'
 import {
   GET_DATASOURCES,
   DELETE_DATASOURCE,
@@ -66,6 +67,7 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [selectedDataSource, setSelectedDataSource] = useState<DataSource | null>(null)
   const [uploaderOpen, setUploaderOpen] = useState(false)
+  const [bulkUploaderOpen, setBulkUploaderOpen] = useState(false)
 
   // Query for project info
   const { data: projectsData } = useProjectsQuery<{
@@ -104,6 +106,10 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
 
   const handleCreateNew = () => {
     setUploaderOpen(true)
+  }
+
+  const handleBulkUpload = () => {
+    setBulkUploaderOpen(true)
   }
 
   const handleEdit = (dataSource: DataSource) => {
@@ -203,12 +209,21 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
               Manage CSV, TSV, and JSON files that serve as input data for your Plan DAGs
             </Text>
           </div>
-          <Button
-            leftSection={<IconPlus size={16} />}
-            onClick={handleCreateNew}
-          >
-            Upload Data Source
-          </Button>
+          <Group gap="xs">
+            <Button
+              leftSection={<IconPlus size={16} />}
+              onClick={handleCreateNew}
+              variant="light"
+            >
+              Upload Single File
+            </Button>
+            <Button
+              leftSection={<IconPlus size={16} />}
+              onClick={handleBulkUpload}
+            >
+              Bulk Upload
+            </Button>
+          </Group>
         </Group>
 
         {dataSourcesError && (
@@ -411,6 +426,17 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
         onClose={() => setUploaderOpen(false)}
         onSuccess={(dataSource) => {
           console.log('DataSource created:', dataSource)
+          refetchDataSources()
+        }}
+      />
+
+      {/* Bulk DataSource Uploader Modal */}
+      <BulkDataSourceUploader
+        projectId={parseInt(projectId || '0')}
+        opened={bulkUploaderOpen}
+        onClose={() => setBulkUploaderOpen(false)}
+        onSuccess={() => {
+          console.log('Bulk upload completed')
           refetchDataSources()
         }}
       />

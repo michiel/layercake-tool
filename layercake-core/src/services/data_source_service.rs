@@ -6,6 +6,7 @@ use std::collections::HashMap;
 
 use crate::database::entities::data_sources::{self, FileFormat, DataType};
 use crate::database::entities::projects;
+use crate::services::file_type_detection;
 
 /// Service for managing DataSources with file processing capabilities
 #[derive(Clone)]
@@ -145,6 +146,47 @@ impl DataSourceService {
             .all(&self.db)
             .await?;
         Ok(data_sources)
+    }
+
+    /// Create a new DataSource with auto-detected data type from file content
+    pub async fn create_with_auto_detect(
+        &self,
+        project_id: i32,
+        name: String,
+        description: Option<String>,
+        filename: String,
+        file_data: Vec<u8>,
+    ) -> Result<data_sources::Model> {
+        // Auto-detect format from filename
+        let file_format = FileFormat::from_extension(&filename)
+            .ok_or_else(|| anyhow!("Unsupported file extension: {}", filename))?;
+
+        // Auto-detect data type from file content using heuristics
+        let data_type = file_type_detection::detect_data_type(&file_format, &file_data)
+            .unwrap_or_else(|_| {
+                // Fallback to filename-based detection if content detection fails
+                if filename.to_lowercase().contains("node") {
+                    DataType::Nodes
+                } else if filename.to_lowercase().contains("edge") {
+                    DataType::Edges
+                } else if filename.to_lowercase().contains("layer") {
+                    DataType::Layers
+                } else if file_format == FileFormat::Json {
+                    DataType::Graph
+                } else {
+                    DataType::Nodes // Default fallback
+                }
+            });
+
+        self.create_from_file(
+            project_id,
+            name,
+            description,
+            filename,
+            file_format,
+            data_type,
+            file_data
+        ).await
     }
 
     /// Update DataSource metadata
@@ -330,7 +372,11 @@ impl DataSourceService {
                     match header {
                         "id" => { node.insert("id".to_string(), json!(field)); },
                         "label" => { node.insert("label".to_string(), json!(field)); },
-                        "layer" => { node.insert("layer".to_string(), json!(field)); },
+                        "layer" => {
+                            if !field.is_empty() {
+                                node.insert("layer".to_string(), json!(field));
+                            }
+                        },
                         "x" => {
                             if let Ok(x) = field.parse::<f64>() {
                                 node.insert("x".to_string(), json!(x));
@@ -342,8 +388,10 @@ impl DataSourceService {
                             }
                         },
                         _ => {
-                            // Store as metadata
-                            node.insert(header.to_string(), json!(field));
+                            // Store as metadata, skip empty strings
+                            if !field.is_empty() {
+                                node.insert(header.to_string(), json!(field));
+                            }
                         }
                     };
                 }
@@ -387,8 +435,13 @@ impl DataSourceService {
             for (i, field) in record.iter().enumerate() {
                 if let Some(header) = headers.get(i) {
                     match header {
-                        "id" | "source" | "target" | "label" => {
+                        "id" | "source" | "target" => {
                             edge.insert(header.to_string(), json!(field));
+                        },
+                        "label" => {
+                            if !field.is_empty() {
+                                edge.insert(header.to_string(), json!(field));
+                            }
                         },
                         "weight" => {
                             if let Ok(weight) = field.parse::<f64>() {
@@ -396,7 +449,10 @@ impl DataSourceService {
                             }
                         },
                         _ => {
-                            edge.insert(header.to_string(), json!(field));
+                            // Store as metadata, skip empty strings
+                            if !field.is_empty() {
+                                edge.insert(header.to_string(), json!(field));
+                            }
                         }
                     };
                 }
@@ -443,11 +499,18 @@ impl DataSourceService {
                 if let Some(header) = headers.get(i) {
                     let key = if header == "layer" { "id" } else { header };
                     match key {
-                        "id" | "label" | "description" => {
+                        "id" | "label" => {
                             layer.insert(key.to_string(), json!(field));
                         },
+                        "description" => {
+                            if !field.is_empty() {
+                                layer.insert(key.to_string(), json!(field));
+                            }
+                        },
                         "color" => {
-                            layer.insert("background_color".to_string(), json!(field));
+                            if !field.is_empty() {
+                                layer.insert("background_color".to_string(), json!(field));
+                            }
                         },
                         "z_index" => {
                             if let Ok(z) = field.parse::<i32>() {
@@ -455,7 +518,10 @@ impl DataSourceService {
                             }
                         },
                         _ => {
-                            layer.insert(key.to_string(), json!(field));
+                            // Store as metadata, skip empty strings
+                            if !field.is_empty() {
+                                layer.insert(key.to_string(), json!(field));
+                            }
                         }
                     };
                 }
