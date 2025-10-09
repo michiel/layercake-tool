@@ -64,6 +64,7 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
     const pane = new Pane({
       container: paneContainerRef.current,
       title: 'Graph Settings',
+      expanded: false, // Collapsed by default
     });
 
     const params = paramsRef.current;
@@ -339,31 +340,30 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
       style={{
         width: '100%',
         height: '100%',
-        display: 'flex',
-        flexDirection: 'row',
+        position: 'relative',
         background: '#fafafa',
       }}
     >
-      {/* Tweakpane container on the left */}
-      <div
-        ref={paneContainerRef}
-        style={{
-          width: '280px',
-          height: '100%',
-          flexShrink: 0,
-          background: '#f8f8f8',
-          borderRight: '1px solid #ddd',
-          overflow: 'auto',
-        }}
-      />
-
-      {/* Graph container on the right */}
+      {/* Graph container - full size */}
       <div
         ref={graphContainerRef}
         style={{
-          flex: 1,
+          width: '100%',
           height: '100%',
           background: '#fafafa',
+        }}
+      />
+
+      {/* Tweakpane container - positioned in top-right */}
+      <div
+        ref={paneContainerRef}
+        style={{
+          position: 'absolute',
+          top: '10px',
+          right: '10px',
+          zIndex: 1000,
+          maxHeight: 'calc(100% - 20px)',
+          overflow: 'auto',
         }}
       />
     </div>
