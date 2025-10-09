@@ -197,7 +197,7 @@ impl GraphBuilder {
     async fn graph_to_data_source(&self, graph: &graphs::Model) -> Result<data_sources::Model> {
         use sea_orm::{ColumnTrait, QueryFilter};
 
-        // Read graph nodes and edges from database
+        // Read graph nodes, edges, and layers from database
         let nodes = graph_nodes::Entity::find()
             .filter(graph_nodes::Column::GraphId.eq(graph.id))
             .all(&self.db)
@@ -205,6 +205,11 @@ impl GraphBuilder {
 
         let edges = graph_edges::Entity::find()
             .filter(graph_edges::Column::GraphId.eq(graph.id))
+            .all(&self.db)
+            .await?;
+
+        let db_layers = layers::Entity::find()
+            .filter(layers::Column::GraphId.eq(graph.id))
             .all(&self.db)
             .await?;
 
@@ -227,7 +232,31 @@ impl GraphBuilder {
                 "layer": e.layer.clone(),
                 "weight": e.weight,
                 "attrs": e.attrs.clone()
-            })).collect::<Vec<_>>()
+            })).collect::<Vec<_>>(),
+            "layers": db_layers.iter().map(|l| {
+                let mut layer_json = serde_json::json!({
+                    "id": l.layer_id.clone(),
+                    "label": l.name.clone(),
+                });
+
+                // Add color if present
+                if let Some(ref color) = l.color {
+                    layer_json["color"] = serde_json::json!(color);
+                }
+
+                // Parse and merge properties if present
+                if let Some(ref props_str) = l.properties {
+                    if let Ok(props) = serde_json::from_str::<serde_json::Value>(props_str) {
+                        if let Some(props_obj) = props.as_object() {
+                            for (key, value) in props_obj {
+                                layer_json[key] = value.clone();
+                            }
+                        }
+                    }
+                }
+
+                layer_json
+            }).collect::<Vec<_>>()
         });
 
         // Create a virtual data_source
@@ -365,7 +394,7 @@ impl GraphBuilder {
                     }
                 }
                 "graph" => {
-                    // Extract both nodes and edges from full graph JSON
+                    // Extract nodes, edges, and layers from full graph JSON
                     if let Some(nodes_array) = graph_data.get("nodes").and_then(|v| v.as_array()) {
                         for node_val in nodes_array {
                             let id = node_val["id"]
@@ -414,6 +443,63 @@ impl GraphBuilder {
                             };
 
                             all_edges.push(edge);
+                        }
+                    }
+
+                    // Extract layers from graph JSON
+                    if let Some(layers_array) = graph_data.get("layers").and_then(|v| v.as_array()) {
+                        for layer_val in layers_array {
+                            let layer_id = layer_val["id"]
+                                .as_str()
+                                .ok_or_else(|| anyhow!("Layer missing 'id' field"))?
+                                .to_string();
+
+                            // Skip empty layer IDs
+                            if layer_id.is_empty() {
+                                continue;
+                            }
+
+                            let name = layer_val["label"]
+                                .as_str()
+                                .unwrap_or(&layer_id)
+                                .to_string();
+
+                            let color = layer_val["color"]
+                                .as_str()
+                                .filter(|s| !s.is_empty())
+                                .map(|s| s.to_string());
+
+                            // Extract properties (background_color, border_color, text_color, etc.)
+                            let mut properties = serde_json::Map::new();
+                            if let Some(bg) = layer_val["background_color"].as_str() {
+                                if !bg.is_empty() {
+                                    properties.insert("background_color".to_string(), serde_json::Value::String(bg.to_string()));
+                                }
+                            }
+                            if let Some(border) = layer_val["border_color"].as_str() {
+                                if !border.is_empty() {
+                                    properties.insert("border_color".to_string(), serde_json::Value::String(border.to_string()));
+                                }
+                            }
+                            if let Some(text) = layer_val["text_color"].as_str() {
+                                if !text.is_empty() {
+                                    properties.insert("text_color".to_string(), serde_json::Value::String(text.to_string()));
+                                }
+                            }
+
+                            let properties_json = if properties.is_empty() {
+                                None
+                            } else {
+                                Some(serde_json::to_string(&properties)?)
+                            };
+
+                            let layer = LayerData {
+                                name,
+                                color,
+                                properties: properties_json,
+                            };
+
+                            all_layers.insert(layer_id, layer);
                         }
                     }
                 }
