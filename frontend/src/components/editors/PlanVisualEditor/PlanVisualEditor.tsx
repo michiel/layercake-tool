@@ -833,10 +833,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
   // Context menu handlers
   const handleContextMenu = useCallback((event: React.MouseEvent) => {
     event.preventDefault();
-    setContextMenu({
-      opened: true,
-      position: { x: event.clientX, y: event.clientY }
-    });
+    // Context menu disabled - just prevent default browser menu
   }, []);
 
   const handleCloseContextMenu = useCallback(() => {
