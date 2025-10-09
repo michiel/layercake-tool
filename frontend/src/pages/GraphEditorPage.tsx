@@ -31,8 +31,10 @@ const GET_GRAPH_DETAILS = gql`
       updatedAt
       layers {
         id
+        layerId
         name
         color
+        properties
       }
       graphNodes {
         id
