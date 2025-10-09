@@ -3,7 +3,7 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, Qu
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 
-use crate::database::entities::{data_sources, graph_edges, graph_nodes, graphs, plan_dag_nodes};
+use crate::database::entities::{data_sources, graph_edges, graph_nodes, graphs, layers, plan_dag_nodes};
 use crate::database::entities::datasources::ExecutionState;
 
 /// Helper function to parse is_partition from JSON Value (handles both boolean and string)
@@ -241,6 +241,7 @@ impl MergeBuilder {
 
         let mut all_nodes = HashMap::new();
         let mut all_edges = Vec::new();
+        let mut all_layers = HashMap::new(); // layer_id -> layer data
 
         // Process each source
         for source in sources {
@@ -250,11 +251,13 @@ impl MergeBuilder {
                     let graph_data: serde_json::Value = serde_json::from_str(&ds.graph_json)
                         .map_err(|e| anyhow!("Failed to parse graph JSON for {}: {}", ds.name, e))?;
 
-                    self.extract_from_json(&mut all_nodes, &mut all_edges, &graph_data, &ds.data_type)?;
+                    self.extract_from_json(&mut all_nodes, &mut all_edges, &mut all_layers, &graph_data, &ds.data_type)?;
                 }
                 DataSourceOrGraph::Graph(upstream_graph) => {
                     // Read nodes and edges from graph_nodes and graph_edges tables
                     self.extract_from_graph_tables(&mut all_nodes, &mut all_edges, upstream_graph.id).await?;
+                    // Also read layers from the upstream graph
+                    self.extract_layers_from_graph(&mut all_layers, upstream_graph.id).await?;
                 }
             }
         }
@@ -333,15 +336,30 @@ impl MergeBuilder {
             edge.insert(&self.db).await?;
         }
 
+        // Insert layers
+        for (layer_id, layer_data) in all_layers {
+            let layer = layers::ActiveModel {
+                graph_id: Set(graph.id),
+                layer_id: Set(layer_id),
+                name: Set(layer_data.name),
+                color: Set(layer_data.color),
+                properties: Set(layer_data.properties),
+                ..Default::default()
+            };
+
+            layer.insert(&self.db).await?;
+        }
+
         let node_count = node_ids.len();
         Ok((node_count, edge_count))
     }
 
-    /// Extract nodes and edges from graph_json
+    /// Extract nodes, edges, and layers from graph_json
     fn extract_from_json(
         &self,
         all_nodes: &mut HashMap<String, NodeData>,
         all_edges: &mut Vec<EdgeData>,
+        all_layers: &mut HashMap<String, LayerData>,
         graph_data: &serde_json::Value,
         data_type: &str,
     ) -> Result<()> {
@@ -453,7 +471,57 @@ impl MergeBuilder {
                 }
             }
             "layers" => {
-                // Layers data source, ignore for merging nodes and edges
+                // Extract layers from datasource
+                if let Some(layers_array) = graph_data.get("layers").and_then(|v| v.as_array()) {
+                    for layer_val in layers_array {
+                        let layer_id = layer_val["id"]
+                            .as_str()
+                            .ok_or_else(|| anyhow!("Layer missing 'id' field"))?
+                            .to_string();
+
+                        let name = layer_val["label"]
+                            .as_str()
+                            .unwrap_or(&layer_id)
+                            .to_string();
+
+                        let color = layer_val["color"]
+                            .as_str()
+                            .filter(|s| !s.is_empty())
+                            .map(|s| s.to_string());
+
+                        // Extract properties (background_color, border_color, text_color, etc.)
+                        let mut properties = serde_json::Map::new();
+                        if let Some(bg) = layer_val["background_color"].as_str() {
+                            if !bg.is_empty() {
+                                properties.insert("background_color".to_string(), serde_json::Value::String(bg.to_string()));
+                            }
+                        }
+                        if let Some(border) = layer_val["border_color"].as_str() {
+                            if !border.is_empty() {
+                                properties.insert("border_color".to_string(), serde_json::Value::String(border.to_string()));
+                            }
+                        }
+                        if let Some(text) = layer_val["text_color"].as_str() {
+                            if !text.is_empty() {
+                                properties.insert("text_color".to_string(), serde_json::Value::String(text.to_string()));
+                            }
+                        }
+
+                        let properties_json = if properties.is_empty() {
+                            None
+                        } else {
+                            Some(serde_json::to_string(&properties)?)
+                        };
+
+                        let layer = LayerData {
+                            name,
+                            color,
+                            properties: properties_json,
+                        };
+
+                        all_layers.insert(layer_id, layer);
+                    }
+                }
             }
             _ => {
                 return Err(anyhow!("Unknown data type: {}", data_type));
@@ -513,10 +581,34 @@ impl MergeBuilder {
         Ok(())
     }
 
+    /// Extract layers from graph layers table
+    async fn extract_layers_from_graph(
+        &self,
+        all_layers: &mut HashMap<String, LayerData>,
+        graph_id: i32,
+    ) -> Result<()> {
+        let db_layers = layers::Entity::find()
+            .filter(layers::Column::GraphId.eq(graph_id))
+            .all(&self.db)
+            .await?;
+
+        for db_layer in db_layers {
+            let layer = LayerData {
+                name: db_layer.name,
+                color: db_layer.color,
+                properties: db_layer.properties,
+            };
+            all_layers.insert(db_layer.layer_id, layer);
+        }
+
+        Ok(())
+    }
+
     /// Clear existing graph data
     async fn clear_graph_data(&self, graph_id: i32) -> Result<()> {
         use crate::database::entities::graph_edges::{Column as EdgeColumn, Entity as EdgeEntity};
         use crate::database::entities::graph_nodes::{Column as NodeColumn, Entity as NodeEntity};
+        use crate::database::entities::layers::{Column as LayerColumn, Entity as LayerEntity};
         use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
         // Delete edges
@@ -528,6 +620,12 @@ impl MergeBuilder {
         // Delete nodes
         NodeEntity::delete_many()
             .filter(NodeColumn::GraphId.eq(graph_id))
+            .exec(&self.db)
+            .await?;
+
+        // Delete layers
+        LayerEntity::delete_many()
+            .filter(LayerColumn::GraphId.eq(graph_id))
             .exec(&self.db)
             .await?;
 
@@ -560,4 +658,11 @@ struct EdgeData {
     layer: Option<String>,
     weight: Option<f64>,
     attrs: Option<serde_json::Value>,
+}
+
+/// Internal layer data structure
+struct LayerData {
+    name: String,
+    color: Option<String>,
+    properties: Option<String>, // JSON string
 }
