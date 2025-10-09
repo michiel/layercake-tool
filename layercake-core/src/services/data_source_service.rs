@@ -507,9 +507,19 @@ impl DataSourceService {
                                 layer.insert(key.to_string(), json!(field));
                             }
                         },
-                        "color" => {
+                        "color" | "background" => {
                             if !field.is_empty() {
                                 layer.insert("background_color".to_string(), json!(field));
+                            }
+                        },
+                        "border" => {
+                            if !field.is_empty() {
+                                layer.insert("border_color".to_string(), json!(field));
+                            }
+                        },
+                        "text" => {
+                            if !field.is_empty() {
+                                layer.insert("text_color".to_string(), json!(field));
                             }
                         },
                         "z_index" => {
