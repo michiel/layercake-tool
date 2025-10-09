@@ -7,6 +7,8 @@ use crate::database::entities::{
     graph_edges,
     graph_nodes::Entity as GraphNodes,
     graph_edges::Entity as GraphEdges,
+    plan_dag_nodes,
+    plan_dag_edges,
 };
 use crate::graph::{Graph, Node, Edge, Layer};
 
@@ -159,6 +161,31 @@ impl GraphService {
             .await?
             .ok_or_else(|| anyhow::anyhow!("Graph not found"))?;
 
+        // Find and delete all plan_dag_nodes that reference this graph by node_id
+        let dag_nodes = plan_dag_nodes::Entity::find()
+            .filter(plan_dag_nodes::Column::Id.eq(&graph.node_id))
+            .all(&self.db)
+            .await?;
+
+        for dag_node in dag_nodes {
+            // Delete connected edges first
+            plan_dag_edges::Entity::delete_many()
+                .filter(plan_dag_edges::Column::SourceNodeId.eq(&dag_node.id))
+                .exec(&self.db)
+                .await?;
+
+            plan_dag_edges::Entity::delete_many()
+                .filter(plan_dag_edges::Column::TargetNodeId.eq(&dag_node.id))
+                .exec(&self.db)
+                .await?;
+
+            // Delete the node
+            plan_dag_nodes::Entity::delete_by_id(&dag_node.id)
+                .exec(&self.db)
+                .await?;
+        }
+
+        // Delete the graph itself
         graphs::Entity::delete_by_id(graph.id)
             .exec(&self.db)
             .await?;

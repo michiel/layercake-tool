@@ -5,7 +5,7 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 
 use crate::database::entities::data_sources::{self, FileFormat, DataType};
-use crate::database::entities::projects;
+use crate::database::entities::{projects, plan_dag_nodes, plan_dag_edges};
 use crate::services::file_type_detection;
 
 /// Service for managing DataSources with file processing capabilities
@@ -277,11 +277,43 @@ impl DataSourceService {
         Ok(updated_data_source)
     }
 
-    /// Delete DataSource
+    /// Delete DataSource and clean up related plan DAG nodes
     pub async fn delete(&self, id: i32) -> Result<()> {
         let data_source = self.get_by_id(id).await?
             .ok_or_else(|| anyhow!("DataSource not found"))?;
 
+        // Find and delete all plan_dag_nodes that reference this datasource
+        let all_dag_nodes = plan_dag_nodes::Entity::find()
+            .filter(plan_dag_nodes::Column::NodeType.eq("DataSourceNode"))
+            .all(&self.db)
+            .await?;
+
+        for dag_node in all_dag_nodes {
+            // Parse config to check if it references this datasource
+            if let Ok(config) = serde_json::from_str::<serde_json::Value>(&dag_node.config_json) {
+                if let Some(ds_id) = config.get("dataSourceId").and_then(|v| v.as_i64()) {
+                    if ds_id as i32 == data_source.id {
+                        // Delete connected edges first
+                        plan_dag_edges::Entity::delete_many()
+                            .filter(plan_dag_edges::Column::SourceNodeId.eq(&dag_node.id))
+                            .exec(&self.db)
+                            .await?;
+
+                        plan_dag_edges::Entity::delete_many()
+                            .filter(plan_dag_edges::Column::TargetNodeId.eq(&dag_node.id))
+                            .exec(&self.db)
+                            .await?;
+
+                        // Delete the node
+                        plan_dag_nodes::Entity::delete_by_id(&dag_node.id)
+                            .exec(&self.db)
+                            .await?;
+                    }
+                }
+            }
+        }
+
+        // Delete the datasource itself
         data_sources::Entity::delete_by_id(data_source.id)
             .exec(&self.db)
             .await?;
