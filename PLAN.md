@@ -1,113 +1,338 @@
-# Graph Editor Implementation Review
+# Layercake Codebase Refactoring Plan
 
-## Implementation Status: ✅ COMPLETE
+**Date:** 2025-10-10
+**Status:** Draft
+**Priority:** Medium
 
-All required fixes have been implemented successfully.
+## Executive Summary
 
-## Architecture Issues (RESOLVED)
+This document outlines identified code quality issues and provides a structured plan for refactoring the Layercake codebase. The analysis found several areas of dead code, duplication, and inconsistency that reduce maintainability.
 
-### Data Model Mismatch (✅ FIXED)
+## Key Findings
 
-1. **Backend** - Added `belongs_to` field to database and GraphQL schema:
-   - Created migration `m20251009_000001_add_belongs_to_to_graph_nodes.rs`
-   - Updated `graph_nodes` entity to include `belongs_to: Option<String>`
-   - Updated GraphQL `GraphNode` type with `belongsTo` field
-   - Updated all graph builders to extract and store `belongs_to` from data sources
+### 1. Dead Code - Database Entities ⚠️ HIGH PRIORITY
 
-2. **Frontend** - Updated GraphQL queries and TypeScript interfaces:
-   - Added `belongsTo` to GraphQL query in `graphs.ts:84`
-   - Added `belongsTo?: string` to `GraphNode` interface
+**Issue:** Obsolete entity files exist but are no longer used.
 
-## Rendering Implementation (✅ FIXED)
+**Files Identified:**
+- `/layercake-core/src/database/entities/nodes.rs` - 0 references
+- `/layercake-core/src/database/entities/edges.rs` - 0 references
+- `/layercake-core/src/database/entities/layers.rs` - Needs verification (may be used)
 
-### New Implementation
+**Impact:**
+- Confuses developers about which entities to use
+- Increases cognitive load when navigating codebase
+- May cause incorrect imports if not careful
 
-`frontend/src/utils/graphUtils.ts:20-181` now correctly:
-- Uses `isPartition` to identify subflows (partition nodes)
-- Uses `belongsTo` to establish parent-child hierarchy
-- Builds recursive hierarchy from root nodes
-- Applies proper z-index stacking (containing subflows have lower z-index)
-- Processes nodes recursively to handle nested subflows
+**Action Items:**
+1. Verify that `nodes.rs` and `edges.rs` are completely unused (grep entire codebase)
+2. Check if database tables still exist for these entities
+3. Remove files and update `mod.rs`
+4. Remove any corresponding database migrations if tables are also unused
 
-### Key Features Implemented
+**Estimated Effort:** 2 hours
 
-1. **Hierarchical Structure**: Uses `belongsTo` references to build tree structure
-2. **Z-Index Calculation**: Containing subflows stack lower than contained ones (negative depth values)
-3. **Recursive Processing**: Handles arbitrary nesting depth
-4. **Label Positioning**: Subflow labels display at top-left via ReactFlow group type
+---
 
-## Validation (✅ ADDED)
+### 2. Entity Naming Inconsistency ⚠️ HIGH PRIORITY
 
-Added validation in both `graph_builder.rs` and `merge_builder.rs`:
-- Edges cannot reference partition nodes (neither source nor target)
-- Clear error messages when validation fails
-- Prevents invalid graph structures at build time
+**Issue:** Two nearly identical entity files with different naming conventions.
 
-## Files Modified
+**Files:**
+- `/layercake-core/src/database/entities/datasources.rs` - 4 references
+- `/layercake-core/src/database/entities/data_sources.rs` - 24 references
 
-### Backend
-- `layercake-core/src/database/migrations/m20251009_000001_add_belongs_to_to_graph_nodes.rs` (new)
-- `layercake-core/src/database/migrations/mod.rs`
-- `layercake-core/src/database/entities/graph_nodes.rs`
-- `layercake-core/src/graphql/types/graph_node.rs`
-- `layercake-core/src/pipeline/graph_builder.rs`
-- `layercake-core/src/pipeline/merge_builder.rs`
-- `layercake-core/src/services/graph_service.rs`
+**Impact:**
+- Confusion about which entity to use
+- Potential for bugs if wrong one is imported
+- Inconsistent naming patterns (snake_case vs camelCase)
 
-### Frontend
-- `frontend/src/graphql/graphs.ts`
-- `frontend/src/utils/graphUtils.ts`
+**Action Items:**
+1. Audit all 4 references to `datasources.rs`
+2. Migrate them to use `data_sources.rs`
+3. Remove `datasources.rs`
+4. Standardize on `data_sources` naming pattern throughout codebase
 
-## Build Status
+**Estimated Effort:** 3 hours
 
-- ✅ Backend: Compiles successfully
-- ✅ Frontend: Builds successfully
-- ✅ All validations in place
+---
 
-## Bug Fixes
+### 3. Duplicate LayerData Struct 🔴 MEDIUM PRIORITY
 
-### ReactFlow Position Calculation (✅ FIXED)
+**Issue:** Identical `LayerData` struct defined in two separate files.
 
-**Issue**: Partition nodes rendered as regular nodes; subflow grouping not appearing
+**Files:**
+- `/layercake-core/src/pipeline/merge_builder.rs:664`
+  ```rust
+  struct LayerData {
+      name: String,
+      color: Option<String>,
+      properties: Option<String>, // JSON string
+  }
+  ```
 
-**Root Cause**: Incorrect position calculation in `processElkNode`:
-- Was calculating absolute positions by accumulating parent positions
-- ReactFlow expects all positions to be relative to parent
-- Partition nodes only rendered if they had children
+- `/layercake-core/src/pipeline/graph_builder.rs:872`
+  ```rust
+  struct LayerData {
+      name: String,
+      color: Option<String>,
+      properties: Option<String>, // JSON string
+  }
+  ```
 
-**Fix**:
-- Removed absolute position calculation (`absoluteX`, `absoluteY`, `parentX`, `parentY`)
-- All nodes now use relative positions: `{ x: elkNode.x || 0, y: elkNode.y || 0 }`
-- Partition nodes render as groups even when empty (removed `&& elkNode.children` condition)
-- ReactFlow handles absolute positioning based on parent hierarchy
+**Impact:**
+- Code duplication violates DRY principle
+- Changes must be made in two places
+- Risk of divergence over time
 
-### is_partition String Parsing (✅ FIXED)
+**Action Items:**
+1. Extract `LayerData` to a shared module (e.g., `/pipeline/types.rs` or `/pipeline/layer_types.rs`)
+2. Update imports in both builder files
+3. Consider if other shared types exist in these builders
 
-**Issue**: Partition nodes with string values ("true", "yes", "y") in CSV files rendered as regular nodes
+**Estimated Effort:** 1 hour
 
-**Root Cause**:
-- CSV data stored as JSON with string values
-- Graph builders used `.as_bool().unwrap_or(false)` which returns `false` for strings
-- Only worked when is_partition was already a JSON boolean
+---
 
-**Fix**:
-- Added `parse_is_partition()` helper function to both `graph_builder.rs` and `merge_builder.rs`
-- Handles both boolean and string values ("true", "y", "yes", "1")
-- Replaced all 4 locations in `graph_builder.rs` (lines 323, 376, 528, 617)
-- Replaced all 2 locations in `merge_builder.rs` (lines 361, 413)
+### 4. Dead Code - Frontend Dialog Component 🔴 MEDIUM PRIORITY
 
-## Data Migration Required
+**Issue:** Duplicate dialog file exists but is not used.
 
-⚠️ **IMPORTANT**: Existing graphs must be rebuilt to populate `belongs_to` values.
+**Files:**
+- `/frontend/src/components/editors/PlanVisualEditor/dialogs/NodeConfigDialog.tsx` - 642 lines (NOT USED)
+- `/frontend/src/components/editors/PlanVisualEditor/NodeConfigDialog.tsx` - 119 lines (ACTIVE)
 
-See **[MIGRATION.md](MIGRATION.md)** for detailed steps.
+**Impact:**
+- 642 lines of dead code
+- Confusing directory structure
+- May cause incorrect imports
 
-**Quick Summary**:
-1. Migrations run automatically on startup (adds `belongs_to` column)
-2. **Delete and recreate existing graphs** from datasources (recommended)
-3. Verify in browser console that nodes have correct `belongsTo` values
+**Action Items:**
+1. Verify the dialogs/ directory version is truly unused
+2. Check if it has any superior features worth porting
+3. Delete `/dialogs/NodeConfigDialog.tsx`
+4. Check if other files in `/dialogs/` subdirectory are similarly orphaned
 
-**Debug Logging**: Browser console now shows:
-- Graph nodes with `belongsTo` and `isPartition` values
-- Root nodes identification
-- ELK graph structure before layout
+**Estimated Effort:** 1 hour
+
+---
+
+### 5. Multiple Collaboration/Presence Implementations 🟡 LOW PRIORITY
+
+**Issue:** Three separate but related collaboration hooks exist.
+
+**Files:**
+- `/frontend/src/hooks/useCollaborationV2.ts` - 6.6KB
+- `/frontend/src/hooks/usePresence.ts` - 4.9KB
+- `/frontend/src/hooks/useWebSocketCollaboration.ts` - 8.3KB
+
+**Impact:**
+- Unclear which hook to use in different scenarios
+- Potential logic duplication
+- May have inconsistent behavior
+
+**Action Items:**
+1. Document the purpose and use case for each hook
+2. Determine if they can be consolidated
+3. If consolidation not feasible, add JSDoc comments explaining when to use each
+4. Consider creating a facade hook that delegates to appropriate implementation
+
+**Estimated Effort:** 4 hours (requires careful analysis)
+
+---
+
+### 6. GraphQL Type Inconsistencies 🟡 LOW PRIORITY
+
+**Issue:** Inconsistent field naming between database and GraphQL (some use camelCase, some use snake_case with rename).
+
+**Example from `/layercake-core/src/graphql/types/data_source.rs`:**
+```rust
+#[graphql(name = "projectId")]
+pub project_id: i32,
+
+#[graphql(name = "fileFormat")]
+pub file_format: String,
+```
+
+**Impact:**
+- Requires manual field name mapping
+- Increases chance of typos
+- Makes schema harder to generate/maintain
+
+**Action Items:**
+1. Establish consistent naming convention (prefer GraphQL-native camelCase throughout)
+2. Consider using automatic field renaming via async-graphql config
+3. Create a style guide for new GraphQL types
+
+**Estimated Effort:** 8 hours (affects many files)
+
+---
+
+### 7. Service Layer Organization 🟡 LOW PRIORITY
+
+**Issue:** Services are organized by feature but lack clear architectural boundaries.
+
+**Current Structure:**
+```
+services/
+├── auth_service.rs
+├── data_source_service.rs
+├── graph_service.rs
+├── project_service.rs
+├── plan_dag_service.rs
+├── import_service.rs
+├── export_service.rs
+└── ...
+```
+
+**Observations:**
+- Some services are very large (e.g., `data_source_service.rs` likely has many responsibilities)
+- No clear separation between domain logic and data access
+- Validation logic scattered across services
+
+**Action Items:**
+1. Audit service responsibilities
+2. Consider extracting to layered architecture:
+   - Domain layer (business rules)
+   - Repository layer (data access)
+   - Service layer (orchestration)
+3. Extract validation logic to dedicated validation module
+4. Document service boundaries and responsibilities
+
+**Estimated Effort:** 16 hours (large refactoring)
+
+---
+
+### 8. Pipeline Builder Code Duplication 🔴 MEDIUM PRIORITY
+
+**Issue:** `merge_builder.rs` and `graph_builder.rs` have similar layer extraction logic.
+
+**Files:**
+- `/layercake-core/src/pipeline/merge_builder.rs` - 25KB, 664 lines
+- `/layercake-core/src/pipeline/graph_builder.rs` - 34KB, 872 lines
+
+**Duplicate Patterns:**
+- Layer extraction from JSON
+- Layer extraction from database
+- Layer insertion logic
+- JSON structure validation
+
+**Impact:**
+- High maintenance cost
+- Bug fixes must be applied twice
+- Risk of logic divergence
+
+**Action Items:**
+1. Extract common layer operations to `/pipeline/layer_operations.rs`:
+   - `extract_layers_from_json()`
+   - `extract_layers_from_graph()`
+   - `insert_layers_to_db()`
+2. Extract common JSON parsing to `/pipeline/json_parser.rs`
+3. Consider introducing a `LayerRepository` for database operations
+4. Create integration tests to ensure behavior remains identical
+
+**Estimated Effort:** 6 hours
+
+---
+
+### 9. Frontend YAML Conversion Duplication ✅ RESOLVED
+
+**Status:** Already fixed in recent commits
+
+**Previous Issue:** YAML conversion logic was duplicated between `App.tsx` and `PlanVisualEditor.tsx`
+
+**Resolution:** Removed from `PlanVisualEditor.tsx`, now only exists in `App.tsx` on the project detail page.
+
+---
+
+## Implementation Priority
+
+### Phase 1: Quick Wins (6-8 hours)
+1. Remove dead entity files (nodes.rs, edges.rs)
+2. Remove dead frontend dialog component
+3. Extract duplicate LayerData struct
+
+### Phase 2: Medium Refactoring (12-16 hours)
+4. Resolve entity naming inconsistency
+5. Extract common pipeline builder logic
+6. Document/consolidate collaboration hooks
+
+### Phase 3: Architectural Improvements (24+ hours)
+7. Standardize GraphQL naming conventions
+8. Refactor service layer architecture
+
+---
+
+## Testing Strategy
+
+For each refactoring:
+1. **Before Changes:**
+   - Run full test suite
+   - Document current behavior
+   - Create regression tests if needed
+
+2. **During Changes:**
+   - Use compiler to catch breaking changes
+   - Run tests frequently
+   - Commit incrementally
+
+3. **After Changes:**
+   - Run full test suite
+   - Manual testing of affected features
+   - Performance benchmarks for critical paths
+
+---
+
+## Rollout Strategy
+
+- **Branch Strategy:** Create feature branches for each phase
+- **Review Process:** All refactorings require code review
+- **Deployment:** Deploy phases incrementally, monitor for issues
+- **Documentation:** Update architecture docs with each phase
+
+---
+
+## Risks and Mitigation
+
+| Risk | Impact | Mitigation |
+|------|--------|-----------|
+| Breaking existing functionality | High | Comprehensive tests before each change |
+| Team velocity reduction | Medium | Limit refactoring to 20% of sprint capacity |
+| Merge conflicts with ongoing work | Medium | Coordinate with team, communicate early |
+| Incomplete refactoring | Low | Focus on self-contained modules first |
+
+---
+
+## Success Metrics
+
+- [ ] Reduce total line count by removing dead code
+- [ ] Eliminate all identified code duplication
+- [ ] Improve code search relevance (fewer false positives)
+- [ ] Reduce onboarding time for new developers
+- [ ] Achieve 100% test coverage on refactored modules
+
+---
+
+## Additional Observations
+
+### Positive Patterns Found
+
+1. **Good CQRS Separation:** Frontend uses separated Command and Query services
+2. **Strong Type Safety:** Rust and TypeScript provide excellent compile-time checks
+3. **Modern Stack:** Good use of async-graphql, SeaORM, React patterns
+4. **Subscription Architecture:** Delta-based updates with JSON Patch are efficient
+
+### Areas for Future Investigation
+
+1. **Bundle Size:** Frontend bundle is large (4.3MB), could benefit from code splitting
+2. **Database Indexes:** Verify all foreign keys and frequently queried fields are indexed
+3. **GraphQL N+1 Queries:** Check if DataLoader pattern would help
+4. **Error Handling:** Standardize error types and responses across services
+
+---
+
+## Conclusion
+
+The codebase is generally well-structured with modern patterns, but has accumulated technical debt through incremental development. The proposed refactoring plan addresses the most impactful issues first while maintaining system stability. The total estimated effort is 50-60 hours, which can be spread across 3-4 sprints.
+
+The highest priority items (Phase 1) should be completed first as they provide immediate maintenance benefits with minimal risk.
