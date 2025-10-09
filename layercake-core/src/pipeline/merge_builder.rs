@@ -1,9 +1,27 @@
 use anyhow::{anyhow, Result};
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
+use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 
 use crate::database::entities::{data_sources, graph_edges, graph_nodes, graphs, plan_dag_nodes};
 use crate::database::entities::datasources::ExecutionState;
+
+/// Helper function to parse is_partition from JSON Value (handles both boolean and string)
+fn parse_is_partition(value: &Value) -> bool {
+    // Try as boolean first
+    if let Some(b) = value.as_bool() {
+        return b;
+    }
+
+    // Try as string with truthy logic
+    if let Some(s) = value.as_str() {
+        let trimmed_lowercase = s.trim().to_lowercase();
+        return matches!(trimmed_lowercase.as_str(), "true" | "y" | "yes" | "1");
+    }
+
+    // Default to false
+    false
+}
 
 /// Service for merging data from multiple upstream sources
 pub struct MergeBuilder {
@@ -340,7 +358,7 @@ impl MergeBuilder {
                             label: node_val["label"].as_str().map(|s| s.to_string()),
                             layer: node_val["layer"].as_str().map(|s| s.to_string()),
                             weight: node_val["weight"].as_f64(),
-                            is_partition: node_val["is_partition"].as_bool().unwrap_or(false),
+                            is_partition: parse_is_partition(&node_val["is_partition"]),
                             belongs_to: node_val["belongs_to"].as_str().map(|s| s.to_string()),
                             attrs: Some(node_val.clone()),
                         };
@@ -392,7 +410,7 @@ impl MergeBuilder {
                             label: node_val["label"].as_str().map(|s| s.to_string()),
                             layer: node_val["layer"].as_str().map(|s| s.to_string()),
                             weight: node_val["weight"].as_f64(),
-                            is_partition: node_val["is_partition"].as_bool().unwrap_or(false),
+                            is_partition: parse_is_partition(&node_val["is_partition"]),
                             belongs_to: node_val["belongs_to"].as_str().map(|s| s.to_string()),
                             attrs: Some(node_val.clone()),
                         };

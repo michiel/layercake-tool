@@ -80,3 +80,18 @@ Added validation in both `graph_builder.rs` and `merge_builder.rs`:
 - All nodes now use relative positions: `{ x: elkNode.x || 0, y: elkNode.y || 0 }`
 - Partition nodes render as groups even when empty (removed `&& elkNode.children` condition)
 - ReactFlow handles absolute positioning based on parent hierarchy
+
+### is_partition String Parsing (✅ FIXED)
+
+**Issue**: Partition nodes with string values ("true", "yes", "y") in CSV files rendered as regular nodes
+
+**Root Cause**:
+- CSV data stored as JSON with string values
+- Graph builders used `.as_bool().unwrap_or(false)` which returns `false` for strings
+- Only worked when is_partition was already a JSON boolean
+
+**Fix**:
+- Added `parse_is_partition()` helper function to both `graph_builder.rs` and `merge_builder.rs`
+- Handles both boolean and string values ("true", "y", "yes", "1")
+- Replaced all 4 locations in `graph_builder.rs` (lines 323, 376, 528, 617)
+- Replaced all 2 locations in `merge_builder.rs` (lines 361, 413)
