@@ -38,3 +38,8 @@
 .react-flow__node-group .react-flow__handle {
   display: none;
 }
+
+/* Hide handles on label nodes */
+.react-flow__node[data-id$="-label"] .react-flow__handle {
+  display: none;
+}

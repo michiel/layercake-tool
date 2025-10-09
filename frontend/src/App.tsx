@@ -125,7 +125,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                 leftSection={<IconGraph size={16} />}
                 onClick={() => navigate(`/projects/${projectId}/plan`)}
               >
-                Plan Editor
+                Plan
               </Button>
               <Button
                 variant={isActiveRoute(`/projects/${projectId}/datasources`) ? 'filled' : 'light'}
@@ -414,7 +414,7 @@ const ProjectsPage = () => {
                       navigate(`/projects/${project.id}/plan`)
                     }}
                   >
-                    Plan Editor
+                    Plan
                   </Button>
                   <Button
                     variant="light"
@@ -721,7 +721,7 @@ const PlanEditorPage = () => {
         <Breadcrumbs
           projectName={selectedProject.name}
           projectId={selectedProject.id}
-          currentPage="Plan Editor"
+          currentPage="Plan"
           onNavigate={handleNavigate}
         />
       </div>
