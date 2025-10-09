@@ -118,17 +118,15 @@ export const getLayoutedElements = async (
   rootNodes.forEach(n => calculateDepth(n.id));
 
   // Process layouted nodes recursively
-  const processElkNode = (elkNode: ElkNode, parentId?: string, parentX: number = 0, parentY: number = 0) => {
+  const processElkNode = (elkNode: ElkNode, parentId?: string) => {
     const node = nodeMap.get(elkNode.id);
-    const absoluteX = parentX + (elkNode.x || 0);
-    const absoluteY = parentY + (elkNode.y || 0);
     const depth = depthMap.get(elkNode.id) || 0;
 
-    if (node?.isPartition && elkNode.children) {
-      // This is a subflow
+    if (node?.isPartition) {
+      // This is a subflow (group node)
       reactFlowNodes.push({
         id: elkNode.id,
-        position: { x: absoluteX, y: absoluteY },
+        position: { x: elkNode.x || 0, y: elkNode.y || 0 },
         data: { label: elkNode.labels?.[0]?.text || elkNode.id },
         type: 'group',
         style: {
@@ -139,10 +137,12 @@ export const getLayoutedElements = async (
         ...(parentId ? { parentNode: parentId, extent: 'parent' as const } : {}),
       });
 
-      // Process children
-      elkNode.children.forEach(childElk => {
-        processElkNode(childElk, elkNode.id, absoluteX, absoluteY);
-      });
+      // Process children if any
+      if (elkNode.children) {
+        elkNode.children.forEach(childElk => {
+          processElkNode(childElk, elkNode.id);
+        });
+      }
     } else {
       // Regular node
       reactFlowNodes.push({

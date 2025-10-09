@@ -63,3 +63,20 @@ Added validation in both `graph_builder.rs` and `merge_builder.rs`:
 - ✅ Backend: Compiles successfully
 - ✅ Frontend: Builds successfully
 - ✅ All validations in place
+
+## Bug Fixes
+
+### ReactFlow Position Calculation (✅ FIXED)
+
+**Issue**: Partition nodes rendered as regular nodes; subflow grouping not appearing
+
+**Root Cause**: Incorrect position calculation in `processElkNode`:
+- Was calculating absolute positions by accumulating parent positions
+- ReactFlow expects all positions to be relative to parent
+- Partition nodes only rendered if they had children
+
+**Fix**:
+- Removed absolute position calculation (`absoluteX`, `absoluteY`, `parentX`, `parentY`)
+- All nodes now use relative positions: `{ x: elkNode.x || 0, y: elkNode.y || 0 }`
+- Partition nodes render as groups even when empty (removed `&& elkNode.children` condition)
+- ReactFlow handles absolute positioning based on parent hierarchy
