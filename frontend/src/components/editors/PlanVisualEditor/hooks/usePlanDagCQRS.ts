@@ -287,8 +287,8 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
         setLoading(true)
         setError(null)
 
-        // Load initial data using CQRS query service
-        const initialData = await cqrsService.queries.getPlanDag({ projectId })
+        // Load initial data using CQRS query service with fresh fetch to avoid stale cache
+        const initialData = await cqrsService.queries.getPlanDag({ projectId, fresh: true })
 
         if (initialData) {
           console.log('[usePlanDagCQRS] Initial Plan DAG loaded:', initialData)
