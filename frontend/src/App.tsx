@@ -173,7 +173,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
         </Stack>
       </AppShell.Navbar>
 
-      <AppShell.Main style={{ flex: 1 }}>
+      <AppShell.Main style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         {children}
       </AppShell.Main>
     </AppShell>
@@ -869,8 +869,8 @@ const PlanEditorPage = () => {
   }
 
   return (
-    <Stack gap={0} style={{ height: '100%' }}>
-      <div style={{ padding: '8px 16px', borderBottom: '1px solid #e9ecef' }}>
+    <Stack gap={0} style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ padding: '8px 16px', borderBottom: '1px solid #e9ecef', flexShrink: 0 }}>
         <Breadcrumbs
           projectName={selectedProject.name}
           projectId={selectedProject.id}
@@ -878,7 +878,7 @@ const PlanEditorPage = () => {
           onNavigate={handleNavigate}
         />
       </div>
-      <div style={{ flex: 1, overflow: 'hidden', minHeight: 0 }}>
+      <div style={{ flex: 1, overflow: 'hidden' }}>
         <ErrorBoundary>
           <PlanVisualEditor
             projectId={selectedProject.id}
