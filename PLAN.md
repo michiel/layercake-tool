@@ -95,3 +95,19 @@ Added validation in both `graph_builder.rs` and `merge_builder.rs`:
 - Handles both boolean and string values ("true", "y", "yes", "1")
 - Replaced all 4 locations in `graph_builder.rs` (lines 323, 376, 528, 617)
 - Replaced all 2 locations in `merge_builder.rs` (lines 361, 413)
+
+## Data Migration Required
+
+⚠️ **IMPORTANT**: Existing graphs must be rebuilt to populate `belongs_to` values.
+
+See **[MIGRATION.md](MIGRATION.md)** for detailed steps.
+
+**Quick Summary**:
+1. Migrations run automatically on startup (adds `belongs_to` column)
+2. **Delete and recreate existing graphs** from datasources (recommended)
+3. Verify in browser console that nodes have correct `belongsTo` values
+
+**Debug Logging**: Browser console now shows:
+- Graph nodes with `belongsTo` and `isPartition` values
+- Root nodes identification
+- ELK graph structure before layout

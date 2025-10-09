@@ -27,6 +27,14 @@ export const getLayoutedElements = async (
   const nodeMap = new Map<string, GraphNode>();
   lcGraph.graphNodes.forEach(node => nodeMap.set(node.id, node));
 
+  // Debug: Log nodes to verify belongsTo and isPartition values
+  console.log('Graph nodes:', lcGraph.graphNodes.map(n => ({
+    id: n.id,
+    label: n.label,
+    isPartition: n.isPartition,
+    belongsTo: n.belongsTo
+  })));
+
   // Build ELK graph structure recursively
   const buildElkNode = (nodeId: string): ElkNode | null => {
     const node = nodeMap.get(nodeId);
@@ -74,6 +82,8 @@ export const getLayoutedElements = async (
     !n.belongsTo || !nodeMap.has(n.belongsTo)
   );
 
+  console.log('Root nodes:', rootNodes.map(n => ({ id: n.id, label: n.label, isPartition: n.isPartition })));
+
   const graph: ElkNode = {
     id: 'root',
     layoutOptions: elkOptions,
@@ -88,6 +98,8 @@ export const getLayoutedElements = async (
       graph.children?.push(elkNode);
     }
   });
+
+  console.log('ELK graph before layout:', JSON.stringify(graph, null, 2));
 
   // Add edges
   lcGraph.graphEdges.forEach(edge => {
