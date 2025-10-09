@@ -1,8 +1,7 @@
 pub mod project;
 pub mod plan;
 pub mod plan_dag;
-pub mod node;
-pub mod edge;
+// REMOVED: node, edge - dead code, GraphQL types not used
 pub mod layer;
 pub mod scalars;
 pub mod user;
@@ -16,8 +15,6 @@ pub mod graph_edge;
 pub use project::*;
 pub use plan::*;
 pub use plan_dag::*;
-pub use node::*;
-pub use edge::*;
 pub use layer::*;
 pub use scalars::*;
 pub use user::*;
