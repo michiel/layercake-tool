@@ -71,7 +71,7 @@ These are **NOT duplicates** - they represent different database tables for diff
 
 **Completed:** 2025-10-10
 **Actual Effort:** 45 minutes
-**Commit:** [pending]
+**Commit:** e636c83d
 
 ---
 
