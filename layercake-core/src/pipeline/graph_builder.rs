@@ -304,6 +304,7 @@ impl GraphBuilder {
                                 layer: node_val["layer"].as_str().map(|s| s.to_string()),
                                 weight: node_val["weight"].as_f64(),
                                 is_partition: node_val["is_partition"].as_bool().unwrap_or(false),
+                                belongs_to: node_val["belongs_to"].as_str().map(|s| s.to_string()),
                                 attrs: Some(node_val.clone()),
                             };
 
@@ -356,6 +357,7 @@ impl GraphBuilder {
                                 layer: node_val["layer"].as_str().map(|s| s.to_string()),
                                 weight: node_val["weight"].as_f64(),
                                 is_partition: node_val["is_partition"].as_bool().unwrap_or(false),
+                                belongs_to: node_val["belongs_to"].as_str().map(|s| s.to_string()),
                                 attrs: Some(node_val.clone()),
                             };
 
@@ -418,6 +420,26 @@ impl GraphBuilder {
                     edge.target
                 ));
             }
+
+            // Validate edges don't reference partition nodes
+            if let Some(source_node) = all_nodes.get(&edge.source) {
+                if source_node.is_partition {
+                    return Err(anyhow!(
+                        "Edge {} has source node {} which is a partition (subflow). Edges cannot connect to partition nodes.",
+                        edge.id,
+                        edge.source
+                    ));
+                }
+            }
+            if let Some(target_node) = all_nodes.get(&edge.target) {
+                if target_node.is_partition {
+                    return Err(anyhow!(
+                        "Edge {} has target node {} which is a partition (subflow). Edges cannot connect to partition nodes.",
+                        edge.id,
+                        edge.target
+                    ));
+                }
+            }
         }
 
         // Insert nodes
@@ -429,6 +451,7 @@ impl GraphBuilder {
                 layer: Set(node_data.layer),
                 weight: Set(node_data.weight),
                 is_partition: Set(node_data.is_partition),
+                belongs_to: Set(node_data.belongs_to),
                 attrs: Set(node_data.attrs),
                 created_at: Set(chrono::Utc::now()),
             };
@@ -486,6 +509,7 @@ impl GraphBuilder {
                 layer: data["layer"].as_str().map(|s| s.to_string()),
                 weight: data["weight"].as_f64(),
                 is_partition: data["is_partition"].as_bool().unwrap_or(false),
+                belongs_to: data["belongs_to"].as_str().map(|s| s.to_string()),
                 attrs: Some(data.clone()),
             };
 
@@ -574,6 +598,7 @@ impl GraphBuilder {
                     layer: node_val["layer"].as_str().map(|s| s.to_string()),
                     weight: node_val["weight"].as_f64(),
                     is_partition: node_val["is_partition"].as_bool().unwrap_or(false),
+                    belongs_to: node_val["belongs_to"].as_str().map(|s| s.to_string()),
                     attrs: Some(node_val.clone()),
                 };
 
@@ -643,6 +668,7 @@ struct NodeData {
     layer: Option<String>,
     weight: Option<f64>,
     is_partition: bool,
+    belongs_to: Option<String>,
     attrs: Option<Value>,
 }
 

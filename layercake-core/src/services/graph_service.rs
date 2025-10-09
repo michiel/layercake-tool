@@ -76,7 +76,7 @@ impl GraphService {
                 label: db_node.label.unwrap_or_default(),
                 layer: db_node.layer.unwrap_or_else(|| "default".to_string()),
                 is_partition: db_node.is_partition,
-                belongs_to: None, // Could be extracted from attrs if needed
+                belongs_to: db_node.belongs_to,
                 weight: db_node.weight.unwrap_or(1.0) as i32,
                 comment: None, // Could be extracted from attrs if needed
             })

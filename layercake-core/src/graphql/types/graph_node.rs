@@ -11,6 +11,8 @@ pub struct GraphNode {
     pub weight: Option<f64>,
     #[graphql(name = "isPartition")]
     pub is_partition: bool,
+    #[graphql(name = "belongsTo")]
+    pub belongs_to: Option<String>,
     pub attrs: Option<serde_json::Value>,
     #[graphql(name = "createdAt")]
     pub created_at: chrono::DateTime<chrono::Utc>,
@@ -25,6 +27,7 @@ impl From<crate::database::entities::graph_nodes::Model> for GraphNode {
             layer: model.layer,
             weight: model.weight,
             is_partition: model.is_partition,
+            belongs_to: model.belongs_to,
             attrs: model.attrs,
             created_at: model.created_at,
         }

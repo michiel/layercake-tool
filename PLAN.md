@@ -1,97 +1,65 @@
-# LayercakeGraphEditor Implementation Plan
+# Graph Editor Implementation Review
 
-This plan outlines the steps to implement the `LayercakeGraphEditor` component, integrate it into the frontend, and provide a way to edit individual graphs.
+## Implementation Status: ✅ COMPLETE
 
-## 1. Implement LayercakeGraphEditor Component
+All required fixes have been implemented successfully.
 
-**Location:** `frontend/src/components/graphs/LayercakeGraphEditor.tsx`
+## Architecture Issues (RESOLVED)
 
-**Description:** This component will visualize an `LcGraph` object using `xyflow/react-flow`.
+### Data Model Mismatch (✅ FIXED)
 
-**Key Features:**
--   **React Flow Setup:** Initialize `ReactFlowProvider` and `ReactFlow` component.
--   **Graph Rendering:**
-    -   Take an `LcGraph` object as input.
-    -   Convert `LcGraph` nodes and edges into `react-flow` compatible nodes and edges.
-    -   Handle `belongs_to` relationships by creating nested sub-flows. This will involve dynamically creating parent nodes for each `belongs_to` group and nesting child nodes within them.
-    -   Render edges with arrows indicating direction (source to target).
--   **Dynamic Layout:**
-    -   Utilize a layout algorithm (e.g., `dagre` or `elkjs`) to arrange nodes and edges automatically.
-    -   The layout should prioritize a top-to-bottom direction.
-    -   Ensure sufficient spacing between nodes for readability.
-    -   The layout should be performed on the initial render of the graph.
--   **Interactivity:**
-    -   Enable basic `react-flow` interactivity (panning, zooming).
-    -   (Future consideration) Allow node dragging within sub-flows.
--   **Styling:** Apply basic styling for nodes, edges, and sub-flows.
+1. **Backend** - Added `belongs_to` field to database and GraphQL schema:
+   - Created migration `m20251009_000001_add_belongs_to_to_graph_nodes.rs`
+   - Updated `graph_nodes` entity to include `belongs_to: Option<String>`
+   - Updated GraphQL `GraphNode` type with `belongsTo` field
+   - Updated all graph builders to extract and store `belongs_to` from data sources
 
-## 2. Add "Edit Graph" Button to GraphsPage
+2. **Frontend** - Updated GraphQL queries and TypeScript interfaces:
+   - Added `belongsTo` to GraphQL query in `graphs.ts:84`
+   - Added `belongsTo?: string` to `GraphNode` interface
 
-**Location:** `frontend/src/components/graphs/GraphsPage.tsx`
+## Rendering Implementation (✅ FIXED)
 
-**Description:** Add an "Edit Graph" button to the actions column of the graphs table.
+### New Implementation
 
-**Changes:**
--   Modify the `Table.Td` for actions to include a new `ActionIcon` with an "Edit" icon.
--   This button will navigate to the new graph editing route (e.g., `/projects/:projectId/graphs/:graphId/edit`).
+`frontend/src/utils/graphUtils.ts:20-181` now correctly:
+- Uses `isPartition` to identify subflows (partition nodes)
+- Uses `belongsTo` to establish parent-child hierarchy
+- Builds recursive hierarchy from root nodes
+- Applies proper z-index stacking (containing subflows have lower z-index)
+- Processes nodes recursively to handle nested subflows
 
-## 3. Create New Route for Graph Editing
+### Key Features Implemented
 
-**Location:** `frontend/src/App.tsx` (or relevant routing configuration)
+1. **Hierarchical Structure**: Uses `belongsTo` references to build tree structure
+2. **Z-Index Calculation**: Containing subflows stack lower than contained ones (negative depth values)
+3. **Recursive Processing**: Handles arbitrary nesting depth
+4. **Label Positioning**: Subflow labels display at top-left via ReactFlow group type
 
-**Description:** Define a new route that will render the `GraphEditorPage` component.
+## Validation (✅ ADDED)
 
-**Changes:**
--   Add a new `Route` entry: `<Route path="/projects/:projectId/graphs/:graphId/edit" element={<GraphEditorPage />} />`.
+Added validation in both `graph_builder.rs` and `merge_builder.rs`:
+- Edges cannot reference partition nodes (neither source nor target)
+- Clear error messages when validation fails
+- Prevents invalid graph structures at build time
 
-## 4. Implement GraphEditorPage Component
+## Files Modified
 
-**Location:** `frontend/src/pages/GraphEditorPage.tsx` (new file)
+### Backend
+- `layercake-core/src/database/migrations/m20251009_000001_add_belongs_to_to_graph_nodes.rs` (new)
+- `layercake-core/src/database/migrations/mod.rs`
+- `layercake-core/src/database/entities/graph_nodes.rs`
+- `layercake-core/src/graphql/types/graph_node.rs`
+- `layercake-core/src/pipeline/graph_builder.rs`
+- `layercake-core/src/pipeline/merge_builder.rs`
+- `layercake-core/src/services/graph_service.rs`
 
-**Description:** This page will fetch the `LcGraph` data and render the `LayercakeGraphEditor`.
+### Frontend
+- `frontend/src/graphql/graphs.ts`
+- `frontend/src/utils/graphUtils.ts`
 
-**Key Features:**
--   **Route Parameter Handling:** Extract `projectId` and `graphId` from the URL parameters.
--   **Data Fetching:**
-    -   Use `useQuery` to fetch the `LcGraph` data using a new GraphQL query (e.g., `GET_GRAPH_DETAILS`).
-    -   Handle loading and error states.
--   **Component Rendering:** Pass the fetched `LcGraph` data to the `LayercakeGraphEditor` component.
--   **Breadcrumbs:** Integrate breadcrumbs for navigation.
--   **Basic UI:** Provide a title and potentially a "Save" button (initially non-functional, for future implementation).
+## Build Status
 
-## 5. Define New GraphQL Query for Graph Details
-
-**Location:** `frontend/src/graphql/graphs.ts`
-
-**Description:** Add a new GraphQL query to fetch the detailed `LcGraph` object, including its nodes, edges, and layers.
-
-**Changes:**
--   Add `GET_GRAPH_DETAILS` query that fetches `id`, `name`, `nodeId`, `executionState`, `nodeCount`, `edgeCount`, `createdAt`, `updatedAt`, and importantly, `layers`, `graphNodes`, and `graphEdges`.
--   Define corresponding TypeScript interfaces for `GraphNode` and `GraphEdge` if not already present.
-
-## 6. Backend GraphQL Resolver for Graph Details
-
-**Location:** `layercake-core/src/graphql/queries/mod.rs` and `layercake-core/src/graphql/types/graph.rs`
-
-**Description:** Implement resolvers to fetch `graphNodes` and `graphEdges` for the `Graph` type.
-
-**Changes:**
--   In `layercake-core/src/graphql/types/graph.rs`, add `graphNodes` and `graphEdges` fields to the `Graph` struct.
--   Implement resolvers for these fields to fetch data from `graph_nodes::Entity` and `graph_edges::Entity` respectively, filtering by `graph_id`.
-
-## 7. Frontend Styling and Utilities
-
-**Location:** `frontend/src/styles/reactFlow.css` (new file) and `frontend/src/utils/graphUtils.ts` (new file)
-
-**Description:** Add necessary styling for React Flow and utility functions for graph manipulation.
-
-**Changes:**
--   `reactFlow.css`: Basic styles for React Flow elements.
--   `graphUtils.ts`: Helper functions for converting `LcGraph` data to `react-flow` elements, handling sub-flows, and performing layout.
-
-## 8. Verification
-
--   Run `cargo check` and `npm run dev` to ensure no compilation errors.
--   Navigate to the `/projects/:projectId/graphs` page and verify the "Edit Graph" button is present.
--   Click the "Edit Graph" button and verify that the `GraphEditorPage` loads and displays the graph correctly.
--   Check the browser console for any errors related to GraphQL queries or React Flow rendering.
+- ✅ Backend: Compiles successfully
+- ✅ Frontend: Builds successfully
+- ✅ All validations in place

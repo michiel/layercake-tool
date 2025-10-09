@@ -12,6 +12,7 @@ export interface GraphNode {
   layer?: string;
   weight?: number;
   isPartition: boolean;
+  belongsTo?: string;
   attrs?: any;
 }
 
@@ -81,6 +82,7 @@ export const GET_GRAPH_DETAILS = gql`
         layer
         weight
         isPartition
+        belongsTo
         attrs
       }
       graphEdges {

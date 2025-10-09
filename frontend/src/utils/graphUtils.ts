@@ -19,10 +19,61 @@ const elkOptions = {
 // Function to convert LcGraph to React Flow elements
 export const getLayoutedElements = async (
   lcGraph: Graph,
-  layers: Layer[],
+  _layers: Layer[],
   nodeWidth: number = 170,
   nodeHeight: number = 50
 ) => {
+  // Create node lookup map
+  const nodeMap = new Map<string, GraphNode>();
+  lcGraph.graphNodes.forEach(node => nodeMap.set(node.id, node));
+
+  // Build ELK graph structure recursively
+  const buildElkNode = (nodeId: string): ElkNode | null => {
+    const node = nodeMap.get(nodeId);
+    if (!node) return null;
+
+    if (node.isPartition) {
+      // This is a subflow - find children
+      const children = lcGraph.graphNodes.filter(n => n.belongsTo === nodeId);
+
+      const elkNode: ElkNode = {
+        id: node.id,
+        labels: [{ text: node.label || node.id }],
+        layoutOptions: {
+          'elk.padding': '[top=40,left=20,bottom=20,right=20]',
+          'elk.direction': 'DOWN',
+          'elk.spacing.nodeNode': '50',
+          'elk.spacing.nodeNodeBetweenLayers': '50',
+        },
+        children: [],
+        edges: [],
+      };
+
+      // Add children recursively
+      children.forEach(child => {
+        const childElk = buildElkNode(child.id);
+        if (childElk) {
+          elkNode.children?.push(childElk);
+        }
+      });
+
+      return elkNode;
+    } else {
+      // Regular node
+      return {
+        id: node.id,
+        width: nodeWidth,
+        height: nodeHeight,
+        labels: [{ text: node.label || node.id }],
+      };
+    }
+  };
+
+  // Find root nodes (no belongsTo or belongsTo references non-existent node)
+  const rootNodes = lcGraph.graphNodes.filter(n =>
+    !n.belongsTo || !nodeMap.has(n.belongsTo)
+  );
+
   const graph: ElkNode = {
     id: 'root',
     layoutOptions: elkOptions,
@@ -30,58 +81,12 @@ export const getLayoutedElements = async (
     edges: [],
   };
 
-  // Create a map for quick lookup of layers by ID
-  const layerMap = new Map<string, Layer>();
-  layers.forEach(layer => layerMap.set(layer.id.toString(), layer));
-
-  // Group nodes by layer for sub-flows
-  const nodesByLayer = new Map<string, GraphNode[]>();
-  lcGraph.graphNodes.forEach(node => {
-    const layerId = node.layer || 'default';
-    if (!nodesByLayer.has(layerId)) {
-      nodesByLayer.set(layerId, []);
+  // Build ELK graph from roots
+  rootNodes.forEach(rootNode => {
+    const elkNode = buildElkNode(rootNode.id);
+    if (elkNode) {
+      graph.children?.push(elkNode);
     }
-    nodesByLayer.get(layerId)?.push(node);
-  });
-
-  // Add layers as parent nodes (sub-flows)
-  nodesByLayer.forEach((nodesInLayer, layerId) => {
-    const layer = layerMap.get(layerId);
-    const layerNode: ElkNode = {
-      id: `layer-${layerId}`,
-      // width: nodeWidth, // Sub-flows don't need fixed width/height
-      // height: nodeHeight,
-      labels: [{ text: layer?.name || `Layer ${layerId}` }],
-      layoutOptions: {
-        'elk.padding': '[top=40,left=20,bottom=20,right=20]',
-        'elk.direction': 'DOWN',
-        'elk.spacing.nodeNode': '50',
-        'elk.spacing.nodeNodeBetweenLayers': '50',
-      },
-      children: [],
-      edges: [],
-    };
-
-    nodesInLayer.forEach(node => {
-      layerNode.children?.push({
-        id: node.id,
-        width: nodeWidth,
-        height: nodeHeight,
-        labels: [{ text: node.label || node.id }],
-      });
-    });
-    graph.children?.push(layerNode);
-  });
-
-  // Add nodes that don't belong to any specific layer
-  const unlayeredNodes = lcGraph.graphNodes.filter(node => !node.layer || !nodesByLayer.has(node.layer));
-  unlayeredNodes.forEach(node => {
-    graph.children?.push({
-      id: node.id,
-      width: nodeWidth,
-      height: nodeHeight,
-      labels: [{ text: node.label || node.id }],
-    });
   });
 
   // Add edges
@@ -99,37 +104,60 @@ export const getLayoutedElements = async (
   const reactFlowNodes: Node[] = [];
   const reactFlowEdges: Edge[] = [];
 
-  // Process layouted nodes and edges
-  elkGraph.children?.forEach((elkNode: ElkNode) => {
-    if (elkNode.children) { // This is a layer (sub-flow)
+  // Calculate depth for z-index (deeper = higher z-index)
+  const depthMap = new Map<string, number>();
+  const calculateDepth = (nodeId: string, depth: number = 0) => {
+    depthMap.set(nodeId, depth);
+    const node = nodeMap.get(nodeId);
+    if (node?.isPartition) {
+      lcGraph.graphNodes
+        .filter(n => n.belongsTo === nodeId)
+        .forEach(child => calculateDepth(child.id, depth + 1));
+    }
+  };
+  rootNodes.forEach(n => calculateDepth(n.id));
+
+  // Process layouted nodes recursively
+  const processElkNode = (elkNode: ElkNode, parentId?: string, parentX: number = 0, parentY: number = 0) => {
+    const node = nodeMap.get(elkNode.id);
+    const absoluteX = parentX + (elkNode.x || 0);
+    const absoluteY = parentY + (elkNode.y || 0);
+    const depth = depthMap.get(elkNode.id) || 0;
+
+    if (node?.isPartition && elkNode.children) {
+      // This is a subflow
       reactFlowNodes.push({
         id: elkNode.id,
-        position: { x: elkNode.x || 0, y: elkNode.y || 0 },
+        position: { x: absoluteX, y: absoluteY },
         data: { label: elkNode.labels?.[0]?.text || elkNode.id },
         type: 'group',
         style: {
           width: elkNode.width || undefined,
           height: elkNode.height || undefined,
+          zIndex: -depth, // Containing subflows have lower z-index
         },
+        ...(parentId ? { parentNode: parentId, extent: 'parent' as const } : {}),
       });
 
-      elkNode.children.forEach((childNode: ElkNode) => {
-        reactFlowNodes.push({
-          id: childNode.id,
-          position: { x: childNode.x || 0, y: childNode.y || 0 },
-          data: { label: childNode.labels?.[0]?.text || childNode.id },
-          parentNode: elkNode.id,
-          extent: 'parent',
-        });
+      // Process children
+      elkNode.children.forEach(childElk => {
+        processElkNode(childElk, elkNode.id, absoluteX, absoluteY);
       });
-    } else { // Regular node
+    } else {
+      // Regular node
       reactFlowNodes.push({
         id: elkNode.id,
         position: { x: elkNode.x || 0, y: elkNode.y || 0 },
         data: { label: elkNode.labels?.[0]?.text || elkNode.id },
+        style: {
+          zIndex: 1, // Regular nodes always on top
+        },
+        ...(parentId ? { parentNode: parentId, extent: 'parent' as const } : {}),
       });
     }
-  });
+  };
+
+  elkGraph.children?.forEach(elkNode => processElkNode(elkNode));
 
   elkGraph.edges?.forEach((edge: ElkExtendedEdge) => {
     reactFlowEdges.push({
@@ -139,6 +167,9 @@ export const getLayoutedElements = async (
       label: edge.labels?.[0]?.text || '',
       type: 'default',
       markerEnd: { type: MarkerType.ArrowClosed },
+      style: {
+        zIndex: 0, // Edges between nodes and subflows
+      },
     });
   });
 
