@@ -21,11 +21,12 @@ import {
   IconGraph,
   IconEdit,
   IconTrash,
-  IconAlertCircle
+  IconAlertCircle,
+  IconRefresh
 } from '@tabler/icons-react'
 import { gql } from '@apollo/client'
 import { Breadcrumbs } from '../common/Breadcrumbs'
-import { Graph, GET_GRAPHS, CREATE_GRAPH, UPDATE_GRAPH, DELETE_GRAPH } from '../../graphql/graphs'
+import { Graph, GET_GRAPHS, CREATE_GRAPH, UPDATE_GRAPH, DELETE_GRAPH, EXECUTE_NODE } from '../../graphql/graphs'
 
 const GET_PROJECTS = gql`
   query GetProjects {
@@ -62,6 +63,10 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
   });
 
   const [deleteGraph, { loading: deleteLoading }] = useMutation(DELETE_GRAPH, {
+    refetchQueries: [{ query: GET_GRAPHS, variables: { projectId: parseInt(projectId || '0') } }]
+  });
+
+  const [executeNode, { loading: executeLoading }] = useMutation(EXECUTE_NODE, {
     refetchQueries: [{ query: GET_GRAPHS, variables: { projectId: parseInt(projectId || '0') } }]
   });
 
@@ -104,6 +109,19 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
     }
     setEditModalOpen(false);
     setSelectedGraph(null);
+  };
+
+  const handleReprocess = async (graph: Graph) => {
+    try {
+      await executeNode({
+        variables: {
+          projectId: parseInt(projectId || '0'),
+          nodeId: graph.nodeId
+        }
+      });
+    } catch (err) {
+      console.error('Failed to reprocess graph:', err);
+    }
   };
 
   if (!selectedProject) {
@@ -197,6 +215,7 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
                         <Group gap="xs">
                           <ActionIcon onClick={() => navigate(`/projects/${projectId}/graphs/${graph.id}/edit`)}><IconGraph size={16} /></ActionIcon>
                           <ActionIcon onClick={() => handleEdit(graph)}><IconEdit size={16} /></ActionIcon>
+                          <ActionIcon onClick={() => handleReprocess(graph)} color="blue" loading={executeLoading}><IconRefresh size={16} /></ActionIcon>
                           <ActionIcon onClick={() => handleDelete(graph)} color="red"><IconTrash size={16} /></ActionIcon>
                         </Group>
                       </Table.Td>

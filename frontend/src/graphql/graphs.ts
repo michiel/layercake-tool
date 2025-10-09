@@ -130,3 +130,13 @@ export const DELETE_GRAPH = gql`
     deleteGraph(id: $id)
   }
 `
+
+export const EXECUTE_NODE = gql`
+  mutation ExecuteNode($projectId: Int!, $nodeId: String!) {
+    executeNode(projectId: $projectId, nodeId: $nodeId) {
+      success
+      message
+      nodeId
+    }
+  }
+`
