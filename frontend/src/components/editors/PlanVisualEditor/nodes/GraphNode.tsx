@@ -1,7 +1,7 @@
 import { memo, useState } from 'react'
 import { NodeProps, Handle, Position } from 'reactflow'
 import { Paper, Text, Group, ActionIcon, Tooltip, Badge, Stack, Loader } from '@mantine/core'
-import { IconSettings, IconTrash, IconPlayerPlayFilled, IconChartDots } from '@tabler/icons-react'
+import { IconSettings, IconTrash, IconPlayerPlayFilled, IconChartDots, IconTable } from '@tabler/icons-react'
 import { useMutation } from '@apollo/client/react'
 import { PlanDagNodeType, GraphNodeConfig } from '../../../../types/plan-dag'
 import { isNodeConfigured } from '../../../../utils/planDagValidation'
@@ -10,6 +10,7 @@ import { useGraphPreview } from '../../../../hooks/usePreview'
 import { getExecutionStateLabel, getExecutionStateColor, isExecutionComplete, isExecutionInProgress, EXECUTE_NODE } from '../../../../graphql/preview'
 import { GraphPreviewDialog } from '../../../visualization/GraphPreviewDialog'
 import { GraphData } from '../../../visualization/GraphPreview'
+import { GraphDataDialog } from '../dialogs/GraphDataDialog'
 
 interface GraphNodeProps extends NodeProps {
   onEdit?: (nodeId: string) => void
@@ -20,6 +21,7 @@ interface GraphNodeProps extends NodeProps {
 export const GraphNode = memo((props: GraphNodeProps) => {
   const { data, selected, onEdit, onDelete, readonly = false } = props
   const [showPreview, setShowPreview] = useState(false)
+  const [showDataDialog, setShowDataDialog] = useState(false)
 
   const config = data.config as GraphNodeConfig
   const color = getNodeColor(PlanDagNodeType.GRAPH)
@@ -235,10 +237,10 @@ export const GraphNode = memo((props: GraphNodeProps) => {
           </Text>
         </Group>
 
-        {/* Center: Preview button */}
+        {/* Center: Preview buttons */}
         {!readonly && executionPreview && isExecutionComplete(executionPreview.executionState) && (
-          <Group justify="center" mb="md">
-            <Tooltip label="Preview graph">
+          <Group justify="center" mb="md" gap="sm">
+            <Tooltip label="Preview graph visualization">
               <ActionIcon
                 size="xl"
                 variant="light"
@@ -252,6 +254,22 @@ export const GraphNode = memo((props: GraphNodeProps) => {
                 }}
               >
                 <IconChartDots size="1.5rem" />
+              </ActionIcon>
+            </Tooltip>
+            <Tooltip label="View graph data (nodes, edges, layers)">
+              <ActionIcon
+                size="xl"
+                variant="light"
+                color="teal"
+                radius="xl"
+                data-action-icon="data"
+                onMouseDown={(e) => {
+                  e.stopPropagation()
+                  e.preventDefault()
+                  setShowDataDialog(true)
+                }}
+              >
+                <IconTable size="1.5rem" />
               </ActionIcon>
             </Tooltip>
           </Group>
@@ -304,6 +322,14 @@ export const GraphNode = memo((props: GraphNodeProps) => {
         onClose={() => setShowPreview(false)}
         data={getGraphPreviewData()}
         title={`Graph Preview: ${data.metadata.label}`}
+      />
+
+      {/* Graph Data Dialog */}
+      <GraphDataDialog
+        opened={showDataDialog}
+        onClose={() => setShowDataDialog(false)}
+        graphId={executionPreview?.graphId || null}
+        title={`Graph Data: ${data.metadata.label}`}
       />
     </>
   )
