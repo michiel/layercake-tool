@@ -2,6 +2,7 @@ mod datasource_importer;
 mod graph_builder;
 mod merge_builder;
 mod dag_executor;
+mod types;
 
 pub use datasource_importer::DatasourceImporter;
 pub use graph_builder::GraphBuilder;

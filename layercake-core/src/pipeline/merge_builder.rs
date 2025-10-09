@@ -5,6 +5,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::database::entities::{data_sources, graph_edges, graph_nodes, graphs, layers, plan_dag_nodes};
 use crate::database::entities::datasources::ExecutionState;
+use super::types::LayerData;
 
 /// Helper function to parse is_partition from JSON Value (handles both boolean and string)
 fn parse_is_partition(value: &Value) -> bool {
@@ -660,9 +661,4 @@ struct EdgeData {
     attrs: Option<serde_json::Value>,
 }
 
-/// Internal layer data structure
-struct LayerData {
-    name: String,
-    color: Option<String>,
-    properties: Option<String>, // JSON string
-}
+// LayerData now imported from super::types (was previously defined here)
