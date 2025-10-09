@@ -1222,7 +1222,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
   }
 
   return (
-    <Stack h="100%" gap={0}>
+    <Stack gap={0} style={{ height: '100%' }}>
       <style>{`
         .react-flow__node {
           border: none !important;

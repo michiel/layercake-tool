@@ -88,7 +88,7 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({
   })
 
   return (
-    <MantineBreadcrumbs separator="/" mb="xs" separatorMargin="xs">
+    <MantineBreadcrumbs separator="/" separatorMargin="xs">
       {breadcrumbItems}
     </MantineBreadcrumbs>
   )

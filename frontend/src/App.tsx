@@ -870,7 +870,7 @@ const PlanEditorPage = () => {
 
   return (
     <Stack gap={0} style={{ height: '100%' }}>
-      <div style={{ padding: '16px', borderBottom: '1px solid #e9ecef' }}>
+      <div style={{ padding: '8px 16px', borderBottom: '1px solid #e9ecef' }}>
         <Breadcrumbs
           projectName={selectedProject.name}
           projectId={selectedProject.id}
@@ -878,7 +878,7 @@ const PlanEditorPage = () => {
           onNavigate={handleNavigate}
         />
       </div>
-      <div style={{ flex: 1, overflow: 'hidden' }}>
+      <div style={{ flex: 1, overflow: 'hidden', height: 0 }}>
         <ErrorBoundary>
           <PlanVisualEditor
             projectId={selectedProject.id}
