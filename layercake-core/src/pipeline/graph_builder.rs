@@ -3,7 +3,7 @@ use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, Set};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 
-use crate::database::entities::{data_sources, datasources, graph_edges, graph_nodes, graphs, plan_dag_nodes};
+use crate::database::entities::{data_sources, datasources, graph_edges, graph_nodes, graphs, layers, plan_dag_nodes};
 use crate::database::entities::datasources::ExecutionState;
 
 /// Helper function to parse is_partition from JSON Value (handles both boolean and string)
@@ -299,6 +299,7 @@ impl GraphBuilder {
 
         let mut all_nodes = HashMap::new();
         let mut all_edges = Vec::new();
+        let mut all_layers = HashMap::new(); // layer_id -> layer data
 
         // Process each data source
         for ds in data_sources {
@@ -417,7 +418,62 @@ impl GraphBuilder {
                     }
                 }
                 "layers" => {
-                    // Layers data source, ignore for building graph
+                    // Extract layers from datasource
+                    if let Some(layers_array) = graph_data.get("layers").and_then(|v| v.as_array()) {
+                        for layer_val in layers_array {
+                            let layer_id = layer_val["id"]
+                                .as_str()
+                                .ok_or_else(|| anyhow!("Layer missing 'id' field"))?
+                                .to_string();
+
+                            // Skip empty layer IDs
+                            if layer_id.is_empty() {
+                                continue;
+                            }
+
+                            let name = layer_val["label"]
+                                .as_str()
+                                .unwrap_or(&layer_id)
+                                .to_string();
+
+                            let color = layer_val["color"]
+                                .as_str()
+                                .filter(|s| !s.is_empty())
+                                .map(|s| s.to_string());
+
+                            // Extract properties (background_color, border_color, text_color, etc.)
+                            let mut properties = serde_json::Map::new();
+                            if let Some(bg) = layer_val["background_color"].as_str() {
+                                if !bg.is_empty() {
+                                    properties.insert("background_color".to_string(), serde_json::Value::String(bg.to_string()));
+                                }
+                            }
+                            if let Some(border) = layer_val["border_color"].as_str() {
+                                if !border.is_empty() {
+                                    properties.insert("border_color".to_string(), serde_json::Value::String(border.to_string()));
+                                }
+                            }
+                            if let Some(text) = layer_val["text_color"].as_str() {
+                                if !text.is_empty() {
+                                    properties.insert("text_color".to_string(), serde_json::Value::String(text.to_string()));
+                                }
+                            }
+
+                            let properties_json = if properties.is_empty() {
+                                None
+                            } else {
+                                Some(serde_json::to_string(&properties)?)
+                            };
+
+                            let layer = LayerData {
+                                name,
+                                color,
+                                properties: properties_json,
+                            };
+
+                            all_layers.insert(layer_id, layer);
+                        }
+                    }
                 }
                 _ => {
                     return Err(anyhow!("Unknown data type: {}", ds.data_type));
@@ -497,6 +553,20 @@ impl GraphBuilder {
             };
 
             edge.insert(&self.db).await?;
+        }
+
+        // Insert layers
+        for (layer_id, layer_data) in all_layers {
+            let layer = layers::ActiveModel {
+                graph_id: Set(graph.id),
+                layer_id: Set(layer_id),
+                name: Set(layer_data.name),
+                color: Set(layer_data.color),
+                properties: Set(layer_data.properties),
+                ..Default::default()
+            };
+
+            layer.insert(&self.db).await?;
         }
 
         let node_count = node_ids.len();
@@ -666,6 +736,7 @@ impl GraphBuilder {
     async fn clear_graph_data(&self, graph_id: i32) -> Result<()> {
         use crate::database::entities::graph_edges::{Column as EdgeColumn, Entity as EdgeEntity};
         use crate::database::entities::graph_nodes::{Column as NodeColumn, Entity as NodeEntity};
+        use crate::database::entities::layers::{Column as LayerColumn, Entity as LayerEntity};
         use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
         // Delete edges
@@ -677,6 +748,12 @@ impl GraphBuilder {
         // Delete nodes
         NodeEntity::delete_many()
             .filter(NodeColumn::GraphId.eq(graph_id))
+            .exec(&self.db)
+            .await?;
+
+        // Delete layers
+        LayerEntity::delete_many()
+            .filter(LayerColumn::GraphId.eq(graph_id))
             .exec(&self.db)
             .await?;
 
@@ -703,4 +780,11 @@ struct EdgeData {
     layer: Option<String>,
     weight: Option<f64>,
     attrs: Option<Value>,
+}
+
+/// Internal layer data structure
+struct LayerData {
+    name: String,
+    color: Option<String>,
+    properties: Option<String>, // JSON string
 }
