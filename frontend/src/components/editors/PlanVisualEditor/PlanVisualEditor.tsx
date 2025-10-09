@@ -1156,10 +1156,11 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
       data: {
         ...node.data,
         edges: edges, // Inject current edges for validation
-        isUnconfigured: !isNodeFullyConfigured(node.id) // Add unconfigured flag
+        isUnconfigured: !isNodeFullyConfigured(node.id), // Add unconfigured flag
+        projectId: projectId // Inject projectId for execute button
       }
     }))
-  }, [nodes, edges, isNodeFullyConfigured])
+  }, [nodes, edges, isNodeFullyConfigured, projectId])
 
   // Enhance edges with markers and styling based on source node configuration status
   // Must be defined before any early returns to follow Rules of Hooks

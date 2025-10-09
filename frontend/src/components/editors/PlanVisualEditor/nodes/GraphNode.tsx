@@ -61,7 +61,11 @@ export const GraphNode = memo((props: GraphNodeProps) => {
   })
 
   const handleExecute = () => {
-    if (!projectId) return
+    console.log('handleExecute called', { projectId, nodeId: props.id })
+    if (!projectId) {
+      console.error('Cannot execute: projectId is missing')
+      return
+    }
     executeNode({
       variables: {
         projectId,
