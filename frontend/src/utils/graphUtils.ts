@@ -4,6 +4,26 @@ import { Graph, GraphNode, Layer } from '../graphql/graphs';
 
 const elk = new ELK();
 
+// Default colors for nodes and groups
+const DEFAULT_NODE_BG = '#ffffff';
+const DEFAULT_NODE_BORDER = '#eee';
+const DEFAULT_NODE_TEXT = '#000000';
+const DEFAULT_GROUP_BG = 'rgba(240, 240, 240, 0.5)';
+const DEFAULT_GROUP_BORDER = '#999';
+
+// Helper to get layer styling
+const getLayerStyle = (layerId: string | undefined, layerMap: Map<string, Layer>) => {
+  if (!layerId) return null;
+  const layer = layerMap.get(layerId);
+  if (!layer?.properties) return null;
+
+  return {
+    backgroundColor: layer.properties.background_color ? `#${layer.properties.background_color}` : null,
+    borderColor: layer.properties.border_color ? `#${layer.properties.border_color}` : null,
+    textColor: layer.properties.text_color ? `#${layer.properties.text_color}` : null,
+  };
+};
+
 const elkOptions = {
   'elk.algorithm': 'layered',
   'elk.direction': 'DOWN',
@@ -19,13 +39,17 @@ const elkOptions = {
 // Function to convert LcGraph to React Flow elements
 export const getLayoutedElements = async (
   lcGraph: Graph,
-  _layers: Layer[],
+  layers: Layer[],
   nodeWidth: number = 170,
   nodeHeight: number = 50
 ) => {
   // Create node lookup map
   const nodeMap = new Map<string, GraphNode>();
   lcGraph.graphNodes.forEach(node => nodeMap.set(node.id, node));
+
+  // Create layer lookup map by layerId
+  const layerMap = new Map<string, Layer>();
+  layers.forEach(layer => layerMap.set(layer.layerId, layer));
 
   // Debug: Log nodes to verify belongsTo and isPartition values
   console.log('=== ALL GRAPH NODES (total: ' + lcGraph.graphNodes.length + ') ===');
@@ -141,6 +165,7 @@ export const getLayoutedElements = async (
     if (node?.isPartition) {
       // This is a subflow (group node)
       const groupLabel = elkNode.labels?.[0]?.text || elkNode.id;
+      const layerStyle = getLayerStyle(node.layer, layerMap);
 
       reactFlowNodes.push({
         id: elkNode.id,
@@ -152,8 +177,8 @@ export const getLayoutedElements = async (
         style: {
           width: elkNode.width || undefined,
           height: elkNode.height || undefined,
-          backgroundColor: 'rgba(240, 240, 240, 0.5)',
-          border: '2px solid #999',
+          backgroundColor: layerStyle?.backgroundColor || DEFAULT_GROUP_BG,
+          border: `2px solid ${layerStyle?.borderColor || DEFAULT_GROUP_BORDER}`,
           borderRadius: '8px',
           zIndex: -depth - 1, // Lower z-index for deeper nesting, below edges
         },
@@ -174,7 +199,7 @@ export const getLayoutedElements = async (
           border: 'none',
           fontSize: '11px',
           fontWeight: '500',
-          color: '#666',
+          color: layerStyle?.textColor || '#666',
           padding: 0,
           pointerEvents: 'none',
           zIndex: 100,
@@ -193,12 +218,17 @@ export const getLayoutedElements = async (
       }
     } else {
       // Regular node
+      const layerStyle = getLayerStyle(node?.layer, layerMap);
+
       reactFlowNodes.push({
         id: elkNode.id,
         position: { x: elkNode.x || 0, y: elkNode.y || 0 },
         data: { label: elkNode.labels?.[0]?.text || elkNode.id },
         style: {
           zIndex: 50, // Regular nodes above edges (10) and groups (negative)
+          backgroundColor: layerStyle?.backgroundColor || DEFAULT_NODE_BG,
+          border: `1px solid ${layerStyle?.borderColor || DEFAULT_NODE_BORDER}`,
+          color: layerStyle?.textColor || DEFAULT_NODE_TEXT,
         },
         ...(parentId ? { parentNode: parentId, extent: 'parent' as const } : {}),
       });

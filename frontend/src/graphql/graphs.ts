@@ -2,8 +2,15 @@ import { gql } from '@apollo/client'
 
 export interface Layer {
   id: number;
+  layerId: string;
   name: string;
   color?: string;
+  properties?: {
+    background_color?: string;
+    border_color?: string;
+    text_color?: string;
+    [key: string]: any;
+  };
 }
 
 export interface GraphNode {
@@ -53,8 +60,10 @@ export const GET_GRAPHS = gql`
       updatedAt
       layers {
         id
+        layerId
         name
         color
+        properties
       }
     }
   }
@@ -73,8 +82,10 @@ export const GET_GRAPH_DETAILS = gql`
       updatedAt
       layers {
         id
+        layerId
         name
         color
+        properties
       }
       graphNodes {
         id
