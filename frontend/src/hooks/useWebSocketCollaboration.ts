@@ -20,6 +20,34 @@ interface UseWebSocketCollaborationOptions {
   reconnectInterval?: number;
 }
 
+/**
+ * Low-level WebSocket collaboration hook
+ *
+ * **⚠️ INTERNAL USE ONLY - DO NOT USE DIRECTLY**
+ *
+ * This hook is used internally by `useCollaborationV2` and should not be used
+ * directly in application code. Use `useCollaborationV2` instead, which provides:
+ * - Automatic fallback to GraphQL when WebSocket unavailable
+ * - Auto-joining sessions with user info
+ * - Simpler API with better defaults
+ *
+ * This hook provides low-level WebSocket connection management for real-time
+ * collaboration, including:
+ * - WebSocket connection lifecycle
+ * - User presence tracking
+ * - Document activity tracking
+ * - Cursor position updates with throttling
+ * - Automatic reconnection with exponential backoff
+ *
+ * Features:
+ * - Throttles cursor updates to 250ms to reduce network load
+ * - Skips cursor movements < 10px for canvas documents
+ * - Handles React StrictMode double-invocation safely
+ * - Automatically cleans up connections on unmount
+ *
+ * @internal
+ * @see useCollaborationV2 - Use this instead for application code
+ */
 export function useWebSocketCollaboration(
   options: UseWebSocketCollaborationOptions
 ): UseWebSocketCollaboration {

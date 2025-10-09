@@ -25,6 +25,52 @@ interface UseCollaborationV2Options {
   };
 }
 
+/**
+ * High-level collaboration hook for real-time multi-user collaboration
+ *
+ * This is the **primary hook for collaboration features** in the application.
+ * It provides a unified interface that automatically handles:
+ * - WebSocket-based real-time presence (user cursors, status, document activity)
+ * - Automatic fallback to GraphQL mutations when WebSocket unavailable
+ * - Auto-joining sessions when user connects
+ * - Document switching for multi-document collaboration
+ *
+ * @example
+ * ```tsx
+ * const collaboration = useCollaborationV2({
+ *   projectId: 123,
+ *   documentId: 'plan-dag-canvas',
+ *   documentType: 'canvas',
+ *   userInfo: {
+ *     id: 'user-1',
+ *     name: 'John Doe',
+ *     avatarColor: '#FF5733'
+ *   }
+ * });
+ *
+ * // Broadcast cursor position
+ * collaboration.broadcastCursorPosition(x, y, selectedNodeId);
+ *
+ * // Get current users
+ * const onlineUsers = collaboration.users;
+ *
+ * // Check connection status
+ * if (collaboration.connected) {
+ *   // Handle connected state
+ * }
+ * ```
+ *
+ * @param options - Configuration options
+ * @param options.projectId - ID of the project to collaborate on
+ * @param options.documentId - ID of the document within the project (default: 'plan-dag-canvas')
+ * @param options.documentType - Type of document: 'canvas' | 'spreadsheet' | '3d' | 'timeline' | 'code_editor'
+ * @param options.enableWebSocket - Enable WebSocket connection (default: true)
+ * @param options.userInfo - Current user information for presence
+ *
+ * @returns Collaboration interface with actions and status
+ *
+ * @internal Uses `useWebSocketCollaboration` internally - do not use that hook directly
+ */
 export const useCollaborationV2 = (options: UseCollaborationV2Options) => {
   const {
     projectId,
