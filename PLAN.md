@@ -10,27 +10,25 @@ This document outlines identified code quality issues and provides a structured 
 
 ## Key Findings
 
-### 1. Dead Code - Database Entities ⚠️ HIGH PRIORITY
+### 1. Dead Code - Database Entities ✅ COMPLETED
 
 **Issue:** Obsolete entity files exist but are no longer used.
 
-**Files Identified:**
-- `/layercake-core/src/database/entities/nodes.rs` - 0 references
-- `/layercake-core/src/database/entities/edges.rs` - 0 references
-- `/layercake-core/src/database/entities/layers.rs` - Needs verification (may be used)
+**Files Removed:**
+- `/layercake-core/src/database/entities/nodes.rs` - ✅ Deleted
+- `/layercake-core/src/database/entities/edges.rs` - ✅ Deleted
+- `/layercake-core/src/graphql/types/node.rs` - ✅ Deleted (unused GraphQL type)
+- `/layercake-core/src/graphql/types/edge.rs` - ✅ Deleted (unused GraphQL type)
+- `/layercake-core/src/database/entities/layers.rs` - ✅ Kept (actively used by pipeline builders)
 
 **Impact:**
-- Confuses developers about which entities to use
-- Increases cognitive load when navigating codebase
-- May cause incorrect imports if not careful
+- Removed ~185 lines of dead code
+- Clearer codebase structure
+- No build errors after removal
 
-**Action Items:**
-1. Verify that `nodes.rs` and `edges.rs` are completely unused (grep entire codebase)
-2. Check if database tables still exist for these entities
-3. Remove files and update `mod.rs`
-4. Remove any corresponding database migrations if tables are also unused
-
-**Estimated Effort:** 2 hours
+**Completed:** 2025-10-10
+**Actual Effort:** 1 hour
+**Commit:** 6a2986f5
 
 ---
 
