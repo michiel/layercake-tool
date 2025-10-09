@@ -14,13 +14,15 @@ export const GraphPreviewDialog = ({ opened, onClose, data, title }: GraphPrevie
       opened={opened}
       onClose={onClose}
       title={title || 'Graph Preview'}
-      size="100%"
-      fullScreen
+      size="90%"
       padding={0}
       styles={{
         body: {
-          height: 'calc(100vh - 60px)',
           padding: 0,
+          height: '75vh',
+        },
+        content: {
+          maxHeight: '90vh',
         },
       }}
     >
