@@ -869,7 +869,7 @@ const PlanEditorPage = () => {
   }
 
   return (
-    <Stack gap={0} style={{ height: '100vh' }}>
+    <Stack gap={0} style={{ height: '100%' }}>
       <div style={{ padding: '16px', borderBottom: '1px solid #e9ecef' }}>
         <Breadcrumbs
           projectName={selectedProject.name}
