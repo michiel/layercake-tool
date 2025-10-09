@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Routes, Route, useNavigate, useParams, useLocation } from 'react-router-dom'
-import { AppShell, Group, Title, Stack, Button, Container, Text, Card, Badge, Alert, Modal, Select, FileButton } from '@mantine/core'
-import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconFileImport } from '@tabler/icons-react'
+import { AppShell, Group, Title, Stack, Button, Container, Text, Card, Badge, Alert, Modal, Select, FileButton, ActionIcon, Tooltip } from '@mantine/core'
+import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconFileImport, IconDownload } from '@tabler/icons-react'
 import { useQuery, useMutation } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import { Breadcrumbs } from './components/common/Breadcrumbs'
@@ -41,6 +41,31 @@ const GET_PROJECTS = gql`
 const DELETE_PROJECT = gql`
   mutation DeleteProject($id: ID!) {
     deleteProject(id: $id)
+  }
+`
+
+// Query to fetch Plan DAG for download
+const GET_PLAN_DAG = gql`
+  query GetPlanDag($projectId: Int!) {
+    planDag(projectId: $projectId) {
+      version
+      nodes {
+        id
+        nodeType
+        position
+        metadata
+        config
+      }
+      edges {
+        id
+        source
+        target
+        sourceHandle
+        targetHandle
+        metadata
+      }
+      metadata
+    }
   }
 `
 
@@ -544,11 +569,123 @@ const ProjectDetailPage = () => {
     }>
   }>(GET_PROJECTS)
 
+  const { data: planDagData } = useQuery(GET_PLAN_DAG, {
+    variables: { projectId: parseInt(projectId || '0') },
+    skip: !projectId,
+  })
+
   const projects = projectsData?.projects || []
   const selectedProject = projects.find((p: any) => p.id === parseInt(projectId || '0'))
+  const planDag = (planDagData as any)?.planDag
 
   const handleNavigate = (route: string) => {
     navigate(route)
+  }
+
+  // Download Plan DAG as YAML
+  const handleDownloadYAML = () => {
+    if (!planDag || !selectedProject) return
+
+    // Convert Plan DAG to YAML-like structure
+    const yamlContent = convertPlanDagToYAML(planDag)
+
+    // Create filename from plan name
+    const planName = planDag.metadata?.name || selectedProject.name || 'plan'
+    const escapedName = planName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+    const filename = `${escapedName}-plan.yaml`
+
+    // Create and download file
+    const blob = new Blob([yamlContent], { type: 'text/yaml;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+
+    console.log(`Downloaded Plan DAG as ${filename}`)
+  }
+
+  // Simple YAML converter
+  const convertPlanDagToYAML = (dag: any): string => {
+    const indent = (level: number) => '  '.repeat(level)
+
+    const serializeValue = (value: any, level: number): string => {
+      if (value === null || value === undefined) return 'null'
+      if (typeof value === 'string') return `"${value.replace(/"/g, '\\"')}"`
+      if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+      if (Array.isArray(value)) {
+        if (value.length === 0) return '[]'
+        return '\n' + value.map(item =>
+          `${indent(level)}- ${serializeValue(item, level + 1).trim()}`
+        ).join('\n')
+      }
+      if (typeof value === 'object') {
+        const entries = Object.entries(value)
+        if (entries.length === 0) return '{}'
+        return '\n' + entries.map(([key, val]) =>
+          `${indent(level)}${key}: ${serializeValue(val, level + 1).trim()}`
+        ).join('\n')
+      }
+      return String(value)
+    }
+
+    let yaml = '# Plan DAG Configuration\n'
+    yaml += `# Generated on ${new Date().toISOString()}\n\n`
+    yaml += `version: "${dag.version || '1.0.0'}"\n\n`
+
+    if (dag.metadata) {
+      yaml += 'metadata:\n'
+      Object.entries(dag.metadata).forEach(([key, value]) => {
+        yaml += `  ${key}: ${serializeValue(value, 2).trim()}\n`
+      })
+      yaml += '\n'
+    }
+
+    yaml += 'nodes:\n'
+    dag.nodes.forEach((node: any) => {
+      yaml += `  - id: "${node.id}"\n`
+      yaml += `    nodeType: "${node.nodeType}"\n`
+      if (node.position) {
+        yaml += `    position:\n`
+        yaml += `      x: ${node.position.x}\n`
+        yaml += `      y: ${node.position.y}\n`
+      }
+      if (node.metadata) {
+        yaml += `    metadata:\n`
+        Object.entries(node.metadata).forEach(([key, value]) => {
+          yaml += `      ${key}: ${serializeValue(value, 3).trim()}\n`
+        })
+      }
+      if (node.config) {
+        const config = typeof node.config === 'string' ? JSON.parse(node.config) : node.config
+        yaml += `    config:\n`
+        Object.entries(config).forEach(([key, value]) => {
+          yaml += `      ${key}: ${serializeValue(value, 3).trim()}\n`
+        })
+      }
+      yaml += '\n'
+    })
+
+    yaml += 'edges:\n'
+    dag.edges.forEach((edge: any) => {
+      yaml += `  - id: "${edge.id}"\n`
+      yaml += `    source: "${edge.source}"\n`
+      yaml += `    target: "${edge.target}"\n`
+      if (edge.sourceHandle) yaml += `    sourceHandle: "${edge.sourceHandle}"\n`
+      if (edge.targetHandle) yaml += `    targetHandle: "${edge.targetHandle}"\n`
+      if (edge.metadata) {
+        yaml += `    metadata:\n`
+        Object.entries(edge.metadata).forEach(([key, value]) => {
+          yaml += `      ${key}: ${serializeValue(value, 3).trim()}\n`
+        })
+      }
+      yaml += '\n'
+    })
+
+    return yaml
   }
 
   // Show loading state while projects are being fetched
@@ -653,17 +790,33 @@ const ProjectDetailPage = () => {
                 </div>
               </Group>
               {!action.disabled && (
-                <Button
-                  variant={action.primary ? 'filled' : 'light'}
-                  size="sm"
-                  leftSection={action.icon}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    action.onClick()
-                  }}
-                >
-                  Open
-                </Button>
+                <Group gap="xs">
+                  {action.title === 'Plan' && planDag && (
+                    <Tooltip label="Download Plan DAG as YAML">
+                      <ActionIcon
+                        variant="subtle"
+                        size="lg"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDownloadYAML()
+                        }}
+                      >
+                        <IconDownload size="1.2rem" />
+                      </ActionIcon>
+                    </Tooltip>
+                  )}
+                  <Button
+                    variant={action.primary ? 'filled' : 'light'}
+                    size="sm"
+                    leftSection={action.icon}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      action.onClick()
+                    }}
+                  >
+                    Open
+                  </Button>
+                </Group>
               )}
             </Group>
           </Card>
