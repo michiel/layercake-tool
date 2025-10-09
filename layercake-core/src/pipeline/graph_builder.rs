@@ -6,6 +6,7 @@ use std::collections::{HashMap, HashSet};
 use crate::database::entities::{data_sources, datasources, graph_edges, graph_nodes, graphs, layers, plan_dag_nodes};
 use crate::database::entities::ExecutionState;
 use super::types::LayerData;
+use super::layer_operations::{insert_layers_to_db, load_layers_from_db};
 
 /// Helper function to parse is_partition from JSON Value (handles both boolean and string)
 fn parse_is_partition(value: &Value) -> bool {
@@ -642,19 +643,8 @@ impl GraphBuilder {
             edge.insert(&self.db).await?;
         }
 
-        // Insert layers
-        for (layer_id, layer_data) in all_layers {
-            let layer = layers::ActiveModel {
-                graph_id: Set(graph.id),
-                layer_id: Set(layer_id),
-                name: Set(layer_data.name),
-                color: Set(layer_data.color),
-                properties: Set(layer_data.properties),
-                ..Default::default()
-            };
-
-            layer.insert(&self.db).await?;
-        }
+        // Insert layers using shared function
+        insert_layers_to_db(&self.db, graph.id, all_layers).await?;
 
         let node_count = node_ids.len();
         Ok((node_count, edge_count))
