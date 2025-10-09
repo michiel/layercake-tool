@@ -32,26 +32,46 @@ This document outlines identified code quality issues and provides a structured 
 
 ---
 
-### 2. Entity Naming Inconsistency ⚠️ HIGH PRIORITY
+### 2. Entity Naming Inconsistency ✅ COMPLETED
 
-**Issue:** Two nearly identical entity files with different naming conventions.
+**Issue:** Two entity files with confusing similar names but serving different purposes.
 
 **Files:**
-- `/layercake-core/src/database/entities/datasources.rs` - 4 references
-- `/layercake-core/src/database/entities/data_sources.rs` - 24 references
+- `/layercake-core/src/database/entities/datasources.rs` (223 lines)
+  - Table: "datasources" (no underscore)
+  - Purpose: DAG DataSourceNode execution tracking
+  - Contains: ~~ExecutionState enum (shared with graphs entity)~~ Now imported from shared module
+  - Used by: pipeline builders (graph_builder, merge_builder, datasource_importer)
+
+- `/layercake-core/src/database/entities/data_sources.rs` (367 lines)
+  - Table: "data_sources" (snake_case)
+  - Purpose: Uploaded file data (CSV/TSV/JSON)
+  - Contains: FileFormat and DataType enums
+  - Used by: data_source_service, file_type_detection
+
+**Analysis:**
+These are **NOT duplicates** - they represent different database tables for different purposes:
+- `data_sources` = the actual uploaded data files
+- `datasources` = references to those files in the DAG for execution tracking
+
+**Solution Implemented:**
+1. ✅ Created `/database/entities/execution_state.rs` (shared module for ExecutionState enum)
+2. ✅ Updated imports in datasources.rs, graphs.rs, and all pipeline builders
+3. ✅ Added comprehensive doc comments to all three entity files explaining their purposes
+4. ✅ Re-exported ExecutionState from entities module for convenience
 
 **Impact:**
-- Confusion about which entity to use
-- Potential for bugs if wrong one is imported
-- Inconsistent naming patterns (snake_case vs camelCase)
+- Clearer separation of concerns with shared ExecutionState type
+- Comprehensive documentation explaining entity purposes and relationships
+- Improved maintainability with single source of truth for ExecutionState
+- No breaking changes (transparent refactoring)
 
-**Action Items:**
-1. Audit all 4 references to `datasources.rs`
-2. Migrate them to use `data_sources.rs`
-3. Remove `datasources.rs`
-4. Standardize on `data_sources` naming pattern throughout codebase
+**Future Consideration:**
+- Consider renaming "datasources" table to "dag_datasource_executions" (requires database migration)
 
-**Estimated Effort:** 3 hours
+**Completed:** 2025-10-10
+**Actual Effort:** 45 minutes
+**Commit:** [pending]
 
 ---
 
@@ -235,8 +255,8 @@ services/
 **Progress:** 3/3 items completed, 827 lines of code removed/refactored
 
 ### Phase 2: Medium Refactoring (12-16 hours) 🚧 IN PROGRESS
-4. Resolve entity naming inconsistency - NEXT
-5. Extract common pipeline builder logic
+4. ✅ Resolve entity naming inconsistency - 45 minutes
+5. Extract common pipeline builder logic - NEXT
 6. Document/consolidate collaboration hooks
 
 ### Phase 3: Architectural Improvements (24+ hours)

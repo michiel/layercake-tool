@@ -2,9 +2,19 @@ use sea_orm::entity::prelude::*;
 use sea_orm::{Set, ActiveValue};
 use serde::{Deserialize, Serialize};
 
-use super::datasources::ExecutionState;
+use super::execution_state::ExecutionState;
 
-/// Graph entity for DAG GraphNode
+/// Graph entity for DAG GraphNode execution tracking
+///
+/// This entity represents graph nodes in the execution DAG. Each record tracks
+/// the execution state, computed results, and metadata for a graph transformation
+/// node in the pipeline.
+///
+/// Related entities:
+/// - `plan_dag_nodes`: The DAG node definition this graph implements
+/// - `graph_nodes`: Individual nodes in the computed graph output
+/// - `graph_edges`: Individual edges in the computed graph output
+/// - `layers`: Layer definitions for the computed graph
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
 #[sea_orm(table_name = "graphs")]
 pub struct Model {

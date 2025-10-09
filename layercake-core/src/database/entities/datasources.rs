@@ -1,41 +1,18 @@
 use sea_orm::entity::prelude::*;
 use sea_orm::{Set, ActiveValue};
 use serde::{Deserialize, Serialize};
+use super::execution_state::ExecutionState;
 
-/// Execution state for pipeline entities
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ExecutionState {
-    NotStarted,
-    Pending,
-    Processing,
-    Completed,
-    Error,
-}
-
-impl ExecutionState {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            ExecutionState::NotStarted => "not_started",
-            ExecutionState::Pending => "pending",
-            ExecutionState::Processing => "processing",
-            ExecutionState::Completed => "completed",
-            ExecutionState::Error => "error",
-        }
-    }
-
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s {
-            "not_started" => Some(ExecutionState::NotStarted),
-            "pending" => Some(ExecutionState::Pending),
-            "processing" => Some(ExecutionState::Processing),
-            "completed" => Some(ExecutionState::Completed),
-            "error" => Some(ExecutionState::Error),
-            _ => None,
-        }
-    }
-}
-
-/// Datasource entity for DAG DataSourceNode
+/// Datasource entity for DAG DataSourceNode execution tracking
+///
+/// This entity represents datasource nodes in the execution DAG, NOT the uploaded
+/// data files themselves (those are in the `data_sources` table). Each record tracks
+/// the execution state and metadata for a datasource node reference in the pipeline.
+///
+/// Related entities:
+/// - `data_sources`: The actual uploaded file data this datasource references
+/// - `plan_dag_nodes`: The DAG node definition this datasource implements
+/// - `graphs`: Graph nodes that may consume this datasource's output
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
 #[sea_orm(table_name = "datasources")]
 pub struct Model {
@@ -174,17 +151,6 @@ impl Model {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_execution_state_conversion() {
-        assert_eq!(ExecutionState::NotStarted.as_str(), "not_started");
-        assert_eq!(ExecutionState::Completed.as_str(), "completed");
-        assert_eq!(
-            ExecutionState::from_str("processing"),
-            Some(ExecutionState::Processing)
-        );
-        assert_eq!(ExecutionState::from_str("invalid"), None);
-    }
 
     #[test]
     fn test_model_status_checks() {

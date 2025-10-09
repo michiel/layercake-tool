@@ -2,6 +2,20 @@ use sea_orm::entity::prelude::*;
 use sea_orm::{Set, ActiveValue};
 use serde::{Deserialize, Serialize};
 
+/// DataSource entity for uploaded file data (CSV/TSV/JSON)
+///
+/// This entity stores the actual uploaded data files and their metadata. Each record
+/// represents a file that has been uploaded to a project, containing the raw binary
+/// data, parsed graph JSON, and processing status.
+///
+/// This is distinct from the `datasources` table, which tracks datasource node
+/// execution in the DAG pipeline. Think of it as:
+/// - `data_sources` = the library of available data files
+/// - `datasources` = references to those files being used in pipeline execution
+///
+/// Related entities:
+/// - `projects`: The project this data source belongs to
+/// - `datasources`: DAG execution nodes that reference this data source
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
 #[sea_orm(table_name = "data_sources")]
 pub struct Model {

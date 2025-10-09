@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use crate::database::entities::{datasource_rows, datasources};
-use crate::database::entities::datasources::ExecutionState;
+use crate::database::entities::ExecutionState;
 
 /// Service for importing data from files into datasource entities
 pub struct DatasourceImporter {
