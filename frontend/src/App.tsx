@@ -878,7 +878,7 @@ const PlanEditorPage = () => {
           onNavigate={handleNavigate}
         />
       </div>
-      <div style={{ flex: 1, overflow: 'hidden', height: 0 }}>
+      <div style={{ flex: 1, overflow: 'hidden', minHeight: 0 }}>
         <ErrorBoundary>
           <PlanVisualEditor
             projectId={selectedProject.id}
