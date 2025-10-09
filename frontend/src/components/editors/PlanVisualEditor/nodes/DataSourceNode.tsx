@@ -9,7 +9,7 @@ import { getNodeColor, getNodeIcon, getNodeTypeLabel } from '../../../../utils/n
 import { GET_DATASOURCE, DataSource, getFileFormatDisplayName, getDataTypeDisplayName, formatFileSize, getStatusColor } from '../../../../graphql/datasources'
 import { useDataSourcePreview } from '../../../../hooks/usePreview'
 import { getExecutionStateLabel, getExecutionStateColor, isExecutionComplete, isExecutionInProgress } from '../../../../graphql/preview'
-import { DataPreviewDialog } from '../../../visualization/DataPreviewDialog'
+import { DataSourceDataDialog } from '../dialogs/DataSourceDataDialog'
 
 // Helper function to get data freshness information
 const getDataFreshness = (dataSource: DataSource) => {
@@ -45,7 +45,7 @@ interface DataSourceNodeProps extends NodeProps {
 export const DataSourceNode = memo((props: DataSourceNodeProps) => {
   const { data, selected, onEdit, onDelete, readonly = false } = props
   const [dataSourceInfo, setDataSourceInfo] = useState<DataSource | null>(null)
-  const [showPreview, setShowPreview] = useState(false)
+  const [showDataDialog, setShowDataDialog] = useState(false)
 
   const config = data.config as DataSourceNodeConfig
   const color = getNodeColor(PlanDagNodeType.DATA_SOURCE)
@@ -64,13 +64,6 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
     skip: !config.dataSourceId,
     errorPolicy: 'ignore'
   })
-
-  // Query data source preview (for table data)
-  const { preview: dataPreview, loading: previewLoading, error: previewError } = useDataSourcePreview(
-    projectId || 0,
-    props.id,
-    { skip: !showPreview || !projectId }
-  )
 
   // Query execution state (always fetch to show status)
   const { preview: executionPreview } = useDataSourcePreview(
@@ -281,20 +274,20 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
           </Text>
         </Group>
 
-        {/* Center: Table icon for data preview */}
-        {!readonly && isConfigured && (
+        {/* Center: Table icon for data view */}
+        {!readonly && isConfigured && dataSourceInfo?.status === 'active' && (
           <Group justify="center" mb="md">
-            <Tooltip label="Preview data">
+            <Tooltip label="View datasource data (nodes, edges, layers)">
               <ActionIcon
                 size="xl"
                 variant="light"
-                color="blue"
+                color="teal"
                 radius="xl"
-                data-action-icon="preview"
+                data-action-icon="data"
                 onMouseDown={(e) => {
                   e.stopPropagation()
                   e.preventDefault()
-                  setShowPreview(true)
+                  setShowDataDialog(true)
                 }}
               >
                 <IconTable size="1.5rem" />
@@ -336,14 +329,12 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
         </Stack>
       </Paper>
 
-      {/* Data Preview Dialog */}
-      <DataPreviewDialog
-        opened={showPreview}
-        onClose={() => setShowPreview(false)}
-        preview={dataPreview || null}
-        loading={previewLoading}
-        error={previewError}
-        title={`Data Preview: ${data.metadata.label}`}
+      {/* Data Source Data Dialog */}
+      <DataSourceDataDialog
+        opened={showDataDialog}
+        onClose={() => setShowDataDialog(false)}
+        dataSourceId={config.dataSourceId || null}
+        title={`Data Source: ${data.metadata.label}`}
       />
     </>
   )
