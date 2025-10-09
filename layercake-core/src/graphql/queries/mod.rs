@@ -1,13 +1,13 @@
 use async_graphql::*;
 use sea_orm::{EntityTrait, ColumnTrait, QueryFilter};
 
-use crate::database::entities::{projects, plans, users, user_sessions, project_collaborators, data_sources, plan_dag_nodes, plan_dag_edges, graphs, graph_nodes, graph_edges};
+use crate::database::entities::{projects, plans, users, user_sessions, project_collaborators, data_sources, plan_dag_nodes, plan_dag_edges, graphs, graph_nodes, graph_edges, layers};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::graph::Graph;
 use crate::graphql::types::project::Project;
 use crate::graphql::types::plan::Plan;
 use crate::graphql::types::plan_dag::{PlanDag, PlanDagNode, PlanDagEdge, PlanDagInput, PlanDagMetadata, ValidationResult};
-use crate::graphql::types::{User, ProjectCollaborator, DataSource, UserSession, DataSourcePreview, GraphPreview, TableRow, TableColumn, GraphNodePreview, GraphEdgePreview};
+use crate::graphql::types::{User, ProjectCollaborator, DataSource, UserSession, DataSourcePreview, GraphPreview, TableRow, TableColumn, GraphNodePreview, GraphEdgePreview, Layer};
 use crate::graphql::types::plan_dag::DataSourceReference;
 
 pub struct Query;
@@ -592,6 +592,12 @@ impl Query {
             .all(&context.db)
             .await?;
 
+        // Get all layers for this graph
+        let db_layers = layers::Entity::find()
+            .filter(layers::Column::GraphId.eq(graph.id))
+            .all(&context.db)
+            .await?;
+
         // Convert to preview format
         let node_previews: Vec<GraphNodePreview> = nodes
             .into_iter()
@@ -603,12 +609,18 @@ impl Query {
             .map(GraphEdgePreview::from)
             .collect();
 
+        let layer_previews: Vec<Layer> = db_layers
+            .into_iter()
+            .map(Layer::from)
+            .collect();
+
         Ok(Some(GraphPreview {
             node_id,
             graph_id: graph.id,
             name: graph.name,
             nodes: node_previews,
             edges: edge_previews,
+            layers: layer_previews,
             node_count: graph.node_count,
             edge_count: graph.edge_count,
             execution_state: graph.execution_state,

@@ -6,7 +6,7 @@ use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::graph::Graph;
 use crate::graphql::types::scalars::JSON;
 
-#[derive(SimpleObject)]
+#[derive(Clone, Debug, SimpleObject)]
 #[graphql(complex)]
 pub struct Layer {
     pub id: i32,

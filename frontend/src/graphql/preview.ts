@@ -1,4 +1,5 @@
 import { gql } from '@apollo/client';
+import { Layer } from './graphs';
 
 // DataSource Preview Query
 export const GET_DATASOURCE_PREVIEW = gql`
@@ -59,6 +60,13 @@ export const GET_GRAPH_PREVIEW = gql`
         layer
         weight
         attrs
+      }
+      layers {
+        id
+        layerId
+        name
+        color
+        properties
       }
       nodeCount
       edgeCount
@@ -121,6 +129,7 @@ export interface GraphPreview {
   name: string;
   nodes: GraphNodePreview[];
   edges: GraphEdgePreview[];
+  layers: Layer[];
   nodeCount: number;
   edgeCount: number;
   executionState: string;

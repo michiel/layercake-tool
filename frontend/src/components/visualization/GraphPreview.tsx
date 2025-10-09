@@ -18,9 +18,18 @@ export interface GraphLink {
   attrs: Record<string, string>;
 }
 
+export interface GraphLayer {
+  layerId: string;
+  name: string;
+  backgroundColor?: string;
+  borderColor?: string;
+  textColor?: string;
+}
+
 export interface GraphData {
   nodes: GraphNode[];
   links: GraphLink[];
+  layers?: GraphLayer[];
 }
 
 interface GraphPreviewProps {
@@ -185,6 +194,31 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
 
     const params = paramsRef.current;
 
+    // Build layer color map
+    const layerColorMap = new Map<string, string>();
+    if (data.layers) {
+      data.layers.forEach(layer => {
+        if (layer.backgroundColor) {
+          layerColorMap.set(layer.layerId, `#${layer.backgroundColor}`);
+        }
+      });
+    }
+
+    // Generate default colors for layers without explicit colors
+    const defaultColors = [
+      '#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f59e0b',
+      '#10b981', '#14b8a6', '#06b6d4', '#3b82f6', '#6366f1'
+    ];
+    let colorIndex = 0;
+    const layerSet = new Set<string>();
+    data.nodes.forEach(node => layerSet.add(node.layer));
+    layerSet.forEach(layer => {
+      if (!layerColorMap.has(layer)) {
+        layerColorMap.set(layer, defaultColors[colorIndex % defaultColors.length]);
+        colorIndex++;
+      }
+    });
+
     // Initialize force-graph
     const graph = (ForceGraph as any)()(graphContainerRef.current)
       .width(currentWidth)
@@ -192,7 +226,7 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
       .graphData(data)
       .nodeId('id')
       .nodeLabel('name')
-      .nodeAutoColorBy('layer')
+      .nodeColor((node: any) => layerColorMap.get(node.layer) || '#999999')
       .nodeCanvasObject((node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
         const p = paramsRef.current;
         const label = node.name;
@@ -237,7 +271,7 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
           );
       })
       .linkLabel('name')
-      .linkAutoColorBy('layer')
+      .linkColor((link: any) => layerColorMap.get(link.layer) || '#999999')
       .linkWidth(params.linkWidth)
       .linkDirectionalArrowLength(params.linkArrowLength)
       .linkDirectionalArrowRelPos(1)

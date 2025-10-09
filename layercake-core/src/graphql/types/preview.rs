@@ -40,6 +40,7 @@ pub struct GraphPreview {
     pub name: String,
     pub nodes: Vec<GraphNodePreview>,
     pub edges: Vec<GraphEdgePreview>,
+    pub layers: Vec<crate::graphql::types::layer::Layer>,
     pub node_count: i32,
     pub edge_count: i32,
     pub execution_state: String,
