@@ -25,13 +25,13 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({
   const getIcon = (page: string) => {
     switch (page.toLowerCase()) {
       case 'home':
-        return <IconHome size={14} />
+        return <IconHome size={12} />
       case 'projects':
-        return <IconDatabase size={14} />
+        return <IconDatabase size={12} />
       case 'plan editor':
-        return <IconGraph size={14} />
+        return <IconGraph size={12} />
       case 'graph editor':
-        return <IconGraph size={14} />
+        return <IconGraph size={12} />
       default:
         return null
     }
@@ -67,7 +67,7 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({
 
     if (isLast || !item.href) {
       return (
-        <Text key={index} size="sm" c="dimmed" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <Text key={index} size="xs" c="dimmed" style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
           {item.icon}
           {item.title}
         </Text>
@@ -78,8 +78,8 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({
       <Anchor
         key={index}
         onClick={() => onNavigate?.(item.href!)}
-        size="sm"
-        style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}
+        size="xs"
+        style={{ display: 'flex', alignItems: 'center', gap: 3, cursor: 'pointer' }}
       >
         {item.icon}
         {item.title}
@@ -88,7 +88,7 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({
   })
 
   return (
-    <MantineBreadcrumbs separator="/" mb="sm">
+    <MantineBreadcrumbs separator="/" mb="xs" separatorMargin="xs">
       {breadcrumbItems}
     </MantineBreadcrumbs>
   )
