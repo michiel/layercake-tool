@@ -163,7 +163,7 @@ useCollaborationV2 (PUBLIC API)
 
 **Completed:** 2025-10-10
 **Actual Effort:** 45 minutes
-**Commit:** [pending]
+**Commit:** c8807066
 
 ---
 
