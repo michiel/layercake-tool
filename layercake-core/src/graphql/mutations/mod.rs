@@ -1447,11 +1447,72 @@ impl Mutation {
     ) -> Result<crate::graphql::types::graph_node::GraphNode> {
         let context = ctx.data::<GraphQLContext>()?;
         let graph_service = GraphService::new(context.db.clone());
+        let edit_service = GraphEditService::new(context.db.clone());
 
+        // Fetch current node to get old values
+        use crate::database::entities::graph_nodes::{Entity as GraphNodes, Column as NodeColumn};
+        use sea_orm::{ColumnTrait, QueryFilter};
+
+        let old_node = GraphNodes::find()
+            .filter(NodeColumn::GraphId.eq(graph_id))
+            .filter(NodeColumn::Id.eq(&node_id))
+            .one(&context.db)
+            .await?;
+
+        // Update the node
         let node = graph_service
-            .update_graph_node(graph_id, node_id, label, layer, attrs)
+            .update_graph_node(graph_id, node_id.clone(), label.clone(), layer.clone(), attrs.clone())
             .await
             .map_err(|e| Error::new(format!("Failed to update graph node: {}", e)))?;
+
+        // Create graph edits for each changed field
+        if let Some(old_node) = old_node {
+            if let Some(new_label) = &label {
+                if old_node.label.as_ref() != Some(new_label) {
+                    let _ = edit_service.create_edit(
+                        graph_id,
+                        "node".to_string(),
+                        node_id.clone(),
+                        "update".to_string(),
+                        Some("label".to_string()),
+                        old_node.label.as_ref().map(|l| serde_json::json!(l)),
+                        Some(serde_json::json!(new_label)),
+                        None,
+                    ).await;
+                }
+            }
+
+            if let Some(new_layer) = &layer {
+                let old_layer_value = old_node.layer.clone().unwrap_or_default();
+                if &old_layer_value != new_layer {
+                    let _ = edit_service.create_edit(
+                        graph_id,
+                        "node".to_string(),
+                        node_id.clone(),
+                        "update".to_string(),
+                        Some("layer".to_string()),
+                        if old_layer_value.is_empty() { None } else { Some(serde_json::json!(old_layer_value)) },
+                        Some(serde_json::json!(new_layer)),
+                        None,
+                    ).await;
+                }
+            }
+
+            if let Some(new_attrs) = &attrs {
+                if old_node.attrs.as_ref() != Some(new_attrs) {
+                    let _ = edit_service.create_edit(
+                        graph_id,
+                        "node".to_string(),
+                        node_id.clone(),
+                        "update".to_string(),
+                        Some("attrs".to_string()),
+                        old_node.attrs.clone(),
+                        Some(new_attrs.clone()),
+                        None,
+                    ).await;
+                }
+            }
+        }
 
         Ok(crate::graphql::types::graph_node::GraphNode::from(node))
     }
@@ -1466,11 +1527,56 @@ impl Mutation {
     ) -> Result<crate::graphql::types::layer::Layer> {
         let context = ctx.data::<GraphQLContext>()?;
         let graph_service = GraphService::new(context.db.clone());
+        let edit_service = GraphEditService::new(context.db.clone());
 
+        // Fetch current layer to get old values
+        use crate::database::entities::layers::Entity as Layers;
+
+        let old_layer = Layers::find_by_id(id)
+            .one(&context.db)
+            .await?;
+
+        // Update the layer
         let layer = graph_service
-            .update_layer_properties(id, name, properties)
+            .update_layer_properties(id, name.clone(), properties.clone())
             .await
             .map_err(|e| Error::new(format!("Failed to update layer properties: {}", e)))?;
+
+        // Create graph edits for changed fields
+        if let Some(old_layer) = old_layer {
+            if let Some(new_name) = &name {
+                if &old_layer.name != new_name {
+                    let _ = edit_service.create_edit(
+                        old_layer.graph_id,
+                        "layer".to_string(),
+                        old_layer.layer_id.clone(),
+                        "update".to_string(),
+                        Some("name".to_string()),
+                        Some(serde_json::json!(old_layer.name)),
+                        Some(serde_json::json!(new_name)),
+                        None,
+                    ).await;
+                }
+            }
+
+            if let Some(new_properties) = &properties {
+                let old_props = old_layer.properties
+                    .and_then(|p| serde_json::from_str::<serde_json::Value>(&p).ok());
+
+                if old_props.as_ref() != Some(new_properties) {
+                    let _ = edit_service.create_edit(
+                        old_layer.graph_id,
+                        "layer".to_string(),
+                        old_layer.layer_id.clone(),
+                        "update".to_string(),
+                        Some("properties".to_string()),
+                        old_props,
+                        Some(new_properties.clone()),
+                        None,
+                    ).await;
+                }
+            }
+        }
 
         Ok(crate::graphql::types::layer::Layer::from(layer))
     }
