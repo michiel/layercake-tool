@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Container, Title, Alert, LoadingOverlay, Button, Stack, Flex } from '@mantine/core';
 import { IconAlertCircle, IconArrowLeft } from '@tabler/icons-react';
@@ -7,7 +7,7 @@ import { gql } from '@apollo/client';
 import { Breadcrumbs } from '../components/common/Breadcrumbs';
 import { LayercakeGraphEditor } from '../components/graphs/LayercakeGraphEditor';
 import { PropertiesAndLayersPanel } from '../components/graphs/PropertiesAndLayersPanel';
-import { ReactFlowProvider } from 'reactflow';
+import { ReactFlowProvider, Node as FlowNode, Edge as FlowEdge } from 'reactflow';
 import { Graph, GraphNode, UPDATE_GRAPH_NODE } from '../graphql/graphs';
 
 const GET_PROJECTS = gql`
@@ -67,6 +67,10 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [layerVisibility, setLayerVisibility] = useState<Map<string, boolean>>(new Map());
 
+  // Store references to ReactFlow setters for optimistic updates
+  const setNodesRef = useRef<React.Dispatch<React.SetStateAction<FlowNode[]>> | null>(null);
+  const setEdgesRef = useRef<React.Dispatch<React.SetStateAction<FlowEdge[]>> | null>(null);
+
   const { data: projectsData } = useQuery<{ projects: Array<{ id: number; name: string }> }>(GET_PROJECTS);
   const selectedProject = projectsData?.projects.find((p: { id: number; name: string }) => p.id === parseInt(projectId || '0'));
 
@@ -75,9 +79,7 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
     skip: !graphId,
   });
 
-  const [updateGraphNode] = useMutation(UPDATE_GRAPH_NODE, {
-    refetchQueries: ['GetGraphDetails'],
-  });
+  const [updateGraphNode] = useMutation(UPDATE_GRAPH_NODE);
 
   const graph: Graph | null = graphData?.graph || null;
 
@@ -89,9 +91,46 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
     navigate(`/projects/${projectId}/graphs`);
   };
 
+  // Callback to capture ReactFlow setters for optimistic updates
+  const handleNodesInitialized = useCallback((
+    setNodes: React.Dispatch<React.SetStateAction<FlowNode[]>>,
+    setEdges: React.Dispatch<React.SetStateAction<FlowEdge[]>>
+  ) => {
+    setNodesRef.current = setNodes;
+    setEdgesRef.current = setEdges;
+  }, []);
+
   const handleNodeUpdate = useCallback((nodeId: string, updates: Partial<GraphNode>) => {
     if (!graphId) return;
 
+    // Optimistic update: immediately update the node in ReactFlow
+    if (setNodesRef.current) {
+      setNodesRef.current(currentNodes => {
+        return currentNodes.map(node => {
+          if (node.id === nodeId) {
+            // Update node data and style
+            const updatedNode = { ...node };
+
+            if (updates.label !== undefined) {
+              updatedNode.data = { ...node.data, label: updates.label };
+            }
+
+            if (updates.layer !== undefined) {
+              // Update layer in data
+              updatedNode.data = { ...updatedNode.data, layer: updates.layer };
+
+              // Update style if layer changed (will be applied when graph refetches)
+              // For now, just store the layer change
+            }
+
+            return updatedNode;
+          }
+          return node;
+        });
+      });
+    }
+
+    // Send mutation to server (no refetch)
     updateGraphNode({
       variables: {
         graphId: parseInt(graphId),
@@ -100,6 +139,9 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
         layer: updates.layer,
         attrs: updates.attrs,
       },
+    }).catch(error => {
+      console.error('Failed to update node:', error);
+      // TODO: Rollback optimistic update on error
     });
   }, [graphId, updateGraphNode]);
 
@@ -194,6 +236,7 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
               graph={graph}
               onNodeSelect={setSelectedNodeId}
               layerVisibility={layerVisibility}
+              onNodesInitialized={handleNodesInitialized}
             />
           </ReactFlowProvider>
         </div>

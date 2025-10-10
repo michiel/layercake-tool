@@ -27,25 +27,27 @@ export const NodePropertiesForm: React.FC<NodePropertiesFormProps> = ({
 
   const handleLabelBlur = () => {
     if (label !== node.label) {
+      // Update happens optimistically in parent, just track save state
       setIsSaving(true);
       onUpdate({ label });
-      // Simulate save completion
+      // Mark as saved immediately since update is optimistic
       setTimeout(() => {
         setIsSaving(false);
         setLastSaved(new Date());
-      }, 300);
+      }, 100);
     }
   };
 
   const handleLayerChange = (value: string | null) => {
     setLayer(value);
+    // Update happens optimistically in parent, just track save state
     setIsSaving(true);
     onUpdate({ layer: value || undefined });
-    // Simulate save completion
+    // Mark as saved immediately since update is optimistic
     setTimeout(() => {
       setIsSaving(false);
       setLastSaved(new Date());
-    }, 300);
+    }, 100);
   };
 
   // Build layer options with "None" as first option
