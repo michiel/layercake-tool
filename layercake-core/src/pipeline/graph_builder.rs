@@ -7,6 +7,8 @@ use crate::database::entities::{data_sources, datasources, graph_edges, graph_no
 use crate::database::entities::ExecutionState;
 use super::types::LayerData;
 use super::layer_operations::{insert_layers_to_db, load_layers_from_db};
+use crate::services::GraphEditService;
+use tracing::{info, warn};
 
 /// Helper function to parse is_partition from JSON Value (handles both boolean and string)
 fn parse_is_partition(value: &Value) -> bool {
@@ -111,9 +113,43 @@ impl GraphBuilder {
         match result {
             Ok((node_count, edge_count)) => {
                 // Update to completed state
-                let mut active: graphs::ActiveModel = graph.into();
+                let mut active: graphs::ActiveModel = graph.clone().into();
                 active = active.set_completed(source_hash, node_count as i32, edge_count as i32);
-                let updated = active.update(&self.db).await?;
+                let mut updated = active.update(&self.db).await?;
+
+                // Check if there are pending edits to replay
+                if updated.has_pending_edits {
+                    info!("Graph {} has pending edits, starting replay", updated.id);
+
+                    let edit_service = GraphEditService::new(self.db.clone());
+                    match edit_service.replay_graph_edits(updated.id).await {
+                        Ok(summary) => {
+                            info!(
+                                "Replay complete for graph {}: {} applied, {} skipped, {} failed",
+                                updated.id, summary.applied, summary.skipped, summary.failed
+                            );
+
+                            // If any edits failed, log warning but don't fail the build
+                            if summary.failed > 0 {
+                                warn!(
+                                    "Graph {} replay had {} failed edits",
+                                    updated.id, summary.failed
+                                );
+                            }
+
+                            // Refresh the graph entity to get updated metadata
+                            updated = graphs::Entity::find_by_id(updated.id)
+                                .one(&self.db)
+                                .await?
+                                .ok_or_else(|| anyhow!("Graph not found after replay"))?;
+                        }
+                        Err(e) => {
+                            warn!("Failed to replay edits for graph {}: {}", updated.id, e);
+                            // Don't fail the entire build, just log the error
+                        }
+                    }
+                }
+
                 Ok(updated)
             }
             Err(e) => {
