@@ -1,5 +1,6 @@
 pub mod graph_service;
 pub mod graph_edit_service;
+pub mod graph_edit_applicator;
 pub mod import_service;
 pub mod export_service;
 pub mod auth_service;
@@ -13,6 +14,7 @@ pub mod file_type_detection;
 
 pub use graph_service::*;
 pub use graph_edit_service::*;
+pub use graph_edit_applicator::*;
 pub use import_service::*;
 pub use export_service::*;
 pub use authorization::*;
