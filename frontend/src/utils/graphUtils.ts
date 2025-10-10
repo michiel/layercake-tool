@@ -184,7 +184,7 @@ export const getLayoutedElements = async (
           backgroundColor: bgColor,
           border: `2px solid ${borderColor}`,
           borderRadius: '8px',
-          zIndex: -depth - 1, // Lower z-index for deeper nesting, below edges
+          zIndex: -100 + depth, // Nested groups above parents, but all below edges (10) and nodes (50)
           // Force these styles to override React Flow defaults, especially for nested nodes
           borderColor: borderColor,
           borderWidth: '2px',
