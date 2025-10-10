@@ -1,6 +1,8 @@
 use anyhow::Result;
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set};
+use tracing::{debug, info, warn};
 use crate::database::entities::graph_edits::{self, Entity as GraphEdits};
+use super::graph_edit_applicator::{GraphEditApplicator, ApplyResult};
 
 /// Service for managing graph edit operations
 ///
@@ -196,4 +198,123 @@ impl GraphEditService {
         let count = query.count(&self.db).await?;
         Ok(count)
     }
+
+    /// Replay all unapplied edits for a graph
+    ///
+    /// Returns a summary of the replay operation
+    pub async fn replay_graph_edits(&self, graph_id: i32) -> Result<ReplaySummary> {
+        info!("Starting replay of edits for graph {}", graph_id);
+
+        // Get all unapplied edits in sequence order
+        let edits = self.get_edits_for_graph(graph_id, true).await?;
+        let total_edits = edits.len();
+
+        info!("Found {} unapplied edits to replay", total_edits);
+
+        let mut summary = ReplaySummary {
+            total: total_edits,
+            applied: 0,
+            skipped: 0,
+            failed: 0,
+            details: Vec::new(),
+        };
+
+        // Create applicator
+        let applicator = GraphEditApplicator::new(self.db.clone());
+
+        // Apply each edit in sequence
+        for edit in edits {
+            debug!(
+                "Replaying edit #{}: {} {} {}",
+                edit.sequence_number, edit.operation, edit.target_type, edit.target_id
+            );
+
+            match applicator.apply_edit(&edit).await {
+                Ok(ApplyResult::Success { message }) => {
+                    summary.applied += 1;
+                    summary.details.push(EditResult {
+                        sequence_number: edit.sequence_number,
+                        target_type: edit.target_type.clone(),
+                        target_id: edit.target_id.clone(),
+                        operation: edit.operation.clone(),
+                        result: "success".to_string(),
+                        message,
+                    });
+
+                    // Mark as applied
+                    if let Err(e) = self.mark_edit_applied(edit.id).await {
+                        warn!("Failed to mark edit {} as applied: {}", edit.id, e);
+                    }
+                }
+                Ok(ApplyResult::Skipped { reason }) => {
+                    summary.skipped += 1;
+                    summary.details.push(EditResult {
+                        sequence_number: edit.sequence_number,
+                        target_type: edit.target_type.clone(),
+                        target_id: edit.target_id.clone(),
+                        operation: edit.operation.clone(),
+                        result: "skipped".to_string(),
+                        message: reason,
+                    });
+                }
+                Ok(ApplyResult::Error { reason }) => {
+                    summary.failed += 1;
+                    summary.details.push(EditResult {
+                        sequence_number: edit.sequence_number,
+                        target_type: edit.target_type.clone(),
+                        target_id: edit.target_id.clone(),
+                        operation: edit.operation.clone(),
+                        result: "failed".to_string(),
+                        message: reason.clone(),
+                    });
+
+                    warn!("Failed to apply edit #{}: {}", edit.sequence_number, reason);
+                }
+                Err(e) => {
+                    summary.failed += 1;
+                    summary.details.push(EditResult {
+                        sequence_number: edit.sequence_number,
+                        target_type: edit.target_type.clone(),
+                        target_id: edit.target_id.clone(),
+                        operation: edit.operation.clone(),
+                        result: "failed".to_string(),
+                        message: e.to_string(),
+                    });
+
+                    warn!("Failed to apply edit #{}: {}", edit.sequence_number, e);
+                }
+            }
+        }
+
+        // Update last_replay_at
+        self.mark_graph_replayed(graph_id).await?;
+
+        info!(
+            "Replay complete for graph {}: {} applied, {} skipped, {} failed",
+            graph_id, summary.applied, summary.skipped, summary.failed
+        );
+
+        Ok(summary)
+    }
+}
+
+/// Summary of a replay operation
+#[derive(Debug, Clone)]
+pub struct ReplaySummary {
+    pub total: usize,
+    pub applied: usize,
+    pub skipped: usize,
+    pub failed: usize,
+    pub details: Vec<EditResult>,
+}
+
+/// Result of applying a single edit during replay
+#[derive(Debug, Clone)]
+pub struct EditResult {
+    pub sequence_number: i32,
+    pub target_type: String,
+    pub target_id: String,
+    pub operation: String,
+    pub result: String, // "success", "skipped", "failed"
+    pub message: String,
 }
