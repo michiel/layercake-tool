@@ -1563,7 +1563,11 @@ impl Mutation {
                 let old_props = old_layer.properties
                     .and_then(|p| serde_json::from_str::<serde_json::Value>(&p).ok());
 
+                tracing::debug!("Layer properties update - old_props: {:?}, new_properties: {:?}", old_props, new_properties);
+                tracing::debug!("Properties are equal: {}", old_props.as_ref() == Some(new_properties));
+
                 if old_props.as_ref() != Some(new_properties) {
+                    tracing::info!("Creating edit for layer properties change");
                     let _ = edit_service.create_edit(
                         old_layer.graph_id,
                         "layer".to_string(),

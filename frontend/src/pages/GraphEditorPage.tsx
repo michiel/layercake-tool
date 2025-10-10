@@ -201,9 +201,17 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
 
     // Build updated properties
     const updatedProperties = {
-      ...layer.properties,
+      ...(layer.properties || {}),
       [`${colorType}_color`]: color,
     };
+
+    console.log('Layer color change:', {
+      layerId,
+      colorType,
+      color,
+      oldProperties: layer.properties,
+      newProperties: updatedProperties,
+    });
 
     // Optimistic update: immediately update node styles in ReactFlow
     if (setNodesRef.current) {
