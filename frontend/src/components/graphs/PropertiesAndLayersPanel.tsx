@@ -1,6 +1,7 @@
 import React from 'react';
 import { Accordion, Paper } from '@mantine/core';
 import { NodePropertiesForm } from './NodePropertiesForm';
+import { LayersAccordionPanel } from './LayersAccordionPanel';
 import { Graph, GraphNode } from '../../graphql/graphs';
 
 interface PropertiesAndLayersPanelProps {
@@ -54,9 +55,7 @@ export const PropertiesAndLayersPanel: React.FC<PropertiesAndLayersPanelProps> =
         <Accordion.Item value="layers">
           <Accordion.Control>Layers</Accordion.Control>
           <Accordion.Panel>
-            <div style={{ color: '#868e96', fontSize: '14px', textAlign: 'center', padding: '20px 0' }}>
-              Layers panel coming soon
-            </div>
+            <LayersAccordionPanel graph={graph} />
           </Accordion.Panel>
         </Accordion.Item>
       </Accordion>
