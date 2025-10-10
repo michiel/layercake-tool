@@ -30,8 +30,14 @@
 .react-flow__node-group {
   /* Background and border are set via inline styles from layer properties */
   /* Keeping only structural properties here */
-  border-radius: 8px;
+  border-radius: 8px !important;
   padding: 25px 15px 15px 15px;
+}
+
+/* Ensure nested group nodes also respect inline border styles */
+.react-flow__node-group .react-flow__node-group {
+  /* Let inline styles control the border completely */
+  border: none; /* Reset, inline styles will override */
 }
 
 /* Hide handles on group nodes */

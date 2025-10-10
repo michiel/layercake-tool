@@ -167,6 +167,10 @@ export const getLayoutedElements = async (
       const groupLabel = elkNode.labels?.[0]?.text || elkNode.id;
       const layerStyle = getLayerStyle(node.layer, layerMap);
 
+      // Build inline style string with !important to override React Flow defaults
+      const borderColor = layerStyle?.borderColor || DEFAULT_GROUP_BORDER;
+      const bgColor = layerStyle?.backgroundColor || DEFAULT_GROUP_BG;
+
       reactFlowNodes.push({
         id: elkNode.id,
         position: { x: elkNode.x || 0, y: elkNode.y || 0 },
@@ -177,10 +181,14 @@ export const getLayoutedElements = async (
         style: {
           width: elkNode.width || undefined,
           height: elkNode.height || undefined,
-          backgroundColor: layerStyle?.backgroundColor || DEFAULT_GROUP_BG,
-          border: `2px solid ${layerStyle?.borderColor || DEFAULT_GROUP_BORDER}`,
+          backgroundColor: bgColor,
+          border: `2px solid ${borderColor}`,
           borderRadius: '8px',
           zIndex: -depth - 1, // Lower z-index for deeper nesting, below edges
+          // Force these styles to override React Flow defaults, especially for nested nodes
+          borderColor: borderColor,
+          borderWidth: '2px',
+          borderStyle: 'solid',
         },
         className: 'layercake-group-node',
         ...(parentId ? { parentNode: parentId, extent: 'parent' as const } : {}),
