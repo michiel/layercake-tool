@@ -9,6 +9,7 @@ use crate::graphql::context::GraphQLContext;
 use crate::services::auth_service::AuthService;
 
 use crate::services::graph_service::GraphService;
+use crate::services::graph_edit_service::GraphEditService;
 use crate::services::data_source_service::DataSourceService;
 use crate::services::export_service::ExportService;
 use crate::pipeline::DagExecutor;
@@ -18,6 +19,7 @@ use crate::graphql::types::plan::{Plan, CreatePlanInput, UpdatePlanInput};
 use crate::graphql::types::plan_dag::{PlanDag, PlanDagNode, PlanDagEdge, PlanDagInput, PlanDagNodeInput, PlanDagEdgeInput, PlanDagNodeUpdateInput, Position, NodePositionInput};
 use crate::graphql::types::{User, ProjectCollaborator, RegisterUserInput, LoginInput, UpdateUserInput, LoginResponse, RegisterResponse, InviteCollaboratorInput, UpdateCollaboratorRoleInput, DataSource, CreateDataSourceInput, UpdateDataSourceInput, BulkUploadDataSourceInput};
 use crate::graphql::types::graph::{Graph, CreateGraphInput, UpdateGraphInput};
+use crate::graphql::types::graph_edit::{GraphEdit, CreateGraphEditInput, ReplaySummary, EditResult};
 
 pub struct Mutation;
 
@@ -1916,6 +1918,75 @@ impl Mutation {
             filename,
             mime_type,
         })
+    }
+
+    /// Create a new graph edit
+    async fn create_graph_edit(
+        &self,
+        ctx: &Context<'_>,
+        input: CreateGraphEditInput,
+    ) -> Result<GraphEdit> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let service = GraphEditService::new(context.db.clone());
+
+        let edit = service
+            .create_edit(
+                input.graph_id,
+                input.target_type,
+                input.target_id,
+                input.operation,
+                input.field_name,
+                input.old_value,
+                input.new_value,
+                input.created_by,
+            )
+            .await
+            .map_err(|e| Error::new(format!("Failed to create graph edit: {}", e)))?;
+
+        Ok(GraphEdit::from(edit))
+    }
+
+    /// Replay all unapplied edits for a graph
+    async fn replay_graph_edits(&self, ctx: &Context<'_>, graph_id: i32) -> Result<ReplaySummary> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let service = GraphEditService::new(context.db.clone());
+
+        let summary = service
+            .replay_graph_edits(graph_id)
+            .await
+            .map_err(|e| Error::new(format!("Failed to replay graph edits: {}", e)))?;
+
+        Ok(ReplaySummary {
+            total: summary.total as i32,
+            applied: summary.applied as i32,
+            skipped: summary.skipped as i32,
+            failed: summary.failed as i32,
+            details: summary
+                .details
+                .into_iter()
+                .map(|d| EditResult {
+                    sequence_number: d.sequence_number,
+                    target_type: d.target_type,
+                    target_id: d.target_id,
+                    operation: d.operation,
+                    result: d.result,
+                    message: d.message,
+                })
+                .collect(),
+        })
+    }
+
+    /// Clear all edits for a graph
+    async fn clear_graph_edits(&self, ctx: &Context<'_>, graph_id: i32) -> Result<bool> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let service = GraphEditService::new(context.db.clone());
+
+        service
+            .clear_graph_edits(graph_id)
+            .await
+            .map_err(|e| Error::new(format!("Failed to clear graph edits: {}", e)))?;
+
+        Ok(true)
     }
 }
 

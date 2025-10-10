@@ -1,14 +1,15 @@
 use async_graphql::*;
 use sea_orm::{EntityTrait, ColumnTrait, QueryFilter};
 
-use crate::database::entities::{projects, plans, users, user_sessions, project_collaborators, data_sources, plan_dag_nodes, plan_dag_edges, graphs, graph_nodes, graph_edges, layers};
+use crate::database::entities::{projects, plans, users, user_sessions, project_collaborators, data_sources, plan_dag_nodes, plan_dag_edges, graphs, graph_nodes, graph_edges, layers, graph_edits};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::graph::Graph;
 use crate::graphql::types::project::Project;
 use crate::graphql::types::plan::Plan;
 use crate::graphql::types::plan_dag::{PlanDag, PlanDagNode, PlanDagEdge, PlanDagInput, PlanDagMetadata, ValidationResult};
-use crate::graphql::types::{User, ProjectCollaborator, DataSource, UserSession, DataSourcePreview, GraphPreview, TableRow, TableColumn, GraphNodePreview, GraphEdgePreview, Layer};
+use crate::graphql::types::{User, ProjectCollaborator, DataSource, UserSession, DataSourcePreview, GraphPreview, TableRow, TableColumn, GraphNodePreview, GraphEdgePreview, Layer, GraphEdit};
 use crate::graphql::types::plan_dag::DataSourceReference;
+use crate::services::graph_edit_service::GraphEditService;
 
 pub struct Query;
 
@@ -627,5 +628,41 @@ impl Query {
             computed_date: graph.computed_date.map(|d| d.to_rfc3339()),
             error_message: graph.error_message,
         }))
+    }
+
+    /// Get all edits for a graph
+    async fn graph_edits(
+        &self,
+        ctx: &Context<'_>,
+        graph_id: i32,
+        unapplied_only: Option<bool>,
+    ) -> Result<Vec<GraphEdit>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let service = GraphEditService::new(context.db.clone());
+
+        let edits = service
+            .get_edits_for_graph(graph_id, unapplied_only.unwrap_or(false))
+            .await
+            .map_err(|e| Error::new(format!("Failed to get graph edits: {}", e)))?;
+
+        Ok(edits.into_iter().map(GraphEdit::from).collect())
+    }
+
+    /// Get edit count for a graph
+    async fn graph_edit_count(
+        &self,
+        ctx: &Context<'_>,
+        graph_id: i32,
+        unapplied_only: Option<bool>,
+    ) -> Result<i32> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let service = GraphEditService::new(context.db.clone());
+
+        let count = service
+            .get_edit_count(graph_id, unapplied_only.unwrap_or(false))
+            .await
+            .map_err(|e| Error::new(format!("Failed to get edit count: {}", e)))?;
+
+        Ok(count as i32)
     }
 }
