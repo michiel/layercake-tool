@@ -8,12 +8,20 @@ interface PropertiesAndLayersPanelProps {
   graph: Graph;
   selectedNodeId: string | null;
   onNodeUpdate: (nodeId: string, updates: Partial<GraphNode>) => void;
+  layerVisibility: Map<string, boolean>;
+  onLayerVisibilityToggle: (layerId: string) => void;
+  onShowAllLayers: () => void;
+  onHideAllLayers: () => void;
 }
 
 export const PropertiesAndLayersPanel: React.FC<PropertiesAndLayersPanelProps> = ({
   graph,
   selectedNodeId,
   onNodeUpdate,
+  layerVisibility,
+  onLayerVisibilityToggle,
+  onShowAllLayers,
+  onHideAllLayers,
 }) => {
   const selectedNode = selectedNodeId
     ? graph.graphNodes.find(n => n.id === selectedNodeId)
@@ -55,7 +63,13 @@ export const PropertiesAndLayersPanel: React.FC<PropertiesAndLayersPanelProps> =
         <Accordion.Item value="layers">
           <Accordion.Control>Layers</Accordion.Control>
           <Accordion.Panel>
-            <LayersAccordionPanel graph={graph} />
+            <LayersAccordionPanel
+              graph={graph}
+              layerVisibility={layerVisibility}
+              onLayerVisibilityToggle={onLayerVisibilityToggle}
+              onShowAllLayers={onShowAllLayers}
+              onHideAllLayers={onHideAllLayers}
+            />
           </Accordion.Panel>
         </Accordion.Item>
       </Accordion>

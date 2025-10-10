@@ -1,10 +1,15 @@
 import React, { useMemo } from 'react';
-import { Stack, Text, Group, Divider } from '@mantine/core';
+import { Stack, Text, Group, Divider, Button } from '@mantine/core';
+import { IconEye, IconEyeOff } from '@tabler/icons-react';
 import { Graph } from '../../graphql/graphs';
 import { LayerListItem } from './LayerListItem';
 
 interface LayersAccordionPanelProps {
   graph: Graph;
+  layerVisibility: Map<string, boolean>;
+  onLayerVisibilityToggle: (layerId: string) => void;
+  onShowAllLayers: () => void;
+  onHideAllLayers: () => void;
 }
 
 interface LayerStatistics {
@@ -12,7 +17,13 @@ interface LayerStatistics {
   edgeCount: number;
 }
 
-export const LayersAccordionPanel: React.FC<LayersAccordionPanelProps> = ({ graph }) => {
+export const LayersAccordionPanel: React.FC<LayersAccordionPanelProps> = ({
+  graph,
+  layerVisibility,
+  onLayerVisibilityToggle,
+  onShowAllLayers,
+  onHideAllLayers,
+}) => {
   // Calculate statistics for each layer
   const layerStats = useMemo(() => {
     const stats = new Map<string, LayerStatistics>();
@@ -76,6 +87,26 @@ export const LayersAccordionPanel: React.FC<LayersAccordionPanelProps> = ({ grap
         </Group>
       </Group>
 
+      {/* Bulk actions */}
+      <Group gap="xs">
+        <Button
+          size="xs"
+          variant="light"
+          leftSection={<IconEye size={14} />}
+          onClick={onShowAllLayers}
+        >
+          Show All
+        </Button>
+        <Button
+          size="xs"
+          variant="light"
+          leftSection={<IconEyeOff size={14} />}
+          onClick={onHideAllLayers}
+        >
+          Hide All
+        </Button>
+      </Group>
+
       <Divider />
 
       {/* Layer list */}
@@ -87,12 +118,15 @@ export const LayersAccordionPanel: React.FC<LayersAccordionPanelProps> = ({ grap
         ) : (
           graph.layers.map(layer => {
             const stats = layerStats.get(layer.layerId) || { nodeCount: 0, edgeCount: 0 };
+            const isVisible = layerVisibility.get(layer.layerId) ?? true;
             return (
               <LayerListItem
                 key={layer.id}
                 layer={layer}
                 nodeCount={stats.nodeCount}
                 edgeCount={stats.edgeCount}
+                isVisible={isVisible}
+                onVisibilityToggle={() => onLayerVisibilityToggle(layer.layerId)}
               />
             );
           })

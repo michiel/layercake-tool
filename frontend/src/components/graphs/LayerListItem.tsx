@@ -1,17 +1,22 @@
 import React from 'react';
-import { Group, Stack, Text, Badge, Box } from '@mantine/core';
+import { Group, Stack, Text, Badge, Box, ActionIcon } from '@mantine/core';
+import { IconEye, IconEyeOff } from '@tabler/icons-react';
 import { Layer } from '../../graphql/graphs';
 
 interface LayerListItemProps {
   layer: Layer;
   nodeCount: number;
   edgeCount: number;
+  isVisible: boolean;
+  onVisibilityToggle: () => void;
 }
 
 export const LayerListItem: React.FC<LayerListItemProps> = ({
   layer,
   nodeCount,
   edgeCount,
+  isVisible,
+  onVisibilityToggle,
 }) => {
   const backgroundColor = layer.properties?.background_color
     ? `#${layer.properties.background_color}`
@@ -30,11 +35,24 @@ export const LayerListItem: React.FC<LayerListItemProps> = ({
         borderRadius: '4px',
         border: '1px solid #e9ecef',
         marginBottom: '8px',
+        opacity: isVisible ? 1 : 0.5,
+        backgroundColor: isVisible ? 'white' : '#f8f9fa',
       }}
     >
       <Stack gap="xs">
         <Group justify="space-between" align="center">
           <Group gap="sm">
+            {/* Visibility toggle */}
+            <ActionIcon
+              variant="subtle"
+              color="gray"
+              size="sm"
+              onClick={onVisibilityToggle}
+              title={isVisible ? 'Hide layer' : 'Show layer'}
+            >
+              {isVisible ? <IconEye size={16} /> : <IconEyeOff size={16} />}
+            </ActionIcon>
+
             {/* Color swatches */}
             <Group gap={4}>
               <Box

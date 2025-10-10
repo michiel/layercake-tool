@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Container, Title, Alert, LoadingOverlay, Button, Stack, Flex } from '@mantine/core';
 import { IconAlertCircle, IconArrowLeft } from '@tabler/icons-react';
@@ -65,6 +65,7 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
   const navigate = useNavigate();
   const { projectId, graphId } = useParams<{ projectId: string; graphId: string }>();
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [layerVisibility, setLayerVisibility] = useState<Map<string, boolean>>(new Map());
 
   const { data: projectsData } = useQuery<{ projects: Array<{ id: number; name: string }> }>(GET_PROJECTS);
   const selectedProject = projectsData?.projects.find((p: { id: number; name: string }) => p.id === parseInt(projectId || '0'));
@@ -101,6 +102,41 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
       },
     });
   }, [graphId, updateGraphNode]);
+
+  // Initialize layer visibility when graph loads
+  useEffect(() => {
+    if (graph) {
+      const initialVisibility = new Map<string, boolean>();
+      graph.layers.forEach(layer => {
+        initialVisibility.set(layer.layerId, true); // All visible by default
+      });
+      setLayerVisibility(initialVisibility);
+    }
+  }, [graph?.id]); // Only re-run when graph ID changes
+
+  const handleLayerVisibilityToggle = useCallback((layerId: string) => {
+    setLayerVisibility(prev => {
+      const newMap = new Map(prev);
+      newMap.set(layerId, !prev.get(layerId));
+      return newMap;
+    });
+  }, []);
+
+  const handleShowAllLayers = useCallback(() => {
+    setLayerVisibility(prev => {
+      const newMap = new Map(prev);
+      newMap.forEach((_, layerId) => newMap.set(layerId, true));
+      return newMap;
+    });
+  }, []);
+
+  const handleHideAllLayers = useCallback(() => {
+    setLayerVisibility(prev => {
+      const newMap = new Map(prev);
+      newMap.forEach((_, layerId) => newMap.set(layerId, false));
+      return newMap;
+    });
+  }, []);
 
   if (!selectedProject) {
     return (
@@ -157,6 +193,7 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
             <LayercakeGraphEditor
               graph={graph}
               onNodeSelect={setSelectedNodeId}
+              layerVisibility={layerVisibility}
             />
           </ReactFlowProvider>
         </div>
@@ -165,6 +202,10 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
           graph={graph}
           selectedNodeId={selectedNodeId}
           onNodeUpdate={handleNodeUpdate}
+          layerVisibility={layerVisibility}
+          onLayerVisibilityToggle={handleLayerVisibilityToggle}
+          onShowAllLayers={handleShowAllLayers}
+          onHideAllLayers={handleHideAllLayers}
         />
       </Flex>
     </Stack>

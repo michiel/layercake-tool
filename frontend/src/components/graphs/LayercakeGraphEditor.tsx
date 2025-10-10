@@ -12,9 +12,10 @@ import { FloatingEdge } from './FloatingEdge';
 interface LayercakeGraphEditorProps {
   graph: Graph;
   onNodeSelect?: (nodeId: string | null) => void;
+  layerVisibility?: Map<string, boolean>;
 }
 
-export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({ graph, onNodeSelect }) => {
+export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({ graph, onNodeSelect, layerVisibility }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const { fitView } = useReactFlow();
@@ -22,10 +23,44 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({ grap
   const nodeTypes = useMemo(() => ({ group: GroupNode }), []);
   const edgeTypes = useMemo(() => ({ floating: FloatingEdge }), []);
 
-  const onLayout = useCallback(async () => {
-    if (!graph || !graph.graphNodes || !graph.graphEdges) return;
+  // Filter graph based on layer visibility
+  const filteredGraph = useMemo(() => {
+    if (!layerVisibility || layerVisibility.size === 0) {
+      return graph;
+    }
 
-    const layouted = await getLayoutedElements(graph, graph.layers);
+    const visibleNodes = graph.graphNodes.filter(node => {
+      if (!node.layer) return true; // No layer = always visible
+      return layerVisibility.get(node.layer) !== false;
+    });
+
+    const visibleNodeIds = new Set(visibleNodes.map(n => n.id));
+
+    const visibleEdges = graph.graphEdges.filter(edge => {
+      // Edge is visible if both source and target nodes are visible
+      const sourceVisible = visibleNodeIds.has(edge.source);
+      const targetVisible = visibleNodeIds.has(edge.target);
+
+      // Also check edge's own layer
+      if (edge.layer) {
+        const edgeLayerVisible = layerVisibility.get(edge.layer) !== false;
+        return sourceVisible && targetVisible && edgeLayerVisible;
+      }
+
+      return sourceVisible && targetVisible;
+    });
+
+    return {
+      ...graph,
+      graphNodes: visibleNodes,
+      graphEdges: visibleEdges,
+    };
+  }, [graph, layerVisibility]);
+
+  const onLayout = useCallback(async () => {
+    if (!filteredGraph || !filteredGraph.graphNodes || !filteredGraph.graphEdges) return;
+
+    const layouted = await getLayoutedElements(filteredGraph, filteredGraph.layers);
 
     setNodes(layouted.nodes);
     setEdges(layouted.edges);
@@ -33,11 +68,11 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({ grap
     window.requestAnimationFrame(() => {
       fitView();
     });
-  }, [graph, setNodes, setEdges, fitView]);
+  }, [filteredGraph, setNodes, setEdges, fitView]);
 
   useEffect(() => {
     onLayout();
-  }, [graph, onLayout]);
+  }, [filteredGraph, onLayout]);
 
   // Handle node selection
   const handleSelectionChange = useCallback(({ nodes }: { nodes: Node[] }) => {
