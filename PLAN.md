@@ -618,25 +618,33 @@ extend type Mutation {
 
 ## Migration Strategy
 
-### Phase 1: Add alongside existing system
-- Deploy GraphEdit table and services
-- Don't auto-create edits yet
-- Manual testing and validation
+### Direct Deployment Approach
 
-### Phase 2: Opt-in recording
-- Add feature flag for edit recording
-- Enable for test graphs only
-- Monitor performance and issues
+Since existing databases can be rebuilt at this stage of development, we can deploy all features directly without gradual rollout:
 
-### Phase 3: Auto-record for new edits
-- Automatically create GraphEdit for all new edits
-- Existing graphs continue without edits
-- Allow manual "Start Tracking" action
+**Single Deployment**:
+1. Run database migration to add `graph_edits` table
+2. Update `graphs` table with new columns
+3. Deploy all backend services (GraphEditService, replay engine)
+4. Deploy frontend mutations that auto-create GraphEdit records
+5. Enable auto-replay on graph regeneration by default
 
-### Phase 4: Full rollout
-- All graph edits create GraphEdit records
-- Auto-replay on regeneration (with opt-out)
-- Monitor and optimize
+**Database Rebuild**:
+- Existing databases can be dropped and recreated with new schema
+- No data migration needed from old schema
+- Fresh start with edit tracking enabled from day one
+
+**Initial State**:
+- All new graph edits immediately create GraphEdit records
+- Auto-replay enabled by default on regeneration
+- Edit history visible in UI from first edit
+- No feature flags or opt-in required
+
+**Rollback Plan** (if needed):
+- Drop `graph_edits` table
+- Remove new columns from `graphs` table
+- Deploy previous version of services
+- Existing graphs continue to work without edit tracking
 
 ---
 
@@ -677,7 +685,7 @@ extend type Mutation {
 2. **Performance**: Replay completes in <5 seconds for 100 edits
 3. **Reliability**: 0 data loss incidents from replay
 4. **Usability**: Users understand and use edit history feature
-5. **Adoption**: 80%+ of graphs have edit tracking enabled
+5. **Adoption**: Edit tracking works seamlessly for all graphs without issues
 
 ---
 
