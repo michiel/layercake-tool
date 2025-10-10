@@ -51,13 +51,21 @@ export const NodePropertiesForm: React.FC<NodePropertiesFormProps> = ({
   };
 
   // Build layer options with "None" as first option
+  // Use special sentinel value to avoid conflicts with empty layer IDs
   const layerOptions = [
-    { value: '', label: 'None' },
+    { value: '__none__', label: 'None' },
     ...layers.map(l => ({
       value: l.layerId,
       label: l.name || l.layerId
     }))
   ];
+
+  // Convert between internal representation and select value
+  const selectValue = layer || '__none__';
+  const handleSelectChange = (value: string | null) => {
+    const actualValue = value === '__none__' ? null : value;
+    handleLayerChange(actualValue);
+  };
 
   return (
     <Stack gap="md">
@@ -71,8 +79,8 @@ export const NodePropertiesForm: React.FC<NodePropertiesFormProps> = ({
 
       <Select
         label="Layer"
-        value={layer || ''}
-        onChange={handleLayerChange}
+        value={selectValue}
+        onChange={handleSelectChange}
         data={layerOptions}
         placeholder="Select layer"
         clearable={false}
