@@ -1,4 +1,4 @@
-# Graph Editor Layers Panel Implementation Plan
+# Graph Editor Properties & Layers Panel Implementation Plan
 
 **Date:** 2025-10-10
 **Status:** Planning
@@ -6,18 +6,28 @@
 
 ## Executive Summary
 
-Add a comprehensive layers panel to the graph editor that provides layer management, visibility control, filtering, and editing capabilities. The panel will be a collapsible sidebar on the right side of the graph editor.
+Add a comprehensive right sidebar to the graph editor with two accordion sections:
+1. **Node Properties Panel** - Dynamic form for editing selected node attributes
+2. **Layers Panel** - Layer management, visibility control, filtering, and editing capabilities
+
+The sidebar will be a collapsible panel on the right side using Mantine's Accordion component.
 
 ## Overview
 
 ### Current State
 - Graph editor displays LayercakeGraphEditor with ReactFlow canvas
 - Layers are loaded from GraphQL but only used for node/edge styling
-- No UI for interacting with layers
+- No UI for interacting with layers or nodes
 - No layer visibility controls or filtering
+- No node property editing interface
 
 ### Target State
-- Two-panel layout: main graph canvas + collapsible layers panel
+- Two-panel layout: main graph canvas + collapsible right sidebar
+- **Sidebar contains vertical Mantine Accordion with two sections:**
+  1. **Node Properties** - Shows when node is selected, allows editing
+  2. **Layers** - Always visible, layer management features
+- Node properties panel: dynamic form with label and layer selection
+- Changes to node properties persist on blur and update graph immediately
 - Layers panel shows all layers with colors, statistics, and controls
 - Layer visibility toggle (show/hide individual layers)
 - Layer filtering (show only selected layers)
@@ -28,6 +38,46 @@ Add a comprehensive layers panel to the graph editor that provides layer managem
 - Responsive layout with panel resize
 
 ## Features Breakdown
+
+### 0. Node Properties Panel 📝
+**User Story:** As a user, I want to edit properties of a selected node in a dedicated panel
+
+**Requirements:**
+- Accordion panel that appears first in the sidebar
+- Shows only when a node is selected (click on node)
+- Displays different fields for regular nodes vs partition nodes (subgraphs)
+- **Fields for all nodes:**
+  - `label`: Text input (string)
+  - `layer`: Dropdown with all available layers + "None" option
+- Auto-save on blur (focus lost from input)
+- Real-time update in graph canvas
+- Clear visual feedback during save
+- Support for both regular nodes and partition/subgraph nodes
+- Accordion can be collapsed when not needed
+
+**UI Components:**
+- Mantine Accordion.Item with title "Node Properties"
+- Dynamic form that renders based on selected node type
+- TextInput for label
+- Select dropdown for layer (populated from graph layers)
+- Loading indicator during save
+- Success/error feedback
+
+**Implementation:**
+- Track selected node in state (nodeId)
+- Render form only when node is selected
+- Populate form fields from node data
+- Debounced auto-save on blur
+- GraphQL mutation to update node
+- Optimistic update for instant feedback
+
+**Backend:**
+- Mutation: `updateGraphNode(nodeId, label, layer, attrs)`
+- Validate node exists
+- Update node in database
+- Return updated node
+
+---
 
 ### 1. View Layer List ✨
 **User Story:** As a user, I want to see all layers in my graph with their visual properties
@@ -174,39 +224,63 @@ GraphEditorPage
     │   ├── Controls
     │   ├── MiniMap
     │   └── Background
-    └── LayersPanel (Collapsible Sidebar)
-        ├── LayersPanelHeader
-        │   ├── Title
-        │   ├── Search/Filter input
-        │   └── Bulk actions (Show All, Hide All)
-        ├── LayerStatsSummary
-        │   ├── Total layers count
-        │   ├── Total nodes count
-        │   └── Total edges count
-        ├── LayersList
-        │   └── LayerListItem (for each layer)
-        │       ├── Visibility toggle
-        │       ├── Color swatches
-        │       ├── Layer name (editable)
-        │       ├── Statistics badges
-        │       ├── Selection indicator
-        │       └── Actions menu (Edit, Delete)
-        └── LayersPanelFooter
-            ├── Add Layer button
-            └── Filter controls
+    └── PropertiesAndLayersPanel (Collapsible Sidebar)
+        └── Mantine Accordion (vertical, multiple=true)
+            ├── Accordion.Item: "Node Properties" (dynamic)
+            │   ├── Accordion.Control: "Node Properties"
+            │   └── Accordion.Panel
+            │       └── NodePropertiesForm
+            │           ├── TextInput (label)
+            │           ├── Select (layer dropdown)
+            │           ├── Save indicator
+            │           └── Error message area
+            └── Accordion.Item: "Layers"
+                ├── Accordion.Control: "Layers"
+                └── Accordion.Panel
+                    ├── LayersPanelHeader
+                    │   ├── Search/Filter input
+                    │   └── Bulk actions (Show All, Hide All)
+                    ├── LayerStatsSummary
+                    │   ├── Total layers count
+                    │   ├── Total nodes count
+                    │   └── Total edges count
+                    ├── LayersList
+                    │   └── LayerListItem (for each layer)
+                    │       ├── Visibility toggle
+                    │       ├── Color swatches
+                    │       ├── Layer name (editable)
+                    │       ├── Statistics badges
+                    │       ├── Selection indicator
+                    │       └── Actions menu (Edit, Delete)
+                    └── LayersPanelFooter
+                        ├── Add Layer button
+                        └── Filter controls
 ```
 
 ### State Management
 
 **Local Component State:**
 ```typescript
-interface LayersState {
+interface PanelState {
+  // Node Properties Panel
+  selectedNodeId: string | null; // Currently selected node
+  nodeFormData: {
+    label: string;
+    layer: string | null;
+  } | null;
+  isSavingNode: boolean;
+  nodeError: string | null;
+
+  // Layers Panel
   layers: Layer[];
   visibilityMap: Map<string, boolean>; // layerId -> visible
   filterSet: Set<string>; // layerIds to filter
   filterMode: boolean; // Is filtering active?
   selectedLayerId: string | null; // For highlighting
   editingLayerId: string | null; // For inline editing
+
+  // Accordion State
+  accordionValue: string[]; // Open accordion sections
 }
 ```
 
@@ -222,7 +296,36 @@ query GetGraphDetails($id: Int!) {
       color
       properties
     }
-    # ... nodes and edges
+    graphNodes {
+      id
+      label
+      layer
+      isPartition
+      # ... other fields
+    }
+    # ... edges
+  }
+}
+
+# Node Properties Mutations (to be created)
+mutation UpdateGraphNode(
+  $graphId: Int!
+  $nodeId: String!
+  $label: String
+  $layer: String
+  $attrs: JSON
+) {
+  updateGraphNode(
+    graphId: $graphId
+    nodeId: $nodeId
+    label: $label
+    layer: $layer
+    attrs: $attrs
+  ) {
+    id
+    label
+    layer
+    attrs
   }
 }
 
@@ -307,23 +410,67 @@ mutation DeleteLayer($layerId: String!) {
 
 ## Implementation Phases
 
-### Phase 1: Basic Panel UI (3-4 hours)
-**Goal:** Display layers panel with basic layout and layer list
+### Phase 0: Node Properties Panel (3-4 hours)
+**Goal:** Add accordion sidebar with node properties editing
 
 **Tasks:**
-1. Create `LayersPanel.tsx` component
-2. Add Mantine Grid/Flex layout to GraphEditorPage
-3. Implement collapsible sidebar (Drawer or custom)
-4. Create `LayerListItem.tsx` component
-5. Display layer name, color swatches
-6. Calculate and display layer statistics
-7. Style panel to match application theme
+1. Create `PropertiesAndLayersPanel.tsx` component
+2. Add Mantine Accordion layout (vertical, multiple=true)
+3. Add Flex/Grid layout to GraphEditorPage for sidebar
+4. Implement collapsible sidebar (drawer or fixed panel)
+5. Create `NodePropertiesForm.tsx` component
+6. Add node selection handler in ReactFlow
+7. Populate form when node is selected
+8. Implement TextInput for label field
+9. Implement Select dropdown for layer (populate from graph.layers)
+10. Add "None" option to layer dropdown
+11. Implement auto-save on blur
+12. Create GraphQL mutation: `updateGraphNode`
+13. Implement backend resolver and service method
+14. Add optimistic update for instant feedback
+15. Add loading indicator during save
+16. Add error handling and display
+
+**Backend Tasks:**
+- Add `updateGraphNode` mutation to schema
+- Implement resolver
+- Create service method to update node in database
+- Validate node exists and user has permission
+- Update graph_nodes table
+- Return updated node
 
 **Acceptance Criteria:**
-- Panel displays on right side of graph editor
-- Can collapse/expand panel
+- Sidebar displays on right side with accordion
+- Node Properties accordion item shows when node is selected
+- Clicking a node in graph populates the form
+- Label and layer fields display current values
+- Dropdown shows all available layers + "None"
+- Changes save automatically on blur
+- Graph updates immediately with new values
+- Loading indicator shows during save
+- Error messages display if save fails
+- Regular nodes and partition nodes both work
+
+---
+
+### Phase 1: Basic Layers Panel UI (3-4 hours)
+**Goal:** Add layers section to accordion with basic layout and layer list
+
+**Tasks:**
+1. Add second Accordion.Item for "Layers"
+2. Create `LayersAccordionPanel.tsx` component
+3. Create `LayerListItem.tsx` component
+4. Display layer name, color swatches
+5. Calculate and display layer statistics
+6. Style panel to match application theme
+7. Ensure accordion allows both panels open simultaneously
+
+**Acceptance Criteria:**
+- Layers accordion item displays below Node Properties
 - Shows all layers with colors and statistics
-- Responsive layout (graph adjusts when panel opens/closes)
+- Both accordion sections can be open at same time
+- Smooth expand/collapse animations
+- Responsive layout
 
 ---
 
@@ -485,6 +632,16 @@ mutation DeleteLayer($layerId: String!) {
 
 ```graphql
 extend type Mutation {
+  # Node Properties
+  updateGraphNode(
+    graphId: Int!
+    nodeId: String!
+    label: String
+    layer: String
+    attrs: JSON
+  ): GraphNode!
+
+  # Layer Management
   updateLayerProperties(
     layerId: String!
     name: String!
@@ -510,6 +667,23 @@ type DeleteLayerResult {
 ### Service Methods
 
 ```rust
+// In graph_service.rs
+
+pub async fn update_graph_node(
+    db: &DatabaseConnection,
+    graph_id: i32,
+    node_id: &str,
+    label: Option<String>,
+    layer: Option<String>,
+    attrs: Option<serde_json::Value>,
+) -> Result<GraphNode> {
+    // Find the node by graph_id and node_id
+    // Validate node exists
+    // Update fields if provided
+    // Save to database
+    // Return updated node
+}
+
 // In layer_service.rs or graph_service.rs
 
 pub async fn update_layer_properties(
@@ -606,6 +780,22 @@ pub async fn check_layer_usage(
 - Apply filters
 
 ### Manual Testing Checklist
+
+**Node Properties Panel:**
+- [ ] Node Properties accordion section displays
+- [ ] Clicking a node populates the form
+- [ ] Label field shows current node label
+- [ ] Layer dropdown shows all layers + "None"
+- [ ] Changing label and blurring saves correctly
+- [ ] Changing layer and blurring saves correctly
+- [ ] Graph updates immediately with new values
+- [ ] Loading indicator shows during save
+- [ ] Error message displays if save fails
+- [ ] Works for both regular nodes and partition nodes
+- [ ] Deselecting node clears or hides form
+- [ ] Multiple rapid edits don't cause conflicts
+
+**Layers Panel:**
 - [ ] Panel displays correctly on all screen sizes
 - [ ] Visibility toggle works for each layer
 - [ ] Bulk show/hide works
@@ -670,17 +860,18 @@ pub async fn check_layer_usage(
 
 | Phase | Estimated Time | Dependencies |
 |-------|---------------|--------------|
-| Phase 1: Basic Panel UI | 3-4 hours | None |
+| Phase 0: Node Properties Panel | 3-4 hours | Backend mutation |
+| Phase 1: Basic Layers Panel UI | 3-4 hours | Phase 0 (accordion structure) |
 | Phase 2: Visibility Controls | 2-3 hours | Phase 1 |
 | Phase 3: Statistics & Selection | 2 hours | Phase 1 |
-| Phase 4: Property Editing | 4-5 hours | Phase 1, Backend |
+| Phase 4: Layer Property Editing | 4-5 hours | Phase 1, Backend |
 | Phase 5: Filtering | 2-3 hours | Phase 2 |
 | Phase 6: Add/Delete Layers | 4-5 hours | Phase 4, Backend |
-| **Total** | **17-22 hours** | |
+| **Total** | **20-26 hours** | |
 
 Plus testing, bug fixes, and polish: **+5-8 hours**
 
-**Grand Total: 22-30 hours** (3-4 working days)
+**Grand Total: 25-34 hours** (3-5 working days)
 
 ---
 
