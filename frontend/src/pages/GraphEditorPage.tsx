@@ -1,13 +1,14 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Container, Title, Alert, LoadingOverlay, Button, Stack } from '@mantine/core';
+import { Container, Title, Alert, LoadingOverlay, Button, Stack, Flex } from '@mantine/core';
 import { IconAlertCircle, IconArrowLeft } from '@tabler/icons-react';
-import { useQuery } from '@apollo/client/react';
+import { useQuery, useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client';
 import { Breadcrumbs } from '../components/common/Breadcrumbs';
 import { LayercakeGraphEditor } from '../components/graphs/LayercakeGraphEditor';
+import { PropertiesAndLayersPanel } from '../components/graphs/PropertiesAndLayersPanel';
 import { ReactFlowProvider } from 'reactflow';
-import { Graph } from '@/graphql/graphs';
+import { Graph, GraphNode, UPDATE_GRAPH_NODE } from '../graphql/graphs';
 
 const GET_PROJECTS = gql`
   query GetProjects {
@@ -63,6 +64,7 @@ interface GraphEditorPageProps {}
 export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
   const navigate = useNavigate();
   const { projectId, graphId } = useParams<{ projectId: string; graphId: string }>();
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
   const { data: projectsData } = useQuery<{ projects: Array<{ id: number; name: string }> }>(GET_PROJECTS);
   const selectedProject = projectsData?.projects.find((p: { id: number; name: string }) => p.id === parseInt(projectId || '0'));
@@ -70,6 +72,10 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
   const { data: graphData, loading: graphLoading, error: graphError } = useQuery<{ graph: Graph }, { id: number }>(GET_GRAPH_DETAILS, {
     variables: { id: parseInt(graphId || '0') },
     skip: !graphId,
+  });
+
+  const [updateGraphNode] = useMutation(UPDATE_GRAPH_NODE, {
+    refetchQueries: ['GetGraphDetails'],
   });
 
   const graph: Graph | null = graphData?.graph || null;
@@ -81,6 +87,20 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
   const handleBack = () => {
     navigate(`/projects/${projectId}/graphs`);
   };
+
+  const handleNodeUpdate = useCallback((nodeId: string, updates: Partial<GraphNode>) => {
+    if (!graphId) return;
+
+    updateGraphNode({
+      variables: {
+        graphId: parseInt(graphId),
+        nodeId,
+        label: updates.label,
+        layer: updates.layer,
+        attrs: updates.attrs,
+      },
+    });
+  }, [graphId, updateGraphNode]);
 
   if (!selectedProject) {
     return (
@@ -131,13 +151,22 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
         />
       </div>
 
-      <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
-        <ReactFlowProvider>
-          <LayercakeGraphEditor graph={graph} />
-        </ReactFlowProvider>
-      </div>
+      <Flex style={{ flex: 1, overflow: 'hidden' }}>
+        <div style={{ flex: 1, position: 'relative' }}>
+          <ReactFlowProvider>
+            <LayercakeGraphEditor
+              graph={graph}
+              onNodeSelect={setSelectedNodeId}
+            />
+          </ReactFlowProvider>
+        </div>
 
-      {/* Add save/cancel buttons here later */}
+        <PropertiesAndLayersPanel
+          graph={graph}
+          selectedNodeId={selectedNodeId}
+          onNodeUpdate={handleNodeUpdate}
+        />
+      </Flex>
     </Stack>
   );
 };

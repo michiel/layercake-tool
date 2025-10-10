@@ -1433,6 +1433,27 @@ impl Mutation {
         Ok(true)
     }
 
+    /// Update a graph node's properties
+    async fn update_graph_node(
+        &self,
+        ctx: &Context<'_>,
+        graph_id: i32,
+        node_id: String,
+        label: Option<String>,
+        layer: Option<String>,
+        attrs: Option<crate::graphql::types::scalars::JSON>,
+    ) -> Result<crate::graphql::types::graph_node::GraphNode> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let graph_service = GraphService::new(context.db.clone());
+
+        let node = graph_service
+            .update_graph_node(graph_id, node_id, label, layer, attrs)
+            .await
+            .map_err(|e| Error::new(format!("Failed to update graph node: {}", e)))?;
+
+        Ok(crate::graphql::types::graph_node::GraphNode::from(node))
+    }
+
 
 
     /// Execute a DAG node (builds graph from upstream data sources)

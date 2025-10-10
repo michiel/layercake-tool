@@ -182,6 +182,9 @@ NC
  - The edges have an arrow for direction (source to target)
  - The belongs_to relationships are the (nested) groupings for which the component uses sub flows (https://reactflow.dev/examples/grouping/sub-flows )
  - The layout of the graph is performed dynamically on first render, there is sufficient spacing between the nodes for readability and the top to bottom preference is used for layout
+ - The there is a panel on the right side. This panel has a vertical accordion element from mantine.
+     - The first panel has a dynamic, editable form containing the properties of the node (node or partition node/subgraph) that has been selected via click. The form has the node attributes (label:string, layer:dropdown of layers + 'None' option). Changes made here will be persisted after focus is lost and reflected in the graph editor
+     - The second panel is a placeholder 
 
 
 

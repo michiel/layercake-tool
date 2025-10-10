@@ -192,4 +192,39 @@ impl GraphService {
 
         Ok(())
     }
+
+    pub async fn update_graph_node(
+        &self,
+        graph_id: i32,
+        node_id: String,
+        label: Option<String>,
+        layer: Option<String>,
+        attrs: Option<serde_json::Value>,
+    ) -> Result<graph_nodes::Model> {
+        use sea_orm::{Set, ActiveModelTrait};
+
+        let node = GraphNodes::find()
+            .filter(graph_nodes::Column::GraphId.eq(graph_id))
+            .filter(graph_nodes::Column::Id.eq(&node_id))
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Graph node not found"))?;
+
+        let mut active_model: graph_nodes::ActiveModel = node.into();
+
+        if let Some(label) = label {
+            active_model.label = Set(Some(label));
+        }
+
+        if let Some(layer) = layer {
+            active_model.layer = Set(if layer.is_empty() { None } else { Some(layer) });
+        }
+
+        if let Some(attrs) = attrs {
+            active_model.attrs = Set(Some(attrs));
+        }
+
+        let updated = active_model.update(&self.db).await?;
+        Ok(updated)
+    }
 }

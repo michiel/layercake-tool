@@ -140,3 +140,26 @@ export const EXECUTE_NODE = gql`
     }
   }
 `
+
+export const UPDATE_GRAPH_NODE = gql`
+  mutation UpdateGraphNode(
+    $graphId: Int!
+    $nodeId: String!
+    $label: String
+    $layer: String
+    $attrs: JSON
+  ) {
+    updateGraphNode(
+      graphId: $graphId
+      nodeId: $nodeId
+      label: $label
+      layer: $layer
+      attrs: $attrs
+    ) {
+      id
+      label
+      layer
+      attrs
+    }
+  }
+`
