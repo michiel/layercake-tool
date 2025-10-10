@@ -1,14 +1,15 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Container, Title, Alert, LoadingOverlay, Button, Stack, Flex } from '@mantine/core';
-import { IconAlertCircle, IconArrowLeft } from '@tabler/icons-react';
+import { Container, Title, Alert, LoadingOverlay, Button, Stack, Flex, Group, Badge, ActionIcon, Tooltip } from '@mantine/core';
+import { IconAlertCircle, IconArrowLeft, IconHistory, IconEdit } from '@tabler/icons-react';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client';
 import { Breadcrumbs } from '../components/common/Breadcrumbs';
 import { LayercakeGraphEditor } from '../components/graphs/LayercakeGraphEditor';
 import { PropertiesAndLayersPanel } from '../components/graphs/PropertiesAndLayersPanel';
+import EditHistoryModal from '../components/graphs/EditHistoryModal';
 import { ReactFlowProvider, Node as FlowNode, Edge as FlowEdge } from 'reactflow';
-import { Graph, GraphNode, UPDATE_GRAPH_NODE, UPDATE_LAYER_PROPERTIES } from '../graphql/graphs';
+import { Graph, GraphNode, UPDATE_GRAPH_NODE, UPDATE_LAYER_PROPERTIES, GET_GRAPH_EDIT_COUNT } from '../graphql/graphs';
 
 const GET_PROJECTS = gql`
   query GetProjects {
@@ -66,6 +67,7 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
   const { projectId, graphId } = useParams<{ projectId: string; graphId: string }>();
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [layerVisibility, setLayerVisibility] = useState<Map<string, boolean>>(new Map());
+  const [editHistoryOpen, setEditHistoryOpen] = useState(false);
 
   // Store references to ReactFlow setters for optimistic updates
   const setNodesRef = useRef<React.Dispatch<React.SetStateAction<FlowNode[]>> | null>(null);
@@ -74,10 +76,19 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
   const { data: projectsData } = useQuery<{ projects: Array<{ id: number; name: string }> }>(GET_PROJECTS);
   const selectedProject = projectsData?.projects.find((p: { id: number; name: string }) => p.id === parseInt(projectId || '0'));
 
-  const { data: graphData, loading: graphLoading, error: graphError } = useQuery<{ graph: Graph }, { id: number }>(GET_GRAPH_DETAILS, {
+  const { data: graphData, loading: graphLoading, error: graphError, refetch: refetchGraph } = useQuery<{ graph: Graph }, { id: number }>(GET_GRAPH_DETAILS, {
     variables: { id: parseInt(graphId || '0') },
     skip: !graphId,
   });
+
+  const { data: editCountData, refetch: refetchEditCount } = useQuery<{ graphEditCount: number }, { graphId: number; unappliedOnly: boolean }>(
+    GET_GRAPH_EDIT_COUNT,
+    {
+      variables: { graphId: parseInt(graphId || '0'), unappliedOnly: true },
+      skip: !graphId,
+      pollInterval: 10000, // Poll every 10 seconds
+    }
+  );
 
   const [updateGraphNode] = useMutation(UPDATE_GRAPH_NODE);
   const [updateLayerProperties] = useMutation(UPDATE_LAYER_PROPERTIES);
@@ -286,15 +297,41 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
     );
   }
 
+  const editCount = editCountData?.graphEditCount || 0;
+  const hasEdits = editCount > 0;
+
   return (
     <Stack gap={0} style={{ height: 'calc(100vh - 60px)', width: '100%', margin: '-16px' }}>
       <div style={{ padding: '8px 16px', borderBottom: '1px solid #e9ecef' }}>
-        <Breadcrumbs
-          projectName={selectedProject.name}
-          projectId={selectedProject.id}
-          currentPage={`Graphs > ${graph.name}`}
-          onNavigate={handleNavigate}
-        />
+        <Flex justify="space-between" align="center">
+          <Breadcrumbs
+            projectName={selectedProject.name}
+            projectId={selectedProject.id}
+            currentPage={`Graphs > ${graph.name}`}
+            onNavigate={handleNavigate}
+          />
+
+          <Group gap="xs">
+            {hasEdits && (
+              <Badge
+                color="yellow"
+                variant="light"
+                leftSection={<IconEdit size={12} />}
+              >
+                {editCount} pending {editCount === 1 ? 'edit' : 'edits'}
+              </Badge>
+            )}
+            <Tooltip label="View edit history">
+              <ActionIcon
+                variant="light"
+                color="blue"
+                onClick={() => setEditHistoryOpen(true)}
+              >
+                <IconHistory size={18} />
+              </ActionIcon>
+            </Tooltip>
+          </Group>
+        </Flex>
       </div>
 
       <Flex style={{ flex: 1, overflow: 'hidden' }}>
@@ -320,6 +357,17 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
           onLayerColorChange={handleLayerColorChange}
         />
       </Flex>
+
+      <EditHistoryModal
+        opened={editHistoryOpen}
+        onClose={() => {
+          setEditHistoryOpen(false);
+          refetchEditCount();
+          refetchGraph();
+        }}
+        graphId={parseInt(graphId || '0')}
+        graphName={graph.name}
+      />
     </Stack>
   );
 };

@@ -42,9 +42,44 @@ export interface Graph {
   edgeCount: number
   createdAt: string
   updatedAt: string
+  hasPendingEdits?: boolean
+  lastEditSequence?: number
+  lastReplayAt?: string
   layers: Layer[];
   graphNodes: GraphNode[];
   graphEdges: GraphEdge[];
+}
+
+export interface GraphEdit {
+  id: number
+  graphId: number
+  targetType: string
+  targetId: string
+  operation: string
+  fieldName?: string
+  oldValue?: any
+  newValue?: any
+  sequenceNumber: number
+  applied: boolean
+  createdAt: string
+  createdBy?: number
+}
+
+export interface EditResult {
+  sequenceNumber: number
+  targetType: string
+  targetId: string
+  operation: string
+  result: string
+  message: string
+}
+
+export interface ReplaySummary {
+  total: number
+  applied: number
+  skipped: number
+  failed: number
+  details: EditResult[]
 }
 
 export const GET_GRAPHS = gql`
@@ -180,5 +215,55 @@ export const UPDATE_LAYER_PROPERTIES = gql`
       name
       properties
     }
+  }
+`
+
+export const GET_GRAPH_EDITS = gql`
+  query GetGraphEdits($graphId: Int!, $unappliedOnly: Boolean) {
+    graphEdits(graphId: $graphId, unappliedOnly: $unappliedOnly) {
+      id
+      graphId
+      targetType
+      targetId
+      operation
+      fieldName
+      oldValue
+      newValue
+      sequenceNumber
+      applied
+      createdAt
+      createdBy
+    }
+  }
+`
+
+export const GET_GRAPH_EDIT_COUNT = gql`
+  query GetGraphEditCount($graphId: Int!, $unappliedOnly: Boolean) {
+    graphEditCount(graphId: $graphId, unappliedOnly: $unappliedOnly)
+  }
+`
+
+export const REPLAY_GRAPH_EDITS = gql`
+  mutation ReplayGraphEdits($graphId: Int!) {
+    replayGraphEdits(graphId: $graphId) {
+      total
+      applied
+      skipped
+      failed
+      details {
+        sequenceNumber
+        targetType
+        targetId
+        operation
+        result
+        message
+      }
+    }
+  }
+`
+
+export const CLEAR_GRAPH_EDITS = gql`
+  mutation ClearGraphEdits($graphId: Int!) {
+    clearGraphEdits(graphId: $graphId)
   }
 `
