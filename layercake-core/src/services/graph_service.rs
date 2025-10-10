@@ -227,4 +227,32 @@ impl GraphService {
         let updated = active_model.update(&self.db).await?;
         Ok(updated)
     }
+
+    pub async fn update_layer_properties(
+        &self,
+        layer_id: i32,
+        name: Option<String>,
+        properties: Option<serde_json::Value>,
+    ) -> Result<layers::Model> {
+        use sea_orm::{Set, ActiveModelTrait};
+
+        let layer = Layers::find_by_id(layer_id)
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Layer not found"))?;
+
+        let mut active_model: layers::ActiveModel = layer.into();
+
+        if let Some(name) = name {
+            active_model.name = Set(name);
+        }
+
+        if let Some(properties) = properties {
+            let properties_string = serde_json::to_string(&properties)?;
+            active_model.properties = Set(Some(properties_string));
+        }
+
+        let updated = active_model.update(&self.db).await?;
+        Ok(updated)
+    }
 }

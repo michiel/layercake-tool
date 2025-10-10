@@ -163,3 +163,22 @@ export const UPDATE_GRAPH_NODE = gql`
     }
   }
 `
+
+export const UPDATE_LAYER_PROPERTIES = gql`
+  mutation UpdateLayerProperties(
+    $id: Int!
+    $name: String
+    $properties: JSON
+  ) {
+    updateLayerProperties(
+      id: $id
+      name: $name
+      properties: $properties
+    ) {
+      id
+      layerId
+      name
+      properties
+    }
+  }
+`

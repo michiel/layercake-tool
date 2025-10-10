@@ -10,6 +10,7 @@ interface LayersAccordionPanelProps {
   onLayerVisibilityToggle: (layerId: string) => void;
   onShowAllLayers: () => void;
   onHideAllLayers: () => void;
+  onLayerColorChange?: (layerId: string, colorType: 'background' | 'border' | 'text', color: string) => void;
 }
 
 interface LayerStatistics {
@@ -23,6 +24,7 @@ export const LayersAccordionPanel: React.FC<LayersAccordionPanelProps> = ({
   onLayerVisibilityToggle,
   onShowAllLayers,
   onHideAllLayers,
+  onLayerColorChange,
 }) => {
   // Calculate statistics for each layer
   const layerStats = useMemo(() => {
@@ -127,6 +129,7 @@ export const LayersAccordionPanel: React.FC<LayersAccordionPanelProps> = ({
                 edgeCount={stats.edgeCount}
                 isVisible={isVisible}
                 onVisibilityToggle={() => onLayerVisibilityToggle(layer.layerId)}
+                onColorChange={onLayerColorChange}
               />
             );
           })

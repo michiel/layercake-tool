@@ -8,7 +8,7 @@ import { Breadcrumbs } from '../components/common/Breadcrumbs';
 import { LayercakeGraphEditor } from '../components/graphs/LayercakeGraphEditor';
 import { PropertiesAndLayersPanel } from '../components/graphs/PropertiesAndLayersPanel';
 import { ReactFlowProvider, Node as FlowNode, Edge as FlowEdge } from 'reactflow';
-import { Graph, GraphNode, UPDATE_GRAPH_NODE } from '../graphql/graphs';
+import { Graph, GraphNode, UPDATE_GRAPH_NODE, UPDATE_LAYER_PROPERTIES } from '../graphql/graphs';
 
 const GET_PROJECTS = gql`
   query GetProjects {
@@ -80,6 +80,7 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
   });
 
   const [updateGraphNode] = useMutation(UPDATE_GRAPH_NODE);
+  const [updateLayerProperties] = useMutation(UPDATE_LAYER_PROPERTIES);
 
   const graph: Graph | null = graphData?.graph || null;
 
@@ -180,6 +181,73 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
     });
   }, []);
 
+  const handleLayerColorChange = useCallback((layerId: string, colorType: 'background' | 'border' | 'text', color: string) => {
+    if (!graph) return;
+
+    // Find the layer
+    const layer = graph.layers.find(l => l.layerId === layerId);
+    if (!layer) return;
+
+    // Build updated properties
+    const updatedProperties = {
+      ...layer.properties,
+      [`${colorType}_color`]: color,
+    };
+
+    // Optimistic update: immediately update node styles in ReactFlow
+    if (setNodesRef.current) {
+      setNodesRef.current(currentNodes => {
+        return currentNodes.map(node => {
+          // Find graph node to check its layer
+          const graphNode = graph.graphNodes.find(gn => gn.id === node.id);
+          if (!graphNode || graphNode.layer !== layerId) return node;
+
+          // Update node style based on color type
+          const newStyle = { ...node.style };
+
+          if (colorType === 'background') {
+            newStyle.backgroundColor = `#${color}`;
+          } else if (colorType === 'border') {
+            newStyle.borderColor = `#${color}`;
+            newStyle.border = `${node.type === 'group' ? '2px' : '1px'} solid #${color}`;
+          } else if (colorType === 'text') {
+            newStyle.color = `#${color}`;
+          }
+
+          return { ...node, style: newStyle };
+        });
+      });
+    }
+
+    // Update edges if they have this layer
+    if (setEdgesRef.current && (colorType === 'border' || colorType === 'text')) {
+      setEdgesRef.current(currentEdges => {
+        return currentEdges.map(edge => {
+          const graphEdge = graph.graphEdges.find(ge => ge.id === edge.id);
+          if (!graphEdge || graphEdge.layer !== layerId) return edge;
+
+          const newStyle = { ...edge.style };
+          if (colorType === 'border' || colorType === 'text') {
+            newStyle.stroke = `#${color}`;
+          }
+
+          return { ...edge, style: newStyle };
+        });
+      });
+    }
+
+    // Send mutation to server
+    updateLayerProperties({
+      variables: {
+        id: layer.id,
+        properties: updatedProperties,
+      },
+    }).catch(error => {
+      console.error('Failed to update layer properties:', error);
+      // TODO: Rollback optimistic update on error
+    });
+  }, [graph, updateLayerProperties]);
+
   if (!selectedProject) {
     return (
       <Container size="xl">
@@ -249,6 +317,7 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
           onLayerVisibilityToggle={handleLayerVisibilityToggle}
           onShowAllLayers={handleShowAllLayers}
           onHideAllLayers={handleHideAllLayers}
+          onLayerColorChange={handleLayerColorChange}
         />
       </Flex>
     </Stack>
