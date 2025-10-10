@@ -16,6 +16,7 @@ pub mod datasource_rows;
 pub mod graphs;
 pub mod graph_nodes;
 pub mod graph_edges;
+pub mod graph_edits;
 pub mod layers;
 
 // Re-export specific entities to avoid naming conflicts

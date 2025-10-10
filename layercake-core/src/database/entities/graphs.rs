@@ -32,6 +32,9 @@ pub struct Model {
     pub error_message: Option<String>,
     #[sea_orm(column_type = "JsonBinary")]
     pub metadata: Option<serde_json::Value>,
+    pub last_edit_sequence: i32,
+    pub has_pending_edits: bool,
+    pub last_replay_at: Option<ChronoDateTimeUtc>,
     pub created_at: ChronoDateTimeUtc,
     pub updated_at: ChronoDateTimeUtc,
 }
@@ -54,6 +57,8 @@ pub enum Relation {
     GraphNodes,
     #[sea_orm(has_many = "super::graph_edges::Entity")]
     GraphEdges,
+    #[sea_orm(has_many = "super::graph_edits::Entity")]
+    GraphEdits,
     #[sea_orm(has_many = "super::layers::Entity")]
     Layers,
 }
@@ -82,6 +87,12 @@ impl Related<super::graph_edges::Entity> for Entity {
     }
 }
 
+impl Related<super::graph_edits::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::GraphEdits.def()
+    }
+}
+
 impl Related<super::layers::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Layers.def()
@@ -104,6 +115,9 @@ impl ActiveModel {
             edge_count: Set(0),
             error_message: ActiveValue::NotSet,
             metadata: ActiveValue::NotSet,
+            last_edit_sequence: Set(0),
+            has_pending_edits: Set(false),
+            last_replay_at: ActiveValue::NotSet,
             created_at: Set(chrono::Utc::now()),
             updated_at: Set(chrono::Utc::now()),
         }
