@@ -31,6 +31,7 @@ One LayercakeGraph has many,
  - LcEdge
  - LcNode
  - LcLayer
+ - LcGraphEdit
 
 ## Details
 
@@ -47,6 +48,7 @@ One LayercakeGraph has many,
  - Each Project has a Plan DAG. The Plan DAG is a JSON object that is an attribute of the Project table
  - Plans contains graph metadata and the relationships between graph copies. Plans do not contain actual graph data (e.g. nodes, edges), graph data is in the Graph table. Plan DAG steps can be (but are not limited to) nodes that are InputNode (from file, etc), MergeNode (from InputNode and/or GraphNode, output GraphNode), CopyNode (from GraphNode, output GraphNode), OutputNode (from GraphNode, output OutputNode (render target)), GraphNode (which are references and metadata for a graph instance), TransformNode (from graph, output graph) that contain the existing graph transformation options in the current YAML. The Plan DAG is generally editing in PlanVisualEditor, with popup items to edit node attributes (example: InputNode editor will have a selectable type for File that allows for selecting file location and data type (nodes, layers, edges)) and node metadata (example: node label)
  - A key function is that edits to graphs (via GraphVisualEditor or GraphSpreadsheetEditor) are tracked and reproducible, so re-applying inputs and re-running the DAG, will re-run the edits (if they are still applicable, removing them from tracking otherwise)
+ - LcGraph entities have many LcGraphEdit entities called GraphEdits. Each GraphEdit describes a change operation made to a node/layer/edge of a Graph instance. So if a node is renamed, this is a GraphEdit. If a layer is added, this is a GraphEdit, if an edge is removed this is a GraphEdit, etc. When an upstream source is updated or a graphnode is regenerated directly, the ordered list of GraphEdits is replayed and applied to the updated GraphData. GraphEdits are keyed to type(node/edge/layer) and id. If an edit has no match in the updated dataset, the edit is discarded.  the goal is to allow a user to edit a graph instance (via different frontend graph editors) and not lose the changes if the upstream data refreshes 
 
 ```yaml
 plan:
