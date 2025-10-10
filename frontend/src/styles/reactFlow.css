@@ -28,8 +28,8 @@
 
 /* Sub-flow / Group node styling */
 .react-flow__node-group {
-  background-color: #f0f0f0;
-  border: 1px dashed #999;
+  /* Background and border are set via inline styles from layer properties */
+  /* Keeping only structural properties here */
   border-radius: 8px;
   padding: 25px 15px 15px 15px;
 }

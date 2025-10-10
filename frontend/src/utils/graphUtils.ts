@@ -13,27 +13,15 @@ const DEFAULT_GROUP_BORDER = '#999';
 
 // Helper to get layer styling
 const getLayerStyle = (layerId: string | undefined, layerMap: Map<string, Layer>) => {
-  if (!layerId) {
-    console.log('[getLayerStyle] No layerId provided');
-    return null;
-  }
-
+  if (!layerId) return null;
   const layer = layerMap.get(layerId);
-  console.log('[getLayerStyle] Looking up layer:', { layerId, layer, properties: layer?.properties });
+  if (!layer?.properties) return null;
 
-  if (!layer?.properties) {
-    console.log('[getLayerStyle] No layer or properties found for layerId:', layerId);
-    return null;
-  }
-
-  const style = {
+  return {
     backgroundColor: layer.properties.background_color ? `#${layer.properties.background_color}` : null,
     borderColor: layer.properties.border_color ? `#${layer.properties.border_color}` : null,
     textColor: layer.properties.text_color ? `#${layer.properties.text_color}` : null,
   };
-
-  console.log('[getLayerStyle] Returning style:', style);
-  return style;
 };
 
 const elkOptions = {
@@ -177,12 +165,6 @@ export const getLayoutedElements = async (
     if (node?.isPartition) {
       // This is a subflow (group node)
       const groupLabel = elkNode.labels?.[0]?.text || elkNode.id;
-      console.log(`[processElkNode] Processing subflow container:`, {
-        id: elkNode.id,
-        nodeLayer: node.layer,
-        layerMapSize: layerMap.size,
-        availableLayers: Array.from(layerMap.keys())
-      });
       const layerStyle = getLayerStyle(node.layer, layerMap);
 
       reactFlowNodes.push({
