@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useMemo } from 'react';
+import React, { useEffect, useCallback, useMemo, useRef } from 'react';
 import ReactFlow, { Controls, Background, MiniMap, useNodesState, useEdgesState, useReactFlow, BackgroundVariant, Node, Edge } from 'reactflow';
 
 import 'reactflow/dist/style.css';
@@ -25,6 +25,7 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const { fitView } = useReactFlow();
+  const isInitialLoad = useRef(true);
 
   const nodeTypes = useMemo(() => ({ group: GroupNode }), []);
   const edgeTypes = useMemo(() => ({ floating: FloatingEdge }), []);
@@ -32,15 +33,30 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
   const onLayout = useCallback(async () => {
     if (!graph || !graph.graphNodes || !graph.graphEdges) return;
 
+    // Preserve selected node IDs before layout
+    const selectedNodeIds = nodes
+      .filter(node => node.selected && !node.id.endsWith('-label'))
+      .map(node => node.id);
+
     const layouted = await getLayoutedElements(graph, graph.layers);
 
-    setNodes(layouted.nodes);
+    // Restore selection state after layout
+    const nodesWithSelection = layouted.nodes.map(node => ({
+      ...node,
+      selected: selectedNodeIds.includes(node.id)
+    }));
+
+    setNodes(nodesWithSelection);
     setEdges(layouted.edges);
 
-    window.requestAnimationFrame(() => {
-      fitView();
-    });
-  }, [graph, setNodes, setEdges, fitView]);
+    // Only fit view on initial load, not on subsequent updates
+    if (isInitialLoad.current) {
+      window.requestAnimationFrame(() => {
+        fitView();
+      });
+      isInitialLoad.current = false;
+    }
+  }, [graph, nodes, setNodes, setEdges, fitView]);
 
   useEffect(() => {
     onLayout();
