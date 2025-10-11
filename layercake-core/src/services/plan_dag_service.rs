@@ -85,6 +85,8 @@ impl PlanDagService {
             node_type: Set(validated_type),
             position_x: Set(validated_x),
             position_y: Set(validated_y),
+            source_position: Set(None),
+            target_position: Set(None),
             metadata_json: Set(serde_json::to_string(&validated_metadata)?),
             config_json: Set(serde_json::to_string(&validated_config)?),
             created_at: Set(now),
