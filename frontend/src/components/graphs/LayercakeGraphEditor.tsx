@@ -26,6 +26,7 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const { fitView } = useReactFlow();
   const isInitialLoad = useRef(true);
+  const selectedNodeIdsRef = useRef<string[]>([]);
 
   const nodeTypes = useMemo(() => ({ group: GroupNode }), []);
   const edgeTypes = useMemo(() => ({ floating: FloatingEdge }), []);
@@ -33,17 +34,12 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
   const onLayout = useCallback(async () => {
     if (!graph || !graph.graphNodes || !graph.graphEdges) return;
 
-    // Preserve selected node IDs before layout
-    const selectedNodeIds = nodes
-      .filter(node => node.selected && !node.id.endsWith('-label'))
-      .map(node => node.id);
-
     const layouted = await getLayoutedElements(graph, graph.layers);
 
-    // Restore selection state after layout
+    // Restore selection state from ref (preserved across re-renders)
     const nodesWithSelection = layouted.nodes.map(node => ({
       ...node,
-      selected: selectedNodeIds.includes(node.id)
+      selected: selectedNodeIdsRef.current.includes(node.id)
     }));
 
     setNodes(nodesWithSelection);
@@ -56,7 +52,7 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
       });
       isInitialLoad.current = false;
     }
-  }, [graph, nodes, setNodes, setEdges, fitView]);
+  }, [graph, setNodes, setEdges, fitView]);
 
   useEffect(() => {
     onLayout();
@@ -124,6 +120,9 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
   const handleSelectionChange = useCallback(({ nodes }: { nodes: Node[] }) => {
     // Filter out label nodes (they end with '-label')
     const selectedNodes = nodes.filter(node => !node.id.endsWith('-label'));
+
+    // Update ref to preserve selection across re-layouts
+    selectedNodeIdsRef.current = selectedNodes.map(node => node.id);
 
     if (onNodeSelect) {
       if (selectedNodes.length > 0) {
