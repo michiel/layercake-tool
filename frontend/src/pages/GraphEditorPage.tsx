@@ -208,18 +208,9 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
     // Check if color actually changed
     const oldColor = layer.properties?.[`${colorType}_color`];
     if (oldColor === color) {
-      console.log('Color unchanged, skipping mutation:', { layerId, colorType, color });
+      // No change, skip mutation
       return;
     }
-
-    console.log('Layer color change:', {
-      layerId,
-      colorType,
-      color,
-      oldColor,
-      oldProperties: layer.properties,
-      newProperties: updatedProperties,
-    });
 
     // Optimistic update: immediately update node styles in ReactFlow
     if (setNodesRef.current) {
