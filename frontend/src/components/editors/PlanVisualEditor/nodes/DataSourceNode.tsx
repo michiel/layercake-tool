@@ -7,7 +7,6 @@ import { PlanDagNodeType, DataSourceNodeConfig } from '../../../../types/plan-da
 import { isNodeConfigured } from '../../../../utils/planDagValidation'
 import { getNodeColor, getNodeIcon, getNodeTypeLabel } from '../../../../utils/nodeStyles'
 import { GET_DATASOURCE, DataSource, getFileFormatDisplayName, getDataTypeDisplayName, formatFileSize, getStatusColor } from '../../../../graphql/datasources'
-import { useDataSourcePreview } from '../../../../hooks/usePreview'
 import { getExecutionStateLabel, getExecutionStateColor, isExecutionComplete, isExecutionInProgress } from '../../../../graphql/preview'
 import { DataSourceDataDialog } from '../dialogs/DataSourceDataDialog'
 
@@ -55,22 +54,16 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
   const hasValidConfig = data.hasValidConfig !== false
   const isConfigured = isNodeConfigured(PlanDagNodeType.DATA_SOURCE, props.id, edges, hasValidConfig)
 
-  // Get project ID from context
-  const projectId = data.projectId as number | undefined
+  // Use inline execution metadata from PlanDAG query, only query if not available
+  const datasourceExecution = data.datasourceExecution
+  const needsQuery = !datasourceExecution && config.dataSourceId
 
-  // Query DataSource details if dataSourceId is available
+  // Fallback query only if inline data not available
   const { data: dataSourceData, loading: dataSourceLoading } = useQuery(GET_DATASOURCE, {
     variables: { id: config.dataSourceId || 0 },
-    skip: !config.dataSourceId,
+    skip: !needsQuery,
     errorPolicy: 'ignore'
   })
-
-  // Query execution state (always fetch to show status)
-  const { preview: executionPreview } = useDataSourcePreview(
-    projectId || 0,
-    props.id,
-    { skip: !projectId, limit: 0 }
-  )
 
   useEffect(() => {
     if ((dataSourceData as any)?.dataSource) {
@@ -92,6 +85,61 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
   }
 
   const renderDataSourceContent = () => {
+    // Use inline datasourceExecution from PlanDAG query
+    if (datasourceExecution) {
+      const tempDataSource = {
+        status: datasourceExecution.status,
+        filename: datasourceExecution.filename,
+        processedAt: datasourceExecution.processedAt,
+        errorMessage: datasourceExecution.errorMessage,
+      }
+
+      const freshness = getDataFreshness(tempDataSource as any)
+
+      return (
+        <Stack gap="xs">
+          <Group gap="xs" wrap="wrap">
+            <Badge
+              size="xs"
+              color={getStatusColor(datasourceExecution.status as any)}
+              leftSection={getStatusIcon(datasourceExecution.status as any)}
+              style={{
+                animation: datasourceExecution.status === 'processing' ? 'pulse 2s infinite' : undefined
+              }}
+            >
+              {datasourceExecution.status}
+            </Badge>
+          </Group>
+
+          <Text size="xs" c="dimmed" ff="monospace" lineClamp={1}>
+            {datasourceExecution.filename}
+          </Text>
+
+          <Group gap="xs" justify="space-between" wrap="wrap">
+            <Tooltip label={`Last processed: ${datasourceExecution.processedAt ? new Date(datasourceExecution.processedAt).toLocaleString() : 'Never'}`}>
+              <Badge
+                size="xs"
+                color={freshness.color}
+                variant={freshness.priority === 'high' ? 'filled' : 'light'}
+                style={{ cursor: 'help' }}
+              >
+                {freshness.text}
+              </Badge>
+            </Tooltip>
+          </Group>
+
+          {datasourceExecution.status === 'error' && datasourceExecution.errorMessage && (
+            <Group gap="xs">
+              <IconAlertCircle size={12} color="red" />
+              <Text size="xs" c="red" lineClamp={1} title={datasourceExecution.errorMessage}>
+                Error processing
+              </Text>
+            </Group>
+          )}
+        </Stack>
+      )
+    }
+
     if (dataSourceLoading) {
       return (
         <Group gap="xs">
@@ -275,7 +323,7 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
         </Group>
 
         {/* Center: Table icon for data view */}
-        {!readonly && isConfigured && dataSourceInfo?.status === 'active' && (
+        {!readonly && isConfigured && (datasourceExecution?.status === 'active' || dataSourceInfo?.status === 'active') && (
           <Group justify="center" mb="md">
             <Tooltip label="View datasource data (nodes, edges, layers)">
               <ActionIcon
@@ -312,14 +360,14 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
                 Not Configured
               </Badge>
             )}
-            {executionPreview && (
+            {datasourceExecution && (
               <Badge
-                variant={isExecutionComplete(executionPreview.executionState) ? 'light' : 'filled'}
-                color={getExecutionStateColor(executionPreview.executionState)}
+                variant={isExecutionComplete(datasourceExecution.executionState) ? 'light' : 'filled'}
+                color={getExecutionStateColor(datasourceExecution.executionState)}
                 size="xs"
-                leftSection={isExecutionInProgress(executionPreview.executionState) ? <Loader size={10} /> : undefined}
+                leftSection={isExecutionInProgress(datasourceExecution.executionState) ? <Loader size={10} /> : undefined}
               >
-                {getExecutionStateLabel(executionPreview.executionState)}
+                {getExecutionStateLabel(datasourceExecution.executionState)}
               </Badge>
             )}
           </Group>

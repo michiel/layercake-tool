@@ -17,6 +17,22 @@ export const GET_PLAN_DAG = gql`
           description
         }
         config
+        datasourceExecution {
+          dataSourceId
+          filename
+          status
+          processedAt
+          executionState
+          errorMessage
+        }
+        graphExecution {
+          graphId
+          nodeCount
+          edgeCount
+          executionState
+          computedDate
+          errorMessage
+        }
       }
       edges {
         id

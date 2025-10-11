@@ -6,7 +6,7 @@ use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::graph::Graph;
 use crate::graphql::types::project::Project;
 use crate::graphql::types::plan::Plan;
-use crate::graphql::types::plan_dag::{PlanDag, PlanDagNode, PlanDagEdge, PlanDagInput, PlanDagMetadata, ValidationResult};
+use crate::graphql::types::plan_dag::{PlanDag, PlanDagNode, PlanDagEdge, PlanDagInput, PlanDagMetadata, ValidationResult, DataSourceExecutionMetadata, GraphExecutionMetadata, PlanDagNodeType};
 use crate::graphql::types::{User, ProjectCollaborator, DataSource, UserSession, DataSourcePreview, GraphPreview, TableRow, TableColumn, GraphNodePreview, GraphEdgePreview, Layer, GraphEdit};
 use crate::graphql::types::plan_dag::DataSourceReference;
 use crate::services::graph_edit_service::GraphEditService;
@@ -117,12 +117,70 @@ impl Query {
             .await?;
         tracing::debug!("Found {} Plan DAG edges", dag_edges.len());
 
-        // Convert database models to GraphQL types
+        // Convert database models to GraphQL types and populate execution metadata
         tracing::debug!("Converting {} nodes to GraphQL format...", dag_nodes.len());
-        let nodes: Vec<PlanDagNode> = dag_nodes.into_iter()
-            .map(|node| PlanDagNode::from(node))
-            .collect();
-        tracing::debug!("Converted {} nodes", nodes.len());
+        let mut nodes: Vec<PlanDagNode> = Vec::new();
+
+        for dag_node in dag_nodes {
+            let mut node = PlanDagNode::from(dag_node.clone());
+
+            // Populate execution metadata based on node type
+            match node.node_type {
+                PlanDagNodeType::DataSource => {
+                    // Try to extract dataSourceId from config
+                    if let Ok(config) = serde_json::from_str::<serde_json::Value>(&dag_node.config_json) {
+                        if let Some(data_source_id) = config.get("dataSourceId").and_then(|v| v.as_i64()).map(|v| v as i32) {
+                            // Query the data_source
+                            if let Ok(Some(ds)) = data_sources::Entity::find_by_id(data_source_id)
+                                .one(&context.db)
+                                .await
+                            {
+                                // Map status to execution_state
+                                let execution_state = match ds.status.as_str() {
+                                    "active" => "completed",
+                                    "processing" => "processing",
+                                    "error" => "error",
+                                    _ => "not_started",
+                                }.to_string();
+
+                                node.datasource_execution = Some(DataSourceExecutionMetadata {
+                                    data_source_id: ds.id,
+                                    filename: ds.filename.clone(),
+                                    status: ds.status.clone(),
+                                    processed_at: ds.processed_at.map(|d| d.to_rfc3339()),
+                                    execution_state,
+                                    error_message: ds.error_message.clone(),
+                                });
+                            }
+                        }
+                    }
+                },
+                PlanDagNodeType::Graph => {
+                    // Query the graph by node_id
+                    if let Ok(Some(graph)) = graphs::Entity::find()
+                        .filter(graphs::Column::ProjectId.eq(project_id))
+                        .filter(graphs::Column::NodeId.eq(&dag_node.id))
+                        .one(&context.db)
+                        .await
+                    {
+                        node.graph_execution = Some(GraphExecutionMetadata {
+                            graph_id: graph.id,
+                            node_count: graph.node_count,
+                            edge_count: graph.edge_count,
+                            execution_state: graph.execution_state.clone(),
+                            computed_date: graph.computed_date.map(|d| d.to_rfc3339()),
+                            error_message: graph.error_message.clone(),
+                        });
+                    }
+                },
+                _ => {
+                    // Other node types don't have execution metadata yet
+                }
+            }
+
+            nodes.push(node);
+        }
+        tracing::debug!("Converted {} nodes with execution metadata", nodes.len());
 
         tracing::debug!("Converting {} edges to GraphQL format...", dag_edges.len());
         let edges: Vec<PlanDagEdge> = dag_edges.into_iter()

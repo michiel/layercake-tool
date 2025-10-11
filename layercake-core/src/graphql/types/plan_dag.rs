@@ -259,20 +259,87 @@ pub enum NodeConfig {
     Output(OutputNodeConfig),
 }
 
-// Plan DAG Node Structure
+// Execution metadata for DataSource nodes
 #[derive(SimpleObject, Clone, Debug, Serialize, Deserialize)]
-#[graphql(complex)]
+pub struct DataSourceExecutionMetadata {
+    #[graphql(name = "dataSourceId")]
+    pub data_source_id: i32,
+    pub filename: String,
+    pub status: String,
+    #[graphql(name = "processedAt")]
+    pub processed_at: Option<String>,
+    #[graphql(name = "executionState")]
+    pub execution_state: String,
+    #[graphql(name = "errorMessage")]
+    pub error_message: Option<String>,
+}
+
+// Execution metadata for Graph nodes
+#[derive(SimpleObject, Clone, Debug, Serialize, Deserialize)]
+pub struct GraphExecutionMetadata {
+    #[graphql(name = "graphId")]
+    pub graph_id: i32,
+    #[graphql(name = "nodeCount")]
+    pub node_count: i32,
+    #[graphql(name = "edgeCount")]
+    pub edge_count: i32,
+    #[graphql(name = "executionState")]
+    pub execution_state: String,
+    #[graphql(name = "computedDate")]
+    pub computed_date: Option<String>,
+    #[graphql(name = "errorMessage")]
+    pub error_message: Option<String>,
+}
+
+// Plan DAG Node Structure
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PlanDagNode {
     pub id: String,
-    #[graphql(name = "nodeType")]
     pub node_type: PlanDagNodeType,
     pub position: Position,
     pub metadata: NodeMetadata,
     pub config: String, // JSON string for now, will be parsed as NodeConfig
-    #[graphql(name = "createdAt")]
     pub created_at: DateTime<Utc>,
-    #[graphql(name = "updatedAt")]
     pub updated_at: DateTime<Utc>,
+    // Optional execution metadata populated by query resolver
+    pub datasource_execution: Option<DataSourceExecutionMetadata>,
+    pub graph_execution: Option<GraphExecutionMetadata>,
+}
+
+#[Object]
+impl PlanDagNode {
+    async fn id(&self) -> &str { &self.id }
+
+    #[graphql(name = "nodeType")]
+    async fn node_type(&self) -> PlanDagNodeType { self.node_type }
+
+    async fn position(&self) -> &Position { &self.position }
+
+    async fn metadata(&self) -> &NodeMetadata { &self.metadata }
+
+    async fn config(&self) -> &str { &self.config }
+
+    #[graphql(name = "createdAt")]
+    async fn created_at(&self) -> DateTime<Utc> { self.created_at }
+
+    #[graphql(name = "updatedAt")]
+    async fn updated_at(&self) -> DateTime<Utc> { self.updated_at }
+
+    #[graphql(name = "datasourceExecution")]
+    async fn datasource_execution(&self) -> Option<&DataSourceExecutionMetadata> {
+        self.datasource_execution.as_ref()
+    }
+
+    #[graphql(name = "graphExecution")]
+    async fn graph_execution(&self) -> Option<&GraphExecutionMetadata> {
+        self.graph_execution.as_ref()
+    }
+
+    /// Parse the config JSON into a specific node configuration type
+    async fn parsed_config(&self) -> Result<String> {
+        // For now, return the raw JSON. In the future, this could parse to specific types
+        Ok(self.config.clone())
+    }
 }
 
 // Plan DAG Edge Structure
@@ -434,6 +501,8 @@ impl From<plan_dag_nodes::Model> for PlanDagNode {
             config: model.config_json,
             created_at: model.created_at,
             updated_at: model.updated_at,
+            datasource_execution: None,
+            graph_execution: None,
         }
     }
 }
@@ -459,12 +528,3 @@ impl From<plan_dag_edges::Model> for PlanDagEdge {
     }
 }
 
-// Complex object implementations for additional resolvers
-#[ComplexObject]
-impl PlanDagNode {
-    /// Parse the config JSON into a specific node configuration type
-    async fn parsed_config(&self) -> Result<String> {
-        // For now, return the raw JSON. In the future, this could parse to specific types
-        Ok(self.config.clone())
-    }
-}

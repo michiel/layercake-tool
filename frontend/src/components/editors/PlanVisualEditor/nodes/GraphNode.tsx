@@ -34,18 +34,22 @@ export const GraphNode = memo((props: GraphNodeProps) => {
   // Get project ID from context
   const projectId = data.projectId as number | undefined
 
-  // Query pipeline graph preview
+  // Use inline execution metadata from PlanDAG query, only query if not available
+  const graphExecution = data.graphExecution
+  const needsExecutionQuery = !graphExecution && projectId
+
+  // Query pipeline graph preview (only for visualization dialog)
   const { preview: graphPreview } = useGraphPreview(
     projectId || 0,
     props.id,
     { skip: !showPreview || !projectId }
   )
 
-  // Query execution state (always fetch to show status)
+  // Fallback query for execution state if not available inline
   const { preview: executionPreview, refetch: refetchExecutionState } = useGraphPreview(
     projectId || 0,
     props.id,
-    { skip: !projectId }
+    { skip: !needsExecutionQuery }
   )
 
   // Execute node mutation
@@ -249,7 +253,7 @@ export const GraphNode = memo((props: GraphNodeProps) => {
         </Group>
 
         {/* Center: Preview buttons */}
-        {!readonly && executionPreview && isExecutionComplete(executionPreview.executionState) && (
+        {!readonly && (graphExecution ? isExecutionComplete(graphExecution.executionState) : executionPreview && isExecutionComplete(executionPreview.executionState)) && (
           <Group justify="center" mb="md" gap="sm">
             <Tooltip label="Preview graph visualization">
               <ActionIcon
@@ -307,21 +311,21 @@ export const GraphNode = memo((props: GraphNodeProps) => {
                 Not Configured
               </Badge>
             )}
-            {executionPreview && (
+            {(graphExecution || executionPreview) && (
               <Badge
-                variant={isExecutionComplete(executionPreview.executionState) ? 'light' : 'filled'}
-                color={getExecutionStateColor(executionPreview.executionState)}
+                variant={isExecutionComplete((graphExecution || executionPreview)!.executionState) ? 'light' : 'filled'}
+                color={getExecutionStateColor((graphExecution || executionPreview)!.executionState)}
                 size="xs"
-                leftSection={isExecutionInProgress(executionPreview.executionState) ? <Loader size={10} /> : undefined}
+                leftSection={isExecutionInProgress((graphExecution || executionPreview)!.executionState) ? <Loader size={10} /> : undefined}
               >
-                {getExecutionStateLabel(executionPreview.executionState)}
+                {getExecutionStateLabel((graphExecution || executionPreview)!.executionState)}
               </Badge>
             )}
           </Group>
 
-          {config.metadata?.nodeCount !== undefined && (
+          {(graphExecution?.nodeCount !== undefined || config.metadata?.nodeCount !== undefined) && (
             <Text size="xs" c="dimmed">
-              Nodes: {config.metadata.nodeCount}, Edges: {config.metadata.edgeCount || 0}
+              Nodes: {graphExecution?.nodeCount || config.metadata.nodeCount}, Edges: {graphExecution?.edgeCount || config.metadata.edgeCount || 0}
             </Text>
           )}
         </Stack>
@@ -339,7 +343,7 @@ export const GraphNode = memo((props: GraphNodeProps) => {
       <GraphDataDialog
         opened={showDataDialog}
         onClose={() => setShowDataDialog(false)}
-        graphId={executionPreview?.graphId || null}
+        graphId={graphExecution?.graphId || executionPreview?.graphId || null}
         title={`Graph Data: ${data.metadata.label}`}
       />
     </>

@@ -116,6 +116,26 @@ export type NodeConfig =
   | CopyNodeConfig
   | OutputNodeConfig;
 
+// Execution metadata for DataSource nodes
+export interface DataSourceExecutionMetadata {
+  dataSourceId: number;
+  filename: string;
+  status: string;
+  processedAt?: string;
+  executionState: string;
+  errorMessage?: string;
+}
+
+// Execution metadata for Graph nodes
+export interface GraphExecutionMetadata {
+  graphId: number;
+  nodeCount: number;
+  edgeCount: number;
+  executionState: string;
+  computedDate?: string;
+  errorMessage?: string;
+}
+
 // Plan DAG Node Structure
 export interface PlanDagNode {
   id: string;
@@ -123,6 +143,8 @@ export interface PlanDagNode {
   position: Position;
   metadata: NodeMetadata;
   config: NodeConfig | string; // Can be object (internal) or JSON string (from GraphQL)
+  datasourceExecution?: DataSourceExecutionMetadata;
+  graphExecution?: GraphExecutionMetadata;
 }
 
 // Plan DAG Edge Structure
