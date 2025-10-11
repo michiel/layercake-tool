@@ -17,6 +17,10 @@ pub struct Position {
 pub struct NodePositionInput {
     pub node_id: String,
     pub position: Position,
+    #[graphql(name = "sourcePosition")]
+    pub source_position: Option<String>,
+    #[graphql(name = "targetPosition")]
+    pub target_position: Option<String>,
 }
 
 // Node metadata
@@ -297,6 +301,8 @@ pub struct PlanDagNode {
     pub id: String,
     pub node_type: PlanDagNodeType,
     pub position: Position,
+    pub source_position: Option<String>,
+    pub target_position: Option<String>,
     pub metadata: NodeMetadata,
     pub config: String, // JSON string for now, will be parsed as NodeConfig
     pub created_at: DateTime<Utc>,
@@ -314,6 +320,12 @@ impl PlanDagNode {
     async fn node_type(&self) -> PlanDagNodeType { self.node_type }
 
     async fn position(&self) -> &Position { &self.position }
+
+    #[graphql(name = "sourcePosition")]
+    async fn source_position(&self) -> Option<&String> { self.source_position.as_ref() }
+
+    #[graphql(name = "targetPosition")]
+    async fn target_position(&self) -> Option<&String> { self.target_position.as_ref() }
 
     async fn metadata(&self) -> &NodeMetadata { &self.metadata }
 
@@ -497,6 +509,8 @@ impl From<plan_dag_nodes::Model> for PlanDagNode {
                 x: model.position_x,
                 y: model.position_y,
             },
+            source_position: model.source_position,
+            target_position: model.target_position,
             metadata,
             config: model.config_json,
             created_at: model.created_at,

@@ -141,6 +141,8 @@ export interface PlanDagNode {
   id: string;
   nodeType: PlanDagNodeType;
   position: Position;
+  sourcePosition?: string;
+  targetPosition?: string;
   metadata: NodeMetadata;
   config: NodeConfig | string; // Can be object (internal) or JSON string (from GraphQL)
   datasourceExecution?: DataSourceExecutionMetadata;

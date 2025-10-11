@@ -763,6 +763,12 @@ impl Mutation {
                 // Update position
                 node_active.position_x = Set(node_pos.position.x);
                 node_active.position_y = Set(node_pos.position.y);
+                if let Some(source_pos) = node_pos.source_position.clone() {
+                    node_active.source_position = Set(Some(source_pos));
+                }
+                if let Some(target_pos) = node_pos.target_position.clone() {
+                    node_active.target_position = Set(Some(target_pos));
+                }
                 node_active.updated_at = Set(Utc::now());
 
                 // Save to database

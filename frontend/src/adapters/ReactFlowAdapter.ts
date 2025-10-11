@@ -108,6 +108,8 @@ export class ReactFlowAdapter {
         x: normalizedNode.position?.x ?? 0,
         y: normalizedNode.position?.y ?? 0
       },
+      sourcePosition: normalizedNode.sourcePosition as any,
+      targetPosition: normalizedNode.targetPosition as any,
       data: {
         // ReactFlow-specific data
         label: normalizedNode.metadata?.label || normalizedNode.id,

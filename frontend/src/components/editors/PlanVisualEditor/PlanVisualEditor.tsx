@@ -863,7 +863,9 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     // Persist position changes to backend in a single batch operation
     const nodePositions = layoutedNodes.map(node => ({
       nodeId: node.id,
-      position: node.position
+      position: node.position,
+      sourcePosition: node.sourcePosition,
+      targetPosition: node.targetPosition
     }));
 
     await cqrsService.commands.batchMoveNodes(projectId, nodePositions);
@@ -898,7 +900,9 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     // Persist position changes to backend in a single batch operation
     const nodePositions = layoutedNodes.map(node => ({
       nodeId: node.id,
-      position: node.position
+      position: node.position,
+      sourcePosition: node.sourcePosition,
+      targetPosition: node.targetPosition
     }));
 
     await cqrsService.commands.batchMoveNodes(projectId, nodePositions);

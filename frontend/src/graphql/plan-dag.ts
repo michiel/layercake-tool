@@ -12,6 +12,8 @@ export const GET_PLAN_DAG = gql`
           x
           y
         }
+        sourcePosition
+        targetPosition
         metadata {
           label
           description
@@ -87,6 +89,8 @@ export const UPDATE_PLAN_DAG = gql`
           x
           y
         }
+        sourcePosition
+        targetPosition
         metadata {
           label
           description
