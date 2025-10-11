@@ -756,7 +756,8 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
       });
 
       // Generate unique ID and default configuration
-      const nodeId = generateNodeId(nodeType);
+      const existingNodeIds = nodes.map(n => n.id);
+      const nodeId = generateNodeId(nodeType, existingNodeIds);
       const config = getDefaultNodeConfig(nodeType);
       const metadata = getDefaultNodeMetadata(nodeType);
 
@@ -969,7 +970,8 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
 
       try {
         // Generate node ID and get defaults
-        const nodeId = generateNodeId(nodeType);
+        const existingNodeIds = nodes.map(n => n.id);
+        const nodeId = generateNodeId(nodeType, existingNodeIds);
         const config = getDefaultNodeConfig(nodeType);
         const metadata = getDefaultNodeMetadata(nodeType);
 

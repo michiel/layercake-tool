@@ -19,8 +19,9 @@ let clipboard: ClipboardData | null = null;
 /**
  * Duplicates a node with a new ID and slightly offset position
  */
-export const duplicateNode = (node: Node): Node => {
-  const newId = generateNodeId(node.data.nodeType);
+export const duplicateNode = (node: Node, allNodes: Node[]): Node => {
+  const existingNodeIds = allNodes.map(n => n.id);
+  const newId = generateNodeId(node.data.nodeType, existingNodeIds);
 
   return {
     ...node,
@@ -44,17 +45,22 @@ export const duplicateNode = (node: Node): Node => {
 /**
  * Duplicates multiple nodes while preserving their relative positions
  */
-export const duplicateNodes = (nodes: Node[]): Node[] => {
+export const duplicateNodes = (nodes: Node[], allNodes: Node[]): Node[] => {
   if (nodes.length === 0) return [];
 
   // Calculate the bounding box of selected nodes
   const minX = Math.min(...nodes.map(n => n.position.x));
   const minY = Math.min(...nodes.map(n => n.position.y));
 
+  // Get existing IDs (including nodes being duplicated)
+  const existingNodeIds = allNodes.map(n => n.id);
+
   // Create a mapping from old IDs to new IDs
   const idMapping = new Map<string, string>();
-  nodes.forEach(node => {
-    idMapping.set(node.id, generateNodeId(node.data.nodeType));
+  nodes.forEach((node) => {
+    // Pass accumulated IDs to ensure each new ID is unique
+    const allIdsIncludingNew = [...existingNodeIds, ...Array.from(idMapping.values())];
+    idMapping.set(node.id, generateNodeId(node.data.nodeType, allIdsIncludingNew));
   });
 
   return nodes.map(node => {
@@ -105,15 +111,20 @@ export const copyToClipboard = (selectedNodes: Node[], selectedEdges: Edge[], al
 /**
  * Pastes nodes and edges from clipboard
  */
-export const pasteFromClipboard = (): { nodes: Node[], edges: Edge[] } | null => {
+export const pasteFromClipboard = (allNodes: Node[]): { nodes: Node[], edges: Edge[] } | null => {
   if (!clipboard || Date.now() - clipboard.timestamp > 300000) { // 5 minute timeout
     return null;
   }
 
+  // Get existing IDs
+  const existingNodeIds = allNodes.map(n => n.id);
+
   // Create new IDs for pasted nodes
   const idMapping = new Map<string, string>();
-  clipboard.nodes.forEach(node => {
-    idMapping.set(node.id, generateNodeId(node.data.nodeType));
+  clipboard.nodes.forEach((node) => {
+    // Pass accumulated IDs to ensure each new ID is unique
+    const allIdsIncludingNew = [...existingNodeIds, ...Array.from(idMapping.values())];
+    idMapping.set(node.id, generateNodeId(node.data.nodeType, allIdsIncludingNew));
   });
 
   const pastedNodes = clipboard.nodes.map(node => {

@@ -141,8 +141,8 @@ export const useAdvancedOperations = ({
     if (readonly || selectedNodes.length === 0) return;
 
     const duplicatedNodes = selectedNodes.length === 1
-      ? [duplicateNode(selectedNodes[0])]
-      : duplicateNodes(selectedNodes);
+      ? [duplicateNode(selectedNodes[0], nodes)]
+      : duplicateNodes(selectedNodes, nodes);
 
     setNodes(currentNodes => {
       // Deselect all current nodes
@@ -152,7 +152,7 @@ export const useAdvancedOperations = ({
     });
 
     // Successfully duplicated nodes
-  }, [readonly, selectedNodes, setNodes]);
+  }, [readonly, selectedNodes, nodes, setNodes]);
 
   const handleCopy = useCallback(() => {
     if (readonly || selectedNodes.length === 0) return;
@@ -166,7 +166,7 @@ export const useAdvancedOperations = ({
   const handlePaste = useCallback(() => {
     if (readonly || !hasClipboardData()) return;
 
-    const clipboardData = pasteFromClipboard();
+    const clipboardData = pasteFromClipboard(nodes);
     if (!clipboardData) {
       // Paste failed: No valid clipboard data available
       return;
@@ -184,7 +184,7 @@ export const useAdvancedOperations = ({
     });
 
     // Successfully pasted from clipboard
-  }, [readonly, setNodes, setEdges]);
+  }, [readonly, nodes, setNodes, setEdges]);
 
   const handleCut = useCallback(() => {
     if (readonly || selectedNodes.length === 0) return;

@@ -1,10 +1,26 @@
 import { PlanDagNodeType, NodeConfig, NodeMetadata } from '../../../../types/plan-dag';
 
-export const generateNodeId = (type: PlanDagNodeType): string => {
-  const timestamp = Date.now();
-  const random = Math.random().toString(36).substr(2, 5);
+export const generateNodeId = (type: PlanDagNodeType, existingNodeIds: string[] = []): string => {
   const typePrefix = type.toLowerCase().replace('_', '');
-  return `${typePrefix}_${timestamp}_${random}`;
+
+  // Extract all numeric suffixes from existing node IDs
+  // Match any node ID that ends with _NNN (where NNN is digits)
+  const numberPattern = /_(\d+)$/;
+  const existingNumbers = existingNodeIds
+    .map(id => {
+      const match = id.match(numberPattern);
+      return match ? parseInt(match[1], 10) : 0;
+    })
+    .filter(num => !isNaN(num));
+
+  // Find the max number and increment
+  const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
+  const nextNumber = maxNumber + 1;
+
+  // Format with leading zeros (3 digits)
+  const paddedNumber = String(nextNumber).padStart(3, '0');
+
+  return `${typePrefix}_${paddedNumber}`;
 };
 
 export const getDefaultNodeConfig = (type: PlanDagNodeType): NodeConfig => {
