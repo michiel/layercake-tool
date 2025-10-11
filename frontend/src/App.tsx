@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Routes, Route, useNavigate, useParams, useLocation } from 'react-router-dom'
 import { AppShell, Group, Title, Stack, Button, Container, Text, Card, Badge, Alert, Modal, Select, FileButton, ActionIcon, Tooltip } from '@mantine/core'
-import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconFileImport, IconDownload } from '@tabler/icons-react'
+import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconFileImport, IconDownload, IconChevronLeft, IconChevronRight } from '@tabler/icons-react'
 import { useQuery, useMutation } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import { Breadcrumbs } from './components/common/Breadcrumbs'
@@ -87,6 +87,9 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   // Generate stable session ID (only once per component mount)
   const [sessionId] = useState(() => generateSessionId());
 
+  // Navigation collapse state
+  const [navCollapsed, setNavCollapsed] = useState(false);
+
   // Get current route info for navigation highlighting
   const isActiveRoute = (path: string) => {
     if (path === '/') return location.pathname === '/'
@@ -119,7 +122,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   return (
     <AppShell
       header={{ height: 60 }}
-      navbar={{ width: 250, breakpoint: 'sm' }}
+      navbar={{ width: navCollapsed ? 60 : 250, breakpoint: 'sm' }}
       padding="md"
       h="100vh"
     >
@@ -133,56 +136,90 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
         />
       </AppShell.Header>
 
-      <AppShell.Navbar p="md">
-        <Title order={4} mb="md">Navigation</Title>
-        <Stack gap="xs">
-          <Button
-            variant={isActiveRoute('/') ? 'filled' : 'light'}
-            fullWidth
-            leftSection={<IconServer size={16} />}
-            onClick={() => navigate('/')}
-          >
-            Home
-          </Button>
-          <Button
-            variant={isActiveRoute('/projects') ? 'filled' : 'light'}
-            fullWidth
-            leftSection={<IconDatabase size={16} />}
-            onClick={() => navigate('/projects')}
-          >
-            Projects
-          </Button>
+      <AppShell.Navbar p={navCollapsed ? 'xs' : 'md'}>
+        <Stack gap="xs" style={{ height: '100%' }}>
+          <Group justify="space-between" mb="xs">
+            {!navCollapsed && <Title order={4}>Navigation</Title>}
+            <Tooltip label={navCollapsed ? "Expand" : "Collapse"} position="right">
+              <ActionIcon
+                variant="subtle"
+                onClick={() => setNavCollapsed(!navCollapsed)}
+                size="sm"
+              >
+                {navCollapsed ? <IconChevronRight size={16} /> : <IconChevronLeft size={16} />}
+              </ActionIcon>
+            </Tooltip>
+          </Group>
 
-          {/* Project-specific navigation - only show when in a project */}
-          {projectId && (
-            <>
-              <div style={{ height: '1px', backgroundColor: '#e9ecef', margin: '8px 0' }} />
+          <Stack gap="xs" style={{ flex: 1 }}>
+            <Tooltip label="Home" position="right" disabled={!navCollapsed}>
               <Button
-                variant={isActiveRoute(`/projects/${projectId}/plan`) ? 'filled' : 'light'}
-                fullWidth
-                leftSection={<IconGraph size={16} />}
-                onClick={() => navigate(`/projects/${projectId}/plan`)}
+                variant={isActiveRoute('/') ? 'filled' : 'light'}
+                fullWidth={!navCollapsed}
+                leftSection={navCollapsed ? undefined : <IconServer size={16} />}
+                onClick={() => navigate('/')}
+                px={navCollapsed ? 'xs' : undefined}
+                style={navCollapsed ? { justifyContent: 'center' } : undefined}
               >
-                Plan
+                {navCollapsed ? <IconServer size={16} /> : 'Home'}
               </Button>
+            </Tooltip>
+            <Tooltip label="Projects" position="right" disabled={!navCollapsed}>
               <Button
-                variant={isActiveRoute(`/projects/${projectId}/datasources`) ? 'filled' : 'light'}
-                fullWidth
-                leftSection={<IconFileDatabase size={16} />}
-                onClick={() => navigate(`/projects/${projectId}/datasources`)}
+                variant={isActiveRoute('/projects') ? 'filled' : 'light'}
+                fullWidth={!navCollapsed}
+                leftSection={navCollapsed ? undefined : <IconDatabase size={16} />}
+                onClick={() => navigate('/projects')}
+                px={navCollapsed ? 'xs' : undefined}
+                style={navCollapsed ? { justifyContent: 'center' } : undefined}
               >
-                Data Sources
+                {navCollapsed ? <IconDatabase size={16} /> : 'Projects'}
               </Button>
-              <Button
-                variant={isActiveRoute(`/projects/${projectId}/graphs`) ? 'filled' : 'light'}
-                fullWidth
-                leftSection={<IconGraph size={16} />}
-                onClick={() => navigate(`/projects/${projectId}/graphs`)}
-              >
-                Graphs
-              </Button>
-            </>
-          )}
+            </Tooltip>
+
+            {/* Project-specific navigation - only show when in a project */}
+            {projectId && (
+              <>
+                <div style={{ height: '1px', backgroundColor: '#e9ecef', margin: '8px 0' }} />
+                <Tooltip label="Plan" position="right" disabled={!navCollapsed}>
+                  <Button
+                    variant={isActiveRoute(`/projects/${projectId}/plan`) ? 'filled' : 'light'}
+                    fullWidth={!navCollapsed}
+                    leftSection={navCollapsed ? undefined : <IconGraph size={16} />}
+                    onClick={() => navigate(`/projects/${projectId}/plan`)}
+                    px={navCollapsed ? 'xs' : undefined}
+                    style={navCollapsed ? { justifyContent: 'center' } : undefined}
+                  >
+                    {navCollapsed ? <IconGraph size={16} /> : 'Plan'}
+                  </Button>
+                </Tooltip>
+                <Tooltip label="Data Sources" position="right" disabled={!navCollapsed}>
+                  <Button
+                    variant={isActiveRoute(`/projects/${projectId}/datasources`) ? 'filled' : 'light'}
+                    fullWidth={!navCollapsed}
+                    leftSection={navCollapsed ? undefined : <IconFileDatabase size={16} />}
+                    onClick={() => navigate(`/projects/${projectId}/datasources`)}
+                    px={navCollapsed ? 'xs' : undefined}
+                    style={navCollapsed ? { justifyContent: 'center' } : undefined}
+                  >
+                    {navCollapsed ? <IconFileDatabase size={16} /> : 'Data Sources'}
+                  </Button>
+                </Tooltip>
+                <Tooltip label="Graphs" position="right" disabled={!navCollapsed}>
+                  <Button
+                    variant={isActiveRoute(`/projects/${projectId}/graphs`) ? 'filled' : 'light'}
+                    fullWidth={!navCollapsed}
+                    leftSection={navCollapsed ? undefined : <IconGraph size={16} />}
+                    onClick={() => navigate(`/projects/${projectId}/graphs`)}
+                    px={navCollapsed ? 'xs' : undefined}
+                    style={navCollapsed ? { justifyContent: 'center' } : undefined}
+                  >
+                    {navCollapsed ? <IconGraph size={16} /> : 'Graphs'}
+                  </Button>
+                </Tooltip>
+              </>
+            )}
+          </Stack>
         </Stack>
       </AppShell.Navbar>
 

@@ -1,5 +1,6 @@
-import React from 'react';
-import { Accordion, Paper } from '@mantine/core';
+import React, { useState } from 'react';
+import { Accordion, Paper, ActionIcon, Tooltip } from '@mantine/core';
+import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
 import { NodePropertiesForm } from './NodePropertiesForm';
 import { LayersAccordionPanel } from './LayersAccordionPanel';
 import { Graph, GraphNode } from '../../graphql/graphs';
@@ -25,9 +26,32 @@ export const PropertiesAndLayersPanel: React.FC<PropertiesAndLayersPanelProps> =
   onHideAllLayers,
   onLayerColorChange,
 }) => {
+  const [collapsed, setCollapsed] = useState(false);
+
   const selectedNode = selectedNodeId
     ? graph.graphNodes.find(n => n.id === selectedNodeId)
     : null;
+
+  if (collapsed) {
+    return (
+      <Tooltip label="Show Properties Panel" position="left">
+        <ActionIcon
+          variant="filled"
+          size="lg"
+          onClick={() => setCollapsed(false)}
+          style={{
+            position: 'absolute',
+            top: '16px',
+            right: '16px',
+            zIndex: 1000,
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)'
+          }}
+        >
+          <IconChevronLeft size={20} />
+        </ActionIcon>
+      </Tooltip>
+    );
+  }
 
   return (
     <Paper
@@ -37,9 +61,26 @@ export const PropertiesAndLayersPanel: React.FC<PropertiesAndLayersPanelProps> =
         width: '320px',
         height: '100%',
         overflow: 'auto',
-        borderLeft: '1px solid #e9ecef'
+        borderLeft: '1px solid #e9ecef',
+        position: 'relative'
       }}
     >
+      <Tooltip label="Hide Properties Panel" position="left">
+        <ActionIcon
+          variant="subtle"
+          size="sm"
+          onClick={() => setCollapsed(true)}
+          style={{
+            position: 'absolute',
+            top: '8px',
+            right: '8px',
+            zIndex: 10
+          }}
+        >
+          <IconChevronRight size={16} />
+        </ActionIcon>
+      </Tooltip>
+
       <Accordion
         multiple
         variant="separated"
