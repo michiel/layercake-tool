@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { useQuery, useMutation } from '@apollo/client/react'
+import { useQuery, useMutation, useApolloClient } from '@apollo/client/react'
 import {
   Modal,
   Text,
@@ -36,15 +36,18 @@ interface EditHistoryModalProps {
   onClose: () => void
   graphId: number
   graphName: string
+  onApplyEdits: (edits: GraphEdit[]) => void
 }
 
 const EditHistoryModal: React.FC<EditHistoryModalProps> = ({
   opened,
   onClose,
   graphId,
-  graphName
+  graphName,
+  onApplyEdits
 }) => {
   const [showAppliedEdits, setShowAppliedEdits] = useState(false)
+  const client = useApolloClient()
 
   const { data, loading, error, refetch } = useQuery(GET_GRAPH_EDITS, {
     variables: {
@@ -76,9 +79,30 @@ const EditHistoryModal: React.FC<EditHistoryModalProps> = ({
     }
   })
 
-  const handleReplay = () => {
-    if (window.confirm('This will replay all unapplied edits on the current graph data. Edits that can\'t be applied will be skipped. Continue?')) {
-      replayEdits({ variables: { graphId } })
+  const handleReplay = async () => {
+    if (!window.confirm('This will replay all unapplied edits on the current graph data. Edits that can\'t be applied will be skipped. Continue?')) {
+      return
+    }
+
+    try {
+      // Fetch unapplied edits to apply them optimistically
+      const { data: editsData } = await client.query({
+        query: GET_GRAPH_EDITS,
+        variables: { graphId, unappliedOnly: true },
+        fetchPolicy: 'network-only',
+      })
+
+      const unappliedEdits = (editsData as any)?.graphEdits || []
+
+      // Apply edits optimistically to canvas
+      if (unappliedEdits.length > 0) {
+        onApplyEdits(unappliedEdits)
+      }
+
+      // Now trigger the backend replay
+      await replayEdits({ variables: { graphId } })
+    } catch (err: any) {
+      alert(`Replay Failed: ${err.message}`)
     }
   }
 

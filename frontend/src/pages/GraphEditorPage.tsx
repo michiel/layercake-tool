@@ -76,7 +76,7 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
   const { data: projectsData } = useQuery<{ projects: Array<{ id: number; name: string }> }>(GET_PROJECTS);
   const selectedProject = projectsData?.projects.find((p: { id: number; name: string }) => p.id === parseInt(projectId || '0'));
 
-  const { data: graphData, loading: graphLoading, error: graphError, refetch: refetchGraph } = useQuery<{ graph: Graph }, { id: number }>(GET_GRAPH_DETAILS, {
+  const { data: graphData, loading: graphLoading, error: graphError } = useQuery<{ graph: Graph }, { id: number }>(GET_GRAPH_DETAILS, {
     variables: { id: parseInt(graphId || '0') },
     skip: !graphId,
   });
@@ -266,6 +266,100 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
     });
   }, [graph, updateLayerProperties]);
 
+  // Apply edits to canvas without full re-render
+  const handleApplyEdits = useCallback((edits: any[]) => {
+    if (!graph) return;
+
+    edits.forEach(edit => {
+      const { targetType, targetId, operation, fieldName, newValue } = edit;
+
+      if (targetType === 'node' && operation === 'update') {
+        // Apply node update optimistically
+        if (setNodesRef.current) {
+          setNodesRef.current(currentNodes => {
+            return currentNodes.map(node => {
+              if (node.id !== targetId) return node;
+
+              const updatedNode = { ...node };
+
+              if (fieldName === 'label' && newValue !== undefined) {
+                updatedNode.data = { ...node.data, label: newValue };
+              } else if (fieldName === 'layer' && newValue !== undefined) {
+                updatedNode.data = { ...updatedNode.data, layer: newValue };
+
+                // Update node style based on new layer
+                const newLayer = graph.layers.find(l => l.layerId === newValue);
+                if (newLayer?.properties) {
+                  const props = newLayer.properties;
+                  const newStyle = { ...node.style };
+
+                  if (props.background_color) {
+                    newStyle.backgroundColor = `#${props.background_color}`;
+                  }
+                  if (props.border_color) {
+                    newStyle.borderColor = `#${props.border_color}`;
+                    newStyle.border = `${node.type === 'group' ? '2px' : '1px'} solid #${props.border_color}`;
+                  }
+                  if (props.text_color) {
+                    newStyle.color = `#${props.text_color}`;
+                  }
+
+                  updatedNode.style = newStyle;
+                }
+              }
+
+              return updatedNode;
+            });
+          });
+        }
+      } else if (targetType === 'layer' && operation === 'update' && fieldName === 'properties' && newValue) {
+        // Apply layer property changes to all nodes/edges with this layer
+        const layerId = targetId;
+        const newProperties = newValue;
+
+        if (setNodesRef.current) {
+          setNodesRef.current(currentNodes => {
+            return currentNodes.map(node => {
+              const graphNode = graph.graphNodes.find(gn => gn.id === node.id);
+              if (!graphNode || graphNode.layer !== layerId) return node;
+
+              const newStyle = { ...node.style };
+
+              if (newProperties.background_color) {
+                newStyle.backgroundColor = `#${newProperties.background_color}`;
+              }
+              if (newProperties.border_color) {
+                newStyle.borderColor = `#${newProperties.border_color}`;
+                newStyle.border = `${node.type === 'group' ? '2px' : '1px'} solid #${newProperties.border_color}`;
+              }
+              if (newProperties.text_color) {
+                newStyle.color = `#${newProperties.text_color}`;
+              }
+
+              return { ...node, style: newStyle };
+            });
+          });
+        }
+
+        if (setEdgesRef.current) {
+          setEdgesRef.current(currentEdges => {
+            return currentEdges.map(edge => {
+              const graphEdge = graph.graphEdges.find(ge => ge.id === edge.id);
+              if (!graphEdge || graphEdge.layer !== layerId) return edge;
+
+              const newStyle = { ...edge.style };
+              if (newProperties.border_color || newProperties.text_color) {
+                newStyle.stroke = `#${newProperties.border_color || newProperties.text_color}`;
+              }
+
+              return { ...edge, style: newStyle };
+            });
+          });
+        }
+      }
+    });
+  }, [graph]);
+
   if (!selectedProject) {
     return (
       <Container size="xl">
@@ -370,10 +464,10 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
         onClose={() => {
           setEditHistoryOpen(false);
           refetchEditCount();
-          refetchGraph();
         }}
         graphId={parseInt(graphId || '0')}
         graphName={graph.name}
+        onApplyEdits={handleApplyEdits}
       />
     </Stack>
   );
