@@ -41,13 +41,13 @@ export const PropertiesAndLayersPanel: React.FC<PropertiesAndLayersPanelProps> =
           onClick={() => setCollapsed(false)}
           style={{
             position: 'absolute',
-            top: '16px',
-            right: '16px',
+            top: '8px',
+            right: '8px',
             zIndex: 1000,
             boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)'
           }}
         >
-          <IconChevronLeft size={20} />
+          <IconChevronLeft size={18} />
         </ActionIcon>
       </Tooltip>
     );
@@ -67,17 +67,18 @@ export const PropertiesAndLayersPanel: React.FC<PropertiesAndLayersPanelProps> =
     >
       <Tooltip label="Hide Properties Panel" position="left">
         <ActionIcon
-          variant="subtle"
-          size="sm"
+          variant="filled"
+          size="lg"
           onClick={() => setCollapsed(true)}
           style={{
             position: 'absolute',
             top: '8px',
             right: '8px',
-            zIndex: 10
+            zIndex: 10,
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)'
           }}
         >
-          <IconChevronRight size={16} />
+          <IconChevronRight size={18} />
         </ActionIcon>
       </Tooltip>
 
