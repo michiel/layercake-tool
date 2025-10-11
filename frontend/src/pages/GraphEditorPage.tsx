@@ -205,10 +205,18 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
       [`${colorType}_color`]: color,
     };
 
+    // Check if color actually changed
+    const oldColor = layer.properties?.[`${colorType}_color`];
+    if (oldColor === color) {
+      console.log('Color unchanged, skipping mutation:', { layerId, colorType, color });
+      return;
+    }
+
     console.log('Layer color change:', {
       layerId,
       colorType,
       color,
+      oldColor,
       oldProperties: layer.properties,
       newProperties: updatedProperties,
     });
