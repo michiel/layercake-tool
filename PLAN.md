@@ -125,11 +125,11 @@ Create a standalone desktop application using Tauri that embeds both the fronten
   - macOS: `~/Library/Application Support/com.layercake.app/layercake.db`
   - Windows: `%APPDATA%\com.layercake.app\layercake.db`
 
-### Stage 3: Add Database Menu and Commands ⏳ IN PROGRESS
+### Stage 3: Add Database Menu and Commands ✅ COMPLETED
 
 **Goal**: Provide UI for database management operations
 
-**Status**: ⏳ In Progress - Commands implemented, menu UI pending
+**Status**: ✅ Completed - Web UI implementation
 
 **Tasks**:
 1. Create `src-tauri/src/commands/database.rs`:
@@ -174,15 +174,34 @@ Create a standalone desktop application using Tauri that embeds both the fronten
 - ✅ `reinitialize_database()` command implemented
 - ✅ `show_database_location()` command implemented (returns directory path)
 - ✅ Commands registered in Tauri invoke_handler
-- ⏳ Database menu added to app UI (pending)
-- ⏳ Menu items trigger commands with confirmation dialogs (pending)
+- ✅ Database settings page added to app UI
+- ✅ UI triggers commands with confirmation dialogs
+- ✅ Visual feedback for success/error states
+- ⏳ Tested in actual Tauri build (pending end-to-end test)
 
 **Completed Changes**:
-- Created `src-tauri/src/commands/database.rs` with 4 commands
-- Commands can get database info, path, reinitialize database, and show location
-- `reinitialize_database()` gracefully shuts down server, deletes DB, and restarts
-- All commands use async/await and proper error handling
+- Created `src-tauri/src/commands/database.rs` with 4 Tauri commands:
+  * `get_database_path()` - Returns current database path
+  * `get_database_info()` - Returns database stats (path, size, exists)
+  * `reinitialize_database()` - Gracefully shuts down server, deletes DB, restarts
+  * `show_database_location()` - Returns database directory path
 - Commands registered in main.rs invoke_handler
+- Created `frontend/src/components/settings/DatabaseSettings.tsx` with:
+  * Display database information (path, size, status)
+  * "Show Database Location" button - displays directory in dialog
+  * "Reinitialise Database" button - with confirmation dialog
+  * Error and success notifications
+  * Auto-reload after reinitialisation
+- Added `/settings/database` route in App.tsx
+- Added "Database Settings" navigation button in sidebar
+- Added `@tauri-apps/api` dependency to frontend package.json
+
+**Implementation Note**:
+Chose web-based UI over native menu for better UX:
+- Easier to implement confirmation dialogs
+- Cross-platform consistent experience
+- Visual feedback and status display
+- More maintainable and testable
 
 **Tests**:
 - Create test data in database

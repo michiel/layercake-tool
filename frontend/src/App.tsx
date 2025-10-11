@@ -220,6 +220,22 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
               </>
             )}
           </Stack>
+
+          <div>
+            <div style={{ height: '1px', backgroundColor: '#e9ecef', margin: '8px 0' }} />
+            <Tooltip label="Database Settings" position="right" disabled={!navCollapsed}>
+              <Button
+                variant={isActiveRoute('/settings/database') ? 'filled' : 'light'}
+                fullWidth={!navCollapsed}
+                leftSection={navCollapsed ? undefined : <IconSettings size={16} />}
+                onClick={() => navigate('/settings/database')}
+                px={navCollapsed ? 'xs' : undefined}
+                style={navCollapsed ? { justifyContent: 'center' } : undefined}
+              >
+                {navCollapsed ? <IconSettings size={16} /> : 'Database Settings'}
+              </Button>
+            </Tooltip>
+          </div>
         </Stack>
       </AppShell.Navbar>
 
@@ -943,6 +959,7 @@ const PlanEditorPage = () => {
 
 import { GraphsPage } from './components/graphs/GraphsPage'
 import { GraphEditorPage } from './pages/GraphEditorPage'
+import { DatabaseSettings } from './components/settings/DatabaseSettings'
 
 // Main App component with routing
 function App() {
@@ -988,6 +1005,11 @@ function App() {
           <Route path="/projects/:projectId/datasources/:dataSourceId/edit" element={
             <ErrorBoundary>
               <DataSourceEditor />
+            </ErrorBoundary>
+          } />
+          <Route path="/settings/database" element={
+            <ErrorBoundary>
+              <DatabaseSettings />
             </ErrorBoundary>
           } />
           <Route path="*" element={
