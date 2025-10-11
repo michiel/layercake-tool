@@ -67,28 +67,51 @@ export const GraphDataDialog: React.FC<GraphDataDialogProps> = ({
       // Update changed nodes
       const promises: Promise<any>[] = [];
 
+      // Helper to normalize values for comparison (treats empty string and undefined as same)
+      const normalizeValue = (val: any) => {
+        if (val === '' || val === null || val === undefined) return undefined;
+        return val;
+      };
+
       for (const newNode of newGraphData.nodes) {
         const oldNode = oldGraph.graphNodes.find(n => n.id === newNode.id);
         if (!oldNode) continue;
 
-        // Check if any fields changed
-        const labelChanged = newNode.label !== (oldNode.label || '');
-        const layerChanged = newNode.layer !== oldNode.layer;
+        // Normalize values for comparison
+        const oldLabel = normalizeValue(oldNode.label);
+        const newLabel = normalizeValue(newNode.label);
+        const oldLayer = normalizeValue(oldNode.layer);
+        const newLayer = normalizeValue(newNode.layer);
+
+        // Check if fields actually changed
+        const labelChanged = oldLabel !== newLabel;
+        const layerChanged = oldLayer !== newLayer;
 
         // Build attrs object excluding standard fields
         const { id, label, layer, is_partition, belongs_to, comment, ...customAttrs } = newNode;
+
+        // Remove empty/undefined values from custom attrs
+        const cleanedCustomAttrs: Record<string, any> = {};
+        for (const [key, value] of Object.entries(customAttrs)) {
+          const normalized = normalizeValue(value);
+          if (normalized !== undefined) {
+            cleanedCustomAttrs[key] = normalized;
+          }
+        }
+
         const oldAttrs = oldNode.attrs || {};
-        const attrsChanged = JSON.stringify(customAttrs) !== JSON.stringify(oldAttrs);
+        const attrsChanged = JSON.stringify(cleanedCustomAttrs) !== JSON.stringify(oldAttrs);
 
         if (labelChanged || layerChanged || attrsChanged) {
+          console.log(`Updating node ${newNode.id}:`, { labelChanged, layerChanged, attrsChanged });
           promises.push(
             updateGraphNode({
               variables: {
                 graphId: graphId,
                 nodeId: newNode.id,
-                label: labelChanged ? newNode.label : undefined,
-                layer: layerChanged ? newNode.layer : undefined,
-                attrs: attrsChanged ? customAttrs : undefined,
+                label: labelChanged ? newLabel : undefined,
+                layer: layerChanged ? newLayer : undefined,
+                attrs: attrsChanged ? cleanedCustomAttrs : undefined,
               }
             })
           );
@@ -100,28 +123,47 @@ export const GraphDataDialog: React.FC<GraphDataDialogProps> = ({
         const oldLayer = oldGraph.layers.find(l => l.layerId === newLayer.id);
         if (!oldLayer) continue;
 
-        // Check if layer changed
-        const nameChanged = newLayer.label !== oldLayer.name;
+        // Normalize values for comparison
+        const oldName = normalizeValue(oldLayer.name);
+        const newName = normalizeValue(newLayer.label);
+        const nameChanged = oldName !== newName;
 
-        // Build properties object
+        // Build properties object, excluding id and label
         const { id, label, ...properties } = newLayer;
+
+        // Clean properties - remove empty/undefined values
+        const cleanedProperties: Record<string, any> = {};
+        for (const [key, value] of Object.entries(properties)) {
+          const normalized = normalizeValue(value);
+          if (normalized !== undefined) {
+            cleanedProperties[key] = normalized;
+          }
+        }
+
         const oldProperties = oldLayer.properties || {};
-        const propertiesChanged = JSON.stringify(properties) !== JSON.stringify(oldProperties);
+        const propertiesChanged = JSON.stringify(cleanedProperties) !== JSON.stringify(oldProperties);
 
         if (nameChanged || propertiesChanged) {
-          // Find layer database ID
+          console.log(`Updating layer ${newLayer.id}:`, { nameChanged, propertiesChanged });
           const layerDbId = oldLayer.id;
           promises.push(
             updateLayerProperties({
               variables: {
                 id: layerDbId,
-                name: nameChanged ? newLayer.label : undefined,
-                properties: propertiesChanged ? properties : undefined,
+                name: nameChanged ? newName : undefined,
+                properties: propertiesChanged ? cleanedProperties : undefined,
               }
             })
           );
         }
       }
+
+      if (promises.length === 0) {
+        console.log('No changes detected');
+        return;
+      }
+
+      console.log(`Saving ${promises.length} changes...`);
 
       // Wait for all updates to complete
       await Promise.all(promises);
