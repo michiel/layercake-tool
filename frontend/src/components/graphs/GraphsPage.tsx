@@ -45,6 +45,7 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedGraph, setSelectedGraph] = useState<Graph | null>(null);
+  const [executingGraphId, setExecutingGraphId] = useState<number | null>(null);
 
   const { data: projectsData } = useQuery<{ projects: Array<{ id: number; name: string }> }>(GET_PROJECTS);
   const selectedProject = projectsData?.projects.find((p: { id: number; name: string }) => p.id === parseInt(projectId || '0'));
@@ -66,7 +67,7 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
     refetchQueries: [{ query: GET_GRAPHS, variables: { projectId: parseInt(projectId || '0') } }]
   });
 
-  const [executeNode, { loading: executeLoading }] = useMutation(EXECUTE_NODE, {
+  const [executeNode] = useMutation(EXECUTE_NODE, {
     refetchQueries: [{ query: GET_GRAPHS, variables: { projectId: parseInt(projectId || '0') } }]
   });
 
@@ -113,6 +114,7 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
 
   const handleReprocess = async (graph: Graph) => {
     try {
+      setExecutingGraphId(graph.id);
       await executeNode({
         variables: {
           projectId: parseInt(projectId || '0'),
@@ -121,6 +123,8 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
       });
     } catch (err) {
       console.error('Failed to reprocess graph:', err);
+    } finally {
+      setExecutingGraphId(null);
     }
   };
 
@@ -191,7 +195,6 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
                   <Table.Tr>
                     <Table.Th>Name</Table.Th>
                     <Table.Th>Node ID</Table.Th>
-                    <Table.Th>Execution State</Table.Th>
                     <Table.Th>Nodes</Table.Th>
                     <Table.Th>Edges</Table.Th>
                     <Table.Th>Layers</Table.Th>
@@ -205,7 +208,6 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
                     <Table.Tr key={graph.id}>
                       <Table.Td>{graph.name}</Table.Td>
                       <Table.Td>{graph.nodeId}</Table.Td>
-                      <Table.Td>{graph.executionState}</Table.Td>
                       <Table.Td>{graph.nodeCount}</Table.Td>
                       <Table.Td>{graph.edgeCount}</Table.Td>
                       <Table.Td>{graph.layers.length}</Table.Td>
@@ -215,7 +217,7 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
                         <Group gap="xs">
                           <ActionIcon onClick={() => navigate(`/projects/${projectId}/graphs/${graph.id}/edit`)}><IconGraph size={16} /></ActionIcon>
                           <ActionIcon onClick={() => handleEdit(graph)}><IconEdit size={16} /></ActionIcon>
-                          <ActionIcon onClick={() => handleReprocess(graph)} color="blue" loading={executeLoading}><IconRefresh size={16} /></ActionIcon>
+                          <ActionIcon onClick={() => handleReprocess(graph)} color="blue" loading={executingGraphId === graph.id}><IconRefresh size={16} /></ActionIcon>
                           <ActionIcon onClick={() => handleDelete(graph)} color="red"><IconTrash size={16} /></ActionIcon>
                         </Group>
                       </Table.Td>
