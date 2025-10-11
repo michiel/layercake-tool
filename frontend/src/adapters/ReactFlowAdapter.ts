@@ -117,6 +117,10 @@ export class ReactFlowAdapter {
         metadata: normalizedNode.metadata,
         hasValidConfig,
 
+        // Execution metadata from GET_PLAN_DAG query
+        datasourceExecution: normalizedNode.datasourceExecution,
+        graphExecution: normalizedNode.graphExecution,
+
         // Original Plan DAG data for round-trip consistency
         originalNode: {
           id: normalizedNode.id,

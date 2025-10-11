@@ -223,6 +223,12 @@ export interface ReactFlowNode extends PlanDagNode {
     nodeType: PlanDagNodeType;
     config: NodeConfig;
     metadata: NodeMetadata;
+    datasourceExecution?: DataSourceExecutionMetadata;
+    graphExecution?: GraphExecutionMetadata;
+    hasValidConfig?: boolean;
+    projectId?: number;
+    edges?: any[];
+    [key: string]: any; // Allow additional properties
   };
   draggable?: boolean;
   selectable?: boolean;
