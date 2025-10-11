@@ -352,6 +352,15 @@ pub struct PlanDagNodeUpdateInput {
     pub config: Option<String>,
 }
 
+#[derive(InputObject, Clone, Debug)]
+pub struct PlanDagEdgeUpdateInput {
+    #[graphql(name = "sourceHandle")]
+    pub source_handle: Option<String>,
+    #[graphql(name = "targetHandle")]
+    pub target_handle: Option<String>,
+    pub metadata: Option<EdgeMetadata>,
+}
+
 // Validation types
 #[derive(SimpleObject, Clone, Debug)]
 pub struct ValidationResult {

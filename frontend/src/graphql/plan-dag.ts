@@ -164,6 +164,22 @@ export const DELETE_PLAN_DAG_EDGE = gql`
   }
 `
 
+export const UPDATE_PLAN_DAG_EDGE = gql`
+  mutation UpdatePlanDagEdge($projectId: Int!, $edgeId: String!, $updates: PlanDagEdgeUpdateInput!) {
+    updatePlanDagEdge(projectId: $projectId, edgeId: $edgeId, updates: $updates) {
+      id
+      source
+      target
+      sourceHandle
+      targetHandle
+      metadata {
+        label
+        dataType
+      }
+    }
+  }
+`
+
 export const MOVE_PLAN_DAG_NODE = gql`
   mutation MovePlanDagNode($projectId: Int!, $nodeId: String!, $position: PositionInput!) {
     movePlanDagNode(projectId: $projectId, nodeId: $nodeId, position: $position) {

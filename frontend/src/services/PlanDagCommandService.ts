@@ -215,6 +215,35 @@ export class PlanDagCommandService {
     }
   }
 
+  async updateEdge(command: UpdateEdgeCommand): Promise<ReactFlowEdge> {
+    try {
+      console.log('[PlanDagCommandService] Updating edge:', command.edgeId)
+
+      // Mark mutation to suppress subscription echo
+      this.markMutationOccurred()
+
+      const result = await this.apollo.mutate({
+        mutation: PlanDagGraphQL.UPDATE_PLAN_DAG_EDGE,
+        variables: {
+          projectId: command.projectId,
+          edgeId: command.edgeId,
+          updates: command.updates
+        },
+        context: createMutationContext(this.clientId)
+      })
+
+      const updatedEdge = (result.data as any)?.updatePlanDagEdge
+      if (!updatedEdge) {
+        throw new Error('Failed to update edge: No data returned')
+      }
+      console.log('[PlanDagCommandService] Edge updated successfully')
+      return updatedEdge
+    } catch (error) {
+      console.error('[PlanDagCommandService] Failed to update edge:', error)
+      throw error
+    }
+  }
+
   // Bulk Plan DAG Commands
   async updatePlanDag(command: UpdatePlanDagCommand): Promise<void> {
     try {
@@ -290,6 +319,16 @@ export interface DeleteEdgeCommand {
   edgeId: string
 }
 
+export interface UpdateEdgeCommand {
+  projectId: number
+  edgeId: string
+  updates: {
+    sourceHandle?: string
+    targetHandle?: string
+    metadata?: any
+  }
+}
+
 export interface UpdatePlanDagCommand {
   projectId: number
   planDag: PlanDag
@@ -306,5 +345,6 @@ export type PlanDagCommand =
   | MoveNodeCommand
   | CreateEdgeCommand
   | DeleteEdgeCommand
+  | UpdateEdgeCommand
   | UpdatePlanDagCommand
   | ValidatePlanDagCommand

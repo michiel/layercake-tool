@@ -867,6 +867,18 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
 
     await cqrsService.commands.batchMoveNodes(projectId, nodePositions);
 
+    // Persist edge handle changes to backend
+    for (const edge of layoutedEdges) {
+      await cqrsService.commands.updateEdge({
+        projectId,
+        edgeId: edge.id,
+        updates: {
+          sourceHandle: edge.sourceHandle || undefined,
+          targetHandle: edge.targetHandle || undefined
+        }
+      });
+    }
+
     // Re-enable external syncs after layout completes
     setDragging(false);
   }, [nodes, edges, setNodes, setEdges, cqrsService, projectId, setDragging]);
@@ -889,6 +901,18 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     }));
 
     await cqrsService.commands.batchMoveNodes(projectId, nodePositions);
+
+    // Persist edge handle changes to backend
+    for (const edge of layoutedEdges) {
+      await cqrsService.commands.updateEdge({
+        projectId,
+        edgeId: edge.id,
+        updates: {
+          sourceHandle: edge.sourceHandle || undefined,
+          targetHandle: edge.targetHandle || undefined
+        }
+      });
+    }
 
     // Re-enable external syncs after layout completes
     setDragging(false);

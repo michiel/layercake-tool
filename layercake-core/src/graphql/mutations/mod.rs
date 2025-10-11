@@ -16,7 +16,7 @@ use crate::pipeline::DagExecutor;
 
 use crate::graphql::types::project::{Project, CreateProjectInput, UpdateProjectInput};
 use crate::graphql::types::plan::{Plan, CreatePlanInput, UpdatePlanInput};
-use crate::graphql::types::plan_dag::{PlanDag, PlanDagNode, PlanDagEdge, PlanDagInput, PlanDagNodeInput, PlanDagEdgeInput, PlanDagNodeUpdateInput, Position, NodePositionInput};
+use crate::graphql::types::plan_dag::{PlanDag, PlanDagNode, PlanDagEdge, PlanDagInput, PlanDagNodeInput, PlanDagEdgeInput, PlanDagNodeUpdateInput, PlanDagEdgeUpdateInput, Position, NodePositionInput};
 use crate::graphql::types::{User, ProjectCollaborator, RegisterUserInput, LoginInput, UpdateUserInput, LoginResponse, RegisterResponse, InviteCollaboratorInput, UpdateCollaboratorRoleInput, DataSource, CreateDataSourceInput, UpdateDataSourceInput, BulkUploadDataSourceInput};
 use crate::graphql::types::graph::{Graph, CreateGraphInput, UpdateGraphInput};
 use crate::graphql::types::graph_edit::{GraphEdit, CreateGraphEditInput, ReplaySummary, EditResult};
@@ -644,6 +644,57 @@ impl Mutation {
         } else {
             Err(Error::new("Edge not found"))
         }
+    }
+
+    /// Update a Plan DAG edge
+    async fn update_plan_dag_edge(
+        &self,
+        ctx: &Context<'_>,
+        project_id: i32,
+        edge_id: String,
+        updates: PlanDagEdgeUpdateInput
+    ) -> Result<Option<PlanDagEdge>> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        // Find the plan for this project
+        let plan = plans::Entity::find()
+            .filter(plans::Column::ProjectId.eq(project_id))
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Plan not found for project"))?;
+
+        // Find the edge
+        let edge = plan_dag_edges::Entity::find()
+            .filter(
+                plan_dag_edges::Column::PlanId.eq(plan.id)
+                    .and(plan_dag_edges::Column::Id.eq(&edge_id))
+            )
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Edge not found"))?;
+
+        let mut edge_active: plan_dag_edges::ActiveModel = edge.into();
+
+        // Update source_handle if provided
+        if let Some(source_handle) = updates.source_handle {
+            edge_active.source_handle = Set(Some(source_handle));
+        }
+
+        // Update target_handle if provided
+        if let Some(target_handle) = updates.target_handle {
+            edge_active.target_handle = Set(Some(target_handle));
+        }
+
+        // Update metadata if provided
+        if let Some(metadata) = updates.metadata {
+            let metadata_json = serde_json::to_string(&metadata)?;
+            edge_active.metadata_json = Set(metadata_json);
+        }
+
+        edge_active.updated_at = Set(Utc::now());
+        let updated_edge = edge_active.update(&context.db).await?;
+
+        Ok(Some(PlanDagEdge::from(updated_edge)))
     }
 
     /// Move a Plan DAG node (update position)
