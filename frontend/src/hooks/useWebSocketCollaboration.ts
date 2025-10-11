@@ -129,15 +129,24 @@ export function useWebSocketCollaboration(
         if (userIndex >= 0) {
           const newUsers = [...prevUsers];
           newUsers[userIndex] = data;
+          // Remove user from list if they're offline
+          if (!data.isOnline) {
+            return newUsers.filter(u => u.userId !== data.userId);
+          }
           return newUsers;
         } else {
-          return [...prevUsers, data];
+          // Only add user if they're online
+          if (data.isOnline) {
+            return [...prevUsers, data];
+          }
+          return prevUsers;
         }
       });
     });
 
     service.setOnBulkPresence((data) => {
-      setUsers(data);
+      // Filter out offline users from bulk presence
+      setUsers(data.filter(u => u.isOnline));
     });
 
     service.setOnDocumentActivity((data) => {
@@ -166,6 +175,32 @@ export function useWebSocketCollaboration(
       isInitializedRef.current = false;
     };
   }, [enabled, projectId, getServerUrl, token, options.maxReconnectAttempts, options.reconnectInterval]);
+
+  // Periodic cleanup of stale users (users who haven't been active in 5 minutes)
+  useEffect(() => {
+    if (!enabled) return;
+
+    const cleanupInterval = setInterval(() => {
+      setUsers(prevUsers => {
+        const now = Date.now();
+        const STALE_THRESHOLD = 5 * 60 * 1000; // 5 minutes
+
+        return prevUsers.filter(user => {
+          const lastActive = new Date(user.lastActive).getTime();
+          const isStale = now - lastActive > STALE_THRESHOLD;
+
+          // Remove user if they're offline or stale
+          if (!user.isOnline || isStale) {
+            console.log(`[useWebSocketCollaboration] Removing stale/offline user: ${user.userName} (${user.userId})`);
+            return false;
+          }
+          return true;
+        });
+      });
+    }, 60000); // Check every minute
+
+    return () => clearInterval(cleanupInterval);
+  }, [enabled]);
 
   // Actions
   const joinSession = useCallback((userData: JoinSessionData) => {

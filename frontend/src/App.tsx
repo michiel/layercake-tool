@@ -69,10 +69,23 @@ const GET_PLAN_DAG = gql`
   }
 `
 
+// Generate a unique session ID for this browser tab/window
+// This ensures each browser session is tracked separately
+const generateSessionId = () => {
+  // Use crypto.randomUUID if available, otherwise fallback to timestamp + random
+  if (crypto.randomUUID) {
+    return `user-${crypto.randomUUID()}`;
+  }
+  return `user-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+};
+
 // Layout wrapper component
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate()
   const location = useLocation()
+
+  // Generate stable session ID (only once per component mount)
+  const [sessionId] = useState(() => generateSessionId());
 
   // Get current route info for navigation highlighting
   const isActiveRoute = (path: string) => {
@@ -91,8 +104,8 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
     documentType: 'canvas',
     enableWebSocket: !!projectId,
     userInfo: {
-      id: 'current-user',
-      name: 'Current User',
+      id: sessionId,
+      name: 'Anonymous User',
       avatarColor: '#3b82f6'
     }
   })
@@ -115,7 +128,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
           projectId={projectId}
           connectionState={connectionStatus.state}
           users={collaboration.users}
-          currentUserId="current-user"
+          currentUserId={sessionId}
           onNavigateHome={() => navigate('/')}
         />
       </AppShell.Header>
