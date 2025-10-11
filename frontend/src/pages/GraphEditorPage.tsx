@@ -9,7 +9,7 @@ import { LayercakeGraphEditor } from '../components/graphs/LayercakeGraphEditor'
 import { PropertiesAndLayersPanel } from '../components/graphs/PropertiesAndLayersPanel';
 import EditHistoryModal from '../components/graphs/EditHistoryModal';
 import { ReactFlowProvider, Node as FlowNode, Edge as FlowEdge } from 'reactflow';
-import { Graph, GraphNode, UPDATE_GRAPH_NODE, UPDATE_LAYER_PROPERTIES, GET_GRAPH_EDIT_COUNT } from '../graphql/graphs';
+import { Graph, GraphNode, UPDATE_GRAPH_NODE, UPDATE_LAYER_PROPERTIES, GET_GRAPH_EDIT_COUNT, CREATE_LAYER } from '../graphql/graphs';
 import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
 
 const GET_PROJECTS = gql`
@@ -94,6 +94,9 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
 
   const [updateGraphNode] = useMutation(UPDATE_GRAPH_NODE);
   const [updateLayerProperties] = useMutation(UPDATE_LAYER_PROPERTIES);
+  const [createLayer] = useMutation(CREATE_LAYER, {
+    refetchQueries: [{ query: GET_GRAPH_DETAILS, variables: { id: parseInt(graphId || '0') } }]
+  });
 
   const graph: Graph | null = graphData?.graph || null;
 
@@ -193,6 +196,31 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
       return newMap;
     });
   }, []);
+
+  const handleAddLayer = useCallback(() => {
+    if (!graph) return;
+
+    // Generate unique layerId
+    const existingLayerIds = graph.layers.map(l => l.layerId);
+    let counter = graph.layers.length + 1;
+    let newLayerId = `layer_${counter}`;
+    while (existingLayerIds.includes(newLayerId)) {
+      counter++;
+      newLayerId = `layer_${counter}`;
+    }
+
+    createLayer({
+      variables: {
+        input: {
+          graphId: graph.id,
+          layerId: newLayerId,
+          name: `Layer ${counter}`
+        }
+      }
+    }).catch(error => {
+      console.error('Failed to create layer:', error);
+    });
+  }, [graph, createLayer]);
 
   const handleLayerColorChange = useCallback((layerId: string, colorType: 'background' | 'border' | 'text', color: string) => {
     if (!graph) return;
@@ -468,6 +496,7 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
             onShowAllLayers={handleShowAllLayers}
             onHideAllLayers={handleHideAllLayers}
             onLayerColorChange={handleLayerColorChange}
+            onAddLayer={handleAddLayer}
           />
         )}
       </Flex>

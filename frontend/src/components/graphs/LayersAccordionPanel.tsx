@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
-import { Stack, Text, Group, Divider, Button } from '@mantine/core';
-import { IconEye, IconEyeOff } from '@tabler/icons-react';
+import { Stack, Text, Group, Divider, ActionIcon, Tooltip } from '@mantine/core';
+import { IconEye, IconEyeOff, IconPlus } from '@tabler/icons-react';
 import { Graph } from '../../graphql/graphs';
 import { LayerListItem } from './LayerListItem';
 
@@ -11,6 +11,7 @@ interface LayersAccordionPanelProps {
   onShowAllLayers: () => void;
   onHideAllLayers: () => void;
   onLayerColorChange?: (layerId: string, colorType: 'background' | 'border' | 'text', color: string) => void;
+  onAddLayer?: () => void;
 }
 
 interface LayerStatistics {
@@ -25,6 +26,7 @@ export const LayersAccordionPanel: React.FC<LayersAccordionPanelProps> = ({
   onShowAllLayers,
   onHideAllLayers,
   onLayerColorChange,
+  onAddLayer,
 }) => {
   // Calculate statistics for each layer
   const layerStats = useMemo(() => {
@@ -91,22 +93,35 @@ export const LayersAccordionPanel: React.FC<LayersAccordionPanelProps> = ({
 
       {/* Bulk actions */}
       <Group gap="xs">
-        <Button
-          size="xs"
-          variant="light"
-          leftSection={<IconEye size={14} />}
-          onClick={onShowAllLayers}
-        >
-          Show All
-        </Button>
-        <Button
-          size="xs"
-          variant="light"
-          leftSection={<IconEyeOff size={14} />}
-          onClick={onHideAllLayers}
-        >
-          Hide All
-        </Button>
+        <Tooltip label="Show all layers">
+          <ActionIcon
+            variant="light"
+            color="blue"
+            onClick={onShowAllLayers}
+          >
+            <IconEye size={16} />
+          </ActionIcon>
+        </Tooltip>
+        <Tooltip label="Hide all layers">
+          <ActionIcon
+            variant="light"
+            color="blue"
+            onClick={onHideAllLayers}
+          >
+            <IconEyeOff size={16} />
+          </ActionIcon>
+        </Tooltip>
+        {onAddLayer && (
+          <Tooltip label="Add layer">
+            <ActionIcon
+              variant="light"
+              color="green"
+              onClick={onAddLayer}
+            >
+              <IconPlus size={16} />
+            </ActionIcon>
+          </Tooltip>
+        )}
       </Group>
 
       <Divider />

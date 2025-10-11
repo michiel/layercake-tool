@@ -13,6 +13,7 @@ interface PropertiesAndLayersPanelProps {
   onShowAllLayers: () => void;
   onHideAllLayers: () => void;
   onLayerColorChange?: (layerId: string, colorType: 'background' | 'border' | 'text', color: string) => void;
+  onAddLayer?: () => void;
 }
 
 export const PropertiesAndLayersPanel: React.FC<PropertiesAndLayersPanelProps> = ({
@@ -24,6 +25,7 @@ export const PropertiesAndLayersPanel: React.FC<PropertiesAndLayersPanelProps> =
   onShowAllLayers,
   onHideAllLayers,
   onLayerColorChange,
+  onAddLayer,
 }) => {
   const selectedNode = selectedNodeId
     ? graph.graphNodes.find(n => n.id === selectedNodeId)
@@ -72,6 +74,7 @@ export const PropertiesAndLayersPanel: React.FC<PropertiesAndLayersPanelProps> =
               onShowAllLayers={onShowAllLayers}
               onHideAllLayers={onHideAllLayers}
               onLayerColorChange={onLayerColorChange}
+              onAddLayer={onAddLayer}
             />
           </Accordion.Panel>
         </Accordion.Item>

@@ -18,7 +18,7 @@ use crate::graphql::types::project::{Project, CreateProjectInput, UpdateProjectI
 use crate::graphql::types::plan::{Plan, CreatePlanInput, UpdatePlanInput};
 use crate::graphql::types::plan_dag::{PlanDag, PlanDagNode, PlanDagEdge, PlanDagInput, PlanDagNodeInput, PlanDagEdgeInput, PlanDagNodeUpdateInput, PlanDagEdgeUpdateInput, Position, NodePositionInput};
 use crate::graphql::types::{User, ProjectCollaborator, RegisterUserInput, LoginInput, UpdateUserInput, LoginResponse, RegisterResponse, InviteCollaboratorInput, UpdateCollaboratorRoleInput, DataSource, CreateDataSourceInput, UpdateDataSourceInput, BulkUploadDataSourceInput};
-use crate::graphql::types::graph::{Graph, CreateGraphInput, UpdateGraphInput};
+use crate::graphql::types::graph::{Graph, CreateGraphInput, UpdateGraphInput, CreateLayerInput};
 use crate::graphql::types::graph_edit::{GraphEdit, CreateGraphEditInput, ReplaySummary, EditResult};
 
 pub struct Mutation;
@@ -1498,6 +1498,28 @@ impl Mutation {
             .map_err(|e| Error::new(format!("Failed to delete Graph: {}", e)))?;
 
         Ok(true)
+    }
+
+    /// Create a new Layer
+    async fn create_layer(&self, ctx: &Context<'_>, input: CreateLayerInput) -> Result<crate::graphql::types::Layer> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        use crate::database::entities::layers;
+
+        let layer = layers::ActiveModel {
+            id: sea_orm::ActiveValue::NotSet,
+            graph_id: Set(input.graph_id),
+            layer_id: Set(input.layer_id),
+            name: Set(input.name),
+            color: Set(None),
+            properties: Set(None),
+        };
+
+        let inserted_layer = layer.insert(&context.db)
+            .await
+            .map_err(|e| Error::new(format!("Failed to create layer: {}", e)))?;
+
+        Ok(crate::graphql::types::Layer::from(inserted_layer))
     }
 
     /// Update a graph node's properties

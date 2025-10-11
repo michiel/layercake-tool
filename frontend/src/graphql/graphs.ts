@@ -166,6 +166,18 @@ export const DELETE_GRAPH = gql`
   }
 `
 
+export const CREATE_LAYER = gql`
+  mutation CreateLayer($input: CreateLayerInput!) {
+    createLayer(input: $input) {
+      id
+      layerId
+      name
+      color
+      properties
+    }
+  }
+`
+
 export const EXECUTE_NODE = gql`
   mutation ExecuteNode($projectId: Int!, $nodeId: String!) {
     executeNode(projectId: $projectId, nodeId: $nodeId) {
