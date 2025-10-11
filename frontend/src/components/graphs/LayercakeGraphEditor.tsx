@@ -133,6 +133,34 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
     }
   }, [onNodeSelect]);
 
+  // Minimap node color customization
+  const minimapNodeColor = useCallback((node: Node) => {
+    // Hide label nodes completely
+    if (node.id.endsWith('-label')) {
+      return 'transparent';
+    }
+    // Make group nodes semi-transparent so child nodes are visible
+    if (node.type === 'group') {
+      return 'rgba(200, 200, 200, 0.2)';
+    }
+    // Regular nodes are solid white
+    return '#fff';
+  }, []);
+
+  // Minimap node stroke color
+  const minimapNodeStrokeColor = useCallback((node: Node) => {
+    // Hide label nodes completely
+    if (node.id.endsWith('-label')) {
+      return 'transparent';
+    }
+    // Semi-transparent border for partition nodes
+    if (node.type === 'group') {
+      return 'rgba(150, 150, 150, 0.5)';
+    }
+    // Solid border for regular nodes
+    return '#555';
+  }, []);
+
   return (
     <div style={{ width: '100%', height: '100%' }}>
       <ReactFlow
@@ -147,7 +175,12 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
         attributionPosition="bottom-left"
       >
         <Controls />
-        <MiniMap />
+        <MiniMap
+          nodeColor={minimapNodeColor}
+          nodeStrokeColor={minimapNodeStrokeColor}
+          nodeStrokeWidth={1}
+          maskColor="rgba(240, 240, 240, 0.8)"
+        />
         <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
       </ReactFlow>
     </div>
