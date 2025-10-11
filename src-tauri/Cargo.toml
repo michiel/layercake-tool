@@ -12,7 +12,7 @@ repository.workspace = true
 tauri-build = { workspace = true }
 
 [dependencies]
-layercake_core = { path = "../layercake-core", package = "layercake-core" }
+layercake_core = { path = "../layercake-core", package = "layercake-core", features = ["server", "graphql"] }
 tauri = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -20,6 +20,16 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 reqwest = { workspace = true }
+anyhow = { workspace = true }
+
+# Server dependencies
+axum = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+
+# Database dependencies
+sea-orm = { workspace = true }
+sea-orm-migration = { workspace = true }
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem
