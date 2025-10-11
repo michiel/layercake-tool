@@ -852,11 +852,12 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     // Suppress external syncs during layout operations
     setDragging(true);
 
-    const layoutedNodes = await autoLayout(nodes, edges, {
+    const { nodes: layoutedNodes, edges: layoutedEdges } = await autoLayout(nodes, edges, {
       direction: 'horizontal'
     });
 
     setNodes(layoutedNodes);
+    setEdges(layoutedEdges);
 
     // Persist position changes to backend in a single batch operation
     const nodePositions = layoutedNodes.map(node => ({
@@ -868,17 +869,18 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
 
     // Re-enable external syncs after layout completes
     setDragging(false);
-  }, [nodes, edges, setNodes, cqrsService, projectId, setDragging]);
+  }, [nodes, edges, setNodes, setEdges, cqrsService, projectId, setDragging]);
 
   const handleAutoLayoutVertical = useCallback(async () => {
     // Suppress external syncs during layout operations
     setDragging(true);
 
-    const layoutedNodes = await autoLayout(nodes, edges, {
+    const { nodes: layoutedNodes, edges: layoutedEdges } = await autoLayout(nodes, edges, {
       direction: 'vertical'
     });
 
     setNodes(layoutedNodes);
+    setEdges(layoutedEdges);
 
     // Persist position changes to backend in a single batch operation
     const nodePositions = layoutedNodes.map(node => ({
@@ -890,7 +892,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
 
     // Re-enable external syncs after layout completes
     setDragging(false);
-  }, [nodes, edges, setNodes, cqrsService, projectId, setDragging]);
+  }, [nodes, edges, setNodes, setEdges, cqrsService, projectId, setDragging]);
 
   // Fit view - zoom to see all nodes
   const handleFitView = useCallback(() => {

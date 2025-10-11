@@ -20,16 +20,17 @@ const DEFAULT_VERTICAL_NODE_SPACING = 120;
 const DEFAULT_VERTICAL_RANK_SPACING = 200;
 
 /**
- * Auto-layout nodes using ELK (Eclipse Layout Kernel)
+ * Auto-layout nodes and edges using ELK (Eclipse Layout Kernel)
  * Optimized for visual clarity with generous spacing
+ * Updates edge connectors based on layout direction
  */
 export async function autoLayout(
   nodes: Node[],
   edges: Edge[],
   options: LayoutOptions
-): Promise<Node[]> {
+): Promise<{ nodes: Node[]; edges: Edge[] }> {
   if (nodes.length === 0) {
-    return nodes;
+    return { nodes, edges };
   }
 
   const isHorizontal = options.direction === 'horizontal';
@@ -105,10 +106,17 @@ export async function autoLayout(
       } as Node;
     }).filter((node): node is Node => node !== null) ?? [];
 
-    return layoutedNodes;
+    // Update edges to use correct handles based on layout direction
+    const layoutedEdges = edges.map((edge) => ({
+      ...edge,
+      sourceHandle: isHorizontal ? 'output-right' : 'output-bottom',
+      targetHandle: isHorizontal ? 'input-left' : 'input-top',
+    }));
+
+    return { nodes: layoutedNodes, edges: layoutedEdges };
   } catch (error) {
     console.error('ELK layout failed:', error);
-    // Return original nodes on error
-    return nodes;
+    // Return original nodes and edges on error
+    return { nodes, edges };
   }
 }
