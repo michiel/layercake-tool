@@ -251,6 +251,14 @@ async fn handle_client_message(
                 *current_user_id = None;
             }
         }
+
+        ClientMessage::Ping => {
+            // Respond with pong
+            let pong_msg = ServerMessage::Pong;
+            if let Err(_) = tx.send(pong_msg).await {
+                return Err("Failed to send pong response".to_string());
+            }
+        }
     }
 
     Ok(())

@@ -70,7 +70,8 @@ export type ClientMessage =
   | { type: 'join_session'; data: JoinSessionData }
   | { type: 'cursor_update'; data: CursorUpdateData }
   | { type: 'switch_document'; data: DocumentSwitchData }
-  | { type: 'leave_session'; data: LeaveSessionData };
+  | { type: 'leave_session'; data: LeaveSessionData }
+  | { type: 'ping' };
 
 // Server → Client messages
 export interface DocumentPresence {
@@ -105,7 +106,8 @@ export type ServerMessage =
   | { type: 'user_presence'; data: UserPresenceData }
   | { type: 'bulk_presence'; data: UserPresenceData[] }
   | { type: 'document_activity'; data: DocumentActivityData }
-  | { type: 'error'; message: string };
+  | { type: 'error'; message: string }
+  | { type: 'pong' };
 
 // WebSocket connection states
 export enum ConnectionState {

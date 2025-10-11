@@ -216,6 +216,9 @@ export class WebSocketCollaborationService {
       case 'error':
         this.onError(message.message);
         break;
+      case 'pong':
+        // Pong response received - connection is alive
+        break;
       default:
         this.onError(`Unknown message type: ${(message as any).type}`);
     }

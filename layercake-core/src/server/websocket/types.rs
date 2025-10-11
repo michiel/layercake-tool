@@ -63,6 +63,7 @@ pub enum ClientMessage {
     LeaveSession {
         data: LeaveSessionData,
     },
+    Ping,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -113,6 +114,7 @@ pub enum ServerMessage {
     Error {
         message: String,
     },
+    Pong,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
