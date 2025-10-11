@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Tabs, Stack, Button, Group, Text, Alert, Table, TextInput, ScrollArea } from '@mantine/core';
-import { IconTable, IconDeviceFloppy, IconAlertCircle } from '@tabler/icons-react';
+import { Tabs, Stack, Button, Group, Text, Table, TextInput, ScrollArea } from '@mantine/core';
+import { IconTable, IconDeviceFloppy } from '@tabler/icons-react';
 
 export interface GraphNode {
   id: string;
@@ -113,12 +113,6 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
 
   return (
     <Stack gap="md">
-      {hasChanges && !readOnly && (
-        <Alert icon={<IconAlertCircle size={16} />} color="blue">
-          You have unsaved changes
-        </Alert>
-      )}
-
       <Group justify="space-between">
         <Text size="sm" c="dimmed">
           {activeTab === 'nodes' && `${localNodes.length} nodes`}

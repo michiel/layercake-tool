@@ -1,6 +1,16 @@
 use async_graphql::*;
 use serde::{Deserialize, Serialize};
 
+// Input type for bulk node updates
+#[derive(InputObject, Clone, Debug)]
+pub struct GraphNodeUpdateInput {
+    #[graphql(name = "nodeId")]
+    pub node_id: String,
+    pub label: Option<String>,
+    pub layer: Option<String>,
+    pub attrs: Option<serde_json::Value>,
+}
+
 #[derive(SimpleObject, Clone, Debug, Serialize, Deserialize)]
 pub struct GraphNode {
     pub id: String,

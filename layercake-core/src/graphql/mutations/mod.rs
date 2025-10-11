@@ -1636,6 +1636,154 @@ impl Mutation {
         Ok(crate::graphql::types::layer::Layer::from(layer))
     }
 
+    /// Bulk update graph nodes and layers in a single transaction
+    async fn bulk_update_graph_data(
+        &self,
+        ctx: &Context<'_>,
+        graph_id: i32,
+        nodes: Option<Vec<crate::graphql::types::graph_node::GraphNodeUpdateInput>>,
+        layers: Option<Vec<crate::graphql::types::layer::LayerUpdateInput>>,
+    ) -> Result<bool> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let graph_service = GraphService::new(context.db.clone());
+        let edit_service = GraphEditService::new(context.db.clone());
+
+        use crate::database::entities::graph_nodes::{Entity as GraphNodes, Column as NodeColumn};
+        use crate::database::entities::layers::Entity as Layers;
+        use sea_orm::{ColumnTrait, QueryFilter};
+
+        // Update nodes
+        if let Some(node_updates) = nodes {
+            for node_update in node_updates {
+                // Fetch current node to get old values
+                let old_node = GraphNodes::find()
+                    .filter(NodeColumn::GraphId.eq(graph_id))
+                    .filter(NodeColumn::Id.eq(&node_update.node_id))
+                    .one(&context.db)
+                    .await?;
+
+                // Update the node
+                let _ = graph_service
+                    .update_graph_node(
+                        graph_id,
+                        node_update.node_id.clone(),
+                        node_update.label.clone(),
+                        node_update.layer.clone(),
+                        node_update.attrs.clone(),
+                    )
+                    .await
+                    .map_err(|e| Error::new(format!("Failed to update graph node: {}", e)))?;
+
+                // Create graph edits for each changed field
+                if let Some(old_node) = old_node {
+                    if let Some(new_label) = &node_update.label {
+                        if old_node.label.as_ref() != Some(new_label) {
+                            let _ = edit_service.create_edit(
+                                graph_id,
+                                "node".to_string(),
+                                node_update.node_id.clone(),
+                                "update".to_string(),
+                                Some("label".to_string()),
+                                old_node.label.as_ref().map(|l| serde_json::json!(l)),
+                                Some(serde_json::json!(new_label)),
+                                None,
+                            ).await;
+                        }
+                    }
+
+                    if let Some(new_layer) = &node_update.layer {
+                        let old_layer_value = old_node.layer.clone().unwrap_or_default();
+                        if &old_layer_value != new_layer {
+                            let _ = edit_service.create_edit(
+                                graph_id,
+                                "node".to_string(),
+                                node_update.node_id.clone(),
+                                "update".to_string(),
+                                Some("layer".to_string()),
+                                if old_layer_value.is_empty() { None } else { Some(serde_json::json!(old_layer_value)) },
+                                Some(serde_json::json!(new_layer)),
+                                None,
+                            ).await;
+                        }
+                    }
+
+                    if let Some(new_attrs) = &node_update.attrs {
+                        if old_node.attrs.as_ref() != Some(new_attrs) {
+                            let _ = edit_service.create_edit(
+                                graph_id,
+                                "node".to_string(),
+                                node_update.node_id.clone(),
+                                "update".to_string(),
+                                Some("attrs".to_string()),
+                                old_node.attrs.clone(),
+                                Some(new_attrs.clone()),
+                                None,
+                            ).await;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Update layers
+        if let Some(layer_updates) = layers {
+            for layer_update in layer_updates {
+                // Fetch current layer to get old values
+                let old_layer = Layers::find_by_id(layer_update.id)
+                    .one(&context.db)
+                    .await?;
+
+                // Update the layer
+                let _ = graph_service
+                    .update_layer_properties(
+                        layer_update.id,
+                        layer_update.name.clone(),
+                        layer_update.properties.clone(),
+                    )
+                    .await
+                    .map_err(|e| Error::new(format!("Failed to update layer properties: {}", e)))?;
+
+                // Create graph edits for changed fields
+                if let Some(old_layer) = old_layer {
+                    if let Some(new_name) = &layer_update.name {
+                        if &old_layer.name != new_name {
+                            let _ = edit_service.create_edit(
+                                old_layer.graph_id,
+                                "layer".to_string(),
+                                old_layer.layer_id.clone(),
+                                "update".to_string(),
+                                Some("name".to_string()),
+                                Some(serde_json::json!(old_layer.name)),
+                                Some(serde_json::json!(new_name)),
+                                None,
+                            ).await;
+                        }
+                    }
+
+                    if let Some(new_properties) = &layer_update.properties {
+                        let old_props = old_layer.properties
+                            .and_then(|p| serde_json::from_str::<serde_json::Value>(&p).ok());
+
+                        if old_props.as_ref() != Some(new_properties) {
+                            let _ = edit_service.create_edit(
+                                old_layer.graph_id,
+                                "layer".to_string(),
+                                old_layer.layer_id.clone(),
+                                "update".to_string(),
+                                Some("properties".to_string()),
+                                old_props,
+                                Some(new_properties.clone()),
+                                None,
+                            ).await;
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(true)
+    }
+
     /// Execute a DAG node (builds graph from upstream data sources)
     async fn execute_node(
         &self,

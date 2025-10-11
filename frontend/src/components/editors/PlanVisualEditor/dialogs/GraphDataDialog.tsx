@@ -2,7 +2,7 @@ import React from 'react';
 import { Modal, Stack, Alert, Loader, Text } from '@mantine/core';
 import { IconAlertCircle } from '@tabler/icons-react';
 import { useQuery, useMutation } from '@apollo/client/react';
-import { GET_GRAPH_DETAILS, Graph, UPDATE_GRAPH_NODE, UPDATE_LAYER_PROPERTIES } from '../../../../graphql/graphs';
+import { GET_GRAPH_DETAILS, Graph, BULK_UPDATE_GRAPH_DATA } from '../../../../graphql/graphs';
 import { GraphSpreadsheetEditor, GraphData } from '../../../editors/GraphSpreadsheetEditor/GraphSpreadsheetEditor';
 
 interface GraphDataDialogProps {
@@ -24,8 +24,7 @@ export const GraphDataDialog: React.FC<GraphDataDialogProps> = ({
     fetchPolicy: 'network-only'
   });
 
-  const [updateGraphNode] = useMutation(UPDATE_GRAPH_NODE);
-  const [updateLayerProperties] = useMutation(UPDATE_LAYER_PROPERTIES);
+  const [bulkUpdateGraphData] = useMutation(BULK_UPDATE_GRAPH_DATA);
 
   const getGraphData = (): GraphData | null => {
     if (!data?.graph) return null;
@@ -64,15 +63,16 @@ export const GraphDataDialog: React.FC<GraphDataDialogProps> = ({
     try {
       const oldGraph = data.graph;
 
-      // Update changed nodes
-      const promises: Promise<any>[] = [];
-
       // Helper to normalize values for comparison (treats empty string and undefined as same)
       const normalizeValue = (val: any) => {
         if (val === '' || val === null || val === undefined) return undefined;
         return val;
       };
 
+      const changedNodes: any[] = [];
+      const changedLayers: any[] = [];
+
+      // Collect changed nodes
       for (const newNode of newGraphData.nodes) {
         const oldNode = oldGraph.graphNodes.find(n => n.id === newNode.id);
         if (!oldNode) continue;
@@ -103,22 +103,16 @@ export const GraphDataDialog: React.FC<GraphDataDialogProps> = ({
         const attrsChanged = JSON.stringify(cleanedCustomAttrs) !== JSON.stringify(oldAttrs);
 
         if (labelChanged || layerChanged || attrsChanged) {
-          console.log(`Updating node ${newNode.id}:`, { labelChanged, layerChanged, attrsChanged });
-          promises.push(
-            updateGraphNode({
-              variables: {
-                graphId: graphId,
-                nodeId: newNode.id,
-                label: labelChanged ? newLabel : undefined,
-                layer: layerChanged ? newLayer : undefined,
-                attrs: attrsChanged ? cleanedCustomAttrs : undefined,
-              }
-            })
-          );
+          changedNodes.push({
+            nodeId: newNode.id,
+            label: labelChanged ? newLabel : null,
+            layer: layerChanged ? newLayer : null,
+            attrs: attrsChanged ? cleanedCustomAttrs : null,
+          });
         }
       }
 
-      // Update changed layers
+      // Collect changed layers
       for (const newLayer of newGraphData.layers) {
         const oldLayer = oldGraph.layers.find(l => l.layerId === newLayer.id);
         if (!oldLayer) continue;
@@ -144,34 +138,34 @@ export const GraphDataDialog: React.FC<GraphDataDialogProps> = ({
         const propertiesChanged = JSON.stringify(cleanedProperties) !== JSON.stringify(oldProperties);
 
         if (nameChanged || propertiesChanged) {
-          console.log(`Updating layer ${newLayer.id}:`, { nameChanged, propertiesChanged });
-          const layerDbId = oldLayer.id;
-          promises.push(
-            updateLayerProperties({
-              variables: {
-                id: layerDbId,
-                name: nameChanged ? newName : undefined,
-                properties: propertiesChanged ? cleanedProperties : undefined,
-              }
-            })
-          );
+          changedLayers.push({
+            id: oldLayer.id,
+            name: nameChanged ? newName : null,
+            properties: propertiesChanged ? cleanedProperties : null,
+          });
         }
       }
 
-      if (promises.length === 0) {
+      if (changedNodes.length === 0 && changedLayers.length === 0) {
         console.log('No changes detected');
         return;
       }
 
-      console.log(`Saving ${promises.length} changes...`);
+      console.log(`Saving ${changedNodes.length} node(s) and ${changedLayers.length} layer(s) in bulk...`);
 
-      // Wait for all updates to complete
-      await Promise.all(promises);
+      // Single bulk update call
+      await bulkUpdateGraphData({
+        variables: {
+          graphId: graphId,
+          nodes: changedNodes.length > 0 ? changedNodes : null,
+          layers: changedLayers.length > 0 ? changedLayers : null,
+        }
+      });
 
       // Refetch the graph data to show updated values
       await refetch();
 
-      console.log(`Updated ${promises.length} items successfully`);
+      console.log(`Updated successfully`);
     } catch (error) {
       console.error('Failed to save graph data:', error);
       throw error;

@@ -6,6 +6,14 @@ use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::graph::Graph;
 use crate::graphql::types::scalars::JSON;
 
+// Input type for bulk layer updates
+#[derive(InputObject, Clone, Debug)]
+pub struct LayerUpdateInput {
+    pub id: i32,
+    pub name: Option<String>,
+    pub properties: Option<JSON>,
+}
+
 #[derive(Clone, Debug, SimpleObject)]
 #[graphql(complex)]
 pub struct Layer {

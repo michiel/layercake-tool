@@ -218,6 +218,20 @@ export const UPDATE_LAYER_PROPERTIES = gql`
   }
 `
 
+export const BULK_UPDATE_GRAPH_DATA = gql`
+  mutation BulkUpdateGraphData(
+    $graphId: Int!
+    $nodes: [GraphNodeUpdateInput!]
+    $layers: [LayerUpdateInput!]
+  ) {
+    bulkUpdateGraphData(
+      graphId: $graphId
+      nodes: $nodes
+      layers: $layers
+    )
+  }
+`
+
 export const GET_GRAPH_EDITS = gql`
   query GetGraphEdits($graphId: Int!, $unappliedOnly: Boolean) {
     graphEdits(graphId: $graphId, unappliedOnly: $unappliedOnly) {
