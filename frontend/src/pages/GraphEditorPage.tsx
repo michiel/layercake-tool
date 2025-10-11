@@ -10,6 +10,7 @@ import { PropertiesAndLayersPanel } from '../components/graphs/PropertiesAndLaye
 import EditHistoryModal from '../components/graphs/EditHistoryModal';
 import { ReactFlowProvider, Node as FlowNode, Edge as FlowEdge } from 'reactflow';
 import { Graph, GraphNode, UPDATE_GRAPH_NODE, UPDATE_LAYER_PROPERTIES, GET_GRAPH_EDIT_COUNT } from '../graphql/graphs';
+import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
 
 const GET_PROJECTS = gql`
   query GetProjects {
@@ -68,6 +69,7 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [layerVisibility, setLayerVisibility] = useState<Map<string, boolean>>(new Map());
   const [editHistoryOpen, setEditHistoryOpen] = useState(false);
+  const [propertiesPanelCollapsed, setPropertiesPanelCollapsed] = useState(false);
 
   // Store references to ReactFlow setters for optimistic updates
   const setNodesRef = useRef<React.Dispatch<React.SetStateAction<FlowNode[]>> | null>(null);
@@ -431,6 +433,15 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
                 <IconHistory size={18} />
               </ActionIcon>
             </Tooltip>
+            <Tooltip label={propertiesPanelCollapsed ? "Show properties panel" : "Hide properties panel"}>
+              <ActionIcon
+                variant="light"
+                color="gray"
+                onClick={() => setPropertiesPanelCollapsed(!propertiesPanelCollapsed)}
+              >
+                {propertiesPanelCollapsed ? <IconChevronLeft size={18} /> : <IconChevronRight size={18} />}
+              </ActionIcon>
+            </Tooltip>
           </Group>
         </Flex>
       </div>
@@ -447,16 +458,18 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
           </ReactFlowProvider>
         </div>
 
-        <PropertiesAndLayersPanel
-          graph={graph}
-          selectedNodeId={selectedNodeId}
-          onNodeUpdate={handleNodeUpdate}
-          layerVisibility={layerVisibility}
-          onLayerVisibilityToggle={handleLayerVisibilityToggle}
-          onShowAllLayers={handleShowAllLayers}
-          onHideAllLayers={handleHideAllLayers}
-          onLayerColorChange={handleLayerColorChange}
-        />
+        {!propertiesPanelCollapsed && (
+          <PropertiesAndLayersPanel
+            graph={graph}
+            selectedNodeId={selectedNodeId}
+            onNodeUpdate={handleNodeUpdate}
+            layerVisibility={layerVisibility}
+            onLayerVisibilityToggle={handleLayerVisibilityToggle}
+            onShowAllLayers={handleShowAllLayers}
+            onHideAllLayers={handleHideAllLayers}
+            onLayerColorChange={handleLayerColorChange}
+          />
+        )}
       </Flex>
 
       <EditHistoryModal
