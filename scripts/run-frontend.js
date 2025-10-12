@@ -18,8 +18,10 @@ if (scriptArgs.length > 0) {
   npmArgs.push('--', ...scriptArgs);
 }
 
-const configDir = process.env.TAURI_CONFIG_DIR || __dirname;
-const projectRoot = path.resolve(configDir, '..');
+const tauriConfigDir = process.env.TAURI_CONFIG_DIR
+  ? path.resolve(process.env.TAURI_CONFIG_DIR)
+  : path.resolve(__dirname, '..', 'src-tauri');
+const projectRoot = path.resolve(tauriConfigDir, '..');
 const frontendDir =
   process.env.LAYERCAKE_FRONTEND_DIR || path.resolve(projectRoot, 'frontend');
 
