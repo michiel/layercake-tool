@@ -8,9 +8,39 @@ Agentic AI with tooling exposed via Model Context Protocol for agentic collabora
 
 Building this as a distributed and collaborative graph editing platform is a later goal and not a priority for version 1.0.0
 
+## Data model relationships between entities
+
+### Project
+
+One project has one,
+ - PlanDAG
+
+One project has many,
+ - Datasource
+ - LayercakeGraph
+
+### PlanDAG
+
+One PlanDAG has many,
+ - PlanNode
+ - PlanEdge
+
+### LayercakeGraph
+
+One LayercakeGraph has many,
+ - LcEdge
+ - LcNode
+ - LcLayer
+ - LcGraphEdit
+
+## Details
+
 ### Layercake plans and graphs
 
  - All aspected of the layercake process from ingestion to transformation to renderings are stored as a DAG. This is the layercake plan. If an upstream node (e.g. representing ingestion of a CSV as a nodeset) changes, all downstream nodes are updated
+ - Each Project has DataSources. DataSources are tables belonging to a project that are a raw import of their source (attr: blob), and contain a graph_json attribute that imports the raw attributes to the appropriate graph_json={{nodes:[], edges:[], layers:[]}} attributes
+ - DataSources can be referenced as a node in the PlanDAG, and can be used as source nodes for an edge with a target node GraphNode. GraphNodes can have multiple DataSourceNodes
+ - DataSources have their own data management page(s) for CRUD operations under a Project
  - Graph data can be imported from CSVs (the existing layercake source format), REST endpoints, SQL querie (react component name : PlanVisualEditor)
  - The layercake plan (PlanDAG) can be edited (visually using react-flow / xflow, component name PlanVisualEditor), with the inputs, graph hierarchy and exports of different graphs in the hierarchy all represented and editable from the same interface
  - Graphs (or more specifically LayercakeGraphs) can be edited using the spreadsheet editor component that has three tabs for nodes, edges, layers (react component name : GraphSpreadsheetEditor) OR using another instance of react-flow / xflow for graph editing (react component name : GraphVisualEditor)
@@ -18,6 +48,7 @@ Building this as a distributed and collaborative graph editing platform is a lat
  - Each Project has a Plan DAG. The Plan DAG is a JSON object that is an attribute of the Project table
  - Plans contains graph metadata and the relationships between graph copies. Plans do not contain actual graph data (e.g. nodes, edges), graph data is in the Graph table. Plan DAG steps can be (but are not limited to) nodes that are InputNode (from file, etc), MergeNode (from InputNode and/or GraphNode, output GraphNode), CopyNode (from GraphNode, output GraphNode), OutputNode (from GraphNode, output OutputNode (render target)), GraphNode (which are references and metadata for a graph instance), TransformNode (from graph, output graph) that contain the existing graph transformation options in the current YAML. The Plan DAG is generally editing in PlanVisualEditor, with popup items to edit node attributes (example: InputNode editor will have a selectable type for File that allows for selecting file location and data type (nodes, layers, edges)) and node metadata (example: node label)
  - A key function is that edits to graphs (via GraphVisualEditor or GraphSpreadsheetEditor) are tracked and reproducible, so re-applying inputs and re-running the DAG, will re-run the edits (if they are still applicable, removing them from tracking otherwise)
+ - LcGraph entities have many LcGraphEdit entities called GraphEdits. Each GraphEdit describes a change operation made to a node/layer/edge of a Graph instance. So if a node is renamed, this is a GraphEdit. If a layer is added, this is a GraphEdit, if an edge is removed this is a GraphEdit, etc. When an upstream source is updated or a graphnode is regenerated directly, the ordered list of GraphEdits is replayed and applied to the updated GraphData. GraphEdits are keyed to type(node/edge/layer) and id. If an edit has no match in the updated dataset, the edit is discarded.  the goal is to allow a user to edit a graph instance (via different frontend graph editors) and not lose the changes if the upstream data refreshes 
 
 ```yaml
 plan:
@@ -98,12 +129,66 @@ plan:
  - The code consistently logs using tracing at TRACING, DEBUG, INFO, WARN and ERROR, with the default level being INFO. This can be overridden via config, command line flags or then RUST_LOG environment variable, with different log levels configurable on a crate/module basis if necessary
  - The web interface will communicate with the backend via GraphQL
  - Layercake plan files can be represented as a YAML file. The Layercake binary will have a command for running the plan, similar to the current implementation ()
-
+NC
 ### Testing
 
  - All functionality must have test coverage
 
 ## Requirements
+
+### Presence
+
+ - All user presence is tracked and shared on a per-project basis. cursor position is tracked on a per-project-per-document basis. position can be different depending on the document, example: current implementation tracks position data on canvas, it should also be able to track position in (for example) spreadsheet coordinates, or in a 3d rendering of a VR journey
+ - User presence like cursor information is ephemeral data and is communicated between the client and server using a direct, raw websocket connection and NOT via GraphQL mutations
+ - On the frontend, user presence shown on a per-project basis in the top bar (icon with the number of active users, click on icon to list active users by name in a Mantine Hover Card)
+ - On the frontend, user presence shown on a per-project-per-document basis by the active user cursor positioning (e.g. presence cursors on the canvas in Plan DAG Editor)
+
+### Frontend
+
+#### Top bar
+
+ - Items on the top bar,
+  * (left) Top left the Layercake icon and title
+  * (right) Icon for light/dark theme switching
+  * (right) Icon for online/offline status indication (no text, red/green icon only)
+  * (right) Account name + avator, onclick dropdown menu with links to Settings, Profile
+
+#### DAG Plan Editor
+
+ - The DAG plan editor has the following nodes
+   * DataSourceNode - this references an *existing* DataSource entity of the Project
+   * GraphNode - this *creates and manages* a Graph entity of the Project
+   * TransformNode - changes a Graph. Input is a GraphNode, output is a GraphNode. The configuration for the TransformNode is a list of rules that are applied in order (example: invert_graph, max_partition_width:2, max_partition_depth:3, node_label_max_length:4, edge_label_max_length:4)
+   * MergeNode - merges DataSourceNodes and/or GraphNodes. The output is a new GraphNode. The configuration for MergeNode are the merge rules (default: overwrite existing nodes/edges/layers with same ID)
+   * OutputNode - this triggers a specific export or visualisation (example: GraphvizDOT, CSV), input is a GraphNode
+ - The DAG Plan editor has a toolbar on the top. This toolbar has draggable icons for each of the node types that can be dropped on the canvas as unconfigured nodes. Unconfigured nodes are highlighted in orange. Clicking the cog icon on an uncofigured node opens the configuration dialog, which is different for each node. A DataSource node allows you to select an existing DataSource. A TransformNode allows you to create a list of rules, each of which has their own configuration
+ - Nodes in the DAG Plan Editor have connectors on all 4 sides. The left and top are INPUT connectors and will only connect FROM nodes that output the correct type. the right and bottom are OUTPUT connectors and will connect TO nodes that input the correct type. Visually input and output connectors are distinct. After connecting an edge to or from a top/left/bottom/right connector, that connection has to stay consistent (NOT connect to top and render as connect to left. if visually connected to top, the render has to be top as well, etc)
+ - The Plan DAG can have nodes in either CONFIGURED or UNCONFIGURED state
+ - Node must meet all their requirements (including node-specific configuration that passes validation, if applicable) to be in configured state, otherwise they are in unconfigured state
+ - Nodes that are not in CONFIGURED state have an orange outline
+ - Node connection rules :
+   * GraphNodes can have multiple inputs (of GraphNode type) but MUST have at least one to be in configured state
+   * GraphNodes can have multiple outputs (of GraphNode type)
+   * DataSourceNodes can have multiple outputs (of GraphNode type), but cannot connect to the same target twice, and MUST have at least one output connected to be in configured state
+   * TransformNodes can have only one input (GraphNode type) and multiple outputs (GraphNode type), but cannot connect to the same target twice, and MUST have one input and one output to be in configured state
+   * OutputNodes can have only one input (of GraphNode type) and MUST have one input to be in configured state
+   * These node connection rules also serve as part of Plan DAG validation on the backend
+ - Edges can be selected and then deleted OR changed OR disconnected and reconnected
+ - The raw websocket is used for bidirectional, ephemeral presence and cursor data. graphql is used for data queries and mutations. keep these separate, and review the current state on frontend and backend to ensure they are separate. a data mutation performed by the client should not result in a subsequent render update based on a subscription update for that specific mutation, as it was initiated by the same client (other clients on that subscriptions SHOULD receive and respond to the update)
+
+
+#### LayercakeGraph Editor
+
+ - The LayercakeGraphEditor is based on the same library as the DAG Plan Editor component xyflow / react-flow
+ - The LayercakeGraphEditor takes a LcGraph object and renders it
+ - The edges have an arrow for direction (source to target)
+ - The belongs_to relationships are the (nested) groupings for which the component uses sub flows (https://reactflow.dev/examples/grouping/sub-flows )
+ - The layout of the graph is performed dynamically on first render, there is sufficient spacing between the nodes for readability and the top to bottom preference is used for layout
+ - The there is a panel on the right side. This panel has a vertical accordion element from mantine.
+     - The first panel has a dynamic, editable form containing the properties of the node (node or partition node/subgraph) that has been selected via click. The form has the node attributes (label:string, layer:dropdown of layers + 'None' option). Changes made here will be persisted after focus is lost and reflected in the graph editor
+     - The second panel is a placeholder 
+
+
 
 ### Artefacts
 
@@ -188,73 +273,4 @@ plan:
  - Graph rendering performance: 60fps for graphs up to 1000 nodes
  - React component optimization with memo and useMemo for large graphs
  - Virtual scrolling for large node/edge lists in spreadsheet view
-
-## Advanced Features and Extensions
-
-### Enhanced Real-time Collaboration
- - Presence indicators showing active users and their cursor positions
- - Collaborative cursors in visual editors (PlanVisualEditor, GraphVisualEditor)
- - Real-time typing indicators in text fields
- - Conflict-free collaborative editing using operational transform
- - Undo/redo functionality that works across collaborative sessions
-
-### Data Import and Integration
- - Support for additional data sources: JSON, XML, SQL databases, REST APIs
- - Scheduled data imports with change detection
- - Data validation and transformation pipelines
- - Import preview and rollback functionality
- - Bulk import operations with progress tracking
-
-### Advanced Visualization
- - 3D graph visualization using three.js and 3d-force-graph
- - Isoflow diagram generation for system architecture views
- - Custom layout algorithms for different graph types
- - Interactive filtering and search within visualizations
- - Export visualizations as SVG, PNG, PDF formats
-
-### Developer Experience
- - Hot reload for development environments
- - Comprehensive logging with structured output (JSON) for production
- - Metrics collection for performance monitoring
- - Error tracking and crash reporting
- - API documentation auto-generation from GraphQL schema
-
-## Security Requirements
-
-### Data Protection
- - Encryption at rest for sensitive graph data
- - Encryption in transit for all API communications (TLS 1.3)
- - Input validation and sanitization for all user inputs
- - Protection against GraphQL query complexity attacks
- - Rate limiting for API endpoints
-
-### Access Control
- - Multi-factor authentication support
- - Session timeout and concurrent session limits
- - Audit logging for all data modifications
- - IP allowlisting for enterprise deployments
- - Data export restrictions based on user roles
-
-## Deployment and Operations
-
-### Container Support
- - Docker containerization with multi-stage builds
- - Kubernetes deployment manifests
- - Environment-specific configuration management
- - Health check endpoints for load balancers
- - Graceful shutdown handling
-
-### Monitoring and Observability
- - Prometheus metrics export
- - Distributed tracing with OpenTelemetry
- - Structured logging compatible with ELK stack
- - Application performance monitoring (APM) integration
- - Database query performance monitoring
-
-### Backup and Recovery
- - Automated database backups with retention policies
- - Point-in-time recovery capabilities
- - Disaster recovery procedures documentation
- - Data migration tools between different storage backends
- - Configuration backup and restore functionality
 

@@ -1,0 +1,2411 @@
+pub mod plan_dag_delta;
+
+use async_graphql::*;
+use sea_orm::{ActiveModelTrait, EntityTrait, Set, ColumnTrait, QueryFilter};
+use chrono::Utc;
+
+use crate::database::entities::{projects, plans, plan_dag_nodes, plan_dag_edges, users, user_sessions, project_collaborators};
+use crate::graphql::context::GraphQLContext;
+use crate::services::auth_service::AuthService;
+
+use crate::services::graph_service::GraphService;
+use crate::services::graph_edit_service::GraphEditService;
+use crate::services::data_source_service::DataSourceService;
+use crate::services::export_service::ExportService;
+use crate::pipeline::DagExecutor;
+
+use crate::graphql::types::project::{Project, CreateProjectInput, UpdateProjectInput};
+use crate::graphql::types::plan::{Plan, CreatePlanInput, UpdatePlanInput};
+use crate::graphql::types::plan_dag::{PlanDag, PlanDagNode, PlanDagEdge, PlanDagInput, PlanDagNodeInput, PlanDagEdgeInput, PlanDagNodeUpdateInput, PlanDagEdgeUpdateInput, Position, NodePositionInput};
+use crate::graphql::types::{User, ProjectCollaborator, RegisterUserInput, LoginInput, UpdateUserInput, LoginResponse, RegisterResponse, InviteCollaboratorInput, UpdateCollaboratorRoleInput, DataSource, CreateDataSourceInput, UpdateDataSourceInput, BulkUploadDataSourceInput};
+use crate::graphql::types::graph::{Graph, CreateGraphInput, UpdateGraphInput, CreateLayerInput};
+use crate::graphql::types::graph_edit::{GraphEdit, CreateGraphEditInput, ReplaySummary, EditResult};
+
+pub struct Mutation;
+
+#[Object]
+impl Mutation {
+    /// Create a new project
+    async fn create_project(&self, ctx: &Context<'_>, input: CreateProjectInput) -> Result<Project> {
+        let context = ctx.data::<GraphQLContext>()?;
+        
+        let mut project = projects::ActiveModel::new();
+        project.name = Set(input.name);
+        project.description = Set(input.description);
+
+        let project = project.insert(&context.db).await?;
+        Ok(Project::from(project))
+    }
+
+    /// Update an existing project
+    async fn update_project(&self, ctx: &Context<'_>, id: i32, input: UpdateProjectInput) -> Result<Project> {
+        let context = ctx.data::<GraphQLContext>()?;
+        
+        let project = projects::Entity::find_by_id(id)
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Project not found"))?;
+
+        let mut project: projects::ActiveModel = project.into();
+        project.name = Set(input.name);
+        project.description = Set(input.description);
+
+        let project = project.update(&context.db).await?;
+        Ok(Project::from(project))
+    }
+
+    /// Delete a project
+    async fn delete_project(&self, ctx: &Context<'_>, id: i32) -> Result<bool> {
+        let context = ctx.data::<GraphQLContext>()?;
+        
+        let project = projects::Entity::find_by_id(id)
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Project not found"))?;
+
+        projects::Entity::delete_by_id(project.id)
+            .exec(&context.db)
+            .await?;
+
+        Ok(true)
+    }
+
+    /// Create a new plan
+    async fn create_plan(&self, ctx: &Context<'_>, input: CreatePlanInput) -> Result<Plan> {
+        let context = ctx.data::<GraphQLContext>()?;
+        
+        let dependencies_json = input.dependencies
+            .map(|deps| serde_json::to_string(&deps))
+            .transpose()?;
+        
+        let plan = plans::ActiveModel {
+            project_id: Set(input.project_id),
+            name: Set(input.name),
+            yaml_content: Set(input.yaml_content),
+            dependencies: Set(dependencies_json),
+            status: Set("pending".to_string()),
+            ..Default::default()
+        };
+
+        let plan = plan.insert(&context.db).await?;
+        Ok(Plan::from(plan))
+    }
+
+    /// Update an existing plan
+    async fn update_plan(&self, ctx: &Context<'_>, id: i32, input: UpdatePlanInput) -> Result<Plan> {
+        let context = ctx.data::<GraphQLContext>()?;
+        
+        let plan = plans::Entity::find_by_id(id)
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Plan not found"))?;
+
+        let dependencies_json = input.dependencies
+            .map(|deps| serde_json::to_string(&deps))
+            .transpose()?;
+
+        let mut plan: plans::ActiveModel = plan.into();
+        plan.name = Set(input.name);
+        plan.yaml_content = Set(input.yaml_content);
+        plan.dependencies = Set(dependencies_json);
+
+        let plan = plan.update(&context.db).await?;
+        Ok(Plan::from(plan))
+    }
+
+    /// Delete a plan
+    async fn delete_plan(&self, ctx: &Context<'_>, id: i32) -> Result<bool> {
+        let context = ctx.data::<GraphQLContext>()?;
+        
+        let plan = plans::Entity::find_by_id(id)
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Plan not found"))?;
+
+        plans::Entity::delete_by_id(plan.id)
+            .exec(&context.db)
+            .await?;
+
+        Ok(true)
+    }
+
+    /// Execute a plan
+    async fn execute_plan(&self, ctx: &Context<'_>, id: i32) -> Result<PlanExecutionResult> {
+        let context = ctx.data::<GraphQLContext>()?;
+        
+        let _plan = plans::Entity::find_by_id(id)
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Plan not found"))?;
+
+        // TODO: Implement plan execution using existing export service
+        // For now, return a success result
+        Ok(PlanExecutionResult {
+            success: true,
+            message: "Plan execution not yet implemented".to_string(),
+            output_files: vec![],
+        })
+    }
+
+    /// Update a complete Plan DAG
+    ///
+    /// **DEPRECATED**: This bulk replace operation conflicts with delta-based updates.
+    /// Use individual node/edge mutations instead for better real-time collaboration.
+    /// See PLAN.md Phase 2 for migration strategy.
+    async fn update_plan_dag(&self, ctx: &Context<'_>, project_id: i32, plan_dag: PlanDagInput) -> Result<Option<PlanDag>> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        // Verify project exists
+        let _project = projects::Entity::find_by_id(project_id)
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Project not found"))?;
+
+        // Clear existing Plan DAG nodes and edges for this project
+        plan_dag_nodes::Entity::delete_many()
+            .filter(plan_dag_nodes::Column::PlanId.eq(project_id))
+            .exec(&context.db)
+            .await?;
+
+        plan_dag_edges::Entity::delete_many()
+            .filter(plan_dag_edges::Column::PlanId.eq(project_id))
+            .exec(&context.db)
+            .await?;
+
+        // Insert new Plan DAG nodes
+        for node in &plan_dag.nodes {
+            let node_type_str = match node.node_type {
+                crate::graphql::types::PlanDagNodeType::DataSource => "DataSourceNode",
+                crate::graphql::types::PlanDagNodeType::Graph => "GraphNode",
+                crate::graphql::types::PlanDagNodeType::Transform => "TransformNode",
+                crate::graphql::types::PlanDagNodeType::Merge => "MergeNode",
+                crate::graphql::types::PlanDagNodeType::Copy => "CopyNode",
+                crate::graphql::types::PlanDagNodeType::Output => "OutputNode",
+            };
+
+            let metadata_json = serde_json::to_string(&node.metadata)?;
+
+            let dag_node = plan_dag_nodes::ActiveModel {
+                id: Set(node.id.clone()),
+                plan_id: Set(project_id), // Use project_id directly
+                node_type: Set(node_type_str.to_string()),
+                position_x: Set(node.position.x),
+                position_y: Set(node.position.y),
+                source_position: Set(None),
+                target_position: Set(None),
+                metadata_json: Set(metadata_json),
+                config_json: Set(node.config.clone()),
+                created_at: Set(Utc::now()),
+                updated_at: Set(Utc::now()),
+            };
+
+            dag_node.insert(&context.db).await?;
+        }
+
+        // Insert new Plan DAG edges
+        for edge in &plan_dag.edges {
+            let metadata_json = serde_json::to_string(&edge.metadata)?;
+
+            let dag_edge = plan_dag_edges::ActiveModel {
+                id: Set(edge.id.clone()),
+                plan_id: Set(project_id), // Use project_id directly
+                source_node_id: Set(edge.source.clone()),
+                target_node_id: Set(edge.target.clone()),
+                source_handle: Set(edge.source_handle.clone()),
+                target_handle: Set(edge.target_handle.clone()),
+                metadata_json: Set(metadata_json),
+                created_at: Set(Utc::now()),
+                updated_at: Set(Utc::now()),
+            };
+
+            dag_edge.insert(&context.db).await?;
+        }
+
+        // Return the updated Plan DAG
+        let dag_nodes = plan_dag_nodes::Entity::find()
+            .filter(plan_dag_nodes::Column::PlanId.eq(project_id))
+            .all(&context.db)
+            .await?;
+
+        let dag_edges = plan_dag_edges::Entity::find()
+            .filter(plan_dag_edges::Column::PlanId.eq(project_id))
+            .all(&context.db)
+            .await?;
+
+        let nodes: Vec<PlanDagNode> = dag_nodes.into_iter().map(PlanDagNode::from).collect();
+        let edges: Vec<PlanDagEdge> = dag_edges.into_iter().map(PlanDagEdge::from).collect();
+
+        Ok(Some(PlanDag {
+            version: plan_dag.version,
+            nodes,
+            edges,
+            metadata: plan_dag.metadata,
+        }))
+    }
+
+    /// Add a single Plan DAG node
+    async fn add_plan_dag_node(&self, ctx: &Context<'_>, project_id: i32, node: PlanDagNodeInput) -> Result<Option<PlanDagNode>> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        // Verify project exists
+        let _project = projects::Entity::find_by_id(project_id)
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Project not found"))?;
+
+        // Find or create a plan for this project
+        let plan = match plans::Entity::find()
+            .filter(plans::Column::ProjectId.eq(project_id))
+            .one(&context.db)
+            .await? {
+            Some(plan) => plan,
+            None => {
+                // Auto-create a plan if one doesn't exist
+                let now = chrono::Utc::now();
+                let new_plan = plans::ActiveModel {
+                    id: sea_orm::ActiveValue::NotSet,
+                    project_id: Set(project_id),
+                    name: Set(format!("Plan for Project {}", project_id)),
+                    yaml_content: Set("".to_string()),
+                    dependencies: Set(None),
+                    status: Set("draft".to_string()),
+                    version: Set(1),
+                    created_at: Set(now),
+                    updated_at: Set(now),
+                };
+                new_plan.insert(&context.db).await?
+            }
+        };
+
+        // Fetch current state to determine node index
+        let (current_nodes, _) = plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
+        let node_index = current_nodes.len();
+
+        let node_type_str = match node.node_type {
+            crate::graphql::types::PlanDagNodeType::DataSource => "DataSourceNode",
+            crate::graphql::types::PlanDagNodeType::Graph => "GraphNode",
+            crate::graphql::types::PlanDagNodeType::Transform => "TransformNode",
+            crate::graphql::types::PlanDagNodeType::Merge => "MergeNode",
+            crate::graphql::types::PlanDagNodeType::Copy => "CopyNode",
+            crate::graphql::types::PlanDagNodeType::Output => "OutputNode",
+        };
+
+        let metadata_json = serde_json::to_string(&node.metadata)?;
+
+        let dag_node = plan_dag_nodes::ActiveModel {
+            id: Set(node.id.clone()),
+            plan_id: Set(plan.id), // Use the actual plan ID instead of project ID
+            node_type: Set(node_type_str.to_string()),
+            position_x: Set(node.position.x),
+            position_y: Set(node.position.y),
+            source_position: Set(None),
+            target_position: Set(None),
+            metadata_json: Set(metadata_json),
+            config_json: Set(node.config.clone()),
+            created_at: Set(Utc::now()),
+            updated_at: Set(Utc::now()),
+        };
+
+        let inserted_node = dag_node.insert(&context.db).await?;
+        let result_node = PlanDagNode::from(inserted_node.clone());
+
+        // Generate JSON Patch delta for node addition
+        let patch_op = plan_dag_delta::generate_node_add_patch(&result_node, node_index);
+
+        // Increment plan version
+        let new_version = plan_dag_delta::increment_plan_version(&context.db, plan.id).await?;
+
+        // Broadcast delta event
+        let user_id = "demo_user".to_string(); // TODO: Get from auth context
+        plan_dag_delta::publish_plan_dag_delta(
+            project_id,
+            new_version,
+            user_id,
+            vec![patch_op],
+        ).await.ok(); // Non-fatal if broadcast fails
+
+        // TODO: Trigger pipeline execution if node is configured
+        // Will be implemented after Phase 2 completion
+        // if should_execute_node(&inserted_node) {
+        //     trigger_async_execution(context.db.clone(), project_id, result_node.id.clone());
+        // }
+
+        Ok(Some(result_node))
+    }
+
+    /// Update a Plan DAG node
+    async fn update_plan_dag_node(&self, ctx: &Context<'_>, project_id: i32, node_id: String, updates: PlanDagNodeUpdateInput) -> Result<Option<PlanDagNode>> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        // Find or create a plan for this project
+        let plan = match plans::Entity::find()
+            .filter(plans::Column::ProjectId.eq(project_id))
+            .one(&context.db)
+            .await? {
+            Some(plan) => plan,
+            None => {
+                // Auto-create a plan if one doesn't exist
+                let now = chrono::Utc::now();
+                let new_plan = plans::ActiveModel {
+                    id: sea_orm::ActiveValue::NotSet,
+                    project_id: Set(project_id),
+                    name: Set(format!("Plan for Project {}", project_id)),
+                    yaml_content: Set("".to_string()),
+                    dependencies: Set(None),
+                    status: Set("draft".to_string()),
+                    version: Set(1),
+                    created_at: Set(now),
+                    updated_at: Set(now),
+                };
+                new_plan.insert(&context.db).await?
+            }
+        };
+
+        // Fetch current state for delta generation
+        let (current_nodes, _) = plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
+
+        // Find the node
+        let node = plan_dag_nodes::Entity::find()
+            .filter(
+                plan_dag_nodes::Column::PlanId.eq(plan.id)
+                    .and(plan_dag_nodes::Column::Id.eq(&node_id))
+            )
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Node not found"))?;
+
+        let mut node_active: plan_dag_nodes::ActiveModel = node.into();
+        let mut patch_ops = Vec::new();
+        let _config_updated = false;
+
+        // Update position if provided
+        if let Some(position) = updates.position {
+            node_active.position_x = Set(position.x);
+            node_active.position_y = Set(position.y);
+
+            // Generate position delta
+            patch_ops.extend(plan_dag_delta::generate_node_position_patch(
+                &node_id,
+                position.x,
+                position.y,
+                &current_nodes,
+            ));
+        }
+
+        // Update metadata if provided
+        if let Some(metadata) = updates.metadata {
+            let metadata_json_str = serde_json::to_string(&metadata)?;
+            node_active.metadata_json = Set(metadata_json_str.clone());
+
+            // Generate metadata delta
+            if let Some(patch) = plan_dag_delta::generate_node_update_patch(
+                &node_id,
+                "metadata",
+                serde_json::from_str(&metadata_json_str).unwrap_or(serde_json::Value::Null),
+                &current_nodes,
+            ) {
+                patch_ops.push(patch);
+            }
+        }
+
+        // Update config if provided
+        if let Some(config) = updates.config {
+            // config_updated = true;
+            node_active.config_json = Set(config.clone());
+
+            // Generate config delta
+            if let Some(patch) = plan_dag_delta::generate_node_update_patch(
+                &node_id,
+                "config",
+                serde_json::from_str(&config).unwrap_or(serde_json::Value::Null),
+                &current_nodes,
+            ) {
+                patch_ops.push(patch);
+            }
+        }
+
+        node_active.updated_at = Set(Utc::now());
+        let updated_node = node_active.update(&context.db).await?;
+        let result_node = PlanDagNode::from(updated_node.clone());
+
+        // Increment plan version and broadcast delta
+        if !patch_ops.is_empty() {
+            let new_version = plan_dag_delta::increment_plan_version(&context.db, plan.id).await?;
+            let user_id = "demo_user".to_string(); // TODO: Get from auth context
+            plan_dag_delta::publish_plan_dag_delta(
+                project_id,
+                new_version,
+                user_id,
+                patch_ops,
+            ).await.ok(); // Non-fatal if broadcast fails
+        }
+
+        // TODO: Trigger pipeline re-execution if config was updated
+        // if config_updated && should_execute_node(&updated_node) {
+        //     trigger_async_execution(context.db.clone(), project_id, result_node.id.clone());
+        // }
+
+        Ok(Some(result_node))
+    }
+
+    /// Delete a Plan DAG node
+    async fn delete_plan_dag_node(&self, ctx: &Context<'_>, project_id: i32, node_id: String) -> Result<Option<PlanDagNode>> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        // Find the plan for this project
+        let plan = plans::Entity::find()
+            .filter(plans::Column::ProjectId.eq(project_id))
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Plan not found for project"))?;
+
+        // Fetch current state for delta generation
+        let (current_nodes, current_edges) = plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
+
+        // Generate delta for node deletion
+        let mut patch_ops = Vec::new();
+        if let Some(patch) = plan_dag_delta::generate_node_delete_patch(&node_id, &current_nodes) {
+            patch_ops.push(patch);
+        }
+
+        // Find and delete connected edges, generating deltas for each
+        let connected_edges: Vec<&PlanDagEdge> = current_edges.iter()
+            .filter(|e| e.source == node_id || e.target == node_id)
+            .collect();
+
+        for edge in &connected_edges {
+            if let Some(patch) = plan_dag_delta::generate_edge_delete_patch(&edge.id, &current_edges) {
+                patch_ops.push(patch);
+            }
+        }
+
+        // Delete edges connected to this node first
+        plan_dag_edges::Entity::delete_many()
+            .filter(
+                plan_dag_edges::Column::PlanId.eq(plan.id)
+                    .and(
+                        plan_dag_edges::Column::SourceNodeId.eq(&node_id)
+                            .or(plan_dag_edges::Column::TargetNodeId.eq(&node_id))
+                    )
+            )
+            .exec(&context.db)
+            .await?;
+
+        // Delete the node
+        let result = plan_dag_nodes::Entity::delete_many()
+            .filter(
+                plan_dag_nodes::Column::PlanId.eq(plan.id)
+                    .and(plan_dag_nodes::Column::Id.eq(&node_id))
+            )
+            .exec(&context.db)
+            .await?;
+
+        if result.rows_affected > 0 {
+            // Increment plan version and broadcast delta
+            if !patch_ops.is_empty() {
+                let new_version = plan_dag_delta::increment_plan_version(&context.db, plan.id).await?;
+                let user_id = "demo_user".to_string(); // TODO: Get from auth context
+                plan_dag_delta::publish_plan_dag_delta(
+                    project_id,
+                    new_version,
+                    user_id,
+                    patch_ops,
+                ).await.ok(); // Non-fatal if broadcast fails
+            }
+
+            Ok(None)
+        } else {
+            Err(Error::new("Node not found"))
+        }
+    }
+
+    /// Add a Plan DAG edge
+    async fn add_plan_dag_edge(&self, ctx: &Context<'_>, project_id: i32, edge: PlanDagEdgeInput) -> Result<Option<PlanDagEdge>> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        // Find or create a plan for this project
+        let plan = match plans::Entity::find()
+            .filter(plans::Column::ProjectId.eq(project_id))
+            .one(&context.db)
+            .await? {
+            Some(plan) => plan,
+            None => {
+                // Auto-create a plan if one doesn't exist
+                let now = chrono::Utc::now();
+                let new_plan = plans::ActiveModel {
+                    id: sea_orm::ActiveValue::NotSet,
+                    project_id: Set(project_id),
+                    name: Set(format!("Plan for Project {}", project_id)),
+                    yaml_content: Set("".to_string()),
+                    dependencies: Set(None),
+                    status: Set("draft".to_string()),
+                    version: Set(1),
+                    created_at: Set(now),
+                    updated_at: Set(now),
+                };
+                new_plan.insert(&context.db).await?
+            }
+        };
+
+        // Fetch current state to determine edge index
+        let (_, current_edges) = plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
+        let edge_index = current_edges.len();
+
+        let metadata_json = serde_json::to_string(&edge.metadata)?;
+
+        let dag_edge = plan_dag_edges::ActiveModel {
+            id: Set(edge.id.clone()),
+            plan_id: Set(plan.id),
+            source_node_id: Set(edge.source.clone()),
+            target_node_id: Set(edge.target.clone()),
+            source_handle: Set(edge.source_handle.clone()),
+            target_handle: Set(edge.target_handle.clone()),
+            metadata_json: Set(metadata_json),
+            created_at: Set(Utc::now()),
+            updated_at: Set(Utc::now()),
+        };
+
+        let inserted_edge = dag_edge.insert(&context.db).await?;
+        let result_edge = PlanDagEdge::from(inserted_edge);
+
+        // Generate JSON Patch delta for edge addition
+        let patch_op = plan_dag_delta::generate_edge_add_patch(&result_edge, edge_index);
+
+        // Increment plan version
+        let new_version = plan_dag_delta::increment_plan_version(&context.db, plan.id).await?;
+
+        // Broadcast delta event
+        let user_id = "demo_user".to_string(); // TODO: Get from auth context
+        plan_dag_delta::publish_plan_dag_delta(
+            project_id,
+            new_version,
+            user_id,
+            vec![patch_op],
+        ).await.ok(); // Non-fatal if broadcast fails
+
+        // TODO: Trigger pipeline execution for affected nodes (target and downstream)
+        // The target node needs to be recomputed because it has a new upstream dependency
+        // trigger_async_affected_execution(context.db.clone(), project_id, result_edge.target.clone());
+
+        Ok(Some(result_edge))
+    }
+
+    /// Delete a Plan DAG edge
+    async fn delete_plan_dag_edge(&self, ctx: &Context<'_>, project_id: i32, edge_id: String) -> Result<Option<PlanDagEdge>> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        // Find the plan for this project
+        let plan = plans::Entity::find()
+            .filter(plans::Column::ProjectId.eq(project_id))
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Plan not found for project"))?;
+
+        // Fetch current state for delta generation
+        let (_, current_edges) = plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
+
+        // Find the edge to get its target node before deletion
+        let _deleted_edge_target = current_edges
+            .iter()
+            .find(|e| e.id == edge_id)
+            .map(|e| e.target.clone());
+
+        // Generate delta for edge deletion
+        let mut patch_ops = Vec::new();
+        if let Some(patch) = plan_dag_delta::generate_edge_delete_patch(&edge_id, &current_edges) {
+            patch_ops.push(patch);
+        }
+
+        // Delete the edge
+        let result = plan_dag_edges::Entity::delete_many()
+            .filter(
+                plan_dag_edges::Column::PlanId.eq(plan.id)
+                    .and(plan_dag_edges::Column::Id.eq(&edge_id))
+            )
+            .exec(&context.db)
+            .await?;
+
+        if result.rows_affected > 0 {
+            // Increment plan version and broadcast delta
+            if !patch_ops.is_empty() {
+                let new_version = plan_dag_delta::increment_plan_version(&context.db, plan.id).await?;
+                let user_id = "demo_user".to_string(); // TODO: Get from auth context
+                plan_dag_delta::publish_plan_dag_delta(
+                    project_id,
+                    new_version,
+                    user_id,
+                    patch_ops,
+                ).await.ok(); // Non-fatal if broadcast fails
+            }
+
+            // TODO: Trigger pipeline re-execution for affected nodes (target and downstream)
+            // The target node needs to be recomputed because it lost an upstream dependency
+            // if let Some(target_node_id) = deleted_edge_target {
+            //     trigger_async_affected_execution(context.db.clone(), project_id, target_node_id);
+            // }
+
+            Ok(None)
+        } else {
+            Err(Error::new("Edge not found"))
+        }
+    }
+
+    /// Update a Plan DAG edge
+    async fn update_plan_dag_edge(
+        &self,
+        ctx: &Context<'_>,
+        project_id: i32,
+        edge_id: String,
+        updates: PlanDagEdgeUpdateInput
+    ) -> Result<Option<PlanDagEdge>> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        // Find the plan for this project
+        let plan = plans::Entity::find()
+            .filter(plans::Column::ProjectId.eq(project_id))
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Plan not found for project"))?;
+
+        // Find the edge
+        let edge = plan_dag_edges::Entity::find()
+            .filter(
+                plan_dag_edges::Column::PlanId.eq(plan.id)
+                    .and(plan_dag_edges::Column::Id.eq(&edge_id))
+            )
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Edge not found"))?;
+
+        let mut edge_active: plan_dag_edges::ActiveModel = edge.into();
+
+        // Update source_handle if provided
+        if let Some(source_handle) = updates.source_handle {
+            edge_active.source_handle = Set(Some(source_handle));
+        }
+
+        // Update target_handle if provided
+        if let Some(target_handle) = updates.target_handle {
+            edge_active.target_handle = Set(Some(target_handle));
+        }
+
+        // Update metadata if provided
+        if let Some(metadata) = updates.metadata {
+            let metadata_json = serde_json::to_string(&metadata)?;
+            edge_active.metadata_json = Set(metadata_json);
+        }
+
+        edge_active.updated_at = Set(Utc::now());
+        let updated_edge = edge_active.update(&context.db).await?;
+
+        Ok(Some(PlanDagEdge::from(updated_edge)))
+    }
+
+    /// Move a Plan DAG node (update position)
+    async fn move_plan_dag_node(&self, ctx: &Context<'_>, project_id: i32, node_id: String, position: Position) -> Result<Option<PlanDagNode>> {
+        let updates = PlanDagNodeUpdateInput {
+            position: Some(position),
+            metadata: None,
+            config: None,
+        };
+
+        self.update_plan_dag_node(ctx, project_id, node_id, updates).await
+    }
+
+    /// Batch move multiple nodes at once (optimized for layout operations)
+    async fn batch_move_plan_dag_nodes(
+        &self,
+        ctx: &Context<'_>,
+        project_id: i32,
+        node_positions: Vec<NodePositionInput>
+    ) -> Result<Vec<PlanDagNode>> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        // Find or create a plan for this project
+        let plan = match plans::Entity::find()
+            .filter(plans::Column::ProjectId.eq(project_id))
+            .one(&context.db)
+            .await? {
+            Some(plan) => plan,
+            None => {
+                let now = chrono::Utc::now();
+                let new_plan = plans::ActiveModel {
+                    id: sea_orm::ActiveValue::NotSet,
+                    project_id: Set(project_id),
+                    name: Set(format!("Plan for Project {}", project_id)),
+                    yaml_content: Set("".to_string()),
+                    dependencies: Set(None),
+                    status: Set("draft".to_string()),
+                    version: Set(1),
+                    created_at: Set(now),
+                    updated_at: Set(now),
+                };
+                new_plan.insert(&context.db).await?
+            }
+        };
+
+        // Fetch current state once for all nodes
+        let (current_nodes, _) = plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
+
+        let mut updated_nodes = Vec::new();
+        let mut all_patch_ops = Vec::new();
+
+        // Update all nodes
+        for node_pos in node_positions {
+            // Find the node
+            let node = plan_dag_nodes::Entity::find()
+                .filter(
+                    plan_dag_nodes::Column::PlanId.eq(plan.id)
+                        .and(plan_dag_nodes::Column::Id.eq(&node_pos.node_id))
+                )
+                .one(&context.db)
+                .await?;
+
+            if let Some(node) = node {
+                let mut node_active: plan_dag_nodes::ActiveModel = node.clone().into();
+
+                // Update position
+                node_active.position_x = Set(node_pos.position.x);
+                node_active.position_y = Set(node_pos.position.y);
+                if let Some(source_pos) = node_pos.source_position.clone() {
+                    node_active.source_position = Set(Some(source_pos));
+                }
+                if let Some(target_pos) = node_pos.target_position.clone() {
+                    node_active.target_position = Set(Some(target_pos));
+                }
+                node_active.updated_at = Set(Utc::now());
+
+                // Save to database
+                let updated_node = node_active.update(&context.db).await?;
+
+                // Generate position delta
+                all_patch_ops.extend(plan_dag_delta::generate_node_position_patch(
+                    &node_pos.node_id,
+                    node_pos.position.x,
+                    node_pos.position.y,
+                    &current_nodes,
+                ));
+
+                updated_nodes.push(PlanDagNode::from(updated_node));
+            }
+        }
+
+        // Publish all deltas in a single batch
+        if !all_patch_ops.is_empty() {
+            let new_version = plan_dag_delta::increment_plan_version(&context.db, plan.id).await?;
+            let user_id = "demo_user".to_string(); // TODO: Get from auth context
+            plan_dag_delta::publish_plan_dag_delta(
+                project_id,
+                new_version,
+                user_id,
+                all_patch_ops,
+            ).await?;
+        }
+
+        Ok(updated_nodes)
+    }
+
+    // Authentication Mutations
+
+    /// Register a new user
+    async fn register(&self, ctx: &Context<'_>, input: RegisterUserInput) -> Result<RegisterResponse> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        // Validate input
+        AuthService::validate_email(&input.email)
+            .map_err(|e| Error::new(format!("Email validation failed: {}", e)))?;
+        AuthService::validate_username(&input.username)
+            .map_err(|e| Error::new(format!("Username validation failed: {}", e)))?;
+        AuthService::validate_display_name(&input.display_name)
+            .map_err(|e| Error::new(format!("Display name validation failed: {}", e)))?;
+
+        // Check if user already exists
+        let existing_user = users::Entity::find()
+            .filter(users::Column::Email.eq(&input.email))
+            .one(&context.db)
+            .await?;
+
+        if existing_user.is_some() {
+            return Err(Error::new("User with this email already exists"));
+        }
+
+        let existing_username = users::Entity::find()
+            .filter(users::Column::Username.eq(&input.username))
+            .one(&context.db)
+            .await?;
+
+        if existing_username.is_some() {
+            return Err(Error::new("Username already taken"));
+        }
+
+        // Hash password using bcrypt
+        let password_hash = AuthService::hash_password(&input.password)
+            .map_err(|e| Error::new(format!("Password hashing failed: {}", e)))?;
+
+        // Create user
+        let mut user = users::ActiveModel::new();
+        user.email = Set(input.email);
+        user.username = Set(input.username);
+        user.display_name = Set(input.display_name);
+        user.password_hash = Set(password_hash);
+        user.avatar_color = Set(AuthService::generate_avatar_color());
+
+        let user = user.insert(&context.db).await?;
+
+        // Create session for the new user
+        let session = user_sessions::ActiveModel::new(user.id, user.username.clone(), 1); // Assuming project ID 1 for now
+        let session = session.insert(&context.db).await?;
+
+        Ok(RegisterResponse {
+            user: User::from(user),
+            session_id: session.session_id,
+            expires_at: session.expires_at,
+        })
+    }
+
+    /// Login user
+    async fn login(&self, ctx: &Context<'_>, input: LoginInput) -> Result<LoginResponse> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        // Find user by email
+        let user = users::Entity::find()
+            .filter(users::Column::Email.eq(&input.email))
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Invalid email or password"))?;
+
+        // Verify password using bcrypt
+        let is_valid = AuthService::verify_password(&input.password, &user.password_hash)
+            .map_err(|e| Error::new(format!("Password verification failed: {}", e)))?;
+
+        if !is_valid {
+            return Err(Error::new("Invalid email or password"));
+        }
+
+        // Check if user is active
+        if !user.is_active {
+            return Err(Error::new("Account is deactivated"));
+        }
+
+        // Create new session
+        let session = user_sessions::ActiveModel::new(user.id, user.username.clone(), 1); // Assuming project ID 1 for now
+        let session = session.insert(&context.db).await?;
+
+        // Update last login
+        let mut user_active: users::ActiveModel = user.clone().into();
+        user_active.last_login_at = Set(Some(Utc::now()));
+        user_active.update(&context.db).await?;
+
+        Ok(LoginResponse {
+            user: User::from(user),
+            session_id: session.session_id,
+            expires_at: session.expires_at,
+        })
+    }
+
+    /// Logout user (deactivate session)
+    async fn logout(&self, ctx: &Context<'_>, session_id: String) -> Result<bool> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        // Find and deactivate session
+        let session = user_sessions::Entity::find()
+            .filter(user_sessions::Column::SessionId.eq(&session_id))
+            .one(&context.db)
+            .await?;
+
+        if let Some(session) = session {
+            let mut session_active: user_sessions::ActiveModel = session.into();
+            session_active = session_active.deactivate();
+            session_active.update(&context.db).await?;
+
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    /// Update user profile
+    async fn update_user(&self, ctx: &Context<'_>, user_id: i32, input: UpdateUserInput) -> Result<User> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        let user = users::Entity::find_by_id(user_id)
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("User not found"))?;
+
+        let mut user_active: users::ActiveModel = user.into();
+
+        if let Some(display_name) = input.display_name {
+            user_active.display_name = Set(display_name);
+        }
+
+        if let Some(email) = input.email {
+            // Check if email is already taken by another user
+            let existing = users::Entity::find()
+                .filter(users::Column::Email.eq(&email))
+                .filter(users::Column::Id.ne(user_id))
+                .one(&context.db)
+                .await?;
+
+            if existing.is_some() {
+                return Err(Error::new("Email already taken"));
+            }
+
+            user_active.email = Set(email);
+        }
+
+        user_active = user_active.set_updated_at();
+        let updated_user = user_active.update(&context.db).await?;
+
+        Ok(User::from(updated_user))
+    }
+
+    // Project Collaboration Mutations
+
+    /// Invite a user to collaborate on a project
+    async fn invite_collaborator(&self, ctx: &Context<'_>, input: InviteCollaboratorInput) -> Result<ProjectCollaborator> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        // Find user by email
+        let user = users::Entity::find()
+            .filter(users::Column::Email.eq(&input.email))
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("User not found with this email"))?;
+
+        // Check if user is already a collaborator
+        let existing = project_collaborators::Entity::find()
+            .filter(project_collaborators::Column::ProjectId.eq(input.project_id))
+            .filter(project_collaborators::Column::UserId.eq(user.id))
+            .filter(project_collaborators::Column::IsActive.eq(true))
+            .one(&context.db)
+            .await?;
+
+        if existing.is_some() {
+            return Err(Error::new("User is already a collaborator on this project"));
+        }
+
+        // Parse role
+        let role = crate::database::entities::project_collaborators::ProjectRole::from_str(&input.role)
+            .map_err(|_| Error::new("Invalid role"))?;
+
+        // Create collaboration
+        // Note: In a real app, you'd get invited_by from the authentication context
+        let collaboration = project_collaborators::ActiveModel::new(
+            input.project_id,
+            user.id,
+            role,
+            Some(1), // TODO: Get from auth context
+        );
+
+        let collaboration = collaboration.insert(&context.db).await?;
+
+        Ok(ProjectCollaborator::from(collaboration))
+    }
+
+    /// Accept collaboration invitation
+    async fn accept_collaboration(&self, ctx: &Context<'_>, collaboration_id: i32) -> Result<ProjectCollaborator> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        let collaboration = project_collaborators::Entity::find_by_id(collaboration_id)
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Collaboration not found"))?;
+
+        let mut collaboration_active: project_collaborators::ActiveModel = collaboration.into();
+        collaboration_active = collaboration_active.accept_invitation();
+        let updated = collaboration_active.update(&context.db).await?;
+
+        Ok(ProjectCollaborator::from(updated))
+    }
+
+    /// Decline collaboration invitation
+    async fn decline_collaboration(&self, ctx: &Context<'_>, collaboration_id: i32) -> Result<ProjectCollaborator> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        let collaboration = project_collaborators::Entity::find_by_id(collaboration_id)
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Collaboration not found"))?;
+
+        let mut collaboration_active: project_collaborators::ActiveModel = collaboration.into();
+        collaboration_active = collaboration_active.decline_invitation();
+        let updated = collaboration_active.update(&context.db).await?;
+
+        Ok(ProjectCollaborator::from(updated))
+    }
+
+    /// Update collaborator role
+    async fn update_collaborator_role(&self, ctx: &Context<'_>, input: UpdateCollaboratorRoleInput) -> Result<ProjectCollaborator> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        let collaboration = project_collaborators::Entity::find_by_id(input.collaborator_id)
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Collaboration not found"))?;
+
+        // Parse new role
+        let role = crate::database::entities::project_collaborators::ProjectRole::from_str(&input.role)
+            .map_err(|_| Error::new("Invalid role"))?;
+
+        let mut collaboration_active: project_collaborators::ActiveModel = collaboration.into();
+        collaboration_active = collaboration_active.update_role(role);
+        let updated = collaboration_active.update(&context.db).await?;
+
+        Ok(ProjectCollaborator::from(updated))
+    }
+
+    /// Remove collaborator from project
+    async fn remove_collaborator(&self, ctx: &Context<'_>, collaboration_id: i32) -> Result<bool> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        let collaboration = project_collaborators::Entity::find_by_id(collaboration_id)
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Collaboration not found"))?;
+
+        let mut collaboration_active: project_collaborators::ActiveModel = collaboration.into();
+        collaboration_active = collaboration_active.deactivate();
+        collaboration_active.update(&context.db).await?;
+
+        Ok(true)
+    }
+
+    // User Presence Mutations
+
+    // REMOVED: update_user_presence, user_offline, and presence_heartbeat mutations
+    // User presence is now handled via WebSocket only (memory-only storage) at /ws/collaboration
+    // These GraphQL mutations have been replaced by real-time WebSocket communication for better performance
+
+    // REMOVED: update_cursor_position mutation - replaced by WebSocket implementation
+    // Cursor position updates are now handled via WebSocket at /ws/collaboration for better performance
+
+    /// Join a project for collaboration
+    async fn join_project_collaboration(
+        &self,
+        ctx: &Context<'_>,
+        project_id: i32,
+    ) -> Result<bool> {
+        let _context = ctx.data::<GraphQLContext>()?;
+
+        // TODO: Extract from authenticated user context when authentication is implemented
+        let (user_id, user_name, avatar_color) = {
+            ("demo_user".to_string(), "Demo User".to_string(), "#3B82F6".to_string())
+        };
+
+        let plan_id = format!("project_{}", project_id);
+
+        // Create user joined event data
+        let user_data = crate::graphql::subscriptions::create_user_event_data(
+            user_id.clone(),
+            user_name,
+            avatar_color,
+        );
+
+        // Create collaboration event
+        let event_data = crate::graphql::subscriptions::CollaborationEventData {
+            node_event: None,
+            edge_event: None,
+            user_event: Some(user_data),
+            cursor_event: None,
+        };
+        let event = crate::graphql::subscriptions::create_collaboration_event(
+            plan_id,
+            user_id,
+            crate::graphql::subscriptions::CollaborationEventType::UserJoined,
+            event_data,
+        );
+
+        // Broadcast the event
+        match crate::graphql::subscriptions::publish_collaboration_event(event).await {
+            Ok(()) => Ok(true),
+            Err(_) => Ok(false),
+        }
+    }
+
+    /// Leave a project collaboration
+    async fn leave_project_collaboration(
+        &self,
+        ctx: &Context<'_>,
+        project_id: i32,
+    ) -> Result<bool> {
+        let _context = ctx.data::<GraphQLContext>()?;
+
+        // TODO: Extract from authenticated user context when authentication is implemented
+        let (user_id, user_name, avatar_color) = {
+            ("demo_user".to_string(), "Demo User".to_string(), "#3B82F6".to_string())
+        };
+
+        let plan_id = format!("project_{}", project_id);
+
+        // Create user left event data
+        let user_data = crate::graphql::subscriptions::create_user_event_data(
+            user_id.clone(),
+            user_name,
+            avatar_color,
+        );
+
+        // Create collaboration event
+        let event_data = crate::graphql::subscriptions::CollaborationEventData {
+            node_event: None,
+            edge_event: None,
+            user_event: Some(user_data),
+            cursor_event: None,
+        };
+        let event = crate::graphql::subscriptions::create_collaboration_event(
+            plan_id,
+            user_id,
+            crate::graphql::subscriptions::CollaborationEventType::UserLeft,
+            event_data,
+        );
+
+        // Broadcast the event
+        match crate::graphql::subscriptions::publish_collaboration_event(event).await {
+            Ok(()) => Ok(true),
+            Err(_) => Ok(false),
+        }
+    }
+
+    /// Create a new DataSource from uploaded file
+    async fn create_data_source_from_file(
+        &self,
+        ctx: &Context<'_>,
+        input: CreateDataSourceInput
+    ) -> Result<DataSource> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let data_source_service = DataSourceService::new(context.db.clone());
+
+        // Decode the base64 file content
+        use base64::Engine;
+        let file_content = base64::engine::general_purpose::STANDARD.decode(&input.file_content)
+            .map_err(|e| Error::new(format!("Failed to decode base64 file content: {}", e)))?;
+
+        // Convert GraphQL enums to database enums
+        let file_format = input.file_format.into();
+        let data_type = input.data_type.into();
+
+        let data_source = data_source_service
+            .create_from_file(
+                input.project_id,
+                input.name.clone(),
+                input.description,
+                input.filename.clone(),
+                file_format,
+                data_type,
+                file_content,
+            )
+            .await
+            .map_err(|e| Error::new(format!("Failed to create DataSource: {}", e)))?;
+
+        // Automatically add a DataSourceNode to the Plan DAG
+        let timestamp = chrono::Utc::now().timestamp_millis();
+        let node_id = format!("datasourcenode_{}_{:08x}", timestamp, data_source.id);
+
+        // Find or create a plan for this project
+        let plan = match plans::Entity::find()
+            .filter(plans::Column::ProjectId.eq(input.project_id))
+            .one(&context.db)
+            .await? {
+            Some(plan) => plan,
+            None => {
+                // Auto-create a plan if one doesn't exist
+                let now = chrono::Utc::now();
+                let new_plan = plans::ActiveModel {
+                    id: sea_orm::ActiveValue::NotSet,
+                    project_id: Set(input.project_id),
+                    name: Set(format!("Plan for Project {}", input.project_id)),
+                    yaml_content: Set("".to_string()),
+                    dependencies: Set(None),
+                    status: Set("draft".to_string()),
+                    version: Set(1),
+                    created_at: Set(now),
+                    updated_at: Set(now),
+                };
+                new_plan.insert(&context.db).await?
+            }
+        };
+
+        // Fetch current state to determine node index and position
+        let (current_nodes, _) = plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
+        let node_index = current_nodes.len();
+
+        // Calculate position: stack vertically with some spacing
+        let position_x = 100.0;
+        let position_y = 100.0 + (node_index as f64 * 120.0);
+
+        // Create the DAG node metadata and config
+        let metadata_json = serde_json::to_string(&serde_json::json!({
+            "label": input.name
+        }))?;
+
+        let config_json = serde_json::to_string(&serde_json::json!({
+            "dataSourceId": data_source.id,
+            "filename": input.filename,
+            "dataType": data_source.data_type.to_lowercase()
+        }))?;
+
+        let dag_node = plan_dag_nodes::ActiveModel {
+            id: Set(node_id.clone()),
+            plan_id: Set(plan.id),
+            node_type: Set("DataSourceNode".to_string()),
+            position_x: Set(position_x),
+            position_y: Set(position_y),
+            source_position: Set(None),
+            target_position: Set(None),
+            metadata_json: Set(metadata_json),
+            config_json: Set(config_json),
+            created_at: Set(Utc::now()),
+            updated_at: Set(Utc::now()),
+        };
+
+        let inserted_node = dag_node.insert(&context.db).await?;
+        let result_node = PlanDagNode::from(inserted_node);
+
+        // Generate JSON Patch delta for node addition
+        let patch_op = plan_dag_delta::generate_node_add_patch(&result_node, node_index);
+
+        // Increment plan version
+        let new_version = plan_dag_delta::increment_plan_version(&context.db, plan.id).await?;
+
+        // Broadcast delta event
+        let user_id = "demo_user".to_string(); // TODO: Get from auth context
+        plan_dag_delta::publish_plan_dag_delta(
+            input.project_id,
+            new_version,
+            user_id,
+            vec![patch_op],
+        ).await.ok(); // Non-fatal if broadcast fails
+
+        Ok(DataSource::from(data_source))
+    }
+
+    /// Bulk upload multiple DataSources with automatic file type detection
+    async fn bulk_upload_data_sources(
+        &self,
+        ctx: &Context<'_>,
+        project_id: i32,
+        files: Vec<BulkUploadDataSourceInput>
+    ) -> Result<Vec<DataSource>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let data_source_service = DataSourceService::new(context.db.clone());
+
+        let mut created_data_sources = Vec::new();
+
+        for file_input in files {
+            // Decode the base64 file content
+            use base64::Engine;
+            let file_content = base64::engine::general_purpose::STANDARD.decode(&file_input.file_content)
+                .map_err(|e| Error::new(format!("Failed to decode base64 file content for {}: {}", file_input.filename, e)))?;
+
+            // Use auto-detection to create the data source
+            let data_source = data_source_service
+                .create_with_auto_detect(
+                    project_id,
+                    file_input.name.clone(),
+                    file_input.description,
+                    file_input.filename.clone(),
+                    file_content,
+                )
+                .await
+                .map_err(|e| Error::new(format!("Failed to create DataSource for {}: {}", file_input.filename, e)))?;
+
+            // Automatically add a DataSourceNode to the Plan DAG
+            let timestamp = chrono::Utc::now().timestamp_millis();
+            let node_id = format!("datasourcenode_{}_{:08x}", timestamp, data_source.id);
+
+            // Find or create a plan for this project
+            let plan = match plans::Entity::find()
+                .filter(plans::Column::ProjectId.eq(project_id))
+                .one(&context.db)
+                .await? {
+                Some(plan) => plan,
+                None => {
+                    // Auto-create a plan if one doesn't exist
+                    let now = chrono::Utc::now();
+                    let new_plan = plans::ActiveModel {
+                        id: sea_orm::ActiveValue::NotSet,
+                        project_id: Set(project_id),
+                        name: Set(format!("Plan for Project {}", project_id)),
+                        yaml_content: Set("".to_string()),
+                        dependencies: Set(None),
+                        status: Set("draft".to_string()),
+                        version: Set(1),
+                        created_at: Set(now),
+                        updated_at: Set(now),
+                    };
+                    new_plan.insert(&context.db).await?
+                }
+            };
+
+            // Fetch current state to determine node index and position
+            let (current_nodes, _) = plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
+            let node_index = current_nodes.len();
+
+            // Calculate position: stack vertically with some spacing
+            let position_x = 100.0;
+            let position_y = 100.0 + (node_index as f64 * 120.0);
+
+            // Create the DAG node metadata and config
+            let metadata_json = serde_json::to_string(&serde_json::json!({
+                "label": file_input.name
+            }))?;
+
+            let config_json = serde_json::to_string(&serde_json::json!({
+                "dataSourceId": data_source.id,
+                "filename": file_input.filename,
+                "dataType": data_source.data_type.to_lowercase()
+            }))?;
+
+            let dag_node = plan_dag_nodes::ActiveModel {
+                id: Set(node_id.clone()),
+                plan_id: Set(plan.id),
+                node_type: Set("DataSourceNode".to_string()),
+                position_x: Set(position_x),
+                position_y: Set(position_y),
+                source_position: Set(None),
+                target_position: Set(None),
+                metadata_json: Set(metadata_json),
+                config_json: Set(config_json),
+                created_at: Set(Utc::now()),
+                updated_at: Set(Utc::now()),
+            };
+
+            let inserted_node = dag_node.insert(&context.db).await?;
+            let result_node = PlanDagNode::from(inserted_node);
+
+            // Generate JSON Patch delta for node addition
+            let patch_op = plan_dag_delta::generate_node_add_patch(&result_node, node_index);
+
+            // Increment plan version
+            let new_version = plan_dag_delta::increment_plan_version(&context.db, plan.id).await?;
+
+            // Broadcast delta event
+            let user_id = "demo_user".to_string(); // TODO: Get from auth context
+            plan_dag_delta::publish_plan_dag_delta(
+                project_id,
+                new_version,
+                user_id,
+                vec![patch_op],
+            ).await.ok(); // Non-fatal if broadcast fails
+
+            created_data_sources.push(DataSource::from(data_source));
+        }
+
+        Ok(created_data_sources)
+    }
+
+    /// Update DataSource metadata
+    async fn update_data_source(
+        &self,
+        ctx: &Context<'_>,
+        id: i32,
+        input: UpdateDataSourceInput
+    ) -> Result<DataSource> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let data_source_service = DataSourceService::new(context.db.clone());
+
+        let data_source = if let Some(file_content_b64) = input.file_content {
+            // Update with new file - decode base64 content
+            use base64::Engine;
+            let file_content = base64::engine::general_purpose::STANDARD.decode(&file_content_b64)
+                .map_err(|e| Error::new(format!("Failed to decode base64 file content: {}", e)))?;
+
+            let filename = input.filename.unwrap_or_else(|| "updated_file".to_string());
+
+            data_source_service
+                .update_file(id, filename, file_content)
+                .await
+                .map_err(|e| Error::new(format!("Failed to update DataSource file: {}", e)))?
+        } else {
+            // Update metadata only
+            data_source_service
+                .update(id, input.name, input.description)
+                .await
+                .map_err(|e| Error::new(format!("Failed to update DataSource: {}", e)))?
+        };
+
+        Ok(DataSource::from(data_source))
+    }
+
+    /// Delete DataSource
+    async fn delete_data_source(&self, ctx: &Context<'_>, id: i32) -> Result<bool> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let data_source_service = DataSourceService::new(context.db.clone());
+
+        data_source_service
+            .delete(id)
+            .await
+            .map_err(|e| Error::new(format!("Failed to delete DataSource: {}", e)))?;
+
+        Ok(true)
+    }
+
+    /// Reprocess existing DataSource file
+    async fn reprocess_data_source(&self, ctx: &Context<'_>, id: i32) -> Result<DataSource> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let data_source_service = DataSourceService::new(context.db.clone());
+
+        let data_source = data_source_service
+            .reprocess(id)
+            .await
+            .map_err(|e| Error::new(format!("Failed to reprocess DataSource: {}", e)))?;
+
+        Ok(DataSource::from(data_source))
+    }
+
+    /// Create a new Graph
+    async fn create_graph(&self, ctx: &Context<'_>, input: CreateGraphInput) -> Result<Graph> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let graph_service = GraphService::new(context.db.clone());
+
+        let graph = graph_service
+            .create_graph(
+                input.project_id,
+                input.name,
+            )
+            .await
+            .map_err(|e| Error::new(format!("Failed to create Graph: {}", e)))?;
+
+        Ok(Graph::from(graph))
+    }
+
+    /// Update Graph metadata
+    async fn update_graph(
+        &self,
+        ctx: &Context<'_>,
+        id: i32,
+        input: UpdateGraphInput
+    ) -> Result<Graph> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let graph_service = GraphService::new(context.db.clone());
+
+        let graph = graph_service
+            .update_graph(id, input.name)
+            .await
+            .map_err(|e| Error::new(format!("Failed to update Graph: {}", e)))?;
+
+        Ok(Graph::from(graph))
+    }
+
+    /// Delete Graph
+    async fn delete_graph(&self, ctx: &Context<'_>, id: i32) -> Result<bool> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let graph_service = GraphService::new(context.db.clone());
+
+        graph_service
+            .delete_graph(id)
+            .await
+            .map_err(|e| Error::new(format!("Failed to delete Graph: {}", e)))?;
+
+        Ok(true)
+    }
+
+    /// Create a new Layer
+    async fn create_layer(&self, ctx: &Context<'_>, input: CreateLayerInput) -> Result<crate::graphql::types::Layer> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        use crate::database::entities::layers;
+
+        let layer = layers::ActiveModel {
+            id: sea_orm::ActiveValue::NotSet,
+            graph_id: Set(input.graph_id),
+            layer_id: Set(input.layer_id),
+            name: Set(input.name),
+            color: Set(None),
+            properties: Set(None),
+        };
+
+        let inserted_layer = layer.insert(&context.db)
+            .await
+            .map_err(|e| Error::new(format!("Failed to create layer: {}", e)))?;
+
+        Ok(crate::graphql::types::Layer::from(inserted_layer))
+    }
+
+    /// Update a graph node's properties
+    async fn update_graph_node(
+        &self,
+        ctx: &Context<'_>,
+        graph_id: i32,
+        node_id: String,
+        label: Option<String>,
+        layer: Option<String>,
+        attrs: Option<crate::graphql::types::scalars::JSON>,
+    ) -> Result<crate::graphql::types::graph_node::GraphNode> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let graph_service = GraphService::new(context.db.clone());
+        let edit_service = GraphEditService::new(context.db.clone());
+
+        // Fetch current node to get old values
+        use crate::database::entities::graph_nodes::{Entity as GraphNodes, Column as NodeColumn};
+        use sea_orm::{ColumnTrait, QueryFilter};
+
+        let old_node = GraphNodes::find()
+            .filter(NodeColumn::GraphId.eq(graph_id))
+            .filter(NodeColumn::Id.eq(&node_id))
+            .one(&context.db)
+            .await?;
+
+        // Update the node
+        let node = graph_service
+            .update_graph_node(graph_id, node_id.clone(), label.clone(), layer.clone(), attrs.clone())
+            .await
+            .map_err(|e| Error::new(format!("Failed to update graph node: {}", e)))?;
+
+        // Create graph edits for each changed field
+        if let Some(old_node) = old_node {
+            if let Some(new_label) = &label {
+                if old_node.label.as_ref() != Some(new_label) {
+                    let _ = edit_service.create_edit(
+                        graph_id,
+                        "node".to_string(),
+                        node_id.clone(),
+                        "update".to_string(),
+                        Some("label".to_string()),
+                        old_node.label.as_ref().map(|l| serde_json::json!(l)),
+                        Some(serde_json::json!(new_label)),
+                        None,
+                    ).await;
+                }
+            }
+
+            if let Some(new_layer) = &layer {
+                let old_layer_value = old_node.layer.clone().unwrap_or_default();
+                if &old_layer_value != new_layer {
+                    let _ = edit_service.create_edit(
+                        graph_id,
+                        "node".to_string(),
+                        node_id.clone(),
+                        "update".to_string(),
+                        Some("layer".to_string()),
+                        if old_layer_value.is_empty() { None } else { Some(serde_json::json!(old_layer_value)) },
+                        Some(serde_json::json!(new_layer)),
+                        None,
+                    ).await;
+                }
+            }
+
+            if let Some(new_attrs) = &attrs {
+                if old_node.attrs.as_ref() != Some(new_attrs) {
+                    let _ = edit_service.create_edit(
+                        graph_id,
+                        "node".to_string(),
+                        node_id.clone(),
+                        "update".to_string(),
+                        Some("attrs".to_string()),
+                        old_node.attrs.clone(),
+                        Some(new_attrs.clone()),
+                        None,
+                    ).await;
+                }
+            }
+        }
+
+        Ok(crate::graphql::types::graph_node::GraphNode::from(node))
+    }
+
+    /// Update layer properties (name, colors, etc.)
+    async fn update_layer_properties(
+        &self,
+        ctx: &Context<'_>,
+        id: i32,
+        name: Option<String>,
+        properties: Option<crate::graphql::types::scalars::JSON>,
+    ) -> Result<crate::graphql::types::layer::Layer> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let graph_service = GraphService::new(context.db.clone());
+        let edit_service = GraphEditService::new(context.db.clone());
+
+        // Fetch current layer to get old values
+        use crate::database::entities::layers::Entity as Layers;
+
+        let old_layer = Layers::find_by_id(id)
+            .one(&context.db)
+            .await?;
+
+        // Update the layer
+        let layer = graph_service
+            .update_layer_properties(id, name.clone(), properties.clone())
+            .await
+            .map_err(|e| Error::new(format!("Failed to update layer properties: {}", e)))?;
+
+        // Create graph edits for changed fields
+        if let Some(old_layer) = old_layer {
+            if let Some(new_name) = &name {
+                if &old_layer.name != new_name {
+                    let _ = edit_service.create_edit(
+                        old_layer.graph_id,
+                        "layer".to_string(),
+                        old_layer.layer_id.clone(),
+                        "update".to_string(),
+                        Some("name".to_string()),
+                        Some(serde_json::json!(old_layer.name)),
+                        Some(serde_json::json!(new_name)),
+                        None,
+                    ).await;
+                }
+            }
+
+            if let Some(new_properties) = &properties {
+                let old_props = old_layer.properties
+                    .and_then(|p| serde_json::from_str::<serde_json::Value>(&p).ok());
+
+                tracing::debug!("Layer properties update - old_props: {:?}, new_properties: {:?}", old_props, new_properties);
+                tracing::debug!("Properties are equal: {}", old_props.as_ref() == Some(new_properties));
+
+                if old_props.as_ref() != Some(new_properties) {
+                    tracing::info!("Creating edit for layer properties change");
+                    let _ = edit_service.create_edit(
+                        old_layer.graph_id,
+                        "layer".to_string(),
+                        old_layer.layer_id.clone(),
+                        "update".to_string(),
+                        Some("properties".to_string()),
+                        old_props,
+                        Some(new_properties.clone()),
+                        None,
+                    ).await;
+                }
+            }
+        }
+
+        Ok(crate::graphql::types::layer::Layer::from(layer))
+    }
+
+    /// Bulk update graph nodes and layers in a single transaction
+    async fn bulk_update_graph_data(
+        &self,
+        ctx: &Context<'_>,
+        graph_id: i32,
+        nodes: Option<Vec<crate::graphql::types::graph_node::GraphNodeUpdateInput>>,
+        layers: Option<Vec<crate::graphql::types::layer::LayerUpdateInput>>,
+    ) -> Result<bool> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let graph_service = GraphService::new(context.db.clone());
+        let edit_service = GraphEditService::new(context.db.clone());
+
+        use crate::database::entities::graph_nodes::{Entity as GraphNodes, Column as NodeColumn};
+        use crate::database::entities::layers::Entity as Layers;
+        use sea_orm::{ColumnTrait, QueryFilter};
+
+        // Update nodes
+        if let Some(node_updates) = nodes {
+            for node_update in node_updates {
+                // Fetch current node to get old values
+                let old_node = GraphNodes::find()
+                    .filter(NodeColumn::GraphId.eq(graph_id))
+                    .filter(NodeColumn::Id.eq(&node_update.node_id))
+                    .one(&context.db)
+                    .await?;
+
+                // Update the node
+                let _ = graph_service
+                    .update_graph_node(
+                        graph_id,
+                        node_update.node_id.clone(),
+                        node_update.label.clone(),
+                        node_update.layer.clone(),
+                        node_update.attrs.clone(),
+                    )
+                    .await
+                    .map_err(|e| Error::new(format!("Failed to update graph node: {}", e)))?;
+
+                // Create graph edits for each changed field
+                if let Some(old_node) = old_node {
+                    if let Some(new_label) = &node_update.label {
+                        if old_node.label.as_ref() != Some(new_label) {
+                            let _ = edit_service.create_edit(
+                                graph_id,
+                                "node".to_string(),
+                                node_update.node_id.clone(),
+                                "update".to_string(),
+                                Some("label".to_string()),
+                                old_node.label.as_ref().map(|l| serde_json::json!(l)),
+                                Some(serde_json::json!(new_label)),
+                                None,
+                            ).await;
+                        }
+                    }
+
+                    if let Some(new_layer) = &node_update.layer {
+                        let old_layer_value = old_node.layer.clone().unwrap_or_default();
+                        if &old_layer_value != new_layer {
+                            let _ = edit_service.create_edit(
+                                graph_id,
+                                "node".to_string(),
+                                node_update.node_id.clone(),
+                                "update".to_string(),
+                                Some("layer".to_string()),
+                                if old_layer_value.is_empty() { None } else { Some(serde_json::json!(old_layer_value)) },
+                                Some(serde_json::json!(new_layer)),
+                                None,
+                            ).await;
+                        }
+                    }
+
+                    if let Some(new_attrs) = &node_update.attrs {
+                        if old_node.attrs.as_ref() != Some(new_attrs) {
+                            let _ = edit_service.create_edit(
+                                graph_id,
+                                "node".to_string(),
+                                node_update.node_id.clone(),
+                                "update".to_string(),
+                                Some("attrs".to_string()),
+                                old_node.attrs.clone(),
+                                Some(new_attrs.clone()),
+                                None,
+                            ).await;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Update layers
+        if let Some(layer_updates) = layers {
+            for layer_update in layer_updates {
+                // Fetch current layer to get old values
+                let old_layer = Layers::find_by_id(layer_update.id)
+                    .one(&context.db)
+                    .await?;
+
+                // Update the layer
+                let _ = graph_service
+                    .update_layer_properties(
+                        layer_update.id,
+                        layer_update.name.clone(),
+                        layer_update.properties.clone(),
+                    )
+                    .await
+                    .map_err(|e| Error::new(format!("Failed to update layer properties: {}", e)))?;
+
+                // Create graph edits for changed fields
+                if let Some(old_layer) = old_layer {
+                    if let Some(new_name) = &layer_update.name {
+                        if &old_layer.name != new_name {
+                            let _ = edit_service.create_edit(
+                                old_layer.graph_id,
+                                "layer".to_string(),
+                                old_layer.layer_id.clone(),
+                                "update".to_string(),
+                                Some("name".to_string()),
+                                Some(serde_json::json!(old_layer.name)),
+                                Some(serde_json::json!(new_name)),
+                                None,
+                            ).await;
+                        }
+                    }
+
+                    if let Some(new_properties) = &layer_update.properties {
+                        let old_props = old_layer.properties
+                            .and_then(|p| serde_json::from_str::<serde_json::Value>(&p).ok());
+
+                        if old_props.as_ref() != Some(new_properties) {
+                            let _ = edit_service.create_edit(
+                                old_layer.graph_id,
+                                "layer".to_string(),
+                                old_layer.layer_id.clone(),
+                                "update".to_string(),
+                                Some("properties".to_string()),
+                                old_props,
+                                Some(new_properties.clone()),
+                                None,
+                            ).await;
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(true)
+    }
+
+    /// Execute a DAG node (builds graph from upstream data sources)
+    async fn execute_node(
+        &self,
+        ctx: &Context<'_>,
+        project_id: i32,
+        node_id: String
+    ) -> Result<NodeExecutionResult> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        // Find the plan for this project
+        let plan = plans::Entity::find()
+            .filter(plans::Column::ProjectId.eq(project_id))
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Plan not found for project"))?;
+
+        // Get all nodes in the plan
+        let nodes = plan_dag_nodes::Entity::find()
+            .filter(plan_dag_nodes::Column::PlanId.eq(plan.id))
+            .all(&context.db)
+            .await?;
+
+        // Get all edges in the plan
+        let edges_models = plan_dag_edges::Entity::find()
+            .filter(plan_dag_edges::Column::PlanId.eq(plan.id))
+            .all(&context.db)
+            .await?;
+
+        // Convert edges to (source, target) tuples
+        let edges: Vec<(String, String)> = edges_models
+            .iter()
+            .map(|e| (e.source_node_id.clone(), e.target_node_id.clone()))
+            .collect();
+
+        // Create executor and execute the node with all its upstream dependencies
+        let executor = DagExecutor::new(context.db.clone());
+
+        executor
+            .execute_with_dependencies(project_id, plan.id, &node_id, &nodes, &edges)
+            .await
+            .map_err(|e| Error::new(format!("Failed to execute node: {}", e)))?;
+
+        Ok(NodeExecutionResult {
+            success: true,
+            message: format!("Node {} and its dependencies executed successfully", node_id),
+            node_id,
+        })
+    }
+
+    /// Import a plan from YAML and create DAG structure
+    async fn import_plan_yaml(
+        &self,
+        ctx: &Context<'_>,
+        project_id: i32,
+        yaml_content: String,
+    ) -> Result<ImportPlanResult> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let now = chrono::Utc::now();
+
+        // Parse YAML
+        let plan_yaml: serde_yaml::Value = serde_yaml::from_str(&yaml_content)
+            .map_err(|e| Error::new(format!("Failed to parse YAML: {}", e)))?;
+
+        // Get or create plan for project
+        let plan = match plans::Entity::find()
+            .filter(plans::Column::ProjectId.eq(project_id))
+            .one(&context.db)
+            .await?
+        {
+            Some(plan) => plan,
+            None => {
+                // Create a new plan for this project with the YAML content
+                let plan_name = plan_yaml.get("meta")
+                    .and_then(|m| m.get("name"))
+                    .and_then(|n| n.as_str())
+                    .unwrap_or("Imported Plan");
+
+                let new_plan = plans::ActiveModel {
+                    project_id: Set(project_id),
+                    name: Set(plan_name.to_string()),
+                    yaml_content: Set(yaml_content.clone()),
+                    status: Set("active".to_string()),
+                    version: Set(1),
+                    created_at: Set(now),
+                    updated_at: Set(now),
+                    ..Default::default()
+                };
+                new_plan.insert(&context.db).await?
+            }
+        };
+
+        // Generate unique node IDs
+        let timestamp = chrono::Utc::now().timestamp_millis();
+        let mut datasource_nodes = Vec::new();
+        let mut node_count = 0;
+
+        // Create DataSource nodes from import.profiles
+        if let Some(import_profiles) = plan_yaml.get("import").and_then(|i| i.get("profiles")) {
+            if let Some(profiles) = import_profiles.as_sequence() {
+                for (idx, profile) in profiles.iter().enumerate() {
+                    let filename = profile.get("filename")
+                        .and_then(|f| f.as_str())
+                        .unwrap_or("unknown.csv");
+                    let filetype = profile.get("filetype")
+                        .and_then(|f| f.as_str())
+                        .unwrap_or("Unknown");
+
+                    let node_id = format!("datasourcenode_{}_{:04x}", timestamp, idx);
+                    let label = format!("{} ({})", filename, filetype);
+
+                    // Create node
+                    let node = plan_dag_nodes::ActiveModel {
+                        id: Set(node_id.clone()),
+                        plan_id: Set(plan.id),
+                        node_type: Set("DataSourceNode".to_string()),
+                        position_x: Set(100.0 + (idx as f64 * 50.0)),
+                        position_y: Set(100.0),
+                        metadata_json: Set(serde_json::json!({ "label": label }).to_string()),
+                        config_json: Set(serde_json::json!({
+                            "filename": filename,
+                            "dataType": filetype.to_lowercase()
+                        }).to_string()),
+                        created_at: Set(now),
+                        updated_at: Set(now),
+                        ..Default::default()
+                    };
+
+                    node.insert(&context.db).await?;
+                    datasource_nodes.push(node_id);
+                    node_count += 1;
+                }
+            }
+        }
+
+        // Create Merge node connecting all datasources
+        let merge_node_id = format!("mergenode_{}_merge", timestamp);
+        let merge_node = plan_dag_nodes::ActiveModel {
+            id: Set(merge_node_id.clone()),
+            plan_id: Set(plan.id),
+            node_type: Set("MergeNode".to_string()),
+            position_x: Set(300.0),
+            position_y: Set(200.0),
+            metadata_json: Set(serde_json::json!({ "label": "Combined Data" }).to_string()),
+            config_json: Set("{}".to_string()),
+            created_at: Set(now),
+            updated_at: Set(now),
+            ..Default::default()
+        };
+        merge_node.insert(&context.db).await?;
+        node_count += 1;
+
+        // Connect datasources to merge node
+        let mut edge_count = 0;
+        for (idx, ds_id) in datasource_nodes.iter().enumerate() {
+            let edge = plan_dag_edges::ActiveModel {
+                id: Set(format!("edge_{}_{:04x}", timestamp, idx)),
+                plan_id: Set(plan.id),
+                source_node_id: Set(ds_id.clone()),
+                target_node_id: Set(merge_node_id.clone()),
+                metadata_json: Set("{}".to_string()),
+                created_at: Set(now),
+                updated_at: Set(now),
+                ..Default::default()
+            };
+            edge.insert(&context.db).await?;
+            edge_count += 1;
+        }
+
+        // Create base Graph node connected to merge
+        let base_graph_id = format!("graphnode_{}_base", timestamp);
+        let base_graph = plan_dag_nodes::ActiveModel {
+            id: Set(base_graph_id.clone()),
+            plan_id: Set(plan.id),
+            node_type: Set("GraphNode".to_string()),
+            position_x: Set(500.0),
+            position_y: Set(200.0),
+            metadata_json: Set(serde_json::json!({ "label": "Base Graph" }).to_string()),
+            config_json: Set("{}".to_string()),
+            created_at: Set(now),
+            updated_at: Set(now),
+            ..Default::default()
+        };
+        base_graph.insert(&context.db).await?;
+        node_count += 1;
+
+        // Connect merge to base graph
+        let edge = plan_dag_edges::ActiveModel {
+            id: Set(format!("edge_{}_merge_to_base", timestamp)),
+            plan_id: Set(plan.id),
+            source_node_id: Set(merge_node_id.clone()),
+            target_node_id: Set(base_graph_id.clone()),
+            metadata_json: Set("{}".to_string()),
+            created_at: Set(now),
+            updated_at: Set(now),
+            ..Default::default()
+        };
+        edge.insert(&context.db).await?;
+        edge_count += 1;
+
+        // Process export profiles with graph_config
+        if let Some(export_profiles) = plan_yaml.get("export").and_then(|e| e.get("profiles")) {
+            if let Some(profiles) = export_profiles.as_sequence() {
+                let mut variation_idx = 0;
+                for profile in profiles.iter() {
+                    if let Some(graph_config) = profile.get("graph_config") {
+                        // This export has graph transformations
+                        let filename = profile.get("filename")
+                            .and_then(|f| f.as_str())
+                            .unwrap_or("output");
+                        let exporter = profile.get("exporter")
+                            .and_then(|e| e.as_str())
+                            .unwrap_or("Unknown");
+
+                        // Create Transform node
+                        let transform_id = format!("transformnode_{}_{:04x}", timestamp, variation_idx);
+                        let transform_label = format!("Transform: {}", filename.split('/').last().unwrap_or(filename));
+                        let transform_node = plan_dag_nodes::ActiveModel {
+                            id: Set(transform_id.clone()),
+                            plan_id: Set(plan.id),
+                            node_type: Set("TransformNode".to_string()),
+                            position_x: Set(700.0),
+                            position_y: Set(100.0 + (variation_idx as f64 * 150.0)),
+                            metadata_json: Set(serde_json::json!({ "label": transform_label }).to_string()),
+                            config_json: Set(serde_json::json!({
+                                "graphConfig": graph_config
+                            }).to_string()),
+                            created_at: Set(now),
+                            updated_at: Set(now),
+                            ..Default::default()
+                        };
+                        transform_node.insert(&context.db).await?;
+                        node_count += 1;
+
+                        // Connect base graph to transform
+                        let edge = plan_dag_edges::ActiveModel {
+                            id: Set(format!("edge_{}_base_to_transform_{:04x}", timestamp, variation_idx)),
+                            plan_id: Set(plan.id),
+                            source_node_id: Set(base_graph_id.clone()),
+                            target_node_id: Set(transform_id.clone()),
+                            metadata_json: Set("{}".to_string()),
+                            created_at: Set(now),
+                            updated_at: Set(now),
+                            ..Default::default()
+                        };
+                        edge.insert(&context.db).await?;
+                        edge_count += 1;
+
+                        // Create Graph node for variation
+                        let graph_id = format!("graphnode_{}_{:04x}", timestamp, variation_idx);
+                        let graph_label = format!("Graph: {}", filename.split('/').last().unwrap_or(filename));
+                        let graph_node = plan_dag_nodes::ActiveModel {
+                            id: Set(graph_id.clone()),
+                            plan_id: Set(plan.id),
+                            node_type: Set("GraphNode".to_string()),
+                            position_x: Set(900.0),
+                            position_y: Set(100.0 + (variation_idx as f64 * 150.0)),
+                            metadata_json: Set(serde_json::json!({ "label": graph_label }).to_string()),
+                            config_json: Set("{}".to_string()),
+                            created_at: Set(now),
+                            updated_at: Set(now),
+                            ..Default::default()
+                        };
+                        graph_node.insert(&context.db).await?;
+                        node_count += 1;
+
+                        // Connect transform to graph
+                        let edge = plan_dag_edges::ActiveModel {
+                            id: Set(format!("edge_{}_transform_to_graph_{:04x}", timestamp, variation_idx)),
+                            plan_id: Set(plan.id),
+                            source_node_id: Set(transform_id.clone()),
+                            target_node_id: Set(graph_id.clone()),
+                            metadata_json: Set("{}".to_string()),
+                            created_at: Set(now),
+                            updated_at: Set(now),
+                            ..Default::default()
+                        };
+                        edge.insert(&context.db).await?;
+                        edge_count += 1;
+
+                        // Create Output node
+                        let output_id = format!("outputnode_{}_{:04x}", timestamp, variation_idx);
+                        let output_label = format!("{}: {}", exporter, filename.split('/').last().unwrap_or(filename));
+                        let output_node = plan_dag_nodes::ActiveModel {
+                            id: Set(output_id.clone()),
+                            plan_id: Set(plan.id),
+                            node_type: Set("OutputNode".to_string()),
+                            position_x: Set(1100.0),
+                            position_y: Set(100.0 + (variation_idx as f64 * 150.0)),
+                            metadata_json: Set(serde_json::json!({ "label": output_label }).to_string()),
+                            config_json: Set(serde_json::json!({
+                                "filename": filename,
+                                "exporter": exporter,
+                                "renderConfig": profile.get("render_config").cloned()
+                            }).to_string()),
+                            created_at: Set(now),
+                            updated_at: Set(now),
+                            ..Default::default()
+                        };
+                        output_node.insert(&context.db).await?;
+                        node_count += 1;
+
+                        // Connect graph to output
+                        let edge = plan_dag_edges::ActiveModel {
+                            id: Set(format!("edge_{}_graph_to_output_{:04x}", timestamp, variation_idx)),
+                            plan_id: Set(plan.id),
+                            source_node_id: Set(graph_id),
+                            target_node_id: Set(output_id),
+                            metadata_json: Set("{}".to_string()),
+                            created_at: Set(now),
+                            updated_at: Set(now),
+                            ..Default::default()
+                        };
+                        edge.insert(&context.db).await?;
+                        edge_count += 1;
+
+                        variation_idx += 1;
+                    }
+                }
+            }
+        }
+
+        Ok(ImportPlanResult {
+            success: true,
+            message: format!("Imported plan with {} nodes and {} edges", node_count, edge_count),
+            node_count: node_count as i32,
+            edge_count: edge_count as i32,
+        })
+    }
+
+    /// Export a node's output (graph export to various formats)
+    async fn export_node_output(
+        &self,
+        ctx: &Context<'_>,
+        project_id: i32,
+        node_id: String
+    ) -> Result<ExportNodeOutputResult> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        // Find the plan for this project
+        let plan = plans::Entity::find()
+            .filter(plans::Column::ProjectId.eq(project_id))
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Plan not found for project"))?;
+
+        // Get the output node
+        let output_node = plan_dag_nodes::Entity::find()
+            .filter(
+                plan_dag_nodes::Column::PlanId.eq(plan.id)
+                    .and(plan_dag_nodes::Column::Id.eq(&node_id))
+            )
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Output node not found"))?;
+
+        // Parse node config to get renderTarget and outputPath
+        let config: serde_json::Value = serde_json::from_str(&output_node.config_json)
+            .map_err(|e| Error::new(format!("Failed to parse node config: {}", e)))?;
+
+        let render_target = config.get("renderTarget")
+            .and_then(|v| v.as_str())
+            .unwrap_or("GML");
+
+        let output_path = config.get("outputPath")
+            .and_then(|v| v.as_str());
+
+        // Get project name for default filename
+        let project = projects::Entity::find_by_id(project_id)
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Project not found"))?;
+
+        // Generate filename
+        let extension = get_extension_for_format(render_target);
+        let filename = output_path
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| format!("{}.{}", project.name, extension));
+
+        // Find the upstream GraphNode connected to this OutputNode
+        let edges = plan_dag_edges::Entity::find()
+            .filter(plan_dag_edges::Column::PlanId.eq(plan.id))
+            .all(&context.db)
+            .await?;
+
+        let upstream_node_id = edges
+            .iter()
+            .find(|e| e.target_node_id == node_id)
+            .map(|e| e.source_node_id.clone())
+            .ok_or_else(|| Error::new("No upstream graph connected to output node"))?;
+
+        // Get all nodes and edges for DAG execution
+        let all_nodes = plan_dag_nodes::Entity::find()
+            .filter(plan_dag_nodes::Column::PlanId.eq(plan.id))
+            .all(&context.db)
+            .await?;
+
+        let edge_tuples: Vec<(String, String)> = edges
+            .iter()
+            .map(|e| (e.source_node_id.clone(), e.target_node_id.clone()))
+            .collect();
+
+        // Execute the upstream GraphNode and its dependencies to ensure graph is built
+        let executor = DagExecutor::new(context.db.clone());
+        executor
+            .execute_with_dependencies(project_id, plan.id, &upstream_node_id, &all_nodes, &edge_tuples)
+            .await
+            .map_err(|e| Error::new(format!("Failed to execute graph: {}", e)))?;
+
+        // Get the built graph from the graphs table using the GraphNode's ID
+        use crate::database::entities::graphs;
+        let graph_model = graphs::Entity::find()
+            .filter(graphs::Column::ProjectId.eq(project_id))
+            .filter(graphs::Column::NodeId.eq(&upstream_node_id))
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new(format!("Graph not found for node {}", upstream_node_id)))?;
+
+        // Build Graph object from the DAG-built graph
+        use crate::services::GraphService;
+        let graph_service = GraphService::new(context.db.clone());
+        let graph = graph_service.build_graph_from_dag_graph(graph_model.id)
+            .await
+            .map_err(|e| Error::new(format!("Failed to build graph: {}", e)))?;
+
+        // Export the graph
+        let export_service = ExportService::new(context.db.clone());
+        let content = export_service.export_to_string(&graph, &parse_export_format(render_target)?)
+            .map_err(|e| Error::new(format!("Export failed: {}", e)))?;
+
+        // Encode as base64
+        use base64::Engine;
+        let encoded_content = base64::engine::general_purpose::STANDARD.encode(content.as_bytes());
+
+        // Get MIME type
+        let mime_type = get_mime_type_for_format(render_target);
+
+        Ok(ExportNodeOutputResult {
+            success: true,
+            message: format!("Successfully exported {} as {}", filename, render_target),
+            content: encoded_content,
+            filename,
+            mime_type,
+        })
+    }
+
+    /// Create a new graph edit
+    async fn create_graph_edit(
+        &self,
+        ctx: &Context<'_>,
+        input: CreateGraphEditInput,
+    ) -> Result<GraphEdit> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let service = GraphEditService::new(context.db.clone());
+
+        let edit = service
+            .create_edit(
+                input.graph_id,
+                input.target_type,
+                input.target_id,
+                input.operation,
+                input.field_name,
+                input.old_value,
+                input.new_value,
+                input.created_by,
+            )
+            .await
+            .map_err(|e| Error::new(format!("Failed to create graph edit: {}", e)))?;
+
+        Ok(GraphEdit::from(edit))
+    }
+
+    /// Replay all unapplied edits for a graph
+    async fn replay_graph_edits(&self, ctx: &Context<'_>, graph_id: i32) -> Result<ReplaySummary> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let service = GraphEditService::new(context.db.clone());
+
+        let summary = service
+            .replay_graph_edits(graph_id)
+            .await
+            .map_err(|e| Error::new(format!("Failed to replay graph edits: {}", e)))?;
+
+        Ok(ReplaySummary {
+            total: summary.total as i32,
+            applied: summary.applied as i32,
+            skipped: summary.skipped as i32,
+            failed: summary.failed as i32,
+            details: summary
+                .details
+                .into_iter()
+                .map(|d| EditResult {
+                    sequence_number: d.sequence_number,
+                    target_type: d.target_type,
+                    target_id: d.target_id,
+                    operation: d.operation,
+                    result: d.result,
+                    message: d.message,
+                })
+                .collect(),
+        })
+    }
+
+    /// Clear all edits for a graph
+    async fn clear_graph_edits(&self, ctx: &Context<'_>, graph_id: i32) -> Result<bool> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let service = GraphEditService::new(context.db.clone());
+
+        service
+            .clear_graph_edits(graph_id)
+            .await
+            .map_err(|e| Error::new(format!("Failed to clear graph edits: {}", e)))?;
+
+        Ok(true)
+    }
+}
+
+// Helper function to get file extension for render target
+fn get_extension_for_format(format: &str) -> &str {
+    match format {
+        "DOT" => "dot",
+        "GML" => "gml",
+        "JSON" => "json",
+        "CSV" => "csv",
+        "CSVNodes" => "csv",
+        "CSVEdges" => "csv",
+        "PlantUML" => "puml",
+        "Mermaid" => "mermaid",
+        _ => "txt",
+    }
+}
+
+// Helper function to get MIME type for render target
+fn get_mime_type_for_format(format: &str) -> String {
+    match format {
+        "DOT" => "text/vnd.graphviz",
+        "GML" => "text/plain",
+        "JSON" => "application/json",
+        "CSV" | "CSVNodes" | "CSVEdges" => "text/csv",
+        "PlantUML" => "text/plain",
+        "Mermaid" => "text/plain",
+        _ => "text/plain",
+    }.to_string()
+}
+
+// Helper function to parse render target string to ExportFileType enum
+fn parse_export_format(format: &str) -> Result<crate::plan::ExportFileType> {
+    use crate::plan::ExportFileType;
+    match format {
+        "DOT" => Ok(ExportFileType::DOT),
+        "GML" => Ok(ExportFileType::GML),
+        "JSON" => Ok(ExportFileType::JSON),
+        "PlantUML" => Ok(ExportFileType::PlantUML),
+        "Mermaid" => Ok(ExportFileType::Mermaid),
+        "CSVNodes" => Ok(ExportFileType::CSVNodes),
+        "CSVEdges" => Ok(ExportFileType::CSVEdges),
+        "CSV" => Ok(ExportFileType::CSVNodes), // Default CSV to nodes
+        _ => Err(Error::new(format!("Unsupported export format: {}", format))),
+    }
+}
+
+#[derive(SimpleObject)]
+pub struct PlanExecutionResult {
+    pub success: bool,
+    pub message: String,
+    pub output_files: Vec<String>,
+}
+
+#[derive(SimpleObject)]
+pub struct NodeExecutionResult {
+    pub success: bool,
+    pub message: String,
+    pub node_id: String,
+}
+
+#[derive(SimpleObject)]
+pub struct ImportPlanResult {
+    pub success: bool,
+    pub message: String,
+    pub node_count: i32,
+    pub edge_count: i32,
+}
+
+#[derive(SimpleObject)]
+pub struct ExportNodeOutputResult {
+    pub success: bool,
+    pub message: String,
+    pub content: String,  // Base64 encoded
+    pub filename: String,
+    pub mime_type: String,
+}

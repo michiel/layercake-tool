@@ -1,0 +1,58 @@
+# Tauri build ignore file
+# Files and directories listed here will be excluded from the bundle
+
+# Development files
+.git
+.gitignore
+.github
+*.md
+CLAUDE.md
+PLAN.md
+TODO.md
+IMPLEMENTATION*.md
+*.log
+*.txt
+
+# Build artifacts
+target/
+node_modules/
+dist/
+
+# Test files
+**/tests/
+**/*_test.rs
+**/*.test.ts
+**/*.test.tsx
+
+# Documentation
+docs/
+adr/
+images/
+
+# Sample data
+sample/
+out/
+
+# Development scripts
+dev.sh
+dev.bat
+scripts/
+DEV_SCRIPTS.md
+
+# Temporary files
+tmp/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE files
+.vscode/
+.idea/
+*.iml
+
+# Docker
+docker-compose/
+Dockerfile
+docker-compose.yml
