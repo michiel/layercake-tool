@@ -66,7 +66,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npm run tauri:build
+          pushd src-tauri >/dev/null
+          cargo tauri build
+          popd >/dev/null
       - name: Collect Tauri artifacts
         shell: bash
         run: |
@@ -74,7 +76,7 @@ jobs:
           mkdir -p tauri-dist
           case "${{ matrix.platform.os-name }}" in
             linux-*)
-              find src-tauri/target/release/bundle -type f \( -name '*.AppImage' -o -name '*.deb' -o -name '*.rpm' \) -print -exec cp {} tauri-dist/ \;
+              find src-tauri/target/release/bundle -type f \( -name '*.AppImage' -o -name '*.deb' -o -name '*.rpm' -o -name '*.tar.gz' \) -print -exec cp {} tauri-dist/ \;
               ;;
             windows-*)
               find src-tauri/target/release/bundle -type f \( -name '*.msi' -o -name '*.exe' \) -print -exec cp {} tauri-dist/ \;
