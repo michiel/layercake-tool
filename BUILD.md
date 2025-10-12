@@ -72,9 +72,11 @@ npm run tauri:dev
 ```
 
 This will:
-1. Build the frontend with hot-reload
-2. Start the embedded backend server
-3. Launch the Tauri development window
+1. Start the Vite dev server at `http://localhost:5173`
+2. Start the embedded backend server on port `3030`
+3. Launch the Tauri window pointed at the dev server
+
+_Tip:_ Run `npm run frontend:dev` when you only need the standalone web app without the Tauri shell.
 
 ### Backend Only
 
@@ -197,6 +199,8 @@ Key configuration options:
   "version": "0.1.7",
   "identifier": "com.layercake.app",
   "build": {
+    "beforeDevCommand": "cd ../frontend && npm run dev -- --host 127.0.0.1 --port 5173",
+    "devPath": "http://localhost:5173",
     "beforeBuildCommand": "cd ../frontend && npm run build",
     "frontendDist": "../frontend/dist"
   },
@@ -220,6 +224,8 @@ Key configuration options:
 
 - `TAURI_SIGNING_PRIVATE_KEY`: Private key for update signing
 - `TAURI_SIGNING_PUBLIC_KEY`: Public key for update verification
+- `APPLE_ID` / `APPLE_TEAM_ID` / `APPLE_APP_SPECIFIC_PASSWORD`: Credentials for macOS signing and notarization pipelines
+- `WINDOWS_CERT_THUMBPRINT` (or `WINDOWS_CERT_PATH` + `WINDOWS_CERT_PASSWORD`): Certificate configuration for Windows signing
 
 ## Troubleshooting
 
@@ -256,56 +262,20 @@ sudo apt install libwebkit2gtk-4.1-dev
 
 ## CI/CD
 
-### GitHub Actions Example
+GitHub Actions builds run via `.github/workflows/tauri-build.yml`.  
+The workflow:
+- spins up jobs on Ubuntu, macOS, and Windows runners
+- installs Node 20, Rust stable, and the Tauri CLI
+- installs Linux WebKit dependencies when needed
+- runs `npm run frontend:install` followed by `npm run tauri:build`
+- uploads the bundles from `src-tauri/target/release/bundle/` as artifacts
 
-```yaml
-name: Build Tauri App
+**Secrets** (optional but recommended for signed releases):
+- `APPLE_ID`, `APPLE_TEAM_ID`, `APPLE_APP_SPECIFIC_PASSWORD` for macOS notarization
+- `TAURI_SIGNING_PRIVATE_KEY` / `TAURI_SIGNING_PUBLIC_KEY` for Tauri updater signing
+- `WINDOWS_CERT_THUMBPRINT` (or `WINDOWS_CERT_PATH` + `WINDOWS_CERT_PASSWORD`) for Windows signing
 
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-
-jobs:
-  build:
-    strategy:
-      matrix:
-        platform: [ubuntu-latest, macos-latest, windows-latest]
-
-    runs-on: ${{ matrix.platform }}
-
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Setup Node
-        uses: actions/setup-node@v3
-        with:
-          node-version: 18
-
-      - name: Setup Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-
-      - name: Install dependencies (Linux)
-        if: matrix.platform == 'ubuntu-latest'
-        run: |
-          sudo apt update
-          sudo apt install libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libayatana-appindicator3-dev librsvg2-dev
-
-      - name: Install frontend dependencies
-        run: npm run frontend:install
-
-      - name: Build Tauri app
-        run: npm run tauri:build
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: layercake-${{ matrix.platform }}
-          path: src-tauri/target/release/bundle/
-```
+Builds succeed without these secrets, but the resulting artifacts will be unsigned.
 
 ## Bundle Size Optimization
 
