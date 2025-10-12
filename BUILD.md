@@ -199,9 +199,9 @@ Key configuration options:
   "version": "0.1.7",
   "identifier": "com.layercake.app",
   "build": {
-    "beforeDevCommand": "npm run --prefix ../frontend dev -- --host 127.0.0.1 --port 5173",
+    "beforeDevCommand": "node ./scripts/run-frontend.js dev -- --host 127.0.0.1 --port 5173",
     "devUrl": "http://localhost:5173",
-    "beforeBuildCommand": "npm run --prefix ../frontend build",
+    "beforeBuildCommand": "node ./scripts/run-frontend.js build",
     "frontendDist": "../frontend/dist"
   },
   "bundle": {
@@ -277,7 +277,7 @@ The workflow:
 
 Builds succeed without these secrets, but the resulting artifacts will be unsigned.
 
-The automated release workflow (`.github/workflows/release.yml`) runs on tag creation and now produces both the Rust CLI binaries and the Tauri desktop bundles (AppImage/deb, MSI/EXE, DMG/zip). Ensure the frontend can build headlessly and that the icon assets are valid Windows resources before tagging.
+The automated release workflow (`.github/workflows/release.yml`) runs on tag creation and now produces both the Rust CLI binaries and the Tauri desktop bundles (AppImage/deb, MSI/EXE, DMG/zip). Frontend builds are triggered through `src-tauri/scripts/run-frontend.js`, which resolves the frontend path relative to the Tauri config so it works in CI environments. Ensure the frontend can build headlessly and that the icon assets are valid Windows resources before tagging.
 
 ## Bundle Size Optimization
 
