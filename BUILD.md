@@ -277,6 +277,8 @@ The workflow:
 
 Builds succeed without these secrets, but the resulting artifacts will be unsigned.
 
+The automated release workflow (`.github/workflows/release.yml`) runs on tag creation and now produces both the Rust CLI binaries and the Tauri desktop bundles (AppImage/deb, MSI/EXE, DMG/zip). Ensure the frontend can build headlessly and that the icon assets are valid Windows resources before tagging.
+
 ## Bundle Size Optimization
 
 Current bundle sizes (approximate):

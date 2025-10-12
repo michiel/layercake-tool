@@ -60,6 +60,42 @@ jobs:
           args: "--locked --release"
           strip: true
           use-cross: false
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version "^2.0" --locked
+      - name: Build Tauri desktop bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run tauri:build
+      - name: Collect Tauri artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p tauri-dist
+          case "${{ matrix.platform.os-name }}" in
+            linux-*)
+              find src-tauri/target/release/bundle -type f \( -name '*.AppImage' -o -name '*.deb' -o -name '*.rpm' \) -print -exec cp {} tauri-dist/ \;
+              ;;
+            windows-*)
+              find src-tauri/target/release/bundle -type f \( -name '*.msi' -o -name '*.exe' \) -print -exec cp {} tauri-dist/ \;
+              ;;
+            macos-*)
+              find src-tauri/target/release/bundle -type f \( -name '*.dmg' -o -name '*.pkg' \) -print -exec cp {} tauri-dist/ \;
+              app_path=$(find src-tauri/target/release/bundle/macos -maxdepth 1 -type d -name '*.app' | head -n 1)
+              if [[ -n "$app_path" ]]; then
+                base_name="$(basename "$app_path" .app)"
+                zip_name="${base_name}-${{ matrix.platform.os-name }}-${{ github.event.release.tag_name }}.zip"
+                (cd "$(dirname "$app_path")" && ditto -c -k --keepParent "${base_name}.app" "${GITHUB_WORKSPACE}/tauri-dist/${zip_name}")
+              fi
+              ;;
+          esac
+          ls -la tauri-dist
+      - name: Upload Tauri bundles to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: tauri-dist/*
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fail_on_unmatched_files: true
       - name: Publish artifacts and release
         uses: houseabsolute/actions-rust-release@v0
         with:
