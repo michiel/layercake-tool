@@ -199,9 +199,9 @@ Key configuration options:
   "version": "0.1.7",
   "identifier": "com.layercake.app",
   "build": {
-    "beforeDevCommand": "cd ../frontend && npm run dev -- --host 127.0.0.1 --port 5173",
+    "beforeDevCommand": "npm run --prefix ../frontend dev -- --host 127.0.0.1 --port 5173",
     "devUrl": "http://localhost:5173",
-    "beforeBuildCommand": "cd ../frontend && npm run build",
+    "beforeBuildCommand": "npm run --prefix ../frontend build",
     "frontendDist": "../frontend/dist"
   },
   "bundle": {
