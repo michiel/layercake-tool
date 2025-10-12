@@ -225,7 +225,7 @@ Chose web-based UI over native menu for better UX:
 
 **Tasks**:
 1. ✅ Update `src-tauri/tauri.conf.json` with bundle metadata (icons, identifiers, platform sections).  
-   - Follow-up: swap `beforeDevCommand` to use `frontend:dev` once hot-reload wiring is ready.  
+   - Follow-up: ensure dev workflow supports both standalone Vite (`npm run frontend:dev`) and Tauri-embedded sessions without redundant rebuilds.  
 2. ✅ Create platform-specific build scripts under `scripts/`.  
 3. ✅ Add Tauri build scripts to the workspace `package.json`.  
 4. ✅ Add `.taurignore` entries for docs, samples, and dev tooling.  
@@ -233,7 +233,7 @@ Chose web-based UI over native menu for better UX:
 6. ⏳ Decide on code-signing/notarization workflow and document environment variables.
 
 **Success Criteria**:
-- 🔄 `npm run tauri:dev` launches a hot-reload workflow without rebuilding the frontend each time.  
+- 🔄 `npm run tauri:dev` launches a hot-reload workflow without rebuilding the frontend each time while keeping the standalone `npm run frontend:dev` path intact.  
 - 🔄 `npm run tauri:build` creates platform bundles using the new scripts (confirm on at least one OS).  
 - ⏳ macOS and Windows signing paths validated (even if optional during dev).  
 - ⏳ CI job produces artifacts for Linux/macOS/Windows.  
