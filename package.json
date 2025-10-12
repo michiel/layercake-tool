@@ -1,0 +1,33 @@
+{
+  "name": "layercake-tool",
+  "version": "0.1.7",
+  "description": "Interactive graph transformation and visualization tool",
+  "private": true,
+  "scripts": {
+    "tauri:dev": "cd src-tauri && cargo tauri dev",
+    "tauri:build": "cd src-tauri && cargo tauri build",
+    "tauri:build:linux": "./scripts/build-linux.sh",
+    "tauri:build:macos": "./scripts/build-macos.sh",
+    "tauri:build:windows": "./scripts/build-windows.sh",
+    "frontend:dev": "cd frontend && npm run dev",
+    "frontend:build": "cd frontend && npm run build",
+    "frontend:install": "cd frontend && npm install",
+    "backend:build": "cargo build -p layercake-core",
+    "backend:test": "cargo test -p layercake-core",
+    "install:all": "npm run frontend:install"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/michiel/layercake-tool"
+  },
+  "keywords": [
+    "graph",
+    "visualization",
+    "transformation",
+    "tauri",
+    "desktop",
+    "collaboration"
+  ],
+  "author": "Layercake Contributors",
+  "license": "MIT OR Apache-2.0"
+}

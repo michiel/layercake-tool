@@ -33,10 +33,27 @@
     ],
     "resources": [],
     "externalBin": [],
-    "copyright": "",
+    "copyright": "Copyright © 2025 Layercake Contributors",
     "category": "DeveloperTool",
     "shortDescription": "Interactive graph transformation and visualization tool",
-    "longDescription": "Layercake is a collaborative graph editing platform that allows users to create, edit, and transform graphs visually with real-time collaboration features."
+    "longDescription": "Layercake is a collaborative graph editing platform that allows users to create, edit, and transform graphs visually with real-time collaboration features.",
+    "linux": {
+      "deb": {
+        "depends": []
+      },
+      "appimage": {
+        "bundleMediaFramework": false
+      }
+    },
+    "macOS": {
+      "minimumSystemVersion": "10.13",
+      "exceptionDomain": ""
+    },
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": ""
+    }
   },
   "plugins": {}
 }

@@ -777,17 +777,17 @@ const ProjectDetailPage = () => {
 
   const projectActions = [
     {
+      title: 'Data Sources',
+      description: 'Manage CSV and JSON files that serve as input data for your Plan DAGs',
+      icon: <IconFileDatabase size={20} />,
+      onClick: () => navigate(`/projects/${projectId}/datasources`),
+    },
+    {
       title: 'Plan',
       description: 'Create and edit Plan DAGs with visual node-based interface',
       icon: <IconGraph size={20} />,
       onClick: () => navigate(`/projects/${projectId}/plan`),
       primary: true,
-    },
-    {
-      title: 'Data Sources',
-      description: 'Manage CSV and JSON files that serve as input data for your Plan DAGs',
-      icon: <IconFileDatabase size={20} />,
-      onClick: () => navigate(`/projects/${projectId}/datasources`),
     },
     {
       title: 'Graphs',

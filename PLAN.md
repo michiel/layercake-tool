@@ -215,46 +215,31 @@ Chose web-based UI over native menu for better UX:
 
 **Goal**: Configure Tauri build process for all platforms
 
+**Status**: 🔄 In Progress (last sync: 2025-02-15)
+
+**Recent Updates**:
+- Added cross-platform shell helpers in `scripts/build-*.sh` for Linux, macOS, and Windows packaging.
+- Introduced root-level `package.json` scripts so `npm run tauri:*` commands wrap the right build steps.
+- Captured platform prerequisites and workflows in `BUILD.md` for contributors.
+- Extended `src-tauri/tauri.conf.json` with per-platform bundle metadata and added `src-tauri/.taurignore` to trim artifacts.
+
 **Tasks**:
-1. Update `src-tauri/tauri.conf.json`:
-   - Configure bundle identifier
-   - Set up icons for all platforms
-   - Configure code signing (optional for development)
-   - Set bundle resources (include any assets needed)
-   - Configure installer options
-
-2. Create platform-specific build scripts:
-   - `scripts/build-linux.sh`: Linux AppImage/Deb/RPM
-   - `scripts/build-macos.sh`: macOS DMG/App bundle
-   - `scripts/build-windows.sh`: Windows MSI/NSIS installer
-
-3. Update `package.json` in project root:
-   ```json
-   "scripts": {
-     "tauri:dev": "cargo tauri dev",
-     "tauri:build": "cargo tauri build",
-     "tauri:build:linux": "./scripts/build-linux.sh",
-     "tauri:build:macos": "./scripts/build-macos.sh",
-     "tauri:build:windows": "./scripts/build-windows.sh"
-   }
-   ```
-
-4. Create `.taurignore` to exclude unnecessary files from bundle
-
-5. Configure GitHub Actions for automated builds (optional):
-   - Build for Linux x64
-   - Build for macOS x64 and ARM64
-   - Build for Windows x64
-   - Upload artifacts
+1. ✅ Update `src-tauri/tauri.conf.json` with bundle metadata (icons, identifiers, platform sections).  
+   - Follow-up: swap `beforeDevCommand` to use `frontend:dev` once hot-reload wiring is ready.  
+2. ✅ Create platform-specific build scripts under `scripts/`.  
+3. ✅ Add Tauri build scripts to the workspace `package.json`.  
+4. ✅ Add `.taurignore` entries for docs, samples, and dev tooling.  
+5. ⏳ Configure GitHub Actions for automated builds (artifacts per platform, signing placeholders).  
+6. ⏳ Decide on code-signing/notarization workflow and document environment variables.
 
 **Success Criteria**:
-- ✅ `cargo tauri dev` runs development version
-- ✅ `cargo tauri build` creates production bundle
-- ✅ Built app runs without external dependencies
-- ✅ App is correctly signed (on macOS)
-- ✅ Installer packages are created
+- 🔄 `npm run tauri:dev` launches a hot-reload workflow without rebuilding the frontend each time.  
+- 🔄 `npm run tauri:build` creates platform bundles using the new scripts (confirm on at least one OS).  
+- ⏳ macOS and Windows signing paths validated (even if optional during dev).  
+- ⏳ CI job produces artifacts for Linux/macOS/Windows.  
+- ✅ Bundles exclude large docs/samples per `.taurignore` and still run offline.
 
-**Platform Outputs**:
+**Platform Outputs** (unchanged):
 - Linux: `.AppImage`, `.deb`, `.rpm` in `src-tauri/target/release/bundle/`
 - macOS: `.app`, `.dmg` in `src-tauri/target/release/bundle/`
 - Windows: `.msi`, `.exe` in `src-tauri/target/release/bundle/`
