@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Title, Card, Text, Group, Button, Stack, Alert, LoadingOverlay, Badge } from '@mantine/core';
 import { IconDatabase, IconRefresh, IconFolder, IconAlertCircle, IconCheck } from '@tabler/icons-react';
-import { invoke } from "@tauri-apps/api/primitives";
+import { invoke } from "@tauri-apps/api/core";
 
 interface DatabaseInfo {
   path: string;
