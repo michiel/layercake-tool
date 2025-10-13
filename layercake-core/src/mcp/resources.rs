@@ -1,10 +1,13 @@
 //! Layercake resource registry for MCP
 //! Implements layercake:// URI scheme for accessing project data, plans, and graph exports
 
-use axum_mcp::prelude::*;
-use axum_mcp::server::resource::{Resource, ResourceContent, ResourceTemplate, ResourceSubscription, UriSchemeConfig, ResourceRegistry};
-use axum_mcp::protocol::ToolContent;
 use crate::services::GraphService;
+use axum_mcp::prelude::*;
+use axum_mcp::protocol::ToolContent;
+use axum_mcp::server::resource::{
+    Resource, ResourceContent, ResourceRegistry, ResourceSubscription, ResourceTemplate,
+    UriSchemeConfig,
+};
 use sea_orm::DatabaseConnection;
 use serde_json::json;
 use std::collections::HashMap;
@@ -19,23 +22,24 @@ pub struct LayercakeResourceRegistry {
 impl LayercakeResourceRegistry {
     pub fn new(db: DatabaseConnection) -> Self {
         let scheme_config = UriSchemeConfig::new(
-            "layercake", 
-            "Layercake graph visualization and transformation resources"
-        ).with_types(vec![
+            "layercake",
+            "Layercake graph visualization and transformation resources",
+        )
+        .with_types(vec![
             "project".to_string(),
             "plan".to_string(),
             "graph".to_string(),
             "export".to_string(),
             "analysis".to_string(),
         ]);
-        
+
         Self { scheme_config, db }
     }
 
     /// Get project resource
     async fn get_project_resource(&self, project_id: i32) -> McpResult<Resource> {
         let _graph_service = GraphService::new(self.db.clone());
-        
+
         // Get project details (assuming we have a method for this)
         // For now, create a basic project resource structure
         let project_data = json!({
@@ -94,17 +98,24 @@ impl LayercakeResourceRegistry {
     /// Get graph export resource
     async fn get_graph_resource(&self, project_id: i32, format: &str) -> McpResult<Resource> {
         // TODO: Fix this function after data model refactoring
-        Err(McpError::Internal { message: "get_graph_resource is not implemented yet".to_string() })
+        Err(McpError::Internal {
+            message: "get_graph_resource is not implemented yet".to_string(),
+        })
     }
 
     /// Get analysis resource
-    async fn get_analysis_resource(&self, project_id: i32, analysis_type: &str) -> McpResult<Resource> {
+    async fn get_analysis_resource(
+        &self,
+        project_id: i32,
+        analysis_type: &str,
+    ) -> McpResult<Resource> {
         match analysis_type {
             "connectivity" => {
                 // Use existing analysis tool functionality
                 let arguments = Some(json!({ "project_id": project_id }));
-                let result = crate::mcp::tools::analysis::analyze_connectivity(arguments, &self.db).await?;
-                
+                let result =
+                    crate::mcp::tools::analysis::analyze_connectivity(arguments, &self.db).await?;
+
                 // Extract the analysis content from the tool result
                 let content = if let Some(ToolContent::Text { text }) = result.content.first() {
                     text.clone()
@@ -126,7 +137,7 @@ impl LayercakeResourceRegistry {
                         meta
                     },
                 })
-            },
+            }
             _ => Err(McpError::Validation {
                 message: format!("Unsupported analysis type: {}", analysis_type),
             }),
@@ -140,7 +151,10 @@ impl ResourceRegistry for LayercakeResourceRegistry {
         &self.scheme_config
     }
 
-    async fn list_resource_templates(&self, _context: &SecurityContext) -> McpResult<Vec<ResourceTemplate>> {
+    async fn list_resource_templates(
+        &self,
+        _context: &SecurityContext,
+    ) -> McpResult<Vec<ResourceTemplate>> {
         Ok(vec![
             ResourceTemplate {
                 uri_template: "layercake://projects/{project_id}".to_string(),
@@ -167,12 +181,17 @@ impl ResourceRegistry for LayercakeResourceRegistry {
             ResourceTemplate {
                 uri_template: "layercake://graphs/{project_id}/{format}".to_string(),
                 name: "Graph Export".to_string(),
-                description: Some("Graph data in various export formats (json, dot, mermaid)".to_string()),
+                description: Some(
+                    "Graph data in various export formats (json, dot, mermaid)".to_string(),
+                ),
                 mime_type: Some("application/json".to_string()),
                 metadata: {
                     let mut meta = HashMap::new();
                     meta.insert("category".to_string(), json!("exports"));
-                    meta.insert("supported_formats".to_string(), json!(["json", "dot", "mermaid"]));
+                    meta.insert(
+                        "supported_formats".to_string(),
+                        json!(["json", "dot", "mermaid"]),
+                    );
                     meta
                 },
             },
@@ -199,38 +218,45 @@ impl ResourceRegistry for LayercakeResourceRegistry {
         }
 
         // Parse URI manually since we don't have the framework's URI parser
-        let uri_without_scheme = uri.strip_prefix("layercake://")
-            .ok_or_else(|| McpError::Validation {
-                message: "Invalid layercake URI".to_string(),
-            })?;
+        let uri_without_scheme =
+            uri.strip_prefix("layercake://")
+                .ok_or_else(|| McpError::Validation {
+                    message: "Invalid layercake URI".to_string(),
+                })?;
 
         let segments: Vec<&str> = uri_without_scheme.split('/').collect();
 
         match segments.as_slice() {
             ["projects", project_id] => {
-                let id = project_id.parse::<i32>().map_err(|_| McpError::Validation {
-                    message: "Invalid project ID".to_string(),
-                })?;
+                let id = project_id
+                    .parse::<i32>()
+                    .map_err(|_| McpError::Validation {
+                        message: "Invalid project ID".to_string(),
+                    })?;
                 self.get_project_resource(id).await
-            },
+            }
             ["plans", plan_id] => {
                 let id = plan_id.parse::<i32>().map_err(|_| McpError::Validation {
                     message: "Invalid plan ID".to_string(),
                 })?;
                 self.get_plan_resource(id).await
-            },
+            }
             ["graphs", project_id, format] => {
-                let id = project_id.parse::<i32>().map_err(|_| McpError::Validation {
-                    message: "Invalid project ID".to_string(),
-                })?;
+                let id = project_id
+                    .parse::<i32>()
+                    .map_err(|_| McpError::Validation {
+                        message: "Invalid project ID".to_string(),
+                    })?;
                 self.get_graph_resource(id, format).await
-            },
+            }
             ["analysis", project_id, analysis_type] => {
-                let id = project_id.parse::<i32>().map_err(|_| McpError::Validation {
-                    message: "Invalid project ID".to_string(),
-                })?;
+                let id = project_id
+                    .parse::<i32>()
+                    .map_err(|_| McpError::Validation {
+                        message: "Invalid project ID".to_string(),
+                    })?;
                 self.get_analysis_resource(id, analysis_type).await
-            },
+            }
             _ => Err(McpError::ResourceNotFound {
                 uri: uri.to_string(),
             }),
@@ -245,15 +271,29 @@ impl ResourceRegistry for LayercakeResourceRegistry {
         }
     }
 
-    async fn subscribe_to_resource(&self, uri: &str, _context: &SecurityContext) -> McpResult<ResourceSubscription> {
+    async fn subscribe_to_resource(
+        &self,
+        uri: &str,
+        _context: &SecurityContext,
+    ) -> McpResult<ResourceSubscription> {
         // For now, return a basic subscription
         Ok(ResourceSubscription {
-            subscription_id: format!("layercake-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis()),
+            subscription_id: format!(
+                "layercake-{}",
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis()
+            ),
             uri: uri.to_string(),
         })
     }
 
-    async fn unsubscribe_from_resource(&self, _subscription_id: &str, _context: &SecurityContext) -> McpResult<()> {
+    async fn unsubscribe_from_resource(
+        &self,
+        _subscription_id: &str,
+        _context: &SecurityContext,
+    ) -> McpResult<()> {
         // For now, just return success
         Ok(())
     }

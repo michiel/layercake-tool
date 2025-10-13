@@ -1,5 +1,5 @@
 use sea_orm::entity::prelude::*;
-use sea_orm::{Set, ActiveValue};
+use sea_orm::{ActiveValue, Set};
 use serde::{Deserialize, Serialize};
 
 /// DataSource entity for uploaded file data (CSV/TSV/JSON)
@@ -26,7 +26,7 @@ pub struct Model {
     pub description: Option<String>,
 
     pub file_format: String, // 'csv', 'tsv', 'json'
-    pub data_type: String, // 'nodes', 'edges', 'layers', 'graph'
+    pub data_type: String,   // 'nodes', 'edges', 'layers', 'graph'
     pub filename: String,
     #[sea_orm(column_type = "Binary(BlobSize::Blob(None))")]
     pub blob: Vec<u8>,
@@ -140,7 +140,10 @@ impl Model {
         } else if self.file_size < 1024 * 1024 * 1024 {
             format!("{:.1} MB", self.file_size as f64 / (1024.0 * 1024.0))
         } else {
-            format!("{:.1} GB", self.file_size as f64 / (1024.0 * 1024.0 * 1024.0))
+            format!(
+                "{:.1} GB",
+                self.file_size as f64 / (1024.0 * 1024.0 * 1024.0)
+            )
         }
     }
 
@@ -255,19 +258,17 @@ impl DataType {
 
     pub fn is_compatible_with_format(&self, format: &FileFormat) -> bool {
         match (format, self) {
-            (FileFormat::Csv, DataType::Nodes) |
-            (FileFormat::Csv, DataType::Edges) |
-            (FileFormat::Csv, DataType::Layers) |
-            (FileFormat::Tsv, DataType::Nodes) |
-            (FileFormat::Tsv, DataType::Edges) |
-            (FileFormat::Tsv, DataType::Layers) |
-            (FileFormat::Json, DataType::Graph) => true,
+            (FileFormat::Csv, DataType::Nodes)
+            | (FileFormat::Csv, DataType::Edges)
+            | (FileFormat::Csv, DataType::Layers)
+            | (FileFormat::Tsv, DataType::Nodes)
+            | (FileFormat::Tsv, DataType::Edges)
+            | (FileFormat::Tsv, DataType::Layers)
+            | (FileFormat::Json, DataType::Graph) => true,
             _ => false,
         }
     }
 }
-
-
 
 #[cfg(test)]
 mod tests {
@@ -275,9 +276,18 @@ mod tests {
 
     #[test]
     fn test_file_format_from_extension() {
-        assert_eq!(FileFormat::from_extension("test.csv"), Some(FileFormat::Csv));
-        assert_eq!(FileFormat::from_extension("test.tsv"), Some(FileFormat::Tsv));
-        assert_eq!(FileFormat::from_extension("test.json"), Some(FileFormat::Json));
+        assert_eq!(
+            FileFormat::from_extension("test.csv"),
+            Some(FileFormat::Csv)
+        );
+        assert_eq!(
+            FileFormat::from_extension("test.tsv"),
+            Some(FileFormat::Tsv)
+        );
+        assert_eq!(
+            FileFormat::from_extension("test.json"),
+            Some(FileFormat::Json)
+        );
         assert_eq!(FileFormat::from_extension("test.txt"), None);
     }
 

@@ -1,12 +1,12 @@
 #![allow(dead_code)]
 
-use anyhow::{Result, anyhow, Error as AnyhowError};
+use anyhow::{anyhow, Error as AnyhowError, Result};
 #[cfg(feature = "graphql")]
 use async_graphql::{Context, Error};
-use sea_orm::{DatabaseConnection, EntityTrait, ColumnTrait, QueryFilter};
 use chrono::Utc;
+use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
 
-use crate::database::entities::{users, user_sessions, project_collaborators};
+use crate::database::entities::{project_collaborators, user_sessions, users};
 #[cfg(feature = "graphql")]
 use crate::graphql::context::GraphQLContext;
 
@@ -26,15 +26,20 @@ impl AuthorizationService {
     #[cfg(feature = "graphql")]
     pub async fn get_authenticated_user(&self, ctx: &Context<'_>) -> Result<users::Model, Error> {
         // Look for session ID in GraphQL context extensions
-        let session_id = ctx.data_opt::<String>()
+        let session_id = ctx
+            .data_opt::<String>()
             .ok_or_else(|| Error::new("No session ID provided"))?;
 
-        self.get_user_from_session(session_id).await
+        self.get_user_from_session(session_id)
+            .await
             .map_err(|e| Error::new(e.to_string()))
     }
 
     /// Get user from session ID
-    pub async fn get_user_from_session(&self, session_id: &str) -> Result<users::Model, AnyhowError> {
+    pub async fn get_user_from_session(
+        &self,
+        session_id: &str,
+    ) -> Result<users::Model, AnyhowError> {
         // Find active session
         let session = user_sessions::Entity::find()
             .filter(user_sessions::Column::SessionId.eq(session_id))
@@ -66,7 +71,12 @@ impl AuthorizationService {
     }
 
     /// Check if user has access to a project
-    pub async fn check_project_access(&self, user_id: i32, project_id: i32, required_role: Option<ProjectRole>) -> Result<ProjectCollaboratorInfo, AnyhowError> {
+    pub async fn check_project_access(
+        &self,
+        user_id: i32,
+        project_id: i32,
+        required_role: Option<ProjectRole>,
+    ) -> Result<ProjectCollaboratorInfo, AnyhowError> {
         let collaboration = project_collaborators::Entity::find()
             .filter(project_collaborators::Column::UserId.eq(user_id))
             .filter(project_collaborators::Column::ProjectId.eq(project_id))
@@ -75,20 +85,24 @@ impl AuthorizationService {
             .await
             .map_err(|e| anyhow!("Database error: {}", e))?;
 
-        let collaboration = collaboration.ok_or_else(|| anyhow!("Access denied: No access to this project"))?;
+        let collaboration =
+            collaboration.ok_or_else(|| anyhow!("Access denied: No access to this project"))?;
 
         // Check invitation status
         if collaboration.invitation_status != "accepted" {
             return Err(anyhow!("Access denied: Invitation not accepted"));
         }
 
-        let user_role = ProjectRole::from_str(&collaboration.role)
-            .map_err(|_| anyhow!("Invalid user role"))?;
+        let user_role =
+            ProjectRole::from_str(&collaboration.role).map_err(|_| anyhow!("Invalid user role"))?;
 
         // Check if user has required role
         if let Some(required) = required_role {
             if !user_role.has_permission(&required) {
-                return Err(anyhow!("Access denied: Requires {} role", required.as_str()));
+                return Err(anyhow!(
+                    "Access denied: Requires {} role",
+                    required.as_str()
+                ));
             }
         }
 
@@ -101,22 +115,40 @@ impl AuthorizationService {
     }
 
     /// Check if user can modify a project (owner or editor)
-    pub async fn check_project_write_access(&self, user_id: i32, project_id: i32) -> Result<ProjectCollaboratorInfo, AnyhowError> {
-        self.check_project_access(user_id, project_id, Some(ProjectRole::Editor)).await
+    pub async fn check_project_write_access(
+        &self,
+        user_id: i32,
+        project_id: i32,
+    ) -> Result<ProjectCollaboratorInfo, AnyhowError> {
+        self.check_project_access(user_id, project_id, Some(ProjectRole::Editor))
+            .await
     }
 
     /// Check if user can delete/manage a project (owner only)
-    pub async fn check_project_admin_access(&self, user_id: i32, project_id: i32) -> Result<ProjectCollaboratorInfo, AnyhowError> {
-        self.check_project_access(user_id, project_id, Some(ProjectRole::Owner)).await
+    pub async fn check_project_admin_access(
+        &self,
+        user_id: i32,
+        project_id: i32,
+    ) -> Result<ProjectCollaboratorInfo, AnyhowError> {
+        self.check_project_access(user_id, project_id, Some(ProjectRole::Owner))
+            .await
     }
 
     /// Check if user can view a project (any role)
-    pub async fn check_project_read_access(&self, user_id: i32, project_id: i32) -> Result<ProjectCollaboratorInfo, AnyhowError> {
+    pub async fn check_project_read_access(
+        &self,
+        user_id: i32,
+        project_id: i32,
+    ) -> Result<ProjectCollaboratorInfo, AnyhowError> {
         self.check_project_access(user_id, project_id, None).await
     }
 
     /// Get user's role in a project
-    pub async fn get_user_project_role(&self, user_id: i32, project_id: i32) -> Result<Option<ProjectRole>, AnyhowError> {
+    pub async fn get_user_project_role(
+        &self,
+        user_id: i32,
+        project_id: i32,
+    ) -> Result<Option<ProjectRole>, AnyhowError> {
         let collaboration = project_collaborators::Entity::find()
             .filter(project_collaborators::Column::UserId.eq(user_id))
             .filter(project_collaborators::Column::ProjectId.eq(project_id))
@@ -137,7 +169,11 @@ impl AuthorizationService {
     }
 
     /// Check if user can manage collaborators (owner only)
-    pub async fn check_collaboration_management_access(&self, user_id: i32, project_id: i32) -> Result<(), AnyhowError> {
+    pub async fn check_collaboration_management_access(
+        &self,
+        user_id: i32,
+        project_id: i32,
+    ) -> Result<(), AnyhowError> {
         self.check_project_admin_access(user_id, project_id).await?;
         Ok(())
     }
@@ -173,10 +209,10 @@ impl ProjectRole {
     pub fn has_permission(&self, required: &ProjectRole) -> bool {
         use ProjectRole::*;
         match (self, required) {
-            (Owner, _) => true,              // Owner can do everything
-            (Editor, Editor) => true,        // Editor can edit
-            (Editor, Viewer) => true,        // Editor can view
-            (Viewer, Viewer) => true,        // Viewer can view
+            (Owner, _) => true,       // Owner can do everything
+            (Editor, Editor) => true, // Editor can edit
+            (Editor, Viewer) => true, // Editor can view
+            (Viewer, Viewer) => true, // Viewer can view
             _ => false,
         }
     }
@@ -209,13 +245,15 @@ pub struct ProjectCollaboratorInfo {
 /// Middleware for extracting authentication from GraphQL context
 #[cfg(feature = "graphql")]
 pub async fn extract_auth_from_context(ctx: &Context<'_>) -> Result<AuthenticatedUser, Error> {
-    let context = ctx.data::<GraphQLContext>()
+    let context = ctx
+        .data::<GraphQLContext>()
         .map_err(|_| Error::new("GraphQL context not found"))?;
 
     let auth_service = AuthorizationService::new(context.db.clone());
 
     // Try to get session ID from headers or context
-    let session_id = ctx.data_opt::<String>()
+    let session_id = ctx
+        .data_opt::<String>()
         .ok_or_else(|| Error::new("Authentication required: No session provided"))?;
 
     let user = auth_service.get_user_from_session(session_id).await?;
@@ -237,38 +275,68 @@ pub struct AuthenticatedUser {
 
 impl AuthenticatedUser {
     /// Check project access
-    pub async fn check_project_access(&self, project_id: i32, required_role: Option<ProjectRole>) -> Result<ProjectCollaboratorInfo, AnyhowError> {
-        self.auth_service.check_project_access(self.user.id, project_id, required_role).await
+    pub async fn check_project_access(
+        &self,
+        project_id: i32,
+        required_role: Option<ProjectRole>,
+    ) -> Result<ProjectCollaboratorInfo, AnyhowError> {
+        self.auth_service
+            .check_project_access(self.user.id, project_id, required_role)
+            .await
     }
 
     /// Check if user can read project
     pub async fn can_read_project(&self, project_id: i32) -> bool {
-        self.auth_service.check_project_read_access(self.user.id, project_id).await.is_ok()
+        self.auth_service
+            .check_project_read_access(self.user.id, project_id)
+            .await
+            .is_ok()
     }
 
     /// Check if user can write to project
     pub async fn can_write_project(&self, project_id: i32) -> bool {
-        self.auth_service.check_project_write_access(self.user.id, project_id).await.is_ok()
+        self.auth_service
+            .check_project_write_access(self.user.id, project_id)
+            .await
+            .is_ok()
     }
 
     /// Check if user can admin project
     pub async fn can_admin_project(&self, project_id: i32) -> bool {
-        self.auth_service.check_project_admin_access(self.user.id, project_id).await.is_ok()
+        self.auth_service
+            .check_project_admin_access(self.user.id, project_id)
+            .await
+            .is_ok()
     }
 
     /// Require project read access (throws error if denied)
-    pub async fn require_project_read(&self, project_id: i32) -> Result<ProjectCollaboratorInfo, AnyhowError> {
-        self.auth_service.check_project_read_access(self.user.id, project_id).await
+    pub async fn require_project_read(
+        &self,
+        project_id: i32,
+    ) -> Result<ProjectCollaboratorInfo, AnyhowError> {
+        self.auth_service
+            .check_project_read_access(self.user.id, project_id)
+            .await
     }
 
     /// Require project write access (throws error if denied)
-    pub async fn require_project_write(&self, project_id: i32) -> Result<ProjectCollaboratorInfo, AnyhowError> {
-        self.auth_service.check_project_write_access(self.user.id, project_id).await
+    pub async fn require_project_write(
+        &self,
+        project_id: i32,
+    ) -> Result<ProjectCollaboratorInfo, AnyhowError> {
+        self.auth_service
+            .check_project_write_access(self.user.id, project_id)
+            .await
     }
 
     /// Require project admin access (throws error if denied)
-    pub async fn require_project_admin(&self, project_id: i32) -> Result<ProjectCollaboratorInfo, AnyhowError> {
-        self.auth_service.check_project_admin_access(self.user.id, project_id).await
+    pub async fn require_project_admin(
+        &self,
+        project_id: i32,
+    ) -> Result<ProjectCollaboratorInfo, AnyhowError> {
+        self.auth_service
+            .check_project_admin_access(self.user.id, project_id)
+            .await
     }
 }
 
@@ -310,8 +378,14 @@ mod tests {
     #[test]
     fn test_role_from_string() {
         assert_eq!(ProjectRole::from_str("owner").unwrap(), ProjectRole::Owner);
-        assert_eq!(ProjectRole::from_str("EDITOR").unwrap(), ProjectRole::Editor);
-        assert_eq!(ProjectRole::from_str("viewer").unwrap(), ProjectRole::Viewer);
+        assert_eq!(
+            ProjectRole::from_str("EDITOR").unwrap(),
+            ProjectRole::Editor
+        );
+        assert_eq!(
+            ProjectRole::from_str("viewer").unwrap(),
+            ProjectRole::Viewer
+        );
         assert!(ProjectRole::from_str("admin").is_err());
     }
 

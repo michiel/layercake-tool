@@ -5,8 +5,8 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::path::Path;
 
-use crate::database::entities::{datasource_rows, datasources};
 use crate::database::entities::ExecutionState;
+use crate::database::entities::{datasource_rows, datasources};
 
 /// Service for importing data from files into datasource entities
 pub struct DatasourceImporter {
@@ -37,10 +37,7 @@ impl DatasourceImporter {
         let file_type = match extension.to_lowercase().as_str() {
             "csv" | "tsv" => {
                 // Try to detect from filename
-                let filename = path
-                    .file_name()
-                    .and_then(|f| f.to_str())
-                    .unwrap_or("");
+                let filename = path.file_name().and_then(|f| f.to_str()).unwrap_or("");
 
                 if filename.contains("node") {
                     "nodes"

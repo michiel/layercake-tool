@@ -1,11 +1,11 @@
 use async_graphql::*;
-use sea_orm::{EntityTrait, ColumnTrait, QueryFilter};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
-use crate::database::entities::{layers, graph_nodes, graph_edges};
+use crate::database::entities::{graph_edges, graph_nodes, layers};
 use crate::graphql::context::GraphQLContext;
-use crate::graphql::types::{Layer, Project};
-use crate::graphql::types::graph_node::GraphNode;
 use crate::graphql::types::graph_edge::GraphEdge;
+use crate::graphql::types::graph_node::GraphNode;
+use crate::graphql::types::{Layer, Project};
 
 #[derive(SimpleObject)]
 #[graphql(complex)]
@@ -31,11 +31,12 @@ pub struct Graph {
 #[ComplexObject]
 impl Graph {
     async fn project(&self, ctx: &Context<'_>) -> Result<Project> {
-        let graphql_ctx = ctx.data::<GraphQLContext>()
+        let graphql_ctx = ctx
+            .data::<GraphQLContext>()
             .map_err(|_| Error::new("GraphQL context not found"))?;
 
-        use sea_orm::EntityTrait;
         use crate::database::entities::projects;
+        use sea_orm::EntityTrait;
 
         let project = projects::Entity::find_by_id(self.project_id)
             .one(&graphql_ctx.db)
@@ -52,7 +53,7 @@ impl Graph {
             .filter(layers::Column::GraphId.eq(self.id))
             .all(&context.db)
             .await?;
-        
+
         Ok(layers.into_iter().map(Layer::from).collect())
     }
 

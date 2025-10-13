@@ -51,18 +51,10 @@ pub enum CursorPosition {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ClientMessage {
-    JoinSession {
-        data: JoinSessionData,
-    },
-    CursorUpdate {
-        data: CursorUpdateData,
-    },
-    SwitchDocument {
-        data: DocumentSwitchData,
-    },
-    LeaveSession {
-        data: LeaveSessionData,
-    },
+    JoinSession { data: JoinSessionData },
+    CursorUpdate { data: CursorUpdateData },
+    SwitchDocument { data: DocumentSwitchData },
+    LeaveSession { data: LeaveSessionData },
     Ping,
 }
 
@@ -102,18 +94,10 @@ pub struct LeaveSessionData {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ServerMessage {
-    UserPresence {
-        data: UserPresenceData,
-    },
-    BulkPresence {
-        data: Vec<UserPresenceData>,
-    },
-    DocumentActivity {
-        data: DocumentActivityData,
-    },
-    Error {
-        message: String,
-    },
+    UserPresence { data: UserPresenceData },
+    BulkPresence { data: Vec<UserPresenceData> },
+    DocumentActivity { data: DocumentActivityData },
+    Error { message: String },
     Pong,
 }
 
@@ -196,17 +180,23 @@ impl CollaborationState {
         }
     }
 
-    pub fn get_or_create_project(&self, project_id: i32) -> dashmap::mapref::one::Ref<i32, ProjectSession> {
+    pub fn get_or_create_project(
+        &self,
+        project_id: i32,
+    ) -> dashmap::mapref::one::Ref<i32, ProjectSession> {
         // Use or_insert_with to create the entry if it doesn't exist
-        self.projects.entry(project_id).or_insert_with(|| ProjectSession {
-            users: dashmap::DashMap::new(),
-            documents: dashmap::DashMap::new(),
-            connections: dashmap::DashMap::new(),
-        });
+        self.projects
+            .entry(project_id)
+            .or_insert_with(|| ProjectSession {
+                users: dashmap::DashMap::new(),
+                documents: dashmap::DashMap::new(),
+                connections: dashmap::DashMap::new(),
+            });
 
         // Since we just ensured the entry exists, this should never panic,
         // but we can handle it safely
-        self.projects.get(&project_id)
+        self.projects
+            .get(&project_id)
             .expect("Project entry should exist after or_insert_with")
     }
 }

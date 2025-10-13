@@ -1,5 +1,5 @@
+use crate::server::websocket::types::{CursorPosition, ServerMessage};
 use tokio::sync::{mpsc, oneshot};
-use crate::server::websocket::types::{ServerMessage, CursorPosition};
 
 /// Commands sent to the CollaborationCoordinator
 pub enum CoordinatorCommand {
@@ -35,9 +35,7 @@ pub enum CoordinatorCommand {
         response: oneshot::Sender<ProjectHealthReport>,
     },
     #[allow(dead_code)]
-    Shutdown {
-        response: oneshot::Sender<()>,
-    },
+    Shutdown { response: oneshot::Sender<()> },
 }
 
 /// Commands sent to a ProjectActor

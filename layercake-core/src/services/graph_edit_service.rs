@@ -1,8 +1,11 @@
-use anyhow::Result;
-use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set};
-use tracing::{debug, info, warn};
+use super::graph_edit_applicator::{ApplyResult, GraphEditApplicator};
 use crate::database::entities::graph_edits::{self, Entity as GraphEdits};
-use super::graph_edit_applicator::{GraphEditApplicator, ApplyResult};
+use anyhow::Result;
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
+    QueryOrder, Set,
+};
+use tracing::{debug, info, warn};
 
 /// Service for managing graph edit operations
 ///
@@ -61,7 +64,8 @@ impl GraphEditService {
         let edit = edit.insert(&self.db).await?;
 
         // Update the graph's last_edit_sequence and has_pending_edits
-        self.update_graph_edit_metadata(graph_id, next_sequence).await?;
+        self.update_graph_edit_metadata(graph_id, next_sequence)
+            .await?;
 
         Ok(edit)
     }
@@ -105,8 +109,7 @@ impl GraphEditService {
         graph_id: i32,
         unapplied_only: bool,
     ) -> Result<Vec<graph_edits::Model>> {
-        let mut query = GraphEdits::find()
-            .filter(graph_edits::Column::GraphId.eq(graph_id));
+        let mut query = GraphEdits::find().filter(graph_edits::Column::GraphId.eq(graph_id));
 
         if unapplied_only {
             query = query.filter(graph_edits::Column::Applied.eq(false));
@@ -188,8 +191,7 @@ impl GraphEditService {
 
     /// Get edit count for a graph
     pub async fn get_edit_count(&self, graph_id: i32, unapplied_only: bool) -> Result<u64> {
-        let mut query = GraphEdits::find()
-            .filter(graph_edits::Column::GraphId.eq(graph_id));
+        let mut query = GraphEdits::find().filter(graph_edits::Column::GraphId.eq(graph_id));
 
         if unapplied_only {
             query = query.filter(graph_edits::Column::Applied.eq(false));

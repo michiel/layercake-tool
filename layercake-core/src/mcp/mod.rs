@@ -1,16 +1,16 @@
 //! MCP implementation using axum-mcp framework
-//! 
+//!
 //! This module provides the MCP server implementation for Layercake,
 //! using the axum-mcp framework for standardized MCP protocol support.
 
 #[cfg(feature = "mcp")]
-pub mod server;
-#[cfg(feature = "mcp")]
-pub mod tools;
+pub mod prompts;
 #[cfg(feature = "mcp")]
 pub mod resources;
 #[cfg(feature = "mcp")]
-pub mod prompts;
+pub mod server;
+#[cfg(feature = "mcp")]
+pub mod tools;
 
 #[cfg(feature = "mcp")]
-pub use server::{LayercakeServerState, LayercakeAuth};
+pub use server::{LayercakeAuth, LayercakeServerState};

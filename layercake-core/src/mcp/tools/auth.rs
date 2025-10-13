@@ -1,10 +1,10 @@
 #![allow(dead_code)]
 
-use axum_mcp::prelude::*;
 use crate::database::entities::users;
-use crate::mcp::tools::{get_required_param, get_optional_param, create_success_response};
+use crate::mcp::tools::{create_success_response, get_optional_param, get_required_param};
 use crate::services::auth_service::AuthService;
-use sea_orm::{DatabaseConnection, Set, EntityTrait, ColumnTrait, QueryFilter, ActiveModelTrait};
+use axum_mcp::prelude::*;
+use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 use serde_json::{json, Value};
 
 /// User registration tool
@@ -97,12 +97,9 @@ pub async fn register_user(
         ..Default::default()
     };
 
-    let user = new_user
-        .insert(db)
-        .await
-        .map_err(|e| McpError::Internal {
-            message: format!("Failed to create user: {}", e),
-        })?;
+    let user = new_user.insert(db).await.map_err(|e| McpError::Internal {
+        message: format!("Failed to create user: {}", e),
+    })?;
 
     let result = json!({
         "user_id": user.id,
@@ -148,9 +145,11 @@ pub async fn login_user(
         })?;
 
     // Verify password
-    let password_valid = AuthService::verify_password(password, &user.password_hash)
-        .map_err(|e| McpError::Internal {
-            message: format!("Password verification failed: {}", e),
+    let password_valid =
+        AuthService::verify_password(password, &user.password_hash).map_err(|e| {
+            McpError::Internal {
+                message: format!("Password verification failed: {}", e),
+            }
         })?;
 
     if !password_valid {
@@ -296,9 +295,10 @@ pub async fn change_password(
     }
 
     // Hash new password
-    let new_password_hash = AuthService::hash_password(new_password).map_err(|e| McpError::Internal {
-        message: format!("Failed to hash new password: {}", e),
-    })?;
+    let new_password_hash =
+        AuthService::hash_password(new_password).map_err(|e| McpError::Internal {
+            message: format!("Failed to hash new password: {}", e),
+        })?;
 
     // Update password
     let mut user_active: users::ActiveModel = user.into();

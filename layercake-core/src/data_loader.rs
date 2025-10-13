@@ -1,10 +1,10 @@
+use anyhow::Result;
+use csv::StringRecord;
 use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
-use anyhow::Result;
-use csv::StringRecord;
 
 pub struct DfNodeLoadProfile {
     pub id_column: usize,
@@ -143,10 +143,9 @@ pub fn load_tsv(filename: &str) -> anyhow::Result<Vec<StringRecord>> {
         .delimiter(b'\t')
         .has_headers(true)
         .from_path(path)?;
-    
-    let records: Vec<StringRecord> = reader.records()
-        .collect::<Result<_, _>>()?;
-    
+
+    let records: Vec<StringRecord> = reader.records().collect::<Result<_, _>>()?;
+
     Ok(records)
 }
 
@@ -156,10 +155,9 @@ pub fn load_csv(filename: &str) -> anyhow::Result<Vec<StringRecord>> {
         .delimiter(b',')
         .has_headers(true)
         .from_path(path)?;
-    
-    let records: Vec<StringRecord> = reader.records()
-        .collect::<Result<_, _>>()?;
-    
+
+    let records: Vec<StringRecord> = reader.records().collect::<Result<_, _>>()?;
+
     Ok(records)
 }
 
@@ -187,10 +185,7 @@ pub fn verify_nodes_headers(headers: &[String]) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn verify_id_column(
-    records: &[StringRecord],
-    id_column_index: usize,
-) -> anyhow::Result<()> {
+pub fn verify_id_column(records: &[StringRecord], id_column_index: usize) -> anyhow::Result<()> {
     // Ensure IDs are unique and not missing
     let mut id_set = std::collections::HashSet::new();
     let mut duplicates = Vec::new();

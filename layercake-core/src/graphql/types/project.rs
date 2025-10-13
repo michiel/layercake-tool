@@ -1,10 +1,10 @@
 use async_graphql::*;
 use chrono::{DateTime, Utc};
-use sea_orm::{EntityTrait, ColumnTrait, QueryFilter};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
-use crate::database::entities::{projects, plans};
+use crate::database::entities::{plans, projects};
 use crate::graphql::context::GraphQLContext;
-use crate::graphql::types::{Plan};
+use crate::graphql::types::Plan;
 
 #[derive(SimpleObject)]
 #[graphql(complex)]
@@ -38,7 +38,7 @@ impl Project {
             .filter(plans::Column::ProjectId.eq(self.id))
             .one(&context.db)
             .await?;
-        
+
         Ok(plan.map(Plan::from))
     }
 }

@@ -2,8 +2,8 @@ use anyhow::Result;
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 use std::collections::HashMap;
 
-use crate::database::entities::layers;
 use super::types::LayerData;
+use crate::database::entities::layers;
 
 /// Insert layers from a HashMap into the database for a given graph
 ///

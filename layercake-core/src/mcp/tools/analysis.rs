@@ -1,8 +1,8 @@
 //! Graph analysis tools for MCP
 
-use axum_mcp::prelude::*;
-use crate::mcp::tools::{get_required_param, get_optional_param, create_success_response};
+use crate::mcp::tools::{create_success_response, get_optional_param, get_required_param};
 use crate::services::GraphService;
+use axum_mcp::prelude::*;
 use sea_orm::DatabaseConnection;
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -63,7 +63,9 @@ pub async fn analyze_connectivity(
     db: &DatabaseConnection,
 ) -> McpResult<ToolsCallResult> {
     // TODO: Fix this function after data model refactoring
-    Err(McpError::Internal { message: "analyze_connectivity is not implemented yet".to_string() })
+    Err(McpError::Internal {
+        message: "analyze_connectivity is not implemented yet".to_string(),
+    })
 }
 
 /// Find paths between nodes
@@ -72,7 +74,9 @@ pub async fn find_paths(
     db: &DatabaseConnection,
 ) -> McpResult<ToolsCallResult> {
     // TODO: Fix this function after data model refactoring
-    Err(McpError::Internal { message: "find_paths is not implemented yet".to_string() })
+    Err(McpError::Internal {
+        message: "find_paths is not implemented yet".to_string(),
+    })
 }
 
 /// Find connected components using DFS
@@ -121,7 +125,7 @@ fn find_all_paths(
 ) -> Vec<Vec<String>> {
     let mut paths = Vec::new();
     let mut queue = VecDeque::new();
-    
+
     // Start with a path containing only the source
     queue.push_back(vec![source.to_string()]);
 
@@ -131,20 +135,22 @@ fn find_all_paths(
         }
 
         let current_node = current_path.last().unwrap();
-        
+
         if current_node == target {
             paths.push(current_path);
             continue;
         }
 
         // Avoid cycles by checking if we've already visited this node in this path
-        if current_path.len() > 10 { // Prevent very long paths
+        if current_path.len() > 10 {
+            // Prevent very long paths
             continue;
         }
 
         if let Some(neighbors) = adjacency.get(current_node) {
             for neighbor in neighbors {
-                if !current_path.contains(neighbor) { // Avoid cycles
+                if !current_path.contains(neighbor) {
+                    // Avoid cycles
                     let mut new_path = current_path.clone();
                     new_path.push(neighbor.clone());
                     queue.push_back(new_path);

@@ -1,14 +1,14 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod server;
 mod commands;
+mod server;
 
-use std::sync::Arc;
 use std::path::PathBuf;
+use std::sync::Arc;
 use tauri::Manager;
 use tokio::sync::RwLock;
-use tracing::{info, error};
+use tracing::{error, info};
 
 use server::ServerHandle;
 
@@ -41,8 +41,7 @@ async fn main() {
     // Initialize tracing for desktop application
     tracing_subscriber::fmt()
         .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "info".into()),
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
         )
         .init();
 
@@ -74,9 +73,7 @@ async fn main() {
             // Set database path
             let database_dir = app_data_dir;
             let database_path = database_dir.join("layercake.db");
-            let database_path_str = database_path
-                .to_string_lossy()
-                .to_string();
+            let database_path_str = database_path.to_string_lossy().to_string();
 
             info!("Database path: {}", database_path_str);
 
@@ -93,7 +90,9 @@ async fn main() {
 
             // Start embedded server
             tauri::async_runtime::spawn(async move {
-                match server::start_embedded_server(db_path.to_string_lossy().to_string(), 3030).await {
+                match server::start_embedded_server(db_path.to_string_lossy().to_string(), 3030)
+                    .await
+                {
                     Ok(handle) => {
                         info!("Embedded server started successfully on port 3030");
                         let mut guard = server_handle.write().await;
@@ -109,7 +108,8 @@ async fn main() {
             app.manage(app_state);
 
             // Set up window event handlers
-            let window = app.get_webview_window("main")
+            let window = app
+                .get_webview_window("main")
                 .ok_or_else(|| "Failed to get main window".to_string())?;
 
             // Clone server handle for cleanup

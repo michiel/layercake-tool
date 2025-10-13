@@ -3,9 +3,9 @@ mod data_loader;
 mod export;
 mod generate_commands;
 mod graph;
+mod pipeline;
 mod plan;
 mod plan_execution;
-mod pipeline;
 mod update;
 
 mod database;
@@ -26,7 +26,6 @@ use clap::{Parser, Subcommand};
 use tracing::info;
 use tracing::Level;
 use tracing_subscriber::EnvFilter;
-
 
 #[derive(Parser)]
 #[clap(author, version, about)]
@@ -107,7 +106,6 @@ enum GenerateCommands {
     Sample { sample: String, dir: String },
 }
 
-
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Cli::parse();
@@ -135,7 +133,11 @@ async fn main() -> Result<()> {
                 generate_commands::generate_sample(sample, dir);
             }
         },
-        Commands::Serve { port, database, cors_origin } => {
+        Commands::Serve {
+            port,
+            database,
+            cors_origin,
+        } => {
             info!("Starting server on port {}", port);
             server::start_server(port, &database, cors_origin.as_deref()).await?;
         }
@@ -144,12 +146,22 @@ async fn main() -> Result<()> {
                 info!("Initializing database: {}", database);
                 server::migrate_database(&database, server::MigrateDirection::Up).await?;
             }
-            DbCommands::Migrate { direction, database } => {
+            DbCommands::Migrate {
+                direction,
+                database,
+            } => {
                 info!("Running database migration: {:?}", direction);
                 server::migrate_database(&database, direction).await?;
             }
-        }
-        Commands::Update { check, force, pre_release, backup, rollback, dry_run } => {
+        },
+        Commands::Update {
+            check,
+            force,
+            pre_release,
+            backup,
+            rollback,
+            dry_run,
+        } => {
             let update_cmd = update::command::UpdateCommand {
                 check_only: check,
                 force,
@@ -184,9 +196,7 @@ fn setup_logging(log_level: &Option<String>) {
     };
 
     tracing_subscriber::fmt()
-        .with_env_filter(
-            EnvFilter::new(format!("handlebars=off,{}", log_level)),
-        )
+        .with_env_filter(EnvFilter::new(format!("handlebars=off,{}", log_level)))
         .without_time()
         .init();
 }

@@ -14,26 +14,26 @@ pub mod updater;
 pub enum UpdateError {
     #[error("Network error: {0}")]
     NetworkError(#[from] reqwest::Error),
-    
+
     #[error("Version comparison failed: {0}")]
     VersionError(String),
-    
+
     #[error("Binary verification failed: {0}")]
     VerificationError(String),
-    
+
     #[error("Installation failed: {0}")]
     InstallationError(String),
-    
+
     #[error("Permission denied: {0}")]
     #[allow(dead_code)] // Reserved for future permission handling
     PermissionError(String),
-    
+
     #[error("Backup creation failed: {0}")]
     BackupError(String),
-    
+
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
-    
+
     #[error("JSON parsing error: {0}")]
     JsonError(#[from] serde_json::Error),
 }
@@ -121,8 +121,15 @@ pub struct PlatformInfo {
 #[async_trait]
 pub trait VersionManager {
     async fn get_current_version(&self) -> Result<String, UpdateError>;
-    async fn get_latest_version(&self, include_prerelease: bool) -> Result<ReleaseInfo, UpdateError>;
-    async fn compare_versions(&self, current: &str, latest: &str) -> Result<VersionComparison, UpdateError>;
+    async fn get_latest_version(
+        &self,
+        include_prerelease: bool,
+    ) -> Result<ReleaseInfo, UpdateError>;
+    async fn compare_versions(
+        &self,
+        current: &str,
+        latest: &str,
+    ) -> Result<VersionComparison, UpdateError>;
 }
 
 /// Trait for platform detection
@@ -134,7 +141,11 @@ pub trait PlatformDetector {
 /// Trait for binary management
 #[async_trait]
 pub trait BinaryManager {
-    async fn verify_binary(&self, path: &PathBuf, expected_size: Option<u64>) -> Result<(), UpdateError>;
+    async fn verify_binary(
+        &self,
+        path: &PathBuf,
+        expected_size: Option<u64>,
+    ) -> Result<(), UpdateError>;
     async fn create_backup(&self, current: &PathBuf) -> Result<PathBuf, UpdateError>;
     async fn install_binary(&self, source: &PathBuf, target: &PathBuf) -> Result<(), UpdateError>;
     async fn rollback(&self, backup: &PathBuf, target: &PathBuf) -> Result<(), UpdateError>;
@@ -144,7 +155,11 @@ pub trait BinaryManager {
 #[async_trait]
 pub trait Updater {
     async fn check_for_updates(&self, include_prerelease: bool) -> Result<UpdateInfo, UpdateError>;
-    async fn download_release(&self, release: &ReleaseInfo, platform: &PlatformInfo) -> Result<PathBuf, UpdateError>;
+    async fn download_release(
+        &self,
+        release: &ReleaseInfo,
+        platform: &PlatformInfo,
+    ) -> Result<PathBuf, UpdateError>;
     async fn perform_update(&self, force: bool, backup: bool) -> Result<(), UpdateError>;
 }
 

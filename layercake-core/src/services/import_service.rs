@@ -1,15 +1,11 @@
 use anyhow::Result;
 use csv::ReaderBuilder;
-use sea_orm::{DatabaseConnection, ActiveModelTrait, Set};
+use sea_orm::{ActiveModelTrait, DatabaseConnection, Set};
 use serde_json::Value;
 use std::collections::HashMap;
 use tracing::{info, warn};
 
-use crate::database::entities::{
-    layers,
-};
-
-
+use crate::database::entities::layers;
 
 pub struct ImportService {
     db: DatabaseConnection,
@@ -28,15 +24,21 @@ impl ImportService {
     async fn import_layers(&self, graph_id: i32, csv_data: &str) -> Result<usize> {
         let mut reader = ReaderBuilder::new().from_reader(csv_data.as_bytes());
         let headers = reader.headers()?.clone();
-        
+
         let mut count = 0;
         for record in reader.records() {
             let record = record?;
-            
+
             let layer_id = record.get(0).unwrap_or("").to_string();
             let name = record.get(1).unwrap_or(&layer_id).to_string();
-            let color = record.get(2).and_then(|s| if s.is_empty() { None } else { Some(s.to_string()) });
-            
+            let color = record.get(2).and_then(|s| {
+                if s.is_empty() {
+                    None
+                } else {
+                    Some(s.to_string())
+                }
+            });
+
             if layer_id.is_empty() {
                 warn!("Skipping layer with empty ID");
                 continue;

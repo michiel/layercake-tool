@@ -1,6 +1,6 @@
-use crate::database::entities::{plan_dag_nodes, plan_dag_edges, plans};
-use crate::graphql::types::{PlanDagNode, PlanDagEdge, PatchOperation, PatchOp, PlanDagDeltaEvent};
-use sea_orm::{DatabaseConnection, EntityTrait, ColumnTrait, QueryFilter};
+use crate::database::entities::{plan_dag_edges, plan_dag_nodes, plans};
+use crate::graphql::types::{PatchOp, PatchOperation, PlanDagDeltaEvent, PlanDagEdge, PlanDagNode};
+use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
 
 /// Helper function to generate JSON Patch for node addition
 pub fn generate_node_add_patch(node: &PlanDagNode, index: usize) -> PatchOperation {
@@ -15,7 +15,12 @@ pub fn generate_node_add_patch(node: &PlanDagNode, index: usize) -> PatchOperati
 }
 
 /// Helper function to generate JSON Patch for node update
-pub fn generate_node_update_patch(node_id: &str, field: &str, value: serde_json::Value, nodes: &[PlanDagNode]) -> Option<PatchOperation> {
+pub fn generate_node_update_patch(
+    node_id: &str,
+    field: &str,
+    value: serde_json::Value,
+    nodes: &[PlanDagNode],
+) -> Option<PatchOperation> {
     // Find the index of the node
     let index = nodes.iter().position(|n| n.id == node_id)?;
 
@@ -28,7 +33,12 @@ pub fn generate_node_update_patch(node_id: &str, field: &str, value: serde_json:
 }
 
 /// Helper function to generate JSON Patch for node position update
-pub fn generate_node_position_patch(node_id: &str, x: f64, y: f64, nodes: &[PlanDagNode]) -> Vec<PatchOperation> {
+pub fn generate_node_position_patch(
+    node_id: &str,
+    x: f64,
+    y: f64,
+    nodes: &[PlanDagNode],
+) -> Vec<PatchOperation> {
     if let Some(index) = nodes.iter().position(|n| n.id == node_id) {
         vec![
             PatchOperation {

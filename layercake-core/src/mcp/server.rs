@@ -1,7 +1,7 @@
 //! Layercake MCP server implementation using axum-mcp
 
 use axum_mcp::prelude::*;
-use axum_mcp::server::{ResourceRegistry, PromptRegistry};
+use axum_mcp::server::{PromptRegistry, ResourceRegistry};
 use sea_orm::DatabaseConnection;
 use std::collections::HashMap;
 
@@ -62,7 +62,7 @@ impl McpAuth for LayercakeAuth {
                     if self.validate_api_key(api_key) {
                         return Ok(SecurityContext::authenticated(
                             client_info.clone(),
-                            vec!["api_key".to_string(), "authenticated".to_string()]
+                            vec!["api_key".to_string(), "authenticated".to_string()],
                         ));
                     }
                 }
@@ -73,7 +73,7 @@ impl McpAuth for LayercakeAuth {
                 if self.validate_api_key(api_key) {
                     return Ok(SecurityContext::authenticated(
                         client_info.clone(),
-                        vec!["api_key".to_string(), "authenticated".to_string()]
+                        vec!["api_key".to_string(), "authenticated".to_string()],
                     ));
                 }
             }
@@ -98,12 +98,11 @@ impl McpAuth for LayercakeAuth {
             true
         } else if context.is_authenticated() {
             // Authenticated users can access most resources but not destructive system operations
-            !matches!((resource, action),
-                ("projects", "delete") | ("system", _)
-            )
+            !matches!((resource, action), ("projects", "delete") | ("system", _))
         } else if context.is_anonymous() {
             // Anonymous users have read-only access to non-sensitive resources
-            matches!((resource, action),
+            matches!(
+                (resource, action),
                 ("projects", "read") | ("graph_data", "read") | ("analysis", "read")
             )
         } else {
@@ -139,8 +138,14 @@ impl McpServerState for LayercakeServerState {
             version: env!("CARGO_PKG_VERSION").to_string(),
             metadata: {
                 let mut meta = HashMap::new();
-                meta.insert("description".to_string(), json!("Graph visualization and transformation MCP server"));
-                meta.insert("capabilities".to_string(), json!(["projects", "plans", "graph_data", "import", "export"]));
+                meta.insert(
+                    "description".to_string(),
+                    json!("Graph visualization and transformation MCP server"),
+                );
+                meta.insert(
+                    "capabilities".to_string(),
+                    json!(["projects", "plans", "graph_data", "import", "export"]),
+                );
                 meta
             },
         }
@@ -157,9 +162,7 @@ impl McpServerState for LayercakeServerState {
                 subscribe: true,
                 list_changed: false,
             }),
-            tools: Some(axum_mcp::protocol::ToolsCapability {
-                list_changed: true,
-            }),
+            tools: Some(axum_mcp::protocol::ToolsCapability { list_changed: true }),
             batch: None,
         }
     }
@@ -181,19 +184,19 @@ impl LayercakeToolRegistry {
 impl ToolRegistry for LayercakeToolRegistry {
     async fn list_tools(&self, _context: &SecurityContext) -> McpResult<Vec<Tool>> {
         let mut tools = Vec::new();
-        
+
         // Project management tools
         tools.extend(super::tools::projects::get_project_tools());
-        
-        // Plan management tools  
+
+        // Plan management tools
         tools.extend(super::tools::plans::get_plan_tools());
-        
+
         // Graph data tools
         tools.extend(super::tools::graph_data::get_graph_data_tools());
-        
+
         // Analysis tools
         tools.extend(super::tools::analysis::get_analysis_tools());
-        
+
         Ok(tools)
     }
 
@@ -389,33 +392,45 @@ impl ToolRegistry for LayercakeToolRegistry {
             
             _ => None,
         };
-        
+
         Ok(tool)
     }
 
-    async fn execute_tool(&self, name: &str, context: ToolExecutionContext) -> McpResult<ToolsCallResult> {
+    async fn execute_tool(
+        &self,
+        name: &str,
+        context: ToolExecutionContext,
+    ) -> McpResult<ToolsCallResult> {
         match name {
             // Project tools
             "list_projects" => super::tools::projects::list_projects(&self.db).await,
-            "create_project" => super::tools::projects::create_project(context.arguments, &self.db).await,
+            "create_project" => {
+                super::tools::projects::create_project(context.arguments, &self.db).await
+            }
             "get_project" => super::tools::projects::get_project(context.arguments, &self.db).await,
-            "delete_project" => super::tools::projects::delete_project(context.arguments, &self.db).await,
-            
+            "delete_project" => {
+                super::tools::projects::delete_project(context.arguments, &self.db).await
+            }
+
             // Plan tools
             "create_plan" => super::tools::plans::create_plan(context.arguments, &self.db).await,
             "execute_plan" => super::tools::plans::execute_plan(context.arguments, &self.db).await,
-            "get_plan_status" => super::tools::plans::get_plan_status(context.arguments, &self.db).await,
-            
+            "get_plan_status" => {
+                super::tools::plans::get_plan_status(context.arguments, &self.db).await
+            }
+
             // Graph data tools
             // TODO: Implement these tools
             // "import_csv" => super::tools::graph_data::import_csv(context.arguments, &self.db).await,
             // "export_graph" => super::tools::graph_data::export_graph(context.arguments, &self.db).await,
             // "get_graph_data" => super::tools::graph_data::get_graph_data(context.arguments, &self.db).await,
-            
+
             // Analysis tools
-            "analyze_connectivity" => super::tools::analysis::analyze_connectivity(context.arguments, &self.db).await,
+            "analyze_connectivity" => {
+                super::tools::analysis::analyze_connectivity(context.arguments, &self.db).await
+            }
             "find_paths" => super::tools::analysis::find_paths(context.arguments, &self.db).await,
-            
+
             _ => Err(McpError::ToolNotFound {
                 name: name.to_string(),
             }),
@@ -424,11 +439,20 @@ impl ToolRegistry for LayercakeToolRegistry {
 
     async fn can_access_tool(&self, name: &str, _context: &SecurityContext) -> bool {
         // Allow access to all our tools for now
-        matches!(name, 
-            "list_projects" | "create_project" | "get_project" | "delete_project" |
-            "create_plan" | "execute_plan" | "get_plan_status" |
-            "import_csv" | "export_graph" | "get_graph_data" |
-            "analyze_connectivity" | "find_paths"
+        matches!(
+            name,
+            "list_projects"
+                | "create_project"
+                | "get_project"
+                | "delete_project"
+                | "create_plan"
+                | "execute_plan"
+                | "get_plan_status"
+                | "import_csv"
+                | "export_graph"
+                | "get_graph_data"
+                | "analyze_connectivity"
+                | "find_paths"
         )
     }
 }

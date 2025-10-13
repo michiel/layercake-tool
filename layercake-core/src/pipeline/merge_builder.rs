@@ -3,10 +3,12 @@ use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, Set};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 
-use crate::database::entities::{data_sources, graph_edges, graph_nodes, graphs, layers, plan_dag_nodes};
-use crate::database::entities::ExecutionState;
-use super::types::LayerData;
 use super::layer_operations::{insert_layers_to_db, load_layers_from_db};
+use super::types::LayerData;
+use crate::database::entities::ExecutionState;
+use crate::database::entities::{
+    data_sources, graph_edges, graph_nodes, graphs, layers, plan_dag_nodes,
+};
 
 /// Helper function to parse is_partition from JSON Value (handles both boolean and string)
 fn parse_is_partition(value: &Value) -> bool {
@@ -76,7 +78,10 @@ impl MergeBuilder {
                     data_sources_list.push(DataSourceOrGraph::Graph(graph));
                 }
                 _ => {
-                    return Err(anyhow!("Unsupported upstream node type for Merge: {}", upstream_node.node_type));
+                    return Err(anyhow!(
+                        "Unsupported upstream node type for Merge: {}",
+                        upstream_node.node_type
+                    ));
                 }
             }
         }
@@ -156,7 +161,8 @@ impl MergeBuilder {
         let config: serde_json::Value = serde_json::from_str(&dag_node.config_json)
             .map_err(|e| anyhow!("Failed to parse node config: {}", e))?;
 
-        let data_source_id = config.get("dataSourceId")
+        let data_source_id = config
+            .get("dataSourceId")
             .and_then(|v| v.as_i64())
             .map(|v| v as i32)
             .ok_or_else(|| anyhow!("Node config does not have dataSourceId: {}", dag_node.id))?;
@@ -187,11 +193,7 @@ impl MergeBuilder {
     }
 
     /// Get upstream graph (from Graph or Merge node)
-    async fn get_upstream_graph(
-        &self,
-        project_id: i32,
-        node_id: &str,
-    ) -> Result<graphs::Model> {
+    async fn get_upstream_graph(&self, project_id: i32, node_id: &str) -> Result<graphs::Model> {
         use crate::database::entities::graphs::{Column, Entity};
         use sea_orm::{ColumnTrait, QueryFilter};
 
@@ -251,15 +253,29 @@ impl MergeBuilder {
                 DataSourceOrGraph::DataSource(ds) => {
                     // Parse graph_json from data_sources
                     let graph_data: serde_json::Value = serde_json::from_str(&ds.graph_json)
-                        .map_err(|e| anyhow!("Failed to parse graph JSON for {}: {}", ds.name, e))?;
+                        .map_err(|e| {
+                            anyhow!("Failed to parse graph JSON for {}: {}", ds.name, e)
+                        })?;
 
-                    self.extract_from_json(&mut all_nodes, &mut all_edges, &mut all_layers, &graph_data, &ds.data_type)?;
+                    self.extract_from_json(
+                        &mut all_nodes,
+                        &mut all_edges,
+                        &mut all_layers,
+                        &graph_data,
+                        &ds.data_type,
+                    )?;
                 }
                 DataSourceOrGraph::Graph(upstream_graph) => {
                     // Read nodes and edges from graph_nodes and graph_edges tables
-                    self.extract_from_graph_tables(&mut all_nodes, &mut all_edges, upstream_graph.id).await?;
+                    self.extract_from_graph_tables(
+                        &mut all_nodes,
+                        &mut all_edges,
+                        upstream_graph.id,
+                    )
+                    .await?;
                     // Also read layers from the upstream graph
-                    self.extract_layers_from_graph(&mut all_layers, upstream_graph.id).await?;
+                    self.extract_layers_from_graph(&mut all_layers, upstream_graph.id)
+                        .await?;
                 }
             }
         }
@@ -368,7 +384,8 @@ impl MergeBuilder {
                             layer: node_val["layer"].as_str().map(|s| s.to_string()),
                             weight: node_val["weight"].as_f64(),
                             is_partition: parse_is_partition(&node_val["is_partition"]),
-                            belongs_to: node_val["belongs_to"].as_str()
+                            belongs_to: node_val["belongs_to"]
+                                .as_str()
                                 .filter(|s| !s.is_empty())
                                 .map(|s| s.to_string()),
                             attrs: Some(node_val.clone()),
@@ -422,7 +439,8 @@ impl MergeBuilder {
                             layer: node_val["layer"].as_str().map(|s| s.to_string()),
                             weight: node_val["weight"].as_f64(),
                             is_partition: parse_is_partition(&node_val["is_partition"]),
-                            belongs_to: node_val["belongs_to"].as_str()
+                            belongs_to: node_val["belongs_to"]
+                                .as_str()
                                 .filter(|s| !s.is_empty())
                                 .map(|s| s.to_string()),
                             attrs: Some(node_val.clone()),
@@ -470,10 +488,7 @@ impl MergeBuilder {
                             .ok_or_else(|| anyhow!("Layer missing 'id' field"))?
                             .to_string();
 
-                        let name = layer_val["label"]
-                            .as_str()
-                            .unwrap_or(&layer_id)
-                            .to_string();
+                        let name = layer_val["label"].as_str().unwrap_or(&layer_id).to_string();
 
                         let color = layer_val["color"]
                             .as_str()
@@ -484,17 +499,26 @@ impl MergeBuilder {
                         let mut properties = serde_json::Map::new();
                         if let Some(bg) = layer_val["background_color"].as_str() {
                             if !bg.is_empty() {
-                                properties.insert("background_color".to_string(), serde_json::Value::String(bg.to_string()));
+                                properties.insert(
+                                    "background_color".to_string(),
+                                    serde_json::Value::String(bg.to_string()),
+                                );
                             }
                         }
                         if let Some(border) = layer_val["border_color"].as_str() {
                             if !border.is_empty() {
-                                properties.insert("border_color".to_string(), serde_json::Value::String(border.to_string()));
+                                properties.insert(
+                                    "border_color".to_string(),
+                                    serde_json::Value::String(border.to_string()),
+                                );
                             }
                         }
                         if let Some(text) = layer_val["text_color"].as_str() {
                             if !text.is_empty() {
-                                properties.insert("text_color".to_string(), serde_json::Value::String(text.to_string()));
+                                properties.insert(
+                                    "text_color".to_string(),
+                                    serde_json::Value::String(text.to_string()),
+                                );
                             }
                         }
 

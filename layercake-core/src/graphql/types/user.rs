@@ -1,8 +1,8 @@
 use async_graphql::*;
 use chrono::{DateTime, Utc};
-use sea_orm::{EntityTrait, ColumnTrait, QueryFilter};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
-use crate::database::entities::{users, user_sessions, project_collaborators};
+use crate::database::entities::{project_collaborators, user_sessions, users};
 use crate::graphql::context::GraphQLContext;
 
 #[derive(SimpleObject)]
@@ -56,7 +56,10 @@ impl User {
             .all(&context.db)
             .await?;
 
-        Ok(collaborations.into_iter().map(ProjectCollaborator::from).collect())
+        Ok(collaborations
+            .into_iter()
+            .map(ProjectCollaborator::from)
+            .collect())
     }
 
     // REMOVED: presence method - user presence now handled via WebSocket only (memory-only storage)

@@ -1,6 +1,6 @@
+use layercake_core::database::entities::{graph_edges, graph_nodes, graphs, layers};
 use layercake_core::database::migrations::Migrator;
-use layercake_core::database::entities::{graphs, graph_nodes, graph_edges, layers};
-use layercake_core::services::{GraphEditService, GraphEditApplicator, ApplyResult};
+use layercake_core::services::{ApplyResult, GraphEditApplicator, GraphEditService};
 use sea_orm::{ActiveModelTrait, Database, DatabaseConnection, DbErr, EntityTrait, Set};
 use sea_orm_migration::MigratorTrait;
 
@@ -12,7 +12,11 @@ async fn setup_test_db() -> Result<DatabaseConnection, DbErr> {
 }
 
 /// Create a test graph
-async fn create_test_graph(db: &DatabaseConnection, project_id: i32, name: &str) -> Result<graphs::Model, DbErr> {
+async fn create_test_graph(
+    db: &DatabaseConnection,
+    project_id: i32,
+    name: &str,
+) -> Result<graphs::Model, DbErr> {
     let graph = graphs::ActiveModel {
         project_id: Set(project_id),
         name: Set(name.to_string()),
@@ -49,33 +53,43 @@ async fn test_replay_node_updates() {
     let graph = create_test_graph(&db, 1, "Test Graph").await.unwrap();
 
     // Create initial nodes
-    create_test_node(&db, graph.id, "node-1", Some("Original Label 1")).await.unwrap();
-    create_test_node(&db, graph.id, "node-2", Some("Original Label 2")).await.unwrap();
+    create_test_node(&db, graph.id, "node-1", Some("Original Label 1"))
+        .await
+        .unwrap();
+    create_test_node(&db, graph.id, "node-2", Some("Original Label 2"))
+        .await
+        .unwrap();
 
     let service = GraphEditService::new(db.clone());
 
     // Create edits to update labels
-    service.create_edit(
-        graph.id,
-        "node".to_string(),
-        "node-1".to_string(),
-        "update".to_string(),
-        Some("label".to_string()),
-        Some(serde_json::json!("Original Label 1")),
-        Some(serde_json::json!("Updated Label 1")),
-        None,
-    ).await.unwrap();
+    service
+        .create_edit(
+            graph.id,
+            "node".to_string(),
+            "node-1".to_string(),
+            "update".to_string(),
+            Some("label".to_string()),
+            Some(serde_json::json!("Original Label 1")),
+            Some(serde_json::json!("Updated Label 1")),
+            None,
+        )
+        .await
+        .unwrap();
 
-    service.create_edit(
-        graph.id,
-        "node".to_string(),
-        "node-2".to_string(),
-        "update".to_string(),
-        Some("label".to_string()),
-        Some(serde_json::json!("Original Label 2")),
-        Some(serde_json::json!("Updated Label 2")),
-        None,
-    ).await.unwrap();
+    service
+        .create_edit(
+            graph.id,
+            "node".to_string(),
+            "node-2".to_string(),
+            "update".to_string(),
+            Some("label".to_string()),
+            Some(serde_json::json!("Original Label 2")),
+            Some(serde_json::json!("Updated Label 2")),
+            None,
+        )
+        .await
+        .unwrap();
 
     // Replay edits
     let summary = service.replay_graph_edits(graph.id).await.unwrap();
@@ -86,7 +100,7 @@ async fn test_replay_node_updates() {
     assert_eq!(summary.failed, 0);
 
     // Verify nodes were updated
-    use layercake_core::database::entities::graph_nodes::{Entity as GraphNodes, Column};
+    use layercake_core::database::entities::graph_nodes::{Column, Entity as GraphNodes};
     use sea_orm::{ColumnTrait, QueryFilter};
 
     let node1 = GraphNodes::find()
@@ -116,32 +130,40 @@ async fn test_replay_with_missing_targets() {
     let graph = create_test_graph(&db, 1, "Test Graph").await.unwrap();
 
     // Create only one node
-    create_test_node(&db, graph.id, "node-1", Some("Label 1")).await.unwrap();
+    create_test_node(&db, graph.id, "node-1", Some("Label 1"))
+        .await
+        .unwrap();
 
     let service = GraphEditService::new(db);
 
     // Create edits for both existing and non-existing nodes
-    service.create_edit(
-        graph.id,
-        "node".to_string(),
-        "node-1".to_string(),
-        "update".to_string(),
-        Some("label".to_string()),
-        Some(serde_json::json!("Label 1")),
-        Some(serde_json::json!("Updated")),
-        None,
-    ).await.unwrap();
+    service
+        .create_edit(
+            graph.id,
+            "node".to_string(),
+            "node-1".to_string(),
+            "update".to_string(),
+            Some("label".to_string()),
+            Some(serde_json::json!("Label 1")),
+            Some(serde_json::json!("Updated")),
+            None,
+        )
+        .await
+        .unwrap();
 
-    service.create_edit(
-        graph.id,
-        "node".to_string(),
-        "node-missing".to_string(),
-        "update".to_string(),
-        Some("label".to_string()),
-        Some(serde_json::json!("Old")),
-        Some(serde_json::json!("New")),
-        None,
-    ).await.unwrap();
+    service
+        .create_edit(
+            graph.id,
+            "node".to_string(),
+            "node-missing".to_string(),
+            "update".to_string(),
+            Some("label".to_string()),
+            Some(serde_json::json!("Old")),
+            Some(serde_json::json!("New")),
+            None,
+        )
+        .await
+        .unwrap();
 
     // Replay edits
     let summary = service.replay_graph_edits(graph.id).await.unwrap();
@@ -152,7 +174,11 @@ async fn test_replay_with_missing_targets() {
     assert_eq!(summary.failed, 0);
 
     // Verify the skipped edit
-    let skipped = summary.details.iter().find(|d| d.result == "skipped").unwrap();
+    let skipped = summary
+        .details
+        .iter()
+        .find(|d| d.result == "skipped")
+        .unwrap();
     assert_eq!(skipped.target_id, "node-missing");
     assert!(skipped.message.contains("not found"));
 }
@@ -162,21 +188,26 @@ async fn test_replay_idempotence() {
     let db = setup_test_db().await.unwrap();
     let graph = create_test_graph(&db, 1, "Test Graph").await.unwrap();
 
-    create_test_node(&db, graph.id, "node-1", Some("Original")).await.unwrap();
+    create_test_node(&db, graph.id, "node-1", Some("Original"))
+        .await
+        .unwrap();
 
     let service = GraphEditService::new(db.clone());
 
     // Create edit
-    service.create_edit(
-        graph.id,
-        "node".to_string(),
-        "node-1".to_string(),
-        "update".to_string(),
-        Some("label".to_string()),
-        Some(serde_json::json!("Original")),
-        Some(serde_json::json!("Updated")),
-        None,
-    ).await.unwrap();
+    service
+        .create_edit(
+            graph.id,
+            "node".to_string(),
+            "node-1".to_string(),
+            "update".to_string(),
+            Some("label".to_string()),
+            Some(serde_json::json!("Original")),
+            Some(serde_json::json!("Updated")),
+            None,
+        )
+        .await
+        .unwrap();
 
     // First replay
     let summary1 = service.replay_graph_edits(graph.id).await.unwrap();
@@ -188,7 +219,7 @@ async fn test_replay_idempotence() {
     assert_eq!(summary2.applied, 0);
 
     // Verify node label is still correct
-    use layercake_core::database::entities::graph_nodes::{Entity as GraphNodes, Column};
+    use layercake_core::database::entities::graph_nodes::{Column, Entity as GraphNodes};
     use sea_orm::{ColumnTrait, QueryFilter};
 
     let node = GraphNodes::find()
@@ -207,43 +238,54 @@ async fn test_replay_sequence_ordering() {
     let db = setup_test_db().await.unwrap();
     let graph = create_test_graph(&db, 1, "Test Graph").await.unwrap();
 
-    create_test_node(&db, graph.id, "node-1", Some("Start")).await.unwrap();
+    create_test_node(&db, graph.id, "node-1", Some("Start"))
+        .await
+        .unwrap();
 
     let service = GraphEditService::new(db.clone());
 
     // Create sequence of edits that build on each other
-    service.create_edit(
-        graph.id,
-        "node".to_string(),
-        "node-1".to_string(),
-        "update".to_string(),
-        Some("label".to_string()),
-        Some(serde_json::json!("Start")),
-        Some(serde_json::json!("Step 1")),
-        None,
-    ).await.unwrap();
+    service
+        .create_edit(
+            graph.id,
+            "node".to_string(),
+            "node-1".to_string(),
+            "update".to_string(),
+            Some("label".to_string()),
+            Some(serde_json::json!("Start")),
+            Some(serde_json::json!("Step 1")),
+            None,
+        )
+        .await
+        .unwrap();
 
-    service.create_edit(
-        graph.id,
-        "node".to_string(),
-        "node-1".to_string(),
-        "update".to_string(),
-        Some("label".to_string()),
-        Some(serde_json::json!("Step 1")),
-        Some(serde_json::json!("Step 2")),
-        None,
-    ).await.unwrap();
+    service
+        .create_edit(
+            graph.id,
+            "node".to_string(),
+            "node-1".to_string(),
+            "update".to_string(),
+            Some("label".to_string()),
+            Some(serde_json::json!("Step 1")),
+            Some(serde_json::json!("Step 2")),
+            None,
+        )
+        .await
+        .unwrap();
 
-    service.create_edit(
-        graph.id,
-        "node".to_string(),
-        "node-1".to_string(),
-        "update".to_string(),
-        Some("label".to_string()),
-        Some(serde_json::json!("Step 2")),
-        Some(serde_json::json!("Final")),
-        None,
-    ).await.unwrap();
+    service
+        .create_edit(
+            graph.id,
+            "node".to_string(),
+            "node-1".to_string(),
+            "update".to_string(),
+            Some("label".to_string()),
+            Some(serde_json::json!("Step 2")),
+            Some(serde_json::json!("Final")),
+            None,
+        )
+        .await
+        .unwrap();
 
     // Replay all edits
     let summary = service.replay_graph_edits(graph.id).await.unwrap();
@@ -252,7 +294,7 @@ async fn test_replay_sequence_ordering() {
     assert_eq!(summary.applied, 3);
 
     // Verify final state
-    use layercake_core::database::entities::graph_nodes::{Entity as GraphNodes, Column};
+    use layercake_core::database::entities::graph_nodes::{Column, Entity as GraphNodes};
     use sea_orm::{ColumnTrait, QueryFilter};
 
     let node = GraphNodes::find()
@@ -272,43 +314,51 @@ async fn test_replay_node_create_and_edge_create() {
     let graph = create_test_graph(&db, 1, "Test Graph").await.unwrap();
 
     // Start with one node
-    create_test_node(&db, graph.id, "node-1", Some("Node 1")).await.unwrap();
+    create_test_node(&db, graph.id, "node-1", Some("Node 1"))
+        .await
+        .unwrap();
 
     let service = GraphEditService::new(db.clone());
 
     // Create edit to add second node
-    service.create_edit(
-        graph.id,
-        "node".to_string(),
-        "node-2".to_string(),
-        "create".to_string(),
-        None,
-        None,
-        Some(serde_json::json!({
-            "label": "Node 2",
-            "layer": "default",
-            "isPartition": false,
-            "attrs": {}
-        })),
-        None,
-    ).await.unwrap();
+    service
+        .create_edit(
+            graph.id,
+            "node".to_string(),
+            "node-2".to_string(),
+            "create".to_string(),
+            None,
+            None,
+            Some(serde_json::json!({
+                "label": "Node 2",
+                "layer": "default",
+                "isPartition": false,
+                "attrs": {}
+            })),
+            None,
+        )
+        .await
+        .unwrap();
 
     // Create edit to add edge between them
-    service.create_edit(
-        graph.id,
-        "edge".to_string(),
-        "edge-1-2".to_string(),
-        "create".to_string(),
-        None,
-        None,
-        Some(serde_json::json!({
-            "source": "node-1",
-            "target": "node-2",
-            "label": "connects",
-            "layer": "default"
-        })),
-        None,
-    ).await.unwrap();
+    service
+        .create_edit(
+            graph.id,
+            "edge".to_string(),
+            "edge-1-2".to_string(),
+            "create".to_string(),
+            None,
+            None,
+            Some(serde_json::json!({
+                "source": "node-1",
+                "target": "node-2",
+                "label": "connects",
+                "layer": "default"
+            })),
+            None,
+        )
+        .await
+        .unwrap();
 
     // Replay edits
     let summary = service.replay_graph_edits(graph.id).await.unwrap();
@@ -318,8 +368,12 @@ async fn test_replay_node_create_and_edge_create() {
     assert_eq!(summary.skipped, 0);
 
     // Verify node was created
-    use layercake_core::database::entities::graph_nodes::{Entity as GraphNodes, Column as NodeColumn};
-    use layercake_core::database::entities::graph_edges::{Entity as GraphEdges, Column as EdgeColumn};
+    use layercake_core::database::entities::graph_edges::{
+        Column as EdgeColumn, Entity as GraphEdges,
+    };
+    use layercake_core::database::entities::graph_nodes::{
+        Column as NodeColumn, Entity as GraphNodes,
+    };
     use sea_orm::{ColumnTrait, QueryFilter};
 
     let node2 = GraphNodes::find()
@@ -354,20 +408,23 @@ async fn test_replay_edge_without_source_target() {
     let service = GraphEditService::new(db);
 
     // Try to create edge without source/target nodes existing
-    service.create_edit(
-        graph.id,
-        "edge".to_string(),
-        "edge-orphan".to_string(),
-        "create".to_string(),
-        None,
-        None,
-        Some(serde_json::json!({
-            "source": "nonexistent-1",
-            "target": "nonexistent-2",
-            "label": "orphan"
-        })),
-        None,
-    ).await.unwrap();
+    service
+        .create_edit(
+            graph.id,
+            "edge".to_string(),
+            "edge-orphan".to_string(),
+            "create".to_string(),
+            None,
+            None,
+            Some(serde_json::json!({
+                "source": "nonexistent-1",
+                "target": "nonexistent-2",
+                "label": "orphan"
+            })),
+            None,
+        )
+        .await
+        .unwrap();
 
     // Replay should skip this edit
     let summary = service.replay_graph_edits(graph.id).await.unwrap();
@@ -388,35 +445,41 @@ async fn test_replay_layer_operations() {
     let service = GraphEditService::new(db.clone());
 
     // Create layer
-    service.create_edit(
-        graph.id,
-        "layer".to_string(),
-        "layer-new".to_string(),
-        "create".to_string(),
-        None,
-        None,
-        Some(serde_json::json!({
-            "name": "New Layer",
-            "color": "FF0000",
-            "properties": {
-                "background_color": "ffffff",
-                "border_color": "000000"
-            }
-        })),
-        None,
-    ).await.unwrap();
+    service
+        .create_edit(
+            graph.id,
+            "layer".to_string(),
+            "layer-new".to_string(),
+            "create".to_string(),
+            None,
+            None,
+            Some(serde_json::json!({
+                "name": "New Layer",
+                "color": "FF0000",
+                "properties": {
+                    "background_color": "ffffff",
+                    "border_color": "000000"
+                }
+            })),
+            None,
+        )
+        .await
+        .unwrap();
 
     // Update layer properties
-    service.create_edit(
-        graph.id,
-        "layer".to_string(),
-        "layer-new".to_string(),
-        "update".to_string(),
-        Some("properties".to_string()),
-        Some(serde_json::json!({"background_color": "ffffff"})),
-        Some(serde_json::json!({"background_color": "ff0000"})),
-        None,
-    ).await.unwrap();
+    service
+        .create_edit(
+            graph.id,
+            "layer".to_string(),
+            "layer-new".to_string(),
+            "update".to_string(),
+            Some("properties".to_string()),
+            Some(serde_json::json!({"background_color": "ffffff"})),
+            Some(serde_json::json!({"background_color": "ff0000"})),
+            None,
+        )
+        .await
+        .unwrap();
 
     // Replay
     let summary = service.replay_graph_edits(graph.id).await.unwrap();
@@ -425,7 +488,7 @@ async fn test_replay_layer_operations() {
     assert_eq!(summary.applied, 2);
 
     // Verify layer exists with updated properties
-    use layercake_core::database::entities::layers::{Entity as Layers, Column};
+    use layercake_core::database::entities::layers::{Column, Entity as Layers};
     use sea_orm::{ColumnTrait, QueryFilter};
 
     let layer = Layers::find()
@@ -448,21 +511,26 @@ async fn test_applicator_node_delete() {
     let db = setup_test_db().await.unwrap();
     let graph = create_test_graph(&db, 1, "Test Graph").await.unwrap();
 
-    create_test_node(&db, graph.id, "node-to-delete", Some("Delete Me")).await.unwrap();
+    create_test_node(&db, graph.id, "node-to-delete", Some("Delete Me"))
+        .await
+        .unwrap();
 
     let service = GraphEditService::new(db.clone());
 
     // Create delete edit
-    service.create_edit(
-        graph.id,
-        "node".to_string(),
-        "node-to-delete".to_string(),
-        "delete".to_string(),
-        None,
-        Some(serde_json::json!({"label": "Delete Me"})),
-        None,
-        None,
-    ).await.unwrap();
+    service
+        .create_edit(
+            graph.id,
+            "node".to_string(),
+            "node-to-delete".to_string(),
+            "delete".to_string(),
+            None,
+            Some(serde_json::json!({"label": "Delete Me"})),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
 
     // Apply the edit
     let applicator = GraphEditApplicator::new(db.clone());
@@ -472,7 +540,7 @@ async fn test_applicator_node_delete() {
     assert!(matches!(result, ApplyResult::Success { .. }));
 
     // Verify node was deleted
-    use layercake_core::database::entities::graph_nodes::{Entity as GraphNodes, Column};
+    use layercake_core::database::entities::graph_nodes::{Column, Entity as GraphNodes};
     use sea_orm::{ColumnTrait, QueryFilter};
 
     let node = GraphNodes::find()
@@ -490,21 +558,26 @@ async fn test_graph_metadata_after_replay() {
     let db = setup_test_db().await.unwrap();
     let graph = create_test_graph(&db, 1, "Test Graph").await.unwrap();
 
-    create_test_node(&db, graph.id, "node-1", Some("Test")).await.unwrap();
+    create_test_node(&db, graph.id, "node-1", Some("Test"))
+        .await
+        .unwrap();
 
     let service = GraphEditService::new(db.clone());
 
     // Create edit
-    service.create_edit(
-        graph.id,
-        "node".to_string(),
-        "node-1".to_string(),
-        "update".to_string(),
-        Some("label".to_string()),
-        Some(serde_json::json!("Test")),
-        Some(serde_json::json!("Updated")),
-        None,
-    ).await.unwrap();
+    service
+        .create_edit(
+            graph.id,
+            "node".to_string(),
+            "node-1".to_string(),
+            "update".to_string(),
+            Some("label".to_string()),
+            Some(serde_json::json!("Test")),
+            Some(serde_json::json!("Updated")),
+            None,
+        )
+        .await
+        .unwrap();
 
     // Replay
     service.replay_graph_edits(graph.id).await.unwrap();

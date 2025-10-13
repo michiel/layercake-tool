@@ -1,7 +1,6 @@
 use sea_orm::entity::prelude::*;
-use sea_orm::{Set, ActiveValue};
+use sea_orm::{ActiveValue, Set};
 use serde::{Deserialize, Serialize};
-
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
 #[sea_orm(table_name = "project_collaborators")]
@@ -10,7 +9,7 @@ pub struct Model {
     pub id: i32,
     pub project_id: i32,
     pub user_id: i32,
-    pub role: String, // "owner", "editor", "viewer"
+    pub role: String,        // "owner", "editor", "viewer"
     pub permissions: String, // JSON: ["read", "write", "admin", "delete"]
     pub invited_by: Option<i32>,
     pub invitation_status: String, // "pending", "accepted", "declined", "revoked"
@@ -94,13 +93,8 @@ impl ProjectRole {
                 "delete".to_string(),
                 "invite".to_string(),
             ],
-            ProjectRole::Editor => vec![
-                "read".to_string(),
-                "write".to_string(),
-            ],
-            ProjectRole::Viewer => vec![
-                "read".to_string(),
-            ],
+            ProjectRole::Editor => vec!["read".to_string(), "write".to_string()],
+            ProjectRole::Viewer => vec!["read".to_string()],
         }
     }
 }
@@ -139,8 +133,8 @@ impl InvitationStatus {
 impl ActiveModel {
     pub fn new(project_id: i32, user_id: i32, role: ProjectRole, invited_by: Option<i32>) -> Self {
         let now = chrono::Utc::now();
-        let permissions_json = serde_json::to_string(&role.default_permissions())
-            .unwrap_or_else(|_| "[]".to_string());
+        let permissions_json =
+            serde_json::to_string(&role.default_permissions()).unwrap_or_else(|_| "[]".to_string());
 
         Self {
             id: ActiveValue::NotSet,
@@ -191,8 +185,8 @@ impl ActiveModel {
     }
 
     pub fn update_permissions(mut self, permissions: Vec<String>) -> Self {
-        let permissions_json = serde_json::to_string(&permissions)
-            .unwrap_or_else(|_| "[]".to_string());
+        let permissions_json =
+            serde_json::to_string(&permissions).unwrap_or_else(|_| "[]".to_string());
 
         self.permissions = Set(permissions_json);
         self.updated_at = Set(chrono::Utc::now());
@@ -222,8 +216,7 @@ impl Model {
     }
 
     pub fn get_permissions(&self) -> Vec<String> {
-        serde_json::from_str::<Vec<String>>(&self.permissions)
-            .unwrap_or_default()
+        serde_json::from_str::<Vec<String>>(&self.permissions).unwrap_or_default()
     }
 
     pub fn has_permission(&self, permission: &str) -> bool {

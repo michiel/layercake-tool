@@ -1,6 +1,6 @@
 use super::{
-    BinaryManager, PlatformDetector, PlatformInfo, ReleaseInfo, UpdateError, UpdateInfo,
-    Updater, VersionComparison, VersionManager,
+    BinaryManager, PlatformDetector, PlatformInfo, ReleaseInfo, UpdateError, UpdateInfo, Updater,
+    VersionComparison, VersionManager,
 };
 use async_trait::async_trait;
 use reqwest::Client;
@@ -43,14 +43,15 @@ impl DefaultUpdater {
         platform: &PlatformInfo,
     ) -> Result<&'a super::ReleaseAsset, UpdateError> {
         let pattern = self.platform_detector.get_asset_pattern(platform);
-        
+
         // Try exact match first
         if let Some(asset) = release.assets.iter().find(|asset| asset.name == pattern) {
             return Ok(asset);
         }
 
         // Try partial matches
-        let candidates: Vec<_> = release.assets
+        let candidates: Vec<_> = release
+            .assets
             .iter()
             .filter(|asset| {
                 asset.name.contains(&platform.os) && asset.name.contains(&platform.arch)
@@ -59,7 +60,7 @@ impl DefaultUpdater {
 
         match candidates.len() {
             0 => Err(UpdateError::VerificationError(format!(
-                "No compatible asset found for platform {}-{}", 
+                "No compatible asset found for platform {}-{}",
                 platform.os, platform.arch
             ))),
             1 => Ok(candidates[0]),
@@ -82,16 +83,17 @@ impl DefaultUpdater {
         target_path: &PathBuf,
         expected_size: Option<u64>,
     ) -> Result<(), UpdateError> {
-        let response = self.client
+        let response = self
+            .client
             .get(url)
             .header("User-Agent", "layercake-updater")
             .send()
             .await?;
 
         if !response.status().is_success() {
-            return Err(UpdateError::NetworkError(
-                reqwest::Error::from(response.error_for_status().unwrap_err())
-            ));
+            return Err(UpdateError::NetworkError(reqwest::Error::from(
+                response.error_for_status().unwrap_err(),
+            )));
         }
 
         let total_size = response.content_length().or(expected_size);
@@ -107,14 +109,15 @@ impl DefaultUpdater {
             let progress = downloaded as f64 / total as f64;
             tracing::debug!("Download progress: {:.1}%", progress * 100.0);
         }
-        
+
         file.sync_all().await?;
-        
+
         // Verify download size if expected size was provided
         if let Some(expected) = expected_size {
             if downloaded != expected {
                 return Err(UpdateError::VerificationError(format!(
-                    "Download size mismatch: expected {}, got {}", expected, downloaded
+                    "Download size mismatch: expected {}, got {}",
+                    expected, downloaded
                 )));
             }
         }
@@ -124,7 +127,10 @@ impl DefaultUpdater {
 
     fn get_current_executable() -> Result<PathBuf, UpdateError> {
         std::env::current_exe().map_err(|e| {
-            UpdateError::InstallationError(format!("Cannot determine current executable path: {}", e))
+            UpdateError::InstallationError(format!(
+                "Cannot determine current executable path: {}",
+                e
+            ))
         })
     }
 }
@@ -133,9 +139,13 @@ impl DefaultUpdater {
 impl Updater for DefaultUpdater {
     async fn check_for_updates(&self, include_prerelease: bool) -> Result<UpdateInfo, UpdateError> {
         let current_version = self.version_manager.get_current_version().await?;
-        let latest_release = self.version_manager.get_latest_version(include_prerelease).await?;
+        let latest_release = self
+            .version_manager
+            .get_latest_version(include_prerelease)
+            .await?;
 
-        let comparison = self.version_manager
+        let comparison = self
+            .version_manager
             .compare_versions(&current_version, &latest_release.tag_name)
             .await?;
 
@@ -155,11 +165,15 @@ impl Updater for DefaultUpdater {
         platform: &PlatformInfo,
     ) -> Result<PathBuf, UpdateError> {
         let asset = self.find_asset_for_platform(release, platform)?;
-        
+
         let temp_filename = format!("layercake-{}-{}", release.tag_name, asset.name);
         let temp_path = self.temp_dir.join(temp_filename);
 
-        tracing::info!("Downloading {} to {}", asset.download_url, temp_path.display());
+        tracing::info!(
+            "Downloading {} to {}",
+            asset.download_url,
+            temp_path.display()
+        );
 
         self.download_with_progress(&asset.download_url, &temp_path, Some(asset.size))
             .await?;
@@ -181,8 +195,9 @@ impl Updater for DefaultUpdater {
             return Ok(());
         }
 
-        let release = update_info.release.as_ref()
-            .ok_or_else(|| UpdateError::VersionError("No release information available".to_string()))?;
+        let release = update_info.release.as_ref().ok_or_else(|| {
+            UpdateError::VersionError("No release information available".to_string())
+        })?;
 
         tracing::info!(
             "Updating from {} to {}",
@@ -204,10 +219,14 @@ impl Updater for DefaultUpdater {
         };
 
         // Install the new binary
-        match self.binary_manager.install_binary(&new_binary_path, &current_exe).await {
+        match self
+            .binary_manager
+            .install_binary(&new_binary_path, &current_exe)
+            .await
+        {
             Ok(()) => {
                 tracing::info!("Successfully updated to {}", update_info.latest_version);
-                
+
                 // Clean up temporary file
                 if let Err(e) = tokio::fs::remove_file(&new_binary_path).await {
                     tracing::warn!("Failed to clean up temporary file: {}", e);
@@ -215,11 +234,13 @@ impl Updater for DefaultUpdater {
             }
             Err(e) => {
                 tracing::error!("Installation failed: {}", e);
-                
+
                 // Attempt rollback if we have a backup
                 if let Some(backup) = backup_path {
                     tracing::info!("Attempting rollback...");
-                    if let Err(rollback_err) = self.binary_manager.rollback(&backup, &current_exe).await {
+                    if let Err(rollback_err) =
+                        self.binary_manager.rollback(&backup, &current_exe).await
+                    {
                         tracing::error!("Rollback also failed: {}", rollback_err);
                         return Err(UpdateError::InstallationError(format!(
                             "Installation failed and rollback failed: {} (rollback error: {})",
@@ -228,7 +249,7 @@ impl Updater for DefaultUpdater {
                     }
                     tracing::info!("Successfully rolled back to previous version");
                 }
-                
+
                 return Err(e);
             }
         }
@@ -244,12 +265,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_updater_creation() {
-        let version_manager = Box::new(GitHubVersionManager::new("michiel/layercake-tool".to_string()));
+        let version_manager = Box::new(GitHubVersionManager::new(
+            "michiel/layercake-tool".to_string(),
+        ));
         let platform_detector = Box::new(DefaultPlatformDetector::new());
         let binary_manager = Box::new(DefaultBinaryManager::new());
 
         let updater = DefaultUpdater::new(version_manager, platform_detector, binary_manager);
-        
+
         // Basic test that updater can be created
         assert!(!updater.temp_dir.as_os_str().is_empty());
     }

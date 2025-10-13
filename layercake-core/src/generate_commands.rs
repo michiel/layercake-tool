@@ -51,7 +51,11 @@ pub fn generate_sample(sample: String, dir: String) {
             let relative_path = match file.path().strip_prefix(dir.path()) {
                 Ok(path) => path,
                 Err(e) => {
-                    error!("Failed to create relative path for {:?}: {}", file.path(), e);
+                    error!(
+                        "Failed to create relative path for {:?}: {}",
+                        file.path(),
+                        e
+                    );
                     continue;
                 }
             };
@@ -74,7 +78,11 @@ pub fn generate_sample(sample: String, dir: String) {
             let relative_path = match sub_dir.path().strip_prefix(dir.path()) {
                 Ok(path) => path,
                 Err(e) => {
-                    error!("Failed to create relative path for {:?}: {}", sub_dir.path(), e);
+                    error!(
+                        "Failed to create relative path for {:?}: {}",
+                        sub_dir.path(),
+                        e
+                    );
                     continue;
                 }
             };

@@ -1,34 +1,49 @@
 pub mod plan_dag_delta;
 
 use async_graphql::*;
-use sea_orm::{ActiveModelTrait, EntityTrait, Set, ColumnTrait, QueryFilter};
 use chrono::Utc;
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 
-use crate::database::entities::{projects, plans, plan_dag_nodes, plan_dag_edges, users, user_sessions, project_collaborators};
+use crate::database::entities::{
+    plan_dag_edges, plan_dag_nodes, plans, project_collaborators, projects, user_sessions, users,
+};
 use crate::graphql::context::GraphQLContext;
 use crate::services::auth_service::AuthService;
 
-use crate::services::graph_service::GraphService;
-use crate::services::graph_edit_service::GraphEditService;
+use crate::pipeline::DagExecutor;
 use crate::services::data_source_service::DataSourceService;
 use crate::services::export_service::ExportService;
-use crate::pipeline::DagExecutor;
+use crate::services::graph_edit_service::GraphEditService;
+use crate::services::graph_service::GraphService;
 
-use crate::graphql::types::project::{Project, CreateProjectInput, UpdateProjectInput};
-use crate::graphql::types::plan::{Plan, CreatePlanInput, UpdatePlanInput};
-use crate::graphql::types::plan_dag::{PlanDag, PlanDagNode, PlanDagEdge, PlanDagInput, PlanDagNodeInput, PlanDagEdgeInput, PlanDagNodeUpdateInput, PlanDagEdgeUpdateInput, Position, NodePositionInput};
-use crate::graphql::types::{User, ProjectCollaborator, RegisterUserInput, LoginInput, UpdateUserInput, LoginResponse, RegisterResponse, InviteCollaboratorInput, UpdateCollaboratorRoleInput, DataSource, CreateDataSourceInput, UpdateDataSourceInput, BulkUploadDataSourceInput};
-use crate::graphql::types::graph::{Graph, CreateGraphInput, UpdateGraphInput, CreateLayerInput};
-use crate::graphql::types::graph_edit::{GraphEdit, CreateGraphEditInput, ReplaySummary, EditResult};
+use crate::graphql::types::graph::{CreateGraphInput, CreateLayerInput, Graph, UpdateGraphInput};
+use crate::graphql::types::graph_edit::{
+    CreateGraphEditInput, EditResult, GraphEdit, ReplaySummary,
+};
+use crate::graphql::types::plan::{CreatePlanInput, Plan, UpdatePlanInput};
+use crate::graphql::types::plan_dag::{
+    NodePositionInput, PlanDag, PlanDagEdge, PlanDagEdgeInput, PlanDagEdgeUpdateInput,
+    PlanDagInput, PlanDagNode, PlanDagNodeInput, PlanDagNodeUpdateInput, Position,
+};
+use crate::graphql::types::project::{CreateProjectInput, Project, UpdateProjectInput};
+use crate::graphql::types::{
+    BulkUploadDataSourceInput, CreateDataSourceInput, DataSource, InviteCollaboratorInput,
+    LoginInput, LoginResponse, ProjectCollaborator, RegisterResponse, RegisterUserInput,
+    UpdateCollaboratorRoleInput, UpdateDataSourceInput, UpdateUserInput, User,
+};
 
 pub struct Mutation;
 
 #[Object]
 impl Mutation {
     /// Create a new project
-    async fn create_project(&self, ctx: &Context<'_>, input: CreateProjectInput) -> Result<Project> {
+    async fn create_project(
+        &self,
+        ctx: &Context<'_>,
+        input: CreateProjectInput,
+    ) -> Result<Project> {
         let context = ctx.data::<GraphQLContext>()?;
-        
+
         let mut project = projects::ActiveModel::new();
         project.name = Set(input.name);
         project.description = Set(input.description);
@@ -38,9 +53,14 @@ impl Mutation {
     }
 
     /// Update an existing project
-    async fn update_project(&self, ctx: &Context<'_>, id: i32, input: UpdateProjectInput) -> Result<Project> {
+    async fn update_project(
+        &self,
+        ctx: &Context<'_>,
+        id: i32,
+        input: UpdateProjectInput,
+    ) -> Result<Project> {
         let context = ctx.data::<GraphQLContext>()?;
-        
+
         let project = projects::Entity::find_by_id(id)
             .one(&context.db)
             .await?
@@ -57,7 +77,7 @@ impl Mutation {
     /// Delete a project
     async fn delete_project(&self, ctx: &Context<'_>, id: i32) -> Result<bool> {
         let context = ctx.data::<GraphQLContext>()?;
-        
+
         let project = projects::Entity::find_by_id(id)
             .one(&context.db)
             .await?
@@ -73,11 +93,12 @@ impl Mutation {
     /// Create a new plan
     async fn create_plan(&self, ctx: &Context<'_>, input: CreatePlanInput) -> Result<Plan> {
         let context = ctx.data::<GraphQLContext>()?;
-        
-        let dependencies_json = input.dependencies
+
+        let dependencies_json = input
+            .dependencies
             .map(|deps| serde_json::to_string(&deps))
             .transpose()?;
-        
+
         let plan = plans::ActiveModel {
             project_id: Set(input.project_id),
             name: Set(input.name),
@@ -92,15 +113,21 @@ impl Mutation {
     }
 
     /// Update an existing plan
-    async fn update_plan(&self, ctx: &Context<'_>, id: i32, input: UpdatePlanInput) -> Result<Plan> {
+    async fn update_plan(
+        &self,
+        ctx: &Context<'_>,
+        id: i32,
+        input: UpdatePlanInput,
+    ) -> Result<Plan> {
         let context = ctx.data::<GraphQLContext>()?;
-        
+
         let plan = plans::Entity::find_by_id(id)
             .one(&context.db)
             .await?
             .ok_or_else(|| Error::new("Plan not found"))?;
 
-        let dependencies_json = input.dependencies
+        let dependencies_json = input
+            .dependencies
             .map(|deps| serde_json::to_string(&deps))
             .transpose()?;
 
@@ -116,7 +143,7 @@ impl Mutation {
     /// Delete a plan
     async fn delete_plan(&self, ctx: &Context<'_>, id: i32) -> Result<bool> {
         let context = ctx.data::<GraphQLContext>()?;
-        
+
         let plan = plans::Entity::find_by_id(id)
             .one(&context.db)
             .await?
@@ -132,7 +159,7 @@ impl Mutation {
     /// Execute a plan
     async fn execute_plan(&self, ctx: &Context<'_>, id: i32) -> Result<PlanExecutionResult> {
         let context = ctx.data::<GraphQLContext>()?;
-        
+
         let _plan = plans::Entity::find_by_id(id)
             .one(&context.db)
             .await?
@@ -152,7 +179,12 @@ impl Mutation {
     /// **DEPRECATED**: This bulk replace operation conflicts with delta-based updates.
     /// Use individual node/edge mutations instead for better real-time collaboration.
     /// See PLAN.md Phase 2 for migration strategy.
-    async fn update_plan_dag(&self, ctx: &Context<'_>, project_id: i32, plan_dag: PlanDagInput) -> Result<Option<PlanDag>> {
+    async fn update_plan_dag(
+        &self,
+        ctx: &Context<'_>,
+        project_id: i32,
+        plan_dag: PlanDagInput,
+    ) -> Result<Option<PlanDag>> {
         let context = ctx.data::<GraphQLContext>()?;
 
         // Verify project exists
@@ -244,7 +276,12 @@ impl Mutation {
     }
 
     /// Add a single Plan DAG node
-    async fn add_plan_dag_node(&self, ctx: &Context<'_>, project_id: i32, node: PlanDagNodeInput) -> Result<Option<PlanDagNode>> {
+    async fn add_plan_dag_node(
+        &self,
+        ctx: &Context<'_>,
+        project_id: i32,
+        node: PlanDagNodeInput,
+    ) -> Result<Option<PlanDagNode>> {
         let context = ctx.data::<GraphQLContext>()?;
 
         // Verify project exists
@@ -257,7 +294,8 @@ impl Mutation {
         let plan = match plans::Entity::find()
             .filter(plans::Column::ProjectId.eq(project_id))
             .one(&context.db)
-            .await? {
+            .await?
+        {
             Some(plan) => plan,
             None => {
                 // Auto-create a plan if one doesn't exist
@@ -278,7 +316,8 @@ impl Mutation {
         };
 
         // Fetch current state to determine node index
-        let (current_nodes, _) = plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
+        let (current_nodes, _) =
+            plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
         let node_index = current_nodes.len();
 
         let node_type_str = match node.node_type {
@@ -317,12 +356,9 @@ impl Mutation {
 
         // Broadcast delta event
         let user_id = "demo_user".to_string(); // TODO: Get from auth context
-        plan_dag_delta::publish_plan_dag_delta(
-            project_id,
-            new_version,
-            user_id,
-            vec![patch_op],
-        ).await.ok(); // Non-fatal if broadcast fails
+        plan_dag_delta::publish_plan_dag_delta(project_id, new_version, user_id, vec![patch_op])
+            .await
+            .ok(); // Non-fatal if broadcast fails
 
         // TODO: Trigger pipeline execution if node is configured
         // Will be implemented after Phase 2 completion
@@ -334,14 +370,21 @@ impl Mutation {
     }
 
     /// Update a Plan DAG node
-    async fn update_plan_dag_node(&self, ctx: &Context<'_>, project_id: i32, node_id: String, updates: PlanDagNodeUpdateInput) -> Result<Option<PlanDagNode>> {
+    async fn update_plan_dag_node(
+        &self,
+        ctx: &Context<'_>,
+        project_id: i32,
+        node_id: String,
+        updates: PlanDagNodeUpdateInput,
+    ) -> Result<Option<PlanDagNode>> {
         let context = ctx.data::<GraphQLContext>()?;
 
         // Find or create a plan for this project
         let plan = match plans::Entity::find()
             .filter(plans::Column::ProjectId.eq(project_id))
             .one(&context.db)
-            .await? {
+            .await?
+        {
             Some(plan) => plan,
             None => {
                 // Auto-create a plan if one doesn't exist
@@ -362,13 +405,15 @@ impl Mutation {
         };
 
         // Fetch current state for delta generation
-        let (current_nodes, _) = plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
+        let (current_nodes, _) =
+            plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
 
         // Find the node
         let node = plan_dag_nodes::Entity::find()
             .filter(
-                plan_dag_nodes::Column::PlanId.eq(plan.id)
-                    .and(plan_dag_nodes::Column::Id.eq(&node_id))
+                plan_dag_nodes::Column::PlanId
+                    .eq(plan.id)
+                    .and(plan_dag_nodes::Column::Id.eq(&node_id)),
             )
             .one(&context.db)
             .await?
@@ -432,12 +477,9 @@ impl Mutation {
         if !patch_ops.is_empty() {
             let new_version = plan_dag_delta::increment_plan_version(&context.db, plan.id).await?;
             let user_id = "demo_user".to_string(); // TODO: Get from auth context
-            plan_dag_delta::publish_plan_dag_delta(
-                project_id,
-                new_version,
-                user_id,
-                patch_ops,
-            ).await.ok(); // Non-fatal if broadcast fails
+            plan_dag_delta::publish_plan_dag_delta(project_id, new_version, user_id, patch_ops)
+                .await
+                .ok(); // Non-fatal if broadcast fails
         }
 
         // TODO: Trigger pipeline re-execution if config was updated
@@ -449,7 +491,12 @@ impl Mutation {
     }
 
     /// Delete a Plan DAG node
-    async fn delete_plan_dag_node(&self, ctx: &Context<'_>, project_id: i32, node_id: String) -> Result<Option<PlanDagNode>> {
+    async fn delete_plan_dag_node(
+        &self,
+        ctx: &Context<'_>,
+        project_id: i32,
+        node_id: String,
+    ) -> Result<Option<PlanDagNode>> {
         let context = ctx.data::<GraphQLContext>()?;
 
         // Find the plan for this project
@@ -460,7 +507,8 @@ impl Mutation {
             .ok_or_else(|| Error::new("Plan not found for project"))?;
 
         // Fetch current state for delta generation
-        let (current_nodes, current_edges) = plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
+        let (current_nodes, current_edges) =
+            plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
 
         // Generate delta for node deletion
         let mut patch_ops = Vec::new();
@@ -469,12 +517,15 @@ impl Mutation {
         }
 
         // Find and delete connected edges, generating deltas for each
-        let connected_edges: Vec<&PlanDagEdge> = current_edges.iter()
+        let connected_edges: Vec<&PlanDagEdge> = current_edges
+            .iter()
             .filter(|e| e.source == node_id || e.target == node_id)
             .collect();
 
         for edge in &connected_edges {
-            if let Some(patch) = plan_dag_delta::generate_edge_delete_patch(&edge.id, &current_edges) {
+            if let Some(patch) =
+                plan_dag_delta::generate_edge_delete_patch(&edge.id, &current_edges)
+            {
                 patch_ops.push(patch);
             }
         }
@@ -482,11 +533,11 @@ impl Mutation {
         // Delete edges connected to this node first
         plan_dag_edges::Entity::delete_many()
             .filter(
-                plan_dag_edges::Column::PlanId.eq(plan.id)
-                    .and(
-                        plan_dag_edges::Column::SourceNodeId.eq(&node_id)
-                            .or(plan_dag_edges::Column::TargetNodeId.eq(&node_id))
-                    )
+                plan_dag_edges::Column::PlanId.eq(plan.id).and(
+                    plan_dag_edges::Column::SourceNodeId
+                        .eq(&node_id)
+                        .or(plan_dag_edges::Column::TargetNodeId.eq(&node_id)),
+                ),
             )
             .exec(&context.db)
             .await?;
@@ -494,8 +545,9 @@ impl Mutation {
         // Delete the node
         let result = plan_dag_nodes::Entity::delete_many()
             .filter(
-                plan_dag_nodes::Column::PlanId.eq(plan.id)
-                    .and(plan_dag_nodes::Column::Id.eq(&node_id))
+                plan_dag_nodes::Column::PlanId
+                    .eq(plan.id)
+                    .and(plan_dag_nodes::Column::Id.eq(&node_id)),
             )
             .exec(&context.db)
             .await?;
@@ -503,14 +555,12 @@ impl Mutation {
         if result.rows_affected > 0 {
             // Increment plan version and broadcast delta
             if !patch_ops.is_empty() {
-                let new_version = plan_dag_delta::increment_plan_version(&context.db, plan.id).await?;
+                let new_version =
+                    plan_dag_delta::increment_plan_version(&context.db, plan.id).await?;
                 let user_id = "demo_user".to_string(); // TODO: Get from auth context
-                plan_dag_delta::publish_plan_dag_delta(
-                    project_id,
-                    new_version,
-                    user_id,
-                    patch_ops,
-                ).await.ok(); // Non-fatal if broadcast fails
+                plan_dag_delta::publish_plan_dag_delta(project_id, new_version, user_id, patch_ops)
+                    .await
+                    .ok(); // Non-fatal if broadcast fails
             }
 
             Ok(None)
@@ -520,14 +570,20 @@ impl Mutation {
     }
 
     /// Add a Plan DAG edge
-    async fn add_plan_dag_edge(&self, ctx: &Context<'_>, project_id: i32, edge: PlanDagEdgeInput) -> Result<Option<PlanDagEdge>> {
+    async fn add_plan_dag_edge(
+        &self,
+        ctx: &Context<'_>,
+        project_id: i32,
+        edge: PlanDagEdgeInput,
+    ) -> Result<Option<PlanDagEdge>> {
         let context = ctx.data::<GraphQLContext>()?;
 
         // Find or create a plan for this project
         let plan = match plans::Entity::find()
             .filter(plans::Column::ProjectId.eq(project_id))
             .one(&context.db)
-            .await? {
+            .await?
+        {
             Some(plan) => plan,
             None => {
                 // Auto-create a plan if one doesn't exist
@@ -548,7 +604,8 @@ impl Mutation {
         };
 
         // Fetch current state to determine edge index
-        let (_, current_edges) = plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
+        let (_, current_edges) =
+            plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
         let edge_index = current_edges.len();
 
         let metadata_json = serde_json::to_string(&edge.metadata)?;
@@ -576,12 +633,9 @@ impl Mutation {
 
         // Broadcast delta event
         let user_id = "demo_user".to_string(); // TODO: Get from auth context
-        plan_dag_delta::publish_plan_dag_delta(
-            project_id,
-            new_version,
-            user_id,
-            vec![patch_op],
-        ).await.ok(); // Non-fatal if broadcast fails
+        plan_dag_delta::publish_plan_dag_delta(project_id, new_version, user_id, vec![patch_op])
+            .await
+            .ok(); // Non-fatal if broadcast fails
 
         // TODO: Trigger pipeline execution for affected nodes (target and downstream)
         // The target node needs to be recomputed because it has a new upstream dependency
@@ -591,7 +645,12 @@ impl Mutation {
     }
 
     /// Delete a Plan DAG edge
-    async fn delete_plan_dag_edge(&self, ctx: &Context<'_>, project_id: i32, edge_id: String) -> Result<Option<PlanDagEdge>> {
+    async fn delete_plan_dag_edge(
+        &self,
+        ctx: &Context<'_>,
+        project_id: i32,
+        edge_id: String,
+    ) -> Result<Option<PlanDagEdge>> {
         let context = ctx.data::<GraphQLContext>()?;
 
         // Find the plan for this project
@@ -602,7 +661,8 @@ impl Mutation {
             .ok_or_else(|| Error::new("Plan not found for project"))?;
 
         // Fetch current state for delta generation
-        let (_, current_edges) = plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
+        let (_, current_edges) =
+            plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
 
         // Find the edge to get its target node before deletion
         let _deleted_edge_target = current_edges
@@ -619,8 +679,9 @@ impl Mutation {
         // Delete the edge
         let result = plan_dag_edges::Entity::delete_many()
             .filter(
-                plan_dag_edges::Column::PlanId.eq(plan.id)
-                    .and(plan_dag_edges::Column::Id.eq(&edge_id))
+                plan_dag_edges::Column::PlanId
+                    .eq(plan.id)
+                    .and(plan_dag_edges::Column::Id.eq(&edge_id)),
             )
             .exec(&context.db)
             .await?;
@@ -628,14 +689,12 @@ impl Mutation {
         if result.rows_affected > 0 {
             // Increment plan version and broadcast delta
             if !patch_ops.is_empty() {
-                let new_version = plan_dag_delta::increment_plan_version(&context.db, plan.id).await?;
+                let new_version =
+                    plan_dag_delta::increment_plan_version(&context.db, plan.id).await?;
                 let user_id = "demo_user".to_string(); // TODO: Get from auth context
-                plan_dag_delta::publish_plan_dag_delta(
-                    project_id,
-                    new_version,
-                    user_id,
-                    patch_ops,
-                ).await.ok(); // Non-fatal if broadcast fails
+                plan_dag_delta::publish_plan_dag_delta(project_id, new_version, user_id, patch_ops)
+                    .await
+                    .ok(); // Non-fatal if broadcast fails
             }
 
             // TODO: Trigger pipeline re-execution for affected nodes (target and downstream)
@@ -656,7 +715,7 @@ impl Mutation {
         ctx: &Context<'_>,
         project_id: i32,
         edge_id: String,
-        updates: PlanDagEdgeUpdateInput
+        updates: PlanDagEdgeUpdateInput,
     ) -> Result<Option<PlanDagEdge>> {
         let context = ctx.data::<GraphQLContext>()?;
 
@@ -670,8 +729,9 @@ impl Mutation {
         // Find the edge
         let edge = plan_dag_edges::Entity::find()
             .filter(
-                plan_dag_edges::Column::PlanId.eq(plan.id)
-                    .and(plan_dag_edges::Column::Id.eq(&edge_id))
+                plan_dag_edges::Column::PlanId
+                    .eq(plan.id)
+                    .and(plan_dag_edges::Column::Id.eq(&edge_id)),
             )
             .one(&context.db)
             .await?
@@ -702,14 +762,21 @@ impl Mutation {
     }
 
     /// Move a Plan DAG node (update position)
-    async fn move_plan_dag_node(&self, ctx: &Context<'_>, project_id: i32, node_id: String, position: Position) -> Result<Option<PlanDagNode>> {
+    async fn move_plan_dag_node(
+        &self,
+        ctx: &Context<'_>,
+        project_id: i32,
+        node_id: String,
+        position: Position,
+    ) -> Result<Option<PlanDagNode>> {
         let updates = PlanDagNodeUpdateInput {
             position: Some(position),
             metadata: None,
             config: None,
         };
 
-        self.update_plan_dag_node(ctx, project_id, node_id, updates).await
+        self.update_plan_dag_node(ctx, project_id, node_id, updates)
+            .await
     }
 
     /// Batch move multiple nodes at once (optimized for layout operations)
@@ -717,7 +784,7 @@ impl Mutation {
         &self,
         ctx: &Context<'_>,
         project_id: i32,
-        node_positions: Vec<NodePositionInput>
+        node_positions: Vec<NodePositionInput>,
     ) -> Result<Vec<PlanDagNode>> {
         let context = ctx.data::<GraphQLContext>()?;
 
@@ -725,7 +792,8 @@ impl Mutation {
         let plan = match plans::Entity::find()
             .filter(plans::Column::ProjectId.eq(project_id))
             .one(&context.db)
-            .await? {
+            .await?
+        {
             Some(plan) => plan,
             None => {
                 let now = chrono::Utc::now();
@@ -745,7 +813,8 @@ impl Mutation {
         };
 
         // Fetch current state once for all nodes
-        let (current_nodes, _) = plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
+        let (current_nodes, _) =
+            plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
 
         let mut updated_nodes = Vec::new();
         let mut all_patch_ops = Vec::new();
@@ -755,8 +824,9 @@ impl Mutation {
             // Find the node
             let node = plan_dag_nodes::Entity::find()
                 .filter(
-                    plan_dag_nodes::Column::PlanId.eq(plan.id)
-                        .and(plan_dag_nodes::Column::Id.eq(&node_pos.node_id))
+                    plan_dag_nodes::Column::PlanId
+                        .eq(plan.id)
+                        .and(plan_dag_nodes::Column::Id.eq(&node_pos.node_id)),
                 )
                 .one(&context.db)
                 .await?;
@@ -794,12 +864,8 @@ impl Mutation {
         if !all_patch_ops.is_empty() {
             let new_version = plan_dag_delta::increment_plan_version(&context.db, plan.id).await?;
             let user_id = "demo_user".to_string(); // TODO: Get from auth context
-            plan_dag_delta::publish_plan_dag_delta(
-                project_id,
-                new_version,
-                user_id,
-                all_patch_ops,
-            ).await?;
+            plan_dag_delta::publish_plan_dag_delta(project_id, new_version, user_id, all_patch_ops)
+                .await?;
         }
 
         Ok(updated_nodes)
@@ -808,7 +874,11 @@ impl Mutation {
     // Authentication Mutations
 
     /// Register a new user
-    async fn register(&self, ctx: &Context<'_>, input: RegisterUserInput) -> Result<RegisterResponse> {
+    async fn register(
+        &self,
+        ctx: &Context<'_>,
+        input: RegisterUserInput,
+    ) -> Result<RegisterResponse> {
         let context = ctx.data::<GraphQLContext>()?;
 
         // Validate input
@@ -925,7 +995,12 @@ impl Mutation {
     }
 
     /// Update user profile
-    async fn update_user(&self, ctx: &Context<'_>, user_id: i32, input: UpdateUserInput) -> Result<User> {
+    async fn update_user(
+        &self,
+        ctx: &Context<'_>,
+        user_id: i32,
+        input: UpdateUserInput,
+    ) -> Result<User> {
         let context = ctx.data::<GraphQLContext>()?;
 
         let user = users::Entity::find_by_id(user_id)
@@ -963,7 +1038,11 @@ impl Mutation {
     // Project Collaboration Mutations
 
     /// Invite a user to collaborate on a project
-    async fn invite_collaborator(&self, ctx: &Context<'_>, input: InviteCollaboratorInput) -> Result<ProjectCollaborator> {
+    async fn invite_collaborator(
+        &self,
+        ctx: &Context<'_>,
+        input: InviteCollaboratorInput,
+    ) -> Result<ProjectCollaborator> {
         let context = ctx.data::<GraphQLContext>()?;
 
         // Find user by email
@@ -986,8 +1065,9 @@ impl Mutation {
         }
 
         // Parse role
-        let role = crate::database::entities::project_collaborators::ProjectRole::from_str(&input.role)
-            .map_err(|_| Error::new("Invalid role"))?;
+        let role =
+            crate::database::entities::project_collaborators::ProjectRole::from_str(&input.role)
+                .map_err(|_| Error::new("Invalid role"))?;
 
         // Create collaboration
         // Note: In a real app, you'd get invited_by from the authentication context
@@ -1004,7 +1084,11 @@ impl Mutation {
     }
 
     /// Accept collaboration invitation
-    async fn accept_collaboration(&self, ctx: &Context<'_>, collaboration_id: i32) -> Result<ProjectCollaborator> {
+    async fn accept_collaboration(
+        &self,
+        ctx: &Context<'_>,
+        collaboration_id: i32,
+    ) -> Result<ProjectCollaborator> {
         let context = ctx.data::<GraphQLContext>()?;
 
         let collaboration = project_collaborators::Entity::find_by_id(collaboration_id)
@@ -1020,7 +1104,11 @@ impl Mutation {
     }
 
     /// Decline collaboration invitation
-    async fn decline_collaboration(&self, ctx: &Context<'_>, collaboration_id: i32) -> Result<ProjectCollaborator> {
+    async fn decline_collaboration(
+        &self,
+        ctx: &Context<'_>,
+        collaboration_id: i32,
+    ) -> Result<ProjectCollaborator> {
         let context = ctx.data::<GraphQLContext>()?;
 
         let collaboration = project_collaborators::Entity::find_by_id(collaboration_id)
@@ -1036,7 +1124,11 @@ impl Mutation {
     }
 
     /// Update collaborator role
-    async fn update_collaborator_role(&self, ctx: &Context<'_>, input: UpdateCollaboratorRoleInput) -> Result<ProjectCollaborator> {
+    async fn update_collaborator_role(
+        &self,
+        ctx: &Context<'_>,
+        input: UpdateCollaboratorRoleInput,
+    ) -> Result<ProjectCollaborator> {
         let context = ctx.data::<GraphQLContext>()?;
 
         let collaboration = project_collaborators::Entity::find_by_id(input.collaborator_id)
@@ -1045,8 +1137,9 @@ impl Mutation {
             .ok_or_else(|| Error::new("Collaboration not found"))?;
 
         // Parse new role
-        let role = crate::database::entities::project_collaborators::ProjectRole::from_str(&input.role)
-            .map_err(|_| Error::new("Invalid role"))?;
+        let role =
+            crate::database::entities::project_collaborators::ProjectRole::from_str(&input.role)
+                .map_err(|_| Error::new("Invalid role"))?;
 
         let mut collaboration_active: project_collaborators::ActiveModel = collaboration.into();
         collaboration_active = collaboration_active.update_role(role);
@@ -1081,16 +1174,16 @@ impl Mutation {
     // Cursor position updates are now handled via WebSocket at /ws/collaboration for better performance
 
     /// Join a project for collaboration
-    async fn join_project_collaboration(
-        &self,
-        ctx: &Context<'_>,
-        project_id: i32,
-    ) -> Result<bool> {
+    async fn join_project_collaboration(&self, ctx: &Context<'_>, project_id: i32) -> Result<bool> {
         let _context = ctx.data::<GraphQLContext>()?;
 
         // TODO: Extract from authenticated user context when authentication is implemented
         let (user_id, user_name, avatar_color) = {
-            ("demo_user".to_string(), "Demo User".to_string(), "#3B82F6".to_string())
+            (
+                "demo_user".to_string(),
+                "Demo User".to_string(),
+                "#3B82F6".to_string(),
+            )
         };
 
         let plan_id = format!("project_{}", project_id);
@@ -1133,7 +1226,11 @@ impl Mutation {
 
         // TODO: Extract from authenticated user context when authentication is implemented
         let (user_id, user_name, avatar_color) = {
-            ("demo_user".to_string(), "Demo User".to_string(), "#3B82F6".to_string())
+            (
+                "demo_user".to_string(),
+                "Demo User".to_string(),
+                "#3B82F6".to_string(),
+            )
         };
 
         let plan_id = format!("project_{}", project_id);
@@ -1170,14 +1267,15 @@ impl Mutation {
     async fn create_data_source_from_file(
         &self,
         ctx: &Context<'_>,
-        input: CreateDataSourceInput
+        input: CreateDataSourceInput,
     ) -> Result<DataSource> {
         let context = ctx.data::<GraphQLContext>()?;
         let data_source_service = DataSourceService::new(context.db.clone());
 
         // Decode the base64 file content
         use base64::Engine;
-        let file_content = base64::engine::general_purpose::STANDARD.decode(&input.file_content)
+        let file_content = base64::engine::general_purpose::STANDARD
+            .decode(&input.file_content)
             .map_err(|e| Error::new(format!("Failed to decode base64 file content: {}", e)))?;
 
         // Convert GraphQL enums to database enums
@@ -1205,7 +1303,8 @@ impl Mutation {
         let plan = match plans::Entity::find()
             .filter(plans::Column::ProjectId.eq(input.project_id))
             .one(&context.db)
-            .await? {
+            .await?
+        {
             Some(plan) => plan,
             None => {
                 // Auto-create a plan if one doesn't exist
@@ -1226,7 +1325,8 @@ impl Mutation {
         };
 
         // Fetch current state to determine node index and position
-        let (current_nodes, _) = plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
+        let (current_nodes, _) =
+            plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
         let node_index = current_nodes.len();
 
         // Calculate position: stack vertically with some spacing
@@ -1274,7 +1374,9 @@ impl Mutation {
             new_version,
             user_id,
             vec![patch_op],
-        ).await.ok(); // Non-fatal if broadcast fails
+        )
+        .await
+        .ok(); // Non-fatal if broadcast fails
 
         Ok(DataSource::from(data_source))
     }
@@ -1284,7 +1386,7 @@ impl Mutation {
         &self,
         ctx: &Context<'_>,
         project_id: i32,
-        files: Vec<BulkUploadDataSourceInput>
+        files: Vec<BulkUploadDataSourceInput>,
     ) -> Result<Vec<DataSource>> {
         let context = ctx.data::<GraphQLContext>()?;
         let data_source_service = DataSourceService::new(context.db.clone());
@@ -1294,8 +1396,14 @@ impl Mutation {
         for file_input in files {
             // Decode the base64 file content
             use base64::Engine;
-            let file_content = base64::engine::general_purpose::STANDARD.decode(&file_input.file_content)
-                .map_err(|e| Error::new(format!("Failed to decode base64 file content for {}: {}", file_input.filename, e)))?;
+            let file_content = base64::engine::general_purpose::STANDARD
+                .decode(&file_input.file_content)
+                .map_err(|e| {
+                    Error::new(format!(
+                        "Failed to decode base64 file content for {}: {}",
+                        file_input.filename, e
+                    ))
+                })?;
 
             // Use auto-detection to create the data source
             let data_source = data_source_service
@@ -1307,7 +1415,12 @@ impl Mutation {
                     file_content,
                 )
                 .await
-                .map_err(|e| Error::new(format!("Failed to create DataSource for {}: {}", file_input.filename, e)))?;
+                .map_err(|e| {
+                    Error::new(format!(
+                        "Failed to create DataSource for {}: {}",
+                        file_input.filename, e
+                    ))
+                })?;
 
             // Automatically add a DataSourceNode to the Plan DAG
             let timestamp = chrono::Utc::now().timestamp_millis();
@@ -1317,7 +1430,8 @@ impl Mutation {
             let plan = match plans::Entity::find()
                 .filter(plans::Column::ProjectId.eq(project_id))
                 .one(&context.db)
-                .await? {
+                .await?
+            {
                 Some(plan) => plan,
                 None => {
                     // Auto-create a plan if one doesn't exist
@@ -1338,7 +1452,8 @@ impl Mutation {
             };
 
             // Fetch current state to determine node index and position
-            let (current_nodes, _) = plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
+            let (current_nodes, _) =
+                plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
             let node_index = current_nodes.len();
 
             // Calculate position: stack vertically with some spacing
@@ -1386,7 +1501,9 @@ impl Mutation {
                 new_version,
                 user_id,
                 vec![patch_op],
-            ).await.ok(); // Non-fatal if broadcast fails
+            )
+            .await
+            .ok(); // Non-fatal if broadcast fails
 
             created_data_sources.push(DataSource::from(data_source));
         }
@@ -1399,7 +1516,7 @@ impl Mutation {
         &self,
         ctx: &Context<'_>,
         id: i32,
-        input: UpdateDataSourceInput
+        input: UpdateDataSourceInput,
     ) -> Result<DataSource> {
         let context = ctx.data::<GraphQLContext>()?;
         let data_source_service = DataSourceService::new(context.db.clone());
@@ -1407,7 +1524,8 @@ impl Mutation {
         let data_source = if let Some(file_content_b64) = input.file_content {
             // Update with new file - decode base64 content
             use base64::Engine;
-            let file_content = base64::engine::general_purpose::STANDARD.decode(&file_content_b64)
+            let file_content = base64::engine::general_purpose::STANDARD
+                .decode(&file_content_b64)
                 .map_err(|e| Error::new(format!("Failed to decode base64 file content: {}", e)))?;
 
             let filename = input.filename.unwrap_or_else(|| "updated_file".to_string());
@@ -1459,10 +1577,7 @@ impl Mutation {
         let graph_service = GraphService::new(context.db.clone());
 
         let graph = graph_service
-            .create_graph(
-                input.project_id,
-                input.name,
-            )
+            .create_graph(input.project_id, input.name)
             .await
             .map_err(|e| Error::new(format!("Failed to create Graph: {}", e)))?;
 
@@ -1474,7 +1589,7 @@ impl Mutation {
         &self,
         ctx: &Context<'_>,
         id: i32,
-        input: UpdateGraphInput
+        input: UpdateGraphInput,
     ) -> Result<Graph> {
         let context = ctx.data::<GraphQLContext>()?;
         let graph_service = GraphService::new(context.db.clone());
@@ -1501,7 +1616,11 @@ impl Mutation {
     }
 
     /// Create a new Layer
-    async fn create_layer(&self, ctx: &Context<'_>, input: CreateLayerInput) -> Result<crate::graphql::types::Layer> {
+    async fn create_layer(
+        &self,
+        ctx: &Context<'_>,
+        input: CreateLayerInput,
+    ) -> Result<crate::graphql::types::Layer> {
         let context = ctx.data::<GraphQLContext>()?;
 
         use crate::database::entities::layers;
@@ -1515,7 +1634,8 @@ impl Mutation {
             properties: Set(None),
         };
 
-        let inserted_layer = layer.insert(&context.db)
+        let inserted_layer = layer
+            .insert(&context.db)
             .await
             .map_err(|e| Error::new(format!("Failed to create layer: {}", e)))?;
 
@@ -1537,7 +1657,7 @@ impl Mutation {
         let edit_service = GraphEditService::new(context.db.clone());
 
         // Fetch current node to get old values
-        use crate::database::entities::graph_nodes::{Entity as GraphNodes, Column as NodeColumn};
+        use crate::database::entities::graph_nodes::{Column as NodeColumn, Entity as GraphNodes};
         use sea_orm::{ColumnTrait, QueryFilter};
 
         let old_node = GraphNodes::find()
@@ -1548,7 +1668,13 @@ impl Mutation {
 
         // Update the node
         let node = graph_service
-            .update_graph_node(graph_id, node_id.clone(), label.clone(), layer.clone(), attrs.clone())
+            .update_graph_node(
+                graph_id,
+                node_id.clone(),
+                label.clone(),
+                layer.clone(),
+                attrs.clone(),
+            )
             .await
             .map_err(|e| Error::new(format!("Failed to update graph node: {}", e)))?;
 
@@ -1556,47 +1682,57 @@ impl Mutation {
         if let Some(old_node) = old_node {
             if let Some(new_label) = &label {
                 if old_node.label.as_ref() != Some(new_label) {
-                    let _ = edit_service.create_edit(
-                        graph_id,
-                        "node".to_string(),
-                        node_id.clone(),
-                        "update".to_string(),
-                        Some("label".to_string()),
-                        old_node.label.as_ref().map(|l| serde_json::json!(l)),
-                        Some(serde_json::json!(new_label)),
-                        None,
-                    ).await;
+                    let _ = edit_service
+                        .create_edit(
+                            graph_id,
+                            "node".to_string(),
+                            node_id.clone(),
+                            "update".to_string(),
+                            Some("label".to_string()),
+                            old_node.label.as_ref().map(|l| serde_json::json!(l)),
+                            Some(serde_json::json!(new_label)),
+                            None,
+                        )
+                        .await;
                 }
             }
 
             if let Some(new_layer) = &layer {
                 let old_layer_value = old_node.layer.clone().unwrap_or_default();
                 if &old_layer_value != new_layer {
-                    let _ = edit_service.create_edit(
-                        graph_id,
-                        "node".to_string(),
-                        node_id.clone(),
-                        "update".to_string(),
-                        Some("layer".to_string()),
-                        if old_layer_value.is_empty() { None } else { Some(serde_json::json!(old_layer_value)) },
-                        Some(serde_json::json!(new_layer)),
-                        None,
-                    ).await;
+                    let _ = edit_service
+                        .create_edit(
+                            graph_id,
+                            "node".to_string(),
+                            node_id.clone(),
+                            "update".to_string(),
+                            Some("layer".to_string()),
+                            if old_layer_value.is_empty() {
+                                None
+                            } else {
+                                Some(serde_json::json!(old_layer_value))
+                            },
+                            Some(serde_json::json!(new_layer)),
+                            None,
+                        )
+                        .await;
                 }
             }
 
             if let Some(new_attrs) = &attrs {
                 if old_node.attrs.as_ref() != Some(new_attrs) {
-                    let _ = edit_service.create_edit(
-                        graph_id,
-                        "node".to_string(),
-                        node_id.clone(),
-                        "update".to_string(),
-                        Some("attrs".to_string()),
-                        old_node.attrs.clone(),
-                        Some(new_attrs.clone()),
-                        None,
-                    ).await;
+                    let _ = edit_service
+                        .create_edit(
+                            graph_id,
+                            "node".to_string(),
+                            node_id.clone(),
+                            "update".to_string(),
+                            Some("attrs".to_string()),
+                            old_node.attrs.clone(),
+                            Some(new_attrs.clone()),
+                            None,
+                        )
+                        .await;
                 }
             }
         }
@@ -1619,9 +1755,7 @@ impl Mutation {
         // Fetch current layer to get old values
         use crate::database::entities::layers::Entity as Layers;
 
-        let old_layer = Layers::find_by_id(id)
-            .one(&context.db)
-            .await?;
+        let old_layer = Layers::find_by_id(id).one(&context.db).await?;
 
         // Update the layer
         let layer = graph_service
@@ -1633,38 +1767,50 @@ impl Mutation {
         if let Some(old_layer) = old_layer {
             if let Some(new_name) = &name {
                 if &old_layer.name != new_name {
-                    let _ = edit_service.create_edit(
-                        old_layer.graph_id,
-                        "layer".to_string(),
-                        old_layer.layer_id.clone(),
-                        "update".to_string(),
-                        Some("name".to_string()),
-                        Some(serde_json::json!(old_layer.name)),
-                        Some(serde_json::json!(new_name)),
-                        None,
-                    ).await;
+                    let _ = edit_service
+                        .create_edit(
+                            old_layer.graph_id,
+                            "layer".to_string(),
+                            old_layer.layer_id.clone(),
+                            "update".to_string(),
+                            Some("name".to_string()),
+                            Some(serde_json::json!(old_layer.name)),
+                            Some(serde_json::json!(new_name)),
+                            None,
+                        )
+                        .await;
                 }
             }
 
             if let Some(new_properties) = &properties {
-                let old_props = old_layer.properties
+                let old_props = old_layer
+                    .properties
                     .and_then(|p| serde_json::from_str::<serde_json::Value>(&p).ok());
 
-                tracing::debug!("Layer properties update - old_props: {:?}, new_properties: {:?}", old_props, new_properties);
-                tracing::debug!("Properties are equal: {}", old_props.as_ref() == Some(new_properties));
+                tracing::debug!(
+                    "Layer properties update - old_props: {:?}, new_properties: {:?}",
+                    old_props,
+                    new_properties
+                );
+                tracing::debug!(
+                    "Properties are equal: {}",
+                    old_props.as_ref() == Some(new_properties)
+                );
 
                 if old_props.as_ref() != Some(new_properties) {
                     tracing::info!("Creating edit for layer properties change");
-                    let _ = edit_service.create_edit(
-                        old_layer.graph_id,
-                        "layer".to_string(),
-                        old_layer.layer_id.clone(),
-                        "update".to_string(),
-                        Some("properties".to_string()),
-                        old_props,
-                        Some(new_properties.clone()),
-                        None,
-                    ).await;
+                    let _ = edit_service
+                        .create_edit(
+                            old_layer.graph_id,
+                            "layer".to_string(),
+                            old_layer.layer_id.clone(),
+                            "update".to_string(),
+                            Some("properties".to_string()),
+                            old_props,
+                            Some(new_properties.clone()),
+                            None,
+                        )
+                        .await;
                 }
             }
         }
@@ -1684,7 +1830,7 @@ impl Mutation {
         let graph_service = GraphService::new(context.db.clone());
         let edit_service = GraphEditService::new(context.db.clone());
 
-        use crate::database::entities::graph_nodes::{Entity as GraphNodes, Column as NodeColumn};
+        use crate::database::entities::graph_nodes::{Column as NodeColumn, Entity as GraphNodes};
         use crate::database::entities::layers::Entity as Layers;
         use sea_orm::{ColumnTrait, QueryFilter};
 
@@ -1714,47 +1860,57 @@ impl Mutation {
                 if let Some(old_node) = old_node {
                     if let Some(new_label) = &node_update.label {
                         if old_node.label.as_ref() != Some(new_label) {
-                            let _ = edit_service.create_edit(
-                                graph_id,
-                                "node".to_string(),
-                                node_update.node_id.clone(),
-                                "update".to_string(),
-                                Some("label".to_string()),
-                                old_node.label.as_ref().map(|l| serde_json::json!(l)),
-                                Some(serde_json::json!(new_label)),
-                                None,
-                            ).await;
+                            let _ = edit_service
+                                .create_edit(
+                                    graph_id,
+                                    "node".to_string(),
+                                    node_update.node_id.clone(),
+                                    "update".to_string(),
+                                    Some("label".to_string()),
+                                    old_node.label.as_ref().map(|l| serde_json::json!(l)),
+                                    Some(serde_json::json!(new_label)),
+                                    None,
+                                )
+                                .await;
                         }
                     }
 
                     if let Some(new_layer) = &node_update.layer {
                         let old_layer_value = old_node.layer.clone().unwrap_or_default();
                         if &old_layer_value != new_layer {
-                            let _ = edit_service.create_edit(
-                                graph_id,
-                                "node".to_string(),
-                                node_update.node_id.clone(),
-                                "update".to_string(),
-                                Some("layer".to_string()),
-                                if old_layer_value.is_empty() { None } else { Some(serde_json::json!(old_layer_value)) },
-                                Some(serde_json::json!(new_layer)),
-                                None,
-                            ).await;
+                            let _ = edit_service
+                                .create_edit(
+                                    graph_id,
+                                    "node".to_string(),
+                                    node_update.node_id.clone(),
+                                    "update".to_string(),
+                                    Some("layer".to_string()),
+                                    if old_layer_value.is_empty() {
+                                        None
+                                    } else {
+                                        Some(serde_json::json!(old_layer_value))
+                                    },
+                                    Some(serde_json::json!(new_layer)),
+                                    None,
+                                )
+                                .await;
                         }
                     }
 
                     if let Some(new_attrs) = &node_update.attrs {
                         if old_node.attrs.as_ref() != Some(new_attrs) {
-                            let _ = edit_service.create_edit(
-                                graph_id,
-                                "node".to_string(),
-                                node_update.node_id.clone(),
-                                "update".to_string(),
-                                Some("attrs".to_string()),
-                                old_node.attrs.clone(),
-                                Some(new_attrs.clone()),
-                                None,
-                            ).await;
+                            let _ = edit_service
+                                .create_edit(
+                                    graph_id,
+                                    "node".to_string(),
+                                    node_update.node_id.clone(),
+                                    "update".to_string(),
+                                    Some("attrs".to_string()),
+                                    old_node.attrs.clone(),
+                                    Some(new_attrs.clone()),
+                                    None,
+                                )
+                                .await;
                         }
                     }
                 }
@@ -1765,9 +1921,7 @@ impl Mutation {
         if let Some(layer_updates) = layers {
             for layer_update in layer_updates {
                 // Fetch current layer to get old values
-                let old_layer = Layers::find_by_id(layer_update.id)
-                    .one(&context.db)
-                    .await?;
+                let old_layer = Layers::find_by_id(layer_update.id).one(&context.db).await?;
 
                 // Update the layer
                 let _ = graph_service
@@ -1783,34 +1937,39 @@ impl Mutation {
                 if let Some(old_layer) = old_layer {
                     if let Some(new_name) = &layer_update.name {
                         if &old_layer.name != new_name {
-                            let _ = edit_service.create_edit(
-                                old_layer.graph_id,
-                                "layer".to_string(),
-                                old_layer.layer_id.clone(),
-                                "update".to_string(),
-                                Some("name".to_string()),
-                                Some(serde_json::json!(old_layer.name)),
-                                Some(serde_json::json!(new_name)),
-                                None,
-                            ).await;
+                            let _ = edit_service
+                                .create_edit(
+                                    old_layer.graph_id,
+                                    "layer".to_string(),
+                                    old_layer.layer_id.clone(),
+                                    "update".to_string(),
+                                    Some("name".to_string()),
+                                    Some(serde_json::json!(old_layer.name)),
+                                    Some(serde_json::json!(new_name)),
+                                    None,
+                                )
+                                .await;
                         }
                     }
 
                     if let Some(new_properties) = &layer_update.properties {
-                        let old_props = old_layer.properties
+                        let old_props = old_layer
+                            .properties
                             .and_then(|p| serde_json::from_str::<serde_json::Value>(&p).ok());
 
                         if old_props.as_ref() != Some(new_properties) {
-                            let _ = edit_service.create_edit(
-                                old_layer.graph_id,
-                                "layer".to_string(),
-                                old_layer.layer_id.clone(),
-                                "update".to_string(),
-                                Some("properties".to_string()),
-                                old_props,
-                                Some(new_properties.clone()),
-                                None,
-                            ).await;
+                            let _ = edit_service
+                                .create_edit(
+                                    old_layer.graph_id,
+                                    "layer".to_string(),
+                                    old_layer.layer_id.clone(),
+                                    "update".to_string(),
+                                    Some("properties".to_string()),
+                                    old_props,
+                                    Some(new_properties.clone()),
+                                    None,
+                                )
+                                .await;
                         }
                     }
                 }
@@ -1825,7 +1984,7 @@ impl Mutation {
         &self,
         ctx: &Context<'_>,
         project_id: i32,
-        node_id: String
+        node_id: String,
     ) -> Result<NodeExecutionResult> {
         let context = ctx.data::<GraphQLContext>()?;
 
@@ -1864,7 +2023,10 @@ impl Mutation {
 
         Ok(NodeExecutionResult {
             success: true,
-            message: format!("Node {} and its dependencies executed successfully", node_id),
+            message: format!(
+                "Node {} and its dependencies executed successfully",
+                node_id
+            ),
             node_id,
         })
     }
@@ -1892,7 +2054,8 @@ impl Mutation {
             Some(plan) => plan,
             None => {
                 // Create a new plan for this project with the YAML content
-                let plan_name = plan_yaml.get("meta")
+                let plan_name = plan_yaml
+                    .get("meta")
                     .and_then(|m| m.get("name"))
                     .and_then(|n| n.as_str())
                     .unwrap_or("Imported Plan");
@@ -1920,10 +2083,12 @@ impl Mutation {
         if let Some(import_profiles) = plan_yaml.get("import").and_then(|i| i.get("profiles")) {
             if let Some(profiles) = import_profiles.as_sequence() {
                 for (idx, profile) in profiles.iter().enumerate() {
-                    let filename = profile.get("filename")
+                    let filename = profile
+                        .get("filename")
                         .and_then(|f| f.as_str())
                         .unwrap_or("unknown.csv");
-                    let filetype = profile.get("filetype")
+                    let filetype = profile
+                        .get("filetype")
                         .and_then(|f| f.as_str())
                         .unwrap_or("Unknown");
 
@@ -1941,7 +2106,8 @@ impl Mutation {
                         config_json: Set(serde_json::json!({
                             "filename": filename,
                             "dataType": filetype.to_lowercase()
-                        }).to_string()),
+                        })
+                        .to_string()),
                         created_at: Set(now),
                         updated_at: Set(now),
                         ..Default::default()
@@ -2026,26 +2192,35 @@ impl Mutation {
                 for profile in profiles.iter() {
                     if let Some(graph_config) = profile.get("graph_config") {
                         // This export has graph transformations
-                        let filename = profile.get("filename")
+                        let filename = profile
+                            .get("filename")
                             .and_then(|f| f.as_str())
                             .unwrap_or("output");
-                        let exporter = profile.get("exporter")
+                        let exporter = profile
+                            .get("exporter")
                             .and_then(|e| e.as_str())
                             .unwrap_or("Unknown");
 
                         // Create Transform node
-                        let transform_id = format!("transformnode_{}_{:04x}", timestamp, variation_idx);
-                        let transform_label = format!("Transform: {}", filename.split('/').last().unwrap_or(filename));
+                        let transform_id =
+                            format!("transformnode_{}_{:04x}", timestamp, variation_idx);
+                        let transform_label = format!(
+                            "Transform: {}",
+                            filename.split('/').last().unwrap_or(filename)
+                        );
                         let transform_node = plan_dag_nodes::ActiveModel {
                             id: Set(transform_id.clone()),
                             plan_id: Set(plan.id),
                             node_type: Set("TransformNode".to_string()),
                             position_x: Set(700.0),
                             position_y: Set(100.0 + (variation_idx as f64 * 150.0)),
-                            metadata_json: Set(serde_json::json!({ "label": transform_label }).to_string()),
+                            metadata_json: Set(
+                                serde_json::json!({ "label": transform_label }).to_string()
+                            ),
                             config_json: Set(serde_json::json!({
                                 "graphConfig": graph_config
-                            }).to_string()),
+                            })
+                            .to_string()),
                             created_at: Set(now),
                             updated_at: Set(now),
                             ..Default::default()
@@ -2055,7 +2230,10 @@ impl Mutation {
 
                         // Connect base graph to transform
                         let edge = plan_dag_edges::ActiveModel {
-                            id: Set(format!("edge_{}_base_to_transform_{:04x}", timestamp, variation_idx)),
+                            id: Set(format!(
+                                "edge_{}_base_to_transform_{:04x}",
+                                timestamp, variation_idx
+                            )),
                             plan_id: Set(plan.id),
                             source_node_id: Set(base_graph_id.clone()),
                             target_node_id: Set(transform_id.clone()),
@@ -2069,14 +2247,17 @@ impl Mutation {
 
                         // Create Graph node for variation
                         let graph_id = format!("graphnode_{}_{:04x}", timestamp, variation_idx);
-                        let graph_label = format!("Graph: {}", filename.split('/').last().unwrap_or(filename));
+                        let graph_label =
+                            format!("Graph: {}", filename.split('/').last().unwrap_or(filename));
                         let graph_node = plan_dag_nodes::ActiveModel {
                             id: Set(graph_id.clone()),
                             plan_id: Set(plan.id),
                             node_type: Set("GraphNode".to_string()),
                             position_x: Set(900.0),
                             position_y: Set(100.0 + (variation_idx as f64 * 150.0)),
-                            metadata_json: Set(serde_json::json!({ "label": graph_label }).to_string()),
+                            metadata_json: Set(
+                                serde_json::json!({ "label": graph_label }).to_string()
+                            ),
                             config_json: Set("{}".to_string()),
                             created_at: Set(now),
                             updated_at: Set(now),
@@ -2087,7 +2268,10 @@ impl Mutation {
 
                         // Connect transform to graph
                         let edge = plan_dag_edges::ActiveModel {
-                            id: Set(format!("edge_{}_transform_to_graph_{:04x}", timestamp, variation_idx)),
+                            id: Set(format!(
+                                "edge_{}_transform_to_graph_{:04x}",
+                                timestamp, variation_idx
+                            )),
                             plan_id: Set(plan.id),
                             source_node_id: Set(transform_id.clone()),
                             target_node_id: Set(graph_id.clone()),
@@ -2101,19 +2285,26 @@ impl Mutation {
 
                         // Create Output node
                         let output_id = format!("outputnode_{}_{:04x}", timestamp, variation_idx);
-                        let output_label = format!("{}: {}", exporter, filename.split('/').last().unwrap_or(filename));
+                        let output_label = format!(
+                            "{}: {}",
+                            exporter,
+                            filename.split('/').last().unwrap_or(filename)
+                        );
                         let output_node = plan_dag_nodes::ActiveModel {
                             id: Set(output_id.clone()),
                             plan_id: Set(plan.id),
                             node_type: Set("OutputNode".to_string()),
                             position_x: Set(1100.0),
                             position_y: Set(100.0 + (variation_idx as f64 * 150.0)),
-                            metadata_json: Set(serde_json::json!({ "label": output_label }).to_string()),
+                            metadata_json: Set(
+                                serde_json::json!({ "label": output_label }).to_string()
+                            ),
                             config_json: Set(serde_json::json!({
                                 "filename": filename,
                                 "exporter": exporter,
                                 "renderConfig": profile.get("render_config").cloned()
-                            }).to_string()),
+                            })
+                            .to_string()),
                             created_at: Set(now),
                             updated_at: Set(now),
                             ..Default::default()
@@ -2123,7 +2314,10 @@ impl Mutation {
 
                         // Connect graph to output
                         let edge = plan_dag_edges::ActiveModel {
-                            id: Set(format!("edge_{}_graph_to_output_{:04x}", timestamp, variation_idx)),
+                            id: Set(format!(
+                                "edge_{}_graph_to_output_{:04x}",
+                                timestamp, variation_idx
+                            )),
                             plan_id: Set(plan.id),
                             source_node_id: Set(graph_id),
                             target_node_id: Set(output_id),
@@ -2143,7 +2337,10 @@ impl Mutation {
 
         Ok(ImportPlanResult {
             success: true,
-            message: format!("Imported plan with {} nodes and {} edges", node_count, edge_count),
+            message: format!(
+                "Imported plan with {} nodes and {} edges",
+                node_count, edge_count
+            ),
             node_count: node_count as i32,
             edge_count: edge_count as i32,
         })
@@ -2154,7 +2351,7 @@ impl Mutation {
         &self,
         ctx: &Context<'_>,
         project_id: i32,
-        node_id: String
+        node_id: String,
     ) -> Result<ExportNodeOutputResult> {
         let context = ctx.data::<GraphQLContext>()?;
 
@@ -2168,8 +2365,9 @@ impl Mutation {
         // Get the output node
         let output_node = plan_dag_nodes::Entity::find()
             .filter(
-                plan_dag_nodes::Column::PlanId.eq(plan.id)
-                    .and(plan_dag_nodes::Column::Id.eq(&node_id))
+                plan_dag_nodes::Column::PlanId
+                    .eq(plan.id)
+                    .and(plan_dag_nodes::Column::Id.eq(&node_id)),
             )
             .one(&context.db)
             .await?
@@ -2179,12 +2377,12 @@ impl Mutation {
         let config: serde_json::Value = serde_json::from_str(&output_node.config_json)
             .map_err(|e| Error::new(format!("Failed to parse node config: {}", e)))?;
 
-        let render_target = config.get("renderTarget")
+        let render_target = config
+            .get("renderTarget")
             .and_then(|v| v.as_str())
             .unwrap_or("GML");
 
-        let output_path = config.get("outputPath")
-            .and_then(|v| v.as_str());
+        let output_path = config.get("outputPath").and_then(|v| v.as_str());
 
         // Get project name for default filename
         let project = projects::Entity::find_by_id(project_id)
@@ -2224,7 +2422,13 @@ impl Mutation {
         // Execute the upstream GraphNode and its dependencies to ensure graph is built
         let executor = DagExecutor::new(context.db.clone());
         executor
-            .execute_with_dependencies(project_id, plan.id, &upstream_node_id, &all_nodes, &edge_tuples)
+            .execute_with_dependencies(
+                project_id,
+                plan.id,
+                &upstream_node_id,
+                &all_nodes,
+                &edge_tuples,
+            )
             .await
             .map_err(|e| Error::new(format!("Failed to execute graph: {}", e)))?;
 
@@ -2240,13 +2444,15 @@ impl Mutation {
         // Build Graph object from the DAG-built graph
         use crate::services::GraphService;
         let graph_service = GraphService::new(context.db.clone());
-        let graph = graph_service.build_graph_from_dag_graph(graph_model.id)
+        let graph = graph_service
+            .build_graph_from_dag_graph(graph_model.id)
             .await
             .map_err(|e| Error::new(format!("Failed to build graph: {}", e)))?;
 
         // Export the graph
         let export_service = ExportService::new(context.db.clone());
-        let content = export_service.export_to_string(&graph, &parse_export_format(render_target)?)
+        let content = export_service
+            .export_to_string(&graph, &parse_export_format(render_target)?)
             .map_err(|e| Error::new(format!("Export failed: {}", e)))?;
 
         // Encode as base64
@@ -2360,7 +2566,8 @@ fn get_mime_type_for_format(format: &str) -> String {
         "PlantUML" => "text/plain",
         "Mermaid" => "text/plain",
         _ => "text/plain",
-    }.to_string()
+    }
+    .to_string()
 }
 
 // Helper function to parse render target string to ExportFileType enum
@@ -2405,7 +2612,7 @@ pub struct ImportPlanResult {
 pub struct ExportNodeOutputResult {
     pub success: bool,
     pub message: String,
-    pub content: String,  // Base64 encoded
+    pub content: String, // Base64 encoded
     pub filename: String,
     pub mime_type: String,
 }

@@ -24,14 +24,20 @@ pub fn render(
                 }
                 Err(err) => {
                     error!("Failed to read partial file '{}': {}", partial, err);
-                    return Err(format!("Failed to read partial file '{}': {}", partial, err).into());
+                    return Err(
+                        format!("Failed to read partial file '{}': {}", partial, err).into(),
+                    );
                 }
             }
         }
     }
 
-    let template_content = fs::read_to_string(&params.template)
-        .map_err(|err| format!("Failed to read template file '{}': {}", params.template, err))?;
+    let template_content = fs::read_to_string(&params.template).map_err(|err| {
+        format!(
+            "Failed to read template file '{}': {}",
+            params.template, err
+        )
+    })?;
 
     let res = handlebars.render_template(
         &template_content,

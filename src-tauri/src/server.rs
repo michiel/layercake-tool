@@ -3,7 +3,7 @@ use std::net::SocketAddr;
 use tokio::task::JoinHandle;
 use tracing::info;
 
-use layercake_core::database::connection::{get_database_url, establish_connection};
+use layercake_core::database::connection::{establish_connection, get_database_url};
 use layercake_core::database::migrations::Migrator;
 use layercake_core::server::app::create_app;
 use sea_orm_migration::prelude::*;

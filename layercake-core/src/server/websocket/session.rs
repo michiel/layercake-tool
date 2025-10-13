@@ -1,12 +1,12 @@
-use std::time::Instant;
 use chrono::{DateTime, Utc};
 use dashmap::mapref::one::Ref;
+use std::time::Instant;
 use tokio::sync::mpsc;
 
 use super::types::{
-    CollaborationState, ProjectSession, UserPresence, DocumentSession, DocumentUserState,
-    DocumentType, CursorPosition, ServerMessage, UserPresenceData, DocumentPresence,
-    DocumentActivityData, DocumentUser,
+    CollaborationState, CursorPosition, DocumentActivityData, DocumentPresence, DocumentSession,
+    DocumentType, DocumentUser, DocumentUserState, ProjectSession, ServerMessage, UserPresence,
+    UserPresenceData,
 };
 
 pub struct SessionManager {
@@ -50,7 +50,11 @@ impl SessionManager {
     }
 
     /// Leave a project session
-    pub async fn leave_project_session(&self, project_id: i32, user_id: &str) -> Result<(), String> {
+    pub async fn leave_project_session(
+        &self,
+        project_id: i32,
+        user_id: &str,
+    ) -> Result<(), String> {
         if let Some(project) = self.state.projects.get(&project_id) {
             project.users.remove(user_id);
             project.connections.remove(user_id);
@@ -87,12 +91,13 @@ impl SessionManager {
         let project = self.state.get_or_create_project(project_id);
 
         // Create or get document session
-        let doc_entry = project.documents.entry(document_id.clone()).or_insert_with(|| {
-            DocumentSession {
+        let doc_entry = project
+            .documents
+            .entry(document_id.clone())
+            .or_insert_with(|| DocumentSession {
                 document_type: document_type.clone(),
                 active_users: dashmap::DashMap::new(),
-            }
-        });
+            });
 
         // Add user to document
         let user_state = DocumentUserState {
@@ -101,7 +106,9 @@ impl SessionManager {
             last_active_in_document: Instant::now(),
         };
 
-        doc_entry.active_users.insert(user_id.to_string(), user_state);
+        doc_entry
+            .active_users
+            .insert(user_id.to_string(), user_state);
 
         // Update user's last active time
         if let Some(mut user) = project.users.get_mut(user_id) {
@@ -109,7 +116,8 @@ impl SessionManager {
         }
 
         // Broadcast document activity
-        self.broadcast_document_activity(&project, &document_id).await?;
+        self.broadcast_document_activity(&project, &document_id)
+            .await?;
 
         Ok(())
     }
@@ -140,7 +148,8 @@ impl SessionManager {
         }
 
         // Broadcast updated document activity
-        self.broadcast_document_activity(&project, document_id).await?;
+        self.broadcast_document_activity(&project, document_id)
+            .await?;
 
         Ok(())
     }
@@ -185,7 +194,10 @@ impl SessionManager {
 
             if let Err(_) = sender.send(message).await {
                 // Connection is dead, mark for cleanup
-                tracing::warn!("Dead connection detected for user {}, scheduling removal", user_id);
+                tracing::warn!(
+                    "Dead connection detected for user {}, scheduling removal",
+                    user_id
+                );
                 dead_connections.push(user_id);
             }
         }
@@ -206,17 +218,16 @@ impl SessionManager {
         document_id: &str,
     ) -> Result<(), String> {
         if let Some(doc) = project.documents.get(document_id) {
-            let active_users: Vec<DocumentUser> = doc.active_users
+            let active_users: Vec<DocumentUser> = doc
+                .active_users
                 .iter()
                 .filter_map(|entry| {
                     // Get user name from project users
-                    project.users.get(entry.key()).map(|user| {
-                        DocumentUser {
-                            user_id: entry.key().clone(),
-                            user_name: user.user_name.clone(),
-                            position: entry.value().position.clone(),
-                            selected_node_id: entry.value().selected_node_id.clone(),
-                        }
+                    project.users.get(entry.key()).map(|user| DocumentUser {
+                        user_id: entry.key().clone(),
+                        user_name: user.user_name.clone(),
+                        position: entry.value().position.clone(),
+                        selected_node_id: entry.value().selected_node_id.clone(),
                     })
                 })
                 .collect();
@@ -263,7 +274,10 @@ impl SessionManager {
     }
 
     /// Collect user presence data for a project
-    fn collect_user_presence_data(&self, project: &Ref<i32, ProjectSession>) -> Vec<UserPresenceData> {
+    fn collect_user_presence_data(
+        &self,
+        project: &Ref<i32, ProjectSession>,
+    ) -> Vec<UserPresenceData> {
         // CRITICAL FIX: This method had nested DashMap iterations causing deadlock!
         // The old pattern: project.users.iter() -> map -> project.documents.iter()
         // was holding iterators across both maps simultaneously.
@@ -293,7 +307,9 @@ impl SessionManager {
                                 document_type: doc_entry.document_type.clone(),
                                 position: user_state.position.clone(),
                                 selected_node_id: user_state.selected_node_id.clone(),
-                                last_active_in_document: Self::instant_to_iso_string(user_state.last_active_in_document),
+                                last_active_in_document: Self::instant_to_iso_string(
+                                    user_state.last_active_in_document,
+                                ),
                             },
                         );
                     }
@@ -320,10 +336,9 @@ impl SessionManager {
         let instant_duration = instant.elapsed();
         let timestamp = duration_since_epoch.saturating_sub(instant_duration);
 
-        let datetime: DateTime<Utc> = DateTime::from_timestamp(
-            timestamp.as_secs() as i64,
-            timestamp.subsec_nanos(),
-        ).unwrap_or_else(|| Utc::now());
+        let datetime: DateTime<Utc> =
+            DateTime::from_timestamp(timestamp.as_secs() as i64, timestamp.subsec_nanos())
+                .unwrap_or_else(|| Utc::now());
 
         datetime.to_rfc3339()
     }
@@ -335,7 +350,8 @@ impl SessionManager {
 
         for project in self.state.projects.iter() {
             // Clean up inactive users
-            let inactive_users: Vec<String> = project.users
+            let inactive_users: Vec<String> = project
+                .users
                 .iter()
                 .filter_map(|entry| {
                     if now.duration_since(entry.value().last_active) > max_inactive_duration {
@@ -357,7 +373,8 @@ impl SessionManager {
             }
 
             // Clean up empty documents
-            let empty_docs: Vec<String> = project.documents
+            let empty_docs: Vec<String> = project
+                .documents
                 .iter()
                 .filter_map(|entry| {
                     if entry.active_users.is_empty() {
@@ -374,7 +391,9 @@ impl SessionManager {
         }
 
         // Clean up empty projects
-        let empty_projects: Vec<i32> = self.state.projects
+        let empty_projects: Vec<i32> = self
+            .state
+            .projects
             .iter()
             .filter_map(|entry| {
                 if entry.users.is_empty() && entry.documents.is_empty() {

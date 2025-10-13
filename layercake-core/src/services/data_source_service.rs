@@ -1,11 +1,11 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use csv::ReaderBuilder;
-use sea_orm::{DatabaseConnection, EntityTrait, ColumnTrait, QueryFilter, Set, ActiveModelTrait};
+use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 
-use crate::database::entities::data_sources::{self, FileFormat, DataType};
-use crate::database::entities::{projects, plan_dag_nodes, plan_dag_edges};
+use crate::database::entities::data_sources::{self, DataType, FileFormat};
+use crate::database::entities::{plan_dag_edges, plan_dag_nodes, projects};
 use crate::services::file_type_detection;
 
 /// Service for managing DataSources with file processing capabilities
@@ -42,10 +42,22 @@ impl DataSourceService {
         } else if filename.to_lowercase().ends_with(".json") {
             DataType::Graph
         } else {
-            return Err(anyhow!("Cannot determine data type from filename: {}", filename));
+            return Err(anyhow!(
+                "Cannot determine data type from filename: {}",
+                filename
+            ));
         };
 
-        self.create_from_file(project_id, name, description, filename, file_format, data_type, file_data).await
+        self.create_from_file(
+            project_id,
+            name,
+            description,
+            filename,
+            file_format,
+            data_type,
+            file_data,
+        )
+        .await
     }
 
     /// Create a new DataSource from uploaded file data
@@ -104,7 +116,10 @@ impl DataSourceService {
         let data_source = data_source.insert(&self.db).await?;
 
         // Process the file
-        let updated_data_source = match self.process_file(&file_format, &data_type, &file_data).await {
+        let updated_data_source = match self
+            .process_file(&file_format, &data_type, &file_data)
+            .await
+        {
             Ok(graph_json) => {
                 // Update with successful processing
                 let mut active_model: data_sources::ActiveModel = data_source.into();
@@ -132,9 +147,7 @@ impl DataSourceService {
 
     /// Get DataSource by ID
     pub async fn get_by_id(&self, id: i32) -> Result<Option<data_sources::Model>> {
-        let data_source = data_sources::Entity::find_by_id(id)
-            .one(&self.db)
-            .await?;
+        let data_source = data_sources::Entity::find_by_id(id).one(&self.db).await?;
         Ok(data_source)
     }
 
@@ -185,8 +198,9 @@ impl DataSourceService {
             filename,
             file_format,
             data_type,
-            file_data
-        ).await
+            file_data,
+        )
+        .await
     }
 
     /// Update DataSource metadata
@@ -196,7 +210,9 @@ impl DataSourceService {
         name: Option<String>,
         description: Option<String>,
     ) -> Result<data_sources::Model> {
-        let data_source = self.get_by_id(id).await?
+        let data_source = self
+            .get_by_id(id)
+            .await?
             .ok_or_else(|| anyhow!("DataSource not found"))?;
 
         let mut active_model: data_sources::ActiveModel = data_source.into();
@@ -220,7 +236,9 @@ impl DataSourceService {
         filename: String,
         file_data: Vec<u8>,
     ) -> Result<data_sources::Model> {
-        let data_source = self.get_by_id(id).await?
+        let data_source = self
+            .get_by_id(id)
+            .await?
             .ok_or_else(|| anyhow!("DataSource not found"))?;
 
         // Detect format from filename extension
@@ -228,7 +246,8 @@ impl DataSourceService {
             .ok_or_else(|| anyhow!("Unsupported file extension: {}", filename))?;
 
         // Get existing data type from the data source
-        let data_type = data_source.get_data_type()
+        let data_type = data_source
+            .get_data_type()
             .ok_or_else(|| anyhow!("Invalid data type in existing data source"))?;
 
         // Validate format/type combination
@@ -253,7 +272,10 @@ impl DataSourceService {
         let data_source = active_model.update(&self.db).await?;
 
         // Process the new file
-        let updated_data_source = match self.process_file(&file_format, &data_type, &file_data).await {
+        let updated_data_source = match self
+            .process_file(&file_format, &data_type, &file_data)
+            .await
+        {
             Ok(graph_json) => {
                 let mut active_model: data_sources::ActiveModel = data_source.into();
                 active_model.graph_json = Set(graph_json);
@@ -279,7 +301,9 @@ impl DataSourceService {
 
     /// Delete DataSource and clean up related plan DAG nodes
     pub async fn delete(&self, id: i32) -> Result<()> {
-        let data_source = self.get_by_id(id).await?
+        let data_source = self
+            .get_by_id(id)
+            .await?
             .ok_or_else(|| anyhow!("DataSource not found"))?;
 
         // Find and delete all plan_dag_nodes that reference this datasource
@@ -323,12 +347,16 @@ impl DataSourceService {
 
     /// Reprocess existing DataSource file
     pub async fn reprocess(&self, id: i32) -> Result<data_sources::Model> {
-        let data_source = self.get_by_id(id).await?
+        let data_source = self
+            .get_by_id(id)
+            .await?
             .ok_or_else(|| anyhow!("DataSource not found"))?;
 
-        let file_format = data_source.get_file_format()
+        let file_format = data_source
+            .get_file_format()
             .ok_or_else(|| anyhow!("Invalid file format"))?;
-        let data_type = data_source.get_data_type()
+        let data_type = data_source
+            .get_data_type()
             .ok_or_else(|| anyhow!("Invalid data type"))?;
 
         // Set to processing status
@@ -340,7 +368,10 @@ impl DataSourceService {
         let data_source = active_model.update(&self.db).await?;
 
         // Process the file
-        let updated_data_source = match self.process_file(&file_format, &data_type, &data_source.blob).await {
+        let updated_data_source = match self
+            .process_file(&file_format, &data_type, &data_source.blob)
+            .await
+        {
             Ok(graph_json) => {
                 let mut active_model: data_sources::ActiveModel = data_source.into();
                 active_model.graph_json = Set(graph_json);
@@ -365,14 +396,31 @@ impl DataSourceService {
     }
 
     /// Process uploaded file data into graph JSON
-    async fn process_file(&self, file_format: &FileFormat, data_type: &DataType, file_data: &[u8]) -> Result<String> {
+    async fn process_file(
+        &self,
+        file_format: &FileFormat,
+        data_type: &DataType,
+        file_data: &[u8],
+    ) -> Result<String> {
         match (file_format, data_type) {
-            (FileFormat::Csv, DataType::Nodes) => self.process_delimited_nodes(file_data, b',').await,
-            (FileFormat::Csv, DataType::Edges) => self.process_delimited_edges(file_data, b',').await,
-            (FileFormat::Csv, DataType::Layers) => self.process_delimited_layers(file_data, b',').await,
-            (FileFormat::Tsv, DataType::Nodes) => self.process_delimited_nodes(file_data, b'\t').await,
-            (FileFormat::Tsv, DataType::Edges) => self.process_delimited_edges(file_data, b'\t').await,
-            (FileFormat::Tsv, DataType::Layers) => self.process_delimited_layers(file_data, b'\t').await,
+            (FileFormat::Csv, DataType::Nodes) => {
+                self.process_delimited_nodes(file_data, b',').await
+            }
+            (FileFormat::Csv, DataType::Edges) => {
+                self.process_delimited_edges(file_data, b',').await
+            }
+            (FileFormat::Csv, DataType::Layers) => {
+                self.process_delimited_layers(file_data, b',').await
+            }
+            (FileFormat::Tsv, DataType::Nodes) => {
+                self.process_delimited_nodes(file_data, b'\t').await
+            }
+            (FileFormat::Tsv, DataType::Edges) => {
+                self.process_delimited_edges(file_data, b'\t').await
+            }
+            (FileFormat::Tsv, DataType::Layers) => {
+                self.process_delimited_layers(file_data, b'\t').await
+            }
             (FileFormat::Json, DataType::Graph) => self.process_json_graph(file_data).await,
             _ => Err(anyhow!("Invalid format/type combination")),
         }
@@ -402,23 +450,27 @@ impl DataSourceService {
             for (i, field) in record.iter().enumerate() {
                 if let Some(header) = headers.get(i) {
                     match header {
-                        "id" => { node.insert("id".to_string(), json!(field)); },
-                        "label" => { node.insert("label".to_string(), json!(field)); },
+                        "id" => {
+                            node.insert("id".to_string(), json!(field));
+                        }
+                        "label" => {
+                            node.insert("label".to_string(), json!(field));
+                        }
                         "layer" => {
                             if !field.is_empty() {
                                 node.insert("layer".to_string(), json!(field));
                             }
-                        },
+                        }
                         "x" => {
                             if let Ok(x) = field.parse::<f64>() {
                                 node.insert("x".to_string(), json!(x));
                             }
-                        },
+                        }
                         "y" => {
                             if let Ok(y) = field.parse::<f64>() {
                                 node.insert("y".to_string(), json!(y));
                             }
-                        },
+                        }
                         _ => {
                             // Store as metadata, skip empty strings
                             if !field.is_empty() {
@@ -469,17 +521,17 @@ impl DataSourceService {
                     match header {
                         "id" | "source" | "target" => {
                             edge.insert(header.to_string(), json!(field));
-                        },
+                        }
                         "label" => {
                             if !field.is_empty() {
                                 edge.insert(header.to_string(), json!(field));
                             }
-                        },
+                        }
                         "weight" => {
                             if let Ok(weight) = field.parse::<f64>() {
                                 edge.insert("weight".to_string(), json!(weight));
                             }
-                        },
+                        }
                         _ => {
                             // Store as metadata, skip empty strings
                             if !field.is_empty() {
@@ -519,7 +571,9 @@ impl DataSourceService {
         let has_label_col = headers.iter().any(|h| h == "label");
 
         if !has_id_col || !has_label_col {
-            return Err(anyhow!("CSV must contain 'label' and either 'id' or 'layer' columns"));
+            return Err(anyhow!(
+                "CSV must contain 'label' and either 'id' or 'layer' columns"
+            ));
         }
 
         for result in reader.records() {
@@ -533,32 +587,32 @@ impl DataSourceService {
                     match key {
                         "id" | "label" => {
                             layer.insert(key.to_string(), json!(field));
-                        },
+                        }
                         "description" => {
                             if !field.is_empty() {
                                 layer.insert(key.to_string(), json!(field));
                             }
-                        },
+                        }
                         "color" | "background" => {
                             if !field.is_empty() {
                                 layer.insert("background_color".to_string(), json!(field));
                             }
-                        },
+                        }
                         "border" => {
                             if !field.is_empty() {
                                 layer.insert("border_color".to_string(), json!(field));
                             }
-                        },
+                        }
                         "text" => {
                             if !field.is_empty() {
                                 layer.insert("text_color".to_string(), json!(field));
                             }
-                        },
+                        }
                         "z_index" => {
                             if let Ok(z) = field.parse::<i32>() {
                                 layer.insert("z_index".to_string(), json!(z));
                             }
-                        },
+                        }
                         _ => {
                             // Store as metadata, skip empty strings
                             if !field.is_empty() {
@@ -591,12 +645,15 @@ impl DataSourceService {
             return Err(anyhow!("JSON must be an object"));
         }
 
-        let obj = graph_data.as_object()
+        let obj = graph_data
+            .as_object()
             .ok_or_else(|| anyhow!("JSON data is not a valid object"))?;
 
         // Ensure required fields exist
         if !obj.contains_key("nodes") || !obj.contains_key("edges") || !obj.contains_key("layers") {
-            return Err(anyhow!("JSON must contain 'nodes', 'edges', and 'layers' arrays"));
+            return Err(anyhow!(
+                "JSON must contain 'nodes', 'edges', and 'layers' arrays"
+            ));
         }
 
         // Validate that they are arrays
@@ -617,10 +674,11 @@ mod tests {
     async fn test_process_csv_nodes() {
         let service = DataSourceService::new(
             // Mock database connection would go here
-            DatabaseConnection::default()
+            DatabaseConnection::default(),
         );
 
-        let csv_data = b"id,label,layer,x,y\nnode1,Node 1,layer1,10.5,20.5\nnode2,Node 2,layer1,30.0,40.0";
+        let csv_data =
+            b"id,label,layer,x,y\nnode1,Node 1,layer1,10.5,20.5\nnode2,Node 2,layer1,30.0,40.0";
 
         // This test would work with proper database setup
         // let result = service.process_csv_nodes(csv_data).await;
@@ -629,9 +687,18 @@ mod tests {
 
     #[test]
     fn test_file_format_detection() {
-        assert_eq!(FileFormat::from_extension("test.csv"), Some(FileFormat::Csv));
-        assert_eq!(FileFormat::from_extension("test.tsv"), Some(FileFormat::Tsv));
-        assert_eq!(FileFormat::from_extension("test.json"), Some(FileFormat::Json));
+        assert_eq!(
+            FileFormat::from_extension("test.csv"),
+            Some(FileFormat::Csv)
+        );
+        assert_eq!(
+            FileFormat::from_extension("test.tsv"),
+            Some(FileFormat::Tsv)
+        );
+        assert_eq!(
+            FileFormat::from_extension("test.json"),
+            Some(FileFormat::Json)
+        );
         assert_eq!(FileFormat::from_extension("unknown.txt"), None);
     }
 

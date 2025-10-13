@@ -30,4 +30,3 @@ pub fn get_graph_data_tools() -> Vec<Tool> {
         metadata: HashMap::new(),
     }]
 }
-

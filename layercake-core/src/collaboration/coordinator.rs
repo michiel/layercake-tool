@@ -1,6 +1,6 @@
-use tokio::sync::mpsc;
 use std::collections::HashMap;
-use tracing::{info, debug, warn};
+use tokio::sync::mpsc;
+use tracing::{debug, info, warn};
 
 use super::project_actor::ProjectActor;
 use super::types::{CoordinatorCommand, ProjectHealthReport};
@@ -38,18 +38,24 @@ impl CollaborationCoordinator {
                     user_name,
                     avatar_color,
                     sender,
-                    response
+                    response,
                 } => {
                     debug!("User {} joining project {}", user_id, project_id);
 
-                    let project = self.projects.entry(project_id)
+                    let project = self
+                        .projects
+                        .entry(project_id)
                         .or_insert_with(|| ProjectActor::spawn(project_id));
 
                     let result = project.join(user_id, user_name, avatar_color, sender).await;
                     let _ = response.send(result);
                 }
 
-                CoordinatorCommand::LeaveProject { project_id, user_id, response } => {
+                CoordinatorCommand::LeaveProject {
+                    project_id,
+                    user_id,
+                    response,
+                } => {
                     debug!("User {} leaving project {}", user_id, project_id);
 
                     if let Some(project) = self.projects.get_mut(&project_id) {
@@ -72,10 +78,12 @@ impl CollaborationCoordinator {
                     user_id,
                     document_id,
                     position,
-                    selected_node_id
+                    selected_node_id,
                 } => {
                     if let Some(project) = self.projects.get(&project_id) {
-                        project.update_cursor(user_id, document_id, position, selected_node_id).await;
+                        project
+                            .update_cursor(user_id, document_id, position, selected_node_id)
+                            .await;
                     } else {
                         warn!("Cursor update for non-existent project {}", project_id);
                     }
@@ -88,13 +96,18 @@ impl CollaborationCoordinator {
                     document_type,
                 } => {
                     if let Some(project) = self.projects.get(&project_id) {
-                        project.switch_document(user_id, document_id, document_type).await;
+                        project
+                            .switch_document(user_id, document_id, document_type)
+                            .await;
                     } else {
                         warn!("Document switch for non-existent project {}", project_id);
                     }
                 }
 
-                CoordinatorCommand::GetProjectHealth { project_id, response } => {
+                CoordinatorCommand::GetProjectHealth {
+                    project_id,
+                    response,
+                } => {
                     let report = if let Some(project) = self.projects.get(&project_id) {
                         project.health_report().await
                     } else {
@@ -104,7 +117,10 @@ impl CollaborationCoordinator {
                 }
 
                 CoordinatorCommand::Shutdown { response } => {
-                    info!("CollaborationCoordinator shutting down {} projects", self.projects.len());
+                    info!(
+                        "CollaborationCoordinator shutting down {} projects",
+                        self.projects.len()
+                    );
 
                     // Graceful shutdown all projects
                     for (project_id, project) in self.projects.drain() {
@@ -138,31 +154,35 @@ impl CoordinatorHandle {
         sender: mpsc::Sender<crate::server::websocket::types::ServerMessage>,
     ) -> Result<(), String> {
         let (tx, rx) = tokio::sync::oneshot::channel();
-        self.command_tx.send(CoordinatorCommand::JoinProject {
-            project_id,
-            user_id,
-            user_name,
-            avatar_color,
-            sender,
-            response: tx,
-        }).await.map_err(|_| "Coordinator unavailable".to_string())?;
+        self.command_tx
+            .send(CoordinatorCommand::JoinProject {
+                project_id,
+                user_id,
+                user_name,
+                avatar_color,
+                sender,
+                response: tx,
+            })
+            .await
+            .map_err(|_| "Coordinator unavailable".to_string())?;
 
-        rx.await.map_err(|_| "Response channel closed".to_string())?
+        rx.await
+            .map_err(|_| "Response channel closed".to_string())?
     }
 
-    pub async fn leave_project(
-        &self,
-        project_id: i32,
-        user_id: String,
-    ) -> Result<(), String> {
+    pub async fn leave_project(&self, project_id: i32, user_id: String) -> Result<(), String> {
         let (tx, rx) = tokio::sync::oneshot::channel();
-        self.command_tx.send(CoordinatorCommand::LeaveProject {
-            project_id,
-            user_id,
-            response: tx,
-        }).await.map_err(|_| "Coordinator unavailable".to_string())?;
+        self.command_tx
+            .send(CoordinatorCommand::LeaveProject {
+                project_id,
+                user_id,
+                response: tx,
+            })
+            .await
+            .map_err(|_| "Coordinator unavailable".to_string())?;
 
-        rx.await.map_err(|_| "Response channel closed".to_string())?
+        rx.await
+            .map_err(|_| "Response channel closed".to_string())?
     }
 
     pub async fn update_cursor(
@@ -173,13 +193,16 @@ impl CoordinatorHandle {
         position: crate::server::websocket::types::CursorPosition,
         selected_node_id: Option<String>,
     ) {
-        let _ = self.command_tx.send(CoordinatorCommand::UpdateCursor {
-            project_id,
-            user_id,
-            document_id,
-            position,
-            selected_node_id,
-        }).await;
+        let _ = self
+            .command_tx
+            .send(CoordinatorCommand::UpdateCursor {
+                project_id,
+                user_id,
+                document_id,
+                position,
+                selected_node_id,
+            })
+            .await;
     }
 
     pub async fn switch_document(
@@ -189,31 +212,43 @@ impl CoordinatorHandle {
         document_id: String,
         document_type: crate::server::websocket::types::DocumentType,
     ) {
-        let _ = self.command_tx.send(CoordinatorCommand::SwitchDocument {
-            project_id,
-            user_id,
-            document_id,
-            document_type,
-        }).await;
+        let _ = self
+            .command_tx
+            .send(CoordinatorCommand::SwitchDocument {
+                project_id,
+                user_id,
+                document_id,
+                document_type,
+            })
+            .await;
     }
 
     #[allow(dead_code)]
     pub async fn get_project_health(&self, project_id: i32) -> ProjectHealthReport {
         let (tx, rx) = tokio::sync::oneshot::channel();
-        if self.command_tx.send(CoordinatorCommand::GetProjectHealth {
-            project_id,
-            response: tx,
-        }).await.is_err() {
+        if self
+            .command_tx
+            .send(CoordinatorCommand::GetProjectHealth {
+                project_id,
+                response: tx,
+            })
+            .await
+            .is_err()
+        {
             return ProjectHealthReport::not_found();
         }
 
-        rx.await.unwrap_or_else(|_| ProjectHealthReport::not_found())
+        rx.await
+            .unwrap_or_else(|_| ProjectHealthReport::not_found())
     }
 
     #[allow(dead_code)]
     pub async fn shutdown(self) {
         let (tx, rx) = tokio::sync::oneshot::channel();
-        let _ = self.command_tx.send(CoordinatorCommand::Shutdown { response: tx }).await;
+        let _ = self
+            .command_tx
+            .send(CoordinatorCommand::Shutdown { response: tx })
+            .await;
         let _ = rx.await;
     }
 }

@@ -1,8 +1,8 @@
 //! Project management tools for MCP
 
-use axum_mcp::prelude::*;
 use crate::database::entities::projects;
-use crate::mcp::tools::{get_required_param, get_optional_param, create_success_response};
+use crate::mcp::tools::{create_success_response, get_optional_param, get_required_param};
+use axum_mcp::prelude::*;
 use sea_orm::*;
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -80,7 +80,9 @@ pub async fn list_projects(db: &DatabaseConnection) -> McpResult<ToolsCallResult
     let projects = projects::Entity::find()
         .all(db)
         .await
-        .map_err(|e| McpError::Internal { message: format!("Database error: {}", e) })?;
+        .map_err(|e| McpError::Internal {
+            message: format!("Database error: {}", e),
+        })?;
 
     let project_list: Vec<Value> = projects
         .into_iter()
@@ -129,7 +131,9 @@ pub async fn create_project(
     let project = projects::Entity::insert(new_project)
         .exec_with_returning(db)
         .await
-        .map_err(|e| McpError::Internal { message: format!("Failed to create project: {}", e) })?;
+        .map_err(|e| McpError::Internal {
+            message: format!("Failed to create project: {}", e),
+        })?;
 
     let result = json!({
         "id": project.id,
@@ -157,7 +161,9 @@ pub async fn get_project(
     let project = projects::Entity::find_by_id(project_id)
         .one(db)
         .await
-        .map_err(|e| McpError::Internal { message: format!("Database error: {}", e) })?
+        .map_err(|e| McpError::Internal {
+            message: format!("Database error: {}", e),
+        })?
         .ok_or_else(|| McpError::ToolExecution {
             tool: "get_project".to_string(),
             message: format!("Project with ID {} not found", project_id),
@@ -189,7 +195,9 @@ pub async fn delete_project(
     let project = projects::Entity::find_by_id(project_id)
         .one(db)
         .await
-        .map_err(|e| McpError::Internal { message: format!("Database error: {}", e) })?
+        .map_err(|e| McpError::Internal {
+            message: format!("Database error: {}", e),
+        })?
         .ok_or_else(|| McpError::ToolExecution {
             tool: "delete_project".to_string(),
             message: format!("Project with ID {} not found", project_id),
@@ -199,7 +207,9 @@ pub async fn delete_project(
     projects::Entity::delete_by_id(project_id)
         .exec(db)
         .await
-        .map_err(|e| McpError::Internal { message: format!("Failed to delete project: {}", e) })?;
+        .map_err(|e| McpError::Internal {
+            message: format!("Failed to delete project: {}", e),
+        })?;
 
     let result = json!({
         "project_id": project_id,

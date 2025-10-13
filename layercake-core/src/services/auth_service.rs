@@ -1,11 +1,10 @@
 #![allow(dead_code)]
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use bcrypt::{hash, verify, DEFAULT_COST};
 use chrono::{Duration, Utc};
 use sea_orm::DatabaseConnection;
 use uuid::Uuid;
-
 
 /// Service for handling authentication operations
 #[allow(dead_code)] // Authentication service reserved for future use
@@ -29,14 +28,12 @@ impl AuthService {
             return Err(anyhow!("Password must be at least 8 characters long"));
         }
 
-        hash(password, DEFAULT_COST)
-            .map_err(|e| anyhow!("Failed to hash password: {}", e))
+        hash(password, DEFAULT_COST).map_err(|e| anyhow!("Failed to hash password: {}", e))
     }
 
     /// Verify a password against a hash
     pub fn verify_password(password: &str, hash: &str) -> Result<bool> {
-        verify(password, hash)
-            .map_err(|e| anyhow!("Failed to verify password: {}", e))
+        verify(password, hash).map_err(|e| anyhow!("Failed to verify password: {}", e))
     }
 
     /// Generate a secure session ID
@@ -76,7 +73,9 @@ impl AuthService {
         }
 
         if domain_part.starts_with('.') || domain_part.ends_with('.') {
-            return Err(anyhow!("Invalid email format: domain cannot start or end with a dot"));
+            return Err(anyhow!(
+                "Invalid email format: domain cannot start or end with a dot"
+            ));
         }
 
         // Check for reasonable length
@@ -102,8 +101,13 @@ impl AuthService {
         }
 
         // Check for valid characters (alphanumeric, underscore, hyphen)
-        if !username.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-') {
-            return Err(anyhow!("Username can only contain letters, numbers, underscores, and hyphens"));
+        if !username
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+        {
+            return Err(anyhow!(
+                "Username can only contain letters, numbers, underscores, and hyphens"
+            ));
         }
 
         Ok(())
@@ -136,9 +140,8 @@ impl AuthService {
     /// Generate a random avatar color
     pub fn generate_avatar_color() -> String {
         let colors = [
-            "#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEAA7",
-            "#DDA0DD", "#98D8C8", "#F7DC6F", "#BB8FCE", "#85C1E9",
-            "#F8C471", "#82E0AA", "#F1948A", "#85C1E9", "#F4D03F"
+            "#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEAA7", "#DDA0DD", "#98D8C8", "#F7DC6F",
+            "#BB8FCE", "#85C1E9", "#F8C471", "#82E0AA", "#F1948A", "#85C1E9", "#F4D03F",
         ];
 
         let index = (Uuid::new_v4().as_u128() % colors.len() as u128) as usize;
@@ -193,7 +196,8 @@ mod tests {
         let hash = AuthService::hash_password(password).expect("Failed to hash password");
 
         assert!(AuthService::verify_password(password, &hash).expect("Failed to verify password"));
-        assert!(!AuthService::verify_password("wrong_password", &hash).expect("Failed to verify wrong password"));
+        assert!(!AuthService::verify_password("wrong_password", &hash)
+            .expect("Failed to verify wrong password"));
     }
 
     #[test]

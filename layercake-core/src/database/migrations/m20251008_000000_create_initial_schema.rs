@@ -1,4 +1,3 @@
-
 use sea_orm_migration::prelude::*;
 
 #[derive(DeriveMigrationName)]
@@ -41,12 +40,27 @@ impl MigrationTrait for Migration {
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(Plans::ProjectId).integer().not_null().unique_key())
+                    .col(
+                        ColumnDef::new(Plans::ProjectId)
+                            .integer()
+                            .not_null()
+                            .unique_key(),
+                    )
                     .col(ColumnDef::new(Plans::Name).string().not_null())
                     .col(ColumnDef::new(Plans::YamlContent).text().not_null())
                     .col(ColumnDef::new(Plans::Dependencies).string())
-                    .col(ColumnDef::new(Plans::Status).string().not_null().default("pending"))
-                    .col(ColumnDef::new(Plans::Version).integer().not_null().default(1))
+                    .col(
+                        ColumnDef::new(Plans::Status)
+                            .string()
+                            .not_null()
+                            .default("pending"),
+                    )
+                    .col(
+                        ColumnDef::new(Plans::Version)
+                            .integer()
+                            .not_null()
+                            .default(1),
+                    )
                     .col(ColumnDef::new(Plans::CreatedAt).timestamp().not_null())
                     .col(ColumnDef::new(Plans::UpdatedAt).timestamp().not_null())
                     .foreign_key(
@@ -66,7 +80,12 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(PlanDagNodes::Table)
                     .if_not_exists()
-                    .col(ColumnDef::new(PlanDagNodes::Id).string().not_null().primary_key())
+                    .col(
+                        ColumnDef::new(PlanDagNodes::Id)
+                            .string()
+                            .not_null()
+                            .primary_key(),
+                    )
                     .col(ColumnDef::new(PlanDagNodes::PlanId).integer().not_null())
                     .col(ColumnDef::new(PlanDagNodes::NodeType).string().not_null())
                     .col(ColumnDef::new(PlanDagNodes::PositionX).double().not_null())
@@ -93,10 +112,23 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(PlanDagEdges::Table)
                     .if_not_exists()
-                    .col(ColumnDef::new(PlanDagEdges::Id).string().not_null().primary_key())
+                    .col(
+                        ColumnDef::new(PlanDagEdges::Id)
+                            .string()
+                            .not_null()
+                            .primary_key(),
+                    )
                     .col(ColumnDef::new(PlanDagEdges::PlanId).integer().not_null())
-                    .col(ColumnDef::new(PlanDagEdges::SourceNodeId).string().not_null())
-                    .col(ColumnDef::new(PlanDagEdges::TargetNodeId).string().not_null())
+                    .col(
+                        ColumnDef::new(PlanDagEdges::SourceNodeId)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(PlanDagEdges::TargetNodeId)
+                            .string()
+                            .not_null(),
+                    )
                     .col(ColumnDef::new(PlanDagEdges::SourceHandle).string())
                     .col(ColumnDef::new(PlanDagEdges::TargetHandle).string())
                     .col(ColumnDef::new(PlanDagEdges::MetadataJson).text().not_null())
@@ -127,15 +159,42 @@ impl MigrationTrait for Migration {
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(Users::Email).string().not_null().unique_key())
-                    .col(ColumnDef::new(Users::Username).string().not_null().unique_key())
+                    .col(
+                        ColumnDef::new(Users::Email)
+                            .string()
+                            .not_null()
+                            .unique_key(),
+                    )
+                    .col(
+                        ColumnDef::new(Users::Username)
+                            .string()
+                            .not_null()
+                            .unique_key(),
+                    )
                     .col(ColumnDef::new(Users::DisplayName).string().not_null())
                     .col(ColumnDef::new(Users::PasswordHash).string().not_null())
                     .col(ColumnDef::new(Users::AvatarColor).string().not_null())
-                    .col(ColumnDef::new(Users::IsActive).boolean().not_null().default(true))
-                    .col(ColumnDef::new(Users::CreatedAt).timestamp_with_time_zone().not_null())
-                    .col(ColumnDef::new(Users::UpdatedAt).timestamp_with_time_zone().not_null())
-                    .col(ColumnDef::new(Users::LastLoginAt).timestamp_with_time_zone().null())
+                    .col(
+                        ColumnDef::new(Users::IsActive)
+                            .boolean()
+                            .not_null()
+                            .default(true),
+                    )
+                    .col(
+                        ColumnDef::new(Users::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(Users::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(Users::LastLoginAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
                     .to_owned(),
             )
             .await?;
@@ -153,30 +212,56 @@ impl MigrationTrait for Migration {
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(UserSessions::SessionId).string().not_null().unique_key())
+                    .col(
+                        ColumnDef::new(UserSessions::SessionId)
+                            .string()
+                            .not_null()
+                            .unique_key(),
+                    )
                     .col(ColumnDef::new(UserSessions::UserId).integer().not_null())
                     .col(ColumnDef::new(UserSessions::UserName).string().not_null())
                     .col(ColumnDef::new(UserSessions::ProjectId).integer().not_null())
-                    .col(ColumnDef::new(UserSessions::LayercakeGraphId).integer().null())
+                    .col(
+                        ColumnDef::new(UserSessions::LayercakeGraphId)
+                            .integer()
+                            .null(),
+                    )
                     .col(ColumnDef::new(UserSessions::CursorPosition).string().null())
                     .col(ColumnDef::new(UserSessions::SelectedNodeId).string().null())
-                    .col(ColumnDef::new(UserSessions::LastActivity).timestamp_with_time_zone().not_null())
-                    .col(ColumnDef::new(UserSessions::IsActive).boolean().not_null().default(true))
-                    .col(ColumnDef::new(UserSessions::CreatedAt).timestamp_with_time_zone().not_null())
-                    .col(ColumnDef::new(UserSessions::ExpiresAt).timestamp_with_time_zone().not_null())
+                    .col(
+                        ColumnDef::new(UserSessions::LastActivity)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(UserSessions::IsActive)
+                            .boolean()
+                            .not_null()
+                            .default(true),
+                    )
+                    .col(
+                        ColumnDef::new(UserSessions::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(UserSessions::ExpiresAt)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_user_sessions_user_id")
                             .from(UserSessions::Table, UserSessions::UserId)
                             .to(Users::Table, Users::Id)
-                            .on_delete(ForeignKeyAction::Cascade)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_user_sessions_project_id")
                             .from(UserSessions::Table, UserSessions::ProjectId)
                             .to(Projects::Table, Projects::Id)
-                            .on_delete(ForeignKeyAction::Cascade)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .to_owned(),
             )
@@ -195,45 +280,95 @@ impl MigrationTrait for Migration {
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(ProjectCollaborators::ProjectId).integer().not_null())
-                    .col(ColumnDef::new(ProjectCollaborators::UserId).integer().not_null())
-                    .col(ColumnDef::new(ProjectCollaborators::Role).string().not_null())
-                    .col(ColumnDef::new(ProjectCollaborators::Permissions).string().not_null())
-                    .col(ColumnDef::new(ProjectCollaborators::InvitedBy).integer().null())
-                    .col(ColumnDef::new(ProjectCollaborators::InvitationStatus).string().not_null().default("pending"))
-                    .col(ColumnDef::new(ProjectCollaborators::InvitedAt).timestamp_with_time_zone().not_null())
-                    .col(ColumnDef::new(ProjectCollaborators::JoinedAt).timestamp_with_time_zone().null())
-                    .col(ColumnDef::new(ProjectCollaborators::LastActiveAt).timestamp_with_time_zone().null())
-                    .col(ColumnDef::new(ProjectCollaborators::IsActive).boolean().not_null().default(true))
-                    .col(ColumnDef::new(ProjectCollaborators::CreatedAt).timestamp_with_time_zone().not_null())
-                    .col(ColumnDef::new(ProjectCollaborators::UpdatedAt).timestamp_with_time_zone().not_null())
+                    .col(
+                        ColumnDef::new(ProjectCollaborators::ProjectId)
+                            .integer()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(ProjectCollaborators::UserId)
+                            .integer()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(ProjectCollaborators::Role)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(ProjectCollaborators::Permissions)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(ProjectCollaborators::InvitedBy)
+                            .integer()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(ProjectCollaborators::InvitationStatus)
+                            .string()
+                            .not_null()
+                            .default("pending"),
+                    )
+                    .col(
+                        ColumnDef::new(ProjectCollaborators::InvitedAt)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(ProjectCollaborators::JoinedAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(ProjectCollaborators::LastActiveAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(ProjectCollaborators::IsActive)
+                            .boolean()
+                            .not_null()
+                            .default(true),
+                    )
+                    .col(
+                        ColumnDef::new(ProjectCollaborators::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(ProjectCollaborators::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_project_collaborators_project_id")
                             .from(ProjectCollaborators::Table, ProjectCollaborators::ProjectId)
                             .to(Projects::Table, Projects::Id)
-                            .on_delete(ForeignKeyAction::Cascade)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_project_collaborators_user_id")
                             .from(ProjectCollaborators::Table, ProjectCollaborators::UserId)
                             .to(Users::Table, Users::Id)
-                            .on_delete(ForeignKeyAction::Cascade)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_project_collaborators_invited_by")
                             .from(ProjectCollaborators::Table, ProjectCollaborators::InvitedBy)
                             .to(Users::Table, Users::Id)
-                            .on_delete(ForeignKeyAction::SetNull)
+                            .on_delete(ForeignKeyAction::SetNull),
                     )
                     .index(
                         Index::create()
                             .name("idx_project_collaborators_project_user")
                             .col(ProjectCollaborators::ProjectId)
                             .col(ProjectCollaborators::UserId)
-                            .unique()
+                            .unique(),
                     )
                     .to_owned(),
             )
@@ -255,44 +390,78 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(UserPresence::UserId).integer().not_null())
                     .col(ColumnDef::new(UserPresence::ProjectId).integer().not_null())
                     .col(ColumnDef::new(UserPresence::SessionId).string().not_null())
-                    .col(ColumnDef::new(UserPresence::LayercakeGraphId).integer().null())
+                    .col(
+                        ColumnDef::new(UserPresence::LayercakeGraphId)
+                            .integer()
+                            .null(),
+                    )
                     .col(ColumnDef::new(UserPresence::CursorPosition).string().null())
                     .col(ColumnDef::new(UserPresence::SelectedNodeId).string().null())
-                    .col(ColumnDef::new(UserPresence::ViewportPosition).string().null())
+                    .col(
+                        ColumnDef::new(UserPresence::ViewportPosition)
+                            .string()
+                            .null(),
+                    )
                     .col(ColumnDef::new(UserPresence::CurrentTool).string().null())
-                    .col(ColumnDef::new(UserPresence::IsOnline).boolean().not_null().default(true))
-                    .col(ColumnDef::new(UserPresence::LastSeen).timestamp_with_time_zone().not_null())
-                    .col(ColumnDef::new(UserPresence::LastHeartbeat).timestamp_with_time_zone().not_null())
-                    .col(ColumnDef::new(UserPresence::Status).string().not_null().default("active"))
-                    .col(ColumnDef::new(UserPresence::CreatedAt).timestamp_with_time_zone().not_null())
-                    .col(ColumnDef::new(UserPresence::UpdatedAt).timestamp_with_time_zone().not_null())
+                    .col(
+                        ColumnDef::new(UserPresence::IsOnline)
+                            .boolean()
+                            .not_null()
+                            .default(true),
+                    )
+                    .col(
+                        ColumnDef::new(UserPresence::LastSeen)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(UserPresence::LastHeartbeat)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(UserPresence::Status)
+                            .string()
+                            .not_null()
+                            .default("active"),
+                    )
+                    .col(
+                        ColumnDef::new(UserPresence::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(UserPresence::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_user_presence_user_id")
                             .from(UserPresence::Table, UserPresence::UserId)
                             .to(Users::Table, Users::Id)
-                            .on_delete(ForeignKeyAction::Cascade)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_user_presence_project_id")
                             .from(UserPresence::Table, UserPresence::ProjectId)
                             .to(Projects::Table, Projects::Id)
-                            .on_delete(ForeignKeyAction::Cascade)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_user_presence_session_id")
                             .from(UserPresence::Table, UserPresence::SessionId)
                             .to(UserSessions::Table, UserSessions::SessionId)
-                            .on_delete(ForeignKeyAction::Cascade)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .index(
                         Index::create()
                             .name("idx_user_presence_project_user")
                             .col(UserPresence::ProjectId)
                             .col(UserPresence::UserId)
-                            .unique()
+                            .unique(),
                     )
                     .to_owned(),
             )
@@ -324,12 +493,34 @@ impl MigrationTrait for Migration {
                             .default("processing"),
                     )
                     .col(ColumnDef::new(DataSources::ErrorMessage).string())
-                    .col(ColumnDef::new(DataSources::FileSize).big_integer().not_null())
+                    .col(
+                        ColumnDef::new(DataSources::FileSize)
+                            .big_integer()
+                            .not_null(),
+                    )
                     .col(ColumnDef::new(DataSources::ProcessedAt).timestamp())
-                    .col(ColumnDef::new(DataSources::FileFormat).string().not_null().default("csv"))
-                    .col(ColumnDef::new(DataSources::DataType).string().not_null().default("nodes"))
-                    .col(ColumnDef::new(DataSources::CreatedAt).timestamp().not_null())
-                    .col(ColumnDef::new(DataSources::UpdatedAt).timestamp().not_null())
+                    .col(
+                        ColumnDef::new(DataSources::FileFormat)
+                            .string()
+                            .not_null()
+                            .default("csv"),
+                    )
+                    .col(
+                        ColumnDef::new(DataSources::DataType)
+                            .string()
+                            .not_null()
+                            .default("nodes"),
+                    )
+                    .col(
+                        ColumnDef::new(DataSources::CreatedAt)
+                            .timestamp()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(DataSources::UpdatedAt)
+                            .timestamp()
+                            .not_null(),
+                    )
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_data_sources_project_id")
@@ -370,8 +561,16 @@ impl MigrationTrait for Migration {
                     )
                     .col(ColumnDef::new(Datasources::ErrorMessage).text())
                     .col(ColumnDef::new(Datasources::Metadata).json_binary())
-                    .col(ColumnDef::new(Datasources::CreatedAt).timestamp().not_null())
-                    .col(ColumnDef::new(Datasources::UpdatedAt).timestamp().not_null())
+                    .col(
+                        ColumnDef::new(Datasources::CreatedAt)
+                            .timestamp()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(Datasources::UpdatedAt)
+                            .timestamp()
+                            .not_null(),
+                    )
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_datasources_project_id")
@@ -403,10 +602,26 @@ impl MigrationTrait for Migration {
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(DatasourceRows::DatasourceId).integer().not_null())
-                    .col(ColumnDef::new(DatasourceRows::RowNumber).integer().not_null())
-                    .col(ColumnDef::new(DatasourceRows::Data).json_binary().not_null())
-                    .col(ColumnDef::new(DatasourceRows::CreatedAt).timestamp().not_null())
+                    .col(
+                        ColumnDef::new(DatasourceRows::DatasourceId)
+                            .integer()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(DatasourceRows::RowNumber)
+                            .integer()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(DatasourceRows::Data)
+                            .json_binary()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(DatasourceRows::CreatedAt)
+                            .timestamp()
+                            .not_null(),
+                    )
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_datasource_rows_datasource_id")
@@ -442,8 +657,18 @@ impl MigrationTrait for Migration {
                     )
                     .col(ColumnDef::new(Graphs::ComputedDate).timestamp())
                     .col(ColumnDef::new(Graphs::SourceHash).string()) // Hash of upstream data
-                    .col(ColumnDef::new(Graphs::NodeCount).integer().not_null().default(0))
-                    .col(ColumnDef::new(Graphs::EdgeCount).integer().not_null().default(0))
+                    .col(
+                        ColumnDef::new(Graphs::NodeCount)
+                            .integer()
+                            .not_null()
+                            .default(0),
+                    )
+                    .col(
+                        ColumnDef::new(Graphs::EdgeCount)
+                            .integer()
+                            .not_null()
+                            .default(0),
+                    )
                     .col(ColumnDef::new(Graphs::ErrorMessage).text())
                     .col(ColumnDef::new(Graphs::Metadata).json_binary())
                     .col(ColumnDef::new(Graphs::CreatedAt).timestamp().not_null())
@@ -477,7 +702,12 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(GraphNodes::Label).string())
                     .col(ColumnDef::new(GraphNodes::Layer).string())
                     .col(ColumnDef::new(GraphNodes::Weight).double())
-                    .col(ColumnDef::new(GraphNodes::IsPartition).boolean().not_null().default(false))
+                    .col(
+                        ColumnDef::new(GraphNodes::IsPartition)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
                     .col(ColumnDef::new(GraphNodes::Attrs).json_binary())
                     .col(ColumnDef::new(GraphNodes::CreatedAt).timestamp().not_null())
                     .primary_key(

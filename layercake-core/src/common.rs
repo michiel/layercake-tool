@@ -10,7 +10,8 @@ pub fn create_path_if_not_exists(path: &str) -> anyhow::Result<()> {
     //
     // remove the file name from the path
 
-    let path = Path::new(path).parent()
+    let path = Path::new(path)
+        .parent()
         .ok_or_else(|| anyhow::anyhow!("Invalid path: no parent directory for '{}'", path))?;
     if !path.exists() {
         info!("Creating path: {:?}", path);

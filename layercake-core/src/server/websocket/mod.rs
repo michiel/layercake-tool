@@ -1,8 +1,8 @@
-pub mod types;
+pub mod handler;
 #[allow(dead_code)]
 pub mod session;
-pub mod handler;
+pub mod types;
 
+pub use handler::websocket_handler;
 #[allow(unused_imports)]
 pub use session::SessionManager;
-pub use handler::websocket_handler;

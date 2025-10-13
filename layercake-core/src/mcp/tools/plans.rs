@@ -1,8 +1,8 @@
 //! Plan management tools for MCP
 
-use axum_mcp::prelude::*;
 use crate::database::entities::plans;
-use crate::mcp::tools::{get_required_param, get_optional_param, create_success_response};
+use crate::mcp::tools::{create_success_response, get_optional_param, get_required_param};
+use axum_mcp::prelude::*;
 use sea_orm::*;
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -102,21 +102,22 @@ pub async fn create_plan(
         .to_string();
 
     let dependencies = get_optional_param(&arguments, "dependencies")
-        .and_then(|v| v.as_array().map(|arr| {
-            arr.iter()
-                .filter_map(|v| v.as_i64().map(|i| i as i32))
-                .collect::<Vec<i32>>()
-        }))
+        .and_then(|v| {
+            v.as_array().map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_i64().map(|i| i as i32))
+                    .collect::<Vec<i32>>()
+            })
+        })
         .unwrap_or_default();
 
     // Validate YAML content
-    serde_yaml::from_str::<serde_yaml::Value>(&yaml_content)
-        .map_err(|e| McpError::Validation {
-            message: format!("Invalid YAML content: {}", e),
-        })?;
+    serde_yaml::from_str::<serde_yaml::Value>(&yaml_content).map_err(|e| McpError::Validation {
+        message: format!("Invalid YAML content: {}", e),
+    })?;
 
-    let dependencies_json = serde_json::to_string(&dependencies)
-        .map_err(|e| McpError::Internal {
+    let dependencies_json =
+        serde_json::to_string(&dependencies).map_err(|e| McpError::Internal {
             message: format!("Failed to serialize dependencies: {}", e),
         })?;
 
@@ -196,7 +197,7 @@ pub async fn execute_plan(
     let mut plan_active: plans::ActiveModel = plan.clone().into();
     plan_active.status = Set("running".to_string());
     plan_active.updated_at = Set(chrono::Utc::now());
-    
+
     plans::Entity::update(plan_active)
         .exec(db)
         .await
@@ -211,7 +212,10 @@ pub async fn execute_plan(
         Ok(_) => ("completed".to_string(), None),
         Err(e) => {
             tracing::error!("Plan execution failed: {}", e);
-            ("failed".to_string(), Some(format!("Plan execution failed: {}", e)))
+            (
+                "failed".to_string(),
+                Some(format!("Plan execution failed: {}", e)),
+            )
         }
     };
 
@@ -219,7 +223,7 @@ pub async fn execute_plan(
     let mut plan_active: plans::ActiveModel = plan.into();
     plan_active.status = Set(status.clone());
     plan_active.updated_at = Set(chrono::Utc::now());
-    
+
     plans::Entity::update(plan_active)
         .exec(db)
         .await
@@ -258,7 +262,8 @@ pub async fn get_plan_status(
             message: format!("Plan with ID {} not found", plan_id),
         })?;
 
-    let dependencies: Vec<i32> = plan.dependencies
+    let dependencies: Vec<i32> = plan
+        .dependencies
         .as_ref()
         .and_then(|deps| serde_json::from_str(deps).ok())
         .unwrap_or_default();

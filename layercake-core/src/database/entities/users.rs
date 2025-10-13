@@ -1,7 +1,6 @@
 use sea_orm::entity::prelude::*;
-use sea_orm::{Set, ActiveValue};
+use sea_orm::{ActiveValue, Set};
 use serde::{Deserialize, Serialize};
-
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
 #[sea_orm(table_name = "users")]
@@ -75,9 +74,8 @@ impl ActiveModel {
     fn generate_random_color() -> ActiveValue<String> {
         // Generate a random color for user avatars
         let colors = [
-            "#228be6", "#51cf66", "#ff8cc8", "#ffd43b",
-            "#74c0fc", "#ff6b6b", "#845ef7", "#20c997",
-            "#fd7e14", "#495057"
+            "#228be6", "#51cf66", "#ff8cc8", "#ffd43b", "#74c0fc", "#ff6b6b", "#845ef7", "#20c997",
+            "#fd7e14", "#495057",
         ];
         let index = (chrono::Utc::now().timestamp() % colors.len() as i64) as usize;
         Set(colors[index].to_string())

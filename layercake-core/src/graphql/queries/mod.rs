@@ -1,14 +1,23 @@
 use async_graphql::*;
-use sea_orm::{EntityTrait, ColumnTrait, QueryFilter};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
-use crate::database::entities::{projects, plans, users, user_sessions, project_collaborators, data_sources, plan_dag_nodes, plan_dag_edges, graphs, graph_nodes, graph_edges, layers, graph_edits};
+use crate::database::entities::{
+    data_sources, graph_edges, graph_edits, graph_nodes, graphs, layers, plan_dag_edges,
+    plan_dag_nodes, plans, project_collaborators, projects, user_sessions, users,
+};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::graph::Graph;
-use crate::graphql::types::project::Project;
 use crate::graphql::types::plan::Plan;
-use crate::graphql::types::plan_dag::{PlanDag, PlanDagNode, PlanDagEdge, PlanDagInput, PlanDagMetadata, ValidationResult, DataSourceExecutionMetadata, GraphExecutionMetadata, PlanDagNodeType};
-use crate::graphql::types::{User, ProjectCollaborator, DataSource, UserSession, DataSourcePreview, GraphPreview, TableRow, TableColumn, GraphNodePreview, GraphEdgePreview, Layer, GraphEdit};
 use crate::graphql::types::plan_dag::DataSourceReference;
+use crate::graphql::types::plan_dag::{
+    DataSourceExecutionMetadata, GraphExecutionMetadata, PlanDag, PlanDagEdge, PlanDagInput,
+    PlanDagMetadata, PlanDagNode, PlanDagNodeType, ValidationResult,
+};
+use crate::graphql::types::project::Project;
+use crate::graphql::types::{
+    DataSource, DataSourcePreview, GraphEdgePreview, GraphEdit, GraphNodePreview, GraphPreview,
+    Layer, ProjectCollaborator, TableColumn, TableRow, User, UserSession,
+};
 use crate::services::graph_edit_service::GraphEditService;
 
 pub struct Query;
@@ -18,30 +27,24 @@ impl Query {
     /// Get all projects
     async fn projects(&self, ctx: &Context<'_>) -> Result<Vec<Project>> {
         let context = ctx.data::<GraphQLContext>()?;
-        let projects = projects::Entity::find()
-            .all(&context.db)
-            .await?;
-        
+        let projects = projects::Entity::find().all(&context.db).await?;
+
         Ok(projects.into_iter().map(Project::from).collect())
     }
 
     /// Get a specific project by ID
     async fn project(&self, ctx: &Context<'_>, id: i32) -> Result<Option<Project>> {
         let context = ctx.data::<GraphQLContext>()?;
-        let project = projects::Entity::find_by_id(id)
-            .one(&context.db)
-            .await?;
-        
+        let project = projects::Entity::find_by_id(id).one(&context.db).await?;
+
         Ok(project.map(Project::from))
     }
 
     /// Get a specific plan by ID
     async fn plan(&self, ctx: &Context<'_>, id: i32) -> Result<Option<Plan>> {
         let context = ctx.data::<GraphQLContext>()?;
-        let plan = plans::Entity::find_by_id(id)
-            .one(&context.db)
-            .await?;
-        
+        let plan = plans::Entity::find_by_id(id).one(&context.db).await?;
+
         Ok(plan.map(Plan::from))
     }
 
@@ -79,7 +82,8 @@ impl Query {
         let plan = match plans::Entity::find()
             .filter(plans::Column::ProjectId.eq(project_id))
             .one(&context.db)
-            .await? {
+            .await?
+        {
             Some(plan) => plan,
             None => {
                 // No plan exists yet - return empty Plan DAG
@@ -128,8 +132,14 @@ impl Query {
             match node.node_type {
                 PlanDagNodeType::DataSource => {
                     // Try to extract dataSourceId from config
-                    if let Ok(config) = serde_json::from_str::<serde_json::Value>(&dag_node.config_json) {
-                        if let Some(data_source_id) = config.get("dataSourceId").and_then(|v| v.as_i64()).map(|v| v as i32) {
+                    if let Ok(config) =
+                        serde_json::from_str::<serde_json::Value>(&dag_node.config_json)
+                    {
+                        if let Some(data_source_id) = config
+                            .get("dataSourceId")
+                            .and_then(|v| v.as_i64())
+                            .map(|v| v as i32)
+                        {
                             // Query the data_source
                             if let Ok(Some(ds)) = data_sources::Entity::find_by_id(data_source_id)
                                 .one(&context.db)
@@ -141,7 +151,8 @@ impl Query {
                                     "processing" => "processing",
                                     "error" => "error",
                                     _ => "not_started",
-                                }.to_string();
+                                }
+                                .to_string();
 
                                 node.datasource_execution = Some(DataSourceExecutionMetadata {
                                     data_source_id: ds.id,
@@ -154,7 +165,7 @@ impl Query {
                             }
                         }
                     }
-                },
+                }
                 PlanDagNodeType::Graph => {
                     // Query the graph by node_id
                     if let Ok(Some(graph)) = graphs::Entity::find()
@@ -172,7 +183,7 @@ impl Query {
                             error_message: graph.error_message.clone(),
                         });
                     }
-                },
+                }
                 _ => {
                     // Other node types don't have execution metadata yet
                 }
@@ -183,7 +194,8 @@ impl Query {
         tracing::debug!("Converted {} nodes with execution metadata", nodes.len());
 
         tracing::debug!("Converting {} edges to GraphQL format...", dag_edges.len());
-        let edges: Vec<PlanDagEdge> = dag_edges.into_iter()
+        let edges: Vec<PlanDagEdge> = dag_edges
+            .into_iter()
             .map(|edge| PlanDagEdge::from(edge))
             .collect();
         tracing::debug!("Converted {} edges", edges.len());
@@ -199,7 +211,10 @@ impl Query {
             author: None,
         };
 
-        tracing::info!("getPlanDag completed successfully for project_id: {}", project_id);
+        tracing::info!(
+            "getPlanDag completed successfully for project_id: {}",
+            project_id
+        );
         Ok(Some(PlanDag {
             version: metadata.version.clone(),
             nodes,
@@ -209,7 +224,11 @@ impl Query {
     }
 
     /// Validate a Plan DAG structure
-    async fn validate_plan_dag(&self, _ctx: &Context<'_>, plan_dag: PlanDagInput) -> Result<ValidationResult> {
+    async fn validate_plan_dag(
+        &self,
+        _ctx: &Context<'_>,
+        plan_dag: PlanDagInput,
+    ) -> Result<ValidationResult> {
         // TODO: Implement comprehensive Plan DAG validation
         // For now, return a basic validation that always passes
 
@@ -217,7 +236,8 @@ impl Query {
         let mut warnings = Vec::new();
 
         // Basic validation: check for orphaned nodes, cycles, etc.
-        let node_ids: std::collections::HashSet<String> = plan_dag.nodes.iter().map(|n| n.id.clone()).collect();
+        let node_ids: std::collections::HashSet<String> =
+            plan_dag.nodes.iter().map(|n| n.id.clone()).collect();
 
         // Check for edges referencing non-existent nodes
         for edge in &plan_dag.edges {
@@ -226,7 +246,10 @@ impl Query {
                     node_id: None,
                     edge_id: Some(edge.id.clone()),
                     error_type: crate::graphql::types::ValidationErrorType::InvalidConnection,
-                    message: format!("Edge {} references non-existent source node {}", edge.id, edge.source),
+                    message: format!(
+                        "Edge {} references non-existent source node {}",
+                        edge.id, edge.source
+                    ),
                 });
             }
             if !node_ids.contains(&edge.target) {
@@ -234,14 +257,20 @@ impl Query {
                     node_id: None,
                     edge_id: Some(edge.id.clone()),
                     error_type: crate::graphql::types::ValidationErrorType::InvalidConnection,
-                    message: format!("Edge {} references non-existent target node {}", edge.id, edge.target),
+                    message: format!(
+                        "Edge {} references non-existent target node {}",
+                        edge.id, edge.target
+                    ),
                 });
             }
         }
 
         // Check for isolated nodes (nodes with no connections)
         for node in &plan_dag.nodes {
-            let has_connections = plan_dag.edges.iter().any(|e| e.source == node.id || e.target == node.id);
+            let has_connections = plan_dag
+                .edges
+                .iter()
+                .any(|e| e.source == node.id || e.target == node.id);
             if !has_connections && plan_dag.nodes.len() > 1 {
                 warnings.push(crate::graphql::types::ValidationWarning {
                     node_id: Some(node.id.clone()),
@@ -290,9 +319,7 @@ impl Query {
     /// Get user by ID
     async fn user(&self, ctx: &Context<'_>, id: i32) -> Result<Option<User>> {
         let context = ctx.data::<GraphQLContext>()?;
-        let user = users::Entity::find_by_id(id)
-            .one(&context.db)
-            .await?;
+        let user = users::Entity::find_by_id(id).one(&context.db).await?;
 
         Ok(user.map(User::from))
     }
@@ -322,7 +349,11 @@ impl Query {
     // Project Collaboration Queries
 
     /// Get all collaborators for a project
-    async fn project_collaborators(&self, ctx: &Context<'_>, project_id: i32) -> Result<Vec<ProjectCollaborator>> {
+    async fn project_collaborators(
+        &self,
+        ctx: &Context<'_>,
+        project_id: i32,
+    ) -> Result<Vec<ProjectCollaborator>> {
         let context = ctx.data::<GraphQLContext>()?;
         let collaborators = project_collaborators::Entity::find()
             .filter(project_collaborators::Column::ProjectId.eq(project_id))
@@ -330,11 +361,18 @@ impl Query {
             .all(&context.db)
             .await?;
 
-        Ok(collaborators.into_iter().map(ProjectCollaborator::from).collect())
+        Ok(collaborators
+            .into_iter()
+            .map(ProjectCollaborator::from)
+            .collect())
     }
 
     /// Get specific collaborator
-    async fn project_collaborator(&self, ctx: &Context<'_>, id: i32) -> Result<Option<ProjectCollaborator>> {
+    async fn project_collaborator(
+        &self,
+        ctx: &Context<'_>,
+        id: i32,
+    ) -> Result<Option<ProjectCollaborator>> {
         let context = ctx.data::<GraphQLContext>()?;
         let collaborator = project_collaborators::Entity::find_by_id(id)
             .one(&context.db)
@@ -344,7 +382,11 @@ impl Query {
     }
 
     /// Get user's collaborations (projects they have access to)
-    async fn user_collaborations(&self, ctx: &Context<'_>, user_id: i32) -> Result<Vec<ProjectCollaborator>> {
+    async fn user_collaborations(
+        &self,
+        ctx: &Context<'_>,
+        user_id: i32,
+    ) -> Result<Vec<ProjectCollaborator>> {
         let context = ctx.data::<GraphQLContext>()?;
         let collaborations = project_collaborators::Entity::find()
             .filter(project_collaborators::Column::UserId.eq(user_id))
@@ -352,11 +394,19 @@ impl Query {
             .all(&context.db)
             .await?;
 
-        Ok(collaborations.into_iter().map(ProjectCollaborator::from).collect())
+        Ok(collaborations
+            .into_iter()
+            .map(ProjectCollaborator::from)
+            .collect())
     }
 
     /// Check if user has access to project
-    async fn user_project_access(&self, ctx: &Context<'_>, user_id: i32, project_id: i32) -> Result<Option<ProjectCollaborator>> {
+    async fn user_project_access(
+        &self,
+        ctx: &Context<'_>,
+        user_id: i32,
+        project_id: i32,
+    ) -> Result<Option<ProjectCollaborator>> {
         let context = ctx.data::<GraphQLContext>()?;
         let collaboration = project_collaborators::Entity::find()
             .filter(project_collaborators::Column::UserId.eq(user_id))
@@ -414,7 +464,10 @@ impl Query {
             .all(&context.db)
             .await?;
 
-        Ok(data_sources_list.into_iter().map(DataSource::from).collect())
+        Ok(data_sources_list
+            .into_iter()
+            .map(DataSource::from)
+            .collect())
     }
 
     /// Get all Graphs for a project
@@ -431,22 +484,27 @@ impl Query {
     /// Get Graph by ID
     async fn graph(&self, ctx: &Context<'_>, id: i32) -> Result<Option<Graph>> {
         let context = ctx.data::<GraphQLContext>()?;
-        let graph = graphs::Entity::find_by_id(id)
-            .one(&context.db)
-            .await?;
+        let graph = graphs::Entity::find_by_id(id).one(&context.db).await?;
 
         Ok(graph.map(Graph::from))
     }
 
     /// Get available DataSources for selection in DAG editor
-    async fn available_data_sources(&self, ctx: &Context<'_>, project_id: i32) -> Result<Vec<DataSourceReference>> {
+    async fn available_data_sources(
+        &self,
+        ctx: &Context<'_>,
+        project_id: i32,
+    ) -> Result<Vec<DataSourceReference>> {
         let context = ctx.data::<GraphQLContext>()?;
         let data_sources_list = data_sources::Entity::find()
             .filter(data_sources::Column::ProjectId.eq(project_id))
             .all(&context.db)
             .await?;
 
-        Ok(data_sources_list.into_iter().map(DataSourceReference::from).collect())
+        Ok(data_sources_list
+            .into_iter()
+            .map(DataSourceReference::from)
+            .collect())
     }
 
     /// Generate download URL for raw DataSource file
@@ -505,7 +563,8 @@ impl Query {
         let config: serde_json::Value = serde_json::from_str(&dag_node.config_json)
             .map_err(|e| Error::new(format!("Failed to parse node config: {}", e)))?;
 
-        let data_source_id = config.get("dataSourceId")
+        let data_source_id = config
+            .get("dataSourceId")
             .and_then(|v| v.as_i64())
             .map(|v| v as i32)
             .ok_or_else(|| Error::new("Node config does not have dataSourceId"))?;
@@ -523,20 +582,25 @@ impl Query {
         // Determine what to extract based on data_type
         let (columns, rows, total_rows) = match data_source.data_type.as_str() {
             "nodes" => {
-                let nodes_array = graph_data.get("nodes")
+                let nodes_array = graph_data
+                    .get("nodes")
                     .and_then(|v| v.as_array())
                     .ok_or_else(|| Error::new("Graph JSON does not contain nodes array"))?;
 
                 // Build columns from first node's keys
-                let columns = if let Some(first_node) = nodes_array.first().and_then(|v| v.as_object()) {
-                    first_node.keys().map(|key| TableColumn {
-                        name: key.clone(),
-                        data_type: "string".to_string(),
-                        nullable: true,
-                    }).collect()
-                } else {
-                    vec![]
-                };
+                let columns =
+                    if let Some(first_node) = nodes_array.first().and_then(|v| v.as_object()) {
+                        first_node
+                            .keys()
+                            .map(|key| TableColumn {
+                                name: key.clone(),
+                                data_type: "string".to_string(),
+                                nullable: true,
+                            })
+                            .collect()
+                    } else {
+                        vec![]
+                    };
 
                 // Build rows from nodes with pagination
                 let paginated_nodes: Vec<&serde_json::Value> = nodes_array
@@ -555,22 +619,27 @@ impl Query {
                     .collect();
 
                 (columns, rows, nodes_array.len() as i32)
-            },
+            }
             "edges" => {
-                let edges_array = graph_data.get("edges")
+                let edges_array = graph_data
+                    .get("edges")
                     .and_then(|v| v.as_array())
                     .ok_or_else(|| Error::new("Graph JSON does not contain edges array"))?;
 
                 // Build columns from first edge's keys
-                let columns = if let Some(first_edge) = edges_array.first().and_then(|v| v.as_object()) {
-                    first_edge.keys().map(|key| TableColumn {
-                        name: key.clone(),
-                        data_type: "string".to_string(),
-                        nullable: true,
-                    }).collect()
-                } else {
-                    vec![]
-                };
+                let columns =
+                    if let Some(first_edge) = edges_array.first().and_then(|v| v.as_object()) {
+                        first_edge
+                            .keys()
+                            .map(|key| TableColumn {
+                                name: key.clone(),
+                                data_type: "string".to_string(),
+                                nullable: true,
+                            })
+                            .collect()
+                    } else {
+                        vec![]
+                    };
 
                 // Build rows from edges with pagination
                 let paginated_edges: Vec<&serde_json::Value> = edges_array
@@ -589,9 +658,12 @@ impl Query {
                     .collect();
 
                 (columns, rows, edges_array.len() as i32)
-            },
+            }
             _ => {
-                return Err(Error::new(format!("Unsupported data type: {}", data_source.data_type)));
+                return Err(Error::new(format!(
+                    "Unsupported data type: {}",
+                    data_source.data_type
+                )));
             }
         };
 
@@ -658,20 +730,13 @@ impl Query {
             .await?;
 
         // Convert to preview format
-        let node_previews: Vec<GraphNodePreview> = nodes
-            .into_iter()
-            .map(GraphNodePreview::from)
-            .collect();
+        let node_previews: Vec<GraphNodePreview> =
+            nodes.into_iter().map(GraphNodePreview::from).collect();
 
-        let edge_previews: Vec<GraphEdgePreview> = edges
-            .into_iter()
-            .map(GraphEdgePreview::from)
-            .collect();
+        let edge_previews: Vec<GraphEdgePreview> =
+            edges.into_iter().map(GraphEdgePreview::from).collect();
 
-        let layer_previews: Vec<Layer> = db_layers
-            .into_iter()
-            .map(Layer::from)
-            .collect();
+        let layer_previews: Vec<Layer> = db_layers.into_iter().map(Layer::from).collect();
 
         Ok(Some(GraphPreview {
             node_id,

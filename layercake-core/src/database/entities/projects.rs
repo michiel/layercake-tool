@@ -1,7 +1,6 @@
 use sea_orm::entity::prelude::*;
-use sea_orm::{Set, ActiveValue};
+use sea_orm::{ActiveValue, Set};
 use serde::{Deserialize, Serialize};
-
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
 #[sea_orm(table_name = "projects")]

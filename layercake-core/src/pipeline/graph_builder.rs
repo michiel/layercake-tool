@@ -3,10 +3,12 @@ use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, Set};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 
-use crate::database::entities::{data_sources, datasources, graph_edges, graph_nodes, graphs, layers, plan_dag_nodes};
-use crate::database::entities::ExecutionState;
-use super::types::LayerData;
 use super::layer_operations::{insert_layers_to_db, load_layers_from_db};
+use super::types::LayerData;
+use crate::database::entities::ExecutionState;
+use crate::database::entities::{
+    data_sources, datasources, graph_edges, graph_nodes, graphs, layers, plan_dag_nodes,
+};
 use crate::services::GraphEditService;
 use tracing::{info, warn};
 
@@ -89,7 +91,10 @@ impl GraphBuilder {
                     data_sources_list.push(graph_as_data_source);
                 }
                 _ => {
-                    return Err(anyhow!("Unsupported upstream node type for Graph: {}", upstream_node.node_type));
+                    return Err(anyhow!(
+                        "Unsupported upstream node type for Graph: {}",
+                        upstream_node.node_type
+                    ));
                 }
             }
         }
@@ -203,7 +208,8 @@ impl GraphBuilder {
         let config: serde_json::Value = serde_json::from_str(&dag_node.config_json)
             .map_err(|e| anyhow!("Failed to parse node config: {}", e))?;
 
-        let data_source_id = config.get("dataSourceId")
+        let data_source_id = config
+            .get("dataSourceId")
             .and_then(|v| v.as_i64())
             .map(|v| v as i32)
             .ok_or_else(|| anyhow!("Node config does not have dataSourceId: {}", dag_node.id))?;
@@ -216,11 +222,7 @@ impl GraphBuilder {
     }
 
     /// Get upstream graph (from Graph or Merge node)
-    async fn get_upstream_graph(
-        &self,
-        project_id: i32,
-        node_id: &str,
-    ) -> Result<graphs::Model> {
+    async fn get_upstream_graph(&self, project_id: i32, node_id: &str) -> Result<graphs::Model> {
         use sea_orm::{ColumnTrait, QueryFilter};
 
         graphs::Entity::find()
@@ -390,7 +392,8 @@ impl GraphBuilder {
                                 layer: node_val["layer"].as_str().map(|s| s.to_string()),
                                 weight: node_val["weight"].as_f64(),
                                 is_partition: parse_is_partition(&node_val["is_partition"]),
-                                belongs_to: node_val["belongs_to"].as_str()
+                                belongs_to: node_val["belongs_to"]
+                                    .as_str()
                                     .filter(|s| !s.is_empty())
                                     .map(|s| s.to_string()),
                                 attrs: Some(node_val.clone()),
@@ -445,7 +448,8 @@ impl GraphBuilder {
                                 layer: node_val["layer"].as_str().map(|s| s.to_string()),
                                 weight: node_val["weight"].as_f64(),
                                 is_partition: parse_is_partition(&node_val["is_partition"]),
-                                belongs_to: node_val["belongs_to"].as_str()
+                                belongs_to: node_val["belongs_to"]
+                                    .as_str()
                                     .filter(|s| !s.is_empty())
                                     .map(|s| s.to_string()),
                                 attrs: Some(node_val.clone()),
@@ -485,7 +489,8 @@ impl GraphBuilder {
                     }
 
                     // Extract layers from graph JSON
-                    if let Some(layers_array) = graph_data.get("layers").and_then(|v| v.as_array()) {
+                    if let Some(layers_array) = graph_data.get("layers").and_then(|v| v.as_array())
+                    {
                         for layer_val in layers_array {
                             let layer_id = layer_val["id"]
                                 .as_str()
@@ -497,10 +502,7 @@ impl GraphBuilder {
                                 continue;
                             }
 
-                            let name = layer_val["label"]
-                                .as_str()
-                                .unwrap_or(&layer_id)
-                                .to_string();
+                            let name = layer_val["label"].as_str().unwrap_or(&layer_id).to_string();
 
                             let color = layer_val["color"]
                                 .as_str()
@@ -511,17 +513,26 @@ impl GraphBuilder {
                             let mut properties = serde_json::Map::new();
                             if let Some(bg) = layer_val["background_color"].as_str() {
                                 if !bg.is_empty() {
-                                    properties.insert("background_color".to_string(), serde_json::Value::String(bg.to_string()));
+                                    properties.insert(
+                                        "background_color".to_string(),
+                                        serde_json::Value::String(bg.to_string()),
+                                    );
                                 }
                             }
                             if let Some(border) = layer_val["border_color"].as_str() {
                                 if !border.is_empty() {
-                                    properties.insert("border_color".to_string(), serde_json::Value::String(border.to_string()));
+                                    properties.insert(
+                                        "border_color".to_string(),
+                                        serde_json::Value::String(border.to_string()),
+                                    );
                                 }
                             }
                             if let Some(text) = layer_val["text_color"].as_str() {
                                 if !text.is_empty() {
-                                    properties.insert("text_color".to_string(), serde_json::Value::String(text.to_string()));
+                                    properties.insert(
+                                        "text_color".to_string(),
+                                        serde_json::Value::String(text.to_string()),
+                                    );
                                 }
                             }
 
@@ -543,7 +554,8 @@ impl GraphBuilder {
                 }
                 "layers" => {
                     // Extract layers from datasource
-                    if let Some(layers_array) = graph_data.get("layers").and_then(|v| v.as_array()) {
+                    if let Some(layers_array) = graph_data.get("layers").and_then(|v| v.as_array())
+                    {
                         for layer_val in layers_array {
                             let layer_id = layer_val["id"]
                                 .as_str()
@@ -555,10 +567,7 @@ impl GraphBuilder {
                                 continue;
                             }
 
-                            let name = layer_val["label"]
-                                .as_str()
-                                .unwrap_or(&layer_id)
-                                .to_string();
+                            let name = layer_val["label"].as_str().unwrap_or(&layer_id).to_string();
 
                             let color = layer_val["color"]
                                 .as_str()
@@ -569,17 +578,26 @@ impl GraphBuilder {
                             let mut properties = serde_json::Map::new();
                             if let Some(bg) = layer_val["background_color"].as_str() {
                                 if !bg.is_empty() {
-                                    properties.insert("background_color".to_string(), serde_json::Value::String(bg.to_string()));
+                                    properties.insert(
+                                        "background_color".to_string(),
+                                        serde_json::Value::String(bg.to_string()),
+                                    );
                                 }
                             }
                             if let Some(border) = layer_val["border_color"].as_str() {
                                 if !border.is_empty() {
-                                    properties.insert("border_color".to_string(), serde_json::Value::String(border.to_string()));
+                                    properties.insert(
+                                        "border_color".to_string(),
+                                        serde_json::Value::String(border.to_string()),
+                                    );
                                 }
                             }
                             if let Some(text) = layer_val["text_color"].as_str() {
                                 if !text.is_empty() {
-                                    properties.insert("text_color".to_string(), serde_json::Value::String(text.to_string()));
+                                    properties.insert(
+                                        "text_color".to_string(),
+                                        serde_json::Value::String(text.to_string()),
+                                    );
                                 }
                             }
 

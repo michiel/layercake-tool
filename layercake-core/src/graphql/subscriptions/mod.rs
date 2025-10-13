@@ -1,13 +1,13 @@
 use async_graphql::*;
 use futures_util::Stream;
-use tokio::sync::broadcast;
 use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::RwLock;
 use std::pin::Pin;
+use std::sync::Arc;
+use tokio::sync::broadcast;
+use tokio::sync::RwLock;
 
 use crate::graphql::context::GraphQLContext;
-use crate::graphql::types::{PlanDagNode, PlanDagEdge, PlanDagDeltaEvent};
+use crate::graphql::types::{PlanDagDeltaEvent, PlanDagEdge, PlanDagNode};
 // REMOVED: CursorPosition import - user presence now handled via WebSocket only
 
 pub struct Subscription;
@@ -82,7 +82,6 @@ pub struct UserPresenceEvent {
     pub last_active: String,
 }
 
-
 /// Plan DAG update events for real-time synchronization
 #[derive(Clone, Debug, SimpleObject)]
 pub struct PlanDagUpdateEvent {
@@ -112,7 +111,8 @@ pub struct PlanDagUpdateData {
 
 /// Global subscription broadcaster for managing real-time events
 #[allow(dead_code)]
-pub type SubscriptionBroadcaster = Arc<RwLock<HashMap<String, broadcast::Sender<CollaborationEvent>>>>;
+pub type SubscriptionBroadcaster =
+    Arc<RwLock<HashMap<String, broadcast::Sender<CollaborationEvent>>>>;
 
 #[Subscription]
 impl Subscription {
@@ -220,7 +220,6 @@ impl Subscription {
 
         Ok(Box::pin(stream))
     }
-
 
     /// Subscribe to all collaboration events for a specific plan
     async fn collaboration_events(

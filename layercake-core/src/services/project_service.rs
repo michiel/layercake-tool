@@ -1,14 +1,13 @@
 #![allow(dead_code)]
 
-use anyhow::{Result, anyhow};
-use sea_orm::{
-    DatabaseConnection, EntityTrait, QueryFilter, ColumnTrait,
-    ActiveModelTrait, Set, QueryOrder
-};
+use anyhow::{anyhow, Result};
 use chrono::Utc;
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, Set,
+};
 
-use crate::database::entities::{projects, project_collaborators, users};
-use crate::services::{ValidationService, AuthorizationService, ProjectRole};
+use crate::database::entities::{project_collaborators, projects, users};
+use crate::services::{AuthorizationService, ProjectRole, ValidationService};
 
 #[allow(dead_code)] // Project service reserved for future use
 #[derive(Clone)]
@@ -24,7 +23,12 @@ impl ProjectService {
     }
 
     /// Create a new project
-    pub async fn create_project(&self, user_id: i32, name: &str, description: Option<&str>) -> Result<projects::Model> {
+    pub async fn create_project(
+        &self,
+        user_id: i32,
+        name: &str,
+        description: Option<&str>,
+    ) -> Result<projects::Model> {
         // Validate input
         let validated_name = ValidationService::validate_project_name(name)
             .map_err(|e| anyhow!("Invalid project name: {}", e))?;
@@ -45,7 +49,9 @@ impl ProjectService {
             ..Default::default()
         };
 
-        let project = project.insert(&self.db).await
+        let project = project
+            .insert(&self.db)
+            .await
             .map_err(|e| anyhow!("Failed to create project: {}", e))?;
 
         // Add creator as owner
@@ -61,16 +67,26 @@ impl ProjectService {
             ..Default::default()
         };
 
-        collaboration.insert(&self.db).await
+        collaboration
+            .insert(&self.db)
+            .await
             .map_err(|e| anyhow!("Failed to add project owner: {}", e))?;
 
         Ok(project)
     }
 
     /// Update project details
-    pub async fn update_project(&self, user_id: i32, project_id: i32, name: Option<&str>, description: Option<&str>) -> Result<projects::Model> {
+    pub async fn update_project(
+        &self,
+        user_id: i32,
+        project_id: i32,
+        name: Option<&str>,
+        description: Option<&str>,
+    ) -> Result<projects::Model> {
         // Check write access
-        self.auth_service.check_project_write_access(user_id, project_id).await?;
+        self.auth_service
+            .check_project_write_access(user_id, project_id)
+            .await?;
 
         // Find project
         let project = projects::Entity::find_by_id(project_id)
@@ -89,14 +105,17 @@ impl ProjectService {
         }
 
         if let Some(description) = description {
-            let validated_description = ValidationService::validate_project_description(description)
-                .map_err(|e| anyhow!("Invalid project description: {}", e))?;
+            let validated_description =
+                ValidationService::validate_project_description(description)
+                    .map_err(|e| anyhow!("Invalid project description: {}", e))?;
             active_project.description = Set(Some(validated_description));
         }
 
         active_project.updated_at = Set(Utc::now());
 
-        let updated_project = active_project.update(&self.db).await
+        let updated_project = active_project
+            .update(&self.db)
+            .await
             .map_err(|e| anyhow!("Failed to update project: {}", e))?;
 
         Ok(updated_project)
@@ -105,7 +124,9 @@ impl ProjectService {
     /// Delete a project (owner only)
     pub async fn delete_project(&self, user_id: i32, project_id: i32) -> Result<()> {
         // Check admin access
-        self.auth_service.check_project_admin_access(user_id, project_id).await?;
+        self.auth_service
+            .check_project_admin_access(user_id, project_id)
+            .await?;
 
         // Delete project (cascading deletes should handle collaborators)
         let result = projects::Entity::delete_by_id(project_id)
@@ -123,7 +144,9 @@ impl ProjectService {
     /// Get project by ID with access check
     pub async fn get_project(&self, user_id: i32, project_id: i32) -> Result<projects::Model> {
         // Check read access
-        self.auth_service.check_project_read_access(user_id, project_id).await?;
+        self.auth_service
+            .check_project_read_access(user_id, project_id)
+            .await?;
 
         // Get project
         let project = projects::Entity::find_by_id(project_id)
@@ -160,9 +183,15 @@ impl ProjectService {
     }
 
     /// Get project collaborators
-    pub async fn get_project_collaborators(&self, user_id: i32, project_id: i32) -> Result<Vec<(project_collaborators::Model, users::Model)>> {
+    pub async fn get_project_collaborators(
+        &self,
+        user_id: i32,
+        project_id: i32,
+    ) -> Result<Vec<(project_collaborators::Model, users::Model)>> {
         // Check read access
-        self.auth_service.check_project_read_access(user_id, project_id).await?;
+        self.auth_service
+            .check_project_read_access(user_id, project_id)
+            .await?;
 
         // Get collaborators with user info
         let collaborators = project_collaborators::Entity::find()
@@ -175,9 +204,7 @@ impl ProjectService {
 
         let result: Vec<(project_collaborators::Model, users::Model)> = collaborators
             .into_iter()
-            .filter_map(|(collab, user_opt)| {
-                user_opt.map(|user| (collab, user))
-            })
+            .filter_map(|(collab, user_opt)| user_opt.map(|user| (collab, user)))
             .collect();
 
         Ok(result)
@@ -187,12 +214,21 @@ impl ProjectService {
 
     /// Check if user can access project
     pub async fn can_access_project(&self, user_id: i32, project_id: i32) -> bool {
-        self.auth_service.check_project_read_access(user_id, project_id).await.is_ok()
+        self.auth_service
+            .check_project_read_access(user_id, project_id)
+            .await
+            .is_ok()
     }
 
     /// Get user's role in project
-    pub async fn get_user_role(&self, user_id: i32, project_id: i32) -> Result<Option<ProjectRole>> {
-        self.auth_service.get_user_project_role(user_id, project_id).await
+    pub async fn get_user_role(
+        &self,
+        user_id: i32,
+        project_id: i32,
+    ) -> Result<Option<ProjectRole>> {
+        self.auth_service
+            .get_user_project_role(user_id, project_id)
+            .await
     }
 }
 

@@ -1,7 +1,6 @@
 use sea_orm::entity::prelude::*;
-use sea_orm::{Set, ActiveValue};
+use sea_orm::{ActiveValue, Set};
 use serde::{Deserialize, Serialize};
-
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
 #[sea_orm(table_name = "user_sessions")]
@@ -119,12 +118,7 @@ impl Model {
         self.cursor_position.as_ref().and_then(|pos| {
             serde_json::from_str::<serde_json::Value>(pos)
                 .ok()
-                .and_then(|json| {
-                    Some((
-                        json.get("x")?.as_f64()?,
-                        json.get("y")?.as_f64()?,
-                    ))
-                })
+                .and_then(|json| Some((json.get("x")?.as_f64()?, json.get("y")?.as_f64()?)))
         })
     }
 

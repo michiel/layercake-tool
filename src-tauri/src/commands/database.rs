@@ -1,5 +1,5 @@
 use tauri::{AppHandle, State};
-use tracing::{info, error};
+use tracing::{error, info};
 
 use crate::AppState;
 
@@ -47,7 +47,9 @@ pub async fn reinitialize_database(
         let mut server_guard = state.server_handle.write().await;
         if let Some(handle) = server_guard.take() {
             info!("Shutting down server for database reinitialization");
-            handle.shutdown().await
+            handle
+                .shutdown()
+                .await
                 .map_err(|e| format!("Failed to shutdown server: {}", e))?;
         }
     }

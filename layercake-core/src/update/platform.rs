@@ -21,11 +21,18 @@ impl PlatformDetector for DefaultPlatformDetector {
         let arch = detect_arch()?;
         let extension = get_extension(&os);
 
-        Ok(PlatformInfo { os, arch, extension })
+        Ok(PlatformInfo {
+            os,
+            arch,
+            extension,
+        })
     }
 
     fn get_asset_pattern(&self, platform: &PlatformInfo) -> String {
-        format!("layercake-{}-{}{}", platform.os, platform.arch, platform.extension)
+        format!(
+            "layercake-{}-{}{}",
+            platform.os, platform.arch, platform.extension
+        )
     }
 }
 
@@ -67,16 +74,17 @@ mod tests {
     #[test]
     fn test_platform_detection() {
         let detector = DefaultPlatformDetector::new();
-        let platform = detector.detect_platform()
+        let platform = detector
+            .detect_platform()
             .expect("Platform detection should work on supported systems");
-        
+
         // Basic sanity checks
         assert!(!platform.os.is_empty());
         assert!(!platform.arch.is_empty());
-        
+
         #[cfg(target_os = "windows")]
         assert_eq!(platform.extension, ".exe");
-        
+
         #[cfg(not(target_os = "windows"))]
         assert_eq!(platform.extension, "");
     }
@@ -89,7 +97,7 @@ mod tests {
             arch: "x86_64".to_string(),
             extension: "".to_string(),
         };
-        
+
         let pattern = detector.get_asset_pattern(&platform);
         assert_eq!(pattern, "layercake-linux-x86_64");
     }

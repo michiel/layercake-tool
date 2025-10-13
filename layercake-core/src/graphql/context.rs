@@ -1,11 +1,11 @@
 #![allow(dead_code)]
 
-use std::sync::Arc;
-use std::sync::atomic::{AtomicI32, Ordering};
-use std::collections::HashMap;
-use tokio::sync::RwLock;
+use crate::services::{ExportService, GraphService, ImportService, PlanDagService};
 use sea_orm::DatabaseConnection;
-use crate::services::{ImportService, ExportService, GraphService, PlanDagService};
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicI32, Ordering};
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 #[derive(Clone)]
 pub struct GraphQLContext {
@@ -63,8 +63,8 @@ impl SessionManager {
 
         // Generate avatar colors
         let colors = [
-            "#ef4444", "#f97316", "#eab308", "#22c55e", "#06b6d4",
-            "#3b82f6", "#8b5cf6", "#ec4899", "#14b8a6", "#f59e0b",
+            "#ef4444", "#f97316", "#eab308", "#22c55e", "#06b6d4", "#3b82f6", "#8b5cf6", "#ec4899",
+            "#14b8a6", "#f59e0b",
         ];
         let color_index = (user_id as usize) % colors.len();
         let avatar_color = colors[color_index].to_string();
@@ -115,11 +115,12 @@ impl GraphQLContext {
     pub fn get_session_id(&self, ctx: &async_graphql::Context<'_>) -> String {
         // In a real implementation, this would come from HTTP headers
         // For now, use a simple approach with context extensions
-        ctx.data_opt::<String>()
-            .cloned()
-            .unwrap_or_else(|| {
-                // Generate a session ID based on connection info
-                format!("browser_session_{}", chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0))
-            })
+        ctx.data_opt::<String>().cloned().unwrap_or_else(|| {
+            // Generate a session ID based on connection info
+            format!(
+                "browser_session_{}",
+                chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
+            )
+        })
     }
 }

@@ -3,8 +3,8 @@ use colored::Colorize;
 use std::path::PathBuf;
 
 use super::{
-    BinaryManager, DefaultBinaryManager, DefaultPlatformDetector, DefaultUpdater, GitHubVersionManager,
-    UpdateError, Updater,
+    BinaryManager, DefaultBinaryManager, DefaultPlatformDetector, DefaultUpdater,
+    GitHubVersionManager, UpdateError, Updater,
 };
 
 pub struct UpdateCommand {
@@ -28,7 +28,9 @@ impl UpdateCommand {
             return self.execute_rollback().await;
         }
 
-        let version_manager = Box::new(GitHubVersionManager::new("michiel/layercake-tool".to_string()));
+        let version_manager = Box::new(GitHubVersionManager::new(
+            "michiel/layercake-tool".to_string(),
+        ));
         let platform_detector = Box::new(DefaultPlatformDetector::new());
         let binary_manager = Box::new(DefaultBinaryManager::new());
 
@@ -54,7 +56,7 @@ impl UpdateCommand {
 
         if update_info.needs_update || self.force {
             println!("\n{}", "Update available!".green().bold());
-            
+
             if let Some(release) = &update_info.release {
                 if let Some(body) = &release.body {
                     if !body.trim().is_empty() {
@@ -65,7 +67,10 @@ impl UpdateCommand {
             }
 
             if self.dry_run {
-                println!("\n{}", "This is a dry run - no changes will be made.".yellow());
+                println!(
+                    "\n{}",
+                    "This is a dry run - no changes will be made.".yellow()
+                );
                 println!("Run without --dry-run to perform the update.");
             } else if self.check_only {
                 println!("\nRun {} to update.", "layercake update".green());
@@ -104,21 +109,23 @@ impl UpdateCommand {
         println!("{}", "Rolling back to previous version...".blue());
 
         // Find backup files
-        let current_exe = std::env::current_exe()
-            .context("Cannot determine current executable path")?;
+        let current_exe =
+            std::env::current_exe().context("Cannot determine current executable path")?;
 
-        let parent_dir = current_exe.parent()
+        let parent_dir = current_exe
+            .parent()
             .context("Cannot determine executable directory")?;
 
         // Look for backup files
         let mut backup_files = Vec::new();
-        let mut entries = tokio::fs::read_dir(parent_dir).await
+        let mut entries = tokio::fs::read_dir(parent_dir)
+            .await
             .context("Cannot read executable directory")?;
 
         while let Some(entry) = entries.next_entry().await? {
             let file_name = entry.file_name();
             let file_name_str = file_name.to_string_lossy();
-            
+
             if file_name_str.starts_with("layercake") && file_name_str.contains(".backup.") {
                 backup_files.push(entry.path());
             }
@@ -126,7 +133,10 @@ impl UpdateCommand {
 
         if backup_files.is_empty() {
             eprintln!("{}", "No backup files found.".red());
-            eprintln!("Create a backup with {} before updating.", "layercake update --backup".yellow());
+            eprintln!(
+                "Create a backup with {} before updating.",
+                "layercake update --backup".yellow()
+            );
             return Ok(());
         }
 
@@ -145,7 +155,7 @@ impl UpdateCommand {
         println!("Found backup: {}", latest_backup.display());
 
         let binary_manager = DefaultBinaryManager::new();
-        
+
         match binary_manager.rollback(latest_backup, &current_exe).await {
             Ok(()) => {
                 println!("\n{}", "✓ Rollback completed successfully!".green().bold());

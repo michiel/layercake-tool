@@ -2,7 +2,10 @@
 //! Provides intelligent prompts for analyzing graph structure, connectivity, and patterns
 
 use axum_mcp::prelude::*;
-use axum_mcp::server::prompt::{Prompt, PromptCategory, PromptParameter, PromptMessage, PromptContent, MessageRole, GetPromptRequest, GetPromptResult, PromptRegistry};
+use axum_mcp::server::prompt::{
+    GetPromptRequest, GetPromptResult, MessageRole, Prompt, PromptCategory, PromptContent,
+    PromptMessage, PromptParameter, PromptRegistry,
+};
 use std::collections::HashMap;
 
 /// Layercake prompt registry for graph analysis templates
@@ -18,11 +21,11 @@ impl LayercakePromptRegistry {
             prompts: HashMap::new(),
             categories: Vec::new(),
         };
-        
+
         registry.initialize_graph_analysis_prompts();
         registry
     }
-    
+
     fn initialize_graph_analysis_prompts(&mut self) {
         // Graph structure analysis prompt
         self.add_graph_analysis_prompt(
@@ -345,7 +348,8 @@ Use the analyze_connectivity tool to get detailed structural analysis before mak
         self.categories.push(PromptCategory {
             id: "graph_analysis".to_string(),
             name: "Graph Analysis".to_string(),
-            description: "Prompts for analyzing graph structure, connectivity, and patterns".to_string(),
+            description: "Prompts for analyzing graph structure, connectivity, and patterns"
+                .to_string(),
             prompts: vec![
                 "analyze_graph_structure".to_string(),
                 "analyze_paths".to_string(),
@@ -354,8 +358,14 @@ Use the analyze_connectivity tool to get detailed structural analysis before mak
             ],
         });
     }
-    
-    fn add_graph_analysis_prompt(&mut self, name: &str, description: &str, template: &str, parameters: Vec<PromptParameter>) {
+
+    fn add_graph_analysis_prompt(
+        &mut self,
+        name: &str,
+        description: &str,
+        template: &str,
+        parameters: Vec<PromptParameter>,
+    ) {
         let prompt = Prompt {
             name: name.to_string(),
             description: description.to_string(),
@@ -383,7 +393,7 @@ Use the analyze_connectivity tool to get detailed structural analysis before mak
                 meta
             },
         };
-        
+
         self.prompts.insert(name.to_string(), prompt);
     }
 }
@@ -399,19 +409,29 @@ impl PromptRegistry for LayercakePromptRegistry {
     async fn list_prompts(&self, _context: &SecurityContext) -> McpResult<Vec<Prompt>> {
         Ok(self.prompts.values().cloned().collect())
     }
-    
-    async fn get_prompt(&self, name: &str, _context: &SecurityContext) -> McpResult<Option<Prompt>> {
+
+    async fn get_prompt(
+        &self,
+        name: &str,
+        _context: &SecurityContext,
+    ) -> McpResult<Option<Prompt>> {
         Ok(self.prompts.get(name).cloned())
     }
-    
-    async fn get_prompt_with_args(&self, request: GetPromptRequest, _context: &SecurityContext) -> McpResult<GetPromptResult> {
-        let prompt = self.prompts.get(&request.name)
+
+    async fn get_prompt_with_args(
+        &self,
+        request: GetPromptRequest,
+        _context: &SecurityContext,
+    ) -> McpResult<GetPromptResult> {
+        let prompt = self
+            .prompts
+            .get(&request.name)
             .ok_or_else(|| McpError::Validation {
                 message: format!("Prompt '{}' not found", request.name),
             })?;
-        
+
         let params = request.arguments.unwrap_or_default();
-        
+
         // Validate required parameters
         for param in &prompt.parameters {
             if param.required && !params.contains_key(&param.name) {
@@ -420,14 +440,14 @@ impl PromptRegistry for LayercakePromptRegistry {
                 });
             }
         }
-        
+
         // Simple template substitution for {{variable}} patterns
         let mut rendered_messages = Vec::new();
         for message in &prompt.messages {
             let rendered_content = match &message.content {
                 PromptContent::Text { text } => {
                     let mut rendered_text = text.clone();
-                    
+
                     // Substitute template variables
                     for (key, value) in &params {
                         let placeholder = format!("{{{{{}}}}}", key);
@@ -435,31 +455,30 @@ impl PromptRegistry for LayercakePromptRegistry {
                             serde_json::Value::String(s) => s.clone(),
                             serde_json::Value::Number(n) => n.to_string(),
                             serde_json::Value::Bool(b) => b.to_string(),
-                            serde_json::Value::Array(arr) => {
-                                arr.iter()
-                                    .map(|v| match v {
-                                        serde_json::Value::String(s) => s.clone(),
-                                        other => other.to_string(),
-                                    })
-                                    .collect::<Vec<_>>()
-                                    .join(", ")
-                            },
+                            serde_json::Value::Array(arr) => arr
+                                .iter()
+                                .map(|v| match v {
+                                    serde_json::Value::String(s) => s.clone(),
+                                    other => other.to_string(),
+                                })
+                                .collect::<Vec<_>>()
+                                .join(", "),
                             other => other.to_string(),
                         };
                         rendered_text = rendered_text.replace(&placeholder, &replacement);
                     }
-                    
+
                     // Handle simple conditional blocks {{#if condition}}...{{/if}}
                     for (key, value) in &params {
                         let if_start = format!("{{{{#if {}}}}}", key);
                         let if_end = "{{/if}}";
-                        
+
                         if let Some(start_pos) = rendered_text.find(&if_start) {
                             if let Some(end_pos) = rendered_text.find(if_end) {
                                 let before = &rendered_text[..start_pos];
                                 let content = &rendered_text[start_pos + if_start.len()..end_pos];
                                 let after = &rendered_text[end_pos + if_end.len()..];
-                                
+
                                 // Check if condition is truthy
                                 let include_content = match value {
                                     serde_json::Value::Bool(b) => *b,
@@ -469,7 +488,7 @@ impl PromptRegistry for LayercakePromptRegistry {
                                     serde_json::Value::Object(obj) => !obj.is_empty(),
                                     serde_json::Value::Number(_) => true,
                                 };
-                                
+
                                 rendered_text = if include_content {
                                     format!("{}{}{}", before, content, after)
                                 } else {
@@ -478,18 +497,20 @@ impl PromptRegistry for LayercakePromptRegistry {
                             }
                         }
                     }
-                    
-                    PromptContent::Text { text: rendered_text }
-                },
+
+                    PromptContent::Text {
+                        text: rendered_text,
+                    }
+                }
                 other => other.clone(),
             };
-            
+
             rendered_messages.push(PromptMessage {
                 role: message.role.clone(),
                 content: rendered_content,
             });
         }
-        
+
         // Render description
         let mut rendered_description = prompt.description.clone();
         for (key, value) in &params {
@@ -502,28 +523,32 @@ impl PromptRegistry for LayercakePromptRegistry {
             };
             rendered_description = rendered_description.replace(&placeholder, &replacement);
         }
-        
+
         Ok(GetPromptResult {
             name: request.name,
             messages: rendered_messages,
             description: rendered_description,
         })
     }
-    
+
     async fn list_categories(&self, _context: &SecurityContext) -> McpResult<Vec<PromptCategory>> {
         Ok(self.categories.clone())
     }
-    
+
     async fn prompt_exists(&self, name: &str, _context: &SecurityContext) -> McpResult<bool> {
         Ok(self.prompts.contains_key(name))
     }
-    
-    async fn validate_prompt_parameters(&self, name: &str, params: &HashMap<String, serde_json::Value>, _context: &SecurityContext) -> McpResult<()> {
-        let prompt = self.prompts.get(name)
-            .ok_or_else(|| McpError::Validation {
-                message: format!("Prompt '{}' not found", name),
-            })?;
-        
+
+    async fn validate_prompt_parameters(
+        &self,
+        name: &str,
+        params: &HashMap<String, serde_json::Value>,
+        _context: &SecurityContext,
+    ) -> McpResult<()> {
+        let prompt = self.prompts.get(name).ok_or_else(|| McpError::Validation {
+            message: format!("Prompt '{}' not found", name),
+        })?;
+
         for param in &prompt.parameters {
             if param.required && !params.contains_key(&param.name) {
                 return Err(McpError::Validation {
@@ -531,7 +556,7 @@ impl PromptRegistry for LayercakePromptRegistry {
                 });
             }
         }
-        
+
         Ok(())
     }
 }

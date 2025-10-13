@@ -1,13 +1,12 @@
-use anyhow::{Result, anyhow};
-use sea_orm::{
-    DatabaseConnection, EntityTrait, QueryFilter, ColumnTrait,
-    ActiveModelTrait, Set, QueryOrder
-};
+use anyhow::{anyhow, Result};
 use chrono::Utc;
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, Set,
+};
 
-use crate::database::entities::{plans, plan_dag_nodes, plan_dag_edges};
+use crate::database::entities::{plan_dag_edges, plan_dag_nodes, plans};
 use crate::graphql::mutations::plan_dag_delta;
-use crate::graphql::types::{PlanDagNode, PlanDagEdge, Position};
+use crate::graphql::types::{PlanDagEdge, PlanDagNode, Position};
 use crate::services::ValidationService;
 
 /// Service layer for Plan DAG operations
@@ -29,7 +28,8 @@ impl PlanDagService {
             .filter(plans::Column::ProjectId.eq(project_id))
             .one(&self.db)
             .await
-            .map_err(|e| anyhow!("Database error: {}", e))? {
+            .map_err(|e| anyhow!("Database error: {}", e))?
+        {
             Some(plan) => Ok(plan),
             None => {
                 let now = Utc::now();
@@ -44,7 +44,9 @@ impl PlanDagService {
                     created_at: Set(now),
                     updated_at: Set(now),
                 };
-                new_plan.insert(&self.db).await
+                new_plan
+                    .insert(&self.db)
+                    .await
                     .map_err(|e| anyhow!("Failed to create plan: {}", e))
             }
         }
@@ -63,16 +65,18 @@ impl PlanDagService {
         // Validate inputs
         let validated_id = ValidationService::validate_node_id(&node_id)?;
         let validated_type = ValidationService::validate_plan_dag_node_type(&node_type)?;
-        let (validated_x, validated_y) = ValidationService::validate_plan_dag_position(position.x, position.y)?;
+        let (validated_x, validated_y) =
+            ValidationService::validate_plan_dag_position(position.x, position.y)?;
         let validated_metadata = ValidationService::validate_plan_dag_metadata(&metadata_json)?;
         let validated_config = ValidationService::validate_plan_dag_config(&config_json)?;
 
         let plan = self.get_or_create_plan(project_id).await?;
 
         // Fetch current state for delta generation and validation
-        let (current_nodes, current_edges) = plan_dag_delta::fetch_current_plan_dag(&self.db, plan.id)
-            .await
-            .map_err(|e| anyhow!("Failed to fetch current state: {}", e))?;
+        let (current_nodes, current_edges) =
+            plan_dag_delta::fetch_current_plan_dag(&self.db, plan.id)
+                .await
+                .map_err(|e| anyhow!("Failed to fetch current state: {}", e))?;
 
         // Validate DAG limits
         ValidationService::validate_plan_dag_limits(current_nodes.len() + 1, current_edges.len())?;
@@ -93,7 +97,9 @@ impl PlanDagService {
             updated_at: Set(now),
         };
 
-        let created_node = node.insert(&self.db).await
+        let created_node = node
+            .insert(&self.db)
+            .await
             .map_err(|e| anyhow!("Failed to create node: {}", e))?;
 
         let result_node = PlanDagNode::from(created_node);
@@ -107,12 +113,9 @@ impl PlanDagService {
             .map_err(|e| anyhow!("Failed to increment version: {}", e))?;
 
         let user_id = "demo_user".to_string(); // TODO: Get from auth context
-        plan_dag_delta::publish_plan_dag_delta(
-            project_id,
-            new_version,
-            user_id,
-            vec![patch_op],
-        ).await.ok(); // Non-fatal if broadcast fails
+        plan_dag_delta::publish_plan_dag_delta(project_id, new_version, user_id, vec![patch_op])
+            .await
+            .ok(); // Non-fatal if broadcast fails
 
         Ok(result_node)
     }
@@ -136,8 +139,9 @@ impl PlanDagService {
         // Find the node
         let node = plan_dag_nodes::Entity::find()
             .filter(
-                plan_dag_nodes::Column::PlanId.eq(plan.id)
-                    .and(plan_dag_nodes::Column::Id.eq(&node_id))
+                plan_dag_nodes::Column::PlanId
+                    .eq(plan.id)
+                    .and(plan_dag_nodes::Column::Id.eq(&node_id)),
             )
             .one(&self.db)
             .await
@@ -189,7 +193,9 @@ impl PlanDagService {
         }
 
         node_active.updated_at = Set(Utc::now());
-        let updated_node = node_active.update(&self.db).await
+        let updated_node = node_active
+            .update(&self.db)
+            .await
             .map_err(|e| anyhow!("Failed to update node: {}", e))?;
 
         let result_node = PlanDagNode::from(updated_node);
@@ -201,12 +207,9 @@ impl PlanDagService {
                 .map_err(|e| anyhow!("Failed to increment version: {}", e))?;
 
             let user_id = "demo_user".to_string(); // TODO: Get from auth context
-            plan_dag_delta::publish_plan_dag_delta(
-                project_id,
-                new_version,
-                user_id,
-                patch_ops,
-            ).await.ok(); // Non-fatal if broadcast fails
+            plan_dag_delta::publish_plan_dag_delta(project_id, new_version, user_id, patch_ops)
+                .await
+                .ok(); // Non-fatal if broadcast fails
         }
 
         Ok(result_node)
@@ -222,15 +225,17 @@ impl PlanDagService {
             .ok_or_else(|| anyhow!("Plan not found for project"))?;
 
         // Fetch current state for delta generation
-        let (current_nodes, current_edges) = plan_dag_delta::fetch_current_plan_dag(&self.db, plan.id)
-            .await
-            .map_err(|e| anyhow!("Failed to fetch current state: {}", e))?;
+        let (current_nodes, current_edges) =
+            plan_dag_delta::fetch_current_plan_dag(&self.db, plan.id)
+                .await
+                .map_err(|e| anyhow!("Failed to fetch current state: {}", e))?;
 
         // Find the node to delete
         let node = plan_dag_nodes::Entity::find()
             .filter(
-                plan_dag_nodes::Column::PlanId.eq(plan.id)
-                    .and(plan_dag_nodes::Column::Id.eq(&node_id))
+                plan_dag_nodes::Column::PlanId
+                    .eq(plan.id)
+                    .and(plan_dag_nodes::Column::Id.eq(&node_id)),
             )
             .one(&self.db)
             .await
@@ -246,12 +251,15 @@ impl PlanDagService {
         }
 
         // Find and delete connected edges, generating deltas for each
-        let connected_edges: Vec<&PlanDagEdge> = current_edges.iter()
+        let connected_edges: Vec<&PlanDagEdge> = current_edges
+            .iter()
             .filter(|e| e.source == node_id || e.target == node_id)
             .collect();
 
         for edge in &connected_edges {
-            if let Some(patch) = plan_dag_delta::generate_edge_delete_patch(&edge.id, &current_edges) {
+            if let Some(patch) =
+                plan_dag_delta::generate_edge_delete_patch(&edge.id, &current_edges)
+            {
                 patch_ops.push(patch);
             }
         }
@@ -259,11 +267,11 @@ impl PlanDagService {
         // Delete edges connected to this node first
         plan_dag_edges::Entity::delete_many()
             .filter(
-                plan_dag_edges::Column::PlanId.eq(plan.id)
-                    .and(
-                        plan_dag_edges::Column::SourceNodeId.eq(&node_id)
-                            .or(plan_dag_edges::Column::TargetNodeId.eq(&node_id))
-                    )
+                plan_dag_edges::Column::PlanId.eq(plan.id).and(
+                    plan_dag_edges::Column::SourceNodeId
+                        .eq(&node_id)
+                        .or(plan_dag_edges::Column::TargetNodeId.eq(&node_id)),
+                ),
             )
             .exec(&self.db)
             .await
@@ -272,8 +280,9 @@ impl PlanDagService {
         // Delete the node
         plan_dag_nodes::Entity::delete_many()
             .filter(
-                plan_dag_nodes::Column::PlanId.eq(plan.id)
-                    .and(plan_dag_nodes::Column::Id.eq(&node_id))
+                plan_dag_nodes::Column::PlanId
+                    .eq(plan.id)
+                    .and(plan_dag_nodes::Column::Id.eq(&node_id)),
             )
             .exec(&self.db)
             .await
@@ -286,12 +295,9 @@ impl PlanDagService {
                 .map_err(|e| anyhow!("Failed to increment version: {}", e))?;
 
             let user_id = "demo_user".to_string(); // TODO: Get from auth context
-            plan_dag_delta::publish_plan_dag_delta(
-                project_id,
-                new_version,
-                user_id,
-                patch_ops,
-            ).await.ok(); // Non-fatal if broadcast fails
+            plan_dag_delta::publish_plan_dag_delta(project_id, new_version, user_id, patch_ops)
+                .await
+                .ok(); // Non-fatal if broadcast fails
         }
 
         Ok(result_node)
@@ -304,7 +310,8 @@ impl PlanDagService {
         node_id: String,
         position: Position,
     ) -> Result<PlanDagNode> {
-        self.update_node(project_id, node_id, Some(position), None, None).await
+        self.update_node(project_id, node_id, Some(position), None, None)
+            .await
     }
 
     /// Create a new Plan DAG edge
@@ -328,9 +335,10 @@ impl PlanDagService {
         let plan = self.get_or_create_plan(project_id).await?;
 
         // Fetch current state for delta generation and validation
-        let (current_nodes, current_edges) = plan_dag_delta::fetch_current_plan_dag(&self.db, plan.id)
-            .await
-            .map_err(|e| anyhow!("Failed to fetch current state: {}", e))?;
+        let (current_nodes, current_edges) =
+            plan_dag_delta::fetch_current_plan_dag(&self.db, plan.id)
+                .await
+                .map_err(|e| anyhow!("Failed to fetch current state: {}", e))?;
 
         // Validate DAG limits
         ValidationService::validate_plan_dag_limits(current_nodes.len(), current_edges.len() + 1)?;
@@ -349,7 +357,9 @@ impl PlanDagService {
             updated_at: Set(now),
         };
 
-        let created_edge = edge.insert(&self.db).await
+        let created_edge = edge
+            .insert(&self.db)
+            .await
             .map_err(|e| anyhow!("Failed to create edge: {}", e))?;
 
         let result_edge = PlanDagEdge::from(created_edge);
@@ -363,12 +373,9 @@ impl PlanDagService {
             .map_err(|e| anyhow!("Failed to increment version: {}", e))?;
 
         let user_id = "demo_user".to_string(); // TODO: Get from auth context
-        plan_dag_delta::publish_plan_dag_delta(
-            project_id,
-            new_version,
-            user_id,
-            vec![patch_op],
-        ).await.ok(); // Non-fatal if broadcast fails
+        plan_dag_delta::publish_plan_dag_delta(project_id, new_version, user_id, vec![patch_op])
+            .await
+            .ok(); // Non-fatal if broadcast fails
 
         Ok(result_edge)
     }
@@ -390,8 +397,9 @@ impl PlanDagService {
         // Find the edge to delete
         let edge = plan_dag_edges::Entity::find()
             .filter(
-                plan_dag_edges::Column::PlanId.eq(plan.id)
-                    .and(plan_dag_edges::Column::Id.eq(&edge_id))
+                plan_dag_edges::Column::PlanId
+                    .eq(plan.id)
+                    .and(plan_dag_edges::Column::Id.eq(&edge_id)),
             )
             .one(&self.db)
             .await
@@ -409,8 +417,9 @@ impl PlanDagService {
         // Delete the edge
         plan_dag_edges::Entity::delete_many()
             .filter(
-                plan_dag_edges::Column::PlanId.eq(plan.id)
-                    .and(plan_dag_edges::Column::Id.eq(&edge_id))
+                plan_dag_edges::Column::PlanId
+                    .eq(plan.id)
+                    .and(plan_dag_edges::Column::Id.eq(&edge_id)),
             )
             .exec(&self.db)
             .await
@@ -423,12 +432,9 @@ impl PlanDagService {
                 .map_err(|e| anyhow!("Failed to increment version: {}", e))?;
 
             let user_id = "demo_user".to_string(); // TODO: Get from auth context
-            plan_dag_delta::publish_plan_dag_delta(
-                project_id,
-                new_version,
-                user_id,
-                patch_ops,
-            ).await.ok(); // Non-fatal if broadcast fails
+            plan_dag_delta::publish_plan_dag_delta(project_id, new_version, user_id, patch_ops)
+                .await
+                .ok(); // Non-fatal if broadcast fails
         }
 
         Ok(result_edge)

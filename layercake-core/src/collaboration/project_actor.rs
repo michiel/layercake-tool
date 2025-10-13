@@ -1,15 +1,14 @@
-use tokio::sync::mpsc;
+use chrono::Utc;
 use std::collections::HashMap;
 use std::time::Instant;
-use chrono::Utc;
+use tokio::sync::mpsc;
 use tracing::{debug, warn};
 
-use crate::server::websocket::types::{
-    ServerMessage, UserPresenceData, DocumentPresence,
-    DocumentActivityData, DocumentUser,
-    CursorPosition, DocumentType,
-};
 use super::types::{ProjectCommand, ProjectHealthReport};
+use crate::server::websocket::types::{
+    CursorPosition, DocumentActivityData, DocumentPresence, DocumentType, DocumentUser,
+    ServerMessage, UserPresenceData,
+};
 
 /// Actor for managing a single project's collaboration state
 pub struct ProjectActor {
@@ -51,25 +50,33 @@ impl ProjectActor {
         sender: mpsc::Sender<ServerMessage>,
     ) -> Result<(), String> {
         let (tx, rx) = tokio::sync::oneshot::channel();
-        self.command_tx.send(ProjectCommand::Join {
-            user_id,
-            user_name,
-            avatar_color,
-            sender,
-            response: tx,
-        }).await.map_err(|_| "Project actor unavailable".to_string())?;
+        self.command_tx
+            .send(ProjectCommand::Join {
+                user_id,
+                user_name,
+                avatar_color,
+                sender,
+                response: tx,
+            })
+            .await
+            .map_err(|_| "Project actor unavailable".to_string())?;
 
-        rx.await.map_err(|_| "Response channel closed".to_string())?
+        rx.await
+            .map_err(|_| "Response channel closed".to_string())?
     }
 
     pub async fn leave(&self, user_id: &str) -> Result<(), String> {
         let (tx, rx) = tokio::sync::oneshot::channel();
-        self.command_tx.send(ProjectCommand::Leave {
-            user_id: user_id.to_string(),
-            response: tx,
-        }).await.map_err(|_| "Project actor unavailable".to_string())?;
+        self.command_tx
+            .send(ProjectCommand::Leave {
+                user_id: user_id.to_string(),
+                response: tx,
+            })
+            .await
+            .map_err(|_| "Project actor unavailable".to_string())?;
 
-        rx.await.map_err(|_| "Response channel closed".to_string())?
+        rx.await
+            .map_err(|_| "Response channel closed".to_string())?
     }
 
     pub async fn update_cursor(
@@ -79,12 +86,15 @@ impl ProjectActor {
         position: CursorPosition,
         selected_node_id: Option<String>,
     ) {
-        let _ = self.command_tx.send(ProjectCommand::UpdateCursor {
-            user_id,
-            document_id,
-            position,
-            selected_node_id,
-        }).await;
+        let _ = self
+            .command_tx
+            .send(ProjectCommand::UpdateCursor {
+                user_id,
+                document_id,
+                position,
+                selected_node_id,
+            })
+            .await;
     }
 
     pub async fn switch_document(
@@ -93,32 +103,49 @@ impl ProjectActor {
         document_id: String,
         document_type: DocumentType,
     ) {
-        let _ = self.command_tx.send(ProjectCommand::SwitchDocument {
-            user_id,
-            document_id,
-            document_type,
-        }).await;
+        let _ = self
+            .command_tx
+            .send(ProjectCommand::SwitchDocument {
+                user_id,
+                document_id,
+                document_type,
+            })
+            .await;
     }
 
     pub async fn is_empty(&self) -> bool {
         let (tx, rx) = tokio::sync::oneshot::channel();
-        if self.command_tx.send(ProjectCommand::IsEmpty { response: tx }).await.is_err() {
-            return true;  // Actor dead = empty
+        if self
+            .command_tx
+            .send(ProjectCommand::IsEmpty { response: tx })
+            .await
+            .is_err()
+        {
+            return true; // Actor dead = empty
         }
         rx.await.unwrap_or(true)
     }
 
     pub async fn health_report(&self) -> ProjectHealthReport {
         let (tx, rx) = tokio::sync::oneshot::channel();
-        if self.command_tx.send(ProjectCommand::HealthReport { response: tx }).await.is_err() {
+        if self
+            .command_tx
+            .send(ProjectCommand::HealthReport { response: tx })
+            .await
+            .is_err()
+        {
             return ProjectHealthReport::not_found();
         }
-        rx.await.unwrap_or_else(|_| ProjectHealthReport::not_found())
+        rx.await
+            .unwrap_or_else(|_| ProjectHealthReport::not_found())
     }
 
     pub async fn shutdown(self) {
         let (tx, rx) = tokio::sync::oneshot::channel();
-        let _ = self.command_tx.send(ProjectCommand::Shutdown { response: tx }).await;
+        let _ = self
+            .command_tx
+            .send(ProjectCommand::Shutdown { response: tx })
+            .await;
         let _ = rx.await;
         let _ = self.task_handle.await;
     }
@@ -156,15 +183,26 @@ struct DocumentUserData {
 
 impl ProjectState {
     async fn run(mut self, mut command_rx: mpsc::Receiver<ProjectCommand>) {
-        debug!("ProjectState event loop started for project {}", self.project_id);
+        debug!(
+            "ProjectState event loop started for project {}",
+            self.project_id
+        );
 
         while let Some(cmd) = command_rx.recv().await {
             match cmd {
-                ProjectCommand::Join { user_id, user_name, avatar_color, sender, response } => {
+                ProjectCommand::Join {
+                    user_id,
+                    user_name,
+                    avatar_color,
+                    sender,
+                    response,
+                } => {
                     let user_data = UserData {
                         user_id: user_id.clone(),
                         user_name: user_name.clone(),
-                        avatar_color: avatar_color.clone().unwrap_or_else(|| "#4A90E2".to_string()),
+                        avatar_color: avatar_color
+                            .clone()
+                            .unwrap_or_else(|| "#4A90E2".to_string()),
                         joined_at: Instant::now(),
                         last_active: Instant::now(),
                     };
@@ -176,7 +214,9 @@ impl ProjectState {
 
                     // Send current presence to new user
                     let presence_list = self.collect_presence_data();
-                    let welcome_msg = ServerMessage::BulkPresence { data: presence_list };
+                    let welcome_msg = ServerMessage::BulkPresence {
+                        data: presence_list,
+                    };
                     let _ = sender.send(welcome_msg).await;
 
                     // Broadcast new user to others
@@ -202,46 +242,71 @@ impl ProjectState {
                     let _ = response.send(Ok(()));
                 }
 
-                ProjectCommand::UpdateCursor { user_id, document_id, position, selected_node_id } => {
+                ProjectCommand::UpdateCursor {
+                    user_id,
+                    document_id,
+                    position,
+                    selected_node_id,
+                } => {
                     if let Some(user) = self.users.get_mut(&user_id) {
                         user.last_active = Instant::now();
                     }
 
                     // Update document state
-                    let doc = self.documents.entry(document_id.clone())
+                    let doc = self
+                        .documents
+                        .entry(document_id.clone())
                         .or_insert_with(|| DocumentData {
-                            document_type: DocumentType::Canvas,  // Default, will be updated on SwitchDocument
+                            document_type: DocumentType::Canvas, // Default, will be updated on SwitchDocument
                             active_users: HashMap::new(),
                         });
 
-                    doc.active_users.insert(user_id.clone(), DocumentUserData {
-                        position: Some(position.clone()),
-                        selected_node_id: selected_node_id.clone(),
-                        last_active: Instant::now(),
-                    });
+                    doc.active_users.insert(
+                        user_id.clone(),
+                        DocumentUserData {
+                            position: Some(position.clone()),
+                            selected_node_id: selected_node_id.clone(),
+                            last_active: Instant::now(),
+                        },
+                    );
 
                     // Broadcast cursor update to users in same document
-                    self.broadcast_cursor_update(&user_id, &document_id, position, selected_node_id).await;
+                    self.broadcast_cursor_update(
+                        &user_id,
+                        &document_id,
+                        position,
+                        selected_node_id,
+                    )
+                    .await;
                 }
 
-                ProjectCommand::SwitchDocument { user_id, document_id, document_type } => {
+                ProjectCommand::SwitchDocument {
+                    user_id,
+                    document_id,
+                    document_type,
+                } => {
                     if let Some(user) = self.users.get_mut(&user_id) {
                         user.last_active = Instant::now();
                     }
 
                     // Create or update document
-                    let doc = self.documents.entry(document_id.clone())
+                    let doc = self
+                        .documents
+                        .entry(document_id.clone())
                         .or_insert_with(|| DocumentData {
                             document_type: document_type.clone(),
                             active_users: HashMap::new(),
                         });
 
                     doc.document_type = document_type.clone();
-                    doc.active_users.insert(user_id.clone(), DocumentUserData {
-                        position: None,
-                        selected_node_id: None,
-                        last_active: Instant::now(),
-                    });
+                    doc.active_users.insert(
+                        user_id.clone(),
+                        DocumentUserData {
+                            position: None,
+                            selected_node_id: None,
+                            last_active: Instant::now(),
+                        },
+                    );
 
                     // Broadcast document activity
                     self.broadcast_document_activity(&document_id).await;
@@ -280,34 +345,43 @@ impl ProjectState {
             }
         }
 
-        debug!("ProjectState event loop ended for project {}", self.project_id);
+        debug!(
+            "ProjectState event loop ended for project {}",
+            self.project_id
+        );
     }
 
     fn collect_presence_data(&self) -> Vec<UserPresenceData> {
-        self.users.iter().map(|(user_id, user_data)| {
-            let mut documents = HashMap::new();
+        self.users
+            .iter()
+            .map(|(user_id, user_data)| {
+                let mut documents = HashMap::new();
 
-            // Collect document presence for this user
-            for (doc_id, doc_data) in &self.documents {
-                if let Some(doc_user_data) = doc_data.active_users.get(user_id) {
-                    documents.insert(doc_id.clone(), DocumentPresence {
-                        document_type: doc_data.document_type.clone(),
-                        position: doc_user_data.position.clone(),
-                        selected_node_id: doc_user_data.selected_node_id.clone(),
-                        last_active_in_document: format_instant(doc_user_data.last_active),
-                    });
+                // Collect document presence for this user
+                for (doc_id, doc_data) in &self.documents {
+                    if let Some(doc_user_data) = doc_data.active_users.get(user_id) {
+                        documents.insert(
+                            doc_id.clone(),
+                            DocumentPresence {
+                                document_type: doc_data.document_type.clone(),
+                                position: doc_user_data.position.clone(),
+                                selected_node_id: doc_user_data.selected_node_id.clone(),
+                                last_active_in_document: format_instant(doc_user_data.last_active),
+                            },
+                        );
+                    }
                 }
-            }
 
-            UserPresenceData {
-                user_id: user_data.user_id.clone(),
-                user_name: user_data.user_name.clone(),
-                avatar_color: user_data.avatar_color.clone(),
-                is_online: true,
-                last_active: format_instant(user_data.last_active),
-                documents,
-            }
-        }).collect()
+                UserPresenceData {
+                    user_id: user_data.user_id.clone(),
+                    user_name: user_data.user_name.clone(),
+                    avatar_color: user_data.avatar_color.clone(),
+                    is_online: true,
+                    last_active: format_instant(user_data.last_active),
+                    documents,
+                }
+            })
+            .collect()
     }
 
     async fn broadcast_user_presence(&self, user_id: &str) {
@@ -319,12 +393,15 @@ impl ProjectState {
         let mut documents = HashMap::new();
         for (doc_id, doc_data) in &self.documents {
             if let Some(doc_user_data) = doc_data.active_users.get(user_id) {
-                documents.insert(doc_id.clone(), DocumentPresence {
-                    document_type: doc_data.document_type.clone(),
-                    position: doc_user_data.position.clone(),
-                    selected_node_id: doc_user_data.selected_node_id.clone(),
-                    last_active_in_document: format_instant(doc_user_data.last_active),
-                });
+                documents.insert(
+                    doc_id.clone(),
+                    DocumentPresence {
+                        document_type: doc_data.document_type.clone(),
+                        position: doc_user_data.position.clone(),
+                        selected_node_id: doc_user_data.selected_node_id.clone(),
+                        last_active_in_document: format_instant(doc_user_data.last_active),
+                    },
+                );
             }
         }
 
@@ -337,13 +414,18 @@ impl ProjectState {
             documents,
         };
 
-        let message = ServerMessage::UserPresence { data: presence_data };
+        let message = ServerMessage::UserPresence {
+            data: presence_data,
+        };
 
         // Broadcast to all other users
         for (target_user_id, connection) in &self.connections {
             if target_user_id != user_id {
                 if let Err(_) = connection.send(message.clone()).await {
-                    warn!("Dead connection detected for user {} in project {}", target_user_id, self.project_id);
+                    warn!(
+                        "Dead connection detected for user {} in project {}",
+                        target_user_id, self.project_id
+                    );
                 }
             }
         }
@@ -359,7 +441,9 @@ impl ProjectState {
             documents: HashMap::new(),
         };
 
-        let message = ServerMessage::UserPresence { data: presence_data };
+        let message = ServerMessage::UserPresence {
+            data: presence_data,
+        };
 
         for connection in self.connections.values() {
             let _ = connection.send(message.clone()).await;
@@ -413,7 +497,9 @@ impl ProjectState {
             None => return,
         };
 
-        let active_users: Vec<DocumentUser> = doc_data.active_users.iter()
+        let active_users: Vec<DocumentUser> = doc_data
+            .active_users
+            .iter()
             .filter_map(|(user_id, doc_user_data)| {
                 self.users.get(user_id).map(|user_data| DocumentUser {
                     user_id: user_data.user_id.clone(),

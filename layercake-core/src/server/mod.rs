@@ -22,21 +22,21 @@ use tracing::info;
 pub async fn start_server(port: u16, database_path: &str, cors_origin: Option<&str>) -> Result<()> {
     let database_url = get_database_url(Some(database_path));
     let db = establish_connection(&database_url).await?;
-    
+
     // Run migrations
     Migrator::up(&db, None).await?;
     info!("Database migrations completed");
 
     let app = app::create_app(db, cors_origin).await?;
-    
+
     // Log all HTTP routes dynamically
     log_routes(port);
-    
+
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port)).await?;
     info!("Server running on http://0.0.0.0:{}", port);
-    
+
     axum::serve(listener, app).await?;
-    
+
     Ok(())
 }
 
@@ -62,7 +62,9 @@ fn log_routes(port: u16) {
         info!("   Features: Tools, Resources, Prompts, layercake:// URI scheme");
         info!("   Capabilities: Graph analysis, connectivity analysis, pathfinding");
         info!("");
-        info!("📋 Available Tools: list_projects, create_project, analyze_connectivity, find_paths");
+        info!(
+            "📋 Available Tools: list_projects, create_project, analyze_connectivity, find_paths"
+        );
         info!("📊 Available Resources: layercake://projects/{{id}}, layercake://graphs/{{id}}/{{format}}");
         info!("🤖 Available Prompts: analyze_graph_structure, analyze_paths, recommend_transformations");
     }

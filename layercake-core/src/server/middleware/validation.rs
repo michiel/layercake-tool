@@ -1,6 +1,6 @@
 use axum::{
-    response::{IntoResponse, Response},
     http::StatusCode,
+    response::{IntoResponse, Response},
     Json,
 };
 use serde_json::Value;
@@ -52,7 +52,6 @@ pub trait Validate {
     fn validate(&self) -> Result<(), ValidationError>;
 }
 
-
 // Project validation structures
 #[derive(serde::Deserialize)]
 pub struct CreateProjectRequest {
@@ -63,18 +62,30 @@ pub struct CreateProjectRequest {
 impl Validate for CreateProjectRequest {
     fn validate(&self) -> Result<(), ValidationError> {
         if self.name.trim().is_empty() {
-            return Err(ValidationError::field("name", "Project name cannot be empty"));
+            return Err(ValidationError::field(
+                "name",
+                "Project name cannot be empty",
+            ));
         }
         if self.name.len() > 100 {
-            return Err(ValidationError::field("name", "Project name too long (max 100 chars)"));
+            return Err(ValidationError::field(
+                "name",
+                "Project name too long (max 100 chars)",
+            ));
         }
         if self.name.chars().any(|c| c.is_control()) {
-            return Err(ValidationError::field("name", "Project name cannot contain control characters"));
+            return Err(ValidationError::field(
+                "name",
+                "Project name cannot contain control characters",
+            ));
         }
 
         if let Some(description) = &self.description {
             if description.len() > 1000 {
-                return Err(ValidationError::field("description", "Description too long (max 1000 chars)"));
+                return Err(ValidationError::field(
+                    "description",
+                    "Description too long (max 1000 chars)",
+                ));
             }
         }
 
@@ -92,19 +103,31 @@ impl Validate for UpdateProjectRequest {
     fn validate(&self) -> Result<(), ValidationError> {
         if let Some(name) = &self.name {
             if name.trim().is_empty() {
-                return Err(ValidationError::field("name", "Project name cannot be empty"));
+                return Err(ValidationError::field(
+                    "name",
+                    "Project name cannot be empty",
+                ));
             }
             if name.len() > 100 {
-                return Err(ValidationError::field("name", "Project name too long (max 100 chars)"));
+                return Err(ValidationError::field(
+                    "name",
+                    "Project name too long (max 100 chars)",
+                ));
             }
             if name.chars().any(|c| c.is_control()) {
-                return Err(ValidationError::field("name", "Project name cannot contain control characters"));
+                return Err(ValidationError::field(
+                    "name",
+                    "Project name cannot contain control characters",
+                ));
             }
         }
 
         if let Some(description) = &self.description {
             if description.len() > 1000 {
-                return Err(ValidationError::field("description", "Description too long (max 1000 chars)"));
+                return Err(ValidationError::field(
+                    "description",
+                    "Description too long (max 1000 chars)",
+                ));
             }
         }
 
@@ -127,25 +150,51 @@ impl Validate for NodeRequest {
             return Err(ValidationError::field("id", "Node ID cannot be empty"));
         }
         if self.id.len() > 50 {
-            return Err(ValidationError::field("id", "Node ID too long (max 50 chars)"));
+            return Err(ValidationError::field(
+                "id",
+                "Node ID too long (max 50 chars)",
+            ));
         }
-        if !self.id.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_') {
-            return Err(ValidationError::field("id", "Node ID can only contain alphanumeric characters, hyphens, and underscores"));
+        if !self
+            .id
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+        {
+            return Err(ValidationError::field(
+                "id",
+                "Node ID can only contain alphanumeric characters, hyphens, and underscores",
+            ));
         }
 
         if self.label.trim().is_empty() {
-            return Err(ValidationError::field("label", "Node label cannot be empty"));
+            return Err(ValidationError::field(
+                "label",
+                "Node label cannot be empty",
+            ));
         }
         if self.label.len() > 200 {
-            return Err(ValidationError::field("label", "Node label too long (max 200 chars)"));
+            return Err(ValidationError::field(
+                "label",
+                "Node label too long (max 200 chars)",
+            ));
         }
 
         if self.node_type.trim().is_empty() {
-            return Err(ValidationError::field("node_type", "Node type cannot be empty"));
+            return Err(ValidationError::field(
+                "node_type",
+                "Node type cannot be empty",
+            ));
         }
 
         // Validate that node_type is one of the allowed types
-        let allowed_types = ["data_source", "transform", "merge", "copy", "output", "graph"];
+        let allowed_types = [
+            "data_source",
+            "transform",
+            "merge",
+            "copy",
+            "output",
+            "graph",
+        ];
         if !allowed_types.contains(&self.node_type.as_str()) {
             return Err(ValidationError::field("node_type", "Invalid node type"));
         }
@@ -169,27 +218,45 @@ impl Validate for EdgeRequest {
             return Err(ValidationError::field("id", "Edge ID cannot be empty"));
         }
         if self.id.len() > 50 {
-            return Err(ValidationError::field("id", "Edge ID too long (max 50 chars)"));
+            return Err(ValidationError::field(
+                "id",
+                "Edge ID too long (max 50 chars)",
+            ));
         }
-        if !self.id.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_') {
-            return Err(ValidationError::field("id", "Edge ID can only contain alphanumeric characters, hyphens, and underscores"));
+        if !self
+            .id
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+        {
+            return Err(ValidationError::field(
+                "id",
+                "Edge ID can only contain alphanumeric characters, hyphens, and underscores",
+            ));
         }
 
         if self.source.trim().is_empty() {
-            return Err(ValidationError::field("source", "Source node ID cannot be empty"));
+            return Err(ValidationError::field(
+                "source",
+                "Source node ID cannot be empty",
+            ));
         }
         if self.target.trim().is_empty() {
-            return Err(ValidationError::field("target", "Target node ID cannot be empty"));
+            return Err(ValidationError::field(
+                "target",
+                "Target node ID cannot be empty",
+            ));
         }
 
         if self.source == self.target {
-            return Err(ValidationError::field("target", "Source and target cannot be the same node"));
+            return Err(ValidationError::field(
+                "target",
+                "Source and target cannot be the same node",
+            ));
         }
 
         Ok(())
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -276,5 +343,4 @@ mod tests {
         };
         assert!(edge.validate().is_err());
     }
-
 }

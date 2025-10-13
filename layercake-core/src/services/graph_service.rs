@@ -1,16 +1,10 @@
-use anyhow::Result;
-use sea_orm::{DatabaseConnection, EntityTrait, ColumnTrait, QueryFilter};
 use crate::database::entities::{
-    layers,
-    layers::Entity as Layers,
-    graph_nodes,
-    graph_edges,
-    graph_nodes::Entity as GraphNodes,
-    graph_edges::Entity as GraphEdges,
-    plan_dag_nodes,
-    plan_dag_edges,
+    graph_edges, graph_edges::Entity as GraphEdges, graph_nodes, graph_nodes::Entity as GraphNodes,
+    layers, layers::Entity as Layers, plan_dag_edges, plan_dag_nodes,
 };
-use crate::graph::{Graph, Node, Edge, Layer};
+use crate::graph::{Edge, Graph, Layer, Node};
+use anyhow::Result;
+use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
 
 pub struct GraphService {
     db: DatabaseConnection,
@@ -112,7 +106,7 @@ impl GraphService {
         name: String,
     ) -> Result<crate::database::entities::graphs::Model> {
         use crate::database::entities::graphs;
-        use sea_orm::{Set, ActiveModelTrait};
+        use sea_orm::{ActiveModelTrait, Set};
 
         // Generate a placeholder node_id for now
         let node_id = format!("graphnode_{}", uuid::Uuid::new_v4().to_string());
@@ -135,7 +129,7 @@ impl GraphService {
         name: Option<String>,
     ) -> Result<crate::database::entities::graphs::Model> {
         use crate::database::entities::graphs;
-        use sea_orm::{Set, ActiveModelTrait};
+        use sea_orm::{ActiveModelTrait, Set};
 
         let graph = graphs::Entity::find_by_id(id)
             .one(&self.db)
@@ -201,7 +195,7 @@ impl GraphService {
         layer: Option<String>,
         attrs: Option<serde_json::Value>,
     ) -> Result<graph_nodes::Model> {
-        use sea_orm::{Set, ActiveModelTrait};
+        use sea_orm::{ActiveModelTrait, Set};
 
         let node = GraphNodes::find()
             .filter(graph_nodes::Column::GraphId.eq(graph_id))
@@ -234,7 +228,7 @@ impl GraphService {
         name: Option<String>,
         properties: Option<serde_json::Value>,
     ) -> Result<layers::Model> {
-        use sea_orm::{Set, ActiveModelTrait};
+        use sea_orm::{ActiveModelTrait, Set};
 
         let layer = Layers::find_by_id(layer_id)
             .one(&self.db)

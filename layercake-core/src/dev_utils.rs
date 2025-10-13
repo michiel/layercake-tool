@@ -3,25 +3,39 @@
 //! This module provides utilities for development mode to automatically create
 //! and assign random users without requiring full authentication setup.
 
-use crate::database::entities::{users, user_sessions, projects};
+use crate::database::entities::{projects, user_sessions, users};
 use anyhow::Result;
-use sea_orm::{DatabaseConnection, EntityTrait, Set, ActiveModelTrait, QueryFilter, ColumnTrait};
 use chrono::Utc;
+use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 use std::sync::OnceLock;
 
 /// Names for development users
 const DEV_USER_NAMES: &[&str] = &[
-    "Alice", "Bob", "Charlie", "Diana", "Eve", "Frank", "Grace", "Henry",
-    "Iris", "Jack", "Kate", "Liam", "Maya", "Noah", "Olivia", "Peter",
-    "Quinn", "Ruby", "Sam", "Tina", "Uma", "Victor", "Wendy", "Xander",
-    "Yara", "Zoe"
+    "Alice", "Bob", "Charlie", "Diana", "Eve", "Frank", "Grace", "Henry", "Iris", "Jack", "Kate",
+    "Liam", "Maya", "Noah", "Olivia", "Peter", "Quinn", "Ruby", "Sam", "Tina", "Uma", "Victor",
+    "Wendy", "Xander", "Yara", "Zoe",
 ];
 
 /// Adjectives for development usernames
 const DEV_ADJECTIVES: &[&str] = &[
-    "creative", "brilliant", "focused", "curious", "energetic", "thoughtful",
-    "dynamic", "innovative", "analytical", "collaborative", "strategic", "intuitive",
-    "methodical", "adventurous", "precise", "versatile", "dedicated", "imaginative"
+    "creative",
+    "brilliant",
+    "focused",
+    "curious",
+    "energetic",
+    "thoughtful",
+    "dynamic",
+    "innovative",
+    "analytical",
+    "collaborative",
+    "strategic",
+    "intuitive",
+    "methodical",
+    "adventurous",
+    "precise",
+    "versatile",
+    "dedicated",
+    "imaginative",
 ];
 
 /// Global counter for ensuring unique usernames
@@ -77,13 +91,9 @@ pub async fn create_dev_user(db: &DatabaseConnection) -> Result<users::Model> {
 pub async fn create_dev_session(
     db: &DatabaseConnection,
     user: &users::Model,
-    project_id: i32
+    project_id: i32,
 ) -> Result<user_sessions::Model> {
-    let session = user_sessions::ActiveModel::new(
-        user.id,
-        user.display_name.clone(),
-        project_id
-    );
+    let session = user_sessions::ActiveModel::new(user.id, user.display_name.clone(), project_id);
 
     let session_model = session.insert(db).await?;
 
@@ -100,7 +110,7 @@ pub async fn create_dev_session(
 /// Gets or creates a development project for testing
 pub async fn get_or_create_dev_project(
     db: &DatabaseConnection,
-    _user_id: i32
+    _user_id: i32,
 ) -> Result<projects::Model> {
     // Try to find an existing development project
     let existing_project = projects::Entity::find()
@@ -115,7 +125,9 @@ pub async fn get_or_create_dev_project(
     // Create a new development project
     let mut project = projects::ActiveModel::new();
     project.name = Set("Development Project".to_string());
-    project.description = Set(Some("Auto-generated project for development and testing".to_string()));
+    project.description = Set(Some(
+        "Auto-generated project for development and testing".to_string(),
+    ));
     project.created_at = Set(Utc::now());
     project.updated_at = Set(Utc::now());
 

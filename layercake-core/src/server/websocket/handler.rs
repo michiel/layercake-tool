@@ -7,9 +7,9 @@ use serde::Deserialize;
 use tokio::sync::mpsc;
 use tracing::{error, info, warn};
 
-use crate::server::app::AppState;
-use crate::collaboration::CoordinatorHandle;
 use super::types::{ClientMessage, ServerMessage};
+use crate::collaboration::CoordinatorHandle;
+use crate::server::app::AppState;
 
 #[derive(Debug, Deserialize)]
 pub struct WebSocketQuery {
@@ -35,7 +35,11 @@ pub async fn websocket_handler(
     // Spawn handle_socket onto its own Tokio task
     // to ensure it doesn't block the HTTP upgrade handler
     ws.on_upgrade(move |socket| async move {
-        tokio::spawn(handle_socket(socket, params.project_id, app_state.coordinator_handle));
+        tokio::spawn(handle_socket(
+            socket,
+            params.project_id,
+            app_state.coordinator_handle,
+        ));
     })
 }
 
@@ -86,8 +90,11 @@ async fn handle_socket(socket: WebSocket, project_id: i32, coordinator: Coordina
     while let Some(msg) = receiver.next().await {
         // Check for connection timeout
         if last_activity.elapsed() > connection_timeout {
-            warn!("WebSocket connection timeout for project {} (no activity for {} seconds)",
-                  project_id, connection_timeout.as_secs());
+            warn!(
+                "WebSocket connection timeout for project {} (no activity for {} seconds)",
+                project_id,
+                connection_timeout.as_secs()
+            );
             break;
         }
 
@@ -117,7 +124,9 @@ async fn handle_socket(socket: WebSocket, project_id: i32, coordinator: Coordina
                             &coordinator,
                             &tx,
                             &mut user_id,
-                        ).await {
+                        )
+                        .await
+                        {
                             error!("Error handling client message: {}", e);
                             let error_msg = ServerMessage::Error {
                                 message: format!("Error processing message: {}", e),
@@ -188,13 +197,15 @@ async fn handle_client_message(
             }
 
             // Join the project via coordinator
-            coordinator.join_project(
-                project_id,
-                data.user_id.clone(),
-                data.user_name,
-                Some(data.avatar_color),
-                tx.clone(),
-            ).await?;
+            coordinator
+                .join_project(
+                    project_id,
+                    data.user_id.clone(),
+                    data.user_name,
+                    Some(data.avatar_color),
+                    tx.clone(),
+                )
+                .await?;
 
             *current_user_id = Some(data.user_id.clone());
 
@@ -202,12 +213,14 @@ async fn handle_client_message(
             if let Some(doc_id) = data.document_id {
                 // For now, assume it's a canvas document type
                 // TODO: Get document type from database or client
-                coordinator.switch_document(
-                    project_id,
-                    data.user_id.clone(),
-                    doc_id,
-                    super::types::DocumentType::Canvas,
-                ).await;
+                coordinator
+                    .switch_document(
+                        project_id,
+                        data.user_id.clone(),
+                        doc_id,
+                        super::types::DocumentType::Canvas,
+                    )
+                    .await;
             }
 
             info!("User {} joined project {}", data.user_id, project_id);
@@ -220,13 +233,15 @@ async fn handle_client_message(
                     return Err("Invalid cursor position values".to_string());
                 }
 
-                coordinator.update_cursor(
-                    project_id,
-                    user_id.clone(),
-                    data.document_id,
-                    data.position,
-                    data.selected_node_id,
-                ).await;
+                coordinator
+                    .update_cursor(
+                        project_id,
+                        user_id.clone(),
+                        data.document_id,
+                        data.position,
+                        data.selected_node_id,
+                    )
+                    .await;
             } else {
                 return Err("Must join session before updating cursor".to_string());
             }
@@ -234,12 +249,14 @@ async fn handle_client_message(
 
         ClientMessage::SwitchDocument { data } => {
             if let Some(user_id) = current_user_id {
-                coordinator.switch_document(
-                    project_id,
-                    user_id.clone(),
-                    data.document_id,
-                    data.document_type,
-                ).await;
+                coordinator
+                    .switch_document(
+                        project_id,
+                        user_id.clone(),
+                        data.document_id,
+                        data.document_type,
+                    )
+                    .await;
             } else {
                 return Err("Must join session before switching documents".to_string());
             }
@@ -247,7 +264,9 @@ async fn handle_client_message(
 
         ClientMessage::LeaveSession { data: _ } => {
             if let Some(user_id) = current_user_id {
-                coordinator.leave_project(project_id, user_id.clone()).await?;
+                coordinator
+                    .leave_project(project_id, user_id.clone())
+                    .await?;
                 *current_user_id = None;
             }
         }
@@ -271,20 +290,27 @@ fn validate_cursor_position(position: &super::types::CursorPosition) -> bool {
         CursorPosition::Canvas { x, y, zoom } => {
             x.is_finite() && y.is_finite() && zoom.map_or(true, |z| z.is_finite() && z > 0.0)
         }
-        CursorPosition::Spreadsheet { row, column, .. } => {
-            *row >= 0 && *column >= 0
-        }
-        CursorPosition::ThreeD { x, y, z, rotation, scale, .. } => {
-            x.is_finite() && y.is_finite() && z.is_finite()
-                && rotation.map_or(true, |(rx, ry, rz)| rx.is_finite() && ry.is_finite() && rz.is_finite())
+        CursorPosition::Spreadsheet { row, column, .. } => *row >= 0 && *column >= 0,
+        CursorPosition::ThreeD {
+            x,
+            y,
+            z,
+            rotation,
+            scale,
+            ..
+        } => {
+            x.is_finite()
+                && y.is_finite()
+                && z.is_finite()
+                && rotation.map_or(true, |(rx, ry, rz)| {
+                    rx.is_finite() && ry.is_finite() && rz.is_finite()
+                })
                 && scale.map_or(true, |s| s.is_finite() && s > 0.0)
         }
         CursorPosition::Timeline { timestamp, track } => {
             *timestamp >= 0 && track.map_or(true, |t| t >= 0)
         }
-        CursorPosition::CodeEditor { line, column, .. } => {
-            *line >= 0 && *column >= 0
-        }
+        CursorPosition::CodeEditor { line, column, .. } => *line >= 0 && *column >= 0,
     }
 }
 

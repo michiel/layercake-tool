@@ -1,6 +1,6 @@
 use async_graphql::*;
-use sea_orm::EntityTrait;
 use chrono::{DateTime, Utc};
+use sea_orm::EntityTrait;
 
 use crate::database::entities::{graph_edits, graphs};
 use crate::graphql::context::GraphQLContext;

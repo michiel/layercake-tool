@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use regex::Regex;
 use serde_json::Value;
 
@@ -39,7 +39,9 @@ impl ValidationService {
         let trimmed = description.trim();
 
         if trimmed.len() > 1000 {
-            return Err(anyhow!("Project description is too long (max 1000 characters)"));
+            return Err(anyhow!(
+                "Project description is too long (max 1000 characters)"
+            ));
         }
 
         // Basic HTML/script injection prevention
@@ -69,7 +71,9 @@ impl ValidationService {
         let regex = Regex::new(r"^[a-zA-Z0-9_]+$")
             .map_err(|e| anyhow!("Failed to compile node ID regex: {}", e))?;
         if !regex.is_match(trimmed) {
-            return Err(anyhow!("Node ID can only contain letters, numbers, and underscores"));
+            return Err(anyhow!(
+                "Node ID can only contain letters, numbers, and underscores"
+            ));
         }
 
         Ok(trimmed.to_string())
@@ -107,7 +111,9 @@ impl ValidationService {
 
         // Prevent directory traversal
         if trimmed.contains("..") {
-            return Err(anyhow!("File path cannot contain '..' (directory traversal)"));
+            return Err(anyhow!(
+                "File path cannot contain '..' (directory traversal)"
+            ));
         }
 
         // Prevent absolute paths in user input
@@ -165,7 +171,9 @@ impl ValidationService {
         let regex = Regex::new(r"^[a-zA-Z0-9_\-\s]+$")
             .map_err(|e| anyhow!("Failed to compile display name regex: {}", e))?;
         if !regex.is_match(trimmed) {
-            return Err(anyhow!("Layer name can only contain letters, numbers, spaces, underscores, and hyphens"));
+            return Err(anyhow!(
+                "Layer name can only contain letters, numbers, spaces, underscores, and hyphens"
+            ));
         }
 
         Ok(trimmed.to_string())
@@ -196,8 +204,8 @@ impl ValidationService {
         }
 
         // Validate as JSON
-        let _: Value = serde_json::from_str(data)
-            .map_err(|e| anyhow!("Invalid session data JSON: {}", e))?;
+        let _: Value =
+            serde_json::from_str(data).map_err(|e| anyhow!("Invalid session data JSON: {}", e))?;
 
         // Limit size
         if data.len() > 1_000 {
@@ -230,7 +238,9 @@ impl ValidationService {
         let role_lower = role.trim().to_lowercase();
 
         if !valid_roles.contains(&role_lower.as_str()) {
-            return Err(anyhow!("Invalid role. Must be one of: owner, editor, viewer"));
+            return Err(anyhow!(
+                "Invalid role. Must be one of: owner, editor, viewer"
+            ));
         }
 
         Ok(role_lower)
@@ -242,7 +252,9 @@ impl ValidationService {
         let status_lower = status.trim().to_lowercase();
 
         if !valid_statuses.contains(&status_lower.as_str()) {
-            return Err(anyhow!("Invalid status. Must be one of: pending, accepted, declined, revoked"));
+            return Err(anyhow!(
+                "Invalid status. Must be one of: pending, accepted, declined, revoked"
+            ));
         }
 
         Ok(status_lower)
@@ -254,7 +266,9 @@ impl ValidationService {
         let status_lower = status.trim().to_lowercase();
 
         if !valid_statuses.contains(&status_lower.as_str()) {
-            return Err(anyhow!("Invalid user status. Must be one of: active, idle, away, offline"));
+            return Err(anyhow!(
+                "Invalid user status. Must be one of: active, idle, away, offline"
+            ));
         }
 
         Ok(status_lower)
@@ -291,11 +305,19 @@ impl ValidationService {
         const MIN_COORDINATE: f64 = -100_000.0;
 
         if !x.is_finite() || x > MAX_COORDINATE || x < MIN_COORDINATE {
-            return Err(anyhow!("Invalid X coordinate: must be between {} and {}", MIN_COORDINATE, MAX_COORDINATE));
+            return Err(anyhow!(
+                "Invalid X coordinate: must be between {} and {}",
+                MIN_COORDINATE,
+                MAX_COORDINATE
+            ));
         }
 
         if !y.is_finite() || y > MAX_COORDINATE || y < MIN_COORDINATE {
-            return Err(anyhow!("Invalid Y coordinate: must be between {} and {}", MIN_COORDINATE, MAX_COORDINATE));
+            return Err(anyhow!(
+                "Invalid Y coordinate: must be between {} and {}",
+                MIN_COORDINATE,
+                MAX_COORDINATE
+            ));
         }
 
         Ok((x, y))
@@ -304,7 +326,9 @@ impl ValidationService {
     /// Validate edge doesn't create self-loop
     pub fn validate_edge_no_self_loop(source: &str, target: &str) -> Result<()> {
         if source == target {
-            return Err(anyhow!("Edge cannot connect a node to itself (self-loop detected)"));
+            return Err(anyhow!(
+                "Edge cannot connect a node to itself (self-loop detected)"
+            ));
         }
         Ok(())
     }
@@ -338,8 +362,8 @@ impl ValidationService {
             return Ok(Value::Object(serde_json::Map::new()));
         }
 
-        let value: Value = serde_json::from_str(config_json)
-            .map_err(|e| anyhow!("Invalid config JSON: {}", e))?;
+        let value: Value =
+            serde_json::from_str(config_json).map_err(|e| anyhow!("Invalid config JSON: {}", e))?;
 
         // Check if it's an object
         if !value.is_object() {
@@ -361,11 +385,19 @@ impl ValidationService {
         const MAX_EDGES: usize = 5000;
 
         if node_count > MAX_NODES {
-            return Err(anyhow!("Plan DAG has too many nodes ({} > max {})", node_count, MAX_NODES));
+            return Err(anyhow!(
+                "Plan DAG has too many nodes ({} > max {})",
+                node_count,
+                MAX_NODES
+            ));
         }
 
         if edge_count > MAX_EDGES {
-            return Err(anyhow!("Plan DAG has too many edges ({} > max {})", edge_count, MAX_EDGES));
+            return Err(anyhow!(
+                "Plan DAG has too many edges ({} > max {})",
+                edge_count,
+                MAX_EDGES
+            ));
         }
 
         Ok(())
@@ -464,7 +496,8 @@ mod tests {
         // Invalid node types
         assert!(ValidationService::validate_plan_dag_node_type("InvalidNode").is_err());
         assert!(ValidationService::validate_plan_dag_node_type("").is_err());
-        assert!(ValidationService::validate_plan_dag_node_type("dataSourceNode").is_err()); // Wrong case
+        assert!(ValidationService::validate_plan_dag_node_type("dataSourceNode").is_err());
+        // Wrong case
     }
 
     #[test]

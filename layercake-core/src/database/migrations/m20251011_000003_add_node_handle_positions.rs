@@ -11,11 +11,7 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(PlanDagNodes::Table)
-                    .add_column(
-                        ColumnDef::new(PlanDagNodes::SourcePosition)
-                            .string()
-                            .null()
-                    )
+                    .add_column(ColumnDef::new(PlanDagNodes::SourcePosition).string().null())
                     .to_owned(),
             )
             .await?;
@@ -25,11 +21,7 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(PlanDagNodes::Table)
-                    .add_column(
-                        ColumnDef::new(PlanDagNodes::TargetPosition)
-                            .string()
-                            .null()
-                    )
+                    .add_column(ColumnDef::new(PlanDagNodes::TargetPosition).string().null())
                     .to_owned(),
             )
             .await

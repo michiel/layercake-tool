@@ -36,11 +36,12 @@ pub struct DataSource {
 #[ComplexObject]
 impl DataSource {
     async fn project(&self, ctx: &Context<'_>) -> Result<Project> {
-        let graphql_ctx = ctx.data::<GraphQLContext>()
+        let graphql_ctx = ctx
+            .data::<GraphQLContext>()
             .map_err(|_| Error::new("GraphQL context not found"))?;
 
-        use sea_orm::EntityTrait;
         use crate::database::entities::projects;
+        use sea_orm::EntityTrait;
 
         let project = projects::Entity::find_by_id(self.project_id)
             .one(&graphql_ctx.db)
@@ -65,7 +66,10 @@ impl DataSource {
         } else if self.file_size < 1024 * 1024 * 1024 {
             format!("{:.1} MB", self.file_size as f64 / (1024.0 * 1024.0))
         } else {
-            format!("{:.1} GB", self.file_size as f64 / (1024.0 * 1024.0 * 1024.0))
+            format!(
+                "{:.1} GB",
+                self.file_size as f64 / (1024.0 * 1024.0 * 1024.0)
+            )
         }
     }
 
@@ -193,8 +197,6 @@ impl From<DataSourceDataType> for crate::database::entities::data_sources::DataT
         }
     }
 }
-
-
 
 // Response types for download URLs
 #[derive(SimpleObject)]

@@ -107,8 +107,10 @@ pub struct PatchConflict {
 /// Currently unused but kept for potential future use with manual patch construction
 #[allow(dead_code)]
 pub fn convert_json_patch_to_operations(patch: &json_patch::Patch) -> Vec<PatchOperation> {
-    patch.0.iter().map(|op| {
-        match op {
+    patch
+        .0
+        .iter()
+        .map(|op| match op {
             json_patch::PatchOperation::Add(add_op) => PatchOperation {
                 op: PatchOp::Add,
                 path: add_op.path.to_string(),
@@ -145,58 +147,101 @@ pub fn convert_json_patch_to_operations(patch: &json_patch::Patch) -> Vec<PatchO
                 value: Some(test_op.value.clone()),
                 from: None,
             },
-        }
-    }).collect()
+        })
+        .collect()
 }
 
 /// Helper function to convert our GraphQL types to json-patch operations
 /// Currently unused but kept for potential future use with manual patch construction
 #[allow(dead_code)]
-pub fn convert_operations_to_json_patch(operations: Vec<PatchOperation>) -> Result<json_patch::Patch, String> {
-    let patch_ops: Result<Vec<json_patch::PatchOperation>, String> = operations.into_iter().map(|op| {
-        match op.op {
+pub fn convert_operations_to_json_patch(
+    operations: Vec<PatchOperation>,
+) -> Result<json_patch::Patch, String> {
+    let patch_ops: Result<Vec<json_patch::PatchOperation>, String> = operations
+        .into_iter()
+        .map(|op| match op.op {
             PatchOp::Add => {
-                let value = op.value.ok_or_else(|| "Add operation requires a value".to_string())?;
+                let value = op
+                    .value
+                    .ok_or_else(|| "Add operation requires a value".to_string())?;
                 Ok(json_patch::PatchOperation::Add(json_patch::AddOperation {
-                    path: op.path.parse().map_err(|e| format!("Invalid path: {}", e))?,
+                    path: op
+                        .path
+                        .parse()
+                        .map_err(|e| format!("Invalid path: {}", e))?,
                     value,
                 }))
-            },
-            PatchOp::Remove => {
-                Ok(json_patch::PatchOperation::Remove(json_patch::RemoveOperation {
-                    path: op.path.parse().map_err(|e| format!("Invalid path: {}", e))?,
-                }))
-            },
+            }
+            PatchOp::Remove => Ok(json_patch::PatchOperation::Remove(
+                json_patch::RemoveOperation {
+                    path: op
+                        .path
+                        .parse()
+                        .map_err(|e| format!("Invalid path: {}", e))?,
+                },
+            )),
             PatchOp::Replace => {
-                let value = op.value.ok_or_else(|| "Replace operation requires a value".to_string())?;
-                Ok(json_patch::PatchOperation::Replace(json_patch::ReplaceOperation {
-                    path: op.path.parse().map_err(|e| format!("Invalid path: {}", e))?,
-                    value,
-                }))
-            },
+                let value = op
+                    .value
+                    .ok_or_else(|| "Replace operation requires a value".to_string())?;
+                Ok(json_patch::PatchOperation::Replace(
+                    json_patch::ReplaceOperation {
+                        path: op
+                            .path
+                            .parse()
+                            .map_err(|e| format!("Invalid path: {}", e))?,
+                        value,
+                    },
+                ))
+            }
             PatchOp::Move => {
-                let from = op.from.ok_or_else(|| "Move operation requires a from path".to_string())?;
-                Ok(json_patch::PatchOperation::Move(json_patch::MoveOperation {
-                    path: op.path.parse().map_err(|e| format!("Invalid path: {}", e))?,
-                    from: from.parse().map_err(|e| format!("Invalid from path: {}", e))?,
-                }))
-            },
+                let from = op
+                    .from
+                    .ok_or_else(|| "Move operation requires a from path".to_string())?;
+                Ok(json_patch::PatchOperation::Move(
+                    json_patch::MoveOperation {
+                        path: op
+                            .path
+                            .parse()
+                            .map_err(|e| format!("Invalid path: {}", e))?,
+                        from: from
+                            .parse()
+                            .map_err(|e| format!("Invalid from path: {}", e))?,
+                    },
+                ))
+            }
             PatchOp::Copy => {
-                let from = op.from.ok_or_else(|| "Copy operation requires a from path".to_string())?;
-                Ok(json_patch::PatchOperation::Copy(json_patch::CopyOperation {
-                    path: op.path.parse().map_err(|e| format!("Invalid path: {}", e))?,
-                    from: from.parse().map_err(|e| format!("Invalid from path: {}", e))?,
-                }))
-            },
+                let from = op
+                    .from
+                    .ok_or_else(|| "Copy operation requires a from path".to_string())?;
+                Ok(json_patch::PatchOperation::Copy(
+                    json_patch::CopyOperation {
+                        path: op
+                            .path
+                            .parse()
+                            .map_err(|e| format!("Invalid path: {}", e))?,
+                        from: from
+                            .parse()
+                            .map_err(|e| format!("Invalid from path: {}", e))?,
+                    },
+                ))
+            }
             PatchOp::Test => {
-                let value = op.value.ok_or_else(|| "Test operation requires a value".to_string())?;
-                Ok(json_patch::PatchOperation::Test(json_patch::TestOperation {
-                    path: op.path.parse().map_err(|e| format!("Invalid path: {}", e))?,
-                    value,
-                }))
-            },
-        }
-    }).collect();
+                let value = op
+                    .value
+                    .ok_or_else(|| "Test operation requires a value".to_string())?;
+                Ok(json_patch::PatchOperation::Test(
+                    json_patch::TestOperation {
+                        path: op
+                            .path
+                            .parse()
+                            .map_err(|e| format!("Invalid path: {}", e))?,
+                        value,
+                    },
+                ))
+            }
+        })
+        .collect();
 
     Ok(json_patch::Patch(patch_ops?))
 }

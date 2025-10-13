@@ -47,10 +47,7 @@ impl DagExecutor {
         let config: serde_json::Value = serde_json::from_str(&node.config_json)?;
         let metadata: serde_json::Value = serde_json::from_str(&node.metadata_json)?;
 
-        let node_name = metadata["label"]
-            .as_str()
-            .unwrap_or("Unnamed")
-            .to_string();
+        let node_name = metadata["label"].as_str().unwrap_or("Unnamed").to_string();
 
         match node.node_type.as_str() {
             "DataSourceNode" => {
@@ -63,7 +60,12 @@ impl DagExecutor {
                 } else if let Some(file_path) = config["filePath"].as_str() {
                     // Legacy path: import from file
                     self.datasource_importer
-                        .import_datasource(project_id, node_id.to_string(), node_name, file_path.to_string())
+                        .import_datasource(
+                            project_id,
+                            node_id.to_string(),
+                            node_name,
+                            file_path.to_string(),
+                        )
                         .await?;
                 } else {
                     return Err(anyhow!(
@@ -77,7 +79,13 @@ impl DagExecutor {
 
                 // Merge data from upstream sources
                 self.merge_builder
-                    .merge_sources(project_id, plan_id, node_id.to_string(), node_name, upstream_ids)
+                    .merge_sources(
+                        project_id,
+                        plan_id,
+                        node_id.to_string(),
+                        node_name,
+                        upstream_ids,
+                    )
                     .await?;
             }
             "GraphNode" => {
@@ -86,15 +94,18 @@ impl DagExecutor {
 
                 // Build graph from upstream datasources (reads from data_sources table)
                 self.graph_builder
-                    .build_graph(project_id, plan_id, node_id.to_string(), node_name, upstream_ids)
+                    .build_graph(
+                        project_id,
+                        plan_id,
+                        node_id.to_string(),
+                        node_name,
+                        upstream_ids,
+                    )
                     .await?;
             }
             "TransformNode" | "CopyNode" => {
                 // TODO: Implement these node types in future phases
-                return Err(anyhow!(
-                    "Node type {} not yet implemented",
-                    node.node_type
-                ));
+                return Err(anyhow!("Node type {} not yet implemented", node.node_type));
             }
             _ => {
                 return Err(anyhow!("Unknown node type: {}", node.node_type));
@@ -118,7 +129,8 @@ impl DagExecutor {
 
         // Execute nodes in order
         for node_id in sorted_nodes {
-            self.execute_node(project_id, plan_id, &node_id, nodes, edges).await?;
+            self.execute_node(project_id, plan_id, &node_id, nodes, edges)
+                .await?;
         }
 
         Ok(())
@@ -152,7 +164,8 @@ impl DagExecutor {
         let sorted = self.topological_sort(&affected_nodes, edges)?;
 
         for node_id in sorted {
-            self.execute_node(project_id, plan_id, &node_id, nodes, edges).await?;
+            self.execute_node(project_id, plan_id, &node_id, nodes, edges)
+                .await?;
         }
 
         Ok(())
@@ -273,18 +286,15 @@ impl DagExecutor {
         let sorted = self.topological_sort(&nodes_to_execute, edges)?;
 
         for node_id in sorted {
-            self.execute_node(project_id, plan_id, &node_id, nodes, edges).await?;
+            self.execute_node(project_id, plan_id, &node_id, nodes, edges)
+                .await?;
         }
 
         Ok(())
     }
 
     /// Find all upstream nodes (ancestors) from a given node
-    fn find_upstream_nodes(
-        &self,
-        start_node: &str,
-        edges: &[(String, String)],
-    ) -> Vec<String> {
+    fn find_upstream_nodes(&self, start_node: &str, edges: &[(String, String)]) -> Vec<String> {
         let mut visited = HashSet::new();
         let mut queue = VecDeque::new();
         queue.push_back(start_node.to_string());

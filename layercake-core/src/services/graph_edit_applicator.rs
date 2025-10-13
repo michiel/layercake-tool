@@ -1,13 +1,16 @@
 use anyhow::Result;
-use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
+    Set,
+};
 use serde_json::Value as JsonValue;
 use tracing::{debug, warn};
 
 use crate::database::entities::{
     graph_edges::{self, Entity as GraphEdges},
+    graph_edits,
     graph_nodes::{self, Entity as GraphNodes},
     layers::{self, Entity as Layers},
-    graph_edits,
 };
 
 /// Result of applying a single edit
@@ -77,23 +80,28 @@ impl GraphEditApplicator {
             });
         }
 
-        let new_value = edit.new_value.as_ref().ok_or_else(|| {
-            anyhow::anyhow!("Create operation missing new_value")
-        })?;
+        let new_value = edit
+            .new_value
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Create operation missing new_value"))?;
 
-        let label = new_value.get("label")
+        let label = new_value
+            .get("label")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
 
-        let layer = new_value.get("layer")
+        let layer = new_value
+            .get("layer")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
 
-        let is_partition = new_value.get("isPartition")
+        let is_partition = new_value
+            .get("isPartition")
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
-        let belongs_to = new_value.get("belongsTo")
+        let belongs_to = new_value
+            .get("belongsTo")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
 
@@ -165,7 +173,10 @@ impl GraphEditApplicator {
         active_model.update(&self.db).await?;
 
         Ok(ApplyResult::Success {
-            message: format!("Updated node {} field {:?}", edit.target_id, edit.field_name),
+            message: format!(
+                "Updated node {} field {:?}",
+                edit.target_id, edit.field_name
+            ),
         })
     }
 
@@ -213,16 +224,19 @@ impl GraphEditApplicator {
             });
         }
 
-        let new_value = edit.new_value.as_ref().ok_or_else(|| {
-            anyhow::anyhow!("Create operation missing new_value")
-        })?;
+        let new_value = edit
+            .new_value
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Create operation missing new_value"))?;
 
-        let source = new_value.get("source")
+        let source = new_value
+            .get("source")
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow::anyhow!("Edge create missing source"))?
             .to_string();
 
-        let target = new_value.get("target")
+        let target = new_value
+            .get("target")
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow::anyhow!("Edge create missing target"))?
             .to_string();
@@ -232,25 +246,32 @@ impl GraphEditApplicator {
             .filter(graph_nodes::Column::GraphId.eq(edit.graph_id))
             .filter(graph_nodes::Column::Id.eq(&source))
             .count(&self.db)
-            .await? > 0;
+            .await?
+            > 0;
 
         let target_exists = GraphNodes::find()
             .filter(graph_nodes::Column::GraphId.eq(edit.graph_id))
             .filter(graph_nodes::Column::Id.eq(&target))
             .count(&self.db)
-            .await? > 0;
+            .await?
+            > 0;
 
         if !source_exists || !target_exists {
             return Ok(ApplyResult::Skipped {
-                reason: format!("Source or target node not found for edge {}", edit.target_id),
+                reason: format!(
+                    "Source or target node not found for edge {}",
+                    edit.target_id
+                ),
             });
         }
 
-        let label = new_value.get("label")
+        let label = new_value
+            .get("label")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
 
-        let layer = new_value.get("layer")
+        let layer = new_value
+            .get("layer")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
 
@@ -314,7 +335,10 @@ impl GraphEditApplicator {
         active_model.update(&self.db).await?;
 
         Ok(ApplyResult::Success {
-            message: format!("Updated edge {} field {:?}", edit.target_id, edit.field_name),
+            message: format!(
+                "Updated edge {} field {:?}",
+                edit.target_id, edit.field_name
+            ),
         })
     }
 
@@ -362,20 +386,24 @@ impl GraphEditApplicator {
             });
         }
 
-        let new_value = edit.new_value.as_ref().ok_or_else(|| {
-            anyhow::anyhow!("Create operation missing new_value")
-        })?;
+        let new_value = edit
+            .new_value
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Create operation missing new_value"))?;
 
-        let name = new_value.get("name")
+        let name = new_value
+            .get("name")
             .and_then(|v| v.as_str())
             .unwrap_or(&edit.target_id)
             .to_string();
 
-        let properties = new_value.get("properties")
+        let properties = new_value
+            .get("properties")
             .map(|v| serde_json::to_string(v))
             .transpose()?;
 
-        let color = new_value.get("color")
+        let color = new_value
+            .get("color")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
 
@@ -437,7 +465,10 @@ impl GraphEditApplicator {
         active_model.update(&self.db).await?;
 
         Ok(ApplyResult::Success {
-            message: format!("Updated layer {} field {:?}", edit.target_id, edit.field_name),
+            message: format!(
+                "Updated layer {} field {:?}",
+                edit.target_id, edit.field_name
+            ),
         })
     }
 

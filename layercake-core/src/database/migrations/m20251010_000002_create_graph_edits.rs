@@ -26,8 +26,17 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(GraphEdits::FieldName).string())
                     .col(ColumnDef::new(GraphEdits::OldValue).json())
                     .col(ColumnDef::new(GraphEdits::NewValue).json())
-                    .col(ColumnDef::new(GraphEdits::SequenceNumber).integer().not_null())
-                    .col(ColumnDef::new(GraphEdits::Applied).boolean().not_null().default(false))
+                    .col(
+                        ColumnDef::new(GraphEdits::SequenceNumber)
+                            .integer()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(GraphEdits::Applied)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
                     .col(ColumnDef::new(GraphEdits::CreatedAt).timestamp().not_null())
                     .col(ColumnDef::new(GraphEdits::CreatedBy).integer())
                     .foreign_key(
@@ -95,7 +104,12 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(Graphs::Table)
-                    .add_column(ColumnDef::new(Graphs::LastEditSequence).integer().not_null().default(0))
+                    .add_column(
+                        ColumnDef::new(Graphs::LastEditSequence)
+                            .integer()
+                            .not_null()
+                            .default(0),
+                    )
                     .to_owned(),
             )
             .await?;
@@ -104,7 +118,12 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(Graphs::Table)
-                    .add_column(ColumnDef::new(Graphs::HasPendingEdits).boolean().not_null().default(false))
+                    .add_column(
+                        ColumnDef::new(Graphs::HasPendingEdits)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
                     .to_owned(),
             )
             .await?;

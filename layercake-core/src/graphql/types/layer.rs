@@ -1,7 +1,7 @@
 use async_graphql::*;
 use sea_orm::EntityTrait;
 
-use crate::database::entities::{layers, graphs};
+use crate::database::entities::{graphs, layers};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::graph::Graph;
 use crate::graphql::types::scalars::JSON;
@@ -27,9 +27,8 @@ pub struct Layer {
 
 impl From<layers::Model> for Layer {
     fn from(model: layers::Model) -> Self {
-        let properties = model.properties
-            .and_then(|p| serde_json::from_str(&p).ok());
-        
+        let properties = model.properties.and_then(|p| serde_json::from_str(&p).ok());
+
         Self {
             id: model.id,
             graph_id: model.graph_id,
@@ -48,7 +47,7 @@ impl Layer {
         let graph = graphs::Entity::find_by_id(self.graph_id)
             .one(&context.db)
             .await?;
-        
+
         Ok(graph.map(Graph::from))
     }
 }

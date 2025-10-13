@@ -21,22 +21,18 @@ fn detect_from_csv(file_data: &[u8], delimiter: u8) -> Result<DataType> {
         .from_reader(file_data);
 
     let headers = reader.headers()?;
-    let header_set: HashSet<String> = headers
-        .iter()
-        .map(|h| h.trim().to_lowercase())
-        .collect();
+    let header_set: HashSet<String> = headers.iter().map(|h| h.trim().to_lowercase()).collect();
 
     // Check for edges: must have id, source, target
-    if header_set.contains("id")
-        && header_set.contains("source")
-        && header_set.contains("target") {
+    if header_set.contains("id") && header_set.contains("source") && header_set.contains("target") {
         return Ok(DataType::Edges);
     }
 
     // Check for layers: must have id and (name or label), often has color
     if header_set.contains("id")
         && (header_set.contains("name") || header_set.contains("label"))
-        && (header_set.contains("color") || header_set.contains("colour")) {
+        && (header_set.contains("color") || header_set.contains("colour"))
+    {
         return Ok(DataType::Layers);
     }
 
@@ -44,8 +40,14 @@ fn detect_from_csv(file_data: &[u8], delimiter: u8) -> Result<DataType> {
     if header_set.contains("id") {
         // Look for common node attributes
         let node_indicators = [
-            "label", "layer", "x", "y", "position",
-            "is_partition", "belongs_to", "weight"
+            "label",
+            "layer",
+            "x",
+            "y",
+            "position",
+            "is_partition",
+            "belongs_to",
+            "weight",
         ];
 
         for indicator in &node_indicators {
@@ -90,9 +92,7 @@ fn detect_from_json(file_data: &[u8]) -> Result<DataType> {
     if let Some(arr) = json.as_array() {
         if let Some(first) = arr.first() {
             if let Some(obj) = first.as_object() {
-                let keys: HashSet<String> = obj.keys()
-                    .map(|k| k.to_lowercase())
-                    .collect();
+                let keys: HashSet<String> = obj.keys().map(|k| k.to_lowercase()).collect();
 
                 // Check for edge indicators
                 if keys.contains("source") && keys.contains("target") {
@@ -101,7 +101,8 @@ fn detect_from_json(file_data: &[u8]) -> Result<DataType> {
 
                 // Check for layer indicators
                 if (keys.contains("name") || keys.contains("label"))
-                    && (keys.contains("color") || keys.contains("colour")) {
+                    && (keys.contains("color") || keys.contains("colour"))
+                {
                     return Ok(DataType::Layers);
                 }
 

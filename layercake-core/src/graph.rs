@@ -1,5 +1,5 @@
-use indexmap::IndexMap;
 use csv::StringRecord;
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use tracing::{debug, error, warn};
@@ -58,7 +58,6 @@ impl Graph {
     pub fn get_node_by_id(&self, id: &str) -> Option<&Node> {
         self.nodes.iter().find(|n| n.id == id)
     }
-    
 
     #[allow(dead_code)] // Reserved for future hierarchy analysis
     pub fn get_max_hierarchy_depth(&self) -> i32 {
@@ -86,14 +85,14 @@ impl Graph {
 
     pub fn get_hierarchy_nodes(&self) -> Vec<Node> {
         let mut nodes = self.nodes.clone();
-        
+
         // For compatibility with test expectations, ensure comments are "null" strings if empty
         for node in &mut nodes {
             if node.comment.is_none() || node.comment.as_ref().map_or(true, |s| s.is_empty()) {
                 node.comment = Some("null".to_string());
             }
         }
-        
+
         nodes.sort_by(|a, b| a.id.cmp(&b.id));
         nodes
     }
@@ -103,15 +102,15 @@ impl Graph {
         self.nodes.iter().for_each(|node| {
             if let Some(parent_id) = &node.belongs_to {
                 if let Some(parent) = self.get_node_by_id(parent_id) {
-                edges.push(Edge {
-                    id: format!("{}_{}", parent.id, node.id),
-                    source: parent.id.clone(),
-                    target: node.id.clone(),
-                    label: "".to_string(), // format!("{} -> {}", parent.label, node.label),
-                    layer: parent.layer.clone(),
-                    weight: 1,
-                    comment: None,
-                });
+                    edges.push(Edge {
+                        id: format!("{}_{}", parent.id, node.id),
+                        source: parent.id.clone(),
+                        target: node.id.clone(),
+                        label: "".to_string(), // format!("{} -> {}", parent.label, node.label),
+                        layer: parent.layer.clone(),
+                        weight: 1,
+                        comment: None,
+                    });
                 }
                 // If parent node not found, skip this edge - could log warning if needed
             }
@@ -125,7 +124,10 @@ impl Graph {
             .edges
             .iter()
             .filter(|e| {
-                if let (Some(source), Some(target)) = (self.get_node_by_id(&e.source), self.get_node_by_id(&e.target)) {
+                if let (Some(source), Some(target)) = (
+                    self.get_node_by_id(&e.source),
+                    self.get_node_by_id(&e.target),
+                ) {
                     !(source.is_partition || target.is_partition)
                 } else {
                     false // Skip edges with missing nodes
@@ -155,12 +157,14 @@ impl Graph {
         ) -> TreeNode {
             let mut tree_node = TreeNode::from_node(node);
             tree_node.depth = depth;
-            
+
             // For compatibility with test expectations, ensure comments are "null" strings if empty
-            if tree_node.comment.is_none() || tree_node.comment.as_ref().map_or(true, |s| s.is_empty()) {
+            if tree_node.comment.is_none()
+                || tree_node.comment.as_ref().map_or(true, |s| s.is_empty())
+            {
                 tree_node.comment = Some("null".to_string());
             }
-            
+
             let children = graph.get_children(node);
             for child in children {
                 let child_node = build_tree(child, depth + 1, graph, tree);
@@ -209,7 +213,7 @@ impl Graph {
         }
         text[..max_length].to_string()
     }
-    
+
     pub fn truncate_node_labels(&mut self, max_length: usize) {
         self.nodes.iter_mut().for_each(|n| {
             n.label = Self::truncate_text(&n.label, max_length);
@@ -221,7 +225,7 @@ impl Graph {
         if text.len() <= max_length {
             return text.to_string();
         }
-        
+
         let mut new_text = String::new();
         let mut current_length = 0;
         for word in text.split_whitespace() {
@@ -255,8 +259,14 @@ impl Graph {
     }
 
     pub fn modify_graph_limit_partition_depth(&mut self, depth: i32) -> Result<(), String> {
-        fn trim_node(node_id: &String, graph: &mut Graph, current_depth: i32, max_depth: i32) -> Result<(), String> {
-            let node = graph.get_node_by_id(node_id)
+        fn trim_node(
+            node_id: &String,
+            graph: &mut Graph,
+            current_depth: i32,
+            max_depth: i32,
+        ) -> Result<(), String> {
+            let node = graph
+                .get_node_by_id(node_id)
                 .ok_or_else(|| format!("Node with id '{}' not found", node_id))?;
             let children = graph.get_children(&node);
 
@@ -274,7 +284,8 @@ impl Graph {
 
             if current_depth >= max_depth {
                 let mut agg_node = {
-                    let node = graph.get_node_by_id(node_id)
+                    let node = graph
+                        .get_node_by_id(node_id)
                         .ok_or_else(|| format!("Node with id '{}' not found", node_id))?;
                     let mut cloned_node = node.clone();
                     cloned_node.is_partition = false; // Ensure the aggregated node is non-partition
@@ -345,7 +356,8 @@ impl Graph {
     pub fn modify_graph_limit_partition_width(&mut self, max_width: i32) -> Result<(), String> {
         fn trim_node(node_id: &String, graph: &mut Graph, max_width: i32) -> Result<(), String> {
             let node = {
-                let node = graph.get_node_by_id(node_id)
+                let node = graph
+                    .get_node_by_id(node_id)
                     .ok_or_else(|| format!("Node with id '{}' not found", node_id))?;
                 node.clone()
             };
@@ -561,13 +573,23 @@ impl Graph {
                             incident_edges[i].source.clone(),
                             incident_edges[i].target.clone(),
                         ))
-                        .ok_or_else(|| format!("Failed to find node in edge mapping for edge {} -> {}", incident_edges[i].source, incident_edges[i].target))?;
+                        .ok_or_else(|| {
+                            format!(
+                                "Failed to find node in edge mapping for edge {} -> {}",
+                                incident_edges[i].source, incident_edges[i].target
+                            )
+                        })?;
                     let node2 = edge_to_node_map
                         .get(&(
                             incident_edges[j].source.clone(),
                             incident_edges[j].target.clone(),
                         ))
-                        .ok_or_else(|| format!("Failed to find node in edge mapping for edge {} -> {}", incident_edges[j].source, incident_edges[j].target))?;
+                        .ok_or_else(|| {
+                            format!(
+                                "Failed to find node in edge mapping for edge {} -> {}",
+                                incident_edges[j].source, incident_edges[j].target
+                            )
+                        })?;
                     inverted_graph.edges.push(Edge {
                         id: format!("{}_{}_{}", node1.id, node2.id, edge_counter),
                         source: node1.id.clone(),
@@ -688,8 +710,7 @@ impl Graph {
                 if !node_ids.contains(belongs_to) {
                     let err = format!(
                         "Node id:[{}] belongs_to {:?} not found in nodes",
-                        n.id,
-                        belongs_to
+                        n.id, belongs_to
                     );
                     errors.push(err);
                 }
@@ -852,9 +873,7 @@ fn get_stripped_value(
     idx: usize,
     label: &str,
 ) -> Result<String, Box<dyn std::error::Error>> {
-    let value = record
-        .get(idx)
-        .ok_or(format!("Missing {}", label))?;
+    let value = record.get(idx).ok_or(format!("Missing {}", label))?;
     Ok(strip_quotes_and_whitespace(value).to_string())
 }
 
@@ -864,7 +883,8 @@ impl Node {
         node_profile: &DfNodeLoadProfile,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         Ok(Node {
-            id: get_stripped_value(record, node_profile.id_column, "id").unwrap_or("noId".to_string()),
+            id: get_stripped_value(record, node_profile.id_column, "id")
+                .unwrap_or("noId".to_string()),
             label: get_stripped_value(record, node_profile.label_column, "label")?,
             layer: get_stripped_value(record, node_profile.layer_column, "layer")?,
             is_partition: is_truthy(&get_stripped_value(
@@ -894,7 +914,7 @@ impl Node {
                 let comment = record
                     .get(node_profile.comment_column)
                     .map(|c| c.to_string());
-                    
+
                 if comment.is_none() || comment.as_ref().map_or(true, |s| s.is_empty()) {
                     Some("null".to_string())
                 } else {
@@ -927,7 +947,7 @@ impl Edge {
                 let comment = record
                     .get(edge_profile.comment_column)
                     .map(|c| c.to_string());
-                
+
                 if comment.is_none() {
                     Some("null".to_string())
                 } else if comment.as_ref().map_or(true, |s| s.is_empty()) {
@@ -1002,15 +1022,13 @@ mod tests {
                     comment: None,
                 },
             ],
-            layers: vec![
-                Layer {
-                    id: "Layer1".to_string(),
-                    label: "Layer 1".to_string(),
-                    background_color: "FFFFFF".to_string(),
-                    text_color: "000000".to_string(),
-                    border_color: "000000".to_string(),
-                },
-            ],
+            layers: vec![Layer {
+                id: "Layer1".to_string(),
+                label: "Layer 1".to_string(),
+                background_color: "FFFFFF".to_string(),
+                text_color: "000000".to_string(),
+                border_color: "000000".to_string(),
+            }],
         }
     }
 
@@ -1238,29 +1256,37 @@ mod tests {
     #[test]
     fn test_invert_graph() {
         let mut graph = create_test_graph();
-        let inverted = graph.invert_graph().expect("Failed to invert graph in test");
+        let inverted = graph
+            .invert_graph()
+            .expect("Failed to invert graph in test");
 
         // Basic structure checks
         assert_eq!(inverted.name, "Inverted Test Graph");
-        
+
         // Check inverted nodes
         assert_eq!(inverted.nodes.len(), 2); // Root node + 1 edge nodes
-        
+
         // Find the root node
-        let root_node = inverted.nodes.iter().find(|n| n.id == "inverted_root").unwrap();
+        let root_node = inverted
+            .nodes
+            .iter()
+            .find(|n| n.id == "inverted_root")
+            .unwrap();
         assert!(root_node.is_partition);
-        
+
         // Check that we have nodes created for each original edge
-        let edge_nodes: Vec<&Node> = inverted.nodes.iter()
+        let edge_nodes: Vec<&Node> = inverted
+            .nodes
+            .iter()
             .filter(|n| n.id != "inverted_root")
             .collect();
         assert_eq!(edge_nodes.len(), 1);
-        
+
         // All edge nodes should belong to the root
         for node in edge_nodes {
             assert_eq!(node.belongs_to, Some("inverted_root".to_string()));
         }
-        
+
         // Original graph should remain unchanged
         assert_eq!(graph.name, "Test Graph");
         assert_eq!(graph.nodes.len(), 3);
@@ -1270,33 +1296,34 @@ mod tests {
     #[test]
     fn test_modify_graph_limit_partition_width() {
         let mut graph = create_complex_test_graph();
-        
+
         // Verify initial state
         let root1 = graph.get_node_by_id("root1").unwrap();
         let root1_children = graph.get_children(root1);
         assert_eq!(root1_children.len(), 4); // Initially has 4 children
-        
+
         // Apply partition width limit of 2
         graph.modify_graph_limit_partition_width(2).unwrap();
-        
+
         // Verify after transformation
         let root1_after = graph.get_node_by_id("root1").unwrap();
         let root1_children_after = graph.get_children(root1_after);
-        
+
         // Should have fewer children now (reduced due to aggregation)
         assert!(root1_children_after.len() < 4);
-        
+
         // Check if we have an aggregated node
-        let has_agg_node = root1_children_after.iter()
+        let has_agg_node = root1_children_after
+            .iter()
             .any(|n| n.id.starts_with("agg_") && n.layer == "aggregated");
         assert!(has_agg_node);
-        
+
         // The second root should still have its normal children
         let root2_after = graph.get_node_by_id("root2").unwrap();
         let root2_children_after = graph.get_children(root2_after);
         assert_eq!(root2_children_after.len(), 2); // Should still have 2 children
     }
-    
+
     #[test]
     fn test_modify_graph_limit_partition_depth() {
         // Create a graph with hierarchical structure
@@ -1353,45 +1380,41 @@ mod tests {
                     comment: None,
                 },
             ],
-            edges: vec![
-                Edge {
-                    id: "e1".to_string(),
-                    source: "level3_1".to_string(),
-                    target: "level3_2".to_string(),
-                    label: "Edge1".to_string(),
-                    layer: "layer1".to_string(),
-                    weight: 1,
-                    comment: None,
-                },
-            ],
-            layers: vec![
-                Layer {
-                    id: "layer1".to_string(),
-                    label: "Layer 1".to_string(),
-                    background_color: "FFFFFF".to_string(),
-                    text_color: "000000".to_string(),
-                    border_color: "000000".to_string(),
-                },
-            ],
+            edges: vec![Edge {
+                id: "e1".to_string(),
+                source: "level3_1".to_string(),
+                target: "level3_2".to_string(),
+                label: "Edge1".to_string(),
+                layer: "layer1".to_string(),
+                weight: 1,
+                comment: None,
+            }],
+            layers: vec![Layer {
+                id: "layer1".to_string(),
+                label: "Layer 1".to_string(),
+                background_color: "FFFFFF".to_string(),
+                text_color: "000000".to_string(),
+                border_color: "000000".to_string(),
+            }],
         };
-        
+
         // Verify initial depth
         assert_eq!(graph.get_max_hierarchy_depth(), 3);
         assert_eq!(graph.nodes.len(), 5);
-        
+
         // Limit depth to 1
         graph.modify_graph_limit_partition_depth(1).unwrap();
-        
+
         // After limiting, the max depth should be 1
         assert_eq!(graph.get_max_hierarchy_depth(), 1);
-        
+
         // Verify nodes are merged/aggregated
         assert!(graph.nodes.len() < 5);
-        
+
         // Level 3 nodes should be gone
         assert!(graph.get_node_by_id("level3_1").is_none());
         assert!(graph.get_node_by_id("level3_2").is_none());
-        
+
         // Level 2 node should now be non-partition
         let level2_1 = graph.get_node_by_id("level2_1");
         if let Some(node) = level2_1 {
@@ -1454,44 +1477,38 @@ mod tests {
                     comment: None,
                 },
             ],
-            layers: vec![
-                Layer {
-                    id: "layer1".to_string(),
-                    label: "Layer 1".to_string(),
-                    background_color: "FFFFFF".to_string(),
-                    text_color: "000000".to_string(),
-                    border_color: "000000".to_string(),
-                },
-            ],
+            layers: vec![Layer {
+                id: "layer1".to_string(),
+                label: "Layer 1".to_string(),
+                background_color: "FFFFFF".to_string(),
+                text_color: "000000".to_string(),
+                border_color: "000000".to_string(),
+            }],
         };
-        
+
         // Verify initial state
         assert_eq!(graph.edges.len(), 3);
-        
+
         // Aggregate edges
         graph.aggregate_edges();
-        
+
         // After aggregation, should have one edge with combined weight
         assert_eq!(graph.edges.len(), 1);
         assert_eq!(graph.edges[0].weight, 6); // Sum of all weights (1+2+3)
     }
-    
+
     #[test]
     fn test_verify_graph_integrity() {
         // Create a valid graph
         let mut graph = create_test_graph();
         // Make sure we have a layer that matches all node/edge layers
         graph.add_layer(Layer::new(
-            "Layer1",
-            "Layer 1",
-            "FFFFFF",
-            "000000",
-            "000000",
+            "Layer1", "Layer 1", "FFFFFF", "000000", "000000",
         ));
-        
+
         // Valid graph should verify successfully
         match graph.verify_graph_integrity() {
-            Ok(_) => {},
+            Ok(_) => {}
             Err(errors) => {
                 println!("Graph verification failed with errors:");
                 for error in errors {
@@ -1500,7 +1517,7 @@ mod tests {
                 panic!("Graph should have verified successfully");
             }
         };
-        
+
         // Create a graph with an invalid connection
         let invalid_graph = Graph {
             name: "Invalid Graph".to_string(),
@@ -1521,7 +1538,7 @@ mod tests {
                     label: "Non-Partition".to_string(),
                     layer: "layer1".to_string(),
                     is_partition: false,
-                    belongs_to: Some("1".to_string()),  // Belongs to partition node 1
+                    belongs_to: Some("1".to_string()), // Belongs to partition node 1
                     weight: 1,
                     comment: None,
                 },
@@ -1530,75 +1547,69 @@ mod tests {
                 // Invalid edge: connects partition to non-partition
                 Edge {
                     id: "e1".to_string(),
-                    source: "1".to_string(),  // Partition node
-                    target: "2".to_string(),  // Non-partition node
+                    source: "1".to_string(), // Partition node
+                    target: "2".to_string(), // Non-partition node
                     label: "Invalid Edge".to_string(),
                     layer: "layer1".to_string(),
                     weight: 1,
                     comment: None,
                 },
             ],
-            layers: vec![
-                Layer {
-                    id: "layer1".to_string(),
-                    label: "Layer 1".to_string(),
-                    background_color: "FFFFFF".to_string(),
-                    text_color: "000000".to_string(),
-                    border_color: "000000".to_string(),
-                },
-            ],
+            layers: vec![Layer {
+                id: "layer1".to_string(),
+                label: "Layer 1".to_string(),
+                background_color: "FFFFFF".to_string(),
+                text_color: "000000".to_string(),
+                border_color: "000000".to_string(),
+            }],
         };
-        
+
         // This should fail verification due to partition to non-partition edge
         let result = invalid_graph.verify_graph_integrity();
         assert!(result.is_err());
-        
+
         // The error should contain information about the invalid edge
         if let Err(errors) = result {
             assert!(errors.iter().any(|e| e.contains("partition node")));
         }
-        
+
         // Create a graph with missing node reference
         let missing_node_graph = Graph {
             name: "Missing Node Graph".to_string(),
-            nodes: vec![
-                Node {
-                    id: "1".to_string(),
-                    label: "Node 1".to_string(),
-                    layer: "layer1".to_string(),
-                    is_partition: false,
-                    belongs_to: None,
-                    weight: 1,
-                    comment: None,
-                },
-            ],
+            nodes: vec![Node {
+                id: "1".to_string(),
+                label: "Node 1".to_string(),
+                layer: "layer1".to_string(),
+                is_partition: false,
+                belongs_to: None,
+                weight: 1,
+                comment: None,
+            }],
             edges: vec![
                 // Edge with missing target
                 Edge {
                     id: "e1".to_string(),
                     source: "1".to_string(),
-                    target: "non_existent".to_string(),  // This node doesn't exist
+                    target: "non_existent".to_string(), // This node doesn't exist
                     label: "Invalid Edge".to_string(),
                     layer: "layer1".to_string(),
                     weight: 1,
                     comment: None,
                 },
             ],
-            layers: vec![
-                Layer {
-                    id: "layer1".to_string(),
-                    label: "Layer 1".to_string(),
-                    background_color: "FFFFFF".to_string(),
-                    text_color: "000000".to_string(),
-                    border_color: "000000".to_string(),
-                },
-            ],
+            layers: vec![Layer {
+                id: "layer1".to_string(),
+                label: "Layer 1".to_string(),
+                background_color: "FFFFFF".to_string(),
+                text_color: "000000".to_string(),
+                border_color: "000000".to_string(),
+            }],
         };
-        
+
         // This should fail verification due to missing node
         let result = missing_node_graph.verify_graph_integrity();
         assert!(result.is_err());
-        
+
         // The error should contain information about the missing node
         if let Err(errors) = result {
             assert!(errors.iter().any(|e| e.contains("not found in nodes")));

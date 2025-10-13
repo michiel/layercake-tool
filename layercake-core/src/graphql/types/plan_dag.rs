@@ -1,8 +1,8 @@
 use async_graphql::*;
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
-use crate::database::entities::{plan_dag_nodes, plan_dag_edges, data_sources};
+use crate::database::entities::{data_sources, plan_dag_edges, plan_dag_nodes};
 
 // Position for ReactFlow nodes
 #[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
@@ -314,28 +314,46 @@ pub struct PlanDagNode {
 
 #[Object]
 impl PlanDagNode {
-    async fn id(&self) -> &str { &self.id }
+    async fn id(&self) -> &str {
+        &self.id
+    }
 
     #[graphql(name = "nodeType")]
-    async fn node_type(&self) -> PlanDagNodeType { self.node_type }
+    async fn node_type(&self) -> PlanDagNodeType {
+        self.node_type
+    }
 
-    async fn position(&self) -> &Position { &self.position }
+    async fn position(&self) -> &Position {
+        &self.position
+    }
 
     #[graphql(name = "sourcePosition")]
-    async fn source_position(&self) -> Option<&String> { self.source_position.as_ref() }
+    async fn source_position(&self) -> Option<&String> {
+        self.source_position.as_ref()
+    }
 
     #[graphql(name = "targetPosition")]
-    async fn target_position(&self) -> Option<&String> { self.target_position.as_ref() }
+    async fn target_position(&self) -> Option<&String> {
+        self.target_position.as_ref()
+    }
 
-    async fn metadata(&self) -> &NodeMetadata { &self.metadata }
+    async fn metadata(&self) -> &NodeMetadata {
+        &self.metadata
+    }
 
-    async fn config(&self) -> &str { &self.config }
+    async fn config(&self) -> &str {
+        &self.config
+    }
 
     #[graphql(name = "createdAt")]
-    async fn created_at(&self) -> DateTime<Utc> { self.created_at }
+    async fn created_at(&self) -> DateTime<Utc> {
+        self.created_at
+    }
 
     #[graphql(name = "updatedAt")]
-    async fn updated_at(&self) -> DateTime<Utc> { self.updated_at }
+    async fn updated_at(&self) -> DateTime<Utc> {
+        self.updated_at
+    }
 
     #[graphql(name = "datasourceExecution")]
     async fn datasource_execution(&self) -> Option<&DataSourceExecutionMetadata> {
@@ -496,8 +514,8 @@ impl From<plan_dag_nodes::Model> for PlanDagNode {
             _ => PlanDagNodeType::DataSource, // Default fallback
         };
 
-        let metadata: NodeMetadata = serde_json::from_str(&model.metadata_json)
-            .unwrap_or_else(|_| NodeMetadata {
+        let metadata: NodeMetadata =
+            serde_json::from_str(&model.metadata_json).unwrap_or_else(|_| NodeMetadata {
                 label: "Unnamed Node".to_string(),
                 description: None,
             });
@@ -523,8 +541,8 @@ impl From<plan_dag_nodes::Model> for PlanDagNode {
 
 impl From<plan_dag_edges::Model> for PlanDagEdge {
     fn from(model: plan_dag_edges::Model) -> Self {
-        let metadata: EdgeMetadata = serde_json::from_str(&model.metadata_json)
-            .unwrap_or_else(|_| EdgeMetadata {
+        let metadata: EdgeMetadata =
+            serde_json::from_str(&model.metadata_json).unwrap_or_else(|_| EdgeMetadata {
                 label: None,
                 data_type: DataType::GraphData,
             });
@@ -541,4 +559,3 @@ impl From<plan_dag_edges::Model> for PlanDagEdge {
         }
     }
 }
-

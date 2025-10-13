@@ -1,5 +1,5 @@
-use layercake_core::database::migrations::Migrator;
 use layercake_core::database::entities::graphs;
+use layercake_core::database::migrations::Migrator;
 use layercake_core::services::GraphEditService;
 use sea_orm::{ActiveModelTrait, Database, DatabaseConnection, DbErr, Set};
 use sea_orm_migration::MigratorTrait;
@@ -15,7 +15,11 @@ async fn setup_test_db() -> Result<DatabaseConnection, DbErr> {
 }
 
 /// Create a test graph
-async fn create_test_graph(db: &DatabaseConnection, project_id: i32, name: &str) -> Result<graphs::Model, DbErr> {
+async fn create_test_graph(
+    db: &DatabaseConnection,
+    project_id: i32,
+    name: &str,
+) -> Result<graphs::Model, DbErr> {
     let graph = graphs::ActiveModel {
         project_id: Set(project_id),
         name: Set(name.to_string()),
@@ -34,31 +38,37 @@ async fn test_create_edit_with_sequence() {
     let service = GraphEditService::new(db);
 
     // Create first edit
-    let edit1 = service.create_edit(
-        graph.id,
-        "node".to_string(),
-        "node-1".to_string(),
-        "update".to_string(),
-        Some("label".to_string()),
-        Some(serde_json::json!("Old Label")),
-        Some(serde_json::json!("New Label")),
-        None,
-    ).await.unwrap();
+    let edit1 = service
+        .create_edit(
+            graph.id,
+            "node".to_string(),
+            "node-1".to_string(),
+            "update".to_string(),
+            Some("label".to_string()),
+            Some(serde_json::json!("Old Label")),
+            Some(serde_json::json!("New Label")),
+            None,
+        )
+        .await
+        .unwrap();
 
     assert_eq!(edit1.sequence_number, 1);
     assert_eq!(edit1.applied, false);
 
     // Create second edit
-    let edit2 = service.create_edit(
-        graph.id,
-        "node".to_string(),
-        "node-2".to_string(),
-        "update".to_string(),
-        Some("layer".to_string()),
-        Some(serde_json::json!("layer1")),
-        Some(serde_json::json!("layer2")),
-        None,
-    ).await.unwrap();
+    let edit2 = service
+        .create_edit(
+            graph.id,
+            "node".to_string(),
+            "node-2".to_string(),
+            "update".to_string(),
+            Some("layer".to_string()),
+            Some(serde_json::json!("layer1")),
+            Some(serde_json::json!("layer2")),
+            None,
+        )
+        .await
+        .unwrap();
 
     assert_eq!(edit2.sequence_number, 2);
     assert_eq!(edit2.applied, false);
@@ -73,16 +83,19 @@ async fn test_get_edits_for_graph() {
 
     // Create multiple edits
     for i in 1..=5 {
-        service.create_edit(
-            graph.id,
-            "node".to_string(),
-            format!("node-{}", i),
-            "update".to_string(),
-            Some("label".to_string()),
-            Some(serde_json::json!(format!("Old {}", i))),
-            Some(serde_json::json!(format!("New {}", i))),
-            None,
-        ).await.unwrap();
+        service
+            .create_edit(
+                graph.id,
+                "node".to_string(),
+                format!("node-{}", i),
+                "update".to_string(),
+                Some("label".to_string()),
+                Some(serde_json::json!(format!("Old {}", i))),
+                Some(serde_json::json!(format!("New {}", i))),
+                None,
+            )
+            .await
+            .unwrap();
     }
 
     // Get all edits
@@ -103,16 +116,19 @@ async fn test_mark_edit_applied() {
     let service = GraphEditService::new(db);
 
     // Create edit
-    let edit = service.create_edit(
-        graph.id,
-        "node".to_string(),
-        "node-1".to_string(),
-        "update".to_string(),
-        Some("label".to_string()),
-        Some(serde_json::json!("Old Label")),
-        Some(serde_json::json!("New Label")),
-        None,
-    ).await.unwrap();
+    let edit = service
+        .create_edit(
+            graph.id,
+            "node".to_string(),
+            "node-1".to_string(),
+            "update".to_string(),
+            Some("label".to_string()),
+            Some(serde_json::json!("Old Label")),
+            Some(serde_json::json!("New Label")),
+            None,
+        )
+        .await
+        .unwrap();
 
     assert_eq!(edit.applied, false);
 
@@ -137,16 +153,19 @@ async fn test_clear_graph_edits() {
 
     // Create multiple edits
     for i in 1..=3 {
-        service.create_edit(
-            graph.id,
-            "node".to_string(),
-            format!("node-{}", i),
-            "update".to_string(),
-            None,
-            None,
-            Some(serde_json::json!({"label": format!("Node {}", i)})),
-            None,
-        ).await.unwrap();
+        service
+            .create_edit(
+                graph.id,
+                "node".to_string(),
+                format!("node-{}", i),
+                "update".to_string(),
+                None,
+                None,
+                Some(serde_json::json!({"label": format!("Node {}", i)})),
+                None,
+            )
+            .await
+            .unwrap();
     }
 
     // Verify edits exist
@@ -175,16 +194,19 @@ async fn test_edit_count() {
 
     // Add edits
     for i in 1..=5 {
-        service.create_edit(
-            graph.id,
-            "node".to_string(),
-            format!("node-{}", i),
-            "update".to_string(),
-            None,
-            None,
-            Some(serde_json::json!(i)),
-            None,
-        ).await.unwrap();
+        service
+            .create_edit(
+                graph.id,
+                "node".to_string(),
+                format!("node-{}", i),
+                "update".to_string(),
+                None,
+                None,
+                Some(serde_json::json!(i)),
+                None,
+            )
+            .await
+            .unwrap();
     }
 
     // Total count
@@ -193,7 +215,10 @@ async fn test_edit_count() {
 
     // Mark some as applied
     let edits = service.get_edits_for_graph(graph.id, false).await.unwrap();
-    service.mark_edits_applied(vec![edits[0].id, edits[1].id]).await.unwrap();
+    service
+        .mark_edits_applied(vec![edits[0].id, edits[1].id])
+        .await
+        .unwrap();
 
     // Unapplied count
     let unapplied_count = service.get_edit_count(graph.id, true).await.unwrap();
@@ -211,16 +236,19 @@ async fn test_graph_metadata_updated() {
     let service = GraphEditService::new(db.clone());
 
     // Create edit
-    service.create_edit(
-        graph.id,
-        "node".to_string(),
-        "node-1".to_string(),
-        "update".to_string(),
-        None,
-        None,
-        Some(serde_json::json!("test")),
-        None,
-    ).await.unwrap();
+    service
+        .create_edit(
+            graph.id,
+            "node".to_string(),
+            "node-1".to_string(),
+            "update".to_string(),
+            None,
+            None,
+            Some(serde_json::json!("test")),
+            None,
+        )
+        .await
+        .unwrap();
 
     // Verify graph metadata updated
     use layercake_core::database::entities::graphs::Entity as Graphs;
@@ -246,30 +274,36 @@ async fn test_multiple_graphs_independent_sequences() {
 
     // Create edits for graph1
     for i in 1..=3 {
-        service.create_edit(
-            graph1.id,
-            "node".to_string(),
-            format!("node-{}", i),
-            "update".to_string(),
-            None,
-            None,
-            Some(serde_json::json!(i)),
-            None,
-        ).await.unwrap();
+        service
+            .create_edit(
+                graph1.id,
+                "node".to_string(),
+                format!("node-{}", i),
+                "update".to_string(),
+                None,
+                None,
+                Some(serde_json::json!(i)),
+                None,
+            )
+            .await
+            .unwrap();
     }
 
     // Create edits for graph2
     for i in 1..=2 {
-        service.create_edit(
-            graph2.id,
-            "node".to_string(),
-            format!("node-{}", i),
-            "update".to_string(),
-            None,
-            None,
-            Some(serde_json::json!(i)),
-            None,
-        ).await.unwrap();
+        service
+            .create_edit(
+                graph2.id,
+                "node".to_string(),
+                format!("node-{}", i),
+                "update".to_string(),
+                None,
+                None,
+                Some(serde_json::json!(i)),
+                None,
+            )
+            .await
+            .unwrap();
     }
 
     // Verify independent sequences

@@ -17,13 +17,10 @@ impl DefaultBinaryManager {
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs();
-        
+
         let mut backup_path = original.clone();
-        let file_name = original
-            .file_name()
-            .unwrap_or_default()
-            .to_string_lossy();
-        
+        let file_name = original.file_name().unwrap_or_default().to_string_lossy();
+
         backup_path.set_file_name(format!("{}.backup.{}", file_name, timestamp));
         backup_path
     }
@@ -45,29 +42,36 @@ impl Default for DefaultBinaryManager {
 
 #[async_trait]
 impl BinaryManager for DefaultBinaryManager {
-    async fn verify_binary(&self, path: &PathBuf, expected_size: Option<u64>) -> Result<(), UpdateError> {
+    async fn verify_binary(
+        &self,
+        path: &PathBuf,
+        expected_size: Option<u64>,
+    ) -> Result<(), UpdateError> {
         // Check if file exists
         if !path.exists() {
-            return Err(UpdateError::VerificationError(
-                format!("Binary not found at: {}", path.display())
-            ));
+            return Err(UpdateError::VerificationError(format!(
+                "Binary not found at: {}",
+                path.display()
+            )));
         }
 
         // Check if it's a file (not a directory)
         let metadata = tokio::fs::metadata(path).await?;
         if !metadata.is_file() {
-            return Err(UpdateError::VerificationError(
-                format!("Path is not a file: {}", path.display())
-            ));
+            return Err(UpdateError::VerificationError(format!(
+                "Path is not a file: {}",
+                path.display()
+            )));
         }
 
         // Verify size if provided
         if let Some(expected) = expected_size {
             let actual = metadata.len();
             if actual != expected {
-                return Err(UpdateError::VerificationError(
-                    format!("Size mismatch: expected {}, got {}", expected, actual)
-                ));
+                return Err(UpdateError::VerificationError(format!(
+                    "Size mismatch: expected {}, got {}",
+                    expected, actual
+                )));
             }
         }
 
@@ -78,36 +82,37 @@ impl BinaryManager for DefaultBinaryManager {
             let permissions = metadata.permissions();
             if permissions.mode() & 0o111 == 0 {
                 return Err(UpdateError::VerificationError(
-                    "Binary is not executable".to_string()
+                    "Binary is not executable".to_string(),
                 ));
             }
         }
 
         // Try to read the file to ensure it's accessible
-        let _contents = tokio::fs::read(path).await.map_err(|e| {
-            UpdateError::VerificationError(format!("Cannot read binary: {}", e))
-        })?;
+        let _contents = tokio::fs::read(path)
+            .await
+            .map_err(|e| UpdateError::VerificationError(format!("Cannot read binary: {}", e)))?;
 
         Ok(())
     }
 
     async fn create_backup(&self, current: &PathBuf) -> Result<PathBuf, UpdateError> {
         if !current.exists() {
-            return Err(UpdateError::BackupError(
-                format!("Original binary not found: {}", current.display())
-            ));
+            return Err(UpdateError::BackupError(format!(
+                "Original binary not found: {}",
+                current.display()
+            )));
         }
 
         let backup_path = Self::get_backup_path(current);
-        
-        tokio::fs::copy(current, &backup_path).await.map_err(|e| {
-            UpdateError::BackupError(format!("Failed to create backup: {}", e))
-        })?;
+
+        tokio::fs::copy(current, &backup_path)
+            .await
+            .map_err(|e| UpdateError::BackupError(format!("Failed to create backup: {}", e)))?;
 
         // Verify backup was created successfully
-        self.verify_binary(&backup_path, None).await.map_err(|e| {
-            UpdateError::BackupError(format!("Backup verification failed: {}", e))
-        })?;
+        self.verify_binary(&backup_path, None)
+            .await
+            .map_err(|e| UpdateError::BackupError(format!("Backup verification failed: {}", e)))?;
 
         Ok(backup_path)
     }
@@ -130,11 +135,12 @@ impl BinaryManager for DefaultBinaryManager {
                 // Try to rename the existing file first (Windows locks running executables)
                 let temp_name = format!("{}.old", target.display());
                 let temp_path = PathBuf::from(&temp_name);
-                
+
                 if let Err(e) = tokio::fs::rename(target, &temp_path).await {
-                    return Err(UpdateError::InstallationError(
-                        format!("Failed to move existing binary (is it running?): {}", e)
-                    ));
+                    return Err(UpdateError::InstallationError(format!(
+                        "Failed to move existing binary (is it running?): {}",
+                        e
+                    )));
                 }
             }
         }
@@ -150,9 +156,14 @@ impl BinaryManager for DefaultBinaryManager {
             use std::os::unix::fs::PermissionsExt;
             let mut perms = tokio::fs::metadata(target).await?.permissions();
             perms.set_mode(0o755); // rwxr-xr-x
-            tokio::fs::set_permissions(target, perms).await.map_err(|e| {
-                UpdateError::InstallationError(format!("Failed to set executable permissions: {}", e))
-            })?;
+            tokio::fs::set_permissions(target, perms)
+                .await
+                .map_err(|e| {
+                    UpdateError::InstallationError(format!(
+                        "Failed to set executable permissions: {}",
+                        e
+                    ))
+                })?;
         }
 
         // Verify installation
@@ -165,9 +176,10 @@ impl BinaryManager for DefaultBinaryManager {
 
     async fn rollback(&self, backup: &PathBuf, target: &PathBuf) -> Result<(), UpdateError> {
         if !backup.exists() {
-            return Err(UpdateError::BackupError(
-                format!("Backup file not found: {}", backup.display())
-            ));
+            return Err(UpdateError::BackupError(format!(
+                "Backup file not found: {}",
+                backup.display()
+            )));
         }
 
         // Verify backup before restoring
@@ -184,9 +196,14 @@ impl BinaryManager for DefaultBinaryManager {
             use std::os::unix::fs::PermissionsExt;
             let mut perms = tokio::fs::metadata(target).await?.permissions();
             perms.set_mode(0o755);
-            tokio::fs::set_permissions(target, perms).await.map_err(|e| {
-                UpdateError::BackupError(format!("Failed to set executable permissions after rollback: {}", e))
-            })?;
+            tokio::fs::set_permissions(target, perms)
+                .await
+                .map_err(|e| {
+                    UpdateError::BackupError(format!(
+                        "Failed to set executable permissions after rollback: {}",
+                        e
+                    ))
+                })?;
         }
 
         // Verify rollback
@@ -207,7 +224,7 @@ mod tests {
     async fn test_verify_nonexistent_binary() {
         let manager = DefaultBinaryManager::new();
         let path = PathBuf::from("/nonexistent/path");
-        
+
         let result = manager.verify_binary(&path, None).await;
         assert!(result.is_err());
     }
@@ -217,37 +234,46 @@ mod tests {
         let manager = DefaultBinaryManager::new();
         let temp_dir = std::env::temp_dir();
         let original_path = temp_dir.join("test_binary_layercake");
-        
+
         // Create a test binary
-        tokio::fs::write(&original_path, b"test content").await
+        tokio::fs::write(&original_path, b"test content")
+            .await
             .expect("Failed to write test content");
-        
+
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            let mut perms = tokio::fs::metadata(&original_path).await
+            let mut perms = tokio::fs::metadata(&original_path)
+                .await
                 .expect("Failed to read file metadata for permissions")
                 .permissions();
             perms.set_mode(0o755);
-            tokio::fs::set_permissions(&original_path, perms).await
+            tokio::fs::set_permissions(&original_path, perms)
+                .await
                 .expect("Failed to set file permissions");
         }
 
         // Create backup
-        let backup_path = manager.create_backup(&original_path).await
+        let backup_path = manager
+            .create_backup(&original_path)
+            .await
             .expect("Failed to create backup");
         assert!(backup_path.exists());
 
         // Modify original
-        tokio::fs::write(&original_path, b"modified content").await
+        tokio::fs::write(&original_path, b"modified content")
+            .await
             .expect("Failed to modify original file");
 
         // Rollback
-        manager.rollback(&backup_path, &original_path).await
+        manager
+            .rollback(&backup_path, &original_path)
+            .await
             .expect("Failed to rollback file");
 
         // Verify rollback worked
-        let content = tokio::fs::read_to_string(&original_path).await
+        let content = tokio::fs::read_to_string(&original_path)
+            .await
             .expect("Failed to read file after rollback");
         assert_eq!(content, "test content");
 

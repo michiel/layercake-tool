@@ -1,6 +1,6 @@
 use async_graphql::*;
 use chrono::{DateTime, Utc};
-use sea_orm::{EntityTrait};
+use sea_orm::EntityTrait;
 
 use crate::database::entities::{plans, projects};
 use crate::graphql::context::GraphQLContext;
@@ -21,9 +21,10 @@ pub struct Plan {
 
 impl From<plans::Model> for Plan {
     fn from(model: plans::Model) -> Self {
-        let dependencies = model.dependencies
+        let dependencies = model
+            .dependencies
             .and_then(|d| serde_json::from_str::<Vec<i32>>(&d).ok());
-        
+
         Self {
             id: model.id,
             project_id: model.project_id,
@@ -44,7 +45,7 @@ impl Plan {
         let project = projects::Entity::find_by_id(self.project_id)
             .one(&context.db)
             .await?;
-        
+
         Ok(project.map(Project::from))
     }
 }
