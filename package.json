@@ -1,9 +1,10 @@
 {
   "name": "layercake-tool",
-  "version": "0.1.7",
+  "version": "0.2.2",
   "description": "Interactive graph transformation and visualization tool",
   "private": true,
   "scripts": {
+    "build": "npm run frontend:build",
     "tauri:dev": "cd src-tauri && cargo tauri dev",
     "tauri:build": "cd src-tauri && cargo tauri build",
     "tauri:build:linux": "./scripts/build-linux.sh",
