@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import path from 'path'
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -21,8 +22,8 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      'web-worker': './src/utils/dummy-web-worker.js',
-      '@tauri-apps/api/core': './src/utils/tauri-api-mock.js',
+      'web-worker': path.resolve(__dirname, 'src/utils/dummy-web-worker.js'),
+      '@tauri-apps/api/core': path.resolve(__dirname, 'src/utils/tauri-api-mock.js'),
     },
   },
 })
