@@ -199,9 +199,9 @@ Key configuration options:
   "version": "0.1.7",
   "identifier": "com.layercake.app",
   "build": {
-    "beforeDevCommand": "node ../scripts/run-frontend.js dev -- --host 127.0.0.1 --port 5173",
+    "beforeDevCommand": "node ./scripts/run-frontend.js dev -- --host 127.0.0.1 --port 5173",
     "devUrl": "http://localhost:5173",
-    "beforeBuildCommand": "node ../scripts/run-frontend.js build",
+    "beforeBuildCommand": "node ./scripts/run-frontend.js build",
     "frontendDist": "../frontend/dist"
   },
   "bundle": {
