@@ -1,4 +1,5 @@
+.vite
 node_modules
 dist
 tmp
-*log
+**log
