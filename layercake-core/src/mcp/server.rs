@@ -357,7 +357,7 @@ impl ToolRegistry for LayercakeToolRegistry {
                 }),
                 "graph_data"
             ).public()),
-            
+
             // Analysis tools
             "analyze_connectivity" => Some(McpTool::new(
                 "analyze_connectivity",
@@ -389,7 +389,7 @@ impl ToolRegistry for LayercakeToolRegistry {
                 }),
                 "analysis"
             ).public()),
-            
+
             _ => None,
         };
 
