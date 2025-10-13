@@ -42,6 +42,7 @@ const result = spawnSync(command, commandArgs, {
     ...process.env,
     NODE_OPTIONS: (`--max-old-space-size=8192 ${process.env.NODE_OPTIONS || ''}`).trim(),
   },
+  shell: process.platform === 'win32',
 });
 
 if (result.error) {
