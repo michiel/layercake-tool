@@ -5,6 +5,7 @@ mod server;
 mod commands;
 
 use std::sync::Arc;
+use std::path::PathBuf;
 use tauri::Manager;
 use tokio::sync::RwLock;
 use tracing::{info, error};
@@ -31,7 +32,8 @@ async fn check_server_status() -> Result<bool, String> {
 // State management for the desktop application
 struct AppState {
     server_handle: Arc<RwLock<Option<ServerHandle>>>,
-    database_path: Arc<RwLock<String>>,
+    database_path: Arc<RwLock<PathBuf>>,
+    database_dir: Arc<RwLock<PathBuf>>,
 }
 
 #[tokio::main]
@@ -70,10 +72,10 @@ async fn main() {
                 .map_err(|e| format!("Failed to create app data directory: {}", e))?;
 
             // Set database path
-            let database_path = app_data_dir.join("layercake.db");
+            let database_dir = app_data_dir;
+            let database_path = database_dir.join("layercake.db");
             let database_path_str = database_path
-                .to_str()
-                .ok_or_else(|| "Invalid database path".to_string())?
+                .to_string_lossy()
                 .to_string();
 
             info!("Database path: {}", database_path_str);
@@ -81,16 +83,17 @@ async fn main() {
             // Create app state
             let app_state = AppState {
                 server_handle: Arc::new(RwLock::new(None)),
-                database_path: Arc::new(RwLock::new(database_path_str.clone())),
+                database_path: Arc::new(RwLock::new(database_path.clone())),
+                database_dir: Arc::new(RwLock::new(database_dir.clone())),
             };
 
             // Clone state for setup
             let server_handle = app_state.server_handle.clone();
-            let db_path = database_path_str.clone();
+            let db_path = database_path.clone();
 
             // Start embedded server
             tauri::async_runtime::spawn(async move {
-                match server::start_embedded_server(db_path, 3030).await {
+                match server::start_embedded_server(db_path.to_string_lossy().to_string(), 3030).await {
                     Ok(handle) => {
                         info!("Embedded server started successfully on port 3030");
                         let mut guard = server_handle.write().await;

@@ -2,9 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Container, Title, Card, Text, Group, Button, Stack, Alert, LoadingOverlay, Badge } from '@mantine/core';
 import { IconDatabase, IconRefresh, IconFolder, IconAlertCircle, IconCheck } from '@tabler/icons-react';
 import { invoke } from "@tauri-apps/api/core";
+import { message } from "@tauri-apps/api/dialog";
+import { open } from "@tauri-apps/api/shell";
 
 interface DatabaseInfo {
   path: string;
+  directory: string;
   size_bytes: number;
   size_mb: string;
   exists: boolean;
@@ -66,7 +69,19 @@ export const DatabaseSettings: React.FC = () => {
   const handleShowLocation = async () => {
     try {
       const location = await invoke<string>('show_database_location');
-      alert(`Database directory:\n${location}`);
+
+      if (!location) {
+        await message('Database directory is unavailable.', { title: 'Database Location' });
+        return;
+      }
+
+      await message(`Database directory:\n${location}`, { title: 'Database Location' });
+
+      try {
+        await open(location);
+      } catch (openError) {
+        console.warn('Unable to open directory in file manager:', openError);
+      }
     } catch (err) {
       setError(`Failed to get database location: ${err}`);
     }
@@ -113,6 +128,13 @@ export const DatabaseSettings: React.FC = () => {
                 <Text size="sm" fw={600}>Path:</Text>
                 <Text size="sm" c="dimmed" style={{ wordBreak: 'break-all' }}>
                   {databaseInfo.path}
+                </Text>
+              </div>
+
+              <div>
+                <Text size="sm" fw={600}>Directory:</Text>
+                <Text size="sm" c="dimmed" style={{ wordBreak: 'break-all' }}>
+                  {databaseInfo.directory}
                 </Text>
               </div>
 

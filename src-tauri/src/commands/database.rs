@@ -7,13 +7,14 @@ use crate::AppState;
 #[tauri::command]
 pub async fn get_database_path(state: State<'_, AppState>) -> Result<String, String> {
     let path = state.database_path.read().await;
-    Ok(path.clone())
+    Ok(path.to_string_lossy().to_string())
 }
 
 /// Get database information
 #[tauri::command]
 pub async fn get_database_info(state: State<'_, AppState>) -> Result<serde_json::Value, String> {
     let db_path = state.database_path.read().await;
+    let db_dir = state.database_dir.read().await;
 
     // Get file size if file exists
     let size = match std::fs::metadata(&*db_path) {
@@ -25,10 +26,11 @@ pub async fn get_database_info(state: State<'_, AppState>) -> Result<serde_json:
     let size_mb = size as f64 / 1_048_576.0;
 
     Ok(serde_json::json!({
-        "path": *db_path,
+        "path": db_path.to_string_lossy().to_string(),
+        "directory": db_dir.to_string_lossy().to_string(),
         "size_bytes": size,
         "size_mb": format!("{:.2}", size_mb),
-        "exists": std::path::Path::new(&*db_path).exists(),
+        "exists": db_path.exists(),
     }))
 }
 
@@ -52,16 +54,16 @@ pub async fn reinitialize_database(
 
     // Step 2: Delete the database file
     let db_path = state.database_path.read().await.clone();
-    info!("Deleting database file: {}", db_path);
+    info!("Deleting database file: {}", db_path.to_string_lossy());
 
-    if std::path::Path::new(&db_path).exists() {
+    if db_path.exists() {
         std::fs::remove_file(&db_path)
             .map_err(|e| format!("Failed to delete database file: {}", e))?;
     }
 
     // Step 3: Restart the server (which will recreate the database and run migrations)
     info!("Restarting server with fresh database");
-    match crate::server::start_embedded_server(db_path.clone(), 3030).await {
+    match crate::server::start_embedded_server(db_path.to_string_lossy().to_string(), 3030).await {
         Ok(handle) => {
             info!("Server restarted successfully with fresh database");
             let mut server_guard = state.server_handle.write().await;
@@ -80,12 +82,6 @@ pub async fn reinitialize_database(
 /// The frontend can display this or use it as needed
 #[tauri::command]
 pub async fn show_database_location(state: State<'_, AppState>) -> Result<String, String> {
-    let db_path = state.database_path.read().await;
-    let path = std::path::Path::new(&*db_path);
-
-    // Get the parent directory
-    let dir = path.parent()
-        .ok_or_else(|| "Failed to get database directory".to_string())?;
-
+    let dir = state.database_dir.read().await;
     Ok(dir.to_string_lossy().to_string())
 }
