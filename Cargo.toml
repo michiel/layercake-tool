@@ -69,4 +69,5 @@ dashmap = "6.0"
 # Tauri dependencies
 tauri = { version = "2.0", features = [] }
 tauri-build = { version = "2.0", features = [] }
-
+tauri-plugin-dialog = { version = "2.0" }
+tauri-plugin-shell = { version = "2.0" }

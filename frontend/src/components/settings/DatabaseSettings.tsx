@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Container, Title, Card, Text, Group, Button, Stack, Alert, LoadingOverlay, Badge } from '@mantine/core';
 import { IconDatabase, IconRefresh, IconFolder, IconAlertCircle, IconCheck } from '@tabler/icons-react';
 import { invoke } from "@tauri-apps/api/core";
-import { message } from "@tauri-apps/api/dialog";
-import { open } from "@tauri-apps/api/shell";
+import { message } from "@tauri-apps/plugin-dialog";
+import { open } from "@tauri-apps/plugin-shell";
 
 interface DatabaseInfo {
   path: string;

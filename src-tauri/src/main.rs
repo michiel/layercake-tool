@@ -48,6 +48,8 @@ async fn main() {
     info!("Starting Layercake desktop application");
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
             get_app_info,
             check_server_status,
