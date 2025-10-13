@@ -38,7 +38,10 @@ if (process.env.npm_execpath) {
 const result = spawnSync(command, commandArgs, {
   cwd: frontendDir,
   stdio: 'inherit',
-  env: process.env,
+  env: {
+    ...process.env,
+    NODE_OPTIONS: `--max-old-space-size=8192 ${process.env.NODE_OPTIONS || ''}`,
+  },
 });
 
 if (result.error) {
