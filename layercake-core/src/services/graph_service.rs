@@ -109,7 +109,7 @@ impl GraphService {
         use sea_orm::{ActiveModelTrait, Set};
 
         // Generate a placeholder node_id for now
-        let node_id = format!("graphnode_{}", uuid::Uuid::new_v4().to_string());
+        let node_id = format!("graphnode_{}", uuid::Uuid::new_v4());
 
         let graph = graphs::ActiveModel {
             project_id: Set(project_id),

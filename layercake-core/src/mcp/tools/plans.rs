@@ -121,23 +121,46 @@ pub async fn create_plan(
             message: format!("Failed to serialize dependencies: {}", e),
         })?;
 
-    let new_plan = plans::ActiveModel {
-        project_id: Set(project_id),
-        name: Set(name),
-        yaml_content: Set(yaml_content),
-        dependencies: Set(Some(dependencies_json)),
-        status: Set("pending".to_string()),
-        created_at: Set(chrono::Utc::now()),
-        updated_at: Set(chrono::Utc::now()),
-        ..Default::default()
-    };
-
-    let plan = plans::Entity::insert(new_plan)
-        .exec_with_returning(db)
+    let existing_plan = plans::Entity::find()
+        .filter(plans::Column::ProjectId.eq(project_id))
+        .one(db)
         .await
         .map_err(|e| McpError::Internal {
-            message: format!("Failed to create plan: {}", e),
+            message: format!("Database error: {}", e),
         })?;
+
+    let now = chrono::Utc::now();
+    let (plan, message) = if let Some(plan) = existing_plan {
+        let mut active: plans::ActiveModel = plan.into();
+        active.name = Set(name.clone());
+        active.yaml_content = Set(yaml_content.clone());
+        active.dependencies = Set(Some(dependencies_json.clone()));
+        active.status = Set("pending".to_string());
+        active.updated_at = Set(now);
+        let updated = active.update(db).await.map_err(|e| McpError::Internal {
+            message: format!("Failed to update plan: {}", e),
+        })?;
+        (updated, "Plan updated successfully")
+    } else {
+        let new_plan = plans::ActiveModel {
+            project_id: Set(project_id),
+            name: Set(name.clone()),
+            yaml_content: Set(yaml_content.clone()),
+            dependencies: Set(Some(dependencies_json.clone())),
+            status: Set("pending".to_string()),
+            created_at: Set(now),
+            updated_at: Set(now),
+            ..Default::default()
+        };
+
+        let created = plans::Entity::insert(new_plan)
+            .exec_with_returning(db)
+            .await
+            .map_err(|e| McpError::Internal {
+                message: format!("Failed to create plan: {}", e),
+            })?;
+        (created, "Plan created successfully")
+    };
 
     let result = json!({
         "id": plan.id,
@@ -147,7 +170,7 @@ pub async fn create_plan(
         "dependencies": dependencies,
         "created_at": plan.created_at,
         "updated_at": plan.updated_at,
-        "message": "Plan created successfully"
+        "message": message
     });
 
     create_success_response(&result)

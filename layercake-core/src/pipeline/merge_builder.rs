@@ -6,9 +6,7 @@ use std::collections::{HashMap, HashSet};
 use super::layer_operations::{insert_layers_to_db, load_layers_from_db};
 use super::types::LayerData;
 use crate::database::entities::ExecutionState;
-use crate::database::entities::{
-    data_sources, graph_edges, graph_nodes, graphs, layers, plan_dag_nodes,
-};
+use crate::database::entities::{data_sources, graph_edges, graph_nodes, graphs, plan_dag_nodes};
 
 /// Helper function to parse is_partition from JSON Value (handles both boolean and string)
 fn parse_is_partition(value: &Value) -> bool {

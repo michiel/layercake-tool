@@ -13,6 +13,28 @@ use serde_json::{json, Value};
 use std::process::{Command, Stdio};
 use tokio::time::{sleep, Duration};
 
+fn extract_text_content(response: &Value) -> Result<String, Box<dyn std::error::Error>> {
+    response
+        .get("content")
+        .and_then(|content| content.as_array())
+        .and_then(|items| {
+            items
+                .iter()
+                .find_map(|item| match item.get("type").and_then(|t| t.as_str()) {
+                    Some("text") => item.get("text").and_then(|t| t.as_str()),
+                    _ => None,
+                })
+        })
+        .map(|text| text.to_string())
+        .ok_or_else(|| "MCP response did not include text content".into())
+}
+
+fn parse_json_payload(response: &Value) -> Result<Value, Box<dyn std::error::Error>> {
+    let text = extract_text_content(response)?;
+    let parsed: Value = serde_json::from_str(&text)?;
+    Ok(parsed)
+}
+
 struct McpClient {
     client: Client,
     url: String,
@@ -150,7 +172,8 @@ async fn test_mcp_end_to_end_workflow() -> Result<(), Box<dyn std::error::Error>
         "Project result: {}",
         serde_json::to_string_pretty(&project_result)?
     );
-    let project_id = project_result["id"]
+    let project_info = parse_json_payload(&project_result)?;
+    let project_id = project_info["id"]
         .as_i64()
         .expect("Project ID should be a number") as i32;
     println!("Created project with ID: {}", project_id);
@@ -222,7 +245,8 @@ steps:
         )
         .await?;
 
-    let plan_id = plan_result["id"]
+    let plan_info = parse_json_payload(&plan_result)?;
+    let plan_id = plan_info["id"]
         .as_i64()
         .expect("Plan ID should be a number") as i32;
     println!("Created plan with ID: {}", plan_id);
@@ -251,47 +275,46 @@ steps:
         )
         .await?;
 
-    let exported_content = &export_result["content"];
+    let export_info = parse_json_payload(&export_result)?;
+    let exported_content = export_info["content"]
+        .as_str()
+        .expect("Export content should be a string");
     println!("Export completed");
 
     // Verify the exported content contains our data
     println!("Verifying exported data...");
-    if let Some(content_str) = exported_content.as_str() {
-        let exported_graph: Value = serde_json::from_str(content_str)?;
+    let exported_graph: Value = serde_json::from_str(exported_content)?;
 
-        // Check that we have nodes, edges, and layers
-        assert!(
-            exported_graph.get("nodes").is_some(),
-            "Exported graph should contain nodes"
-        );
-        assert!(
-            exported_graph.get("edges").is_some(),
-            "Exported graph should contain edges"
-        );
-        assert!(
-            exported_graph.get("layers").is_some(),
-            "Exported graph should contain layers"
-        );
+    // Check that we have nodes, edges, and layers
+    assert!(
+        exported_graph.get("nodes").is_some(),
+        "Exported graph should contain nodes"
+    );
+    assert!(
+        exported_graph.get("edges").is_some(),
+        "Exported graph should contain edges"
+    );
+    assert!(
+        exported_graph.get("layers").is_some(),
+        "Exported graph should contain layers"
+    );
 
-        // Verify counts
-        let nodes = exported_graph["nodes"]
-            .as_array()
-            .expect("Nodes should be an array");
-        let edges = exported_graph["edges"]
-            .as_array()
-            .expect("Edges should be an array");
-        let layers = exported_graph["layers"]
-            .as_array()
-            .expect("Layers should be an array");
+    // Verify counts
+    let nodes = exported_graph["nodes"]
+        .as_array()
+        .expect("Nodes should be an array");
+    let edges = exported_graph["edges"]
+        .as_array()
+        .expect("Edges should be an array");
+    let layers = exported_graph["layers"]
+        .as_array()
+        .expect("Layers should be an array");
 
-        assert_eq!(nodes.len(), 3, "Should have 3 nodes");
-        assert_eq!(edges.len(), 2, "Should have 2 edges");
-        assert_eq!(layers.len(), 2, "Should have 2 layers");
+    assert_eq!(nodes.len(), 3, "Should have 3 nodes");
+    assert_eq!(edges.len(), 2, "Should have 2 edges");
+    assert_eq!(layers.len(), 2, "Should have 2 layers");
 
-        println!("✓ Verified 3 nodes, 2 edges, 2 layers in exported data");
-    } else {
-        panic!("Export content should be a string");
-    }
+    println!("✓ Verified 3 nodes, 2 edges, 2 layers in exported data");
 
     // Step 8: Get final graph data to verify everything is in place
     println!("Getting final graph data...");
@@ -304,13 +327,15 @@ steps:
         )
         .await?;
 
-    let node_count = graph_data["nodes"]["count"]
+    let graph_info = parse_json_payload(&graph_data)?;
+
+    let node_count = graph_info["nodes"]["count"]
         .as_u64()
         .expect("Node count should be a number");
-    let edge_count = graph_data["edges"]["count"]
+    let edge_count = graph_info["edges"]["count"]
         .as_u64()
         .expect("Edge count should be a number");
-    let layer_count = graph_data["layers"]["count"]
+    let layer_count = graph_info["layers"]["count"]
         .as_u64()
         .expect("Layer count should be a number");
 
@@ -326,7 +351,8 @@ steps:
     println!("\n🎉 End-to-end MCP test completed successfully!");
     println!("✓ Server started with in-memory SQLite");
     println!("✓ MCP WebSocket connection established");
-    println!("✓ Created project: '{}'", project_result["name"]);
+    let project_name = project_info["name"].as_str().unwrap_or("E2E Test Project");
+    println!("✓ Created project: '{}'", project_name);
     println!("✓ Added 3 nodes via CSV import");
     println!("✓ Added 2 edges via CSV import");
     println!("✓ Added 2 layers via CSV import");

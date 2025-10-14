@@ -3,7 +3,7 @@ use csv::ReaderBuilder;
 use sea_orm::{ActiveModelTrait, DatabaseConnection, Set};
 use serde_json::Value;
 use std::collections::HashMap;
-use tracing::{info, warn};
+use tracing::warn;
 
 use crate::database::entities::layers;
 

@@ -3,7 +3,7 @@ use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, Set};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 
-use super::layer_operations::{insert_layers_to_db, load_layers_from_db};
+use super::layer_operations::insert_layers_to_db;
 use super::types::LayerData;
 use crate::database::entities::ExecutionState;
 use crate::database::entities::{
@@ -326,8 +326,6 @@ impl GraphBuilder {
         plan_id: i32,
         node_id: &str,
     ) -> Result<data_sources::Model> {
-        use sea_orm::{ColumnTrait, QueryFilter};
-
         // Find the plan_dag_node to get the config
         // Note: Node IDs are globally unique, no need to filter by plan_id
         let dag_node = plan_dag_nodes::Entity::find_by_id(node_id)

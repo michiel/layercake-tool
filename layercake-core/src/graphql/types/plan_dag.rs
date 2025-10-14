@@ -542,7 +542,7 @@ impl From<plan_dag_nodes::Model> for PlanDagNode {
 impl From<plan_dag_edges::Model> for PlanDagEdge {
     fn from(model: plan_dag_edges::Model) -> Self {
         let metadata: EdgeMetadata =
-            serde_json::from_str(&model.metadata_json).unwrap_or_else(|_| EdgeMetadata {
+            serde_json::from_str(&model.metadata_json).unwrap_or(EdgeMetadata {
                 label: None,
                 data_type: DataType::GraphData,
             });

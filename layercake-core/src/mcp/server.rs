@@ -24,6 +24,12 @@ pub struct LayercakeAuth {
     pub valid_api_keys: std::collections::HashSet<String>,
 }
 
+impl Default for LayercakeAuth {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LayercakeAuth {
     pub fn new() -> Self {
         Self {
@@ -210,7 +216,7 @@ impl ToolRegistry for LayercakeToolRegistry {
                 json!({"type": "object", "properties": {}, "additionalProperties": false}),
                 "projects"
             ).public()),
-            
+
             "create_project" => Some(McpTool::new(
                 "create_project", 
                 "Create a new graph project",
@@ -225,7 +231,7 @@ impl ToolRegistry for LayercakeToolRegistry {
                 }),
                 "projects"
             ).public()),
-            
+
             "get_project" => Some(McpTool::new(
                 "get_project",
                 "Get details of a specific project", 
@@ -239,7 +245,7 @@ impl ToolRegistry for LayercakeToolRegistry {
                 }),
                 "projects"
             ).public()),
-            
+
             "delete_project" => Some(McpTool::new(
                 "delete_project",
                 "Delete a project and all its data",
@@ -253,7 +259,7 @@ impl ToolRegistry for LayercakeToolRegistry {
                 }),
                 "projects"
             ).public()),
-            
+
             // Plan tools
             "create_plan" => Some(McpTool::new(
                 "create_plan",
@@ -275,7 +281,7 @@ impl ToolRegistry for LayercakeToolRegistry {
                 }),
                 "plans"
             ).public()),
-            
+
             "execute_plan" => Some(McpTool::new(
                 "execute_plan",
                 "Execute a transformation plan",
@@ -289,7 +295,7 @@ impl ToolRegistry for LayercakeToolRegistry {
                 }),
                 "plans"
             ).public()),
-            
+
             "get_plan_status" => Some(McpTool::new(
                 "get_plan_status",
                 "Get the execution status of a plan",
@@ -303,7 +309,7 @@ impl ToolRegistry for LayercakeToolRegistry {
                 }),
                 "plans"
             ).public()),
-            
+
             // Graph data tools
             "import_csv" => Some(McpTool::new(
                 "import_csv",
@@ -321,7 +327,7 @@ impl ToolRegistry for LayercakeToolRegistry {
                 }),
                 "graph_data"
             ).public()),
-            
+
             "export_graph" => Some(McpTool::new(
                 "export_graph",
                 "Export graph data in various formats", 
@@ -340,7 +346,7 @@ impl ToolRegistry for LayercakeToolRegistry {
                 }),
                 "graph_data"
             ).public()),
-            
+
             "get_graph_data" => Some(McpTool::new(
                 "get_graph_data",
                 "Retrieve graph structure (nodes, edges, layers)",
@@ -372,7 +378,7 @@ impl ToolRegistry for LayercakeToolRegistry {
                 }),
                 "analysis"
             ).public()),
-            
+
             "find_paths" => Some(McpTool::new(
                 "find_paths",
                 "Find paths between nodes in the graph",
@@ -420,10 +426,13 @@ impl ToolRegistry for LayercakeToolRegistry {
             }
 
             // Graph data tools
-            // TODO: Implement these tools
-            // "import_csv" => super::tools::graph_data::import_csv(context.arguments, &self.db).await,
-            // "export_graph" => super::tools::graph_data::export_graph(context.arguments, &self.db).await,
-            // "get_graph_data" => super::tools::graph_data::get_graph_data(context.arguments, &self.db).await,
+            "import_csv" => super::tools::graph_data::import_csv(context.arguments, &self.db).await,
+            "export_graph" => {
+                super::tools::graph_data::export_graph(context.arguments, &self.db).await
+            }
+            "get_graph_data" => {
+                super::tools::graph_data::get_graph_data(context.arguments, &self.db).await
+            }
 
             // Analysis tools
             "analyze_connectivity" => {

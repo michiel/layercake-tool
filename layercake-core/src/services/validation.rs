@@ -304,7 +304,7 @@ impl ValidationService {
         const MAX_COORDINATE: f64 = 100_000.0;
         const MIN_COORDINATE: f64 = -100_000.0;
 
-        if !x.is_finite() || x > MAX_COORDINATE || x < MIN_COORDINATE {
+        if !x.is_finite() || !(MIN_COORDINATE..=MAX_COORDINATE).contains(&x) {
             return Err(anyhow!(
                 "Invalid X coordinate: must be between {} and {}",
                 MIN_COORDINATE,
@@ -312,7 +312,7 @@ impl ValidationService {
             ));
         }
 
-        if !y.is_finite() || y > MAX_COORDINATE || y < MIN_COORDINATE {
+        if !y.is_finite() || !(MIN_COORDINATE..=MAX_COORDINATE).contains(&y) {
             return Err(anyhow!(
                 "Invalid Y coordinate: must be between {} and {}",
                 MIN_COORDINATE,

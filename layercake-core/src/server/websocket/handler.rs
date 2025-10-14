@@ -288,7 +288,7 @@ fn validate_cursor_position(position: &super::types::CursorPosition) -> bool {
 
     match position {
         CursorPosition::Canvas { x, y, zoom } => {
-            x.is_finite() && y.is_finite() && zoom.map_or(true, |z| z.is_finite() && z > 0.0)
+            x.is_finite() && y.is_finite() && zoom.is_none_or(|z| z.is_finite() && z > 0.0)
         }
         CursorPosition::Spreadsheet { row, column, .. } => *row >= 0 && *column >= 0,
         CursorPosition::ThreeD {
@@ -302,13 +302,12 @@ fn validate_cursor_position(position: &super::types::CursorPosition) -> bool {
             x.is_finite()
                 && y.is_finite()
                 && z.is_finite()
-                && rotation.map_or(true, |(rx, ry, rz)| {
-                    rx.is_finite() && ry.is_finite() && rz.is_finite()
-                })
-                && scale.map_or(true, |s| s.is_finite() && s > 0.0)
+                && rotation
+                    .is_none_or(|(rx, ry, rz)| rx.is_finite() && ry.is_finite() && rz.is_finite())
+                && scale.is_none_or(|s| s.is_finite() && s > 0.0)
         }
         CursorPosition::Timeline { timestamp, track } => {
-            *timestamp >= 0 && track.map_or(true, |t| t >= 0)
+            *timestamp >= 0 && track.is_none_or(|t| t >= 0)
         }
         CursorPosition::CodeEditor { line, column, .. } => *line >= 0 && *column >= 0,
     }

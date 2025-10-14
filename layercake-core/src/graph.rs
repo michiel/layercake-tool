@@ -88,7 +88,7 @@ impl Graph {
 
         // For compatibility with test expectations, ensure comments are "null" strings if empty
         for node in &mut nodes {
-            if node.comment.is_none() || node.comment.as_ref().map_or(true, |s| s.is_empty()) {
+            if node.comment.is_none() || node.comment.as_ref().is_none_or(|s| s.is_empty()) {
                 node.comment = Some("null".to_string());
             }
         }
@@ -160,7 +160,7 @@ impl Graph {
 
             // For compatibility with test expectations, ensure comments are "null" strings if empty
             if tree_node.comment.is_none()
-                || tree_node.comment.as_ref().map_or(true, |s| s.is_empty())
+                || tree_node.comment.as_ref().is_none_or(|s| s.is_empty())
             {
                 tree_node.comment = Some("null".to_string());
             }
@@ -230,11 +230,11 @@ impl Graph {
         let mut current_length = 0;
         for word in text.split_whitespace() {
             if current_length + word.len() > max_length {
-                new_text.push_str("\n");
+                new_text.push('\n');
                 current_length = 0;
             }
             new_text.push_str(word);
-            new_text.push_str(" ");
+            new_text.push(' ');
             current_length += word.len() + 1;
         }
         new_text.trim().to_string()
@@ -268,7 +268,7 @@ impl Graph {
             let node = graph
                 .get_node_by_id(node_id)
                 .ok_or_else(|| format!("Node with id '{}' not found", node_id))?;
-            let children = graph.get_children(&node);
+            let children = graph.get_children(node);
 
             let all_child_node_ids: Vec<String> = children.iter().map(|n| n.id.clone()).collect();
 
@@ -434,7 +434,7 @@ impl Graph {
 
                 let children: Vec<Node> = non_partition_child_node_ids
                     .iter()
-                    .filter_map(|id| graph.get_node_by_id(id).map(|n| n.clone()))
+                    .filter_map(|id| graph.get_node_by_id(id).cloned())
                     .collect();
 
                 // Remove children beyond max_width
@@ -544,7 +544,7 @@ impl Graph {
             let new_node = Node {
                 id: format!("n_{}_{}_{}", edge.source, edge.target, node_counter),
                 is_partition: false,
-                label: edge_label(&edge),
+                label: edge_label(edge),
                 layer: edge.layer.clone(),
                 belongs_to: Some("inverted_root".to_string()),
                 weight: edge.weight,
@@ -915,7 +915,7 @@ impl Node {
                     .get(node_profile.comment_column)
                     .map(|c| c.to_string());
 
-                if comment.is_none() || comment.as_ref().map_or(true, |s| s.is_empty()) {
+                if comment.is_none() || comment.as_ref().is_none_or(|s| s.is_empty()) {
                     Some("null".to_string())
                 } else {
                     comment
@@ -950,7 +950,7 @@ impl Edge {
 
                 if comment.is_none() {
                     Some("null".to_string())
-                } else if comment.as_ref().map_or(true, |s| s.is_empty()) {
+                } else if comment.as_ref().is_none_or(|s| s.is_empty()) {
                     Some("null".to_string())
                 } else {
                     comment.map(|c| format!("\"{}\"", c))

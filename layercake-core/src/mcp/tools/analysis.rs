@@ -1,7 +1,5 @@
 //! Graph analysis tools for MCP
 
-use crate::mcp::tools::{create_success_response, get_optional_param, get_required_param};
-use crate::services::GraphService;
 use axum_mcp::prelude::*;
 use sea_orm::DatabaseConnection;
 use serde_json::{json, Value};

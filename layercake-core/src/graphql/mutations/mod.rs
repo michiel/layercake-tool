@@ -2206,7 +2206,7 @@ impl Mutation {
                             format!("transformnode_{}_{:04x}", timestamp, variation_idx);
                         let transform_label = format!(
                             "Transform: {}",
-                            filename.split('/').last().unwrap_or(filename)
+                            filename.split('/').next_back().unwrap_or(filename)
                         );
                         let transform_node = plan_dag_nodes::ActiveModel {
                             id: Set(transform_id.clone()),
@@ -2247,8 +2247,10 @@ impl Mutation {
 
                         // Create Graph node for variation
                         let graph_id = format!("graphnode_{}_{:04x}", timestamp, variation_idx);
-                        let graph_label =
-                            format!("Graph: {}", filename.split('/').last().unwrap_or(filename));
+                        let graph_label = format!(
+                            "Graph: {}",
+                            filename.split('/').next_back().unwrap_or(filename)
+                        );
                         let graph_node = plan_dag_nodes::ActiveModel {
                             id: Set(graph_id.clone()),
                             plan_id: Set(plan.id),
@@ -2288,7 +2290,7 @@ impl Mutation {
                         let output_label = format!(
                             "{}: {}",
                             exporter,
-                            filename.split('/').last().unwrap_or(filename)
+                            filename.split('/').next_back().unwrap_or(filename)
                         );
                         let output_node = plan_dag_nodes::ActiveModel {
                             id: Set(output_id.clone()),
@@ -2341,8 +2343,8 @@ impl Mutation {
                 "Imported plan with {} nodes and {} edges",
                 node_count, edge_count
             ),
-            node_count: node_count as i32,
-            edge_count: edge_count as i32,
+            node_count: node_count,
+            edge_count: edge_count,
         })
     }
 

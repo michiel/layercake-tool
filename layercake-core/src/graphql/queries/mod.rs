@@ -2,8 +2,8 @@ use async_graphql::*;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
 use crate::database::entities::{
-    data_sources, graph_edges, graph_edits, graph_nodes, graphs, layers, plan_dag_edges,
-    plan_dag_nodes, plans, project_collaborators, projects, user_sessions, users,
+    data_sources, graph_edges, graph_nodes, graphs, layers, plan_dag_edges, plan_dag_nodes, plans,
+    project_collaborators, projects, user_sessions, users,
 };
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::graph::Graph;
@@ -194,10 +194,7 @@ impl Query {
         tracing::debug!("Converted {} nodes with execution metadata", nodes.len());
 
         tracing::debug!("Converting {} edges to GraphQL format...", dag_edges.len());
-        let edges: Vec<PlanDagEdge> = dag_edges
-            .into_iter()
-            .map(|edge| PlanDagEdge::from(edge))
-            .collect();
+        let edges: Vec<PlanDagEdge> = dag_edges.into_iter().map(PlanDagEdge::from).collect();
         tracing::debug!("Converted {} edges", edges.len());
 
         // Create metadata

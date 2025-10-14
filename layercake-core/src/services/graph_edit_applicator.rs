@@ -3,7 +3,6 @@ use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
     Set,
 };
-use serde_json::Value as JsonValue;
 use tracing::{debug, warn};
 
 use crate::database::entities::{
@@ -399,7 +398,7 @@ impl GraphEditApplicator {
 
         let properties = new_value
             .get("properties")
-            .map(|v| serde_json::to_string(v))
+            .map(serde_json::to_string)
             .transpose()?;
 
         let color = new_value

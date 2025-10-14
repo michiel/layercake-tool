@@ -338,7 +338,7 @@ impl SessionManager {
 
         let datetime: DateTime<Utc> =
             DateTime::from_timestamp(timestamp.as_secs() as i64, timestamp.subsec_nanos())
-                .unwrap_or_else(|| Utc::now());
+                .unwrap_or_else(Utc::now);
 
         datetime.to_rfc3339()
     }

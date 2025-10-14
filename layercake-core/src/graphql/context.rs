@@ -32,6 +32,12 @@ pub struct SessionInfo {
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
+impl Default for SessionManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SessionManager {
     pub fn new() -> Self {
         Self {
