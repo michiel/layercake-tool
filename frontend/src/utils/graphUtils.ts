@@ -26,7 +26,6 @@ const getLayerStyle = (layerId: string | undefined, layerMap: Map<string, Layer>
 
 const elkOptions = {
   'elk.algorithm': 'layered',
-  'elk.direction': 'DOWN',
   'elk.spacing.nodeNode': '75',
   'elk.spacing.nodeNodeBetweenLayers': '75',
   'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
@@ -38,6 +37,7 @@ const elkOptions = {
 
 interface LayoutOptions {
   disableSubflows?: boolean;
+  orientation?: 'vertical' | 'horizontal';
 }
 
 // Function to convert LcGraph to React Flow elements
@@ -49,6 +49,8 @@ export const getLayoutedElements = async (
   options: LayoutOptions = {}
 ) => {
   const disableSubflows = options.disableSubflows === true;
+  const orientation = options.orientation ?? 'vertical';
+  const layoutDirection = orientation === 'horizontal' ? 'RIGHT' : 'DOWN';
   // Create node lookup map
   const nodeMap = new Map<string, GraphNode>();
   lcGraph.graphNodes.forEach(node => nodeMap.set(node.id, node));
@@ -71,7 +73,7 @@ export const getLayoutedElements = async (
         labels: [{ text: node.label || node.id }],
         layoutOptions: {
           'elk.padding': '[top=40,left=20,bottom=20,right=20]',
-          'elk.direction': 'DOWN',
+          'elk.direction': layoutDirection,
           'elk.spacing.nodeNode': '50',
           'elk.spacing.nodeNodeBetweenLayers': '50',
         },
@@ -108,6 +110,7 @@ export const getLayoutedElements = async (
     id: 'root',
     layoutOptions: {
       ...elkOptions,
+      'elk.direction': layoutDirection,
       ...(disableSubflows ? { 'elk.hierarchyHandling': 'INCLUDE_CHILDREN' } : {}),
     },
     children: [],

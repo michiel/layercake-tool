@@ -64,6 +64,7 @@ const GET_GRAPH_DETAILS = gql`
 interface GraphEditorPageProps {}
 
 type GraphViewMode = 'flow' | 'hierarchy';
+type GraphOrientation = 'vertical' | 'horizontal';
 
 export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
   const navigate = useNavigate();
@@ -73,6 +74,7 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
   const [editHistoryOpen, setEditHistoryOpen] = useState(false);
   const [propertiesPanelCollapsed, setPropertiesPanelCollapsed] = useState(false);
   const [viewMode, setViewMode] = useState<GraphViewMode>('flow');
+  const [orientation, setOrientation] = useState<GraphOrientation>('vertical');
 
   // Store references to ReactFlow setters for optimistic updates
   const setNodesRef = useRef<React.Dispatch<React.SetStateAction<FlowNode[]>> | null>(null);
@@ -202,6 +204,10 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
 
   const handleToggleViewMode = useCallback(() => {
     setViewMode(prev => (prev === 'flow' ? 'hierarchy' : 'flow'));
+  }, []);
+
+  const handleToggleOrientation = useCallback(() => {
+    setOrientation(prev => (prev === 'vertical' ? 'horizontal' : 'vertical'));
   }, []);
 
   const handleAddLayer = useCallback(() => {
@@ -490,6 +496,7 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
               layerVisibility={layerVisibility}
               onNodesInitialized={handleNodesInitialized}
               mode={viewMode}
+              orientation={orientation}
             />
           </ReactFlowProvider>
         </div>
@@ -507,6 +514,8 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
             onAddLayer={handleAddLayer}
             viewMode={viewMode}
             onToggleViewMode={handleToggleViewMode}
+            orientation={orientation}
+            onToggleOrientation={handleToggleOrientation}
           />
         )}
       </Flex>

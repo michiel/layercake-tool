@@ -16,6 +16,8 @@ interface PropertiesAndLayersPanelProps {
   onAddLayer?: () => void;
   viewMode: 'flow' | 'hierarchy';
   onToggleViewMode: () => void;
+  orientation: 'vertical' | 'horizontal';
+  onToggleOrientation: () => void;
 }
 
 export const PropertiesAndLayersPanel: React.FC<PropertiesAndLayersPanelProps> = ({
@@ -30,6 +32,8 @@ export const PropertiesAndLayersPanel: React.FC<PropertiesAndLayersPanelProps> =
   onAddLayer,
   viewMode,
   onToggleViewMode,
+  orientation,
+  onToggleOrientation,
 }) => {
   const selectedNode = selectedNodeId
     ? graph.graphNodes.find(n => n.id === selectedNodeId)
@@ -46,13 +50,20 @@ export const PropertiesAndLayersPanel: React.FC<PropertiesAndLayersPanelProps> =
         borderLeft: '1px solid #e9ecef'
       }}
     >
-      <Group justify="flex-end" mb="sm">
+      <Group justify="space-between" mb="sm">
         <Button
           size="xs"
           variant="light"
           onClick={onToggleViewMode}
         >
           {viewMode === 'flow' ? 'Switch to Hierarchy' : 'Switch to Flow'}
+        </Button>
+        <Button
+          size="xs"
+          variant="light"
+          onClick={onToggleOrientation}
+        >
+          {orientation === 'vertical' ? 'To Left-Right' : 'To Top-Bottom'}
         </Button>
       </Group>
 

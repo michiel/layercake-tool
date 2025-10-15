@@ -10,6 +10,7 @@ import { GroupNode } from './GroupNode';
 import { FloatingEdge } from './FloatingEdge';
 
 type GraphViewMode = 'flow' | 'hierarchy';
+type GraphOrientation = 'vertical' | 'horizontal';
 
 interface LayercakeGraphEditorProps {
   graph: Graph;
@@ -17,6 +18,7 @@ interface LayercakeGraphEditorProps {
   layerVisibility?: Map<string, boolean>;
   onNodesInitialized?: (setNodes: React.Dispatch<React.SetStateAction<Node[]>>, setEdges: React.Dispatch<React.SetStateAction<Edge[]>>) => void;
   mode?: GraphViewMode;
+  orientation?: GraphOrientation;
 }
 
 export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
@@ -24,7 +26,8 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
   onNodeSelect,
   layerVisibility,
   onNodesInitialized,
-  mode = 'flow'
+  mode = 'flow',
+  orientation = 'vertical'
 }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -87,7 +90,10 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
       renderGraph.layers,
       170,
       50,
-      { disableSubflows: mode === 'hierarchy' }
+      {
+        disableSubflows: mode === 'hierarchy',
+        orientation,
+      }
     );
 
     // Restore selection state from ref (preserved across re-renders)
@@ -106,7 +112,7 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
       });
       isInitialLoad.current = false;
     }
-  }, [renderGraph, setNodes, setEdges, fitView]);
+  }, [renderGraph, setNodes, setEdges, fitView, orientation, mode]);
 
   useEffect(() => {
     onLayout();
