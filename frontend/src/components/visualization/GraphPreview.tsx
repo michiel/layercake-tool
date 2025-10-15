@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import ForceGraph from 'force-graph';
 import { Pane } from 'tweakpane';
 
@@ -64,6 +64,7 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
   });
 
   const [, forceUpdate] = useState({});
+  const dataSignatureRef = useRef<string>('');
 
   // Initialize Tweakpane
   useEffect(() => {
@@ -176,6 +177,24 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
       }
     };
   }, []);
+
+  const computeSignature = useCallback((graph: GraphData) => {
+    const nodeSig = graph.nodes
+      .map(node => `${node.id}:${node.layer}:${JSON.stringify(node.attrs)}`)
+      .join('|');
+    const edgeSig = graph.links
+      .map(link => `${link.source}->${link.target}:${link.layer}`)
+      .join('|');
+    return `${nodeSig}#${edgeSig}`;
+  }, []);
+
+  useEffect(() => {
+    const signature = computeSignature(data);
+    if (signature !== dataSignatureRef.current) {
+      dataSignatureRef.current = signature;
+      forceUpdate({});
+    }
+  }, [data, computeSignature]);
 
   // Initialize graph when data changes
   useEffect(() => {
@@ -345,7 +364,7 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
         graphRef.current = null;
       }
     };
-  }, [data, width, height]);
+  }, [data, width, height, computeSignature]);
 
   // Handle window resize events
   useEffect(() => {
