@@ -88,7 +88,8 @@ export const GraphNode = memo((props: GraphNodeProps) => {
         name: node.label || node.id,
         layer: node.layer || 'default',
         attrs: {
-          is_partition: node.isPartition.toString(),
+          is_partition: node.isPartition ? 'true' : 'false',
+          belongs_to: (node as any).belongsTo || node.attrs?.belongs_to || '',
           weight: (node.weight || 0).toString(),
           ...node.attrs,
         },

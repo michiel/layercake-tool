@@ -17,8 +17,8 @@ export const GraphPreviewDialog = ({ opened, onClose, data, title }: GraphPrevie
     if (!data) return { flow: null, hierarchy: null };
 
     const flowNodes = data.nodes.filter(node => {
-      const flag = node.attrs?.isPartition;
-      return !(flag === 'true' || flag === '1' || flag === 'yes');
+      const flag = node.attrs?.is_partition ?? node.attrs?.isPartition;
+      return !(flag === 'true' || flag === '1' || flag === 'yes' || flag === 'TRUE');
     });
     const flowIds = new Set(flowNodes.map(node => node.id));
     const flowEdges = data.links.filter(link => flowIds.has(link.source) && flowIds.has(link.target));
@@ -30,13 +30,14 @@ export const GraphPreviewDialog = ({ opened, onClose, data, title }: GraphPrevie
     });
 
     const hierarchyEdges = data.nodes
-      .filter(node => {
-        const parentId = node.attrs?.belongsTo;
-        return parentId && data.nodes.some(candidate => candidate.id === parentId);
+      .map(node => {
+        const parent = node.attrs?.belongs_to ?? node.attrs?.belongsTo;
+        return { node, parent };
       })
-      .map(node => ({
-        id: `hierarchy-${node.attrs.belongsTo}-${node.id}`,
-        source: node.attrs.belongsTo as string,
+      .filter(({ parent }) => parent && data.nodes.some(candidate => candidate.id === parent))
+      .map(({ node, parent }) => ({
+        id: `hierarchy-${parent}-${node.id}`,
+        source: parent as string,
         target: node.id,
         name: '',
         layer: node.layer,
@@ -91,7 +92,7 @@ export const GraphPreviewDialog = ({ opened, onClose, data, title }: GraphPrevie
         <Tabs.Panel value="flow" pt="md" style={{ height: '75vh' }}>
           {normalizedData.flow && (
             <GraphPreview
-              key={`flow-${normalizedData.flow.nodes.length}-${normalizedData.flow.links.length}`}
+              key={`flow-${normalizedData.flow.nodes.length}-${normalizedData.flow.links.length}-${tab}`}
               data={normalizedData.flow}
             />
           )}
@@ -99,7 +100,7 @@ export const GraphPreviewDialog = ({ opened, onClose, data, title }: GraphPrevie
         <Tabs.Panel value="hierarchy" pt="md" style={{ height: '75vh' }}>
           {normalizedData.hierarchy && (
             <GraphPreview
-              key={`hierarchy-${normalizedData.hierarchy.nodes.length}-${normalizedData.hierarchy.links.length}`}
+              key={`hierarchy-${normalizedData.hierarchy.nodes.length}-${normalizedData.hierarchy.links.length}-${tab}`}
               data={normalizedData.hierarchy}
             />
           )}
