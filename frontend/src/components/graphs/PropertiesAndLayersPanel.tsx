@@ -1,5 +1,5 @@
 import React from 'react';
-import { Accordion, Paper } from '@mantine/core';
+import { Accordion, Paper, Button, Group } from '@mantine/core';
 import { NodePropertiesForm } from './NodePropertiesForm';
 import { LayersAccordionPanel } from './LayersAccordionPanel';
 import { Graph, GraphNode } from '../../graphql/graphs';
@@ -14,6 +14,8 @@ interface PropertiesAndLayersPanelProps {
   onHideAllLayers: () => void;
   onLayerColorChange?: (layerId: string, colorType: 'background' | 'border' | 'text', color: string) => void;
   onAddLayer?: () => void;
+  viewMode: 'flow' | 'hierarchy';
+  onToggleViewMode: () => void;
 }
 
 export const PropertiesAndLayersPanel: React.FC<PropertiesAndLayersPanelProps> = ({
@@ -26,6 +28,8 @@ export const PropertiesAndLayersPanel: React.FC<PropertiesAndLayersPanelProps> =
   onHideAllLayers,
   onLayerColorChange,
   onAddLayer,
+  viewMode,
+  onToggleViewMode,
 }) => {
   const selectedNode = selectedNodeId
     ? graph.graphNodes.find(n => n.id === selectedNodeId)
@@ -42,6 +46,16 @@ export const PropertiesAndLayersPanel: React.FC<PropertiesAndLayersPanelProps> =
         borderLeft: '1px solid #e9ecef'
       }}
     >
+      <Group justify="flex-end" mb="sm">
+        <Button
+          size="xs"
+          variant="light"
+          onClick={onToggleViewMode}
+        >
+          {viewMode === 'flow' ? 'Switch to Hierarchy' : 'Switch to Flow'}
+        </Button>
+      </Group>
+
       <Accordion
         multiple
         variant="separated"

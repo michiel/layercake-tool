@@ -36,13 +36,19 @@ const elkOptions = {
   'elk.layered.cycleBreaking.strategy': 'DEPTH_FIRST',
 };
 
+interface LayoutOptions {
+  disableSubflows?: boolean;
+}
+
 // Function to convert LcGraph to React Flow elements
 export const getLayoutedElements = async (
   lcGraph: Graph,
   layers: Layer[],
   nodeWidth: number = 170,
-  nodeHeight: number = 50
+  nodeHeight: number = 50,
+  options: LayoutOptions = {}
 ) => {
+  const disableSubflows = options.disableSubflows === true;
   // Create node lookup map
   const nodeMap = new Map<string, GraphNode>();
   lcGraph.graphNodes.forEach(node => nodeMap.set(node.id, node));
@@ -50,18 +56,6 @@ export const getLayoutedElements = async (
   // Create layer lookup map by layerId
   const layerMap = new Map<string, Layer>();
   layers.forEach(layer => layerMap.set(layer.layerId, layer));
-
-  // Debug: Log nodes to verify belongsTo and isPartition values
-  console.log('=== ALL GRAPH NODES (total: ' + lcGraph.graphNodes.length + ') ===');
-  lcGraph.graphNodes.forEach(n => {
-    console.log(`  ${n.id}: isPartition=${n.isPartition}, belongsTo=${n.belongsTo || 'null'}, label="${n.label}"`);
-  });
-
-  console.log('\n=== PARTITION NODES ===');
-  lcGraph.graphNodes.filter(n => n.isPartition).forEach(n => {
-    const children = lcGraph.graphNodes.filter(c => c.belongsTo === n.id);
-    console.log(`  ${n.id} (${n.label}): ${children.length} children - [${children.map(c => c.id).join(', ')}]`);
-  });
 
   // Build ELK graph structure recursively
   const buildElkNode = (nodeId: string): ElkNode | null => {
@@ -110,24 +104,31 @@ export const getLayoutedElements = async (
     !n.belongsTo || !nodeMap.has(n.belongsTo)
   );
 
-  console.log('Root nodes:', rootNodes.map(n => ({ id: n.id, label: n.label, isPartition: n.isPartition })));
-
   const graph: ElkNode = {
     id: 'root',
-    layoutOptions: elkOptions,
+    layoutOptions: {
+      ...elkOptions,
+      ...(disableSubflows ? { 'elk.hierarchyHandling': 'INCLUDE_CHILDREN' } : {}),
+    },
     children: [],
     edges: [],
   };
 
-  // Build ELK graph from roots
-  rootNodes.forEach(rootNode => {
-    const elkNode = buildElkNode(rootNode.id);
-    if (elkNode) {
-      graph.children?.push(elkNode);
-    }
-  });
-
-  console.log('ELK graph before layout:', JSON.stringify(graph, null, 2));
+  if (disableSubflows) {
+    graph.children = lcGraph.graphNodes.map(node => ({
+      id: node.id,
+      width: nodeWidth,
+      height: nodeHeight,
+      labels: [{ text: node.label || node.id }],
+    }));
+  } else {
+    rootNodes.forEach(rootNode => {
+      const elkNode = buildElkNode(rootNode.id);
+      if (elkNode) {
+        graph.children?.push(elkNode);
+      }
+    });
+  }
 
   // Add edges
   lcGraph.graphEdges.forEach(edge => {
@@ -148,8 +149,16 @@ export const getLayoutedElements = async (
   const depthMap = new Map<string, number>();
   const calculateDepth = (nodeId: string, depth: number = 0) => {
     depthMap.set(nodeId, depth);
+
+    if (disableSubflows) {
+      lcGraph.graphNodes
+        .filter(n => n.belongsTo === nodeId)
+        .forEach(child => calculateDepth(child.id, depth + 1));
+      return;
+    }
+
     const node = nodeMap.get(nodeId);
-    if (node?.isPartition) {
+    if (!disableSubflows && node?.isPartition) {
       lcGraph.graphNodes
         .filter(n => n.belongsTo === nodeId)
         .forEach(child => calculateDepth(child.id, depth + 1));

@@ -63,6 +63,8 @@ const GET_GRAPH_DETAILS = gql`
 
 interface GraphEditorPageProps {}
 
+type GraphViewMode = 'flow' | 'hierarchy';
+
 export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
   const navigate = useNavigate();
   const { projectId, graphId } = useParams<{ projectId: string; graphId: string }>();
@@ -70,6 +72,7 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
   const [layerVisibility, setLayerVisibility] = useState<Map<string, boolean>>(new Map());
   const [editHistoryOpen, setEditHistoryOpen] = useState(false);
   const [propertiesPanelCollapsed, setPropertiesPanelCollapsed] = useState(false);
+  const [viewMode, setViewMode] = useState<GraphViewMode>('flow');
 
   // Store references to ReactFlow setters for optimistic updates
   const setNodesRef = useRef<React.Dispatch<React.SetStateAction<FlowNode[]>> | null>(null);
@@ -195,6 +198,10 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
       newMap.forEach((_, layerId) => newMap.set(layerId, false));
       return newMap;
     });
+  }, []);
+
+  const handleToggleViewMode = useCallback(() => {
+    setViewMode(prev => (prev === 'flow' ? 'hierarchy' : 'flow'));
   }, []);
 
   const handleAddLayer = useCallback(() => {
@@ -482,6 +489,7 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
               onNodeSelect={setSelectedNodeId}
               layerVisibility={layerVisibility}
               onNodesInitialized={handleNodesInitialized}
+              mode={viewMode}
             />
           </ReactFlowProvider>
         </div>
@@ -497,6 +505,8 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
             onHideAllLayers={handleHideAllLayers}
             onLayerColorChange={handleLayerColorChange}
             onAddLayer={handleAddLayer}
+            viewMode={viewMode}
+            onToggleViewMode={handleToggleViewMode}
           />
         )}
       </Flex>

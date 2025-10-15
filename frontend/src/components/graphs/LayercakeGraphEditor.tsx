@@ -9,18 +9,22 @@ import { getLayoutedElements } from '../../utils/graphUtils';
 import { GroupNode } from './GroupNode';
 import { FloatingEdge } from './FloatingEdge';
 
+type GraphViewMode = 'flow' | 'hierarchy';
+
 interface LayercakeGraphEditorProps {
   graph: Graph;
   onNodeSelect?: (nodeId: string | null) => void;
   layerVisibility?: Map<string, boolean>;
   onNodesInitialized?: (setNodes: React.Dispatch<React.SetStateAction<Node[]>>, setEdges: React.Dispatch<React.SetStateAction<Edge[]>>) => void;
+  mode?: GraphViewMode;
 }
 
 export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
   graph,
   onNodeSelect,
   layerVisibility,
-  onNodesInitialized
+  onNodesInitialized,
+  mode = 'flow'
 }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -31,10 +35,60 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
   const nodeTypes = useMemo(() => ({ group: GroupNode }), []);
   const edgeTypes = useMemo(() => ({ floating: FloatingEdge }), []);
 
-  const onLayout = useCallback(async () => {
-    if (!graph || !graph.graphNodes || !graph.graphEdges) return;
+  const renderGraph = useMemo(() => {
+    if (!graph) {
+      return graph;
+    }
 
-    const layouted = await getLayoutedElements(graph, graph.layers);
+    if (mode === 'hierarchy') {
+      const normalizeParentId = (belongsTo?: string | null) =>
+        belongsTo ? belongsTo.trim() : undefined;
+
+      const nodeMap = new Map(
+        graph.graphNodes.map(node => [node.id, node])
+      );
+
+      const hierarchyNodes = graph.graphNodes.map(node => ({
+        ...node,
+        isPartition: false,
+      }));
+
+      const hierarchyEdges = graph.graphNodes
+        .map(node => ({
+          node,
+          parentId: normalizeParentId(node.belongsTo),
+        }))
+        .filter(({ parentId }) => parentId && nodeMap.has(parentId))
+        .map(({ node, parentId }) => ({
+          id: `hierarchy-${parentId}-${node.id}`,
+          source: parentId as string,
+          target: node.id,
+          label: '',
+          layer: undefined,
+          weight: undefined,
+          attrs: undefined,
+        }));
+
+      return {
+        ...graph,
+        graphNodes: hierarchyNodes,
+        graphEdges: hierarchyEdges,
+      };
+    }
+
+    return graph;
+  }, [graph, mode]);
+
+  const onLayout = useCallback(async () => {
+    if (!renderGraph || !renderGraph.graphNodes || !renderGraph.graphEdges) return;
+
+    const layouted = await getLayoutedElements(
+      renderGraph,
+      renderGraph.layers,
+      170,
+      50,
+      { disableSubflows: mode === 'hierarchy' }
+    );
 
     // Restore selection state from ref (preserved across re-renders)
     const nodesWithSelection = layouted.nodes.map(node => ({
@@ -52,11 +106,11 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
       });
       isInitialLoad.current = false;
     }
-  }, [graph, setNodes, setEdges, fitView]);
+  }, [renderGraph, setNodes, setEdges, fitView]);
 
   useEffect(() => {
     onLayout();
-  }, [graph, onLayout]);
+  }, [renderGraph, onLayout]);
 
   // Notify parent that nodes/edges are ready for manipulation
   useEffect(() => {
@@ -68,6 +122,7 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
   // Update hidden property when visibility changes (no re-layout!)
   useEffect(() => {
     if (!layerVisibility || layerVisibility.size === 0) return;
+    if (!renderGraph) return;
 
     setNodes(currentNodes => {
       return currentNodes.map(node => {
@@ -77,7 +132,7 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
         }
 
         // Find the corresponding graph node to get layer info
-        const graphNode = graph.graphNodes.find(gn => gn.id === node.id);
+        const graphNode = renderGraph.graphNodes.find(gn => gn.id === node.id);
         if (!graphNode) return node;
 
         const shouldHide = graphNode.layer
@@ -90,7 +145,7 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
 
     setEdges(currentEdges => {
       return currentEdges.map(edge => {
-        const graphEdge = graph.graphEdges.find(ge => ge.id === edge.id);
+        const graphEdge = renderGraph.graphEdges.find(ge => ge.id === edge.id);
         if (!graphEdge) return edge;
 
         // Hide edge if its layer is hidden
@@ -99,8 +154,8 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
           : false;
 
         // Hide edge if source or target is hidden
-        const sourceNode = graph.graphNodes.find(n => n.id === graphEdge.source);
-        const targetNode = graph.graphNodes.find(n => n.id === graphEdge.target);
+        const sourceNode = renderGraph.graphNodes.find(n => n.id === graphEdge.source);
+        const targetNode = renderGraph.graphNodes.find(n => n.id === graphEdge.target);
 
         const sourceHidden = sourceNode?.layer
           ? layerVisibility.get(sourceNode.layer) === false
@@ -114,7 +169,7 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
         return { ...edge, hidden: shouldHide };
       });
     });
-  }, [layerVisibility, graph, setNodes, setEdges]);
+  }, [layerVisibility, renderGraph, setNodes, setEdges]);
 
   // Handle node selection
   const handleSelectionChange = useCallback(({ nodes }: { nodes: Node[] }) => {
