@@ -21,6 +21,7 @@ interface LayercakeGraphEditorProps {
   orientation?: GraphOrientation;
   groupingEnabled?: boolean;
   fitViewTrigger?: number;
+  wrapperRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
@@ -32,6 +33,7 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
   orientation = 'vertical',
   groupingEnabled = true,
   fitViewTrigger,
+  wrapperRef,
 }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -250,7 +252,7 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
   }, []);
 
   return (
-    <div style={{ width: '100%', height: '100%' }}>
+    <div style={{ width: '100%', height: '100%' }} ref={wrapperRef}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
