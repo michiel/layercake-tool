@@ -15,6 +15,7 @@ use crate::services::data_source_service::DataSourceService;
 use crate::services::export_service::ExportService;
 use crate::services::graph_edit_service::GraphEditService;
 use crate::services::graph_service::GraphService;
+use crate::services::sample_project_service::SampleProjectService;
 
 use crate::graphql::types::graph::{CreateGraphInput, CreateLayerInput, Graph, UpdateGraphInput};
 use crate::graphql::types::graph_edit::{
@@ -49,6 +50,23 @@ impl Mutation {
         project.description = Set(input.description);
 
         let project = project.insert(&context.db).await?;
+        Ok(Project::from(project))
+    }
+
+    /// Create a project from a bundled sample definition
+    async fn create_sample_project(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(name = "sampleKey")] sample_key: String,
+    ) -> Result<Project> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let service = SampleProjectService::new(context.db.clone());
+
+        let project = service
+            .create_sample_project(&sample_key)
+            .await
+            .map_err(|e| Error::new(format!("Failed to create sample project: {}", e)))?;
+
         Ok(Project::from(project))
     }
 
@@ -1577,7 +1595,7 @@ impl Mutation {
         let graph_service = GraphService::new(context.db.clone());
 
         let graph = graph_service
-            .create_graph(input.project_id, input.name)
+            .create_graph(input.project_id, input.name, None)
             .await
             .map_err(|e| Error::new(format!("Failed to create Graph: {}", e)))?;
 

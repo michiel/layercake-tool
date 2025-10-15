@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Routes, Route, useNavigate, useParams, useLocation } from 'react-router-dom'
 import { AppShell, Group, Title, Stack, Button, Container, Text, Card, Badge, Alert, Modal, Select, FileButton, ActionIcon, Tooltip } from '@mantine/core'
-import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconFileImport, IconDownload, IconChevronLeft, IconChevronRight } from '@tabler/icons-react'
+import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconFileImport, IconDownload, IconChevronLeft, IconChevronRight, IconFolderPlus } from '@tabler/icons-react'
 import { useQuery, useMutation } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import { Breadcrumbs } from './components/common/Breadcrumbs'
@@ -41,6 +41,26 @@ const GET_PROJECTS = gql`
 const DELETE_PROJECT = gql`
   mutation DeleteProject($id: ID!) {
     deleteProject(id: $id)
+  }
+`
+
+const GET_SAMPLE_PROJECTS = gql`
+  query GetSampleProjects {
+    sampleProjects {
+      key
+      name
+      description
+    }
+  }
+`
+
+const CREATE_SAMPLE_PROJECT = gql`
+  mutation CreateSampleProject($sampleKey: String!) {
+    createSampleProject(sampleKey: $sampleKey) {
+      id
+      name
+      description
+    }
   }
 `
 
@@ -336,6 +356,9 @@ const ProjectsPage = () => {
   const [importFile, setImportFile] = useState<File | null>(null)
   const [importLoading, setImportLoading] = useState(false)
   const [importError, setImportError] = useState<string | null>(null)
+  const [sampleModalOpened, setSampleModalOpened] = useState(false)
+  const [selectedSampleKey, setSelectedSampleKey] = useState<string | null>(null)
+  const [sampleError, setSampleError] = useState<string | null>(null)
 
   const { data: projectsData, loading: projectsLoading, error: projectsError, refetch } = useQuery<{
     projects: Array<{
@@ -349,11 +372,35 @@ const ProjectsPage = () => {
     errorPolicy: 'all',
   })
 
+  const { data: sampleProjectsData, loading: sampleProjectsLoading, error: sampleProjectsError } = useQuery<{
+    sampleProjects: Array<{
+      key: string
+      name: string
+      description?: string | null
+    }>
+  }>(GET_SAMPLE_PROJECTS)
+
   const projects = projectsData?.projects || []
 
   const [deleteProject] = useMutation(DELETE_PROJECT, {
     refetchQueries: [{ query: GET_PROJECTS }],
   });
+
+  const [createSampleProject, { loading: createSampleLoading }] = useMutation(CREATE_SAMPLE_PROJECT, {
+    onCompleted: (result) => {
+      const project = (result as any)?.createSampleProject
+      if (project) {
+        refetch()
+        navigate(`/projects/${project.id}`)
+        setSampleModalOpened(false)
+        setSelectedSampleKey(null)
+        setSampleError(null)
+      }
+    },
+    onError: (error) => {
+      setSampleError(error.message)
+    }
+  })
 
   const [importPlanYaml] = useMutation(gql`
     mutation ImportPlanYaml($projectId: Int!, $yamlContent: String!) {
@@ -424,6 +471,46 @@ const ProjectsPage = () => {
     }
   }
 
+  const handleOpenSampleModal = () => {
+    setSampleError(null)
+    setSampleModalOpened(true)
+  }
+
+  const handleSampleModalClose = () => {
+    setSampleModalOpened(false)
+    setSelectedSampleKey(null)
+    setSampleError(null)
+  }
+
+  const handleCreateSampleProject = async () => {
+    if (!selectedSampleKey) {
+      setSampleError('Please select a sample project')
+      return
+    }
+
+    setSampleError(null)
+
+    try {
+      await createSampleProject({
+        variables: {
+          sampleKey: selectedSampleKey,
+        },
+      })
+    } catch (error) {
+      // Errors are reported via the mutation's onError handler
+      console.error('Failed to create sample project', error)
+    }
+  }
+
+  const sampleOptions =
+    sampleProjectsData?.sampleProjects?.map(sample => ({
+      value: sample.key,
+      label: sample.name,
+      description: sample.description ?? undefined,
+    })) ?? []
+
+  const selectedSample = sampleOptions.find(option => option.value === selectedSampleKey)
+
   return (
     <Container size="xl">
       <Breadcrumbs currentPage="Projects" onNavigate={handleNavigate} />
@@ -433,6 +520,13 @@ const ProjectsPage = () => {
         <Group gap="xs">
           <Button leftSection={<IconPlus size={16} />} onClick={handleCreateProject}>
             New Project
+          </Button>
+          <Button
+            variant="light"
+            leftSection={<IconFolderPlus size={16} />}
+            onClick={handleOpenSampleModal}
+          >
+            Add Sample Project
           </Button>
           <Button
             variant="light"
@@ -542,6 +636,59 @@ const ProjectsPage = () => {
         onClose={() => setCreateModalOpened(false)}
         onSuccess={handleProjectCreated}
       />
+
+      <Modal
+        opened={sampleModalOpened}
+        onClose={handleSampleModalClose}
+        title="Add Sample Project"
+        size="md"
+      >
+        <Stack gap="md">
+          <Text size="sm" c="dimmed">
+            Select one of the bundled samples to create a project preloaded with data sources and a starter DAG.
+          </Text>
+
+          {sampleProjectsError && (
+            <Alert color="red" title="Unable to load samples">
+              {sampleProjectsError.message}
+            </Alert>
+          )}
+
+          <Select
+            label="Sample Project"
+            placeholder={sampleProjectsLoading ? 'Loading samples...' : 'Select a sample'}
+            data={sampleOptions}
+            value={selectedSampleKey}
+            onChange={setSelectedSampleKey}
+            disabled={sampleProjectsLoading || sampleOptions.length === 0}
+          />
+
+          {selectedSample?.description && (
+            <Text size="sm" c="dimmed">
+              {selectedSample.description}
+            </Text>
+          )}
+
+          {sampleError && (
+            <Alert color="red" title="Cannot create sample project">
+              {sampleError}
+            </Alert>
+          )}
+
+          <Group justify="flex-end" gap="xs">
+            <Button variant="subtle" onClick={handleSampleModalClose} disabled={createSampleLoading}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateSampleProject}
+              loading={createSampleLoading}
+              disabled={!selectedSampleKey || sampleProjectsLoading}
+            >
+              Create Sample Project
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
 
       <Modal
         opened={importModalOpened}

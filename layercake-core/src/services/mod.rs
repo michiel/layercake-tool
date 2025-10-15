@@ -10,6 +10,7 @@ pub mod graph_service;
 pub mod import_service;
 pub mod plan_dag_service;
 pub mod project_service;
+pub mod sample_project_service;
 pub mod validation;
 
 pub use authorization::*;
@@ -19,4 +20,5 @@ pub use graph_edit_service::*;
 pub use graph_service::*;
 pub use import_service::*;
 pub use plan_dag_service::*;
+pub use sample_project_service::*;
 pub use validation::*;

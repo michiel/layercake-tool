@@ -14,16 +14,27 @@ use crate::graphql::types::plan_dag::{
     PlanDagMetadata, PlanDagNode, PlanDagNodeType, ValidationResult,
 };
 use crate::graphql::types::project::Project;
+use crate::graphql::types::sample_project::SampleProject;
 use crate::graphql::types::{
     DataSource, DataSourcePreview, GraphEdgePreview, GraphEdit, GraphNodePreview, GraphPreview,
     Layer, ProjectCollaborator, TableColumn, TableRow, User, UserSession,
 };
-use crate::services::graph_edit_service::GraphEditService;
+use crate::services::{
+    graph_edit_service::GraphEditService, sample_project_service::SampleProjectService,
+};
 
 pub struct Query;
 
 #[Object]
 impl Query {
+    /// List bundled sample projects
+    async fn sample_projects(&self) -> Result<Vec<SampleProject>> {
+        Ok(SampleProjectService::list_available_projects()
+            .into_iter()
+            .map(SampleProject::from)
+            .collect())
+    }
+
     /// Get all projects
     async fn projects(&self, ctx: &Context<'_>) -> Result<Vec<Project>> {
         let context = ctx.data::<GraphQLContext>()?;

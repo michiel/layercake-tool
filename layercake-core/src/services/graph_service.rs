@@ -104,19 +104,18 @@ impl GraphService {
         &self,
         project_id: i32,
         name: String,
+        node_id: Option<String>,
     ) -> Result<crate::database::entities::graphs::Model> {
         use crate::database::entities::graphs;
         use sea_orm::{ActiveModelTrait, Set};
 
-        // Generate a placeholder node_id for now
-        let node_id = format!("graphnode_{}", uuid::Uuid::new_v4());
+        let node_id = node_id
+            .unwrap_or_else(|| format!("graphnode_{}", uuid::Uuid::new_v4().simple().to_string()));
 
-        let graph = graphs::ActiveModel {
-            project_id: Set(project_id),
-            name: Set(name),
-            node_id: Set(node_id),
-            ..Default::default()
-        };
+        let mut graph = graphs::ActiveModel::new();
+        graph.project_id = Set(project_id);
+        graph.name = Set(name);
+        graph.node_id = Set(node_id);
 
         let graph = graph.insert(&self.db).await?;
 

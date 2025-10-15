@@ -10,6 +10,7 @@ pub mod graph_node;
 pub mod json_patch;
 pub mod layer;
 pub mod preview;
+pub mod sample_project;
 pub mod scalars;
 pub mod user;
 
@@ -23,5 +24,6 @@ pub use plan::*;
 pub use plan_dag::*;
 pub use preview::*;
 pub use project::*;
+pub use sample_project::*;
 pub use scalars::*;
 pub use user::*;
