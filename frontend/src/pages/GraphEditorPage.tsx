@@ -75,6 +75,8 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
   const [propertiesPanelCollapsed, setPropertiesPanelCollapsed] = useState(false);
   const [viewMode, setViewMode] = useState<GraphViewMode>('flow');
   const [orientation, setOrientation] = useState<GraphOrientation>('vertical');
+  const [flowGroupingEnabled, setFlowGroupingEnabled] = useState(true);
+  const [fitViewTrigger, setFitViewTrigger] = useState(0);
 
   // Store references to ReactFlow setters for optimistic updates
   const setNodesRef = useRef<React.Dispatch<React.SetStateAction<FlowNode[]>> | null>(null);
@@ -202,13 +204,24 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
     });
   }, []);
 
+  const requestFitView = useCallback(() => {
+    setFitViewTrigger(prev => prev + 1);
+  }, []);
+
   const handleToggleViewMode = useCallback(() => {
     setViewMode(prev => (prev === 'flow' ? 'hierarchy' : 'flow'));
-  }, []);
+    requestFitView();
+  }, [requestFitView]);
 
   const handleToggleOrientation = useCallback(() => {
     setOrientation(prev => (prev === 'vertical' ? 'horizontal' : 'vertical'));
-  }, []);
+    requestFitView();
+  }, [requestFitView]);
+
+  const handleToggleFlowGrouping = useCallback(() => {
+    setFlowGroupingEnabled(prev => !prev);
+    requestFitView();
+  }, [requestFitView]);
 
   const handleAddLayer = useCallback(() => {
     if (!graph) return;
@@ -497,6 +510,8 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
               onNodesInitialized={handleNodesInitialized}
               mode={viewMode}
               orientation={orientation}
+              groupingEnabled={viewMode === 'flow' ? flowGroupingEnabled : false}
+              fitViewTrigger={fitViewTrigger}
             />
           </ReactFlowProvider>
         </div>
@@ -516,6 +531,8 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
             onToggleViewMode={handleToggleViewMode}
             orientation={orientation}
             onToggleOrientation={handleToggleOrientation}
+            flowGroupingEnabled={flowGroupingEnabled}
+            onToggleFlowGrouping={handleToggleFlowGrouping}
           />
         )}
       </Flex>

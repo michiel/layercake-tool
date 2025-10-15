@@ -1,5 +1,5 @@
 import React from 'react';
-import { Accordion, Paper, Button, Group } from '@mantine/core';
+import { Accordion, Paper, Button, Group, Stack } from '@mantine/core';
 import { NodePropertiesForm } from './NodePropertiesForm';
 import { LayersAccordionPanel } from './LayersAccordionPanel';
 import { Graph, GraphNode } from '../../graphql/graphs';
@@ -18,6 +18,8 @@ interface PropertiesAndLayersPanelProps {
   onToggleViewMode: () => void;
   orientation: 'vertical' | 'horizontal';
   onToggleOrientation: () => void;
+  flowGroupingEnabled: boolean;
+  onToggleFlowGrouping: () => void;
 }
 
 export const PropertiesAndLayersPanel: React.FC<PropertiesAndLayersPanelProps> = ({
@@ -34,6 +36,8 @@ export const PropertiesAndLayersPanel: React.FC<PropertiesAndLayersPanelProps> =
   onToggleViewMode,
   orientation,
   onToggleOrientation,
+  flowGroupingEnabled,
+  onToggleFlowGrouping,
 }) => {
   const selectedNode = selectedNodeId
     ? graph.graphNodes.find(n => n.id === selectedNodeId)
@@ -50,27 +54,38 @@ export const PropertiesAndLayersPanel: React.FC<PropertiesAndLayersPanelProps> =
         borderLeft: '1px solid #e9ecef'
       }}
     >
-      <Group justify="space-between" mb="sm">
-        <Button
-          size="xs"
-          variant="light"
-          onClick={onToggleViewMode}
-        >
-          {viewMode === 'flow' ? 'Switch to Hierarchy' : 'Switch to Flow'}
-        </Button>
-        <Button
-          size="xs"
-          variant="light"
-          onClick={onToggleOrientation}
-        >
-          {orientation === 'vertical' ? 'To Left-Right' : 'To Top-Bottom'}
-        </Button>
-      </Group>
+      <Stack gap="xs" mb="sm">
+        <Group justify="space-between">
+          <Button
+            size="xs"
+            variant="light"
+            onClick={onToggleViewMode}
+          >
+            {viewMode === 'flow' ? 'Switch to Hierarchy' : 'Switch to Flow'}
+          </Button>
+          <Button
+            size="xs"
+            variant="light"
+            onClick={onToggleOrientation}
+          >
+            {orientation === 'vertical' ? 'To Left-Right' : 'To Top-Bottom'}
+          </Button>
+        </Group>
+        {viewMode === 'flow' && (
+          <Button
+            size="xs"
+            variant="light"
+            onClick={onToggleFlowGrouping}
+          >
+            {flowGroupingEnabled ? 'Disable groupings' : 'Enable groupings'}
+          </Button>
+        )}
+      </Stack>
 
       <Accordion
         multiple
         variant="separated"
-        defaultValue={['node-properties']}
+        defaultValue={['node-properties', 'layers']}
       >
         <Accordion.Item value="node-properties">
           <Accordion.Control>Node Properties</Accordion.Control>

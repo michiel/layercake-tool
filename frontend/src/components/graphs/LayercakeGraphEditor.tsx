@@ -19,6 +19,8 @@ interface LayercakeGraphEditorProps {
   onNodesInitialized?: (setNodes: React.Dispatch<React.SetStateAction<Node[]>>, setEdges: React.Dispatch<React.SetStateAction<Edge[]>>) => void;
   mode?: GraphViewMode;
   orientation?: GraphOrientation;
+  groupingEnabled?: boolean;
+  fitViewTrigger?: number;
 }
 
 export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
@@ -27,7 +29,9 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
   layerVisibility,
   onNodesInitialized,
   mode = 'flow',
-  orientation = 'vertical'
+  orientation = 'vertical',
+  groupingEnabled = true,
+  fitViewTrigger,
 }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -79,44 +83,67 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
       };
     }
 
-    return graph;
-  }, [graph, mode]);
+    if (mode === 'flow' && !groupingEnabled) {
+      const filteredNodes = graph.graphNodes.filter(node => !node.isPartition);
+      const allowedIds = new Set(filteredNodes.map(node => node.id));
 
-  const onLayout = useCallback(async () => {
-    if (!renderGraph || !renderGraph.graphNodes || !renderGraph.graphEdges) return;
+      const filteredEdges = graph.graphEdges.filter(
+        edge => allowedIds.has(edge.source) && allowedIds.has(edge.target)
+      );
 
-    const layouted = await getLayoutedElements(
-      renderGraph,
-      renderGraph.layers,
-      170,
-      50,
-      {
-        disableSubflows: mode === 'hierarchy',
-        orientation,
-      }
-    );
-
-    // Restore selection state from ref (preserved across re-renders)
-    const nodesWithSelection = layouted.nodes.map(node => ({
-      ...node,
-      selected: selectedNodeIdsRef.current.includes(node.id)
-    }));
-
-    setNodes(nodesWithSelection);
-    setEdges(layouted.edges);
-
-    // Only fit view on initial load, not on subsequent updates
-    if (isInitialLoad.current) {
-      window.requestAnimationFrame(() => {
-        fitView();
-      });
-      isInitialLoad.current = false;
+      return {
+        ...graph,
+        graphNodes: filteredNodes,
+        graphEdges: filteredEdges,
+      };
     }
-  }, [renderGraph, setNodes, setEdges, fitView, orientation, mode]);
+
+    return graph;
+  }, [graph, mode, groupingEnabled]);
+
+  const onLayout = useCallback(
+    async (shouldFitView: boolean) => {
+      if (!renderGraph || !renderGraph.graphNodes || !renderGraph.graphEdges) return;
+
+      const layouted = await getLayoutedElements(
+        renderGraph,
+        renderGraph.layers,
+        170,
+        50,
+        {
+          disableSubflows: mode === 'hierarchy' || (mode === 'flow' && !groupingEnabled),
+          orientation,
+        }
+      );
+
+      // Restore selection state from ref (preserved across re-renders)
+      const nodesWithSelection = layouted.nodes.map(node => ({
+        ...node,
+        selected: selectedNodeIdsRef.current.includes(node.id),
+      }));
+
+      setNodes(nodesWithSelection);
+      setEdges(layouted.edges);
+
+      if (shouldFitView || isInitialLoad.current) {
+        window.requestAnimationFrame(() => {
+          fitView({ padding: 0.15, minZoom: 0.02 });
+          isInitialLoad.current = false;
+        });
+      }
+    },
+    [renderGraph, setNodes, setEdges, fitView, orientation, mode, groupingEnabled]
+  );
 
   useEffect(() => {
-    onLayout();
+    onLayout(false);
   }, [renderGraph, onLayout]);
+
+  useEffect(() => {
+    if (fitViewTrigger !== undefined) {
+      onLayout(true);
+    }
+  }, [fitViewTrigger, onLayout]);
 
   // Notify parent that nodes/edges are ready for manipulation
   useEffect(() => {
