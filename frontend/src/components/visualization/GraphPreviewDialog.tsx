@@ -16,12 +16,14 @@ export const GraphPreviewDialog = ({ opened, onClose, data, title }: GraphPrevie
   const normalizedData = useMemo(() => {
     if (!data) return { flow: null, hierarchy: null };
 
+    const partitionFlags = new Set(['true', '1', 'yes', 'TRUE']);
     const flowNodes = data.nodes.filter(node => {
-      const flag = node.attrs?.is_partition ?? node.attrs?.isPartition;
-      return !(flag === 'true' || flag === '1' || flag === 'yes' || flag === 'TRUE');
+      const flag = node.attrs?.is_partition ?? node.attrs?.isPartition ?? '';
+      return !partitionFlags.has(flag);
     });
     const flowIds = new Set(flowNodes.map(node => node.id));
     const flowEdges = data.links.filter(link => flowIds.has(link.source) && flowIds.has(link.target));
+    const allNodeIds = new Set(data.nodes.map(node => node.id));
 
     const hierarchyNodes = data.nodes.map(node => {
       const attrs = { ...node.attrs };
@@ -34,7 +36,7 @@ export const GraphPreviewDialog = ({ opened, onClose, data, title }: GraphPrevie
         const parent = node.attrs?.belongs_to ?? node.attrs?.belongsTo;
         return { node, parent };
       })
-      .filter(({ parent }) => parent && data.nodes.some(candidate => candidate.id === parent))
+      .filter(({ parent }) => parent && allNodeIds.has(parent))
       .map(({ node, parent }) => ({
         id: `hierarchy-${parent}-${node.id}`,
         source: parent as string,

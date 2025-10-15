@@ -1,7 +1,7 @@
 import { memo, useState } from 'react'
 import { NodeProps, Handle, Position } from 'reactflow'
 import { Paper, Text, Group, ActionIcon, Tooltip, Badge, Stack, Loader } from '@mantine/core'
-import { IconSettings, IconTrash, IconPlayerPlayFilled, IconChartDots, IconTable } from '@tabler/icons-react'
+import { IconSettings, IconTrash, IconPlayerPlayFilled, IconChartDots, IconTable, IconExternalLink } from '@tabler/icons-react'
 import { useMutation } from '@apollo/client/react'
 import { PlanDagNodeType, GraphNodeConfig } from '../../../../types/plan-dag'
 import { isNodeConfigured } from '../../../../utils/planDagValidation'
@@ -11,6 +11,7 @@ import { getExecutionStateLabel, getExecutionStateColor, isExecutionComplete, is
 import { GraphPreviewDialog } from '../../../visualization/GraphPreviewDialog'
 import { GraphData } from '../../../visualization/GraphPreview'
 import { GraphDataDialog } from '../dialogs/GraphDataDialog'
+import { useNavigate } from 'react-router-dom'
 
 interface GraphNodeProps extends NodeProps {
   onEdit?: (nodeId: string) => void
@@ -22,6 +23,7 @@ export const GraphNode = memo((props: GraphNodeProps) => {
   const { data, selected, onEdit, onDelete, readonly = false } = props
   const [showPreview, setShowPreview] = useState(false)
   const [showDataDialog, setShowDataDialog] = useState(false)
+  const navigate = useNavigate()
 
   const config = data.config as GraphNodeConfig
   const color = getNodeColor(PlanDagNodeType.GRAPH)
@@ -37,6 +39,7 @@ export const GraphNode = memo((props: GraphNodeProps) => {
   // Use inline execution metadata from PlanDAG query, only query if not available
   const graphExecution = data.graphExecution
   const needsExecutionQuery = !graphExecution && projectId
+  const graphId = graphExecution?.graphId || null
 
   // Query pipeline graph preview (only for visualization dialog)
   const { preview: graphPreview } = useGraphPreview(
@@ -51,6 +54,7 @@ export const GraphNode = memo((props: GraphNodeProps) => {
     props.id,
     { skip: !needsExecutionQuery }
   )
+  const resolvedGraphId = graphId || executionPreview?.graphId || null
 
   // Execute node mutation
   const [executeNode, { loading: executing }] = useMutation(EXECUTE_NODE, {
@@ -288,6 +292,24 @@ export const GraphNode = memo((props: GraphNodeProps) => {
                 <IconTable size="1.5rem" />
               </ActionIcon>
             </Tooltip>
+            {projectId && resolvedGraphId && (
+              <Tooltip label="Open graph editor">
+                <ActionIcon
+                  size="xl"
+                  variant="light"
+                  color="grape"
+                  radius="xl"
+                  data-action-icon="open-graph"
+                  onMouseDown={(e) => {
+                    e.stopPropagation()
+                    e.preventDefault()
+                    navigate(`/projects/${projectId}/graphs/${resolvedGraphId}/edit`)
+                  }}
+                >
+                  <IconExternalLink size="1.5rem" />
+                </ActionIcon>
+              </Tooltip>
+            )}
           </Group>
         )}
 
@@ -344,7 +366,7 @@ export const GraphNode = memo((props: GraphNodeProps) => {
       <GraphDataDialog
         opened={showDataDialog}
         onClose={() => setShowDataDialog(false)}
-        graphId={graphExecution?.graphId || executionPreview?.graphId || null}
+        graphId={resolvedGraphId}
         title={`Graph Data: ${data.metadata.label}`}
       />
     </>

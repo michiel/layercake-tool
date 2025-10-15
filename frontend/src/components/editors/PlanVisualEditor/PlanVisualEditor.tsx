@@ -55,9 +55,10 @@ interface PlanVisualEditorProps {
   onNodeSelect?: (nodeId: string | null) => void
   onEdgeSelect?: (edgeId: string | null) => void
   readonly?: boolean
+  focusNodeId?: string
 }
 
-const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly = false }: PlanVisualEditorProps) => {
+const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly = false, focusNodeId }: PlanVisualEditorProps) => {
   // Get ReactFlow instance for fit view and screen position conversion
   const { fitView, screenToFlowPosition } = useReactFlow();
 
@@ -140,6 +141,27 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     nodesRef.current = nodes
   }, [nodes])
 
+  useEffect(() => {
+    if (!focusNodeId) return
+    if (lastFocusedNodeIdRef.current === focusNodeId) return
+
+    const targetNode = nodes.find(node => node.id === focusNodeId)
+    if (!targetNode) return
+
+    lastFocusedNodeIdRef.current = focusNodeId
+
+    setNodes((currentNodes) => currentNodes.map(node => ({
+      ...node,
+      selected: node.id === focusNodeId
+    })))
+    setSelectedNode(focusNodeId)
+    onNodeSelect?.(focusNodeId)
+
+    requestAnimationFrame(() => {
+      fitView({ nodes: [targetNode], padding: 0.25 })
+    })
+  }, [focusNodeId, nodes, setNodes, fitView, onNodeSelect])
+
   // Get mutations from CQRS service (includes delta generation)
   // Adapt CQRS command interface to match old mutation interface
   const mutations = {
@@ -210,6 +232,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
   const [selectedNode, setSelectedNode] = useState<string | null>(null)
   const [_selectedEdge, setSelectedEdge] = useState<string | null>(null)
   const viewportRef = useRef({ x: 0, y: 0, zoom: 1 })
+  const lastFocusedNodeIdRef = useRef<string | null>(null)
 
   // Edge configuration dialog state
   const [edgeConfigDialogOpen, setEdgeConfigDialogOpen] = useState(false)

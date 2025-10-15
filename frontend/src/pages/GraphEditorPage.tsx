@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Container, Title, Alert, LoadingOverlay, Button, Stack, Flex, Group, Badge, ActionIcon, Tooltip, Menu } from '@mantine/core';
-import { IconAlertCircle, IconArrowLeft, IconHistory, IconEdit, IconDownload } from '@tabler/icons-react';
+import { IconAlertCircle, IconArrowLeft, IconHistory, IconEdit, IconDownload, IconRoute } from '@tabler/icons-react';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client';
 import { Breadcrumbs } from '../components/common/Breadcrumbs';
@@ -566,6 +566,17 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
               </Menu.Item>
             </Menu.Dropdown>
           </Menu>
+          {projectId && graph?.nodeId && (
+            <Tooltip label="View in Plan DAG">
+              <ActionIcon
+                variant="light"
+                color="indigo"
+                onClick={() => navigate(`/projects/${projectId}/plan?focusNode=${graph.nodeId}`)}
+              >
+                <IconRoute size={18} />
+              </ActionIcon>
+            </Tooltip>
+          )}
           <Tooltip label="View edit history">
             <ActionIcon
               variant="light"

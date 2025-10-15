@@ -1042,6 +1042,7 @@ const ProjectDetailPage = () => {
 // Plan editor page component
 const PlanEditorPage = () => {
   const navigate = useNavigate()
+  const location = useLocation()
   const { projectId } = useParams<{ projectId: string }>()
   const { data: projectsData, loading: projectsLoading } = useQuery<{
     projects: Array<{
@@ -1081,6 +1082,9 @@ const PlanEditorPage = () => {
     )
   }
 
+  const searchParams = new URLSearchParams(location.search)
+  const focusNodeId = searchParams.get('focusNode') || undefined
+
   return (
     <Stack gap={0} style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div style={{ padding: '8px 16px', borderBottom: '1px solid #e9ecef', flexShrink: 0 }}>
@@ -1097,6 +1101,7 @@ const PlanEditorPage = () => {
             projectId={selectedProject.id}
             onNodeSelect={(nodeId) => console.log('Selected node:', nodeId)}
             onEdgeSelect={(edgeId) => console.log('Selected edge:', edgeId)}
+            focusNodeId={focusNodeId}
           />
         </ErrorBoundary>
       </div>
