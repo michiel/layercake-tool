@@ -2,26 +2,84 @@ import { ApolloClient, InMemoryCache, createHttpLink, split, from } from '@apoll
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions'
 import { getMainDefinition } from '@apollo/client/utilities'
 import { onError } from '@apollo/client/link/error'
+import { setContext } from '@apollo/client/link/context'
 import { createClient } from 'graphql-ws'
+import { getServerInfo, isTauriApp, waitForServer } from '../utils/tauri'
 
-// Configuration based on environment
-// const isDevelopment = import.meta.env.DEV
+// Store server configuration
+let serverConfig: { url: string; secret: string; wsUrl: string } | null = null
+
+// Initialize server configuration for Tauri
+export async function initializeTauriServer(): Promise<void> {
+  if (!isTauriApp()) {
+    console.log('[GraphQL] Not running in Tauri, using web mode configuration')
+    return
+  }
+
+  console.log('[GraphQL] Initializing Tauri server connection...')
+
+  // Wait for the server to be ready
+  const isReady = await waitForServer()
+  if (!isReady) {
+    throw new Error('Failed to connect to embedded server')
+  }
+
+  // Get server info
+  const info = await getServerInfo()
+  if (!info) {
+    throw new Error('Failed to get server information')
+  }
+
+  serverConfig = {
+    url: info.url,
+    secret: info.secret,
+    wsUrl: info.url.replace('http', 'ws'),
+  }
+
+  console.log('[GraphQL] Tauri server configured:', { url: serverConfig.url })
+}
 
 // GraphQL endpoints - configurable for different environments
 const getGraphQLEndpoints = () => {
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'
+  // Use Tauri server if configured
+  if (serverConfig) {
+    return {
+      httpUrl: `${serverConfig.url}/graphql`,
+      wsUrl: `${serverConfig.wsUrl}/graphql/ws`,
+      secret: serverConfig.secret,
+    }
+  }
 
+  // Otherwise use environment variables (web mode)
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'
   return {
     httpUrl: `${baseUrl}/graphql`,
     wsUrl: `${baseUrl.replace('http', 'ws')}/graphql/ws`,
+    secret: null,
   }
 }
 
-const { httpUrl, wsUrl } = getGraphQLEndpoints()
+// Create authentication link for Tauri secret
+const authLink = setContext((_, { headers }) => {
+  const { secret } = getGraphQLEndpoints()
+
+  // Add secret header if available (Tauri mode)
+  if (secret) {
+    return {
+      headers: {
+        ...headers,
+        'x-tauri-secret': secret,
+      },
+    }
+  }
+
+  return { headers }
+})
 
 // HTTP Link for queries and mutations with timeout using AbortController
+// Use a function to get the current endpoint (supports dynamic reconfiguration)
 const httpLink = createHttpLink({
-  uri: httpUrl,
+  uri: () => getGraphQLEndpoints().httpUrl,
   credentials: 'omit',
   fetch: (uri, options) => {
     const controller = new AbortController()
@@ -39,25 +97,39 @@ const httpLink = createHttpLink({
 })
 
 // WebSocket Link for subscriptions (real-time collaboration)
-const wsLink = new GraphQLWsLink(
-  createClient({
-    url: wsUrl,
-    connectionParams: () => {
-      // No authentication in development mode
-      return {}
-    },
-    shouldRetry: () => {
-      // Retry connection on network errors
-      return true
-    },
-    on: {
-      connected: () => console.log('[GraphQL WebSocket] Connected to', wsUrl),
-      connecting: () => console.log('[GraphQL WebSocket] Connecting to', wsUrl),
-      closed: (event) => console.log('[GraphQL WebSocket] Closed', event),
-      error: (error) => console.error('[GraphQL WebSocket] Error', error),
-    },
-  })
-)
+// Use lazy initialization to support dynamic endpoints
+let wsClient: ReturnType<typeof createClient> | null = null
+
+function getOrCreateWsClient() {
+  if (!wsClient) {
+    const { wsUrl: currentWsUrl } = getGraphQLEndpoints()
+
+    wsClient = createClient({
+      url: currentWsUrl,
+      connectionParams: () => {
+        const { secret } = getGraphQLEndpoints()
+        // Include secret in WebSocket connection params if available (Tauri mode)
+        if (secret) {
+          return { 'x-tauri-secret': secret }
+        }
+        return {}
+      },
+      shouldRetry: () => {
+        // Retry connection on network errors
+        return true
+      },
+      on: {
+        connected: () => console.log('[GraphQL WebSocket] Connected to', currentWsUrl),
+        connecting: () => console.log('[GraphQL WebSocket] Connecting to', currentWsUrl),
+        closed: (event) => console.log('[GraphQL WebSocket] Closed', event),
+        error: (error) => console.error('[GraphQL WebSocket] Error', error),
+      },
+    })
+  }
+  return wsClient
+}
+
+const wsLink = new GraphQLWsLink(getOrCreateWsClient())
 
 // Error handling link
 const errorLink = onError((errorResponse) => {
@@ -94,7 +166,7 @@ const splitLink = split(
     )
   },
   wsLink,
-  from([errorLink, httpLink]) // Apply error handling only to HTTP link
+  from([authLink, errorLink, httpLink]) // Apply auth and error handling to HTTP link
 )
 
 // Apollo Client with enhanced cache configuration for real-time collaboration

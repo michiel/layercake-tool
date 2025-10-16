@@ -3010,6 +3010,7 @@ dependencies = [
  "anyhow",
  "axum",
  "layercake-core",
+ "rand 0.8.5",
  "reqwest",
  "sea-orm",
  "sea-orm-migration",
