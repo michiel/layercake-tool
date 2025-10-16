@@ -5,6 +5,8 @@ use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, Set};
 use spreadsheet_ods::{WorkBook, Sheet, Value};
 
 use crate::database::entities::data_sources;
+use crate::database::entities::data_sources::{FileFormat, DataType};
+use crate::services::data_source_service::DataSourceService;
 
 pub struct DataSourceBulkService {
     db: DatabaseConnection,
@@ -13,6 +15,66 @@ pub struct DataSourceBulkService {
 impl DataSourceBulkService {
     pub fn new(db: DatabaseConnection) -> Self {
         Self { db }
+    }
+
+    /// Infer data type from sheet name or headers
+    fn infer_data_type(sheet_name: &str, headers: &[String]) -> Option<DataType> {
+        let name_lower = sheet_name.to_lowercase();
+
+        // Check sheet name first
+        if name_lower.contains("node") {
+            return Some(DataType::Nodes);
+        }
+        if name_lower.contains("edge") || name_lower.contains("link") {
+            return Some(DataType::Edges);
+        }
+        if name_lower.contains("layer") {
+            return Some(DataType::Layers);
+        }
+
+        // Check headers
+        if headers.contains(&"source".to_string()) && headers.contains(&"target".to_string()) {
+            return Some(DataType::Edges);
+        }
+        if headers.contains(&"layer".to_string()) && headers.contains(&"background".to_string()) {
+            return Some(DataType::Layers);
+        }
+        if headers.contains(&"label".to_string()) && !headers.contains(&"source".to_string()) {
+            return Some(DataType::Nodes);
+        }
+
+        None
+    }
+
+    /// Convert calamine range to CSV string
+    fn range_to_csv(range: &calamine::Range<calamine::Data>) -> Result<Vec<u8>> {
+        use calamine::Data;
+        use std::io::Write;
+
+        let mut csv_data = Vec::new();
+
+        for row_idx in 0..range.height() {
+            let mut row_values = Vec::new();
+
+            for col_idx in 0..range.width() {
+                let cell = range.get((row_idx, col_idx));
+                let value = match cell {
+                    Some(Data::String(s)) => s.clone(),
+                    Some(Data::Int(i)) => i.to_string(),
+                    Some(Data::Float(f)) => f.to_string(),
+                    Some(Data::Bool(b)) => b.to_string(),
+                    Some(Data::Empty) | None => String::new(),
+                    _ => String::new(),
+                };
+                row_values.push(value);
+            }
+
+            // Write CSV row
+            let row_str = row_values.join(",");
+            writeln!(csv_data, "{}", row_str)?;
+        }
+
+        Ok(csv_data)
     }
 
     /// Export datasources to XLSX format
@@ -188,131 +250,81 @@ impl DataSourceBulkService {
     }
 
     /// Import datasources from XLSX format
-    /// Each sheet represents a datasource (identified by sheet name or ID field)
-    /// If datasource exists (by ID), update it; otherwise create new
+    /// Each sheet becomes a datasource containing the tabular data from that sheet
     pub async fn import_from_xlsx(
         &self,
         project_id: i32,
         xlsx_data: &[u8],
     ) -> Result<DataSourceImportResult> {
-        use calamine::{open_workbook_from_rs, Reader, Xlsx};
+        use calamine::{open_workbook_from_rs, Reader, Xlsx, Data};
         use std::io::Cursor;
 
-        // Log file size for debugging
-        tracing::info!("Attempting to import XLSX file with {} bytes", xlsx_data.len());
-
-        // Log first few bytes for debugging (should be PK for zip files)
-        if xlsx_data.len() >= 4 {
-            tracing::info!("File header bytes: {:02x} {:02x} {:02x} {:02x}",
-                xlsx_data[0], xlsx_data[1], xlsx_data[2], xlsx_data[3]);
-
-            // XLSX files are ZIP archives, so should start with PK (0x50 0x4B)
-            if xlsx_data[0] != 0x50 || xlsx_data[1] != 0x4B {
-                tracing::warn!("File does not start with PK signature - not a valid ZIP/XLSX file");
-            }
-        }
-
-        // For debugging: write to temp file
-        if std::env::var("DEBUG_IMPORT").is_ok() {
-            let temp_path = format!("/tmp/debug_import_{}.xlsx", std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs());
-            if let Err(e) = std::fs::write(&temp_path, xlsx_data) {
-                tracing::warn!("Failed to write debug file: {}", e);
-            } else {
-                tracing::info!("Wrote debug file to: {}", temp_path);
-            }
-        }
+        tracing::info!("Importing XLSX file with {} bytes", xlsx_data.len());
 
         let cursor = Cursor::new(xlsx_data);
         let mut workbook: Xlsx<_> = open_workbook_from_rs(cursor)
             .map_err(|e| {
-                tracing::error!("Calamine error details: {:?}", e);
-                anyhow::anyhow!("Failed to open XLSX file ({} bytes): {:?}", xlsx_data.len(), e)
+                tracing::error!("Failed to open XLSX: {:?}", e);
+                anyhow::anyhow!("Failed to open XLSX file: {:?}", e)
             })?;
 
         let mut created_count = 0;
         let mut updated_count = 0;
         let mut imported_ids = Vec::new();
 
+        let service = DataSourceService::new(self.db.clone());
+
         // Iterate through all sheets
-        for sheet_name in workbook.sheet_names() {
+        let sheet_names = workbook.sheet_names();
+        tracing::info!("Found {} sheets in XLSX", sheet_names.len());
+
+        for sheet_name in sheet_names {
             let sheet_name = sheet_name.to_string();
+            tracing::info!("Processing sheet: {}", sheet_name);
 
             if let Ok(range) = workbook.worksheet_range(&sheet_name) {
-                // Parse datasource from sheet
-                let datasource_data = self.parse_datasource_from_sheet(&range)?;
+                tracing::info!("Sheet '{}' dimensions: {}x{}", sheet_name, range.height(), range.width());
 
-                // Check if datasource with this ID exists
-                if let Some(existing_id) = datasource_data.id {
-                    // Update existing
-                    let existing = data_sources::Entity::find_by_id(existing_id)
-                        .one(&self.db)
-                        .await?;
+                if range.height() == 0 || range.width() == 0 {
+                    tracing::warn!("Skipping empty sheet: {}", sheet_name);
+                    continue;
+                }
 
-                    if let Some(existing) = existing {
-                        use sea_orm::ActiveModelTrait;
-                        let mut active: data_sources::ActiveModel = existing.into();
-
-                        // Update fields
-                        if let Some(name) = datasource_data.name {
-                            active.name = Set(name);
-                        }
-                        active.description = Set(datasource_data.description);
-
-                        let updated = active.update(&self.db).await?;
-                        updated_count += 1;
-                        imported_ids.push(updated.id);
-                    }
-                } else {
-                    // Create new datasource from imported data
-                    if let (Some(name), Some(file_format), Some(data_type), Some(filename), Some(graph_json)) = (
-                        datasource_data.name.clone(),
-                        datasource_data.file_format.clone(),
-                        datasource_data.data_type.clone(),
-                        datasource_data.filename.clone(),
-                        datasource_data.graph_json.clone(),
-                    ) {
-                        tracing::info!("Creating new datasource: {}", name);
-
-                        // Calculate file size from graph_json
-                        let file_size = graph_json.len() as i64;
-
-                        // Create new datasource with empty blob (we have graph_json which is what matters)
-                        let new_datasource = data_sources::ActiveModel {
-                            id: sea_orm::ActiveValue::NotSet,
-                            project_id: Set(project_id),
-                            name: Set(name),
-                            description: Set(datasource_data.description),
-                            file_format: Set(file_format),
-                            data_type: Set(data_type),
-                            filename: Set(filename),
-                            blob: Set(Vec::new()), // Empty blob since we have graph_json
-                            graph_json: Set(graph_json),
-                            status: Set("active".to_string()),
-                            error_message: Set(None),
-                            file_size: Set(file_size),
-                            processed_at: Set(Some(chrono::Utc::now())),
-                            created_at: Set(chrono::Utc::now()),
-                            updated_at: Set(chrono::Utc::now()),
-                        };
-
-                        let created = new_datasource.insert(&self.db).await?;
-                        created_count += 1;
-                        imported_ids.push(created.id);
-                        tracing::info!("Created datasource with id: {}", created.id);
-                    } else {
-                        tracing::warn!("Sheet '{}' is missing required fields - skipping. Has: name={:?}, file_format={:?}, data_type={:?}, filename={:?}, graph_json={}",
-                            sheet_name,
-                            datasource_data.name.as_ref().map(|_| "present"),
-                            datasource_data.file_format.as_ref().map(|_| "present"),
-                            datasource_data.data_type.as_ref().map(|_| "present"),
-                            datasource_data.filename.as_ref().map(|_| "present"),
-                            if datasource_data.graph_json.is_some() { "present" } else { "missing" }
-                        );
+                // Extract headers from first row
+                let mut headers = Vec::new();
+                for col_idx in 0..range.width() {
+                    if let Some(Data::String(s)) = range.get((0, col_idx)) {
+                        headers.push(s.clone());
                     }
                 }
+
+                tracing::info!("Sheet headers: {:?}", headers);
+
+                // Infer data type
+                let data_type = Self::infer_data_type(&sheet_name, &headers)
+                    .ok_or_else(|| anyhow::anyhow!("Could not infer data type for sheet: {}", sheet_name))?;
+
+                tracing::info!("Inferred data type: {:?}", data_type);
+
+                // Convert sheet to CSV
+                let csv_data = Self::range_to_csv(&range)?;
+                tracing::info!("Converted sheet to {} bytes of CSV", csv_data.len());
+
+                // Create datasource using existing service
+                let filename = format!("{}.csv", sheet_name);
+                let datasource = service.create_from_file(
+                    project_id,
+                    sheet_name.clone(),
+                    Some(format!("Imported from spreadsheet")),
+                    filename,
+                    FileFormat::Csv,
+                    data_type,
+                    csv_data,
+                ).await?;
+
+                created_count += 1;
+                imported_ids.push(datasource.id);
+                tracing::info!("Created datasource: {} with id: {}", sheet_name, datasource.id);
             }
         }
 
@@ -324,113 +336,81 @@ impl DataSourceBulkService {
     }
 
     /// Import datasources from ODS format
-    /// Each sheet represents a datasource (identified by sheet name or ID field)
-    /// If datasource exists (by ID), update it; otherwise create new
+    /// Each sheet becomes a datasource containing the tabular data from that sheet
     pub async fn import_from_ods(
         &self,
         project_id: i32,
         ods_data: &[u8],
     ) -> Result<DataSourceImportResult> {
-        use calamine::{open_workbook_from_rs, Reader, Ods};
+        use calamine::{open_workbook_from_rs, Reader, Ods, Data};
         use std::io::Cursor;
 
-        tracing::info!("Attempting to import ODS file with {} bytes", ods_data.len());
+        tracing::info!("Importing ODS file with {} bytes", ods_data.len());
 
         let cursor = Cursor::new(ods_data);
         let mut workbook: Ods<_> = open_workbook_from_rs(cursor)
-            .context("Failed to open ODS file")?;
+            .map_err(|e| {
+                tracing::error!("Failed to open ODS: {:?}", e);
+                anyhow::anyhow!("Failed to open ODS file: {:?}", e)
+            })?;
 
         let mut created_count = 0;
         let mut updated_count = 0;
         let mut imported_ids = Vec::new();
 
+        let service = DataSourceService::new(self.db.clone());
+
         // Iterate through all sheets
         let sheet_names = workbook.sheet_names();
-        tracing::info!("Found {} sheets in ODS file", sheet_names.len());
+        tracing::info!("Found {} sheets in ODS", sheet_names.len());
 
         for sheet_name in sheet_names {
             let sheet_name = sheet_name.to_string();
             tracing::info!("Processing sheet: {}", sheet_name);
 
             if let Ok(range) = workbook.worksheet_range(&sheet_name) {
-                tracing::info!("Sheet '{}' has dimensions: {}x{}", sheet_name, range.height(), range.width());
+                tracing::info!("Sheet '{}' dimensions: {}x{}", sheet_name, range.height(), range.width());
 
-                // Parse datasource from sheet
-                let datasource_data = self.parse_datasource_from_sheet(&range)?;
+                if range.height() == 0 || range.width() == 0 {
+                    tracing::warn!("Skipping empty sheet: {}", sheet_name);
+                    continue;
+                }
 
-                tracing::info!("Parsed datasource data from sheet '{}': id={:?}, name={:?}, file_format={:?}, data_type={:?}",
-                    sheet_name, datasource_data.id, datasource_data.name,
-                    datasource_data.file_format, datasource_data.data_type);
-
-                // Check if datasource with this ID exists
-                if let Some(existing_id) = datasource_data.id {
-                    // Update existing
-                    let existing = data_sources::Entity::find_by_id(existing_id)
-                        .one(&self.db)
-                        .await?;
-
-                    if let Some(existing) = existing {
-                        use sea_orm::ActiveModelTrait;
-                        let mut active: data_sources::ActiveModel = existing.into();
-
-                        // Update fields
-                        if let Some(name) = datasource_data.name {
-                            active.name = Set(name);
-                        }
-                        active.description = Set(datasource_data.description);
-
-                        let updated = active.update(&self.db).await?;
-                        updated_count += 1;
-                        imported_ids.push(updated.id);
-                    }
-                } else {
-                    // Create new datasource from imported data
-                    if let (Some(name), Some(file_format), Some(data_type), Some(filename), Some(graph_json)) = (
-                        datasource_data.name.clone(),
-                        datasource_data.file_format.clone(),
-                        datasource_data.data_type.clone(),
-                        datasource_data.filename.clone(),
-                        datasource_data.graph_json.clone(),
-                    ) {
-                        tracing::info!("Creating new datasource: {}", name);
-
-                        // Calculate file size from graph_json
-                        let file_size = graph_json.len() as i64;
-
-                        // Create new datasource with empty blob (we have graph_json which is what matters)
-                        let new_datasource = data_sources::ActiveModel {
-                            id: sea_orm::ActiveValue::NotSet,
-                            project_id: Set(project_id),
-                            name: Set(name),
-                            description: Set(datasource_data.description),
-                            file_format: Set(file_format),
-                            data_type: Set(data_type),
-                            filename: Set(filename),
-                            blob: Set(Vec::new()), // Empty blob since we have graph_json
-                            graph_json: Set(graph_json),
-                            status: Set("active".to_string()),
-                            error_message: Set(None),
-                            file_size: Set(file_size),
-                            processed_at: Set(Some(chrono::Utc::now())),
-                            created_at: Set(chrono::Utc::now()),
-                            updated_at: Set(chrono::Utc::now()),
-                        };
-
-                        let created = new_datasource.insert(&self.db).await?;
-                        created_count += 1;
-                        imported_ids.push(created.id);
-                        tracing::info!("Created datasource with id: {}", created.id);
-                    } else {
-                        tracing::warn!("Sheet '{}' is missing required fields - skipping. Has: name={:?}, file_format={:?}, data_type={:?}, filename={:?}, graph_json={}",
-                            sheet_name,
-                            datasource_data.name.as_ref().map(|_| "present"),
-                            datasource_data.file_format.as_ref().map(|_| "present"),
-                            datasource_data.data_type.as_ref().map(|_| "present"),
-                            datasource_data.filename.as_ref().map(|_| "present"),
-                            if datasource_data.graph_json.is_some() { "present" } else { "missing" }
-                        );
+                // Extract headers from first row
+                let mut headers = Vec::new();
+                for col_idx in 0..range.width() {
+                    if let Some(Data::String(s)) = range.get((0, col_idx)) {
+                        headers.push(s.clone());
                     }
                 }
+
+                tracing::info!("Sheet headers: {:?}", headers);
+
+                // Infer data type
+                let data_type = Self::infer_data_type(&sheet_name, &headers)
+                    .ok_or_else(|| anyhow::anyhow!("Could not infer data type for sheet: {}", sheet_name))?;
+
+                tracing::info!("Inferred data type: {:?}", data_type);
+
+                // Convert sheet to CSV
+                let csv_data = Self::range_to_csv(&range)?;
+                tracing::info!("Converted sheet to {} bytes of CSV", csv_data.len());
+
+                // Create datasource using existing service
+                let filename = format!("{}.csv", sheet_name);
+                let datasource = service.create_from_file(
+                    project_id,
+                    sheet_name.clone(),
+                    Some(format!("Imported from spreadsheet")),
+                    filename,
+                    FileFormat::Csv,
+                    data_type,
+                    csv_data,
+                ).await?;
+
+                created_count += 1;
+                imported_ids.push(datasource.id);
+                tracing::info!("Created datasource: {} with id: {}", sheet_name, datasource.id);
             }
         }
 
@@ -440,82 +420,6 @@ impl DataSourceBulkService {
             imported_ids,
         })
     }
-
-    fn parse_datasource_from_sheet(
-        &self,
-        range: &calamine::Range<calamine::Data>,
-    ) -> Result<DataSourceData> {
-        use calamine::Data;
-
-        let mut data = DataSourceData::default();
-
-        tracing::debug!("Parsing sheet with {} rows", range.height());
-
-        // Read key-value pairs from rows
-        for row_idx in 0..range.height() {
-            if let (Some(key_cell), Some(value_cell)) =
-                (range.get((row_idx, 0)), range.get((row_idx, 1)))
-            {
-                tracing::debug!("Row {}: key={:?}, value={:?}", row_idx, key_cell, value_cell);
-
-                if let Data::String(ref key) = key_cell {
-                    match key.as_str() {
-                        "id" => {
-                            if let Data::Int(id) = value_cell {
-                                data.id = Some(*id as i32);
-                            } else if let Data::Float(id) = value_cell {
-                                data.id = Some(*id as i32);
-                            }
-                        }
-                        "name" => {
-                            if let Data::String(ref name) = value_cell {
-                                data.name = Some(name.clone());
-                            }
-                        }
-                        "description" => {
-                            if let Data::String(ref desc) = value_cell {
-                                data.description = Some(desc.clone());
-                            }
-                        }
-                        "file_format" => {
-                            if let Data::String(ref fmt) = value_cell {
-                                data.file_format = Some(fmt.clone());
-                            }
-                        }
-                        "data_type" => {
-                            if let Data::String(ref dt) = value_cell {
-                                data.data_type = Some(dt.clone());
-                            }
-                        }
-                        "filename" => {
-                            if let Data::String(ref fn_) = value_cell {
-                                data.filename = Some(fn_.clone());
-                            }
-                        }
-                        "graph_json" => {
-                            if let Data::String(ref json) = value_cell {
-                                data.graph_json = Some(json.clone());
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-            }
-        }
-
-        Ok(data)
-    }
-}
-
-#[derive(Default)]
-struct DataSourceData {
-    id: Option<i32>,
-    name: Option<String>,
-    description: Option<String>,
-    file_format: Option<String>,
-    data_type: Option<String>,
-    filename: Option<String>,
-    graph_json: Option<String>,
 }
 
 pub struct DataSourceImportResult {
