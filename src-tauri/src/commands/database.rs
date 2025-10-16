@@ -65,9 +65,13 @@ pub async fn reinitialize_database(
 
     // Step 3: Restart the server (which will recreate the database and run migrations)
     info!("Restarting server with fresh database");
-    match crate::server::start_embedded_server(db_path.to_string_lossy().to_string(), 3030).await {
+    match crate::server::start_embedded_server(db_path.to_string_lossy().to_string()).await {
         Ok(handle) => {
-            info!("Server restarted successfully with fresh database");
+            let port = handle.port;
+            info!(
+                "Server restarted successfully with fresh database on port {}",
+                port
+            );
             let mut server_guard = state.server_handle.write().await;
             *server_guard = Some(handle);
             Ok("Database reinitialized successfully".to_string())
