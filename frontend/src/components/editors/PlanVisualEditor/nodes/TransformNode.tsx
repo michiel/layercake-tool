@@ -2,6 +2,7 @@ import { memo } from 'react'
 import { NodeProps } from 'reactflow'
 import { BaseNode } from './BaseNode'
 import { PlanDagNodeType } from '../../../../types/plan-dag'
+import { usePlanDagCQRSMutations } from '../../../../hooks/usePlanDagCQRSMutations'
 
 interface TransformNodeProps extends NodeProps {
   onEdit?: (nodeId: string) => void
@@ -11,6 +12,20 @@ interface TransformNodeProps extends NodeProps {
 export const TransformNode = memo((props: TransformNodeProps) => {
   const { data, onEdit, onDelete } = props
 
+  // Get project ID from context
+  const projectId = data.projectId as number | undefined
+  const { updateNode } = usePlanDagCQRSMutations({ projectId: projectId || 0 })
+
+  const handleLabelChange = async (newLabel: string) => {
+    try {
+      await updateNode(props.id, {
+        metadata: { ...data.metadata, label: newLabel }
+      })
+    } catch (error) {
+      console.error('Failed to update node label:', error)
+    }
+  }
+
   return (
     <BaseNode
       {...props}
@@ -19,9 +34,11 @@ export const TransformNode = memo((props: TransformNodeProps) => {
       metadata={data.metadata}
       onEdit={() => onEdit?.(props.id)}
       onDelete={() => onDelete?.(props.id)}
+      onLabelChange={handleLabelChange}
       readonly={data.readonly}
       edges={data.edges}
       hasValidConfig={data.hasValidConfig}
+      editableLabel={true}
     />
   )
 })

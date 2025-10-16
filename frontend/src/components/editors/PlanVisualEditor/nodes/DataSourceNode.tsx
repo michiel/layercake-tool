@@ -1,39 +1,14 @@
 import { memo, useState, useEffect } from 'react'
-import { NodeProps, Handle, Position } from 'reactflow'
+import { NodeProps } from 'reactflow'
 import { useQuery } from '@apollo/client/react'
-import { Paper, Text, Group, ActionIcon, Tooltip, Badge, Stack, Loader } from '@mantine/core'
-import { IconSettings, IconTrash, IconAlertCircle, IconCheck, IconClock, IconX, IconTable } from '@tabler/icons-react'
+import { Text, Group, ActionIcon, Tooltip, Badge, Loader } from '@mantine/core'
+import { IconAlertCircle, IconTable } from '@tabler/icons-react'
 import { PlanDagNodeType, DataSourceNodeConfig } from '../../../../types/plan-dag'
 import { isNodeConfigured } from '../../../../utils/planDagValidation'
-import { getNodeColor, getNodeIcon, getNodeTypeLabel } from '../../../../utils/nodeStyles'
-import { GET_DATASOURCE, DataSource, getFileFormatDisplayName, getDataTypeDisplayName, formatFileSize, getStatusColor } from '../../../../graphql/datasources'
+import { GET_DATASOURCE, DataSource } from '../../../../graphql/datasources'
 import { getExecutionStateLabel, getExecutionStateColor, isExecutionComplete, isExecutionInProgress } from '../../../../graphql/preview'
 import { DataSourceDataDialog } from '../dialogs/DataSourceDataDialog'
-
-// Helper function to get data freshness information
-const getDataFreshness = (dataSource: DataSource) => {
-  if (!dataSource.processedAt) {
-    return { text: 'Never processed', color: 'red', priority: 'high' }
-  }
-
-  const processed = new Date(dataSource.processedAt)
-  const now = new Date()
-  const diffMs = now.getTime() - processed.getTime()
-  const diffHours = diffMs / (1000 * 60 * 60)
-  const diffDays = diffMs / (1000 * 60 * 60 * 24)
-
-  if (diffHours < 1) {
-    return { text: 'Just processed', color: 'green', priority: 'low' }
-  } else if (diffHours < 24) {
-    return { text: `${Math.round(diffHours)}h ago`, color: 'green', priority: 'low' }
-  } else if (diffDays < 7) {
-    return { text: `${Math.round(diffDays)}d ago`, color: 'blue', priority: 'medium' }
-  } else if (diffDays < 30) {
-    return { text: `${Math.round(diffDays)}d ago`, color: 'orange', priority: 'medium' }
-  } else {
-    return { text: `${Math.round(diffDays)}d ago`, color: 'red', priority: 'high' }
-  }
-}
+import { BaseNode } from './BaseNode'
 
 interface DataSourceNodeProps extends NodeProps {
   onEdit?: (nodeId: string) => void
@@ -42,12 +17,11 @@ interface DataSourceNodeProps extends NodeProps {
 }
 
 export const DataSourceNode = memo((props: DataSourceNodeProps) => {
-  const { data, selected, onEdit, onDelete, readonly = false } = props
+  const { data, onEdit, onDelete, readonly = false } = props
   const [dataSourceInfo, setDataSourceInfo] = useState<DataSource | null>(null)
   const [showDataDialog, setShowDataDialog] = useState(false)
 
   const config = data.config as DataSourceNodeConfig
-  const color = getNodeColor(PlanDagNodeType.DATA_SOURCE)
 
   // Check if node is configured
   const edges = data.edges || []
@@ -59,7 +33,7 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
   const needsQuery = !datasourceExecution && config.dataSourceId
 
   // Fallback query only if inline data not available
-  const { data: dataSourceData, loading: dataSourceLoading } = useQuery(GET_DATASOURCE, {
+  const { data: dataSourceData } = useQuery(GET_DATASOURCE, {
     variables: { id: config.dataSourceId || 0 },
     skip: !needsQuery,
     errorPolicy: 'ignore'
@@ -71,260 +45,44 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
     }
   }, [dataSourceData])
 
-  const getStatusIcon = (status: DataSource['status']) => {
-    switch (status) {
-      case 'active':
-        return <IconCheck size={12} />
-      case 'processing':
-        return <IconClock size={12} />
-      case 'error':
-        return <IconX size={12} />
-      default:
-        return null
-    }
-  }
-
-  const renderDataSourceContent = () => {
-    // Use inline datasourceExecution from PlanDAG query
-    if (datasourceExecution) {
-      const tempDataSource = {
-        status: datasourceExecution.status,
-        filename: datasourceExecution.filename,
-        processedAt: datasourceExecution.processedAt,
-        errorMessage: datasourceExecution.errorMessage,
-      }
-
-      const freshness = getDataFreshness(tempDataSource as any)
-
-      return (
-        <Stack gap="xs">
-          <Group gap="xs" wrap="wrap">
-            <Badge
-              size="xs"
-              color={getStatusColor(datasourceExecution.status as any)}
-              leftSection={getStatusIcon(datasourceExecution.status as any)}
-              style={{
-                animation: datasourceExecution.status === 'processing' ? 'pulse 2s infinite' : undefined
-              }}
-            >
-              {datasourceExecution.status}
-            </Badge>
-          </Group>
-
-          <Text size="xs" c="dimmed" ff="monospace" lineClamp={1}>
-            {datasourceExecution.filename}
-          </Text>
-
-          <Group gap="xs" justify="space-between" wrap="wrap">
-            <Tooltip label={`Last processed: ${datasourceExecution.processedAt ? new Date(datasourceExecution.processedAt).toLocaleString() : 'Never'}`}>
-              <Badge
-                size="xs"
-                color={freshness.color}
-                variant={freshness.priority === 'high' ? 'filled' : 'light'}
-                style={{ cursor: 'help' }}
-              >
-                {freshness.text}
-              </Badge>
-            </Tooltip>
-          </Group>
-
-          {datasourceExecution.status === 'error' && datasourceExecution.errorMessage && (
-            <Group gap="xs">
-              <IconAlertCircle size={12} color="red" />
-              <Text size="xs" c="red" lineClamp={1} title={datasourceExecution.errorMessage}>
-                Error processing
-              </Text>
-            </Group>
-          )}
-        </Stack>
-      )
-    }
-
-    if (dataSourceLoading) {
-      return (
-        <Group gap="xs">
-          <Loader size="xs" />
-          <Text size="xs" c="dimmed">Loading...</Text>
-        </Group>
-      )
-    }
-
-    if (dataSourceInfo) {
-      const freshness = getDataFreshness(dataSourceInfo)
-
-      return (
-        <Stack gap="xs">
-          <Group gap="xs" wrap="wrap">
-            <Badge
-              size="xs"
-              color={getStatusColor(dataSourceInfo.status)}
-              leftSection={getStatusIcon(dataSourceInfo.status)}
-              style={{
-                animation: dataSourceInfo.status === 'processing' ? 'pulse 2s infinite' : undefined
-              }}
-            >
-              {dataSourceInfo.status}
-            </Badge>
-            <Badge variant="outline" size="xs" color="blue">
-              {getFileFormatDisplayName(dataSourceInfo.fileFormat)}
-            </Badge>
-            <Badge variant="outline" size="xs" color="green">
-              {getDataTypeDisplayName(dataSourceInfo.dataType)}
-            </Badge>
-          </Group>
-
-          <Text size="xs" c="dimmed" ff="monospace" lineClamp={1}>
-            {dataSourceInfo.filename}
-          </Text>
-
-          <Group gap="xs" justify="space-between" wrap="wrap">
-            <Text size="xs" c="dimmed">
-              {formatFileSize(dataSourceInfo.fileSize)}
-            </Text>
-            <Tooltip label={`Last processed: ${dataSourceInfo.processedAt ? new Date(dataSourceInfo.processedAt).toLocaleString() : 'Never'}`}>
-              <Badge
-                size="xs"
-                color={freshness.color}
-                variant={freshness.priority === 'high' ? 'filled' : 'light'}
-                style={{ cursor: 'help' }}
-              >
-                {freshness.text}
-              </Badge>
-            </Tooltip>
-          </Group>
-
-          {dataSourceInfo.status === 'error' && dataSourceInfo.errorMessage && (
-            <Group gap="xs">
-              <IconAlertCircle size={12} color="red" />
-              <Text size="xs" c="red" lineClamp={1} title={dataSourceInfo.errorMessage}>
-                Error processing
-              </Text>
-            </Group>
-          )}
-        </Stack>
-      )
-    }
-
-    // Fallback for legacy or missing DataSource
-    if (config.source || config.dataType) {
-      return (
-        <Stack gap="xs">
-          <Badge variant="outline" size="xs" color="gray">
-            Legacy
-          </Badge>
-          <Text size="xs" c="dimmed">
-            {config.dataType}: {config.source}
-          </Text>
-        </Stack>
-      )
-    }
-
-    // No DataSource configured
-    return (
-      <Text size="xs" c="dimmed">
-        Click edit to select a data source
-      </Text>
-    )
-  }
+  // Custom label badges for data source node
+  const labelBadges = (
+    <>
+      {!isConfigured && (
+        <Badge variant="outline" size="xs" color="orange">
+          Not Configured
+        </Badge>
+      )}
+      {datasourceExecution && (
+        <Badge
+          variant={isExecutionComplete(datasourceExecution.executionState) ? 'light' : 'filled'}
+          color={getExecutionStateColor(datasourceExecution.executionState)}
+          size="xs"
+          leftSection={isExecutionInProgress(datasourceExecution.executionState) ? <Loader size={10} /> : undefined}
+        >
+          {getExecutionStateLabel(datasourceExecution.executionState)}
+        </Badge>
+      )}
+    </>
+  )
 
   return (
     <>
-      {/* Output Handles - DataSource nodes only have outputs, no inputs */}
-      <Handle
-        type="source"
-        position={Position.Right}
-        id="output-right"
-        style={{
-          background: '#fff',
-          border: `2px solid ${color}`,
-          width: 12,
-          height: 12,
-          borderRadius: '0',
-        }}
-      />
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        id="output-bottom"
-        style={{
-          background: '#fff',
-          border: `2px solid ${color}`,
-          width: 12,
-          height: 12,
-          borderRadius: '0',
-        }}
-      />
-
-      {/* Node Content */}
-      <Paper
-        shadow={selected ? "md" : "sm"}
-        p="md"
-        style={{
-          border: `2px solid ${color}`,
-          borderRadius: 8,
-          minWidth: 200,
-          maxWidth: 280,
-          background: '#fff',
-          cursor: 'default',
-          pointerEvents: 'all',
-        }}
+      <BaseNode
+        {...props}
+        nodeType={PlanDagNodeType.DATA_SOURCE}
+        config={config}
+        metadata={data.metadata}
+        onEdit={() => onEdit?.(props.id)}
+        onDelete={() => onDelete?.(props.id)}
+        readonly={readonly}
+        edges={edges}
+        hasValidConfig={hasValidConfig}
+        labelBadges={labelBadges}
       >
-        {/* Top right: Edit and Delete icons */}
-        {!readonly && (
-          <Group gap={4} style={{ position: 'absolute', top: 8, right: 8, pointerEvents: 'auto', zIndex: 10 }}>
-            <Tooltip label="Edit data source">
-              <ActionIcon
-                size="sm"
-                variant="subtle"
-                color="gray"
-                data-action-icon="edit"
-                onMouseDown={(e) => {
-                  e.stopPropagation()
-                  e.preventDefault()
-                  console.log('Edit icon mousedown for data source, calling onEdit')
-                  onEdit?.(props.id)
-                }}
-              >
-                <IconSettings size="0.8rem" />
-              </ActionIcon>
-            </Tooltip>
-            <Tooltip label="Delete node">
-              <ActionIcon
-                size="sm"
-                variant="subtle"
-                color="red"
-                data-action-icon="delete"
-                onMouseDown={(e) => {
-                  e.stopPropagation()
-                  e.preventDefault()
-                  console.log('Delete icon mousedown for data source, calling onDelete')
-                  onDelete?.(props.id)
-                }}
-              >
-                <IconTrash size="0.8rem" />
-              </ActionIcon>
-            </Tooltip>
-          </Group>
-        )}
-
-        {/* Middle: Icon and Label */}
-        <Group gap="sm" mb="sm" wrap="nowrap" className="node-header" style={{ paddingRight: !readonly ? 60 : 0, cursor: 'grab' }}>
-          <div style={{
-            color,
-            display: 'flex',
-            alignItems: 'center',
-            flexShrink: 0
-          }}>
-            {getNodeIcon(PlanDagNodeType.DATA_SOURCE, '1.4rem')}
-          </div>
-          <Text size="sm" fw={600} lineClamp={2} style={{ wordBreak: 'break-word', flex: 1, minWidth: 0 }}>
-            {data.metadata.label}
-          </Text>
-        </Group>
-
-        {/* Center: Table icon for data view */}
+        {/* View data button - only show if configured and active */}
         {!readonly && isConfigured && (datasourceExecution?.status === 'active' || dataSourceInfo?.status === 'active') && (
-          <Group justify="center" mb="md">
+          <Group justify="center">
             <Tooltip label="View datasource data (nodes, edges, layers)">
               <ActionIcon
                 size="xl"
@@ -344,38 +102,24 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
           </Group>
         )}
 
-        {/* Bottom: Labels and data source details */}
-        <Stack gap="xs">
-          <Group gap="xs" wrap="wrap">
-            <Badge
-              variant="light"
-              color={color}
-              size="xs"
-              style={{ textTransform: 'none' }}
-            >
-              {getNodeTypeLabel(PlanDagNodeType.DATA_SOURCE)}
-            </Badge>
-            {!isConfigured && (
-              <Badge variant="outline" size="xs" color="orange">
-                Not Configured
-              </Badge>
-            )}
-            {datasourceExecution && (
-              <Badge
-                variant={isExecutionComplete(datasourceExecution.executionState) ? 'light' : 'filled'}
-                color={getExecutionStateColor(datasourceExecution.executionState)}
-                size="xs"
-                leftSection={isExecutionInProgress(datasourceExecution.executionState) ? <Loader size={10} /> : undefined}
-              >
-                {getExecutionStateLabel(datasourceExecution.executionState)}
-              </Badge>
-            )}
+        {/* Show error message if there's an error */}
+        {datasourceExecution?.status === 'error' && datasourceExecution.errorMessage && (
+          <Group gap="xs">
+            <IconAlertCircle size={12} color="red" />
+            <Text size="xs" c="red" lineClamp={1} title={datasourceExecution.errorMessage}>
+              Error processing
+            </Text>
           </Group>
-
-          {/* DataSource-specific content */}
-          {renderDataSourceContent()}
-        </Stack>
-      </Paper>
+        )}
+        {dataSourceInfo?.status === 'error' && dataSourceInfo.errorMessage && (
+          <Group gap="xs">
+            <IconAlertCircle size={12} color="red" />
+            <Text size="xs" c="red" lineClamp={1} title={dataSourceInfo.errorMessage}>
+              Error processing
+            </Text>
+          </Group>
+        )}
+      </BaseNode>
 
       {/* Data Source Data Dialog */}
       <DataSourceDataDialog

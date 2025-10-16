@@ -1,12 +1,13 @@
 import { memo, useState } from 'react'
-import { NodeProps, Handle, Position } from 'reactflow'
+import { NodeProps } from 'reactflow'
 import { useMutation } from '@apollo/client/react'
-import { Paper, Text, Group, ActionIcon, Tooltip, Badge, Stack } from '@mantine/core'
-import { IconSettings, IconTrash, IconDownload } from '@tabler/icons-react'
+import { Text, Group, ActionIcon, Tooltip, Badge, Stack } from '@mantine/core'
+import { IconDownload } from '@tabler/icons-react'
 import { PlanDagNodeType, OutputNodeConfig } from '../../../../types/plan-dag'
 import { isNodeConfigured } from '../../../../utils/planDagValidation'
-import { getNodeColor, getNodeIcon, getNodeTypeLabel } from '../../../../utils/nodeStyles'
+import { getNodeColor } from '../../../../utils/nodeStyles'
 import { EXPORT_NODE_OUTPUT, ExportNodeOutputResult } from '../../../../graphql/export'
+import { BaseNode } from './BaseNode'
 
 interface OutputNodeProps extends NodeProps {
   onEdit?: (nodeId: string) => void
@@ -31,7 +32,7 @@ interface OutputNodeProps extends NodeProps {
 // }
 
 export const OutputNode = memo((props: OutputNodeProps) => {
-  const { data, selected, onEdit, onDelete, readonly = false } = props
+  const { data, onEdit, onDelete, readonly = false } = props
   const [downloading, setDownloading] = useState(false)
 
   const config = data.config as OutputNodeConfig
@@ -93,102 +94,42 @@ export const OutputNode = memo((props: OutputNodeProps) => {
     })
   }
 
-  return (
+  // Custom label badges for output node
+  const labelBadges = (
     <>
-      {/* Input Handles */}
-      <Handle
-        type="target"
-        position={Position.Left}
-        id="input-left"
-        style={{
-          background: '#fff',
-          border: `2px solid ${color}`,
-          width: 12,
-          height: 12,
-          borderRadius: '0',
-        }}
-      />
-      <Handle
-        type="target"
-        position={Position.Top}
-        id="input-top"
-        style={{
-          background: '#fff',
-          border: `2px solid ${color}`,
-          width: 12,
-          height: 12,
-          borderRadius: '0',
-        }}
-      />
-
-      {/* Node Content */}
-      <Paper
-        shadow={selected ? "md" : "sm"}
-        p="md"
-        style={{
-          border: `2px solid ${color}`,
-          borderRadius: 8,
-          minWidth: 200,
-          maxWidth: 280,
-          background: '#fff',
-          cursor: 'default',
-          pointerEvents: 'all',
-        }}
+      <Badge
+        variant="light"
+        color={color}
+        size="xs"
+        style={{ textTransform: 'none' }}
       >
-        {/* Top right: Edit and Delete icons */}
-        {!readonly && (
-          <Group gap={4} style={{ position: 'absolute', top: 8, right: 8, pointerEvents: 'auto', zIndex: 10 }}>
-            <Tooltip label="Edit output node">
-              <ActionIcon
-                size="sm"
-                variant="subtle"
-                color="gray"
-                data-action-icon="edit"
-                onMouseDown={(e) => {
-                  e.stopPropagation()
-                  e.preventDefault()
-                  onEdit?.(props.id)
-                }}
-              >
-                <IconSettings size="0.8rem" />
-              </ActionIcon>
-            </Tooltip>
-            <Tooltip label="Delete node">
-              <ActionIcon
-                size="sm"
-                variant="subtle"
-                color="red"
-                data-action-icon="delete"
-                onMouseDown={(e) => {
-                  e.stopPropagation()
-                  e.preventDefault()
-                  onDelete?.(props.id)
-                }}
-              >
-                <IconTrash size="0.8rem" />
-              </ActionIcon>
-            </Tooltip>
-          </Group>
-        )}
+        Output
+      </Badge>
+      {!isConfigured && (
+        <Badge variant="outline" size="xs" color="orange">
+          Not Configured
+        </Badge>
+      )}
+    </>
+  )
 
-        {/* Middle: Icon and Label */}
-        <Group gap="sm" mb="sm" wrap="nowrap" className="node-header" style={{ paddingRight: !readonly ? 60 : 0, cursor: 'grab' }}>
-          <div style={{
-            color,
-            display: 'flex',
-            alignItems: 'center',
-            flexShrink: 0
-          }}>
-            {getNodeIcon(PlanDagNodeType.OUTPUT, '1.4rem')}
-          </div>
-          <Text size="sm" fw={600} lineClamp={2} style={{ wordBreak: 'break-word', flex: 1, minWidth: 0 }}>
-            {data.metadata.label}
-          </Text>
-        </Group>
-
-        {/* Center: Download button */}
+  return (
+    <BaseNode
+      {...props}
+      nodeType={PlanDagNodeType.OUTPUT}
+      config={config}
+      metadata={data.metadata}
+      onEdit={() => onEdit?.(props.id)}
+      onDelete={() => onDelete?.(props.id)}
+      readonly={readonly}
+      edges={edges}
+      hasValidConfig={hasValidConfig}
+      labelBadges={labelBadges}
+    >
+      <Stack gap="xs">
+        {/* Download button */}
         {!readonly && isConfigured && (
-          <Group justify="center" mb="md">
+          <Group justify="center">
             <Tooltip label="Download export">
               <ActionIcon
                 size="xl"
@@ -209,38 +150,20 @@ export const OutputNode = memo((props: OutputNodeProps) => {
           </Group>
         )}
 
-        {/* Bottom: Labels and metadata */}
-        <Stack gap="xs">
-          <Group gap="xs" wrap="wrap">
-            <Badge
-              variant="light"
-              color={color}
-              size="xs"
-              style={{ textTransform: 'none' }}
-            >
-              {getNodeTypeLabel(PlanDagNodeType.OUTPUT)}
-            </Badge>
-            {!isConfigured && (
-              <Badge variant="outline" size="xs" color="orange">
-                Not Configured
-              </Badge>
-            )}
-          </Group>
+        {/* Output metadata */}
+        {config.renderTarget && (
+          <Text size="xs" c="dimmed">
+            Format: {config.renderTarget}
+          </Text>
+        )}
 
-          {config.renderTarget && (
-            <Text size="xs" c="dimmed">
-              Format: {config.renderTarget}
-            </Text>
-          )}
-
-          {config.outputPath && (
-            <Text size="xs" c="dimmed" ff="monospace" lineClamp={1}>
-              {config.outputPath}
-            </Text>
-          )}
-        </Stack>
-      </Paper>
-    </>
+        {config.outputPath && (
+          <Text size="xs" c="dimmed" ff="monospace" lineClamp={1}>
+            {config.outputPath}
+          </Text>
+        )}
+      </Stack>
+    </BaseNode>
   )
 })
 
