@@ -2,6 +2,7 @@ pub mod auth_service;
 pub mod authorization;
 pub mod collaboration_service;
 pub mod data_source_service;
+pub mod datasource_bulk_service;
 pub mod export_service;
 pub mod file_type_detection;
 pub mod graph_edit_applicator;
@@ -14,6 +15,7 @@ pub mod sample_project_service;
 pub mod validation;
 
 pub use authorization::*;
+pub use datasource_bulk_service::*;
 pub use export_service::*;
 pub use graph_edit_applicator::*;
 pub use graph_edit_service::*;

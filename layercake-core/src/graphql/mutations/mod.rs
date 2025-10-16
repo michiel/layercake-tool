@@ -12,6 +12,7 @@ use crate::services::auth_service::AuthService;
 
 use crate::pipeline::DagExecutor;
 use crate::services::data_source_service::DataSourceService;
+use crate::services::datasource_bulk_service::DataSourceBulkService;
 use crate::services::export_service::ExportService;
 use crate::services::graph_edit_service::GraphEditService;
 use crate::services::graph_service::GraphService;
@@ -1670,17 +1671,26 @@ impl Mutation {
         input: ExportDataSourcesInput,
     ) -> Result<ExportDataSourcesResult> {
         let context = ctx.data::<GraphQLContext>()?;
-
-        // TODO: Implement export service
-        // For now, return a placeholder
-        use base64::{Engine as _, engine::general_purpose};
-        let placeholder_content = "Placeholder XLSX content";
-        let encoded = general_purpose::STANDARD.encode(placeholder_content);
+        let bulk_service = DataSourceBulkService::new(context.db.clone());
 
         let format_str = match input.format {
             crate::graphql::types::SpreadsheetFormat::XLSX => "xlsx",
             crate::graphql::types::SpreadsheetFormat::ODS => "ods",
         };
+
+        // Currently only XLSX is implemented
+        let file_bytes = if input.format == crate::graphql::types::SpreadsheetFormat::XLSX {
+            bulk_service
+                .export_to_xlsx(&input.data_source_ids)
+                .await
+                .map_err(|e| Error::new(format!("Failed to export datasources: {}", e)))?
+        } else {
+            return Err(Error::new("ODS format not yet implemented"));
+        };
+
+        // Encode as base64
+        use base64::{Engine as _, engine::general_purpose};
+        let encoded = general_purpose::STANDARD.encode(&file_bytes);
 
         Ok(ExportDataSourcesResult {
             file_content: encoded,
@@ -1697,13 +1707,40 @@ impl Mutation {
         input: ImportDataSourcesInput,
     ) -> Result<ImportDataSourcesResult> {
         let context = ctx.data::<GraphQLContext>()?;
+        let bulk_service = DataSourceBulkService::new(context.db.clone());
 
-        // TODO: Implement import service
-        // For now, return a placeholder
+        // Decode base64 file content
+        use base64::{Engine as _, engine::general_purpose};
+        let file_bytes = general_purpose::STANDARD
+            .decode(&input.file_content)
+            .map_err(|e| Error::new(format!("Invalid base64 content: {}", e)))?;
+
+        // Import from XLSX (check file extension)
+        let result = if input.filename.to_lowercase().ends_with(".xlsx") {
+            bulk_service
+                .import_from_xlsx(input.project_id, &file_bytes)
+                .await
+                .map_err(|e| Error::new(format!("Failed to import datasources: {}", e)))?
+        } else {
+            return Err(Error::new("Only XLSX format is currently supported for import"));
+        };
+
+        // Fetch the imported datasources to return
+        use crate::database::entities::data_sources;
+        use sea_orm::EntityTrait;
+
+        let datasources = data_sources::Entity::find()
+            .all(&context.db)
+            .await?
+            .into_iter()
+            .filter(|ds| result.imported_ids.contains(&ds.id))
+            .map(DataSource::from)
+            .collect();
+
         Ok(ImportDataSourcesResult {
-            data_sources: vec![],
-            created_count: 0,
-            updated_count: 0,
+            data_sources: datasources,
+            created_count: result.created_count,
+            updated_count: result.updated_count,
         })
     }
 
