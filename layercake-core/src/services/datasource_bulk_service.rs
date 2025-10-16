@@ -268,12 +268,14 @@ impl DataSourceBulkService {
                 } else {
                     // Create new datasource from imported data
                     if let (Some(name), Some(file_format), Some(data_type), Some(filename), Some(graph_json)) = (
-                        datasource_data.name,
-                        datasource_data.file_format,
-                        datasource_data.data_type,
-                        datasource_data.filename,
-                        datasource_data.graph_json,
+                        datasource_data.name.clone(),
+                        datasource_data.file_format.clone(),
+                        datasource_data.data_type.clone(),
+                        datasource_data.filename.clone(),
+                        datasource_data.graph_json.clone(),
                     ) {
+                        tracing::info!("Creating new datasource: {}", name);
+
                         // Calculate file size from graph_json
                         let file_size = graph_json.len() as i64;
 
@@ -299,6 +301,16 @@ impl DataSourceBulkService {
                         let created = new_datasource.insert(&self.db).await?;
                         created_count += 1;
                         imported_ids.push(created.id);
+                        tracing::info!("Created datasource with id: {}", created.id);
+                    } else {
+                        tracing::warn!("Sheet '{}' is missing required fields - skipping. Has: name={:?}, file_format={:?}, data_type={:?}, filename={:?}, graph_json={}",
+                            sheet_name,
+                            datasource_data.name.as_ref().map(|_| "present"),
+                            datasource_data.file_format.as_ref().map(|_| "present"),
+                            datasource_data.data_type.as_ref().map(|_| "present"),
+                            datasource_data.filename.as_ref().map(|_| "present"),
+                            if datasource_data.graph_json.is_some() { "present" } else { "missing" }
+                        );
                     }
                 }
             }
@@ -322,6 +334,8 @@ impl DataSourceBulkService {
         use calamine::{open_workbook_from_rs, Reader, Ods};
         use std::io::Cursor;
 
+        tracing::info!("Attempting to import ODS file with {} bytes", ods_data.len());
+
         let cursor = Cursor::new(ods_data);
         let mut workbook: Ods<_> = open_workbook_from_rs(cursor)
             .context("Failed to open ODS file")?;
@@ -331,12 +345,22 @@ impl DataSourceBulkService {
         let mut imported_ids = Vec::new();
 
         // Iterate through all sheets
-        for sheet_name in workbook.sheet_names() {
+        let sheet_names = workbook.sheet_names();
+        tracing::info!("Found {} sheets in ODS file", sheet_names.len());
+
+        for sheet_name in sheet_names {
             let sheet_name = sheet_name.to_string();
+            tracing::info!("Processing sheet: {}", sheet_name);
 
             if let Ok(range) = workbook.worksheet_range(&sheet_name) {
+                tracing::info!("Sheet '{}' has dimensions: {}x{}", sheet_name, range.height(), range.width());
+
                 // Parse datasource from sheet
                 let datasource_data = self.parse_datasource_from_sheet(&range)?;
+
+                tracing::info!("Parsed datasource data from sheet '{}': id={:?}, name={:?}, file_format={:?}, data_type={:?}",
+                    sheet_name, datasource_data.id, datasource_data.name,
+                    datasource_data.file_format, datasource_data.data_type);
 
                 // Check if datasource with this ID exists
                 if let Some(existing_id) = datasource_data.id {
@@ -362,12 +386,14 @@ impl DataSourceBulkService {
                 } else {
                     // Create new datasource from imported data
                     if let (Some(name), Some(file_format), Some(data_type), Some(filename), Some(graph_json)) = (
-                        datasource_data.name,
-                        datasource_data.file_format,
-                        datasource_data.data_type,
-                        datasource_data.filename,
-                        datasource_data.graph_json,
+                        datasource_data.name.clone(),
+                        datasource_data.file_format.clone(),
+                        datasource_data.data_type.clone(),
+                        datasource_data.filename.clone(),
+                        datasource_data.graph_json.clone(),
                     ) {
+                        tracing::info!("Creating new datasource: {}", name);
+
                         // Calculate file size from graph_json
                         let file_size = graph_json.len() as i64;
 
@@ -393,6 +419,16 @@ impl DataSourceBulkService {
                         let created = new_datasource.insert(&self.db).await?;
                         created_count += 1;
                         imported_ids.push(created.id);
+                        tracing::info!("Created datasource with id: {}", created.id);
+                    } else {
+                        tracing::warn!("Sheet '{}' is missing required fields - skipping. Has: name={:?}, file_format={:?}, data_type={:?}, filename={:?}, graph_json={}",
+                            sheet_name,
+                            datasource_data.name.as_ref().map(|_| "present"),
+                            datasource_data.file_format.as_ref().map(|_| "present"),
+                            datasource_data.data_type.as_ref().map(|_| "present"),
+                            datasource_data.filename.as_ref().map(|_| "present"),
+                            if datasource_data.graph_json.is_some() { "present" } else { "missing" }
+                        );
                     }
                 }
             }
@@ -413,11 +449,15 @@ impl DataSourceBulkService {
 
         let mut data = DataSourceData::default();
 
+        tracing::debug!("Parsing sheet with {} rows", range.height());
+
         // Read key-value pairs from rows
         for row_idx in 0..range.height() {
             if let (Some(key_cell), Some(value_cell)) =
                 (range.get((row_idx, 0)), range.get((row_idx, 1)))
             {
+                tracing::debug!("Row {}: key={:?}, value={:?}", row_idx, key_cell, value_cell);
+
                 if let Data::String(ref key) = key_cell {
                     match key.as_str() {
                         "id" => {
