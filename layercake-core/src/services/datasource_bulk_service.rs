@@ -236,10 +236,40 @@ impl DataSourceBulkService {
                         imported_ids.push(updated.id);
                     }
                 } else {
-                    // Create new datasource
-                    // Note: This requires actual file content which we don't have from the sheet
-                    // In practice, you'd need to handle this differently or store the file content in the sheet
-                    created_count += 1;
+                    // Create new datasource from imported data
+                    if let (Some(name), Some(file_format), Some(data_type), Some(filename), Some(graph_json)) = (
+                        datasource_data.name,
+                        datasource_data.file_format,
+                        datasource_data.data_type,
+                        datasource_data.filename,
+                        datasource_data.graph_json,
+                    ) {
+                        // Calculate file size from graph_json
+                        let file_size = graph_json.len() as i64;
+
+                        // Create new datasource with empty blob (we have graph_json which is what matters)
+                        let new_datasource = data_sources::ActiveModel {
+                            id: sea_orm::ActiveValue::NotSet,
+                            project_id: Set(project_id),
+                            name: Set(name),
+                            description: Set(datasource_data.description),
+                            file_format: Set(file_format),
+                            data_type: Set(data_type),
+                            filename: Set(filename),
+                            blob: Set(Vec::new()), // Empty blob since we have graph_json
+                            graph_json: Set(graph_json),
+                            status: Set("active".to_string()),
+                            error_message: Set(None),
+                            file_size: Set(file_size),
+                            processed_at: Set(Some(chrono::Utc::now())),
+                            created_at: Set(chrono::Utc::now()),
+                            updated_at: Set(chrono::Utc::now()),
+                        };
+
+                        let created = new_datasource.insert(&self.db).await?;
+                        created_count += 1;
+                        imported_ids.push(created.id);
+                    }
                 }
             }
         }
@@ -300,10 +330,40 @@ impl DataSourceBulkService {
                         imported_ids.push(updated.id);
                     }
                 } else {
-                    // Create new datasource
-                    // Note: This requires actual file content which we don't have from the sheet
-                    // In practice, you'd need to handle this differently or store the file content in the sheet
-                    created_count += 1;
+                    // Create new datasource from imported data
+                    if let (Some(name), Some(file_format), Some(data_type), Some(filename), Some(graph_json)) = (
+                        datasource_data.name,
+                        datasource_data.file_format,
+                        datasource_data.data_type,
+                        datasource_data.filename,
+                        datasource_data.graph_json,
+                    ) {
+                        // Calculate file size from graph_json
+                        let file_size = graph_json.len() as i64;
+
+                        // Create new datasource with empty blob (we have graph_json which is what matters)
+                        let new_datasource = data_sources::ActiveModel {
+                            id: sea_orm::ActiveValue::NotSet,
+                            project_id: Set(project_id),
+                            name: Set(name),
+                            description: Set(datasource_data.description),
+                            file_format: Set(file_format),
+                            data_type: Set(data_type),
+                            filename: Set(filename),
+                            blob: Set(Vec::new()), // Empty blob since we have graph_json
+                            graph_json: Set(graph_json),
+                            status: Set("active".to_string()),
+                            error_message: Set(None),
+                            file_size: Set(file_size),
+                            processed_at: Set(Some(chrono::Utc::now())),
+                            created_at: Set(chrono::Utc::now()),
+                            updated_at: Set(chrono::Utc::now()),
+                        };
+
+                        let created = new_datasource.insert(&self.db).await?;
+                        created_count += 1;
+                        imported_ids.push(created.id);
+                    }
                 }
             }
         }
