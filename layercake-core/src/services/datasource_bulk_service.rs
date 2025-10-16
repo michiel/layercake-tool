@@ -1,6 +1,8 @@
 use anyhow::{Context, Result};
+use icu_locid::locale;
 use rust_xlsxwriter::*;
 use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, Set};
+use spreadsheet_ods::{WorkBook, Sheet, Value};
 
 use crate::database::entities::data_sources;
 
@@ -98,6 +100,93 @@ impl DataSourceBulkService {
             .context("Failed to generate XLSX")
     }
 
+    /// Export datasources to ODS format
+    /// Each datasource becomes a separate sheet named with its ID
+    pub async fn export_to_ods(&self, datasource_ids: &[i32]) -> Result<Vec<u8>> {
+        let mut workbook = WorkBook::new(locale!("en_US"));
+
+        // Fetch all requested datasources
+        let datasources = data_sources::Entity::find()
+            .all(&self.db)
+            .await
+            .context("Failed to fetch datasources")?
+            .into_iter()
+            .filter(|ds| datasource_ids.contains(&ds.id))
+            .collect::<Vec<_>>();
+
+        for datasource in datasources {
+            // Create a sheet named with the datasource ID
+            let sheet_name = format!("ds_{}", datasource.id);
+            let mut sheet = Sheet::new(&sheet_name);
+
+            // Write datasource properties as rows
+            let mut row = 0u32;
+
+            // ID
+            sheet.set_value(row, 0, Value::Text("id".to_string()));
+            sheet.set_value(row, 1, Value::Number(datasource.id as f64));
+            row += 1;
+
+            // Name
+            sheet.set_value(row, 0, Value::Text("name".to_string()));
+            sheet.set_value(row, 1, Value::Text(datasource.name.clone()));
+            row += 1;
+
+            // Description
+            if let Some(desc) = &datasource.description {
+                sheet.set_value(row, 0, Value::Text("description".to_string()));
+                sheet.set_value(row, 1, Value::Text(desc.clone()));
+                row += 1;
+            }
+
+            // File format
+            sheet.set_value(row, 0, Value::Text("file_format".to_string()));
+            sheet.set_value(row, 1, Value::Text(datasource.file_format.clone()));
+            row += 1;
+
+            // Data type
+            sheet.set_value(row, 0, Value::Text("data_type".to_string()));
+            sheet.set_value(row, 1, Value::Text(datasource.data_type.clone()));
+            row += 1;
+
+            // Filename
+            sheet.set_value(row, 0, Value::Text("filename".to_string()));
+            sheet.set_value(row, 1, Value::Text(datasource.filename.clone()));
+            row += 1;
+
+            // File size
+            sheet.set_value(row, 0, Value::Text("file_size".to_string()));
+            sheet.set_value(row, 1, Value::Number(datasource.file_size as f64));
+            row += 1;
+
+            // Status
+            sheet.set_value(row, 0, Value::Text("status".to_string()));
+            sheet.set_value(row, 1, Value::Text(datasource.status.clone()));
+            row += 1;
+
+            // Graph JSON (potentially large)
+            sheet.set_value(row, 0, Value::Text("graph_json".to_string()));
+            sheet.set_value(row, 1, Value::Text(datasource.graph_json.clone()));
+            row += 1;
+
+            // Timestamps
+            sheet.set_value(row, 0, Value::Text("created_at".to_string()));
+            sheet.set_value(row, 1, Value::Text(datasource.created_at.to_rfc3339()));
+            row += 1;
+
+            sheet.set_value(row, 0, Value::Text("updated_at".to_string()));
+            sheet.set_value(row, 1, Value::Text(datasource.updated_at.to_rfc3339()));
+
+            workbook.push_sheet(sheet);
+        }
+
+        // Save to buffer
+        let buffer = Vec::new();
+        let result = spreadsheet_ods::write_ods_buf(&mut workbook, buffer)
+            .context("Failed to generate ODS")?;
+        Ok(result)
+    }
+
     /// Import datasources from XLSX format
     /// Each sheet represents a datasource (identified by sheet name or ID field)
     /// If datasource exists (by ID), update it; otherwise create new
@@ -112,6 +201,70 @@ impl DataSourceBulkService {
         let cursor = Cursor::new(xlsx_data);
         let mut workbook: Xlsx<_> = open_workbook_from_rs(cursor)
             .context("Failed to open XLSX file")?;
+
+        let mut created_count = 0;
+        let mut updated_count = 0;
+        let mut imported_ids = Vec::new();
+
+        // Iterate through all sheets
+        for sheet_name in workbook.sheet_names() {
+            let sheet_name = sheet_name.to_string();
+
+            if let Ok(range) = workbook.worksheet_range(&sheet_name) {
+                // Parse datasource from sheet
+                let datasource_data = self.parse_datasource_from_sheet(&range)?;
+
+                // Check if datasource with this ID exists
+                if let Some(existing_id) = datasource_data.id {
+                    // Update existing
+                    let existing = data_sources::Entity::find_by_id(existing_id)
+                        .one(&self.db)
+                        .await?;
+
+                    if let Some(existing) = existing {
+                        use sea_orm::ActiveModelTrait;
+                        let mut active: data_sources::ActiveModel = existing.into();
+
+                        // Update fields
+                        if let Some(name) = datasource_data.name {
+                            active.name = Set(name);
+                        }
+                        active.description = Set(datasource_data.description);
+
+                        let updated = active.update(&self.db).await?;
+                        updated_count += 1;
+                        imported_ids.push(updated.id);
+                    }
+                } else {
+                    // Create new datasource
+                    // Note: This requires actual file content which we don't have from the sheet
+                    // In practice, you'd need to handle this differently or store the file content in the sheet
+                    created_count += 1;
+                }
+            }
+        }
+
+        Ok(DataSourceImportResult {
+            created_count,
+            updated_count,
+            imported_ids,
+        })
+    }
+
+    /// Import datasources from ODS format
+    /// Each sheet represents a datasource (identified by sheet name or ID field)
+    /// If datasource exists (by ID), update it; otherwise create new
+    pub async fn import_from_ods(
+        &self,
+        project_id: i32,
+        ods_data: &[u8],
+    ) -> Result<DataSourceImportResult> {
+        use calamine::{open_workbook_from_rs, Reader, Ods};
+        use std::io::Cursor;
+
+        let cursor = Cursor::new(ods_data);
+        let mut workbook: Ods<_> = open_workbook_from_rs(cursor)
+            .context("Failed to open ODS file")?;
 
         let mut created_count = 0;
         let mut updated_count = 0;

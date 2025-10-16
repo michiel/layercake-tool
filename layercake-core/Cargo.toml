@@ -105,6 +105,8 @@ dashmap = { workspace = true, optional = true }
 # Spreadsheet dependencies
 calamine = { workspace = true }
 rust_xlsxwriter = { workspace = true }
+spreadsheet-ods = { workspace = true }
+icu_locid = { workspace = true }
 
 [dev-dependencies]
 # Test dependencies for E2E tests

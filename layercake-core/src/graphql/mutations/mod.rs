@@ -1678,14 +1678,20 @@ impl Mutation {
             crate::graphql::types::SpreadsheetFormat::ODS => "ods",
         };
 
-        // Currently only XLSX is implemented
-        let file_bytes = if input.format == crate::graphql::types::SpreadsheetFormat::XLSX {
-            bulk_service
-                .export_to_xlsx(&input.data_source_ids)
-                .await
-                .map_err(|e| Error::new(format!("Failed to export datasources: {}", e)))?
-        } else {
-            return Err(Error::new("ODS format not yet implemented"));
+        // Export to the requested format
+        let file_bytes = match input.format {
+            crate::graphql::types::SpreadsheetFormat::XLSX => {
+                bulk_service
+                    .export_to_xlsx(&input.data_source_ids)
+                    .await
+                    .map_err(|e| Error::new(format!("Failed to export datasources: {}", e)))?
+            }
+            crate::graphql::types::SpreadsheetFormat::ODS => {
+                bulk_service
+                    .export_to_ods(&input.data_source_ids)
+                    .await
+                    .map_err(|e| Error::new(format!("Failed to export datasources: {}", e)))?
+            }
         };
 
         // Encode as base64
@@ -1715,14 +1721,19 @@ impl Mutation {
             .decode(&input.file_content)
             .map_err(|e| Error::new(format!("Invalid base64 content: {}", e)))?;
 
-        // Import from XLSX (check file extension)
+        // Import from XLSX or ODS (check file extension)
         let result = if input.filename.to_lowercase().ends_with(".xlsx") {
             bulk_service
                 .import_from_xlsx(input.project_id, &file_bytes)
                 .await
                 .map_err(|e| Error::new(format!("Failed to import datasources: {}", e)))?
+        } else if input.filename.to_lowercase().ends_with(".ods") {
+            bulk_service
+                .import_from_ods(input.project_id, &file_bytes)
+                .await
+                .map_err(|e| Error::new(format!("Failed to import datasources: {}", e)))?
         } else {
-            return Err(Error::new("Only XLSX format is currently supported for import"));
+            return Err(Error::new("Only XLSX and ODS formats are supported for import"));
         };
 
         // Fetch the imported datasources to return
