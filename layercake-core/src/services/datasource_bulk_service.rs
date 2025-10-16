@@ -199,11 +199,38 @@ impl DataSourceBulkService {
         use std::io::Cursor;
 
         // Log file size for debugging
-        tracing::debug!("Attempting to import XLSX file with {} bytes", xlsx_data.len());
+        tracing::info!("Attempting to import XLSX file with {} bytes", xlsx_data.len());
+
+        // Log first few bytes for debugging (should be PK for zip files)
+        if xlsx_data.len() >= 4 {
+            tracing::info!("File header bytes: {:02x} {:02x} {:02x} {:02x}",
+                xlsx_data[0], xlsx_data[1], xlsx_data[2], xlsx_data[3]);
+
+            // XLSX files are ZIP archives, so should start with PK (0x50 0x4B)
+            if xlsx_data[0] != 0x50 || xlsx_data[1] != 0x4B {
+                tracing::warn!("File does not start with PK signature - not a valid ZIP/XLSX file");
+            }
+        }
+
+        // For debugging: write to temp file
+        if std::env::var("DEBUG_IMPORT").is_ok() {
+            let temp_path = format!("/tmp/debug_import_{}.xlsx", std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs());
+            if let Err(e) = std::fs::write(&temp_path, xlsx_data) {
+                tracing::warn!("Failed to write debug file: {}", e);
+            } else {
+                tracing::info!("Wrote debug file to: {}", temp_path);
+            }
+        }
 
         let cursor = Cursor::new(xlsx_data);
         let mut workbook: Xlsx<_> = open_workbook_from_rs(cursor)
-            .context(format!("Failed to open XLSX file ({} bytes)", xlsx_data.len()))?;
+            .map_err(|e| {
+                tracing::error!("Calamine error details: {:?}", e);
+                anyhow::anyhow!("Failed to open XLSX file ({} bytes): {:?}", xlsx_data.len(), e)
+            })?;
 
         let mut created_count = 0;
         let mut updated_count = 0;
