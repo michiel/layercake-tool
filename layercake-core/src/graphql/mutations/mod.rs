@@ -1717,9 +1717,14 @@ impl Mutation {
 
         // Decode base64 file content
         use base64::{Engine as _, engine::general_purpose};
+        tracing::info!("Importing datasources from file: {} (base64 length: {})",
+            input.filename, input.file_content.len());
+
         let file_bytes = general_purpose::STANDARD
             .decode(&input.file_content)
             .map_err(|e| Error::new(format!("Invalid base64 content: {}", e)))?;
+
+        tracing::info!("Decoded {} bytes from base64", file_bytes.len());
 
         // Import from XLSX or ODS (check file extension)
         let result = if input.filename.to_lowercase().ends_with(".xlsx") {

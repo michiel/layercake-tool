@@ -219,8 +219,15 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
 
       const data = (result.data as any)?.exportDataSources
       if (data) {
-        // Decode base64 and download
-        const blob = new Blob([atob(data.fileContent)], {
+        // Decode base64 to binary
+        const binaryString = atob(data.fileContent)
+        const bytes = new Uint8Array(binaryString.length)
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i)
+        }
+
+        // Create blob and download
+        const blob = new Blob([bytes], {
           type: format === 'xlsx'
             ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
             : 'application/vnd.oasis.opendocument.spreadsheet'
@@ -250,10 +257,20 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
     console.log('Importing file:', file.name)
 
     try {
-      // Read file as base64
+      // Read file as ArrayBuffer then convert to base64
       const reader = new FileReader()
       reader.onload = async (e) => {
-        const base64 = btoa(e.target?.result as string)
+        const arrayBuffer = e.target?.result as ArrayBuffer
+
+        // Convert ArrayBuffer to base64
+        const bytes = new Uint8Array(arrayBuffer)
+        let binary = ''
+        for (let i = 0; i < bytes.byteLength; i++) {
+          binary += String.fromCharCode(bytes[i])
+        }
+        const base64 = btoa(binary)
+
+        console.log('File read successfully, size:', arrayBuffer.byteLength, 'bytes')
 
         const result = await importDataSources({
           variables: {
@@ -274,7 +291,7 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
 
         setImportModalOpen(false)
       }
-      reader.readAsBinaryString(file)
+      reader.readAsArrayBuffer(file)
     } catch (error) {
       console.error('Failed to import datasources:', error)
       alert('Failed to import datasources. See console for details.')

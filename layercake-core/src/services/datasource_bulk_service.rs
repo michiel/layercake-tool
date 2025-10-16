@@ -198,9 +198,12 @@ impl DataSourceBulkService {
         use calamine::{open_workbook_from_rs, Reader, Xlsx};
         use std::io::Cursor;
 
+        // Log file size for debugging
+        tracing::debug!("Attempting to import XLSX file with {} bytes", xlsx_data.len());
+
         let cursor = Cursor::new(xlsx_data);
         let mut workbook: Xlsx<_> = open_workbook_from_rs(cursor)
-            .context("Failed to open XLSX file")?;
+            .context(format!("Failed to open XLSX file ({} bytes)", xlsx_data.len()))?;
 
         let mut created_count = 0;
         let mut updated_count = 0;
