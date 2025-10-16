@@ -422,7 +422,8 @@ pub struct PlanDagInput {
 
 #[derive(InputObject, Clone, Debug)]
 pub struct PlanDagNodeInput {
-    pub id: String,
+    /// Optional ID - if not provided, backend will generate one
+    pub id: Option<String>,
     #[graphql(name = "nodeType")]
     pub node_type: PlanDagNodeType,
     pub position: Position,
@@ -432,7 +433,8 @@ pub struct PlanDagNodeInput {
 
 #[derive(InputObject, Clone, Debug)]
 pub struct PlanDagEdgeInput {
-    pub id: String,
+    /// Optional ID - if not provided, backend will generate one
+    pub id: Option<String>,
     pub source: String,
     pub target: String,
     #[graphql(name = "sourceHandle")]

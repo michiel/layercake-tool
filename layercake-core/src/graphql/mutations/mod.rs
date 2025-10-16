@@ -35,6 +35,58 @@ use crate::graphql::types::{
 
 pub struct Mutation;
 
+/// Generate a unique node ID based on node type and existing nodes
+fn generate_node_id(
+    node_type: &crate::graphql::types::PlanDagNodeType,
+    existing_nodes: &[PlanDagNode],
+) -> String {
+    generate_node_id_from_ids(node_type, &existing_nodes.iter().map(|n| n.id.as_str()).collect::<Vec<_>>())
+}
+
+/// Generate a unique node ID based on node type and existing node IDs
+fn generate_node_id_from_ids(
+    node_type: &crate::graphql::types::PlanDagNodeType,
+    existing_node_ids: &[&str],
+) -> String {
+    use crate::graphql::types::PlanDagNodeType;
+
+    // Get type prefix
+    let type_prefix = match node_type {
+        PlanDagNodeType::DataSource => "datasource",
+        PlanDagNodeType::Graph => "graph",
+        PlanDagNodeType::Transform => "transform",
+        PlanDagNodeType::Merge => "merge",
+        PlanDagNodeType::Copy => "copy",
+        PlanDagNodeType::Output => "output",
+    };
+
+    // Extract all numeric suffixes from existing node IDs
+    let number_pattern = regex::Regex::new(r"_(\d+)$").unwrap();
+    let existing_numbers: Vec<i32> = existing_node_ids
+        .iter()
+        .filter_map(|id| {
+            number_pattern
+                .captures(id)
+                .and_then(|cap| cap.get(1))
+                .and_then(|m| m.as_str().parse::<i32>().ok())
+        })
+        .collect();
+
+    // Find the max number and increment
+    let max_number = existing_numbers.iter().max().copied().unwrap_or(0);
+    let next_number = max_number + 1;
+
+    // Format with leading zeros (3 digits)
+    format!("{}_{:03}", type_prefix, next_number)
+}
+
+/// Generate a unique edge ID based on source and target
+fn generate_edge_id(source: &str, target: &str) -> String {
+    use uuid::Uuid;
+    // Use a UUID suffix to ensure uniqueness even if same source/target combination
+    format!("edge-{}-{}-{}", source, target, Uuid::new_v4().simple())
+}
+
 #[Object]
 impl Mutation {
     /// Create a new project
@@ -222,8 +274,18 @@ impl Mutation {
             .exec(&context.db)
             .await?;
 
+        // Collect existing node IDs for ID generation
+        let mut existing_node_ids: Vec<String> = Vec::new();
+
         // Insert new Plan DAG nodes
         for node in &plan_dag.nodes {
+            // Generate ID if not provided
+            let node_id = node.id.clone().unwrap_or_else(|| {
+                let id_refs: Vec<&str> = existing_node_ids.iter().map(|s| s.as_str()).collect();
+                generate_node_id_from_ids(&node.node_type, &id_refs)
+            });
+            existing_node_ids.push(node_id.clone());
+
             let node_type_str = match node.node_type {
                 crate::graphql::types::PlanDagNodeType::DataSource => "DataSourceNode",
                 crate::graphql::types::PlanDagNodeType::Graph => "GraphNode",
@@ -236,7 +298,7 @@ impl Mutation {
             let metadata_json = serde_json::to_string(&node.metadata)?;
 
             let dag_node = plan_dag_nodes::ActiveModel {
-                id: Set(node.id.clone()),
+                id: Set(node_id),
                 plan_id: Set(project_id), // Use project_id directly
                 node_type: Set(node_type_str.to_string()),
                 position_x: Set(node.position.x),
@@ -254,10 +316,15 @@ impl Mutation {
 
         // Insert new Plan DAG edges
         for edge in &plan_dag.edges {
+            // Generate ID if not provided
+            let edge_id = edge.id.clone().unwrap_or_else(|| {
+                generate_edge_id(&edge.source, &edge.target)
+            });
+
             let metadata_json = serde_json::to_string(&edge.metadata)?;
 
             let dag_edge = plan_dag_edges::ActiveModel {
-                id: Set(edge.id.clone()),
+                id: Set(edge_id),
                 plan_id: Set(project_id), // Use project_id directly
                 source_node_id: Set(edge.source.clone()),
                 target_node_id: Set(edge.target.clone()),
@@ -333,10 +400,13 @@ impl Mutation {
             }
         };
 
-        // Fetch current state to determine node index
+        // Fetch current state to determine node index and generate unique ID
         let (current_nodes, _) =
             plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
         let node_index = current_nodes.len();
+
+        // Generate unique ID on backend - ignore frontend-provided ID
+        let generated_id = generate_node_id(&node.node_type, &current_nodes);
 
         let node_type_str = match node.node_type {
             crate::graphql::types::PlanDagNodeType::DataSource => "DataSourceNode",
@@ -350,7 +420,7 @@ impl Mutation {
         let metadata_json = serde_json::to_string(&node.metadata)?;
 
         let dag_node = plan_dag_nodes::ActiveModel {
-            id: Set(node.id.clone()),
+            id: Set(generated_id),
             plan_id: Set(plan.id), // Use the actual plan ID instead of project ID
             node_type: Set(node_type_str.to_string()),
             position_x: Set(node.position.x),
@@ -626,10 +696,13 @@ impl Mutation {
             plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
         let edge_index = current_edges.len();
 
+        // Generate unique ID on backend - ignore frontend-provided ID
+        let generated_id = generate_edge_id(&edge.source, &edge.target);
+
         let metadata_json = serde_json::to_string(&edge.metadata)?;
 
         let dag_edge = plan_dag_edges::ActiveModel {
-            id: Set(edge.id.clone()),
+            id: Set(generated_id),
             plan_id: Set(plan.id),
             source_node_id: Set(edge.source.clone()),
             target_node_id: Set(edge.target.clone()),
