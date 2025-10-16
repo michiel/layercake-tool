@@ -77,8 +77,61 @@ impl DataSourceBulkService {
         Ok(csv_data)
     }
 
+    /// Convert graph_json to CSV rows
+    fn graph_json_to_csv_rows(graph_json: &str, data_type: &str) -> Result<Vec<Vec<String>>> {
+        let data: serde_json::Value = serde_json::from_str(graph_json)
+            .context("Failed to parse graph_json")?;
+
+        let array = match data_type {
+            "nodes" => data.get("nodes"),
+            "edges" => data.get("edges"),
+            "layers" => data.get("layers"),
+            _ => None,
+        }.and_then(|v| v.as_array())
+         .ok_or_else(|| anyhow::anyhow!("No {} array in graph_json", data_type))?;
+
+        if array.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // Extract all unique keys for headers
+        let mut all_keys = std::collections::BTreeSet::new();
+        for item in array {
+            if let Some(obj) = item.as_object() {
+                for key in obj.keys() {
+                    all_keys.insert(key.clone());
+                }
+            }
+        }
+
+        let headers: Vec<String> = all_keys.into_iter().collect();
+        let mut rows = vec![headers.clone()];
+
+        // Convert each object to a row
+        for item in array {
+            if let Some(obj) = item.as_object() {
+                let mut row = Vec::new();
+                for header in &headers {
+                    let value = obj.get(header)
+                        .map(|v| match v {
+                            serde_json::Value::String(s) => s.clone(),
+                            serde_json::Value::Number(n) => n.to_string(),
+                            serde_json::Value::Bool(b) => b.to_string(),
+                            serde_json::Value::Null => String::new(),
+                            _ => serde_json::to_string(v).unwrap_or_default(),
+                        })
+                        .unwrap_or_default();
+                    row.push(value);
+                }
+                rows.push(row);
+            }
+        }
+
+        Ok(rows)
+    }
+
     /// Export datasources to XLSX format
-    /// Each datasource becomes a separate sheet named with its ID
+    /// Each datasource becomes a separate sheet named with its ID containing CSV data
     pub async fn export_to_xlsx(&self, datasource_ids: &[i32]) -> Result<Vec<u8>> {
         let mut workbook = Workbook::new();
 
@@ -91,69 +144,40 @@ impl DataSourceBulkService {
             .filter(|ds| datasource_ids.contains(&ds.id))
             .collect::<Vec<_>>();
 
+        tracing::info!("Exporting {} datasources to XLSX", datasources.len());
+
         for datasource in datasources {
             // Create a sheet named with the datasource ID
-            let sheet_name = format!("ds_{}", datasource.id);
+            let sheet_name = datasource.id.to_string();
             let worksheet = workbook.add_worksheet();
             worksheet.set_name(&sheet_name)?;
 
-            // Write datasource properties as rows
-            let mut row = 0u32;
+            tracing::info!("Exporting datasource {} ({}) to sheet {}",
+                datasource.id, datasource.name, sheet_name);
 
-            // ID
-            worksheet.write_string(row, 0, "id")?;
-            worksheet.write_number(row, 1, datasource.id as f64)?;
-            row += 1;
-
-            // Name
-            worksheet.write_string(row, 0, "name")?;
-            worksheet.write_string(row, 1, &datasource.name)?;
-            row += 1;
-
-            // Description
-            if let Some(desc) = &datasource.description {
-                worksheet.write_string(row, 0, "description")?;
-                worksheet.write_string(row, 1, desc)?;
-                row += 1;
+            // Convert graph_json to CSV rows
+            match Self::graph_json_to_csv_rows(&datasource.graph_json, &datasource.data_type) {
+                Ok(rows) => {
+                    // Write rows to sheet
+                    for (row_idx, row_data) in rows.iter().enumerate() {
+                        for (col_idx, value) in row_data.iter().enumerate() {
+                            // Try to parse as number, otherwise write as string
+                            if let Ok(num) = value.parse::<f64>() {
+                                worksheet.write_number(row_idx as u32, col_idx as u16, num)?;
+                            } else {
+                                worksheet.write_string(row_idx as u32, col_idx as u16, value)?;
+                            }
+                        }
+                    }
+                    tracing::info!("Wrote {} rows to sheet {}", rows.len(), sheet_name);
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to convert datasource {} to CSV: {}", datasource.id, e);
+                    // Write error message to sheet
+                    worksheet.write_string(0, 0, "Error")?;
+                    worksheet.write_string(0, 1, &format!("Failed to export: {}", e))?;
+                }
             }
-
-            // File format
-            worksheet.write_string(row, 0, "file_format")?;
-            worksheet.write_string(row, 1, &datasource.file_format)?;
-            row += 1;
-
-            // Data type
-            worksheet.write_string(row, 0, "data_type")?;
-            worksheet.write_string(row, 1, &datasource.data_type)?;
-            row += 1;
-
-            // Filename
-            worksheet.write_string(row, 0, "filename")?;
-            worksheet.write_string(row, 1, &datasource.filename)?;
-            row += 1;
-
-            // File size
-            worksheet.write_string(row, 0, "file_size")?;
-            worksheet.write_number(row, 1, datasource.file_size as f64)?;
-            row += 1;
-
-            // Status
-            worksheet.write_string(row, 0, "status")?;
-            worksheet.write_string(row, 1, &datasource.status)?;
-            row += 1;
-
-            // Graph JSON (potentially large)
-            worksheet.write_string(row, 0, "graph_json")?;
-            worksheet.write_string(row, 1, &datasource.graph_json)?;
-            row += 1;
-
-            // Timestamps
-            worksheet.write_string(row, 0, "created_at")?;
-            worksheet.write_string(row, 1, &datasource.created_at.to_rfc3339())?;
-            row += 1;
-
-            worksheet.write_string(row, 0, "updated_at")?;
-            worksheet.write_string(row, 1, &datasource.updated_at.to_rfc3339())?;
         }
 
         // Save to buffer
@@ -163,7 +187,7 @@ impl DataSourceBulkService {
     }
 
     /// Export datasources to ODS format
-    /// Each datasource becomes a separate sheet named with its ID
+    /// Each datasource becomes a separate sheet named with its ID containing CSV data
     pub async fn export_to_ods(&self, datasource_ids: &[i32]) -> Result<Vec<u8>> {
         let mut workbook = WorkBook::new(locale!("en_US"));
 
@@ -176,68 +200,39 @@ impl DataSourceBulkService {
             .filter(|ds| datasource_ids.contains(&ds.id))
             .collect::<Vec<_>>();
 
+        tracing::info!("Exporting {} datasources to ODS", datasources.len());
+
         for datasource in datasources {
             // Create a sheet named with the datasource ID
-            let sheet_name = format!("ds_{}", datasource.id);
+            let sheet_name = datasource.id.to_string();
             let mut sheet = Sheet::new(&sheet_name);
 
-            // Write datasource properties as rows
-            let mut row = 0u32;
+            tracing::info!("Exporting datasource {} ({}) to sheet {}",
+                datasource.id, datasource.name, sheet_name);
 
-            // ID
-            sheet.set_value(row, 0, Value::Text("id".to_string()));
-            sheet.set_value(row, 1, Value::Number(datasource.id as f64));
-            row += 1;
-
-            // Name
-            sheet.set_value(row, 0, Value::Text("name".to_string()));
-            sheet.set_value(row, 1, Value::Text(datasource.name.clone()));
-            row += 1;
-
-            // Description
-            if let Some(desc) = &datasource.description {
-                sheet.set_value(row, 0, Value::Text("description".to_string()));
-                sheet.set_value(row, 1, Value::Text(desc.clone()));
-                row += 1;
+            // Convert graph_json to CSV rows
+            match Self::graph_json_to_csv_rows(&datasource.graph_json, &datasource.data_type) {
+                Ok(rows) => {
+                    // Write rows to sheet
+                    for (row_idx, row_data) in rows.iter().enumerate() {
+                        for (col_idx, value) in row_data.iter().enumerate() {
+                            // Try to parse as number, otherwise write as string
+                            if let Ok(num) = value.parse::<f64>() {
+                                sheet.set_value(row_idx as u32, col_idx as u32, Value::Number(num));
+                            } else {
+                                sheet.set_value(row_idx as u32, col_idx as u32, Value::Text(value.clone()));
+                            }
+                        }
+                    }
+                    tracing::info!("Wrote {} rows to sheet {}", rows.len(), sheet_name);
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to convert datasource {} to CSV: {}", datasource.id, e);
+                    // Write error message to sheet
+                    sheet.set_value(0, 0, Value::Text("Error".to_string()));
+                    sheet.set_value(0, 1, Value::Text(format!("Failed to export: {}", e)));
+                }
             }
-
-            // File format
-            sheet.set_value(row, 0, Value::Text("file_format".to_string()));
-            sheet.set_value(row, 1, Value::Text(datasource.file_format.clone()));
-            row += 1;
-
-            // Data type
-            sheet.set_value(row, 0, Value::Text("data_type".to_string()));
-            sheet.set_value(row, 1, Value::Text(datasource.data_type.clone()));
-            row += 1;
-
-            // Filename
-            sheet.set_value(row, 0, Value::Text("filename".to_string()));
-            sheet.set_value(row, 1, Value::Text(datasource.filename.clone()));
-            row += 1;
-
-            // File size
-            sheet.set_value(row, 0, Value::Text("file_size".to_string()));
-            sheet.set_value(row, 1, Value::Number(datasource.file_size as f64));
-            row += 1;
-
-            // Status
-            sheet.set_value(row, 0, Value::Text("status".to_string()));
-            sheet.set_value(row, 1, Value::Text(datasource.status.clone()));
-            row += 1;
-
-            // Graph JSON (potentially large)
-            sheet.set_value(row, 0, Value::Text("graph_json".to_string()));
-            sheet.set_value(row, 1, Value::Text(datasource.graph_json.clone()));
-            row += 1;
-
-            // Timestamps
-            sheet.set_value(row, 0, Value::Text("created_at".to_string()));
-            sheet.set_value(row, 1, Value::Text(datasource.created_at.to_rfc3339()));
-            row += 1;
-
-            sheet.set_value(row, 0, Value::Text("updated_at".to_string()));
-            sheet.set_value(row, 1, Value::Text(datasource.updated_at.to_rfc3339()));
 
             workbook.push_sheet(sheet);
         }
@@ -310,7 +305,32 @@ impl DataSourceBulkService {
                 let csv_data = Self::range_to_csv(&range)?;
                 tracing::info!("Converted sheet to {} bytes of CSV", csv_data.len());
 
-                // Create datasource using existing service
+                // Check if sheet name is a datasource ID (numeric)
+                if let Ok(datasource_id) = sheet_name.parse::<i32>() {
+                    // Try to find and update existing datasource
+                    if let Some(existing) = data_sources::Entity::find_by_id(datasource_id)
+                        .one(&self.db)
+                        .await? {
+                        tracing::info!("Found existing datasource {} - updating", datasource_id);
+
+                        // Update the datasource with new CSV data
+                        let filename = format!("{}.csv", existing.name);
+                        let datasource = service.update_file(
+                            datasource_id,
+                            filename,
+                            csv_data,
+                        ).await?;
+
+                        updated_count += 1;
+                        imported_ids.push(datasource.id);
+                        tracing::info!("Updated datasource: {} (id: {})", datasource.name, datasource.id);
+                        continue;
+                    } else {
+                        tracing::warn!("Datasource {} not found - will create new", datasource_id);
+                    }
+                }
+
+                // Create new datasource
                 let filename = format!("{}.csv", sheet_name);
                 let datasource = service.create_from_file(
                     project_id,
@@ -396,7 +416,32 @@ impl DataSourceBulkService {
                 let csv_data = Self::range_to_csv(&range)?;
                 tracing::info!("Converted sheet to {} bytes of CSV", csv_data.len());
 
-                // Create datasource using existing service
+                // Check if sheet name is a datasource ID (numeric)
+                if let Ok(datasource_id) = sheet_name.parse::<i32>() {
+                    // Try to find and update existing datasource
+                    if let Some(existing) = data_sources::Entity::find_by_id(datasource_id)
+                        .one(&self.db)
+                        .await? {
+                        tracing::info!("Found existing datasource {} - updating", datasource_id);
+
+                        // Update the datasource with new CSV data
+                        let filename = format!("{}.csv", existing.name);
+                        let datasource = service.update_file(
+                            datasource_id,
+                            filename,
+                            csv_data,
+                        ).await?;
+
+                        updated_count += 1;
+                        imported_ids.push(datasource.id);
+                        tracing::info!("Updated datasource: {} (id: {})", datasource.name, datasource.id);
+                        continue;
+                    } else {
+                        tracing::warn!("Datasource {} not found - will create new", datasource_id);
+                    }
+                }
+
+                // Create new datasource
                 let filename = format!("{}.csv", sheet_name);
                 let datasource = service.create_from_file(
                     project_id,
