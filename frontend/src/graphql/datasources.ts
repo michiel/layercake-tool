@@ -183,6 +183,43 @@ export const DATASOURCE_UPDATED = gql`
   }
 `
 
+// Export data sources as spreadsheet
+export const EXPORT_DATASOURCES = gql`
+  mutation ExportDataSources($input: ExportDataSourcesInput!) {
+    exportDataSources(input: $input) {
+      fileContent
+      filename
+      format
+    }
+  }
+`
+
+// Import data sources from spreadsheet
+export const IMPORT_DATASOURCES = gql`
+  mutation ImportDataSources($input: ImportDataSourcesInput!) {
+    importDataSources(input: $input) {
+      dataSources {
+        id
+        projectId
+        name
+        description
+        fileFormat
+        dataType
+        filename
+        graphJson
+        status
+        errorMessage
+        fileSize
+        processedAt
+        createdAt
+        updatedAt
+      }
+      createdCount
+      updatedCount
+    }
+  }
+`
+
 // File format enum (physical representation)
 export enum FileFormat {
   CSV = 'CSV',

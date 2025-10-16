@@ -28,9 +28,10 @@ use crate::graphql::types::plan_dag::{
 };
 use crate::graphql::types::project::{CreateProjectInput, Project, UpdateProjectInput};
 use crate::graphql::types::{
-    BulkUploadDataSourceInput, CreateDataSourceInput, DataSource, InviteCollaboratorInput,
-    LoginInput, LoginResponse, ProjectCollaborator, RegisterResponse, RegisterUserInput,
-    UpdateCollaboratorRoleInput, UpdateDataSourceInput, UpdateUserInput, User,
+    BulkUploadDataSourceInput, CreateDataSourceInput, DataSource, ExportDataSourcesInput,
+    ExportDataSourcesResult, ImportDataSourcesInput, ImportDataSourcesResult,
+    InviteCollaboratorInput, LoginInput, LoginResponse, ProjectCollaborator, RegisterResponse,
+    RegisterUserInput, UpdateCollaboratorRoleInput, UpdateDataSourceInput, UpdateUserInput, User,
 };
 
 pub struct Mutation;
@@ -1660,6 +1661,50 @@ impl Mutation {
             .map_err(|e| Error::new(format!("Failed to reprocess DataSource: {}", e)))?;
 
         Ok(DataSource::from(data_source))
+    }
+
+    /// Export data sources as spreadsheet (XLSX or ODS)
+    async fn export_data_sources(
+        &self,
+        ctx: &Context<'_>,
+        input: ExportDataSourcesInput,
+    ) -> Result<ExportDataSourcesResult> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        // TODO: Implement export service
+        // For now, return a placeholder
+        use base64::{Engine as _, engine::general_purpose};
+        let placeholder_content = "Placeholder XLSX content";
+        let encoded = general_purpose::STANDARD.encode(placeholder_content);
+
+        let format_str = match input.format {
+            crate::graphql::types::SpreadsheetFormat::XLSX => "xlsx",
+            crate::graphql::types::SpreadsheetFormat::ODS => "ods",
+        };
+
+        Ok(ExportDataSourcesResult {
+            file_content: encoded,
+            filename: format!("datasources_export_{}.{}",
+                chrono::Utc::now().timestamp(), format_str),
+            format: format_str.to_string(),
+        })
+    }
+
+    /// Import data sources from spreadsheet (XLSX or ODS)
+    async fn import_data_sources(
+        &self,
+        ctx: &Context<'_>,
+        input: ImportDataSourcesInput,
+    ) -> Result<ImportDataSourcesResult> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        // TODO: Implement import service
+        // For now, return a placeholder
+        Ok(ImportDataSourcesResult {
+            data_sources: vec![],
+            created_count: 0,
+            updated_count: 0,
+        })
     }
 
     /// Create a new Graph

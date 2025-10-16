@@ -15,7 +15,8 @@ import {
   Alert,
   Table,
   Menu,
-  LoadingOverlay
+  LoadingOverlay,
+  Checkbox
 } from '@mantine/core'
 import {
   IconPlus,
@@ -28,7 +29,9 @@ import {
   IconAlertCircle,
   IconCheck,
   IconClock,
-  IconX
+  IconX,
+  IconFileExport,
+  IconFileUpload
 } from '@tabler/icons-react'
 import { useQuery as useProjectsQuery } from '@apollo/client/react'
 import { Breadcrumbs } from '../common/Breadcrumbs'
@@ -38,6 +41,8 @@ import {
   GET_DATASOURCES,
   DELETE_DATASOURCE,
   REPROCESS_DATASOURCE,
+  EXPORT_DATASOURCES,
+  IMPORT_DATASOURCES,
   DataSource,
   formatFileSize,
   getFileFormatDisplayName,
@@ -68,6 +73,9 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
   const [selectedDataSource, setSelectedDataSource] = useState<DataSource | null>(null)
   const [uploaderOpen, setUploaderOpen] = useState(false)
   const [bulkUploaderOpen, setBulkUploaderOpen] = useState(false)
+  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set())
+  const [exportFormatModalOpen, setExportFormatModalOpen] = useState(false)
+  const [importModalOpen, setImportModalOpen] = useState(false)
 
   // Query for project info
   const { data: projectsData } = useProjectsQuery<{
@@ -97,6 +105,8 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
   // Mutations
   const [deleteDataSource, { loading: deleteLoading }] = useMutation(DELETE_DATASOURCE)
   const [reprocessDataSource, { loading: reprocessLoading }] = useMutation(REPROCESS_DATASOURCE)
+  const [exportDataSources] = useMutation(EXPORT_DATASOURCES)
+  const [importDataSources] = useMutation(IMPORT_DATASOURCES)
 
   const dataSources: DataSource[] = (dataSourcesData as any)?.dataSources || []
 
@@ -168,6 +178,109 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
     URL.revokeObjectURL(url)
   }
 
+  const toggleRowSelection = (id: number) => {
+    setSelectedRows((prev) => {
+      const newSet = new Set(prev)
+      if (newSet.has(id)) {
+        newSet.delete(id)
+      } else {
+        newSet.add(id)
+      }
+      return newSet
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedRows.size === dataSources.length) {
+      setSelectedRows(new Set())
+    } else {
+      setSelectedRows(new Set(dataSources.map(ds => ds.id)))
+    }
+  }
+
+  const handleExportClick = () => {
+    setExportFormatModalOpen(true)
+  }
+
+  const handleExport = async (format: 'xlsx' | 'ods') => {
+    const selectedDataSources = dataSources.filter(ds => selectedRows.has(ds.id))
+    console.log('Exporting datasources:', selectedDataSources.map(ds => ds.id), 'as', format)
+
+    try {
+      const result = await exportDataSources({
+        variables: {
+          input: {
+            projectId: parseInt(projectId || '0'),
+            dataSourceIds: Array.from(selectedRows),
+            format: format.toUpperCase()
+          }
+        }
+      })
+
+      const data = (result.data as any)?.exportDataSources
+      if (data) {
+        // Decode base64 and download
+        const blob = new Blob([atob(data.fileContent)], {
+          type: format === 'xlsx'
+            ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            : 'application/vnd.oasis.opendocument.spreadsheet'
+        })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = data.filename
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+      }
+
+      setExportFormatModalOpen(false)
+    } catch (error) {
+      console.error('Failed to export datasources:', error)
+      alert('Failed to export datasources. See console for details.')
+    }
+  }
+
+  const handleImportClick = () => {
+    setImportModalOpen(true)
+  }
+
+  const handleImport = async (file: File) => {
+    console.log('Importing file:', file.name)
+
+    try {
+      // Read file as base64
+      const reader = new FileReader()
+      reader.onload = async (e) => {
+        const base64 = btoa(e.target?.result as string)
+
+        const result = await importDataSources({
+          variables: {
+            input: {
+              projectId: parseInt(projectId || '0'),
+              fileContent: base64,
+              filename: file.name
+            }
+          }
+        })
+
+        const data = (result.data as any)?.importDataSources
+        if (data) {
+          console.log(`Imported: ${data.createdCount} created, ${data.updatedCount} updated`)
+          await refetchDataSources()
+          alert(`Successfully imported: ${data.createdCount} created, ${data.updatedCount} updated`)
+        }
+
+        setImportModalOpen(false)
+      }
+      reader.readAsBinaryString(file)
+    } catch (error) {
+      console.error('Failed to import datasources:', error)
+      alert('Failed to import datasources. See console for details.')
+    }
+  }
+
   const getStatusIcon = (status: DataSource['status']) => {
     switch (status) {
       case 'active':
@@ -210,6 +323,21 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
             </Text>
           </div>
           <Group gap="xs">
+            <Button
+              leftSection={<IconFileExport size={16} />}
+              onClick={handleExportClick}
+              disabled={selectedRows.size === 0}
+              variant="light"
+            >
+              Export ({selectedRows.size})
+            </Button>
+            <Button
+              leftSection={<IconFileUpload size={16} />}
+              onClick={handleImportClick}
+              variant="light"
+            >
+              Import
+            </Button>
             <Button
               leftSection={<IconPlus size={16} />}
               onClick={handleCreateNew}
@@ -261,6 +389,13 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
               <Table striped highlightOnHover>
                 <Table.Thead>
                   <Table.Tr>
+                    <Table.Th style={{ width: 40 }}>
+                      <Checkbox
+                        checked={selectedRows.size === dataSources.length && dataSources.length > 0}
+                        indeterminate={selectedRows.size > 0 && selectedRows.size < dataSources.length}
+                        onChange={toggleSelectAll}
+                      />
+                    </Table.Th>
                     <Table.Th>Name</Table.Th>
                     <Table.Th>Format</Table.Th>
                     <Table.Th>Data Type</Table.Th>
@@ -274,6 +409,12 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
                 <Table.Tbody>
                   {dataSources.map((dataSource) => (
                     <Table.Tr key={dataSource.id}>
+                      <Table.Td>
+                        <Checkbox
+                          checked={selectedRows.has(dataSource.id)}
+                          onChange={() => toggleRowSelection(dataSource.id)}
+                        />
+                      </Table.Td>
                       <Table.Td>
                         <div>
                           <Text fw={500}>{dataSource.name}</Text>
@@ -440,6 +581,65 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
           refetchDataSources()
         }}
       />
+
+      {/* Export Format Selection Modal */}
+      <Modal
+        opened={exportFormatModalOpen}
+        onClose={() => setExportFormatModalOpen(false)}
+        title="Export Data Sources"
+      >
+        <Text mb="md">
+          Select the format for exporting {selectedRows.size} data source{selectedRows.size !== 1 ? 's' : ''}:
+        </Text>
+
+        <Stack gap="sm">
+          <Button
+            fullWidth
+            leftSection={<IconFileExport size={16} />}
+            onClick={() => handleExport('xlsx')}
+          >
+            Export as XLSX (Excel)
+          </Button>
+          <Button
+            fullWidth
+            leftSection={<IconFileExport size={16} />}
+            onClick={() => handleExport('ods')}
+            variant="light"
+          >
+            Export as ODS (OpenDocument)
+          </Button>
+        </Stack>
+      </Modal>
+
+      {/* Import Data Sources Modal */}
+      <Modal
+        opened={importModalOpen}
+        onClose={() => setImportModalOpen(false)}
+        title="Import Data Sources"
+      >
+        <Text mb="md">
+          Upload an XLSX or ODS file containing data sources. Each sheet will be imported as a data source.
+          If a sheet ID matches an existing data source, it will create a new version.
+        </Text>
+
+        <input
+          type="file"
+          accept=".xlsx,.ods"
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (file) {
+              handleImport(file)
+            }
+          }}
+          style={{ marginBottom: '1rem' }}
+        />
+
+        <Group justify="flex-end" gap="sm">
+          <Button variant="light" onClick={() => setImportModalOpen(false)}>
+            Cancel
+          </Button>
+        </Group>
+      </Modal>
     </>
   )
 }

@@ -188,6 +188,13 @@ NC
      - The first panel has a dynamic, editable form containing the properties of the node (node or partition node/subgraph) that has been selected via click. The form has the node attributes (label:string, layer:dropdown of layers + 'None' option). Changes made here will be persisted after focus is lost and reflected in the graph editor
      - The second panel is a placeholder 
 
+#### Datasource management CRUD
+
+ - The datasources pages shows a table of datasources
+ - Rows in the table can be selected
+ - If rows are selected, an export button activates, pressing the export button gives the option of xlxs or ods
+ - Exported datasources are exported as individual sheets to xlxs or ods spreadsheet, with sheets have the id of the datasource as their label. this functionality is implemented on the backend
+ - There is an import button on the datasources page, allowing upload of an xlxs or ods spreadsheet in the same format. new datasources are created when a sheet id does not have a corresponding datasource id yet, if a datasource does exist the import of that sheet is its new version
 
 
 ### Artefacts

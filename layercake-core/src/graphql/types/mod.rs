@@ -15,6 +15,7 @@ pub mod scalars;
 pub mod user;
 
 pub use data_source::*;
+pub use graph::*;
 pub use graph_edge::*;
 pub use graph_edit::*;
 pub use graph_node::*;
