@@ -243,9 +243,12 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
       }
 
       setExportFormatModalOpen(false)
+      setSelectedRows(new Set()) // Clear selection after successful export
+      alert(`Successfully exported ${selectedRows.size} datasource${selectedRows.size !== 1 ? 's' : ''} to ${format.toUpperCase()}`)
     } catch (error) {
       console.error('Failed to export datasources:', error)
-      alert('Failed to export datasources. See console for details.')
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      alert(`Failed to export datasources: ${errorMessage}`)
     }
   }
 
@@ -286,15 +289,18 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
         if (data) {
           console.log(`Imported: ${data.createdCount} created, ${data.updatedCount} updated`)
           await refetchDataSources()
-          alert(`Successfully imported: ${data.createdCount} created, ${data.updatedCount} updated`)
+          const message = `Successfully imported datasources:\n` +
+            `• ${data.createdCount} created\n` +
+            `• ${data.updatedCount} updated`
+          alert(message)
+          setImportModalOpen(false)
         }
-
-        setImportModalOpen(false)
       }
       reader.readAsArrayBuffer(file)
     } catch (error) {
       console.error('Failed to import datasources:', error)
-      alert('Failed to import datasources. See console for details.')
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      alert(`Failed to import datasources: ${errorMessage}`)
     }
   }
 
@@ -636,7 +642,8 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
       >
         <Text mb="md">
           Upload an XLSX or ODS file containing data sources. Each sheet will be imported as a data source.
-          If a sheet ID matches an existing data source, it will create a new version.
+          If a sheet name matches an existing data source name in this project, it will update that data source.
+          Otherwise, a new data source will be created.
         </Text>
 
         <input

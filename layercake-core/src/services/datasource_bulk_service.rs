@@ -131,7 +131,7 @@ impl DataSourceBulkService {
     }
 
     /// Export datasources to XLSX format
-    /// Each datasource becomes a separate sheet named with its ID containing CSV data
+    /// Each datasource becomes a separate sheet named with its name containing CSV data
     pub async fn export_to_xlsx(&self, datasource_ids: &[i32]) -> Result<Vec<u8>> {
         let mut workbook = Workbook::new();
 
@@ -146,9 +146,26 @@ impl DataSourceBulkService {
 
         tracing::info!("Exporting {} datasources to XLSX", datasources.len());
 
+        // Check for duplicate names
+        let mut name_counts = std::collections::HashMap::new();
+        for ds in &datasources {
+            *name_counts.entry(&ds.name).or_insert(0) += 1;
+        }
+        let duplicates: Vec<&String> = name_counts.iter()
+            .filter(|(_, &count)| count > 1)
+            .map(|(&name, _)| name)
+            .collect();
+
+        if !duplicates.is_empty() {
+            return Err(anyhow::anyhow!(
+                "Cannot export: duplicate datasource names found: {}",
+                duplicates.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ")
+            ));
+        }
+
         for datasource in datasources {
-            // Create a sheet named with the datasource ID
-            let sheet_name = datasource.id.to_string();
+            // Create a sheet named with the datasource name
+            let sheet_name = datasource.name.clone();
             let worksheet = workbook.add_worksheet();
             worksheet.set_name(&sheet_name)?;
 
@@ -187,7 +204,7 @@ impl DataSourceBulkService {
     }
 
     /// Export datasources to ODS format
-    /// Each datasource becomes a separate sheet named with its ID containing CSV data
+    /// Each datasource becomes a separate sheet named with its name containing CSV data
     pub async fn export_to_ods(&self, datasource_ids: &[i32]) -> Result<Vec<u8>> {
         let mut workbook = WorkBook::new(locale!("en_US"));
 
@@ -202,9 +219,26 @@ impl DataSourceBulkService {
 
         tracing::info!("Exporting {} datasources to ODS", datasources.len());
 
+        // Check for duplicate names
+        let mut name_counts = std::collections::HashMap::new();
+        for ds in &datasources {
+            *name_counts.entry(&ds.name).or_insert(0) += 1;
+        }
+        let duplicates: Vec<&String> = name_counts.iter()
+            .filter(|(_, &count)| count > 1)
+            .map(|(&name, _)| name)
+            .collect();
+
+        if !duplicates.is_empty() {
+            return Err(anyhow::anyhow!(
+                "Cannot export: duplicate datasource names found: {}",
+                duplicates.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ")
+            ));
+        }
+
         for datasource in datasources {
-            // Create a sheet named with the datasource ID
-            let sheet_name = datasource.id.to_string();
+            // Create a sheet named with the datasource name
+            let sheet_name = datasource.name.clone();
             let mut sheet = Sheet::new(&sheet_name);
 
             tracing::info!("Exporting datasource {} ({}) to sheet {}",
@@ -305,29 +339,28 @@ impl DataSourceBulkService {
                 let csv_data = Self::range_to_csv(&range)?;
                 tracing::info!("Converted sheet to {} bytes of CSV", csv_data.len());
 
-                // Check if sheet name is a datasource ID (numeric)
-                if let Ok(datasource_id) = sheet_name.parse::<i32>() {
-                    // Try to find and update existing datasource
-                    if let Some(existing) = data_sources::Entity::find_by_id(datasource_id)
-                        .one(&self.db)
-                        .await? {
-                        tracing::info!("Found existing datasource {} - updating", datasource_id);
+                // Try to find existing datasource by name
+                use sea_orm::ColumnTrait;
+                use sea_orm::QueryFilter;
+                if let Some(existing) = data_sources::Entity::find()
+                    .filter(data_sources::Column::ProjectId.eq(project_id))
+                    .filter(data_sources::Column::Name.eq(sheet_name.clone()))
+                    .one(&self.db)
+                    .await? {
+                    tracing::info!("Found existing datasource '{}' (id: {}) - updating", sheet_name, existing.id);
 
-                        // Update the datasource with new CSV data
-                        let filename = format!("{}.csv", existing.name);
-                        let datasource = service.update_file(
-                            datasource_id,
-                            filename,
-                            csv_data,
-                        ).await?;
+                    // Update the datasource with new CSV data
+                    let filename = format!("{}.csv", existing.name);
+                    let datasource = service.update_file(
+                        existing.id,
+                        filename,
+                        csv_data,
+                    ).await?;
 
-                        updated_count += 1;
-                        imported_ids.push(datasource.id);
-                        tracing::info!("Updated datasource: {} (id: {})", datasource.name, datasource.id);
-                        continue;
-                    } else {
-                        tracing::warn!("Datasource {} not found - will create new", datasource_id);
-                    }
+                    updated_count += 1;
+                    imported_ids.push(datasource.id);
+                    tracing::info!("Updated datasource: {} (id: {})", datasource.name, datasource.id);
+                    continue;
                 }
 
                 // Create new datasource
@@ -416,29 +449,28 @@ impl DataSourceBulkService {
                 let csv_data = Self::range_to_csv(&range)?;
                 tracing::info!("Converted sheet to {} bytes of CSV", csv_data.len());
 
-                // Check if sheet name is a datasource ID (numeric)
-                if let Ok(datasource_id) = sheet_name.parse::<i32>() {
-                    // Try to find and update existing datasource
-                    if let Some(existing) = data_sources::Entity::find_by_id(datasource_id)
-                        .one(&self.db)
-                        .await? {
-                        tracing::info!("Found existing datasource {} - updating", datasource_id);
+                // Try to find existing datasource by name
+                use sea_orm::ColumnTrait;
+                use sea_orm::QueryFilter;
+                if let Some(existing) = data_sources::Entity::find()
+                    .filter(data_sources::Column::ProjectId.eq(project_id))
+                    .filter(data_sources::Column::Name.eq(sheet_name.clone()))
+                    .one(&self.db)
+                    .await? {
+                    tracing::info!("Found existing datasource '{}' (id: {}) - updating", sheet_name, existing.id);
 
-                        // Update the datasource with new CSV data
-                        let filename = format!("{}.csv", existing.name);
-                        let datasource = service.update_file(
-                            datasource_id,
-                            filename,
-                            csv_data,
-                        ).await?;
+                    // Update the datasource with new CSV data
+                    let filename = format!("{}.csv", existing.name);
+                    let datasource = service.update_file(
+                        existing.id,
+                        filename,
+                        csv_data,
+                    ).await?;
 
-                        updated_count += 1;
-                        imported_ids.push(datasource.id);
-                        tracing::info!("Updated datasource: {} (id: {})", datasource.name, datasource.id);
-                        continue;
-                    } else {
-                        tracing::warn!("Datasource {} not found - will create new", datasource_id);
-                    }
+                    updated_count += 1;
+                    imported_ids.push(datasource.id);
+                    tracing::info!("Updated datasource: {} (id: {})", datasource.name, datasource.id);
+                    continue;
                 }
 
                 // Create new datasource
