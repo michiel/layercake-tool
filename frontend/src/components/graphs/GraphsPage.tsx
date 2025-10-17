@@ -46,7 +46,10 @@ const GET_PROJECTS = gql`
 
 interface GraphsPageProps {}
 
-const formatDate = (value: string) => new Date(value).toLocaleDateString()
+const formatDateTime = (value: string) => {
+  const date = new Date(value)
+  return date.toLocaleString()
+}
 
 const getExecutionStateIcon = (state: string) => {
   switch (state) {
@@ -221,11 +224,9 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
                   <Table.Tr>
                     <Table.Th>Name</Table.Th>
                     <Table.Th>Status</Table.Th>
-                    <Table.Th>Node ID</Table.Th>
                     <Table.Th>Nodes</Table.Th>
                     <Table.Th>Edges</Table.Th>
                     <Table.Th>Layers</Table.Th>
-                    <Table.Th>Created</Table.Th>
                     <Table.Th>Updated</Table.Th>
                     <Table.Th>Actions</Table.Th>
                   </Table.Tr>
@@ -250,11 +251,6 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
                           </Badge>
                         </Table.Td>
                         <Table.Td>
-                          <Text size="sm" ff="monospace">
-                            {graph.nodeId}
-                          </Text>
-                        </Table.Td>
-                        <Table.Td>
                           <Badge variant="light" color="blue">
                             {graph.nodeCount}
                           </Badge>
@@ -271,12 +267,7 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
                         </Table.Td>
                         <Table.Td>
                           <Text size="sm" c="dimmed">
-                            {formatDate(graph.createdAt)}
-                          </Text>
-                        </Table.Td>
-                        <Table.Td>
-                          <Text size="sm" c="dimmed">
-                            {formatDate(graph.updatedAt)}
+                            {formatDateTime(graph.updatedAt)}
                           </Text>
                         </Table.Td>
                         <Table.Td>

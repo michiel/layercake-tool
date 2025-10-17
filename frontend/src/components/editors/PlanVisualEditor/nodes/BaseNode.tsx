@@ -4,7 +4,7 @@ import { Paper, Text, Group, ActionIcon, Tooltip, Badge, Box, TextInput } from '
 import { IconSettings, IconTrash, IconCheck, IconX } from '@tabler/icons-react'
 import { PlanDagNodeType, NodeConfig, NodeMetadata } from '../../../../types/plan-dag'
 import { getRequiredInputCount, canHaveMultipleOutputs, isNodeConfigured } from '../../../../utils/planDagValidation'
-import { getNodeColor, getNodeIcon, getNodeTypeLabel } from '../../../../utils/nodeStyles'
+import { getNodeColor, getNodeIcon } from '../../../../utils/nodeStyles'
 
 interface BaseNodeProps extends NodeProps {
   nodeType: PlanDagNodeType
@@ -119,14 +119,6 @@ export const BaseNode = memo(({
   // Default label badges if not provided
   const defaultLabelBadges = (
     <>
-      <Badge
-        variant="light"
-        color={color}
-        size="xs"
-        style={{ textTransform: 'none' }}
-      >
-        {getNodeTypeLabel(nodeType)}
-      </Badge>
       {!isConfigured && (
         <Badge variant="outline" size="xs" color="orange">
           Not Configured
@@ -260,18 +252,20 @@ export const BaseNode = memo(({
         )}
 
         {/* Bottom Section 1: Labels (narrow horizontal section) */}
-        <Box
-          px="md"
-          py="xs"
-          style={{
-            borderTop: `1px solid #e9ecef`,
-            flex: '0 0 auto',
-          }}
-        >
-          <Group gap="xs" wrap="wrap">
-            {labelBadges || defaultLabelBadges}
-          </Group>
-        </Box>
+        {(labelBadges !== undefined ? labelBadges !== null : !isConfigured) && (
+          <Box
+            px="md"
+            py="xs"
+            style={{
+              borderTop: `1px solid #e9ecef`,
+              flex: '0 0 auto',
+            }}
+          >
+            <Group gap="xs" wrap="wrap">
+              {labelBadges ?? defaultLabelBadges}
+            </Group>
+          </Box>
+        )}
 
         {/* Bottom Section 2: Tool buttons (narrow horizontal section) */}
         {!readonly && (

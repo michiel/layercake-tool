@@ -423,7 +423,6 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
                     <Table.Th>Format</Table.Th>
                     <Table.Th>Data Type</Table.Th>
                     <Table.Th>Status</Table.Th>
-                    <Table.Th>File</Table.Th>
                     <Table.Th>Size</Table.Th>
                     <Table.Th>Updated</Table.Th>
                     <Table.Th>Actions</Table.Th>
@@ -480,18 +479,13 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
                         </Group>
                       </Table.Td>
                       <Table.Td>
-                        <Text size="sm" ff="monospace">
-                          {dataSource.filename}
-                        </Text>
-                      </Table.Td>
-                      <Table.Td>
                         <Text size="sm">
                           {formatFileSize(dataSource.fileSize)}
                         </Text>
                       </Table.Td>
                       <Table.Td>
                         <Text size="sm" c="dimmed">
-                          {new Date(dataSource.updatedAt).toLocaleDateString()}
+                          {new Date(dataSource.updatedAt).toLocaleString()}
                         </Text>
                       </Table.Td>
                       <Table.Td>

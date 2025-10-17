@@ -14,15 +14,9 @@ import { TopBar } from './components/layout/TopBar'
 import { useCollaborationV2 } from './hooks/useCollaborationV2'
 import { useConnectionStatus } from './hooks/useConnectionStatus'
 
-// Health check query to verify backend connectivity
-const HEALTH_CHECK = gql`
-  query HealthCheck {
-    projects {
-      id
-      name
-    }
-  }
-`
+// Collaboration Context for providing project-level collaboration to all pages
+const CollaborationContext = React.createContext<any>(null)
+export const useCollaboration = () => React.useContext(CollaborationContext)
 
 // Query to fetch projects
 const GET_PROJECTS = gql`
@@ -201,6 +195,18 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
             {projectId && (
               <>
                 <div style={{ height: '1px', backgroundColor: '#e9ecef', margin: '8px 0' }} />
+                <Tooltip label="Project" position="right" disabled={!navCollapsed}>
+                  <Button
+                    variant={isActiveRoute(`/projects/${projectId}`) && !isActiveRoute(`/projects/${projectId}/plan`) && !isActiveRoute(`/projects/${projectId}/datasources`) && !isActiveRoute(`/projects/${projectId}/graphs`) ? 'filled' : 'light'}
+                    fullWidth={!navCollapsed}
+                    leftSection={navCollapsed ? undefined : <IconFolderPlus size={16} />}
+                    onClick={() => navigate(`/projects/${projectId}`)}
+                    px={navCollapsed ? 'xs' : undefined}
+                    style={navCollapsed ? { justifyContent: 'center' } : undefined}
+                  >
+                    {navCollapsed ? <IconFolderPlus size={16} /> : 'Project'}
+                  </Button>
+                </Tooltip>
                 <Tooltip label="Plan" position="right" disabled={!navCollapsed}>
                   <Button
                     variant={isActiveRoute(`/projects/${projectId}/plan`) ? 'filled' : 'light'}
@@ -260,7 +266,9 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
       </AppShell.Navbar>
 
       <AppShell.Main style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-        {children}
+        <CollaborationContext.Provider value={collaboration}>
+          {children}
+        </CollaborationContext.Provider>
       </AppShell.Main>
     </AppShell>
   )
@@ -270,80 +278,278 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
 const HomePage = () => {
   const navigate = useNavigate()
   const [createModalOpened, setCreateModalOpened] = useState(false)
+  const [sampleModalOpened, setSampleModalOpened] = useState(false)
+  const [selectedSampleKey, setSelectedSampleKey] = useState<string | null>(null)
+  const [sampleError, setSampleError] = useState<string | null>(null)
 
-  const { loading: healthLoading, error: healthError } = useQuery(HEALTH_CHECK, {
-    errorPolicy: 'all',
-    notifyOnNetworkStatusChange: true,
+  const { data: projectsData } = useQuery<{
+    projects: Array<{
+      id: number
+      name: string
+      description: string
+      createdAt: string
+      updatedAt: string
+    }>
+  }>(GET_PROJECTS)
+
+  const { data: sampleProjectsData, loading: sampleProjectsLoading } = useQuery<{
+    sampleProjects: Array<{
+      key: string
+      name: string
+      description?: string | null
+    }>
+  }>(GET_SAMPLE_PROJECTS)
+
+  const [createSampleProject, { loading: createSampleLoading }] = useMutation(CREATE_SAMPLE_PROJECT, {
+    onCompleted: (result) => {
+      const project = (result as any)?.createSampleProject
+      if (project) {
+        navigate(`/projects/${project.id}`)
+        setSampleModalOpened(false)
+        setSelectedSampleKey(null)
+        setSampleError(null)
+      }
+    },
+    onError: (error) => {
+      setSampleError(error.message)
+    },
+    refetchQueries: [{ query: GET_PROJECTS }]
   })
 
-  const handleNavigate = (route: string) => {
-    navigate(route)
-  }
+  // Get 5 most recent projects
+  const recentProjects = [...(projectsData?.projects || [])]
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    .slice(0, 5)
 
   const handleCreateProject = () => {
     setCreateModalOpened(true)
   }
 
   const handleProjectCreated = (project: { id: number; name: string; description?: string }) => {
-    navigate(`/projects/${project.id}`) // Navigate to the new project
+    navigate(`/projects/${project.id}`)
   }
 
+  const handleOpenSampleModal = () => {
+    setSampleError(null)
+    setSampleModalOpened(true)
+  }
+
+  const handleSampleModalClose = () => {
+    setSampleModalOpened(false)
+    setSelectedSampleKey(null)
+    setSampleError(null)
+  }
+
+  const handleCreateSampleProject = async () => {
+    if (!selectedSampleKey) {
+      setSampleError('Please select a sample project')
+      return
+    }
+
+    setSampleError(null)
+
+    try {
+      await createSampleProject({
+        variables: {
+          sampleKey: selectedSampleKey,
+        },
+      })
+    } catch (error) {
+      console.error('Failed to create sample project', error)
+    }
+  }
+
+  const sampleOptions =
+    sampleProjectsData?.sampleProjects?.map(sample => ({
+      value: sample.key,
+      label: sample.name,
+      description: sample.description ?? undefined,
+    })) ?? []
+
+  const selectedSample = sampleOptions.find(option => option.value === selectedSampleKey)
+
   return (
-    <Container size="xl">
-      <Breadcrumbs currentPage="Home" onNavigate={handleNavigate} />
+    <div style={{ width: '100%', height: '100%' }}>
+      {/* Action buttons section */}
+      <div style={{ padding: '3rem 2rem', backgroundColor: '#f8f9fa', borderBottom: '1px solid #dee2e6' }}>
+        <Group justify="center" gap="xl">
+          <Button
+            size="xl"
+            variant="filled"
+            leftSection={<IconDatabase size={24} />}
+            onClick={() => navigate('/projects')}
+            style={{ minWidth: 240, height: 80, fontSize: '1.1rem' }}
+          >
+            Browse Projects
+          </Button>
+          <Button
+            size="xl"
+            variant="filled"
+            color="blue"
+            leftSection={<IconPlus size={24} />}
+            onClick={handleCreateProject}
+            style={{ minWidth: 240, height: 80, fontSize: '1.1rem' }}
+          >
+            Start New Project
+          </Button>
+          <Button
+            size="xl"
+            variant="filled"
+            color="teal"
+            leftSection={<IconFolderPlus size={24} />}
+            onClick={handleOpenSampleModal}
+            style={{ minWidth: 240, height: 80, fontSize: '1.1rem' }}
+          >
+            Import Sample Project
+          </Button>
+        </Group>
+      </div>
 
-      <Title order={1} mb="xl">Welcome to Layercake</Title>
+      {/* Recent projects section */}
+      <div style={{ padding: '2rem' }}>
+        <Title order={2} mb="xl" style={{ textAlign: 'center' }}>
+          Recent Projects
+        </Title>
 
-      <Text size="lg" mb="md">
-        Interactive graph transformation and visualization tool with real-time collaboration.
-      </Text>
+        {recentProjects.length === 0 ? (
+          <Card withBorder p="xl" radius="md" style={{ maxWidth: 600, margin: '0 auto' }}>
+            <Stack align="center" gap="md">
+              <IconGraph size={48} color="gray" />
+              <Title order={3}>No Projects Yet</Title>
+              <Text ta="center" c="dimmed">
+                Create your first project to get started with Layercake.
+              </Text>
+            </Stack>
+          </Card>
+        ) : (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+            gap: '1.5rem',
+            maxWidth: 1600,
+            margin: '0 auto'
+          }}>
+            {recentProjects.map((project) => (
+              <Card
+                key={project.id}
+                withBorder
+                padding="lg"
+                radius="md"
+                shadow="sm"
+                style={{ cursor: 'pointer', height: '100%', display: 'flex', flexDirection: 'column' }}
+                onClick={() => navigate(`/projects/${project.id}`)}
+              >
+                <Card.Section withBorder inheritPadding py="xs" style={{ backgroundColor: '#f8f9fa' }}>
+                  <Group justify="space-between">
+                    <Group gap="xs">
+                      <IconGraph size={20} />
+                      <Text fw={600}>{project.name}</Text>
+                    </Group>
+                    <Badge variant="light" size="sm">
+                      ID: {project.id}
+                    </Badge>
+                  </Group>
+                </Card.Section>
 
-      <Group mb="xl">
-        <div>
-          <Text fw={500}>Status:</Text>
-          <Text size="sm" c={healthError ? 'red' : healthLoading ? 'yellow' : 'green'}>
-            {healthError ? 'Backend Disconnected' : healthLoading ? 'Connecting...' : 'Connected'}
-          </Text>
-        </div>
+                <Stack gap="sm" mt="md" style={{ flex: 1 }}>
+                  {project.description && (
+                    <Text size="sm" c="dimmed" lineClamp={2}>
+                      {project.description}
+                    </Text>
+                  )}
 
-        <div>
-          <Text fw={500}>Mode:</Text>
-          <Text size="sm">
-            {window.location.protocol === 'file:' ? 'Desktop (Tauri)' : 'Web Browser'}
-          </Text>
-        </div>
-      </Group>
+                  <div style={{ marginTop: 'auto' }}>
+                    <Text size="xs" c="dimmed">
+                      Updated {new Date(project.updatedAt).toLocaleDateString()}
+                    </Text>
+                  </div>
+                </Stack>
 
-      <Title order={2} mb="md">Getting Started</Title>
-
-      <Group mb="md">
-        <Button
-          size="lg"
-          leftSection={<IconDatabase size={20} />}
-          onClick={() => navigate('/projects')}
-        >
-          Browse Projects
-        </Button>
-        <Button
-          size="lg"
-          variant="outline"
-          leftSection={<IconGraph size={20} />}
-          onClick={handleCreateProject}
-        >
-          Create New Project
-        </Button>
-      </Group>
-
-      <Text size="sm" c="dimmed">
-        Phase 2.3: Frontend-Backend Integration Complete - Real-time Plan DAG editor ready
-      </Text>
+                <Card.Section withBorder inheritPadding py="xs" mt="md">
+                  <Group gap="xs" justify="flex-end">
+                    <Button
+                      size="xs"
+                      variant="light"
+                      leftSection={<IconGraph size={14} />}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        navigate(`/projects/${project.id}/plan`)
+                      }}
+                    >
+                      Plan
+                    </Button>
+                    <Button
+                      size="xs"
+                      variant="light"
+                      leftSection={<IconFileDatabase size={14} />}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        navigate(`/projects/${project.id}/datasources`)
+                      }}
+                    >
+                      Data
+                    </Button>
+                  </Group>
+                </Card.Section>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
 
       <CreateProjectModal
         opened={createModalOpened}
         onClose={() => setCreateModalOpened(false)}
         onSuccess={handleProjectCreated}
       />
-    </Container>
+
+      <Modal
+        opened={sampleModalOpened}
+        onClose={handleSampleModalClose}
+        title="Import Sample Project"
+        size="md"
+      >
+        <Stack gap="md">
+          <Text size="sm" c="dimmed">
+            Select one of the bundled samples to create a project preloaded with data sources and a starter DAG.
+          </Text>
+
+          <Select
+            label="Sample Project"
+            placeholder={sampleProjectsLoading ? 'Loading samples...' : 'Select a sample'}
+            data={sampleOptions}
+            value={selectedSampleKey}
+            onChange={setSelectedSampleKey}
+            disabled={sampleProjectsLoading || sampleOptions.length === 0}
+          />
+
+          {selectedSample?.description && (
+            <Text size="sm" c="dimmed">
+              {selectedSample.description}
+            </Text>
+          )}
+
+          {sampleError && (
+            <Alert color="red" title="Cannot create sample project">
+              {sampleError}
+            </Alert>
+          )}
+
+          <Group justify="flex-end" gap="xs">
+            <Button variant="subtle" onClick={handleSampleModalClose} disabled={createSampleLoading}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateSampleProject}
+              loading={createSampleLoading}
+              disabled={!selectedSampleKey || sampleProjectsLoading}
+            >
+              Create Sample Project
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+    </div>
   )
 }
 
@@ -1044,6 +1250,7 @@ const PlanEditorPage = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const { projectId } = useParams<{ projectId: string }>()
+  const collaboration = useCollaboration() // Get project-level collaboration from context
   const { data: projectsData, loading: projectsLoading } = useQuery<{
     projects: Array<{
       id: number
@@ -1102,6 +1309,7 @@ const PlanEditorPage = () => {
             onNodeSelect={(nodeId) => console.log('Selected node:', nodeId)}
             onEdgeSelect={(edgeId) => console.log('Selected edge:', edgeId)}
             focusNodeId={focusNodeId}
+            collaboration={collaboration}
           />
         </ErrorBoundary>
       </div>

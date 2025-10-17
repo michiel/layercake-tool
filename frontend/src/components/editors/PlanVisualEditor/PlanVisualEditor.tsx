@@ -21,7 +21,6 @@ import {
   IconAlertCircle
 } from '@tabler/icons-react'
 
-import { useCollaborationV2 } from '../../../hooks/useCollaborationV2'
 import { PlanDagNodeType, NodeConfig, NodeMetadata, DataSourceNodeConfig, ReactFlowEdge, PlanDagNode, PlanDag } from '../../../types/plan-dag'
 import { validateConnectionWithCycleDetection, canAcceptMultipleInputs } from '../../../utils/planDagValidation'
 import { ReactFlowAdapter } from '../../../adapters/ReactFlowAdapter'
@@ -56,9 +55,10 @@ interface PlanVisualEditorProps {
   onEdgeSelect?: (edgeId: string | null) => void
   readonly?: boolean
   focusNodeId?: string
+  collaboration?: any // Project-level collaboration instance from App.tsx
 }
 
-const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly = false, focusNodeId }: PlanVisualEditorProps) => {
+const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly = false, focusNodeId, collaboration }: PlanVisualEditorProps) => {
   // Get ReactFlow instance for fit view and screen position conversion
   const { fitView, screenToFlowPosition } = useReactFlow();
 
@@ -214,19 +214,12 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     }
   }, [setNodes, setEdges, mutations, setDragging])
 
-  // Collaboration setup
-  const currentUserId: string | undefined = undefined
-  const collaboration = useCollaborationV2({
-    projectId,
-    documentId: 'plan-dag-canvas',
-    documentType: 'canvas',
-    enableWebSocket: true,
-    userInfo: {
-      id: currentUserId || 'anonymous',
-      name: currentUserId ? `User ${currentUserId}` : 'Anonymous User',
-      avatarColor: '#3b82f6'
+  // Switch to plan-dag-canvas document when component mounts
+  useEffect(() => {
+    if (collaboration?.switchDocument) {
+      collaboration.switchDocument('plan-dag-canvas', 'canvas')
     }
-  })
+  }, [collaboration])
 
   // Other UI state
   const [selectedNode, setSelectedNode] = useState<string | null>(null)
@@ -238,8 +231,8 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
   const [edgeConfigDialogOpen, setEdgeConfigDialogOpen] = useState(false)
   const [configEdge, setConfigEdge] = useState<ReactFlowEdge | null>(null)
 
-  // Use users directly from the collaboration hook
-  const onlineUsers: UserPresenceData[] = collaboration.users || []
+  // Use users directly from the collaboration prop
+  const onlineUsers: UserPresenceData[] = collaboration?.users || []
 
 
 
@@ -744,7 +737,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     if (typeof worldX === 'number' && typeof worldY === 'number' &&
         !isNaN(worldX) && !isNaN(worldY) &&
         isFinite(worldX) && isFinite(worldY)) {
-      collaboration.broadcastCursorPosition(worldX, worldY, selectedNode || undefined)
+      collaboration?.broadcastCursorPosition(worldX, worldY, selectedNode || undefined)
     }
   }, [collaboration, selectedNode, readonly])
 
@@ -1125,23 +1118,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
   );
 
   // Use stable nodeTypes reference directly
-
-
-  // Join/leave collaboration on mount/unmount
-  useEffect(() => {
-    if (!readonly) {
-      collaboration.joinProject()
-    }
-
-    return () => {
-      if (!readonly) {
-        collaboration.leaveProject()
-      }
-    }
-    // Note: 'collaboration' intentionally omitted from deps to prevent infinite re-joins
-    // Join/leave should only happen on component mount/unmount, not when collaboration object changes
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [readonly])
+  // Note: Project join/leave is now handled at App level
 
   const miniMapNodeColor = useCallback((node: Node) => {
     switch (node.data?.nodeType) {
@@ -1411,7 +1388,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
           )}
 
           {/* Phase 3: Collaborative cursors for real-time user presence */}
-          <CollaborativeCursors users={onlineUsers} currentUserId={currentUserId || undefined} />
+          <CollaborativeCursors users={onlineUsers} currentUserId={undefined} />
 
           {/* Collaboration features integration complete */}
         </ReactFlow>

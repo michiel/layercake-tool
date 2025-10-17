@@ -5,7 +5,6 @@ import { IconSettings, IconTrash, IconPlayerPlayFilled, IconChartDots, IconTable
 import { useMutation } from '@apollo/client/react'
 import { PlanDagNodeType, GraphNodeConfig } from '../../../../types/plan-dag'
 import { isNodeConfigured } from '../../../../utils/planDagValidation'
-import { getNodeColor } from '../../../../utils/nodeStyles'
 import { useGraphPreview } from '../../../../hooks/usePreview'
 import { getExecutionStateLabel, getExecutionStateColor, isExecutionComplete, isExecutionInProgress, EXECUTE_NODE } from '../../../../graphql/preview'
 import { GraphPreviewDialog } from '../../../visualization/GraphPreviewDialog'
@@ -32,7 +31,6 @@ export const GraphNode = memo((props: GraphNodeProps) => {
   const { updateNode } = usePlanDagCQRSMutations({ projectId: projectId || 0 })
 
   const config = data.config as GraphNodeConfig
-  const color = getNodeColor(PlanDagNodeType.GRAPH)
 
   const handleLabelChange = async (newLabel: string) => {
     try {
@@ -188,16 +186,9 @@ export const GraphNode = memo((props: GraphNodeProps) => {
   )
 
   // Custom label badges for graph node
-  const labelBadges = (
+  const hasBadges = config.isReference || !isConfigured || ((graphExecution || executionPreview) && !isExecutionComplete((graphExecution || executionPreview)!.executionState))
+  const labelBadges = hasBadges ? (
     <>
-      <Badge
-        variant="light"
-        color={color}
-        size="xs"
-        style={{ textTransform: 'none' }}
-      >
-        Graph
-      </Badge>
       {config.isReference && (
         <Badge variant="outline" size="xs" color="blue">
           Reference
@@ -208,7 +199,7 @@ export const GraphNode = memo((props: GraphNodeProps) => {
           Not Configured
         </Badge>
       )}
-      {(graphExecution || executionPreview) && (
+      {(graphExecution || executionPreview) && !isExecutionComplete((graphExecution || executionPreview)!.executionState) && (
         <Badge
           variant={isExecutionComplete((graphExecution || executionPreview)!.executionState) ? 'light' : 'filled'}
           color={getExecutionStateColor((graphExecution || executionPreview)!.executionState)}
@@ -219,7 +210,7 @@ export const GraphNode = memo((props: GraphNodeProps) => {
         </Badge>
       )}
     </>
-  )
+  ) : null
 
   return (
     <>

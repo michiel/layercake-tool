@@ -5,7 +5,6 @@ import { Text, Group, ActionIcon, Tooltip, Badge, Stack } from '@mantine/core'
 import { IconDownload } from '@tabler/icons-react'
 import { PlanDagNodeType, OutputNodeConfig } from '../../../../types/plan-dag'
 import { isNodeConfigured } from '../../../../utils/planDagValidation'
-import { getNodeColor } from '../../../../utils/nodeStyles'
 import { EXPORT_NODE_OUTPUT, ExportNodeOutputResult } from '../../../../graphql/export'
 import { BaseNode } from './BaseNode'
 
@@ -36,7 +35,6 @@ export const OutputNode = memo((props: OutputNodeProps) => {
   const [downloading, setDownloading] = useState(false)
 
   const config = data.config as OutputNodeConfig
-  const color = getNodeColor(PlanDagNodeType.OUTPUT)
 
   // Check if node is configured
   const edges = data.edges || []
@@ -95,23 +93,11 @@ export const OutputNode = memo((props: OutputNodeProps) => {
   }
 
   // Custom label badges for output node
-  const labelBadges = (
-    <>
-      <Badge
-        variant="light"
-        color={color}
-        size="xs"
-        style={{ textTransform: 'none' }}
-      >
-        Output
-      </Badge>
-      {!isConfigured && (
-        <Badge variant="outline" size="xs" color="orange">
-          Not Configured
-        </Badge>
-      )}
-    </>
-  )
+  const labelBadges = !isConfigured ? (
+    <Badge variant="outline" size="xs" color="orange">
+      Not Configured
+    </Badge>
+  ) : null
 
   return (
     <BaseNode

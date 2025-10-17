@@ -46,14 +46,15 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
   }, [dataSourceData])
 
   // Custom label badges for data source node
-  const labelBadges = (
+  const hasBadges = !isConfigured || (datasourceExecution && !isExecutionComplete(datasourceExecution.executionState))
+  const labelBadges = hasBadges ? (
     <>
       {!isConfigured && (
         <Badge variant="outline" size="xs" color="orange">
           Not Configured
         </Badge>
       )}
-      {datasourceExecution && (
+      {datasourceExecution && !isExecutionComplete(datasourceExecution.executionState) && (
         <Badge
           variant={isExecutionComplete(datasourceExecution.executionState) ? 'light' : 'filled'}
           color={getExecutionStateColor(datasourceExecution.executionState)}
@@ -64,7 +65,7 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
         </Badge>
       )}
     </>
-  )
+  ) : null
 
   return (
     <>
