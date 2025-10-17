@@ -9,18 +9,31 @@ import { getLayoutedElements } from '../../utils/graphUtils';
 import { GroupNode } from './GroupNode';
 import { FloatingEdge } from './FloatingEdge';
 
+type GraphViewMode = 'flow' | 'hierarchy';
+type GraphOrientation = 'vertical' | 'horizontal';
+
 interface LayercakeGraphEditorProps {
   graph: Graph;
   onNodeSelect?: (nodeId: string | null) => void;
   layerVisibility?: Map<string, boolean>;
   onNodesInitialized?: (setNodes: React.Dispatch<React.SetStateAction<Node[]>>, setEdges: React.Dispatch<React.SetStateAction<Edge[]>>) => void;
+  mode?: GraphViewMode;
+  orientation?: GraphOrientation;
+  groupingEnabled?: boolean;
+  fitViewTrigger?: number;
+  wrapperRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
   graph,
   onNodeSelect,
   layerVisibility,
-  onNodesInitialized
+  onNodesInitialized,
+  mode = 'flow',
+  orientation = 'vertical',
+  groupingEnabled = true,
+  fitViewTrigger,
+  wrapperRef,
 }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -31,32 +44,108 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
   const nodeTypes = useMemo(() => ({ group: GroupNode }), []);
   const edgeTypes = useMemo(() => ({ floating: FloatingEdge }), []);
 
-  const onLayout = useCallback(async () => {
-    if (!graph || !graph.graphNodes || !graph.graphEdges) return;
-
-    const layouted = await getLayoutedElements(graph, graph.layers);
-
-    // Restore selection state from ref (preserved across re-renders)
-    const nodesWithSelection = layouted.nodes.map(node => ({
-      ...node,
-      selected: selectedNodeIdsRef.current.includes(node.id)
-    }));
-
-    setNodes(nodesWithSelection);
-    setEdges(layouted.edges);
-
-    // Only fit view on initial load, not on subsequent updates
-    if (isInitialLoad.current) {
-      window.requestAnimationFrame(() => {
-        fitView();
-      });
-      isInitialLoad.current = false;
+  const renderGraph = useMemo(() => {
+    if (!graph) {
+      return graph;
     }
-  }, [graph, setNodes, setEdges, fitView]);
+
+    if (mode === 'hierarchy') {
+      const normalizeParentId = (belongsTo?: string | null) =>
+        belongsTo ? belongsTo.trim() : undefined;
+
+      const nodeMap = new Map(
+        graph.graphNodes.map(node => [node.id, node])
+      );
+
+      const hierarchyNodes = graph.graphNodes.map(node => ({
+        ...node,
+        isPartition: false,
+      }));
+
+      const hierarchyEdges = graph.graphNodes
+        .map(node => ({
+          node,
+          parentId: normalizeParentId(node.belongsTo),
+        }))
+        .filter(({ parentId }) => parentId && nodeMap.has(parentId))
+        .map(({ node, parentId }) => ({
+          id: `hierarchy-${parentId}-${node.id}`,
+          source: parentId as string,
+          target: node.id,
+          label: '',
+          layer: undefined,
+          weight: undefined,
+          attrs: undefined,
+        }));
+
+      return {
+        ...graph,
+        graphNodes: hierarchyNodes,
+        graphEdges: hierarchyEdges,
+      };
+    }
+
+    if (mode === 'flow' && !groupingEnabled) {
+      const filteredNodes = graph.graphNodes.filter(node => !node.isPartition);
+      const allowedIds = new Set(filteredNodes.map(node => node.id));
+
+      const filteredEdges = graph.graphEdges.filter(
+        edge => allowedIds.has(edge.source) && allowedIds.has(edge.target)
+      );
+
+      return {
+        ...graph,
+        graphNodes: filteredNodes,
+        graphEdges: filteredEdges,
+      };
+    }
+
+    return graph;
+  }, [graph, mode, groupingEnabled]);
+
+  const onLayout = useCallback(
+    async (shouldFitView: boolean) => {
+      if (!renderGraph || !renderGraph.graphNodes || !renderGraph.graphEdges) return;
+
+      const layouted = await getLayoutedElements(
+        renderGraph,
+        renderGraph.layers,
+        170,
+        50,
+        {
+          disableSubflows: mode === 'hierarchy' || (mode === 'flow' && !groupingEnabled),
+          orientation,
+        }
+      );
+
+      // Restore selection state from ref (preserved across re-renders)
+      const nodesWithSelection = layouted.nodes.map(node => ({
+        ...node,
+        selected: selectedNodeIdsRef.current.includes(node.id),
+      }));
+
+      setNodes(nodesWithSelection);
+      setEdges(layouted.edges);
+
+      if (shouldFitView || isInitialLoad.current) {
+        window.requestAnimationFrame(() => {
+          fitView({ padding: 0.15, minZoom: 0.02 });
+          isInitialLoad.current = false;
+        });
+      }
+    },
+    [renderGraph, setNodes, setEdges, fitView, orientation, mode, groupingEnabled]
+  );
 
   useEffect(() => {
-    onLayout();
-  }, [graph, onLayout]);
+    onLayout(false);
+  }, [renderGraph, onLayout]);
+
+  useEffect(() => {
+    if (fitViewTrigger !== undefined) {
+      onLayout(true);
+    }
+  }, [fitViewTrigger, onLayout]);
 
   // Notify parent that nodes/edges are ready for manipulation
   useEffect(() => {
@@ -68,6 +157,7 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
   // Update hidden property when visibility changes (no re-layout!)
   useEffect(() => {
     if (!layerVisibility || layerVisibility.size === 0) return;
+    if (!renderGraph) return;
 
     setNodes(currentNodes => {
       return currentNodes.map(node => {
@@ -77,7 +167,7 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
         }
 
         // Find the corresponding graph node to get layer info
-        const graphNode = graph.graphNodes.find(gn => gn.id === node.id);
+        const graphNode = renderGraph.graphNodes.find(gn => gn.id === node.id);
         if (!graphNode) return node;
 
         const shouldHide = graphNode.layer
@@ -90,7 +180,7 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
 
     setEdges(currentEdges => {
       return currentEdges.map(edge => {
-        const graphEdge = graph.graphEdges.find(ge => ge.id === edge.id);
+        const graphEdge = renderGraph.graphEdges.find(ge => ge.id === edge.id);
         if (!graphEdge) return edge;
 
         // Hide edge if its layer is hidden
@@ -99,8 +189,8 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
           : false;
 
         // Hide edge if source or target is hidden
-        const sourceNode = graph.graphNodes.find(n => n.id === graphEdge.source);
-        const targetNode = graph.graphNodes.find(n => n.id === graphEdge.target);
+        const sourceNode = renderGraph.graphNodes.find(n => n.id === graphEdge.source);
+        const targetNode = renderGraph.graphNodes.find(n => n.id === graphEdge.target);
 
         const sourceHidden = sourceNode?.layer
           ? layerVisibility.get(sourceNode.layer) === false
@@ -114,7 +204,7 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
         return { ...edge, hidden: shouldHide };
       });
     });
-  }, [layerVisibility, graph, setNodes, setEdges]);
+  }, [layerVisibility, renderGraph, setNodes, setEdges]);
 
   // Handle node selection
   const handleSelectionChange = useCallback(({ nodes }: { nodes: Node[] }) => {
@@ -162,7 +252,7 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
   }, []);
 
   return (
-    <div style={{ width: '100%', height: '100%' }}>
+    <div style={{ width: '100%', height: '100%' }} ref={wrapperRef}>
       <ReactFlow
         nodes={nodes}
         edges={edges}

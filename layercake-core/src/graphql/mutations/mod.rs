@@ -12,9 +12,11 @@ use crate::services::auth_service::AuthService;
 
 use crate::pipeline::DagExecutor;
 use crate::services::data_source_service::DataSourceService;
+use crate::services::datasource_bulk_service::DataSourceBulkService;
 use crate::services::export_service::ExportService;
 use crate::services::graph_edit_service::GraphEditService;
 use crate::services::graph_service::GraphService;
+use crate::services::sample_project_service::SampleProjectService;
 
 use crate::graphql::types::graph::{CreateGraphInput, CreateLayerInput, Graph, UpdateGraphInput};
 use crate::graphql::types::graph_edit::{
@@ -27,12 +29,65 @@ use crate::graphql::types::plan_dag::{
 };
 use crate::graphql::types::project::{CreateProjectInput, Project, UpdateProjectInput};
 use crate::graphql::types::{
-    BulkUploadDataSourceInput, CreateDataSourceInput, DataSource, InviteCollaboratorInput,
-    LoginInput, LoginResponse, ProjectCollaborator, RegisterResponse, RegisterUserInput,
-    UpdateCollaboratorRoleInput, UpdateDataSourceInput, UpdateUserInput, User,
+    BulkUploadDataSourceInput, CreateDataSourceInput, DataSource, ExportDataSourcesInput,
+    ExportDataSourcesResult, ImportDataSourcesInput, ImportDataSourcesResult,
+    InviteCollaboratorInput, LoginInput, LoginResponse, ProjectCollaborator, RegisterResponse,
+    RegisterUserInput, UpdateCollaboratorRoleInput, UpdateDataSourceInput, UpdateUserInput, User,
 };
 
 pub struct Mutation;
+
+/// Generate a unique node ID based on node type and existing nodes
+fn generate_node_id(
+    node_type: &crate::graphql::types::PlanDagNodeType,
+    existing_nodes: &[PlanDagNode],
+) -> String {
+    generate_node_id_from_ids(node_type, &existing_nodes.iter().map(|n| n.id.as_str()).collect::<Vec<_>>())
+}
+
+/// Generate a unique node ID based on node type and existing node IDs
+fn generate_node_id_from_ids(
+    node_type: &crate::graphql::types::PlanDagNodeType,
+    existing_node_ids: &[&str],
+) -> String {
+    use crate::graphql::types::PlanDagNodeType;
+
+    // Get type prefix
+    let type_prefix = match node_type {
+        PlanDagNodeType::DataSource => "datasource",
+        PlanDagNodeType::Graph => "graph",
+        PlanDagNodeType::Transform => "transform",
+        PlanDagNodeType::Merge => "merge",
+        PlanDagNodeType::Copy => "copy",
+        PlanDagNodeType::Output => "output",
+    };
+
+    // Extract all numeric suffixes from existing node IDs
+    let number_pattern = regex::Regex::new(r"_(\d+)$").unwrap();
+    let existing_numbers: Vec<i32> = existing_node_ids
+        .iter()
+        .filter_map(|id| {
+            number_pattern
+                .captures(id)
+                .and_then(|cap| cap.get(1))
+                .and_then(|m| m.as_str().parse::<i32>().ok())
+        })
+        .collect();
+
+    // Find the max number and increment
+    let max_number = existing_numbers.iter().max().copied().unwrap_or(0);
+    let next_number = max_number + 1;
+
+    // Format with leading zeros (3 digits)
+    format!("{}_{:03}", type_prefix, next_number)
+}
+
+/// Generate a unique edge ID based on source and target
+fn generate_edge_id(source: &str, target: &str) -> String {
+    use uuid::Uuid;
+    // Use a UUID suffix to ensure uniqueness even if same source/target combination
+    format!("edge-{}-{}-{}", source, target, Uuid::new_v4().simple())
+}
 
 #[Object]
 impl Mutation {
@@ -49,6 +104,23 @@ impl Mutation {
         project.description = Set(input.description);
 
         let project = project.insert(&context.db).await?;
+        Ok(Project::from(project))
+    }
+
+    /// Create a project from a bundled sample definition
+    async fn create_sample_project(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(name = "sampleKey")] sample_key: String,
+    ) -> Result<Project> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let service = SampleProjectService::new(context.db.clone());
+
+        let project = service
+            .create_sample_project(&sample_key)
+            .await
+            .map_err(|e| Error::new(format!("Failed to create sample project: {}", e)))?;
+
         Ok(Project::from(project))
     }
 
@@ -204,8 +276,18 @@ impl Mutation {
             .exec(&context.db)
             .await?;
 
+        // Collect existing node IDs for ID generation
+        let mut existing_node_ids: Vec<String> = Vec::new();
+
         // Insert new Plan DAG nodes
         for node in &plan_dag.nodes {
+            // Generate ID if not provided
+            let node_id = node.id.clone().unwrap_or_else(|| {
+                let id_refs: Vec<&str> = existing_node_ids.iter().map(|s| s.as_str()).collect();
+                generate_node_id_from_ids(&node.node_type, &id_refs)
+            });
+            existing_node_ids.push(node_id.clone());
+
             let node_type_str = match node.node_type {
                 crate::graphql::types::PlanDagNodeType::DataSource => "DataSourceNode",
                 crate::graphql::types::PlanDagNodeType::Graph => "GraphNode",
@@ -218,7 +300,7 @@ impl Mutation {
             let metadata_json = serde_json::to_string(&node.metadata)?;
 
             let dag_node = plan_dag_nodes::ActiveModel {
-                id: Set(node.id.clone()),
+                id: Set(node_id),
                 plan_id: Set(project_id), // Use project_id directly
                 node_type: Set(node_type_str.to_string()),
                 position_x: Set(node.position.x),
@@ -236,10 +318,15 @@ impl Mutation {
 
         // Insert new Plan DAG edges
         for edge in &plan_dag.edges {
+            // Generate ID if not provided
+            let edge_id = edge.id.clone().unwrap_or_else(|| {
+                generate_edge_id(&edge.source, &edge.target)
+            });
+
             let metadata_json = serde_json::to_string(&edge.metadata)?;
 
             let dag_edge = plan_dag_edges::ActiveModel {
-                id: Set(edge.id.clone()),
+                id: Set(edge_id),
                 plan_id: Set(project_id), // Use project_id directly
                 source_node_id: Set(edge.source.clone()),
                 target_node_id: Set(edge.target.clone()),
@@ -315,10 +402,13 @@ impl Mutation {
             }
         };
 
-        // Fetch current state to determine node index
+        // Fetch current state to determine node index and generate unique ID
         let (current_nodes, _) =
             plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
         let node_index = current_nodes.len();
+
+        // Generate unique ID on backend - ignore frontend-provided ID
+        let generated_id = generate_node_id(&node.node_type, &current_nodes);
 
         let node_type_str = match node.node_type {
             crate::graphql::types::PlanDagNodeType::DataSource => "DataSourceNode",
@@ -332,7 +422,7 @@ impl Mutation {
         let metadata_json = serde_json::to_string(&node.metadata)?;
 
         let dag_node = plan_dag_nodes::ActiveModel {
-            id: Set(node.id.clone()),
+            id: Set(generated_id),
             plan_id: Set(plan.id), // Use the actual plan ID instead of project ID
             node_type: Set(node_type_str.to_string()),
             position_x: Set(node.position.x),
@@ -608,10 +698,13 @@ impl Mutation {
             plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
         let edge_index = current_edges.len();
 
+        // Generate unique ID on backend - ignore frontend-provided ID
+        let generated_id = generate_edge_id(&edge.source, &edge.target);
+
         let metadata_json = serde_json::to_string(&edge.metadata)?;
 
         let dag_edge = plan_dag_edges::ActiveModel {
-            id: Set(edge.id.clone()),
+            id: Set(generated_id),
             plan_id: Set(plan.id),
             source_node_id: Set(edge.source.clone()),
             target_node_id: Set(edge.target.clone()),
@@ -1571,13 +1664,109 @@ impl Mutation {
         Ok(DataSource::from(data_source))
     }
 
+    /// Export data sources as spreadsheet (XLSX or ODS)
+    async fn export_data_sources(
+        &self,
+        ctx: &Context<'_>,
+        input: ExportDataSourcesInput,
+    ) -> Result<ExportDataSourcesResult> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let bulk_service = DataSourceBulkService::new(context.db.clone());
+
+        let format_str = match input.format {
+            crate::graphql::types::SpreadsheetFormat::XLSX => "xlsx",
+            crate::graphql::types::SpreadsheetFormat::ODS => "ods",
+        };
+
+        // Export to the requested format
+        let file_bytes = match input.format {
+            crate::graphql::types::SpreadsheetFormat::XLSX => {
+                bulk_service
+                    .export_to_xlsx(&input.data_source_ids)
+                    .await
+                    .map_err(|e| Error::new(format!("Failed to export datasources: {}", e)))?
+            }
+            crate::graphql::types::SpreadsheetFormat::ODS => {
+                bulk_service
+                    .export_to_ods(&input.data_source_ids)
+                    .await
+                    .map_err(|e| Error::new(format!("Failed to export datasources: {}", e)))?
+            }
+        };
+
+        // Encode as base64
+        use base64::{Engine as _, engine::general_purpose};
+        let encoded = general_purpose::STANDARD.encode(&file_bytes);
+
+        Ok(ExportDataSourcesResult {
+            file_content: encoded,
+            filename: format!("datasources_export_{}.{}",
+                chrono::Utc::now().timestamp(), format_str),
+            format: format_str.to_string(),
+        })
+    }
+
+    /// Import data sources from spreadsheet (XLSX or ODS)
+    async fn import_data_sources(
+        &self,
+        ctx: &Context<'_>,
+        input: ImportDataSourcesInput,
+    ) -> Result<ImportDataSourcesResult> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let bulk_service = DataSourceBulkService::new(context.db.clone());
+
+        // Decode base64 file content
+        use base64::{Engine as _, engine::general_purpose};
+        tracing::info!("Importing datasources from file: {} (base64 length: {})",
+            input.filename, input.file_content.len());
+
+        let file_bytes = general_purpose::STANDARD
+            .decode(&input.file_content)
+            .map_err(|e| Error::new(format!("Invalid base64 content: {}", e)))?;
+
+        tracing::info!("Decoded {} bytes from base64", file_bytes.len());
+
+        // Import from XLSX or ODS (check file extension)
+        let result = if input.filename.to_lowercase().ends_with(".xlsx") {
+            bulk_service
+                .import_from_xlsx(input.project_id, &file_bytes)
+                .await
+                .map_err(|e| Error::new(format!("Failed to import datasources: {}", e)))?
+        } else if input.filename.to_lowercase().ends_with(".ods") {
+            bulk_service
+                .import_from_ods(input.project_id, &file_bytes)
+                .await
+                .map_err(|e| Error::new(format!("Failed to import datasources: {}", e)))?
+        } else {
+            return Err(Error::new("Only XLSX and ODS formats are supported for import"));
+        };
+
+        // Fetch the imported datasources to return
+        use crate::database::entities::data_sources;
+        use sea_orm::EntityTrait;
+
+        let datasources = data_sources::Entity::find()
+            .all(&context.db)
+            .await?
+            .into_iter()
+            .filter(|ds| result.imported_ids.contains(&ds.id))
+            .map(DataSource::from)
+            .collect();
+
+        Ok(ImportDataSourcesResult {
+            data_sources: datasources,
+            created_count: result.created_count,
+            updated_count: result.updated_count,
+        })
+    }
+
     /// Create a new Graph
     async fn create_graph(&self, ctx: &Context<'_>, input: CreateGraphInput) -> Result<Graph> {
         let context = ctx.data::<GraphQLContext>()?;
         let graph_service = GraphService::new(context.db.clone());
 
         let graph = graph_service
-            .create_graph(input.project_id, input.name)
+            .create_graph(input.project_id, input.name, None)
             .await
             .map_err(|e| Error::new(format!("Failed to create Graph: {}", e)))?;
 

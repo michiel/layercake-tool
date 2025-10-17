@@ -14,7 +14,9 @@ import {
   Alert,
   Table,
   LoadingOverlay,
-  TextInput
+  TextInput,
+  Badge,
+  Menu
 } from '@mantine/core'
 import {
   IconPlus,
@@ -22,11 +24,16 @@ import {
   IconEdit,
   IconTrash,
   IconAlertCircle,
-  IconRefresh
+  IconRefresh,
+  IconDots,
+  IconCheck,
+  IconClock,
+  IconX
 } from '@tabler/icons-react'
 import { gql } from '@apollo/client'
 import { Breadcrumbs } from '../common/Breadcrumbs'
 import { Graph, GET_GRAPHS, CREATE_GRAPH, UPDATE_GRAPH, DELETE_GRAPH, EXECUTE_NODE } from '../../graphql/graphs'
+import { getExecutionStateColor, getExecutionStateLabel, isExecutionInProgress } from '../../graphql/preview'
 
 const GET_PROJECTS = gql`
   query GetProjects {
@@ -39,94 +46,110 @@ const GET_PROJECTS = gql`
 
 interface GraphsPageProps {}
 
-export const GraphsPage: React.FC<GraphsPageProps> = () => {
-  const navigate = useNavigate();
-  const { projectId } = useParams<{ projectId: string }>();
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [editModalOpen, setEditModalOpen] = useState(false);
-  const [selectedGraph, setSelectedGraph] = useState<Graph | null>(null);
-  const [executingGraphId, setExecutingGraphId] = useState<number | null>(null);
+const formatDate = (value: string) => new Date(value).toLocaleDateString()
 
-  const { data: projectsData } = useQuery<{ projects: Array<{ id: number; name: string }> }>(GET_PROJECTS);
-  const selectedProject = projectsData?.projects.find((p: { id: number; name: string }) => p.id === parseInt(projectId || '0'));
+const getExecutionStateIcon = (state: string) => {
+  switch (state) {
+    case 'COMPLETED':
+      return <IconCheck size={14} />
+    case 'PENDING':
+    case 'PROCESSING':
+      return <IconClock size={14} />
+    case 'ERROR':
+      return <IconX size={14} />
+    default:
+      return null
+  }
+}
+
+export const GraphsPage: React.FC<GraphsPageProps> = () => {
+  const navigate = useNavigate()
+  const { projectId } = useParams<{ projectId: string }>()
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [editModalOpen, setEditModalOpen] = useState(false)
+  const [selectedGraph, setSelectedGraph] = useState<Graph | null>(null)
+  const [executingGraphId, setExecutingGraphId] = useState<number | null>(null)
+
+  const { data: projectsData } = useQuery<{ projects: Array<{ id: number; name: string }> }>(GET_PROJECTS)
+  const selectedProject = projectsData?.projects.find((p: { id: number; name: string }) => p.id === parseInt(projectId || '0'))
 
   const { data, loading, error } = useQuery<{ graphs: Graph[] }>(GET_GRAPHS, {
     variables: { projectId: parseInt(projectId || '0') },
     fetchPolicy: 'cache-and-network'
-  });
+  })
 
   const [createGraph, { loading: createLoading }] = useMutation(CREATE_GRAPH, {
     refetchQueries: [{ query: GET_GRAPHS, variables: { projectId: parseInt(projectId || '0') } }]
-  });
+  })
 
   const [updateGraph, { loading: updateLoading }] = useMutation(UPDATE_GRAPH, {
     refetchQueries: [{ query: GET_GRAPHS, variables: { projectId: parseInt(projectId || '0') } }]
-  });
+  })
 
   const [deleteGraph, { loading: deleteLoading }] = useMutation(DELETE_GRAPH, {
     refetchQueries: [{ query: GET_GRAPHS, variables: { projectId: parseInt(projectId || '0') } }]
-  });
+  })
 
   const [executeNode] = useMutation(EXECUTE_NODE, {
     refetchQueries: [{ query: GET_GRAPHS, variables: { projectId: parseInt(projectId || '0') } }]
-  });
+  })
 
-  const graphs: Graph[] = data?.graphs || [];
+  const graphs: Graph[] = data?.graphs || []
 
   const handleNavigate = (route: string) => {
-    navigate(route);
-  };
+    navigate(route)
+  }
 
   const handleCreate = () => {
-    setSelectedGraph(null);
-    setEditModalOpen(true);
-  };
+    setSelectedGraph(null)
+    setEditModalOpen(true)
+  }
 
   const handleEdit = (graph: Graph) => {
-    setSelectedGraph(graph);
-    setEditModalOpen(true);
-  };
+    setSelectedGraph(graph)
+    setEditModalOpen(true)
+  }
 
   const handleDelete = (graph: Graph) => {
-    setSelectedGraph(graph);
-    setDeleteModalOpen(true);
-  };
+    setSelectedGraph(graph)
+    setDeleteModalOpen(true)
+  }
 
   const confirmDelete = async () => {
     if (selectedGraph) {
-      await deleteGraph({ variables: { id: selectedGraph.id } });
-      setDeleteModalOpen(false);
-      setSelectedGraph(null);
+      await deleteGraph({ variables: { id: selectedGraph.id } })
+      setDeleteModalOpen(false)
+      setSelectedGraph(null)
     }
-  };
+  }
 
   const handleSave = async (values: { name: string }) => {
     if (selectedGraph) {
-      await updateGraph({ variables: { id: selectedGraph.id, input: { name: values.name } } });
+      await updateGraph({ variables: { id: selectedGraph.id, input: { name: values.name } } })
     } else {
       // For creation, we need to generate a nodeId internally or derive it.
       // For now, we'll use a placeholder. This will be handled by the backend.
-      await createGraph({ variables: { input: { name: values.name, projectId: parseInt(projectId || '0'), nodeId: 'generated-node-id' } } });
+      await createGraph({ variables: { input: { name: values.name, projectId: parseInt(projectId || '0'), nodeId: 'generated-node-id' } } })
     }
-    setEditModalOpen(false);
-    setSelectedGraph(null);
-  };
+    setEditModalOpen(false)
+    setSelectedGraph(null)
+  }
 
   const handleReprocess = async (graph: Graph) => {
     try {
-      setExecutingGraphId(graph.id);
+      setExecutingGraphId(graph.id)
       await executeNode({
         variables: {
           projectId: parseInt(projectId || '0'),
           nodeId: graph.nodeId
         }
-      });
+      })
     } catch (err) {
-      console.error('Failed to reprocess graph:', err);
+      console.error('Failed to reprocess graph:', err)
     } finally {
-      setExecutingGraphId(null);
+      setExecutingGraphId(null)
     }
-  };
+  }
 
   if (!selectedProject) {
     return (
@@ -156,12 +179,15 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
               Manage graph entities for this project
             </Text>
           </div>
-          <Button
-            leftSection={<IconPlus size={16} />}
-            onClick={handleCreate}
-          >
-            New Graph
-          </Button>
+          <Group gap="xs">
+            <Button
+              leftSection={<IconPlus size={16} />}
+              onClick={handleCreate}
+              variant="light"
+            >
+              New Graph
+            </Button>
+          </Group>
         </Group>
 
         {error && (
@@ -194,6 +220,7 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
                 <Table.Thead>
                   <Table.Tr>
                     <Table.Th>Name</Table.Th>
+                    <Table.Th>Status</Table.Th>
                     <Table.Th>Node ID</Table.Th>
                     <Table.Th>Nodes</Table.Th>
                     <Table.Th>Edges</Table.Th>
@@ -204,25 +231,95 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
-                  {graphs.map((graph) => (
-                    <Table.Tr key={graph.id}>
-                      <Table.Td>{graph.name}</Table.Td>
-                      <Table.Td>{graph.nodeId}</Table.Td>
-                      <Table.Td>{graph.nodeCount}</Table.Td>
-                      <Table.Td>{graph.edgeCount}</Table.Td>
-                      <Table.Td>{graph.layers.length}</Table.Td>
-                      <Table.Td>{new Date(graph.createdAt).toLocaleDateString()}</Table.Td>
-                      <Table.Td>{new Date(graph.updatedAt).toLocaleDateString()}</Table.Td>
-                      <Table.Td>
-                        <Group gap="xs">
-                          <ActionIcon onClick={() => navigate(`/projects/${projectId}/graphs/${graph.id}/edit`)}><IconGraph size={16} /></ActionIcon>
-                          <ActionIcon onClick={() => handleEdit(graph)}><IconEdit size={16} /></ActionIcon>
-                          <ActionIcon onClick={() => handleReprocess(graph)} color="blue" loading={executingGraphId === graph.id}><IconRefresh size={16} /></ActionIcon>
-                          <ActionIcon onClick={() => handleDelete(graph)} color="red"><IconTrash size={16} /></ActionIcon>
-                        </Group>
-                      </Table.Td>
-                    </Table.Tr>
-                  ))}
+                  {graphs.map((graph) => {
+                    const executionState = graph.executionState || 'NOT_STARTED'
+                    const isRunning = executingGraphId === graph.id || isExecutionInProgress(executionState)
+
+                    return (
+                      <Table.Tr key={graph.id}>
+                        <Table.Td>
+                          <Text fw={500}>{graph.name}</Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <Badge
+                            variant="light"
+                            color={getExecutionStateColor(executionState)}
+                            leftSection={getExecutionStateIcon(executionState)}
+                          >
+                            {getExecutionStateLabel(executionState)}
+                          </Badge>
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="sm" ff="monospace">
+                            {graph.nodeId}
+                          </Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <Badge variant="light" color="blue">
+                            {graph.nodeCount}
+                          </Badge>
+                        </Table.Td>
+                        <Table.Td>
+                          <Badge variant="light" color="grape">
+                            {graph.edgeCount}
+                          </Badge>
+                        </Table.Td>
+                        <Table.Td>
+                          <Badge variant="light" color="teal">
+                            {graph.layers?.length ?? 0}
+                          </Badge>
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="sm" c="dimmed">
+                            {formatDate(graph.createdAt)}
+                          </Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="sm" c="dimmed">
+                            {formatDate(graph.updatedAt)}
+                          </Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <Menu shadow="md" width={220}>
+                            <Menu.Target>
+                              <ActionIcon variant="subtle">
+                                <IconDots size={16} />
+                              </ActionIcon>
+                            </Menu.Target>
+                            <Menu.Dropdown>
+                              <Menu.Item
+                                leftSection={<IconGraph size={14} />}
+                                onClick={() => navigate(`/projects/${projectId}/graphs/${graph.id}/edit`)}
+                              >
+                                Open Graph Editor
+                              </Menu.Item>
+                              <Menu.Item
+                                leftSection={<IconEdit size={14} />}
+                                onClick={() => handleEdit(graph)}
+                              >
+                                Rename
+                              </Menu.Item>
+                              <Menu.Item
+                                leftSection={<IconRefresh size={14} />}
+                                onClick={() => handleReprocess(graph)}
+                                disabled={isRunning}
+                              >
+                                Reprocess
+                              </Menu.Item>
+                              <Menu.Divider />
+                              <Menu.Item
+                                leftSection={<IconTrash size={14} />}
+                                color="red"
+                                onClick={() => handleDelete(graph)}
+                              >
+                                Delete
+                              </Menu.Item>
+                            </Menu.Dropdown>
+                          </Menu>
+                        </Table.Td>
+                      </Table.Tr>
+                    )
+                  })}
                 </Table.Tbody>
               </Table>
             </Table.ScrollContainer>

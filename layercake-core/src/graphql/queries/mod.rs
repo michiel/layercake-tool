@@ -14,16 +14,27 @@ use crate::graphql::types::plan_dag::{
     PlanDagMetadata, PlanDagNode, PlanDagNodeType, ValidationResult,
 };
 use crate::graphql::types::project::Project;
+use crate::graphql::types::sample_project::SampleProject;
 use crate::graphql::types::{
     DataSource, DataSourcePreview, GraphEdgePreview, GraphEdit, GraphNodePreview, GraphPreview,
     Layer, ProjectCollaborator, TableColumn, TableRow, User, UserSession,
 };
-use crate::services::graph_edit_service::GraphEditService;
+use crate::services::{
+    graph_edit_service::GraphEditService, sample_project_service::SampleProjectService,
+};
 
 pub struct Query;
 
 #[Object]
 impl Query {
+    /// List bundled sample projects
+    async fn sample_projects(&self) -> Result<Vec<SampleProject>> {
+        Ok(SampleProjectService::list_available_projects()
+            .into_iter()
+            .map(SampleProject::from)
+            .collect())
+    }
+
     /// Get all projects
     async fn projects(&self, ctx: &Context<'_>) -> Result<Vec<Project>> {
         let context = ctx.data::<GraphQLContext>()?;
@@ -234,29 +245,30 @@ impl Query {
 
         // Basic validation: check for orphaned nodes, cycles, etc.
         let node_ids: std::collections::HashSet<String> =
-            plan_dag.nodes.iter().map(|n| n.id.clone()).collect();
+            plan_dag.nodes.iter().filter_map(|n| n.id.clone()).collect();
 
         // Check for edges referencing non-existent nodes
         for edge in &plan_dag.edges {
+            let edge_id_str = edge.id.clone().unwrap_or_else(|| "<unknown>".to_string());
             if !node_ids.contains(&edge.source) {
                 errors.push(crate::graphql::types::ValidationError {
                     node_id: None,
-                    edge_id: Some(edge.id.clone()),
+                    edge_id: edge.id.clone(),
                     error_type: crate::graphql::types::ValidationErrorType::InvalidConnection,
                     message: format!(
                         "Edge {} references non-existent source node {}",
-                        edge.id, edge.source
+                        edge_id_str, edge.source
                     ),
                 });
             }
             if !node_ids.contains(&edge.target) {
                 errors.push(crate::graphql::types::ValidationError {
                     node_id: None,
-                    edge_id: Some(edge.id.clone()),
+                    edge_id: edge.id.clone(),
                     error_type: crate::graphql::types::ValidationErrorType::InvalidConnection,
                     message: format!(
                         "Edge {} references non-existent target node {}",
-                        edge.id, edge.target
+                        edge_id_str, edge.target
                     ),
                 });
             }
@@ -264,17 +276,20 @@ impl Query {
 
         // Check for isolated nodes (nodes with no connections)
         for node in &plan_dag.nodes {
-            let has_connections = plan_dag
-                .edges
-                .iter()
-                .any(|e| e.source == node.id || e.target == node.id);
-            if !has_connections && plan_dag.nodes.len() > 1 {
-                warnings.push(crate::graphql::types::ValidationWarning {
-                    node_id: Some(node.id.clone()),
-                    edge_id: None,
-                    warning_type: crate::graphql::types::ValidationWarningType::UnusedOutput,
-                    message: format!("Node {} has no connections", node.id),
-                });
+            // Skip nodes without IDs (they will be generated)
+            if let Some(ref node_id) = node.id {
+                let has_connections = plan_dag
+                    .edges
+                    .iter()
+                    .any(|e| &e.source == node_id || &e.target == node_id);
+                if !has_connections && plan_dag.nodes.len() > 1 {
+                    warnings.push(crate::graphql::types::ValidationWarning {
+                        node_id: node.id.clone(),
+                        edge_id: None,
+                        warning_type: crate::graphql::types::ValidationWarningType::UnusedOutput,
+                        message: format!("Node {} has no connections", node_id),
+                    });
+                }
             }
         }
 

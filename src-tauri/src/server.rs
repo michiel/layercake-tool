@@ -1,5 +1,7 @@
 use anyhow::Result;
+use rand::Rng;
 use std::net::SocketAddr;
+use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
 use tracing::info;
 
@@ -10,6 +12,7 @@ use sea_orm_migration::prelude::*;
 
 pub struct ServerHandle {
     pub port: u16,
+    pub secret: String,
     pub handle: JoinHandle<Result<()>>,
 }
 
@@ -23,9 +26,30 @@ impl ServerHandle {
     }
 }
 
-/// Start the embedded server on a background task
-pub async fn start_embedded_server(database_path: String, port: u16) -> Result<ServerHandle> {
-    info!("Starting embedded server on port {}", port);
+/// Generate a cryptographically secure random secret for authentication
+fn generate_secret() -> String {
+    const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ\
+                            abcdefghijklmnopqrstuvwxyz\
+                            0123456789";
+    const SECRET_LEN: usize = 32;
+
+    let mut rng = rand::thread_rng();
+    (0..SECRET_LEN)
+        .map(|_| {
+            let idx = rng.gen_range(0..CHARSET.len());
+            CHARSET[idx] as char
+        })
+        .collect()
+}
+
+/// Start the embedded server on a background task with dynamic port allocation
+/// Uses port 0 to let the OS pick an available port automatically (Tauri v2 best practice)
+pub async fn start_embedded_server(database_path: String) -> Result<ServerHandle> {
+    info!("Starting embedded server with dynamic port allocation");
+
+    // Generate a shared secret for authentication
+    let secret = generate_secret();
+    info!("Generated server secret");
 
     // Establish database connection
     let database_url = get_database_url(Some(&database_path));
@@ -36,19 +60,30 @@ pub async fn start_embedded_server(database_path: String, port: u16) -> Result<S
     Migrator::up(&db, None).await?;
     info!("Database migrations completed");
 
-    // Create the Axum app with CORS allowing tauri:// protocol
-    let app = create_app(db, Some("tauri://localhost")).await?;
+    // Create the Axum app; allow all origins during embedded dev so the Vite shell can reach it
+    let app = create_app(db, None).await?;
+
+    // Use port 0 for dynamic allocation - OS will pick an available port
+    let addr = SocketAddr::from(([127, 0, 0, 1], 0));
+
+    // Create a channel to send the actual port back
+    let (port_tx, port_rx) = oneshot::channel();
 
     // Spawn the server on a background task
-    let addr = SocketAddr::from(([127, 0, 0, 1], port));
-    info!("Embedded server listening on {}", addr);
-
     let handle = tokio::spawn(async move {
         let listener = tokio::net::TcpListener::bind(addr)
             .await
             .map_err(|e| anyhow::anyhow!("Failed to bind server: {}", e))?;
 
-        info!("Server successfully bound to {}", addr);
+        // Get the actual port that was assigned
+        let actual_addr = listener
+            .local_addr()
+            .map_err(|e| anyhow::anyhow!("Failed to get local address: {}", e))?;
+
+        info!("Server successfully bound to {}", actual_addr);
+
+        // Send the port back to the main task
+        let _ = port_tx.send(actual_addr.port());
 
         axum::serve(listener, app)
             .await
@@ -57,7 +92,18 @@ pub async fn start_embedded_server(database_path: String, port: u16) -> Result<S
         Ok(())
     });
 
-    Ok(ServerHandle { port, handle })
+    // Wait for the actual port to be assigned
+    let port = port_rx
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to receive port: {}", e))?;
+
+    info!("Embedded server started on port {}", port);
+
+    Ok(ServerHandle {
+        port,
+        secret,
+        handle,
+    })
 }
 
 /// Check if the server is healthy by making a health check request

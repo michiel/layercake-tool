@@ -205,3 +205,46 @@ pub struct DownloadUrl {
     pub filename: String,
     pub expires_at: chrono::DateTime<chrono::Utc>,
 }
+
+// Export/Import types
+#[derive(Enum, Copy, Clone, Eq, PartialEq, Debug)]
+pub enum SpreadsheetFormat {
+    XLSX,
+    ODS,
+}
+
+#[derive(InputObject)]
+pub struct ExportDataSourcesInput {
+    #[graphql(name = "projectId")]
+    pub project_id: i32,
+    #[graphql(name = "dataSourceIds")]
+    pub data_source_ids: Vec<i32>,
+    pub format: SpreadsheetFormat,
+}
+
+#[derive(SimpleObject)]
+pub struct ExportDataSourcesResult {
+    #[graphql(name = "fileContent")]
+    pub file_content: String, // Base64 encoded spreadsheet file
+    pub filename: String,
+    pub format: String,
+}
+
+#[derive(InputObject)]
+pub struct ImportDataSourcesInput {
+    #[graphql(name = "projectId")]
+    pub project_id: i32,
+    #[graphql(name = "fileContent")]
+    pub file_content: String, // Base64 encoded spreadsheet file
+    pub filename: String,
+}
+
+#[derive(SimpleObject)]
+pub struct ImportDataSourcesResult {
+    #[graphql(name = "dataSources")]
+    pub data_sources: Vec<DataSource>,
+    #[graphql(name = "createdCount")]
+    pub created_count: i32,
+    #[graphql(name = "updatedCount")]
+    pub updated_count: i32,
+}

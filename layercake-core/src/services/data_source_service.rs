@@ -178,12 +178,13 @@ impl DataSourceService {
         let data_type = file_type_detection::detect_data_type(&file_format, &file_data)
             .unwrap_or_else(|_| {
                 // Fallback to filename-based detection if content detection fails
-                if filename.to_lowercase().contains("node") {
-                    DataType::Nodes
-                } else if filename.to_lowercase().contains("edge") {
-                    DataType::Edges
-                } else if filename.to_lowercase().contains("layer") {
+                let lowercase = filename.to_lowercase();
+                if lowercase.contains("layer") {
                     DataType::Layers
+                } else if lowercase.contains("edge") {
+                    DataType::Edges
+                } else if lowercase.contains("node") {
+                    DataType::Nodes
                 } else if file_format == FileFormat::Json {
                     DataType::Graph
                 } else {

@@ -23,6 +23,7 @@ reqwest = { workspace = true }
 anyhow = { workspace = true }
 tauri-plugin-dialog = { workspace = true }
 tauri-plugin-shell = { workspace = true }
+rand = "0.8"
 
 # Server dependencies
 axum = { workspace = true }

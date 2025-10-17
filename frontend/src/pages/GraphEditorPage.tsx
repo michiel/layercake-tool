@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Container, Title, Alert, LoadingOverlay, Button, Stack, Flex, Group, Badge, ActionIcon, Tooltip } from '@mantine/core';
-import { IconAlertCircle, IconArrowLeft, IconHistory, IconEdit } from '@tabler/icons-react';
+import { Container, Title, Alert, LoadingOverlay, Button, Stack, Flex, Group, Badge, ActionIcon, Tooltip, Menu } from '@mantine/core';
+import { IconAlertCircle, IconArrowLeft, IconHistory, IconEdit, IconDownload, IconRoute } from '@tabler/icons-react';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client';
 import { Breadcrumbs } from '../components/common/Breadcrumbs';
@@ -11,6 +11,15 @@ import EditHistoryModal from '../components/graphs/EditHistoryModal';
 import { ReactFlowProvider, Node as FlowNode, Edge as FlowEdge } from 'reactflow';
 import { Graph, GraphNode, UPDATE_GRAPH_NODE, UPDATE_LAYER_PROPERTIES, GET_GRAPH_EDIT_COUNT, CREATE_LAYER } from '../graphql/graphs';
 import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
+
+declare global {
+  interface Window {
+    htmlToImage?: {
+      toPng: (node: HTMLElement, options?: any) => Promise<string>;
+      toSvg: (node: HTMLElement, options?: any) => Promise<string>;
+    };
+  }
+}
 
 const GET_PROJECTS = gql`
   query GetProjects {
@@ -63,6 +72,9 @@ const GET_GRAPH_DETAILS = gql`
 
 interface GraphEditorPageProps {}
 
+type GraphViewMode = 'flow' | 'hierarchy';
+type GraphOrientation = 'vertical' | 'horizontal';
+
 export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
   const navigate = useNavigate();
   const { projectId, graphId } = useParams<{ projectId: string; graphId: string }>();
@@ -70,6 +82,12 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
   const [layerVisibility, setLayerVisibility] = useState<Map<string, boolean>>(new Map());
   const [editHistoryOpen, setEditHistoryOpen] = useState(false);
   const [propertiesPanelCollapsed, setPropertiesPanelCollapsed] = useState(false);
+  const [viewMode, setViewMode] = useState<GraphViewMode>('flow');
+  const [orientation, setOrientation] = useState<GraphOrientation>('vertical');
+  const [flowGroupingEnabled, setFlowGroupingEnabled] = useState(true);
+  const [fitViewTrigger, setFitViewTrigger] = useState(0);
+  const reactFlowWrapperRef = useRef<HTMLDivElement>(null);
+  const htmlToImagePromiseRef = useRef<Promise<any> | null>(null);
 
   // Store references to ReactFlow setters for optimistic updates
   const setNodesRef = useRef<React.Dispatch<React.SetStateAction<FlowNode[]>> | null>(null);
@@ -115,6 +133,10 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
   ) => {
     setNodesRef.current = setNodes;
     setEdgesRef.current = setEdges;
+  }, []);
+
+  const requestFitView = useCallback(() => {
+    setFitViewTrigger(prev => prev + 1);
   }, []);
 
   const handleNodeUpdate = useCallback((nodeId: string, updates: Partial<GraphNode>) => {
@@ -196,6 +218,83 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
       return newMap;
     });
   }, []);
+
+  const handleToggleViewMode = useCallback(() => {
+    setViewMode(prev => (prev === 'flow' ? 'hierarchy' : 'flow'));
+    requestFitView();
+  }, [requestFitView]);
+
+  const handleToggleOrientation = useCallback(() => {
+    setOrientation(prev => (prev === 'vertical' ? 'horizontal' : 'vertical'));
+    requestFitView();
+  }, [requestFitView]);
+
+  const handleToggleFlowGrouping = useCallback(() => {
+    setFlowGroupingEnabled(prev => !prev);
+    requestFitView();
+  }, [requestFitView]);
+
+  const ensureHtmlToImage = useCallback((): Promise<any> => {
+    if (typeof window !== 'undefined' && window.htmlToImage) {
+      return Promise.resolve(window.htmlToImage);
+    }
+    if (htmlToImagePromiseRef.current) {
+      return htmlToImagePromiseRef.current;
+    }
+    htmlToImagePromiseRef.current = new Promise((resolve, reject) => {
+      if (typeof document === 'undefined') {
+        reject(new Error('Document is not available'));
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = 'https://unpkg.com/html-to-image@1.11.11/dist/html-to-image.js';
+      script.async = true;
+      script.onload = () => {
+        if (window.htmlToImage) {
+          resolve(window.htmlToImage);
+        } else {
+          reject(new Error('html-to-image failed to load'));
+        }
+      };
+      script.onerror = () => reject(new Error('Failed to load html-to-image script'));
+      document.body.appendChild(script);
+    });
+    return htmlToImagePromiseRef.current;
+  }, []);
+
+  const handleDownload = useCallback(async (format: 'png' | 'svg') => {
+    try {
+      const htmlToImage = await ensureHtmlToImage();
+      if (!reactFlowWrapperRef.current) {
+        throw new Error('Graph wrapper not available');
+      }
+      const target = reactFlowWrapperRef.current.querySelector('.react-flow__viewport') as HTMLElement | null;
+      if (!target) {
+        throw new Error('Unable to find graph viewport');
+      }
+      const fileNameBase = graph?.name?.replace(/\s+/g, '_').toLowerCase() || 'graph';
+      if (format === 'png') {
+        const dataUrl = await htmlToImage.toPng(target, {
+          backgroundColor: '#ffffff',
+          pixelRatio: 2,
+        });
+        const link = document.createElement('a');
+        link.download = `${fileNameBase}.png`;
+        link.href = dataUrl;
+        link.click();
+      } else {
+        const dataUrl = await htmlToImage.toSvg(target, {
+          backgroundColor: '#ffffff',
+        });
+        const link = document.createElement('a');
+        link.download = `${fileNameBase}.svg`;
+        link.href = dataUrl;
+        link.click();
+      }
+    } catch (error) {
+      console.error('Failed to download graph image:', error);
+    }
+  }, [ensureHtmlToImage, graph?.name]);
 
   const handleAddLayer = useCallback(() => {
     if (!graph) return;
@@ -442,24 +541,50 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
             onNavigate={handleNavigate}
           />
 
-          <Group gap="xs">
-            {hasEdits && (
-              <Badge
-                color="yellow"
-                variant="light"
-                leftSection={<IconEdit size={12} />}
-              >
-                {editCount} pending {editCount === 1 ? 'edit' : 'edits'}
-              </Badge>
-            )}
-            <Tooltip label="View edit history">
+        <Group gap="xs">
+          {hasEdits && (
+            <Badge
+              color="yellow"
+              variant="light"
+              leftSection={<IconEdit size={12} />}
+            >
+              {editCount} pending {editCount === 1 ? 'edit' : 'edits'}
+            </Badge>
+          )}
+          <Menu withinPortal position="bottom-start">
+            <Menu.Target>
+              <ActionIcon variant="light" color="gray">
+                <IconDownload size={18} />
+              </ActionIcon>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Item onClick={() => handleDownload('png')}>
+                Download PNG
+              </Menu.Item>
+              <Menu.Item onClick={() => handleDownload('svg')}>
+                Download SVG
+              </Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
+          {projectId && graph?.nodeId && (
+            <Tooltip label="View in Plan DAG">
               <ActionIcon
                 variant="light"
-                color="blue"
-                onClick={() => setEditHistoryOpen(true)}
+                color="indigo"
+                onClick={() => navigate(`/projects/${projectId}/plan?focusNode=${graph.nodeId}`)}
               >
-                <IconHistory size={18} />
+                <IconRoute size={18} />
               </ActionIcon>
+            </Tooltip>
+          )}
+          <Tooltip label="View edit history">
+            <ActionIcon
+              variant="light"
+              color="blue"
+              onClick={() => setEditHistoryOpen(true)}
+            >
+              <IconHistory size={18} />
+            </ActionIcon>
             </Tooltip>
             <Tooltip label={propertiesPanelCollapsed ? "Show properties panel" : "Hide properties panel"}>
               <ActionIcon
@@ -482,6 +607,11 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
               onNodeSelect={setSelectedNodeId}
               layerVisibility={layerVisibility}
               onNodesInitialized={handleNodesInitialized}
+              mode={viewMode}
+              orientation={orientation}
+              groupingEnabled={viewMode === 'flow' ? flowGroupingEnabled : false}
+              fitViewTrigger={fitViewTrigger}
+              wrapperRef={reactFlowWrapperRef}
             />
           </ReactFlowProvider>
         </div>
@@ -497,6 +627,12 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
             onHideAllLayers={handleHideAllLayers}
             onLayerColorChange={handleLayerColorChange}
             onAddLayer={handleAddLayer}
+            viewMode={viewMode}
+            onToggleViewMode={handleToggleViewMode}
+            orientation={orientation}
+            onToggleOrientation={handleToggleOrientation}
+            flowGroupingEnabled={flowGroupingEnabled}
+            onToggleFlowGrouping={handleToggleFlowGrouping}
           />
         )}
       </Flex>

@@ -22,11 +22,30 @@ async fn get_app_info() -> Result<serde_json::Value, String> {
     }))
 }
 
+// Tauri command to get server connection info
+#[tauri::command]
+async fn get_server_info(state: tauri::State<'_, AppState>) -> Result<serde_json::Value, String> {
+    let guard = state.server_handle.read().await;
+    if let Some(handle) = guard.as_ref() {
+        Ok(serde_json::json!({
+            "port": handle.port,
+            "secret": handle.secret,
+            "url": format!("http://localhost:{}", handle.port)
+        }))
+    } else {
+        Err("Server not started".to_string())
+    }
+}
+
 // Tauri command to check backend server status
 #[tauri::command]
-async fn check_server_status() -> Result<bool, String> {
-    // Check embedded server at fixed port 3030
-    Ok(server::check_server_health(3030).await)
+async fn check_server_status(state: tauri::State<'_, AppState>) -> Result<bool, String> {
+    let guard = state.server_handle.read().await;
+    if let Some(handle) = guard.as_ref() {
+        Ok(server::check_server_health(handle.port).await)
+    } else {
+        Ok(false)
+    }
 }
 
 // State management for the desktop application
@@ -52,6 +71,7 @@ async fn main() {
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
             get_app_info,
+            get_server_info,
             check_server_status,
             commands::database::get_database_path,
             commands::database::get_database_info,
@@ -90,13 +110,15 @@ async fn main() {
             let server_handle = app_state.server_handle.clone();
             let db_path = database_path.clone();
 
-            // Start embedded server
+            // Start embedded server with dynamic port allocation
             tauri::async_runtime::spawn(async move {
-                match server::start_embedded_server(db_path.to_string_lossy().to_string(), 3030)
-                    .await
-                {
+                match server::start_embedded_server(db_path.to_string_lossy().to_string()).await {
                     Ok(handle) => {
-                        info!("Embedded server started successfully on port 3030");
+                        let port = handle.port;
+                        info!(
+                            "Embedded server started successfully on port {} with secret authentication",
+                            port
+                        );
                         let mut guard = server_handle.write().await;
                         *guard = Some(handle);
                     }
@@ -122,9 +144,11 @@ async fn main() {
                 if let tauri::WindowEvent::CloseRequested { .. } = event {
                     info!("Application closing, shutting down server");
 
-                    // Shutdown server gracefully
-                    tauri::async_runtime::block_on(async {
-                        let mut guard = server_handle_cleanup.write().await;
+                    // Shutdown server gracefully by spawning a task
+                    // (don't use block_on as it causes "runtime within runtime" panic)
+                    let server_handle_clone = server_handle_cleanup.clone();
+                    tauri::async_runtime::spawn(async move {
+                        let mut guard = server_handle_clone.write().await;
                         if let Some(handle) = guard.take() {
                             if let Err(e) = handle.shutdown().await {
                                 error!("Error shutting down server: {}", e);

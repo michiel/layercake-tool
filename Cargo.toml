@@ -66,6 +66,12 @@ url = "2.0"
 # WebSocket collaboration dependencies
 dashmap = "6.0"
 
+# Spreadsheet dependencies
+calamine = "0.26"
+rust_xlsxwriter = "0.80"
+spreadsheet-ods = "0.25"
+icu_locid = "1.5"
+
 # Tauri dependencies
 tauri = { version = "2.0", features = [] }
 tauri-build = { version = "2.0", features = [] }

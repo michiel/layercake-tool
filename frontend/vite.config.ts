@@ -2,6 +2,20 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
+const isTauri =
+  Boolean(process.env.TAURI_CONFIG_DIR) ||
+  process.env.TAURI === 'true' ||
+  Boolean(process.env.TAURI_PLATFORM) ||
+  Boolean(process.env.TAURI_ENV_PLATFORM)
+
+const alias: Record<string, string> = {
+  'web-worker': path.resolve(__dirname, 'src/utils/dummy-web-worker.js'),
+}
+
+if (!isTauri) {
+  alias['@tauri-apps/api/core'] = path.resolve(__dirname, 'src/utils/tauri-api-mock.js')
+}
+
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
@@ -21,9 +35,6 @@ export default defineConfig({
     global: 'globalThis',
   },
   resolve: {
-    alias: {
-      'web-worker': path.resolve(__dirname, 'src/utils/dummy-web-worker.js'),
-      '@tauri-apps/api/core': path.resolve(__dirname, 'src/utils/tauri-api-mock.js'),
-    },
+    alias,
   },
 })
