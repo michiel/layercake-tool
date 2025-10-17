@@ -3,9 +3,7 @@ import { Accordion, Paper, Group, Button, Slider, Stack, Text } from '@mantine/c
 import { NodePropertiesForm } from './NodePropertiesForm';
 import { LayersAccordionPanel } from './LayersAccordionPanel';
 import { Graph, GraphNode } from '../../graphql/graphs';
-
-type GraphViewMode = 'flow' | 'hierarchy';
-type GraphOrientation = 'vertical' | 'horizontal';
+import { GraphViewMode, GraphOrientation, HierarchyViewMode } from './LayercakeGraphEditor';
 
 interface PropertiesAndLayersPanelProps {
   graph: Graph;
@@ -23,6 +21,8 @@ interface PropertiesAndLayersPanelProps {
   onToggleOrientation: () => void;
   flowGroupingEnabled: boolean;
   onToggleFlowGrouping: () => void;
+  hierarchyViewMode: HierarchyViewMode;
+  onToggleHierarchyViewMode: () => void;
   nodeSpacing: number;
   onNodeSpacingChange: (value: number) => void;
   rankSpacing: number;
@@ -47,6 +47,8 @@ export const PropertiesAndLayersPanel: React.FC<PropertiesAndLayersPanelProps> =
   onToggleOrientation,
   flowGroupingEnabled,
   onToggleFlowGrouping,
+  hierarchyViewMode,
+  onToggleHierarchyViewMode,
   nodeSpacing,
   onNodeSpacingChange,
   rankSpacing,
@@ -102,6 +104,16 @@ export const PropertiesAndLayersPanel: React.FC<PropertiesAndLayersPanelProps> =
                     onClick={onToggleFlowGrouping}
                   >
                     {flowGroupingEnabled ? 'Disable Groupings' : 'Enable Groupings'}
+                  </Button>
+                )}
+
+                {viewMode === 'hierarchy' && (
+                  <Button
+                    size="xs"
+                    variant="light"
+                    onClick={onToggleHierarchyViewMode}
+                  >
+                    {hierarchyViewMode === 'graph' ? 'As Containers' : 'As Graph'}
                   </Button>
                 )}
               </Group>

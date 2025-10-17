@@ -1,11 +1,11 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Container, Title, Alert, LoadingOverlay, Button, Stack, Flex, Group, Badge, ActionIcon, Tooltip, Menu } from '@mantine/core';
-import { IconAlertCircle, IconArrowLeft, IconHistory, IconEdit, IconDownload, IconRoute } from '@tabler/icons-react';
+import { IconAlertCircle, IconArrowLeft, IconHistory, IconEdit, IconDownload, IconRoute, IconZoomScan } from '@tabler/icons-react';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client';
 import { Breadcrumbs } from '../components/common/Breadcrumbs';
-import { LayercakeGraphEditor } from '../components/graphs/LayercakeGraphEditor';
+import { LayercakeGraphEditor, GraphViewMode, GraphOrientation, HierarchyViewMode } from '../components/graphs/LayercakeGraphEditor';
 import { PropertiesAndLayersPanel } from '../components/graphs/PropertiesAndLayersPanel';
 import EditHistoryModal from '../components/graphs/EditHistoryModal';
 import { ReactFlowProvider, Node as FlowNode, Edge as FlowEdge } from 'reactflow';
@@ -72,9 +72,6 @@ const GET_GRAPH_DETAILS = gql`
 
 interface GraphEditorPageProps {}
 
-type GraphViewMode = 'flow' | 'hierarchy';
-type GraphOrientation = 'vertical' | 'horizontal';
-
 export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
   const navigate = useNavigate();
   const { projectId, graphId } = useParams<{ projectId: string; graphId: string }>();
@@ -85,6 +82,7 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
   const [viewMode, setViewMode] = useState<GraphViewMode>('flow');
   const [orientation, setOrientation] = useState<GraphOrientation>('vertical');
   const [flowGroupingEnabled, setFlowGroupingEnabled] = useState(true);
+  const [hierarchyViewMode, setHierarchyViewMode] = useState<HierarchyViewMode>('graph');
   const [fitViewTrigger, setFitViewTrigger] = useState(0);
   const [nodeSpacing, setNodeSpacing] = useState(75);
   const [rankSpacing, setRankSpacing] = useState(75);
@@ -180,6 +178,7 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
         label: updates.label,
         layer: updates.layer,
         attrs: updates.attrs,
+        belongsTo: updates.belongsTo,
       },
     }).catch(error => {
       console.error('Failed to update node:', error);
@@ -234,6 +233,11 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
 
   const handleToggleFlowGrouping = useCallback(() => {
     setFlowGroupingEnabled(prev => !prev);
+    requestFitView();
+  }, [requestFitView]);
+
+  const handleToggleHierarchyViewMode = useCallback(() => {
+    setHierarchyViewMode(prev => (prev === 'graph' ? 'containers' : 'graph'));
     requestFitView();
   }, [requestFitView]);
 
@@ -569,6 +573,15 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
               {editCount} pending {editCount === 1 ? 'edit' : 'edits'}
             </Badge>
           )}
+          <Tooltip label="Zoom to Fit">
+            <ActionIcon
+              variant="light"
+              color="gray"
+              onClick={requestFitView}
+            >
+              <IconZoomScan size={18} />
+            </ActionIcon>
+          </Tooltip>
           <Menu withinPortal position="bottom-start">
             <Menu.Target>
               <ActionIcon variant="light" color="gray">
@@ -628,11 +641,13 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
               mode={viewMode}
               orientation={orientation}
               groupingEnabled={viewMode === 'flow' ? flowGroupingEnabled : false}
+              hierarchyViewMode={hierarchyViewMode}
               fitViewTrigger={fitViewTrigger}
               wrapperRef={reactFlowWrapperRef}
               nodeSpacing={nodeSpacing}
               rankSpacing={rankSpacing}
               minEdgeLength={minEdgeLength}
+              onNodeUpdate={handleNodeUpdate}
             />
           </ReactFlowProvider>
         </div>
@@ -654,6 +669,8 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
             onToggleOrientation={handleToggleOrientation}
             flowGroupingEnabled={flowGroupingEnabled}
             onToggleFlowGrouping={handleToggleFlowGrouping}
+            hierarchyViewMode={hierarchyViewMode}
+            onToggleHierarchyViewMode={handleToggleHierarchyViewMode}
             nodeSpacing={nodeSpacing}
             onNodeSpacingChange={handleNodeSpacingChange}
             rankSpacing={rankSpacing}

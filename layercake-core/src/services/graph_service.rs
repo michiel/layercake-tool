@@ -193,6 +193,7 @@ impl GraphService {
         label: Option<String>,
         layer: Option<String>,
         attrs: Option<serde_json::Value>,
+        belongs_to: Option<Option<String>>,
     ) -> Result<graph_nodes::Model> {
         use sea_orm::{ActiveModelTrait, Set};
 
@@ -215,6 +216,10 @@ impl GraphService {
 
         if let Some(attrs) = attrs {
             active_model.attrs = Set(Some(attrs));
+        }
+
+        if let Some(belongs_to_value) = belongs_to {
+            active_model.belongs_to = Set(belongs_to_value);
         }
 
         let updated = active_model.update(&self.db).await?;

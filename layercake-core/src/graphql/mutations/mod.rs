@@ -1840,6 +1840,7 @@ impl Mutation {
         label: Option<String>,
         layer: Option<String>,
         attrs: Option<crate::graphql::types::scalars::JSON>,
+        belongs_to: Option<String>,
     ) -> Result<crate::graphql::types::graph_node::GraphNode> {
         let context = ctx.data::<GraphQLContext>()?;
         let graph_service = GraphService::new(context.db.clone());
@@ -1855,6 +1856,15 @@ impl Mutation {
             .one(&context.db)
             .await?;
 
+        // Convert belongs_to to Option<Option<String>> for service call
+        let belongs_to_param = belongs_to.as_ref().map(|b| {
+            if b.is_empty() {
+                None
+            } else {
+                Some(b.clone())
+            }
+        });
+
         // Update the node
         let node = graph_service
             .update_graph_node(
@@ -1863,6 +1873,7 @@ impl Mutation {
                 label.clone(),
                 layer.clone(),
                 attrs.clone(),
+                belongs_to_param.clone(),
             )
             .await
             .map_err(|e| Error::new(format!("Failed to update graph node: {}", e)))?;
@@ -1919,6 +1930,23 @@ impl Mutation {
                             Some("attrs".to_string()),
                             old_node.attrs.clone(),
                             Some(new_attrs.clone()),
+                            None,
+                        )
+                        .await;
+                }
+            }
+
+            if let Some(new_belongs_to) = belongs_to_param.clone() {
+                if old_node.belongs_to != new_belongs_to {
+                    let _ = edit_service
+                        .create_edit(
+                            graph_id,
+                            "node".to_string(),
+                            node_id.clone(),
+                            "update".to_string(),
+                            Some("belongsTo".to_string()),
+                            old_node.belongs_to.as_ref().map(|b| serde_json::json!(b)),
+                            new_belongs_to.as_ref().map(|b| serde_json::json!(b)),
                             None,
                         )
                         .await;
@@ -2041,6 +2069,7 @@ impl Mutation {
                         node_update.label.clone(),
                         node_update.layer.clone(),
                         node_update.attrs.clone(),
+                        None, // belongs_to not supported in bulk update
                     )
                     .await
                     .map_err(|e| Error::new(format!("Failed to update graph node: {}", e)))?;

@@ -9,8 +9,9 @@ import { getLayoutedElements } from '../../utils/graphUtils';
 import { GroupNode } from './GroupNode';
 import { FloatingEdge } from './FloatingEdge';
 
-type GraphViewMode = 'flow' | 'hierarchy';
-type GraphOrientation = 'vertical' | 'horizontal';
+export type GraphViewMode = 'flow' | 'hierarchy';
+export type GraphOrientation = 'vertical' | 'horizontal';
+export type HierarchyViewMode = 'graph' | 'containers';
 
 interface LayercakeGraphEditorProps {
   graph: Graph;
@@ -20,11 +21,13 @@ interface LayercakeGraphEditorProps {
   mode?: GraphViewMode;
   orientation?: GraphOrientation;
   groupingEnabled?: boolean;
+  hierarchyViewMode?: HierarchyViewMode;
   fitViewTrigger?: number;
   wrapperRef?: React.RefObject<HTMLDivElement | null>;
   nodeSpacing?: number;
   rankSpacing?: number;
   minEdgeLength?: number;
+  onNodeUpdate?: (nodeId: string, updates: { belongsTo?: string }) => void;
 }
 
 export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
@@ -35,11 +38,13 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
   mode = 'flow',
   orientation = 'vertical',
   groupingEnabled = true,
+  hierarchyViewMode = 'graph',
   fitViewTrigger,
   wrapperRef,
   nodeSpacing = 75,
   rankSpacing = 75,
   minEdgeLength = 50,
+  onNodeUpdate,
 }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -57,39 +62,48 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
     }
 
     if (mode === 'hierarchy') {
-      const normalizeParentId = (belongsTo?: string | null) =>
-        belongsTo ? belongsTo.trim() : undefined;
+      if (hierarchyViewMode === 'containers') {
+        // Show as containers: preserve isPartition (like flow), but remove edges
+        return {
+          ...graph,
+          graphEdges: [], // No edges in containers view
+        };
+      } else {
+        // Show as graph: convert hierarchy to edges, flatten partitions
+        const normalizeParentId = (belongsTo?: string | null) =>
+          belongsTo ? belongsTo.trim() : undefined;
 
-      const nodeMap = new Map(
-        graph.graphNodes.map(node => [node.id, node])
-      );
+        const nodeMap = new Map(
+          graph.graphNodes.map(node => [node.id, node])
+        );
 
-      const hierarchyNodes = graph.graphNodes.map(node => ({
-        ...node,
-        isPartition: false,
-      }));
-
-      const hierarchyEdges = graph.graphNodes
-        .map(node => ({
-          node,
-          parentId: normalizeParentId(node.belongsTo),
-        }))
-        .filter(({ parentId }) => parentId && nodeMap.has(parentId))
-        .map(({ node, parentId }) => ({
-          id: `hierarchy-${parentId}-${node.id}`,
-          source: parentId as string,
-          target: node.id,
-          label: '',
-          layer: undefined,
-          weight: undefined,
-          attrs: undefined,
+        const hierarchyNodes = graph.graphNodes.map(node => ({
+          ...node,
+          isPartition: false,
         }));
 
-      return {
-        ...graph,
-        graphNodes: hierarchyNodes,
-        graphEdges: hierarchyEdges,
-      };
+        const hierarchyEdges = graph.graphNodes
+          .map(node => ({
+            node,
+            parentId: normalizeParentId(node.belongsTo),
+          }))
+          .filter(({ parentId }) => parentId && nodeMap.has(parentId))
+          .map(({ node, parentId }) => ({
+            id: `hierarchy-${parentId}-${node.id}`,
+            source: parentId as string,
+            target: node.id,
+            label: '',
+            layer: undefined,
+            weight: undefined,
+            attrs: undefined,
+          }));
+
+        return {
+          ...graph,
+          graphNodes: hierarchyNodes,
+          graphEdges: hierarchyEdges,
+        };
+      }
     }
 
     if (mode === 'flow' && !groupingEnabled) {
@@ -108,7 +122,7 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
     }
 
     return graph;
-  }, [graph, mode, groupingEnabled]);
+  }, [graph, mode, groupingEnabled, hierarchyViewMode]);
 
   const onLayout = useCallback(
     async (shouldFitView: boolean) => {
@@ -120,7 +134,7 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
         170,
         50,
         {
-          disableSubflows: mode === 'hierarchy' || (mode === 'flow' && !groupingEnabled),
+          disableSubflows: (mode === 'hierarchy' && hierarchyViewMode === 'graph') || (mode === 'flow' && !groupingEnabled),
           orientation,
           nodeSpacing,
           rankSpacing,
@@ -144,7 +158,7 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
         });
       }
     },
-    [renderGraph, setNodes, setEdges, fitView, orientation, mode, groupingEnabled, nodeSpacing, rankSpacing, minEdgeLength]
+    [renderGraph, setNodes, setEdges, fitView, orientation, mode, groupingEnabled, hierarchyViewMode, nodeSpacing, rankSpacing, minEdgeLength]
   );
 
   useEffect(() => {
@@ -234,6 +248,119 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
     }
   }, [onNodeSelect]);
 
+  // Handle node/subflow drag stop to detect parent group changes
+  const handleNodeDragStop = useCallback((_event: React.MouseEvent, node: Node) => {
+    // Only apply drag reparenting in Flow mode or Hierarchy containers mode
+    if (mode === 'hierarchy' && hierarchyViewMode !== 'containers') return;
+    if (mode !== 'flow' && mode !== 'hierarchy') return;
+
+    if (!onNodeUpdate || !renderGraph) return;
+
+    // Skip only label nodes
+    if (node.id.endsWith('-label')) return;
+
+    // Find the graph node to get its original belongsTo
+    const graphNode = renderGraph.graphNodes.find(gn => gn.id === node.id);
+    if (!graphNode) return;
+
+    // Helper to get absolute position of a node (accounting for parent offsets)
+    const getAbsolutePosition = (n: Node): { x: number; y: number } => {
+      let absX = n.position.x;
+      let absY = n.position.y;
+      let currentNode = n;
+
+      // Traverse up parent chain to get absolute coordinates
+      while (currentNode.parentNode) {
+        const parent = nodes.find(p => p.id === currentNode.parentNode);
+        if (!parent) break;
+        absX += parent.position.x;
+        absY += parent.position.y;
+        currentNode = parent;
+      }
+
+      return { x: absX, y: absY };
+    };
+
+    // Get absolute position of the dropped node
+    const nodeAbsPos = getAbsolutePosition(node);
+    const nodeRect = {
+      x: nodeAbsPos.x,
+      y: nodeAbsPos.y,
+      width: (node.width as number) || 170,
+      height: (node.height as number) || 50,
+    };
+
+    // Check center point of node for containment
+    const nodeCenterX = nodeRect.x + nodeRect.width / 2;
+    const nodeCenterY = nodeRect.y + nodeRect.height / 2;
+
+    // Find all group nodes and check if node center is inside any of them
+    const groupNodes = nodes.filter(n => n.type === 'group');
+
+    // Helper to check if a node is a descendant of another
+    const isDescendantOf = (childId: string, ancestorId: string): boolean => {
+      let current = nodes.find(n => n.id === childId);
+      while (current?.parentNode) {
+        if (current.parentNode === ancestorId) return true;
+        current = nodes.find(n => n.id === current!.parentNode);
+      }
+      return false;
+    };
+
+    // Find the deepest (most nested) group that contains this node
+    let newParent: string | undefined = undefined;
+    let maxDepth = -1;
+
+    for (const group of groupNodes) {
+      // Skip self and descendants (can't drop a group inside itself or its children)
+      if (group.id === node.id || isDescendantOf(group.id, node.id)) continue;
+
+      const groupAbsPos = getAbsolutePosition(group);
+      const groupRect = {
+        x: groupAbsPos.x,
+        y: groupAbsPos.y,
+        width: (group.width as number) || (group.style?.width as number) || 0,
+        height: (group.height as number) || (group.style?.height as number) || 0,
+      };
+
+      // Check if node center is within group bounds
+      const isInside =
+        nodeCenterX >= groupRect.x &&
+        nodeCenterX <= groupRect.x + groupRect.width &&
+        nodeCenterY >= groupRect.y &&
+        nodeCenterY <= groupRect.y + groupRect.height;
+
+      if (isInside) {
+        // Calculate depth (count parents)
+        let depth = 0;
+        let currentGroup = group;
+        while (currentGroup.parentNode) {
+          depth++;
+          currentGroup = nodes.find(n => n.id === currentGroup.parentNode) || currentGroup;
+          if (!currentGroup.parentNode) break;
+        }
+
+        // Use deepest group
+        if (depth > maxDepth) {
+          maxDepth = depth;
+          newParent = group.id;
+        }
+      }
+    }
+
+    const originalParent = graphNode.belongsTo || undefined;
+
+    // Check if parent changed
+    if (newParent !== originalParent) {
+      const nodeType = node.type === 'group' ? 'Subflow' : 'Node';
+      console.log(`${nodeType} ${node.id} parent changed from ${originalParent || 'root'} to ${newParent || 'root'}`);
+      // Update belongsTo relationship
+      onNodeUpdate(node.id, {
+        belongsTo: newParent || ''  // Empty string means no parent (root level)
+      });
+    }
+  }, [mode, hierarchyViewMode, onNodeUpdate, renderGraph, nodes]);
+
   // Minimap node color customization
   const minimapNodeColor = useCallback((node: Node) => {
     // Hide label nodes completely
@@ -270,6 +397,7 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onSelectionChange={handleSelectionChange}
+        onNodeDragStop={handleNodeDragStop}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         fitView

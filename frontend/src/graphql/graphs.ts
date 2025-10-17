@@ -195,6 +195,7 @@ export const UPDATE_GRAPH_NODE = gql`
     $label: String
     $layer: String
     $attrs: JSON
+    $belongsTo: String
   ) {
     updateGraphNode(
       graphId: $graphId
@@ -202,11 +203,13 @@ export const UPDATE_GRAPH_NODE = gql`
       label: $label
       layer: $layer
       attrs: $attrs
+      belongsTo: $belongsTo
     ) {
       id
       label
       layer
       attrs
+      belongsTo
     }
   }
 `

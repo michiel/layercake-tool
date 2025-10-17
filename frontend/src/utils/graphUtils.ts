@@ -212,7 +212,7 @@ export const getLayoutedElements = async (
           borderStyle: 'solid',
         },
         className: 'layercake-group-node',
-        ...(parentId ? { parentNode: parentId, extent: 'parent' as const } : {}),
+        ...(parentId ? { parentNode: parentId } : {}),
       });
 
       // Add label as a separate node with high z-index
@@ -259,7 +259,7 @@ export const getLayoutedElements = async (
           border: `1px solid ${layerStyle?.borderColor || DEFAULT_NODE_BORDER}`,
           color: layerStyle?.textColor || DEFAULT_NODE_TEXT,
         },
-        ...(parentId ? { parentNode: parentId, extent: 'parent' as const } : {}),
+        ...(parentId ? { parentNode: parentId } : {}),
       });
     }
   };
