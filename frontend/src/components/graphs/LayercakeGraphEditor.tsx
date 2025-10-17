@@ -46,6 +46,7 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
   const { fitView } = useReactFlow();
   const isInitialLoad = useRef(true);
   const selectedNodeIdsRef = useRef<string[]>([]);
+  const prevFitViewTriggerRef = useRef<number | undefined>(undefined);
 
   const nodeTypes = useMemo(() => ({ group: GroupNode }), []);
   const edgeTypes = useMemo(() => ({ floating: FloatingEdge }), []);
@@ -151,7 +152,8 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
   }, [renderGraph, onLayout]);
 
   useEffect(() => {
-    if (fitViewTrigger !== undefined) {
+    if (fitViewTrigger !== undefined && fitViewTrigger !== prevFitViewTriggerRef.current) {
+      prevFitViewTriggerRef.current = fitViewTrigger;
       onLayout(true);
     }
   }, [fitViewTrigger, onLayout]);
