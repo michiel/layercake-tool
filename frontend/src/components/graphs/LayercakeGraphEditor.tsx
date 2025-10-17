@@ -22,6 +22,9 @@ interface LayercakeGraphEditorProps {
   groupingEnabled?: boolean;
   fitViewTrigger?: number;
   wrapperRef?: React.RefObject<HTMLDivElement | null>;
+  nodeSpacing?: number;
+  rankSpacing?: number;
+  minEdgeLength?: number;
 }
 
 export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
@@ -34,6 +37,9 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
   groupingEnabled = true,
   fitViewTrigger,
   wrapperRef,
+  nodeSpacing = 75,
+  rankSpacing = 75,
+  minEdgeLength = 50,
 }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -115,6 +121,9 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
         {
           disableSubflows: mode === 'hierarchy' || (mode === 'flow' && !groupingEnabled),
           orientation,
+          nodeSpacing,
+          rankSpacing,
+          minEdgeLength,
         }
       );
 
@@ -134,7 +143,7 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
         });
       }
     },
-    [renderGraph, setNodes, setEdges, fitView, orientation, mode, groupingEnabled]
+    [renderGraph, setNodes, setEdges, fitView, orientation, mode, groupingEnabled, nodeSpacing, rankSpacing, minEdgeLength]
   );
 
   useEffect(() => {

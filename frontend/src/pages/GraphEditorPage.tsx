@@ -86,6 +86,9 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
   const [orientation, setOrientation] = useState<GraphOrientation>('vertical');
   const [flowGroupingEnabled, setFlowGroupingEnabled] = useState(true);
   const [fitViewTrigger, setFitViewTrigger] = useState(0);
+  const [nodeSpacing, setNodeSpacing] = useState(75);
+  const [rankSpacing, setRankSpacing] = useState(75);
+  const [minEdgeLength, setMinEdgeLength] = useState(50);
   const reactFlowWrapperRef = useRef<HTMLDivElement>(null);
   const htmlToImagePromiseRef = useRef<Promise<any> | null>(null);
 
@@ -231,6 +234,21 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
 
   const handleToggleFlowGrouping = useCallback(() => {
     setFlowGroupingEnabled(prev => !prev);
+    requestFitView();
+  }, [requestFitView]);
+
+  const handleNodeSpacingChange = useCallback((value: number) => {
+    setNodeSpacing(value);
+    requestFitView();
+  }, [requestFitView]);
+
+  const handleRankSpacingChange = useCallback((value: number) => {
+    setRankSpacing(value);
+    requestFitView();
+  }, [requestFitView]);
+
+  const handleMinEdgeLengthChange = useCallback((value: number) => {
+    setMinEdgeLength(value);
     requestFitView();
   }, [requestFitView]);
 
@@ -612,6 +630,9 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
               groupingEnabled={viewMode === 'flow' ? flowGroupingEnabled : false}
               fitViewTrigger={fitViewTrigger}
               wrapperRef={reactFlowWrapperRef}
+              nodeSpacing={nodeSpacing}
+              rankSpacing={rankSpacing}
+              minEdgeLength={minEdgeLength}
             />
           </ReactFlowProvider>
         </div>
@@ -633,6 +654,12 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
             onToggleOrientation={handleToggleOrientation}
             flowGroupingEnabled={flowGroupingEnabled}
             onToggleFlowGrouping={handleToggleFlowGrouping}
+            nodeSpacing={nodeSpacing}
+            onNodeSpacingChange={handleNodeSpacingChange}
+            rankSpacing={rankSpacing}
+            onRankSpacingChange={handleRankSpacingChange}
+            minEdgeLength={minEdgeLength}
+            onMinEdgeLengthChange={handleMinEdgeLengthChange}
           />
         )}
       </Flex>

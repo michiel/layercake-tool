@@ -38,6 +38,9 @@ const elkOptions = {
 interface LayoutOptions {
   disableSubflows?: boolean;
   orientation?: 'vertical' | 'horizontal';
+  nodeSpacing?: number;
+  rankSpacing?: number;
+  minEdgeLength?: number;
 }
 
 // Function to convert LcGraph to React Flow elements
@@ -51,6 +54,9 @@ export const getLayoutedElements = async (
   const disableSubflows = options.disableSubflows === true;
   const orientation = options.orientation ?? 'vertical';
   const layoutDirection = orientation === 'horizontal' ? 'RIGHT' : 'DOWN';
+  const nodeSpacing = options.nodeSpacing ?? 75;
+  const rankSpacing = options.rankSpacing ?? 75;
+  const minEdgeLength = options.minEdgeLength ?? 50;
   // Create node lookup map
   const nodeMap = new Map<string, GraphNode>();
   lcGraph.graphNodes.forEach(node => nodeMap.set(node.id, node));
@@ -74,8 +80,8 @@ export const getLayoutedElements = async (
         layoutOptions: {
           'elk.padding': '[top=40,left=20,bottom=20,right=20]',
           'elk.direction': layoutDirection,
-          'elk.spacing.nodeNode': '50',
-          'elk.spacing.nodeNodeBetweenLayers': '50',
+          'elk.spacing.nodeNode': String(nodeSpacing),
+          'elk.spacing.nodeNodeBetweenLayers': String(rankSpacing),
         },
         children: [],
         edges: [],
@@ -111,6 +117,9 @@ export const getLayoutedElements = async (
     layoutOptions: {
       ...elkOptions,
       'elk.direction': layoutDirection,
+      'elk.spacing.nodeNode': String(nodeSpacing),
+      'elk.spacing.nodeNodeBetweenLayers': String(rankSpacing),
+      'elk.layered.spacing.edgeNodeBetweenLayers': String(minEdgeLength),
       ...(disableSubflows ? { 'elk.hierarchyHandling': 'INCLUDE_CHILDREN' } : {}),
     },
     children: [],

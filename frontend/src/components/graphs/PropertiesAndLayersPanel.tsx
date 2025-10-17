@@ -1,8 +1,11 @@
 import React from 'react';
-import { Accordion, Paper, Button, Group, Stack } from '@mantine/core';
+import { Accordion, Paper, Group, Button, Slider, Stack, Text } from '@mantine/core';
 import { NodePropertiesForm } from './NodePropertiesForm';
 import { LayersAccordionPanel } from './LayersAccordionPanel';
 import { Graph, GraphNode } from '../../graphql/graphs';
+
+type GraphViewMode = 'flow' | 'hierarchy';
+type GraphOrientation = 'vertical' | 'horizontal';
 
 interface PropertiesAndLayersPanelProps {
   graph: Graph;
@@ -14,12 +17,18 @@ interface PropertiesAndLayersPanelProps {
   onHideAllLayers: () => void;
   onLayerColorChange?: (layerId: string, colorType: 'background' | 'border' | 'text', color: string) => void;
   onAddLayer?: () => void;
-  viewMode: 'flow' | 'hierarchy';
+  viewMode: GraphViewMode;
   onToggleViewMode: () => void;
-  orientation: 'vertical' | 'horizontal';
+  orientation: GraphOrientation;
   onToggleOrientation: () => void;
   flowGroupingEnabled: boolean;
   onToggleFlowGrouping: () => void;
+  nodeSpacing: number;
+  onNodeSpacingChange: (value: number) => void;
+  rankSpacing: number;
+  onRankSpacingChange: (value: number) => void;
+  minEdgeLength: number;
+  onMinEdgeLengthChange: (value: number) => void;
 }
 
 export const PropertiesAndLayersPanel: React.FC<PropertiesAndLayersPanelProps> = ({
@@ -38,6 +47,12 @@ export const PropertiesAndLayersPanel: React.FC<PropertiesAndLayersPanelProps> =
   onToggleOrientation,
   flowGroupingEnabled,
   onToggleFlowGrouping,
+  nodeSpacing,
+  onNodeSpacingChange,
+  rankSpacing,
+  onRankSpacingChange,
+  minEdgeLength,
+  onMinEdgeLengthChange,
 }) => {
   const selectedNode = selectedNodeId
     ? graph.graphNodes.find(n => n.id === selectedNodeId)
@@ -54,39 +69,91 @@ export const PropertiesAndLayersPanel: React.FC<PropertiesAndLayersPanelProps> =
         borderLeft: '1px solid #e9ecef'
       }}
     >
-      <Stack gap="xs" mb="sm">
-        <Group justify="space-between">
-          <Button
-            size="xs"
-            variant="light"
-            onClick={onToggleViewMode}
-          >
-            {viewMode === 'flow' ? 'Switch to Hierarchy' : 'Switch to Flow'}
-          </Button>
-          <Button
-            size="xs"
-            variant="light"
-            onClick={onToggleOrientation}
-          >
-            {orientation === 'vertical' ? 'To Left-Right' : 'To Top-Bottom'}
-          </Button>
-        </Group>
-        {viewMode === 'flow' && (
-          <Button
-            size="xs"
-            variant="light"
-            onClick={onToggleFlowGrouping}
-          >
-            {flowGroupingEnabled ? 'Disable groupings' : 'Enable groupings'}
-          </Button>
-        )}
-      </Stack>
-
       <Accordion
         multiple
         variant="separated"
-        defaultValue={['node-properties', 'layers']}
+        defaultValue={['layout-options', 'node-properties', 'layers']}
       >
+        <Accordion.Item value="layout-options">
+          <Accordion.Control>Layout Options</Accordion.Control>
+          <Accordion.Panel>
+            <Stack gap="md">
+              <Group gap="xs">
+                <Button
+                  size="xs"
+                  variant="light"
+                  onClick={onToggleViewMode}
+                >
+                  {viewMode === 'flow' ? 'Hierarchy' : 'Flow'}
+                </Button>
+
+                <Button
+                  size="xs"
+                  variant="light"
+                  onClick={onToggleOrientation}
+                >
+                  {orientation === 'vertical' ? 'LR' : 'TD'}
+                </Button>
+
+                {viewMode === 'flow' && (
+                  <Button
+                    size="xs"
+                    variant="light"
+                    onClick={onToggleFlowGrouping}
+                  >
+                    {flowGroupingEnabled ? 'Disable Groupings' : 'Enable Groupings'}
+                  </Button>
+                )}
+              </Group>
+
+              <div>
+                <Group justify="space-between" mb={4}>
+                  <Text size="xs" c="dimmed">Node Spacing</Text>
+                  <Text size="xs" fw={500}>{nodeSpacing}</Text>
+                </Group>
+                <Slider
+                  value={nodeSpacing}
+                  onChange={onNodeSpacingChange}
+                  min={20}
+                  max={200}
+                  step={5}
+                  size="sm"
+                />
+              </div>
+
+              <div>
+                <Group justify="space-between" mb={4}>
+                  <Text size="xs" c="dimmed">Rank Spacing</Text>
+                  <Text size="xs" fw={500}>{rankSpacing}</Text>
+                </Group>
+                <Slider
+                  value={rankSpacing}
+                  onChange={onRankSpacingChange}
+                  min={20}
+                  max={200}
+                  step={5}
+                  size="sm"
+                />
+              </div>
+
+              <div>
+                <Group justify="space-between" mb={4}>
+                  <Text size="xs" c="dimmed">Min Edge Length</Text>
+                  <Text size="xs" fw={500}>{minEdgeLength}</Text>
+                </Group>
+                <Slider
+                  value={minEdgeLength}
+                  onChange={onMinEdgeLengthChange}
+                  min={20}
+                  max={200}
+                  step={5}
+                  size="sm"
+                />
+              </div>
+            </Stack>
+          </Accordion.Panel>
+        </Accordion.Item>
+
         <Accordion.Item value="node-properties">
           <Accordion.Control>Node Properties</Accordion.Control>
           <Accordion.Panel>
