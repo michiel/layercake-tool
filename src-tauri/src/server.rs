@@ -60,8 +60,8 @@ pub async fn start_embedded_server(database_path: String) -> Result<ServerHandle
     Migrator::up(&db, None).await?;
     info!("Database migrations completed");
 
-    // Create the Axum app with CORS allowing tauri:// protocol
-    let app = create_app(db, Some("tauri://localhost")).await?;
+    // Create the Axum app; allow all origins during embedded dev so the Vite shell can reach it
+    let app = create_app(db, None).await?;
 
     // Use port 0 for dynamic allocation - OS will pick an available port
     let addr = SocketAddr::from(([127, 0, 0, 1], 0));

@@ -10,6 +10,7 @@
     "frontendDist": "../frontend/dist"
   },
   "app": {
+    "withGlobalTauri": true,
     "windows": [
       {
         "title": "Layercake - Graph Editor",

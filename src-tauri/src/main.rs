@@ -144,9 +144,11 @@ async fn main() {
                 if let tauri::WindowEvent::CloseRequested { .. } = event {
                     info!("Application closing, shutting down server");
 
-                    // Shutdown server gracefully
-                    tauri::async_runtime::block_on(async {
-                        let mut guard = server_handle_cleanup.write().await;
+                    // Shutdown server gracefully by spawning a task
+                    // (don't use block_on as it causes "runtime within runtime" panic)
+                    let server_handle_clone = server_handle_cleanup.clone();
+                    tauri::async_runtime::spawn(async move {
+                        let mut guard = server_handle_clone.write().await;
                         if let Some(handle) = guard.take() {
                             if let Err(e) = handle.shutdown().await {
                                 error!("Error shutting down server: {}", e);
