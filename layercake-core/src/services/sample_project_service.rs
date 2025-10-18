@@ -238,8 +238,7 @@ impl SampleProjectService {
                 plan_id: Set(plan.id),
                 source_node_id: Set(ds_id),
                 target_node_id: Set(merge_node_id.clone()),
-                source_handle: Set(None),
-                target_handle: Set(None),
+                // Removed source_handle and target_handle for floating edges
                 metadata_json: Set(edge_metadata_json()),
                 created_at: Set(now),
                 updated_at: Set(now),
@@ -254,8 +253,7 @@ impl SampleProjectService {
             plan_id: Set(plan.id),
             source_node_id: Set(merge_node_id),
             target_node_id: Set(graph_node_id),
-            source_handle: Set(None),
-            target_handle: Set(None),
+            // Removed source_handle and target_handle for floating edges
             metadata_json: Set(edge_metadata_json()),
             created_at: Set(now),
             updated_at: Set(now),

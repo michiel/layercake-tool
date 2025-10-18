@@ -10,8 +10,7 @@ pub struct Model {
     pub plan_id: i32,
     pub source_node_id: String,
     pub target_node_id: String,
-    pub source_handle: Option<String>,
-    pub target_handle: Option<String>,
+    // Removed source_handle and target_handle for floating edges
     pub metadata_json: String,
     pub created_at: ChronoDateTimeUtc,
     pub updated_at: ChronoDateTimeUtc,
@@ -42,8 +41,7 @@ impl ActiveModel {
             plan_id: ActiveValue::NotSet,
             source_node_id: ActiveValue::NotSet,
             target_node_id: ActiveValue::NotSet,
-            source_handle: ActiveValue::NotSet,
-            target_handle: ActiveValue::NotSet,
+            // Removed source_handle and target_handle for floating edges
             metadata_json: ActiveValue::NotSet,
             created_at: Set(chrono::Utc::now()),
             updated_at: Set(chrono::Utc::now()),

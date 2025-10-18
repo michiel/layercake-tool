@@ -350,8 +350,7 @@ impl PlanDagService {
             plan_id: Set(plan.id),
             source_node_id: Set(validated_source),
             target_node_id: Set(validated_target),
-            source_handle: Set(None), // TODO: Add handle support to service layer
-            target_handle: Set(None), // TODO: Add handle support to service layer
+            // Removed source_handle and target_handle for floating edges
             metadata_json: Set(serde_json::to_string(&validated_metadata)?),
             created_at: Set(now),
             updated_at: Set(now),

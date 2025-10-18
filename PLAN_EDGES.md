@@ -316,7 +316,20 @@ const onConnect = useCallback(
 );
 ```
 
-### Phase 4: Update Data Model
+### Phase 4: Update Data Model ✅ **COMPLETED**
+
+**Status**: Removed sourceHandle/targetHandle from all layers
+- Updated Rust database entity (plan_dag_edges::Model)
+- Updated GraphQL types (PlanDagEdge, PlanDagEdgeInput, PlanDagEdgeUpdateInput)
+- Updated GraphQL mutations (addEdge, updatePlanDag, updateEdge)
+- Updated service layer (plan_dag_service, sample_project_service)
+- Updated frontend TypeScript types (PlanDagEdge, ReactFlowEdge)
+- Updated ReactFlowAdapter edge conversions
+- Updated PlanDagCQRSService edge creation
+
+**Note**: Database migration required - see instructions below.
+
+**Original**: Phase 4: Update Data Model
 
 **4.1 Frontend TypeScript Types**
 ```typescript

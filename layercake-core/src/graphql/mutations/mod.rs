@@ -330,8 +330,7 @@ impl Mutation {
                 plan_id: Set(project_id), // Use project_id directly
                 source_node_id: Set(edge.source.clone()),
                 target_node_id: Set(edge.target.clone()),
-                source_handle: Set(edge.source_handle.clone()),
-                target_handle: Set(edge.target_handle.clone()),
+                // Removed source_handle and target_handle for floating edges
                 metadata_json: Set(metadata_json),
                 created_at: Set(Utc::now()),
                 updated_at: Set(Utc::now()),
@@ -708,8 +707,7 @@ impl Mutation {
             plan_id: Set(plan.id),
             source_node_id: Set(edge.source.clone()),
             target_node_id: Set(edge.target.clone()),
-            source_handle: Set(edge.source_handle.clone()),
-            target_handle: Set(edge.target_handle.clone()),
+            // Removed source_handle and target_handle for floating edges
             metadata_json: Set(metadata_json),
             created_at: Set(Utc::now()),
             updated_at: Set(Utc::now()),
@@ -832,15 +830,7 @@ impl Mutation {
 
         let mut edge_active: plan_dag_edges::ActiveModel = edge.into();
 
-        // Update source_handle if provided
-        if let Some(source_handle) = updates.source_handle {
-            edge_active.source_handle = Set(Some(source_handle));
-        }
-
-        // Update target_handle if provided
-        if let Some(target_handle) = updates.target_handle {
-            edge_active.target_handle = Set(Some(target_handle));
-        }
+        // Removed source_handle and target_handle updates for floating edges
 
         // Update metadata if provided
         if let Some(metadata) = updates.metadata {

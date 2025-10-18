@@ -107,9 +107,8 @@ export class PlanDagCQRSService {
   async createEdgeFromReactFlow(
     projectId: number,
     sourceId: string,
-    targetId: string,
-    sourceHandle?: string,
-    targetHandle?: string
+    targetId: string
+    // Removed sourceHandle and targetHandle for floating edges
   ) {
     console.log('[PlanDagCQRSService] Creating edge from ReactFlow')
 
@@ -119,8 +118,7 @@ export class PlanDagCQRSService {
         id: `edge-${sourceId}-${targetId}-${Date.now()}`,
         source: sourceId,
         target: targetId,
-        sourceHandle,
-        targetHandle,
+        // Removed sourceHandle and targetHandle for floating edges
         metadata: {
           label: '',
           dataType: 'GRAPH_DATA' as any

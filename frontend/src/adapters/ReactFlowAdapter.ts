@@ -173,9 +173,8 @@ export class ReactFlowAdapter {
       id: edge.id,
       source: edge.source,
       target: edge.target,
-      sourceHandle: edge.sourceHandle || null,
-      targetHandle: edge.targetHandle || null,
-      type: 'smoothstep',
+      // Removed sourceHandle and targetHandle for floating edges
+      type: 'floating',
       animated: false,
       label: metadata.label || 'Data',
       style: {
@@ -204,8 +203,7 @@ export class ReactFlowAdapter {
       id: edge.id,
       source: edge.source,
       target: edge.target,
-      sourceHandle: edge.sourceHandle,
-      targetHandle: edge.targetHandle,
+      // Removed sourceHandle and targetHandle for floating edges
       metadata: originalEdge?.metadata || {
         label: edge.label as string || '',
         dataType: 'unknown'
