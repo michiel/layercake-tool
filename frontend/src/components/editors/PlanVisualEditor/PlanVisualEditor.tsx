@@ -40,11 +40,14 @@ import { NodeTypeSelector } from './dialogs/NodeTypeSelector'
 // Import extracted components and hooks
 import { AdvancedToolbar } from './components/AdvancedToolbar'
 import { ContextMenu } from './components/ContextMenu'
-import { ConnectionLine } from './components/ConnectionLine'
 import { usePlanDagCQRS } from './hooks/usePlanDagCQRS'
 import { useAdvancedOperations } from './hooks/useAdvancedOperations'
 import { getDefaultNodeConfig, getDefaultNodeMetadata } from './utils/nodeDefaults'
 import { autoLayout } from './utils/autoLayout'
+
+// Import floating edge components
+import { FloatingEdge } from './edges/FloatingEdge'
+import { FloatingConnectionLine } from './edges/FloatingConnectionLine'
 
 // Import ReactFlow styles
 import 'reactflow/dist/style.css'
@@ -468,18 +471,14 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         return
       }
 
-      // Generate new edge ID with source, target, and handle information
-      const sourceHandle = newConnection.sourceHandle || 'output'
-      const targetHandle = newConnection.targetHandle || 'input'
-      const newEdgeId = `${newConnection.source}-${newConnection.target}-${sourceHandle}-${targetHandle}`
+      // Generate new edge ID (simplified since no handles)
+      const newEdgeId = `${newConnection.source}-${newConnection.target}-${Date.now()}`
 
-      // Create the new edge with the updated connection
+      // Create the new edge with the updated connection (floating edges don't use handles)
       const newEdge: ReactFlowEdge = {
         id: newEdgeId,
         source: newConnection.source!,
         target: newConnection.target!,
-        sourceHandle: newConnection.sourceHandle,
-        targetHandle: newConnection.targetHandle,
         metadata: {
           label: isValid.dataType === 'GRAPH_REFERENCE' ? 'Graph Ref' : 'Data',
           dataType: isValid.dataType,
@@ -491,7 +490,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         const filtered = els.filter(e => e.id !== oldEdge.id)
         return addEdge({
           ...newEdge,
-          type: 'smoothstep',
+          type: 'floating',
           animated: false,
           style: {
             stroke: isValid.dataType === 'GRAPH_REFERENCE' ? '#228be6' : '#868e96',
@@ -617,9 +616,8 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         id: `edge-${Date.now()}`,
         source: connection.source!,
         target: connection.target!,
-        sourceHandle: connection.sourceHandle || null, // Preserve specific handle used
-        targetHandle: connection.targetHandle || null, // Preserve specific handle used
-        type: 'smoothstep',
+        // Floating edges don't use sourceHandle/targetHandle
+        type: 'floating',
         animated: false,
         label: isValid.dataType === 'GRAPH_REFERENCE' ? 'Graph Ref' : 'Data',
         style: {
@@ -647,8 +645,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         // Omit id - backend will generate it
         source: newEdge.source,
         target: newEdge.target,
-        sourceHandle: newEdge.sourceHandle,
-        targetHandle: newEdge.targetHandle,
+        // Floating edges don't use sourceHandle/targetHandle
         metadata: newEdge.data.metadata
       }
 
@@ -1062,16 +1059,12 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
               );
 
               if (validation.isValid) {
-              // Determine target handle based on node type
-              const targetHandle = 'input-left'; // Most nodes use input-left
-
               // Create edge (backend will generate ID)
+              // Floating edges don't use sourceHandle/targetHandle
               const edge: Partial<ReactFlowEdge> = {
                 // Omit id - backend will generate it
                 source: sourceConnection.nodeId,
                 target: createdNode.id,  // Use backend-generated node ID
-                sourceHandle: sourceConnection.handleId,
-                targetHandle: targetHandle,
                 metadata: {
                   label: validation.dataType === 'GRAPH_REFERENCE' ? 'Graph Ref' : 'Data',
                   dataType: validation.dataType,
@@ -1119,6 +1112,11 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
 
   // Use stable nodeTypes reference directly
   // Note: Project join/leave is now handled at App level
+
+  // Register edge types for floating edges
+  const edgeTypes = useMemo(() => ({
+    floating: FloatingEdge,
+  }), []);
 
   const miniMapNodeColor = useCallback((node: Node) => {
     switch (node.data?.nodeType) {
@@ -1336,10 +1334,11 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
             }
           }}
           nodeTypes={NODE_TYPES}
+          edgeTypes={edgeTypes}
           connectionMode={ConnectionMode.Loose}
-          connectionLineComponent={ConnectionLine}
+          connectionLineComponent={FloatingConnectionLine}
           defaultEdgeOptions={{
-            type: 'smoothstep',
+            type: 'floating',
             animated: false,
             style: { stroke: '#868e96', strokeWidth: 2 }
           }}
