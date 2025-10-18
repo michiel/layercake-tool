@@ -1,4 +1,12 @@
-import { memo, ReactNode, useState } from 'react'
+import {
+  memo,
+  ReactNode,
+  useState,
+  useCallback,
+  useRef,
+  type MouseEvent as ReactMouseEvent,
+  type TouchEvent as ReactTouchEvent
+} from 'react'
 import { Handle, Position, NodeProps } from 'reactflow'
 import { Paper, Text, Group, ActionIcon, Tooltip, Badge, Box, TextInput } from '@mantine/core'
 import { IconSettings, IconTrash, IconCheck, IconX, IconArrowRight } from '@tabler/icons-react'
@@ -38,7 +46,8 @@ export const BaseNode = memo(({
   toolButtons,
   labelBadges,
   footerContent,
-  editableLabel = false
+  editableLabel = false,
+  sourcePosition
 }: BaseNodeProps) => {
   const color = getNodeColor(nodeType)
   const requiredInputs = getRequiredInputCount(nodeType)
@@ -50,6 +59,113 @@ export const BaseNode = memo(({
   // Label editing state
   const [isEditingLabel, setIsEditingLabel] = useState(false)
   const [labelValue, setLabelValue] = useState(metadata.label || '')
+
+  const handleRefs = useRef<Record<string, HTMLDivElement | null>>({})
+
+  const registerHandleRef = useCallback(
+    (id: string) => (el: HTMLDivElement | null) => {
+      if (el) {
+        handleRefs.current[id] = el
+      } else {
+        delete handleRefs.current[id]
+      }
+    },
+    []
+  )
+
+  type ConnectionStartEvent = ReactMouseEvent<HTMLDivElement> | ReactTouchEvent<HTMLDivElement>
+
+  const getPointerDetails = useCallback((event: ConnectionStartEvent) => {
+    const nativeEvent = event.nativeEvent as MouseEvent | TouchEvent
+
+    if ('touches' in nativeEvent && nativeEvent.touches.length > 0) {
+      const touch = nativeEvent.touches[0]
+      return {
+        clientX: touch.clientX,
+        clientY: touch.clientY,
+        pointerType: 'touch' as const
+      }
+    }
+
+    if ('changedTouches' in nativeEvent && nativeEvent.changedTouches.length > 0) {
+      const touch = nativeEvent.changedTouches[0]
+      return {
+        clientX: touch.clientX,
+        clientY: touch.clientY,
+        pointerType: 'touch' as const
+      }
+    }
+
+    return {
+      clientX: (nativeEvent as MouseEvent).clientX,
+      clientY: (nativeEvent as MouseEvent).clientY,
+      pointerType: 'mouse' as const
+    }
+  }, [])
+
+  const dispatchHandlePointerDown = useCallback(
+    (handleElement: HTMLDivElement, clientX: number, clientY: number, pointerType: 'mouse' | 'touch') => {
+      const commonInit = {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+        buttons: 1,
+        clientX,
+        clientY
+      }
+
+      if (typeof PointerEvent !== 'undefined') {
+        try {
+          const pointerEvent = new PointerEvent('pointerdown', {
+            ...commonInit,
+            pointerId: Date.now(),
+            pointerType
+          })
+          handleElement.dispatchEvent(pointerEvent)
+        } catch {
+          // Safari might not support PointerEvent constructor; fall through to mouse event
+        }
+      }
+
+      handleElement.dispatchEvent(
+        new MouseEvent('mousedown', {
+          ...commonInit,
+          view: window
+        })
+      )
+    },
+    []
+  )
+
+  const handleStartConnection = useCallback(
+    (event: ConnectionStartEvent) => {
+      if (readonly) {
+        return
+      }
+
+      const preferredHandleId = sourcePosition === Position.Bottom ? 'output-bottom' : 'output-right'
+      const handleElement =
+        handleRefs.current[preferredHandleId] ??
+        handleRefs.current['output-right'] ??
+        handleRefs.current['output-bottom']
+
+      if (!handleElement) {
+        console.warn('[BaseNode] Unable to start connection - no output handle available for node', id)
+        return
+      }
+
+      event.stopPropagation()
+      event.preventDefault()
+
+      const { clientX, clientY, pointerType } = getPointerDetails(event)
+      const handleRect = handleElement.getBoundingClientRect()
+      const resolvedClientX = Number.isFinite(clientX) ? clientX : handleRect.left + handleRect.width / 2
+      const resolvedClientY = Number.isFinite(clientY) ? clientY : handleRect.top + handleRect.height / 2
+
+      dispatchHandlePointerDown(handleElement, resolvedClientX, resolvedClientY, pointerType)
+    },
+    [readonly, sourcePosition, getPointerDetails, dispatchHandlePointerDown, id]
+  )
 
   const handleLabelSave = () => {
     if (labelValue.trim() && labelValue !== metadata.label) {
@@ -177,29 +293,22 @@ export const BaseNode = memo(({
         {/* Edge Creation Icon - Top Right */}
         {canHaveOutputs && !readonly && (
           <Tooltip label="Create edge" position="top">
-            <Handle
-              type="source"
-              position={Position.Right}
-              id="output-action"
-              isConnectable={!readonly}
-              className="nodrag"
+            <div
               style={{
                 position: 'absolute',
                 top: 8,
                 right: 8,
-                transform: 'none',
                 zIndex: 10,
+                cursor: 'pointer',
+                color: color,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 width: 24,
                 height: 24,
                 borderRadius: '50%',
                 background: '#f8f9fa',
                 border: `1px solid ${color}`,
-                color: color,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
                 transition: 'background 0.2s ease, color 0.2s ease',
               }}
               onMouseEnter={(e) => {
@@ -210,9 +319,12 @@ export const BaseNode = memo(({
                 e.currentTarget.style.background = '#f8f9fa';
                 e.currentTarget.style.color = color;
               }}
+              onMouseDown={(event) => handleStartConnection(event)}
+              onTouchStart={(event) => handleStartConnection(event)}
+              className="nodrag"
             >
               <IconArrowRight size={14} />
-            </Handle>
+            </div>
           </Tooltip>
         )}
 
@@ -338,9 +450,10 @@ export const BaseNode = memo(({
             position={Position.Right}
             id="output-right"
             isConnectable={!readonly}
+            ref={registerHandleRef('output-right')}
             style={{
               opacity: 0,
-              pointerEvents: 'none',
+              pointerEvents: 'auto',
             }}
           />
           <Handle
@@ -348,9 +461,10 @@ export const BaseNode = memo(({
             position={Position.Bottom}
             id="output-bottom"
             isConnectable={!readonly}
+            ref={registerHandleRef('output-bottom')}
             style={{
               opacity: 0,
-              pointerEvents: 'none',
+              pointerEvents: 'auto',
             }}
           />
         </>
