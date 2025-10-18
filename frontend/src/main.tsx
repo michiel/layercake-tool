@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { ApolloProvider } from '@apollo/client/react'
 import { MantineProvider, Loader, Center, Stack, Text } from '@mantine/core'
+import { Notifications } from '@mantine/notifications'
 import { apolloClient, initializeTauriServer } from './graphql/client'
 import { isTauriApp } from './utils/tauri'
 import App from './App'
@@ -10,6 +11,7 @@ import App from './App'
 // Mantine CSS
 import '@mantine/core/styles.css'
 import '@mantine/dates/styles.css'
+import '@mantine/notifications/styles.css'
 
 const root = ReactDOM.createRoot(document.getElementById('root')!)
 
@@ -19,6 +21,7 @@ if (isTauriApp()) {
   root.render(
     <React.StrictMode>
       <MantineProvider>
+        <Notifications />
         <Center style={{ height: '100vh' }}>
           <Stack align="center" gap="md">
             <Loader size="xl" />
@@ -42,6 +45,7 @@ if (isTauriApp()) {
         <React.StrictMode>
           <ApolloProvider client={apolloClient}>
             <MantineProvider>
+              <Notifications />
               <BrowserRouter>
                 <App />
               </BrowserRouter>
@@ -55,6 +59,7 @@ if (isTauriApp()) {
       root.render(
         <React.StrictMode>
           <MantineProvider>
+            <Notifications />
             <Center style={{ height: '100vh' }}>
               <Stack align="center" gap="md" style={{ maxWidth: 500 }}>
                 <Text size="xl" fw={700} c="red">
@@ -78,6 +83,7 @@ if (isTauriApp()) {
     <React.StrictMode>
       <ApolloProvider client={apolloClient}>
         <MantineProvider>
+          <Notifications />
           <BrowserRouter>
             <App />
           </BrowserRouter>

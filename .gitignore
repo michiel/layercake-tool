@@ -4,6 +4,8 @@ out/
 *.db
 tmp/
 *log
+node_modules/
+**/node_modules/
 
 # Development logs
 backend.log

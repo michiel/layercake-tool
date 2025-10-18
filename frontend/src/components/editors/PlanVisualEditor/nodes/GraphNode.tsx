@@ -13,6 +13,7 @@ import { GraphDataDialog } from '../dialogs/GraphDataDialog'
 import { useNavigate } from 'react-router-dom'
 import { BaseNode } from './BaseNode'
 import { usePlanDagCQRSMutations } from '../../../../hooks/usePlanDagCQRSMutations'
+import { showErrorNotification, showSuccessNotification } from '../../../../utils/notifications'
 
 interface GraphNodeProps extends NodeProps {
   onEdit?: (nodeId: string) => void
@@ -70,19 +71,19 @@ export const GraphNode = memo((props: GraphNodeProps) => {
   // Execute node mutation
   const [executeNode, { loading: executing }] = useMutation(EXECUTE_NODE, {
     onCompleted: (data: any) => {
-      console.log('Success:', data.executeNode.message)
+      showSuccessNotification('Execution Started', data.executeNode.message)
       // Refetch execution state to update badge
       refetchExecutionState()
     },
     onError: (error: any) => {
-      console.error('Execution Failed:', error.message)
+      showErrorNotification('Execution Failed', error.message)
     },
   })
 
   const handleExecute = () => {
     console.log('handleExecute called', { projectId, nodeId: props.id })
     if (!projectId) {
-      console.error('Cannot execute: projectId is missing')
+      showErrorNotification('Cannot Execute', 'Project ID is missing')
       return
     }
     executeNode({

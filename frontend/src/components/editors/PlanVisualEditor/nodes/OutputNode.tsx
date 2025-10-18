@@ -7,6 +7,7 @@ import { PlanDagNodeType, OutputNodeConfig } from '../../../../types/plan-dag'
 import { isNodeConfigured } from '../../../../utils/planDagValidation'
 import { EXPORT_NODE_OUTPUT, ExportNodeOutputResult } from '../../../../graphql/export'
 import { BaseNode } from './BaseNode'
+import { showErrorNotification, showSuccessNotification } from '../../../../utils/notifications'
 
 interface OutputNodeProps extends NodeProps {
   onEdit?: (nodeId: string) => void
@@ -69,17 +70,19 @@ export const OutputNode = memo((props: OutputNodeProps) => {
           link.click()
           document.body.removeChild(link)
           window.URL.revokeObjectURL(url)
-          console.log('Download completed:', result.filename)
+          showSuccessNotification('Download Complete', result.filename)
         } catch (error) {
           console.error('Failed to decode and download:', error)
+          showErrorNotification('Download Failed', 'Failed to decode export content')
         }
       } else {
-        console.error('Export failed:', result.message)
+        showErrorNotification('Export Failed', result.message)
       }
       setDownloading(false)
     },
     onError: (error: any) => {
       console.error('Export failed:', error.message)
+      showErrorNotification('Export Failed', error.message)
       setDownloading(false)
     },
   })
@@ -108,16 +111,18 @@ export const OutputNode = memo((props: OutputNodeProps) => {
           setPreviewOpen(true)
         } catch (error) {
           console.error('Failed to decode content:', error)
+          showErrorNotification('Preview Failed', 'Failed to decode export content')
           setPreviewContent('Error: Failed to decode content')
         }
       } else {
-        console.error('Export failed:', result.message)
+        showErrorNotification('Preview Failed', result.message)
         setPreviewContent(`Error: ${result.message}`)
       }
       setPreviewLoading(false)
     },
     onError: (error: any) => {
       console.error('Export failed:', error.message)
+      showErrorNotification('Preview Failed', error.message)
       setPreviewContent(`Error: ${error.message}`)
       setPreviewLoading(false)
     },
@@ -145,9 +150,10 @@ export const OutputNode = memo((props: OutputNodeProps) => {
   const handleCopyToClipboard = async () => {
     try {
       await navigator.clipboard.writeText(previewContent)
-      console.log('Content copied to clipboard')
+      showSuccessNotification('Copied', 'Content copied to clipboard')
     } catch (error) {
       console.error('Failed to copy to clipboard:', error)
+      showErrorNotification('Copy Failed', 'Failed to copy content to clipboard')
     }
   }
 
