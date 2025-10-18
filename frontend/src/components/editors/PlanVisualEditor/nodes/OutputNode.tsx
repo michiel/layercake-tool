@@ -99,12 +99,17 @@ export const OutputNode = memo((props: OutputNodeProps) => {
     </Badge>
   ) : null
 
+  // Override metadata to use renderTarget as label if available
+  const displayMetadata = config.renderTarget
+    ? { ...data.metadata, label: config.renderTarget }
+    : data.metadata
+
   return (
     <BaseNode
       {...props}
       nodeType={PlanDagNodeType.OUTPUT}
       config={config}
-      metadata={data.metadata}
+      metadata={displayMetadata}
       onEdit={() => onEdit?.(props.id)}
       onDelete={() => onDelete?.(props.id)}
       readonly={readonly}
@@ -118,7 +123,7 @@ export const OutputNode = memo((props: OutputNodeProps) => {
           <Group justify="center">
             <Tooltip label="Download export">
               <ActionIcon
-                size="xl"
+                size="lg"
                 variant="light"
                 color="blue"
                 radius="xl"
@@ -130,19 +135,13 @@ export const OutputNode = memo((props: OutputNodeProps) => {
                   handleDownload()
                 }}
               >
-                <IconDownload size="1.5rem" />
+                <IconDownload size="0.75rem" />
               </ActionIcon>
             </Tooltip>
           </Group>
         )}
 
         {/* Output metadata */}
-        {config.renderTarget && (
-          <Text size="xs" c="dimmed">
-            Format: {config.renderTarget}
-          </Text>
-        )}
-
         {config.outputPath && (
           <Text size="xs" c="dimmed" ff="monospace" lineClamp={1}>
             {config.outputPath}

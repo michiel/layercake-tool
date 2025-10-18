@@ -19,6 +19,7 @@ interface BaseNodeProps extends NodeProps {
   children?: ReactNode
   toolButtons?: ReactNode
   labelBadges?: ReactNode
+  footerContent?: ReactNode
   editableLabel?: boolean
 }
 
@@ -36,6 +37,7 @@ export const BaseNode = memo(({
   children,
   toolButtons,
   labelBadges,
+  footerContent,
   editableLabel = false
 }: BaseNodeProps) => {
   const color = getNodeColor(nodeType)
@@ -267,13 +269,13 @@ export const BaseNode = memo(({
           </Box>
         )}
 
-        {/* Bottom Section 2: Tool buttons (narrow horizontal section) */}
-        {!readonly && (
+        {/* Bottom Section 2: Tool buttons and footer content (narrow horizontal section) */}
+        {(!readonly || footerContent) && (
           <Group
-            gap={4}
+            gap="sm"
             px="md"
             py="xs"
-            justify="flex-end"
+            justify="space-between"
             style={{
               borderTop: `1px solid #e9ecef`,
               flex: '0 0 auto',
@@ -281,7 +283,12 @@ export const BaseNode = memo(({
               minHeight: 36,
             }}
           >
-            {toolButtons || defaultToolButtons}
+            {footerContent && <div style={{ flex: 1, minWidth: 0 }}>{footerContent}</div>}
+            {!readonly && (
+              <Group gap={4}>
+                {toolButtons || defaultToolButtons}
+              </Group>
+            )}
           </Group>
         )}
       </Paper>

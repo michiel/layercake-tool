@@ -1,6 +1,6 @@
 import { memo, useState } from 'react'
 import { NodeProps } from 'reactflow'
-import { Text, Group, ActionIcon, Tooltip, Badge, Stack, Loader } from '@mantine/core'
+import { Text, Group, ActionIcon, Tooltip, Badge, Loader } from '@mantine/core'
 import { IconSettings, IconTrash, IconPlayerPlayFilled, IconChartDots, IconTable, IconExternalLink } from '@tabler/icons-react'
 import { useMutation } from '@apollo/client/react'
 import { PlanDagNodeType, GraphNodeConfig } from '../../../../types/plan-dag'
@@ -212,6 +212,13 @@ export const GraphNode = memo((props: GraphNodeProps) => {
     </>
   ) : null
 
+  // Footer content with node/edge counts
+  const footerContent = (graphExecution?.nodeCount !== undefined || config.metadata?.nodeCount !== undefined) ? (
+    <Text size="xs" c="dimmed">
+      Nodes: {graphExecution?.nodeCount || config.metadata.nodeCount}, Edges: {graphExecution?.edgeCount || config.metadata.edgeCount || 0}
+    </Text>
+  ) : null
+
   return (
     <>
       <BaseNode
@@ -227,72 +234,64 @@ export const GraphNode = memo((props: GraphNodeProps) => {
         hasValidConfig={hasValidConfig}
         toolButtons={toolButtons}
         labelBadges={labelBadges}
+        footerContent={footerContent}
         editableLabel={true}
       >
-        <Stack gap="xs">
-          {/* Preview buttons */}
-          {!readonly && (graphExecution ? isExecutionComplete(graphExecution.executionState) : executionPreview && isExecutionComplete(executionPreview.executionState)) && (
-            <Group justify="center" gap="sm">
-              <Tooltip label="Preview graph visualisation">
+        {/* Preview buttons */}
+        {!readonly && (graphExecution ? isExecutionComplete(graphExecution.executionState) : executionPreview && isExecutionComplete(executionPreview.executionState)) && (
+          <Group justify="center" gap="sm">
+            <Tooltip label="Preview graph visualisation">
+              <ActionIcon
+                size="lg"
+                variant="light"
+                color="blue"
+                radius="xl"
+                data-action-icon="preview"
+                onMouseDown={(e) => {
+                  e.stopPropagation()
+                  e.preventDefault()
+                  setShowPreview(true)
+                }}
+              >
+                <IconChartDots size="0.75rem" />
+              </ActionIcon>
+            </Tooltip>
+            <Tooltip label="View graph data (nodes, edges, layers)">
+              <ActionIcon
+                size="lg"
+                variant="light"
+                color="teal"
+                radius="xl"
+                data-action-icon="data"
+                onMouseDown={(e) => {
+                  e.stopPropagation()
+                  e.preventDefault()
+                  setShowDataDialog(true)
+                }}
+              >
+                <IconTable size="0.75rem" />
+              </ActionIcon>
+            </Tooltip>
+            {projectId && resolvedGraphId && (
+              <Tooltip label="Open graph editor">
                 <ActionIcon
-                  size="xl"
+                  size="lg"
                   variant="light"
-                  color="blue"
+                  color="grape"
                   radius="xl"
-                  data-action-icon="preview"
+                  data-action-icon="open-graph"
                   onMouseDown={(e) => {
                     e.stopPropagation()
                     e.preventDefault()
-                    setShowPreview(true)
+                    navigate(`/projects/${projectId}/graphs/${resolvedGraphId}/edit`)
                   }}
                 >
-                  <IconChartDots size="1.5rem" />
+                  <IconExternalLink size="0.75rem" />
                 </ActionIcon>
               </Tooltip>
-              <Tooltip label="View graph data (nodes, edges, layers)">
-                <ActionIcon
-                  size="xl"
-                  variant="light"
-                  color="teal"
-                  radius="xl"
-                  data-action-icon="data"
-                  onMouseDown={(e) => {
-                    e.stopPropagation()
-                    e.preventDefault()
-                    setShowDataDialog(true)
-                  }}
-                >
-                  <IconTable size="1.5rem" />
-                </ActionIcon>
-              </Tooltip>
-              {projectId && resolvedGraphId && (
-                <Tooltip label="Open graph editor">
-                  <ActionIcon
-                    size="xl"
-                    variant="light"
-                    color="grape"
-                    radius="xl"
-                    data-action-icon="open-graph"
-                    onMouseDown={(e) => {
-                      e.stopPropagation()
-                      e.preventDefault()
-                      navigate(`/projects/${projectId}/graphs/${resolvedGraphId}/edit`)
-                    }}
-                  >
-                    <IconExternalLink size="1.5rem" />
-                  </ActionIcon>
-                </Tooltip>
-              )}
-            </Group>
-          )}
-
-          {/* Node/Edge counts */}
-          {(graphExecution?.nodeCount !== undefined || config.metadata?.nodeCount !== undefined) && (
-            <Text size="xs" c="dimmed">
-              Nodes: {graphExecution?.nodeCount || config.metadata.nodeCount}, Edges: {graphExecution?.edgeCount || config.metadata.edgeCount || 0}
-            </Text>
-          )}
-        </Stack>
+            )}
+          </Group>
+        )}
       </BaseNode>
 
       {/* Graph Preview Dialog */}

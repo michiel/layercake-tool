@@ -86,7 +86,7 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
           <Group justify="center">
             <Tooltip label="View datasource data (nodes, edges, layers)">
               <ActionIcon
-                size="xl"
+                size="lg"
                 variant="light"
                 color="teal"
                 radius="xl"
@@ -97,7 +97,7 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
                   setShowDataDialog(true)
                 }}
               >
-                <IconTable size="1.5rem" />
+                <IconTable size="0.75rem" />
               </ActionIcon>
             </Tooltip>
           </Group>

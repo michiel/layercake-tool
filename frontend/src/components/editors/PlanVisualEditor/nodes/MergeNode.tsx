@@ -1,7 +1,8 @@
 import { memo } from 'react'
 import { NodeProps } from 'reactflow'
+import { Text } from '@mantine/core'
 import { BaseNode } from './BaseNode'
-import { PlanDagNodeType } from '../../../../types/plan-dag'
+import { PlanDagNodeType, MergeNodeConfig } from '../../../../types/plan-dag'
 
 interface MergeNodeProps extends NodeProps {
   onEdit?: (nodeId: string) => void
@@ -10,6 +11,14 @@ interface MergeNodeProps extends NodeProps {
 
 export const MergeNode = memo((props: MergeNodeProps) => {
   const { data, onEdit, onDelete } = props
+  const config = data.config as MergeNodeConfig
+
+  // Footer content with merge strategy
+  const footerContent = config.mergeStrategy ? (
+    <Text size="xs" c="dimmed">
+      {config.mergeStrategy}
+    </Text>
+  ) : null
 
   return (
     <BaseNode
@@ -22,6 +31,7 @@ export const MergeNode = memo((props: MergeNodeProps) => {
       readonly={data.readonly}
       edges={data.edges}
       hasValidConfig={data.hasValidConfig}
+      footerContent={footerContent}
     />
   )
 })
