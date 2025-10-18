@@ -59,6 +59,7 @@ export const BaseNode = memo(({
   // Label editing state
   const [isEditingLabel, setIsEditingLabel] = useState(false)
   const [labelValue, setLabelValue] = useState(metadata.label || '')
+  const [edgeTriggerHovered, setEdgeTriggerHovered] = useState(false)
 
   const handleRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
@@ -116,14 +117,15 @@ export const BaseNode = memo(({
 
       if (typeof PointerEvent !== 'undefined') {
         try {
-          const pointerEvent = new PointerEvent('pointerdown', {
-            ...commonInit,
-            pointerId: Date.now(),
-            pointerType
-          })
-          handleElement.dispatchEvent(pointerEvent)
+          handleElement.dispatchEvent(
+            new PointerEvent('pointerdown', {
+              ...commonInit,
+              pointerId: Date.now(),
+              pointerType
+            })
+          )
         } catch {
-          // Safari might not support PointerEvent constructor; fall through to mouse event
+          // Safari might not support PointerEvent; fall back to MouseEvent
         }
       }
 
@@ -139,9 +141,7 @@ export const BaseNode = memo(({
 
   const handleStartConnection = useCallback(
     (event: ConnectionStartEvent) => {
-      if (readonly) {
-        return
-      }
+      if (readonly) return
 
       const preferredHandleId = sourcePosition === Position.Bottom ? 'output-bottom' : 'output-right'
       const handleElement =
@@ -257,7 +257,10 @@ export const BaseNode = memo(({
             isConnectable={!readonly}
             style={{
               opacity: 0,
-              pointerEvents: 'none',
+              pointerEvents: 'auto',
+              width: 36,
+              height: 36,
+              transform: 'translate(-18px, -50%)',
             }}
           />
           <Handle
@@ -267,7 +270,10 @@ export const BaseNode = memo(({
             isConnectable={!readonly}
             style={{
               opacity: 0,
-              pointerEvents: 'none',
+              pointerEvents: 'auto',
+              width: 36,
+              height: 36,
+              transform: 'translate(-50%, -18px)',
             }}
           />
         </>
@@ -290,44 +296,36 @@ export const BaseNode = memo(({
           position: 'relative',
         }}
       >
-        {/* Edge Creation Icon - Top Right */}
         {canHaveOutputs && !readonly && (
-          <Tooltip label="Create edge" position="top">
+          <Tooltip label="Create edge" position="left">
             <div
               style={{
                 position: 'absolute',
-                top: 8,
-                right: 8,
-                zIndex: 10,
-                cursor: 'pointer',
-                color: color,
+                top: '50%',
+                right: -14,
+                width: 32,
+                height: 32,
+                transform: 'translateY(-50%)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                width: 24,
-                height: 24,
+                cursor: 'pointer',
                 borderRadius: '50%',
-                background: '#f8f9fa',
+                background: edgeTriggerHovered ? color : '#f8f9fa',
+                color: edgeTriggerHovered ? '#fff' : color,
                 border: `1px solid ${color}`,
-                transition: 'background 0.2s ease, color 0.2s ease',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
               }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = color;
-                e.currentTarget.style.color = '#fff';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = '#f8f9fa';
-                e.currentTarget.style.color = color;
-              }}
+              onMouseEnter={() => setEdgeTriggerHovered(true)}
+              onMouseLeave={() => setEdgeTriggerHovered(false)}
               onMouseDown={(event) => handleStartConnection(event)}
               onTouchStart={(event) => handleStartConnection(event)}
               className="nodrag"
             >
-              <IconArrowRight size={14} />
+              <IconArrowRight size={16} style={{ pointerEvents: 'none' }} />
             </div>
           </Tooltip>
         )}
-
         {/* Top Row: Icon and Label */}
         <Group
           gap="sm"
@@ -434,9 +432,12 @@ export const BaseNode = memo(({
           >
             {footerContent && <div style={{ flex: 1, minWidth: 0 }}>{footerContent}</div>}
             {!readonly && (
-              <Group gap={4}>
-                {toolButtons || defaultToolButtons}
-              </Group>
+              <>
+                <Group gap={4} wrap="nowrap">
+                  {toolButtons || defaultToolButtons}
+                </Group>
+                <div style={{ flex: 1 }} />
+              </>
             )}
           </Group>
         )}
@@ -451,9 +452,13 @@ export const BaseNode = memo(({
             id="output-right"
             isConnectable={!readonly}
             ref={registerHandleRef('output-right')}
+            className="nodrag"
             style={{
               opacity: 0,
               pointerEvents: 'auto',
+              width: 28,
+              height: 28,
+              transform: 'translate(14px, -50%)',
             }}
           />
           <Handle
