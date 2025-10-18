@@ -1,8 +1,8 @@
 import { memo, useState } from 'react'
 import { NodeProps } from 'reactflow'
 import { useMutation } from '@apollo/client/react'
-import { Text, Group, ActionIcon, Tooltip, Badge, Stack } from '@mantine/core'
-import { IconDownload } from '@tabler/icons-react'
+import { Text, Group, ActionIcon, Tooltip, Badge, Stack, Modal, Textarea, ScrollArea } from '@mantine/core'
+import { IconDownload, IconEye } from '@tabler/icons-react'
 import { PlanDagNodeType, OutputNodeConfig } from '../../../../types/plan-dag'
 import { isNodeConfigured } from '../../../../utils/planDagValidation'
 import { EXPORT_NODE_OUTPUT, ExportNodeOutputResult } from '../../../../graphql/export'
@@ -33,6 +33,9 @@ interface OutputNodeProps extends NodeProps {
 export const OutputNode = memo((props: OutputNodeProps) => {
   const { data, onEdit, onDelete, readonly = false } = props
   const [downloading, setDownloading] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [previewContent, setPreviewContent] = useState('')
+  const [previewLoading, setPreviewLoading] = useState(false)
 
   const config = data.config as OutputNodeConfig
 
@@ -92,6 +95,46 @@ export const OutputNode = memo((props: OutputNodeProps) => {
     })
   }
 
+  // Preview mutation (separate from download)
+  const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
+    onCompleted: (data: any) => {
+      const result = data.exportNodeOutput as ExportNodeOutputResult
+      if (result.success) {
+        // Decode base64 content and display as text
+        try {
+          const decodedContent = atob(result.content)
+          setPreviewContent(decodedContent)
+          setPreviewOpen(true)
+        } catch (error) {
+          console.error('Failed to decode content:', error)
+          setPreviewContent('Error: Failed to decode content')
+        }
+      } else {
+        console.error('Export failed:', result.message)
+        setPreviewContent(`Error: ${result.message}`)
+      }
+      setPreviewLoading(false)
+    },
+    onError: (error: any) => {
+      console.error('Export failed:', error.message)
+      setPreviewContent(`Error: ${error.message}`)
+      setPreviewLoading(false)
+    },
+  })
+
+  const handlePreview = async () => {
+    if (!projectId || !isConfigured) return
+
+    setPreviewLoading(true)
+    setPreviewContent('')
+    exportForPreview({
+      variables: {
+        projectId,
+        nodeId: props.id,
+      },
+    })
+  }
+
   // Custom label badges for output node
   const labelBadges = !isConfigured ? (
     <Badge variant="outline" size="xs" color="orange">
@@ -118,9 +161,26 @@ export const OutputNode = memo((props: OutputNodeProps) => {
       labelBadges={labelBadges}
     >
       <Stack gap="xs">
-        {/* Download button */}
+        {/* Download and preview buttons */}
         {!readonly && isConfigured && (
-          <Group justify="center">
+          <Group justify="center" gap="xs">
+            <Tooltip label="Preview export">
+              <ActionIcon
+                size="lg"
+                variant="light"
+                color="gray"
+                radius="xl"
+                data-action-icon="preview"
+                loading={previewLoading}
+                onMouseDown={(e) => {
+                  e.stopPropagation()
+                  e.preventDefault()
+                  handlePreview()
+                }}
+              >
+                <IconEye size="0.75rem" />
+              </ActionIcon>
+            </Tooltip>
             <Tooltip label="Download export">
               <ActionIcon
                 size="lg"
@@ -148,6 +208,32 @@ export const OutputNode = memo((props: OutputNodeProps) => {
           </Text>
         )}
       </Stack>
+
+      {/* Preview Dialog */}
+      <Modal
+        opened={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        title={`Export Preview: ${config.renderTarget || 'Output'}`}
+        size="xl"
+        styles={{
+          body: { padding: 0 },
+        }}
+      >
+        <ScrollArea h={600} p="md">
+          <Textarea
+            value={previewContent}
+            readOnly
+            minRows={30}
+            autosize
+            styles={{
+              input: {
+                fontFamily: 'monospace',
+                fontSize: '0.875rem',
+              },
+            }}
+          />
+        </ScrollArea>
+      </Modal>
     </BaseNode>
   )
 })
