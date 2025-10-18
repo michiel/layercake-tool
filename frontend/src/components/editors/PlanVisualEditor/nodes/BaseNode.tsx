@@ -1,7 +1,7 @@
 import { memo, ReactNode, useState } from 'react'
 import { Handle, Position, NodeProps } from 'reactflow'
 import { Paper, Text, Group, ActionIcon, Tooltip, Badge, Box, TextInput } from '@mantine/core'
-import { IconSettings, IconTrash, IconCheck, IconX } from '@tabler/icons-react'
+import { IconSettings, IconTrash, IconCheck, IconX, IconArrowRight } from '@tabler/icons-react'
 import { PlanDagNodeType, NodeConfig, NodeMetadata } from '../../../../types/plan-dag'
 import { getRequiredInputCount, canHaveMultipleOutputs, isNodeConfigured } from '../../../../utils/planDagValidation'
 import { getNodeColor, getNodeIcon } from '../../../../utils/nodeStyles'
@@ -171,8 +171,50 @@ export const BaseNode = memo(({
           pointerEvents: 'all',
           display: 'flex',
           flexDirection: 'column',
+          position: 'relative',
         }}
       >
+        {/* Edge Creation Icon - Top Right */}
+        {canHaveOutputs && !readonly && (
+          <Tooltip label="Create edge" position="top">
+            <div
+              style={{
+                position: 'absolute',
+                top: 8,
+                right: 8,
+                zIndex: 10,
+                cursor: 'pointer',
+                color: color,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 24,
+                height: 24,
+                borderRadius: '50%',
+                background: '#f8f9fa',
+                border: `1px solid ${color}`,
+                transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = color;
+                e.currentTarget.style.color = '#fff';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = '#f8f9fa';
+                e.currentTarget.style.color = color;
+              }}
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                // This will trigger ReactFlow's connection mode
+                // The actual connection logic is handled by ReactFlow's onConnectStart
+              }}
+              className="nodrag"
+            >
+              <IconArrowRight size={14} />
+            </div>
+          </Tooltip>
+        )}
+
         {/* Top Row: Icon and Label */}
         <Group
           gap="sm"

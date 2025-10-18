@@ -17,15 +17,15 @@ Convert the Plan DAG editor from using fixed four-directional handles (top/left/
 All phases have been successfully implemented:
 
 - ✅ **Phase 1**: FloatingEdge and FloatingConnectionLine components created
-- 🔄 **Phase 2**: Edge creation icon (deferred - optional enhancement)
+- ✅ **Phase 2**: Edge creation icon added to BaseNode
 - ✅ **Phase 3**: ReactFlow configured to use floating edges
 - ✅ **Phase 4**: Backend data model updated (sourceHandle/targetHandle removed)
 - ✅ **Phase 5**: Auto-layout updated to remove handle logic
 - ✅ **Phase 6**: Visual polish applied (handles hidden, edges render cleanly)
 
 **Remaining work**:
-- Database migration to drop source_handle and target_handle columns (documented in Phase 4 commit)
-- Optional: Add edge creation icon to BaseNode (Phase 2)
+- None - all phases complete!
+- Database migration will run automatically on next server start
 
 ## Reference Implementation
 
@@ -187,7 +187,13 @@ export function FloatingConnectionLine({
 }
 ```
 
-### Phase 2: Update Node Component
+### Phase 2: Update Node Component ✅ **COMPLETED**
+
+**Status**: Added edge creation icon to BaseNode
+- Added IconArrowRight icon button in top-right corner of nodes
+- Icon only visible on nodes with outputs and not in readonly mode
+- Styled with node color, hover effects, and tooltip
+- Handles remain hidden but functional for connection logic
 
 **2.1 Remove Fixed Handles from BaseNode.tsx**
 - Remove all `<Handle>` components (lines 134-164 for inputs, 296-326 for outputs)
