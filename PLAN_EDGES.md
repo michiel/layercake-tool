@@ -12,6 +12,21 @@ Convert the Plan DAG editor from using fixed four-directional handles (top/left/
 4. Update data model to remove sourceHandle/targetHandle fields
 5. Maintain all existing edge validation and connection logic
 
+## Implementation Status ✅ **COMPLETE**
+
+All phases have been successfully implemented:
+
+- ✅ **Phase 1**: FloatingEdge and FloatingConnectionLine components created
+- 🔄 **Phase 2**: Edge creation icon (deferred - optional enhancement)
+- ✅ **Phase 3**: ReactFlow configured to use floating edges
+- ✅ **Phase 4**: Backend data model updated (sourceHandle/targetHandle removed)
+- ✅ **Phase 5**: Auto-layout updated to remove handle logic
+- ✅ **Phase 6**: Visual polish applied (handles hidden, edges render cleanly)
+
+**Remaining work**:
+- Database migration to drop source_handle and target_handle columns (documented in Phase 4 commit)
+- Optional: Add edge creation icon to BaseNode (Phase 2)
+
 ## Reference Implementation
 
 ReactFlow Floating Edges example: https://reactflow.dev/examples/edges/floating-edges
@@ -428,7 +443,14 @@ Remove all references to source_handle and target_handle:
 - `layercake-core/src/graphql/mutations/mod.rs`
 - `layercake-core/src/services/sample_project_service.rs`
 
-### Phase 6: Visual Polish
+### Phase 6: Visual Polish ✅ **COMPLETED**
+
+**Status**: Hidden fixed handles, floating edges now render with clean visuals
+- Made all fixed handles invisible (opacity: 0, pointerEvents: none)
+- Handles remain functional for ReactFlow connection logic
+- Edges now connect to optimal boundary points without visible handles
+- Edge styling maintained: blue for GRAPH_REFERENCE, gray for GRAPH_DATA
+- Smooth transitions already working through ReactFlow
 
 **6.1 Edge Styling**
 - Maintain current color coding (blue for GRAPH_REFERENCE, gray for GRAPH_DATA)

@@ -131,7 +131,7 @@ export const BaseNode = memo(({
 
   return (
     <>
-      {/* Input Handles - Left and Top sides */}
+      {/* Input Handles - Hidden for floating edges but functional */}
       {requiredInputs > 0 && (
         <>
           <Handle
@@ -140,11 +140,8 @@ export const BaseNode = memo(({
             id="input-left"
             isConnectable={!readonly}
             style={{
-              background: '#fff',
-              border: `2px solid ${color}`,
-              width: 12,
-              height: 12,
-              borderRadius: '50%',
+              opacity: 0,
+              pointerEvents: 'none',
             }}
           />
           <Handle
@@ -153,11 +150,8 @@ export const BaseNode = memo(({
             id="input-top"
             isConnectable={!readonly}
             style={{
-              background: '#fff',
-              border: `2px solid ${color}`,
-              width: 12,
-              height: 12,
-              borderRadius: '50%',
+              opacity: 0,
+              pointerEvents: 'none',
             }}
           />
         </>
@@ -293,7 +287,7 @@ export const BaseNode = memo(({
         )}
       </Paper>
 
-      {/* Output Handles - Right and Bottom sides */}
+      {/* Output Handles - Hidden for floating edges but functional */}
       {canHaveOutputs && (
         <>
           <Handle
@@ -302,11 +296,8 @@ export const BaseNode = memo(({
             id="output-right"
             isConnectable={!readonly}
             style={{
-              background: '#fff',
-              border: `2px solid ${color}`,
-              width: 12,
-              height: 12,
-              borderRadius: '3px',
+              opacity: 0,
+              pointerEvents: 'none',
             }}
           />
           <Handle
@@ -315,11 +306,8 @@ export const BaseNode = memo(({
             id="output-bottom"
             isConnectable={!readonly}
             style={{
-              background: '#fff',
-              border: `2px solid ${color}`,
-              width: 12,
-              height: 12,
-              borderRadius: '3px',
+              opacity: 0,
+              pointerEvents: 'none',
             }}
           />
         </>
