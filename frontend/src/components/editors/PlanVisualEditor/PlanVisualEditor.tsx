@@ -885,17 +885,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
 
     await cqrsService.commands.batchMoveNodes(projectId, nodePositions);
 
-    // Persist edge handle changes to backend
-    for (const edge of layoutedEdges) {
-      await cqrsService.commands.updateEdge({
-        projectId,
-        edgeId: edge.id,
-        updates: {
-          sourceHandle: edge.sourceHandle || undefined,
-          targetHandle: edge.targetHandle || undefined
-        }
-      });
-    }
+    // Floating edges don't use handles, no edge updates needed
 
     // Re-enable external syncs after layout completes
     setDragging(false);
@@ -922,17 +912,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
 
     await cqrsService.commands.batchMoveNodes(projectId, nodePositions);
 
-    // Persist edge handle changes to backend
-    for (const edge of layoutedEdges) {
-      await cqrsService.commands.updateEdge({
-        projectId,
-        edgeId: edge.id,
-        updates: {
-          sourceHandle: edge.sourceHandle || undefined,
-          targetHandle: edge.targetHandle || undefined
-        }
-      });
-    }
+    // Floating edges don't use handles, no edge updates needed
 
     // Re-enable external syncs after layout completes
     setDragging(false);

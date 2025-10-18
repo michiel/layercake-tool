@@ -391,7 +391,13 @@ pub struct PlanDagEdge {
 }
 ```
 
-### Phase 5: Update Edge Operations
+### Phase 5: Update Edge Operations ✅ **COMPLETED**
+
+**Status**: Removed handle logic from auto-layout and edge operations
+- Removed edge handle update loops from handleAutoLayoutHorizontal
+- Removed edge handle update loops from handleAutoLayoutVertical
+- Edge reconnection was already updated in Phase 3
+- Backend services were already updated in Phase 4
 
 **5.1 Update Edge Reconnection**
 ```typescript
