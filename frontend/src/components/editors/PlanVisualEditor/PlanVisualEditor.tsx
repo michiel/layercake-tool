@@ -541,7 +541,18 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
 
       changes.forEach((change) => {
         if (change.type === 'remove' && !readonly) {
-          mutations.deleteEdge(change.id)
+          // Find the edge to get the backend ID
+          const edge = edges.find(e => e.id === change.id)
+          if (edge) {
+            const backendEdgeId = (edge.data as any)?.originalEdge?.id || edge.id
+
+            // Remove from local state immediately for instant visual feedback
+            setEdges((eds) => eds.filter((e) => e.id !== change.id))
+
+            // Persist deletion to backend
+            mutations.deleteEdge(backendEdgeId)
+            console.log('Edge deleted via DEL key:', backendEdgeId)
+          }
         }
         if (change.type === 'select') {
           const edgeId = change.selected ? change.id : null
@@ -550,7 +561,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         }
       })
     },
-    [onEdgesChange, mutations, onEdgeSelect, readonly, planDagState.performanceMonitor, planDag, updateManager]
+    [onEdgesChange, mutations, onEdgeSelect, readonly, planDagState.performanceMonitor, planDag, updateManager, edges, setEdges]
   )
 
   // Handle new connections
@@ -612,14 +623,9 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         // Floating edges don't use sourceHandle/targetHandle
         type: 'floating',
         animated: false,
-        label: isValid.dataType === 'GRAPH_REFERENCE' ? 'Graph Ref' : 'Data',
         style: {
           stroke: isValid.dataType === 'GRAPH_REFERENCE' ? '#228be6' : '#868e96',
           strokeWidth: 2,
-        },
-        labelStyle: {
-          fontSize: 12,
-          fontWeight: 500,
         },
         data: {
           metadata: {
@@ -1176,6 +1182,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
 
       return {
         ...edge,
+        reconnectable: !readonly,
         style: {
           ...(edge.style || {}),
           stroke: edgeColor,
@@ -1189,7 +1196,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         }
       }
     })
-  }, [edges, isNodeFullyConfigured])
+  }, [edges, isNodeFullyConfigured, readonly])
 
   if (loading) {
     return (
@@ -1228,6 +1235,15 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
           border: none !important;
           padding: 0 !important;
           background: transparent !important;
+        }
+        .react-flow__pane {
+          cursor: default !important;
+        }
+        .react-flow__edge-interaction {
+          cursor: grab !important;
+        }
+        .react-flow__edge-interaction:active {
+          cursor: grabbing !important;
         }
       `}</style>
 
@@ -1317,7 +1333,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
           }}
           multiSelectionKeyCode="Control"
           selectionKeyCode="Shift"
-          deleteKeyCode={null}
+          deleteKeyCode={readonly ? null : ["Delete", "Backspace"]}
           panOnDrag={[1, 2]}
           selectionOnDrag={true}
           minZoom={0.1}

@@ -60,6 +60,7 @@ export const BaseNode = memo(({
   const [isEditingLabel, setIsEditingLabel] = useState(false)
   const [labelValue, setLabelValue] = useState(metadata.label || '')
   const [edgeTriggerHovered, setEdgeTriggerHovered] = useState(false)
+  const [edgeDropTargetHovered, setEdgeDropTargetHovered] = useState(false)
 
   const handleRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
@@ -296,6 +297,33 @@ export const BaseNode = memo(({
           position: 'relative',
         }}
       >
+        {requiredInputs > 0 && !readonly && (
+          <Tooltip label="Edge drop target" position="right">
+            <div
+              style={{
+                position: 'absolute',
+                top: '50%',
+                left: -14,
+                width: 32,
+                height: 32,
+                transform: 'translateY(-50%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '50%',
+                background: edgeDropTargetHovered ? color : '#f8f9fa',
+                color: edgeDropTargetHovered ? '#fff' : color,
+                border: `1px solid ${color}`,
+                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+              }}
+              onMouseEnter={() => setEdgeDropTargetHovered(true)}
+              onMouseLeave={() => setEdgeDropTargetHovered(false)}
+              className="nodrag"
+            >
+              <IconArrowRight size={16} style={{ pointerEvents: 'none' }} />
+            </div>
+          </Tooltip>
+        )}
         {canHaveOutputs && !readonly && (
           <Tooltip label="Create edge" position="left">
             <div

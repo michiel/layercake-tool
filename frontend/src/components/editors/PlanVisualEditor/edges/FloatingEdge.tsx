@@ -1,4 +1,4 @@
-import { useStore, getBezierPath, EdgeProps, Node, BaseEdge, EdgeLabelRenderer } from 'reactflow';
+import { useStore, getBezierPath, EdgeProps, Node } from 'reactflow';
 import { getEdgeParams } from './edgeUtils';
 
 // Selector for accessing nodes from ReactFlow store
@@ -32,7 +32,6 @@ export function FloatingEdge({
   target,
   markerEnd,
   markerStart,
-  style,
   data,
   selected,
 }: FloatingEdgeProps) {
@@ -54,7 +53,7 @@ export function FloatingEdge({
   );
 
   // Generate bezier path (matches ReactFlow floating edges example)
-  const [edgePath, labelX, labelY] = getBezierPath({
+  const [edgePath] = getBezierPath({
     sourceX: sx,
     sourceY: sy,
     sourcePosition: sourcePos,
@@ -68,39 +67,29 @@ export function FloatingEdge({
   const strokeWidth = selected ? 3 : 2;
 
   return (
-    <>
-      <BaseEdge
-        id={id}
-        path={edgePath}
-        markerEnd={markerEnd}
-        markerStart={markerStart}
-        style={{
-          ...style,
-          stroke: edgeColor,
-          strokeWidth,
-        }}
+    <g>
+      {/* Invisible wider path for better interaction */}
+      <path
+        id={`${id}-interaction`}
+        d={edgePath}
+        fill="none"
+        stroke="transparent"
+        strokeWidth={20}
+        className="react-flow__edge-interaction"
+        style={{ cursor: 'grab' }}
       />
-      {/* Optional: Add edge label rendering */}
-      {data?.metadata?.label && (
-        <EdgeLabelRenderer>
-          <div
-            style={{
-              position: 'absolute',
-              transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
-              fontSize: 10,
-              fontWeight: 500,
-              background: '#fff',
-              padding: '2px 4px',
-              borderRadius: 3,
-              border: '1px solid #ccc',
-              pointerEvents: 'all',
-            }}
-            className="nodrag nopan"
-          >
-            {data.metadata.label}
-          </div>
-        </EdgeLabelRenderer>
-      )}
-    </>
+      {/* Visible edge path */}
+      <path
+        id={id}
+        d={edgePath}
+        fill="none"
+        stroke={edgeColor}
+        strokeWidth={strokeWidth}
+        markerEnd={markerEnd as string}
+        markerStart={markerStart as string}
+        className="react-flow__edge-path"
+        style={{ pointerEvents: 'none' }}
+      />
+    </g>
   );
 }
