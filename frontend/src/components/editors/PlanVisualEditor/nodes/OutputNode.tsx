@@ -1,8 +1,8 @@
-import { memo, useState } from 'react'
+import { memo, useState, useRef } from 'react'
 import { NodeProps } from 'reactflow'
 import { useMutation } from '@apollo/client/react'
-import { Text, Group, ActionIcon, Tooltip, Badge, Stack, Modal, Textarea, ScrollArea } from '@mantine/core'
-import { IconDownload, IconEye } from '@tabler/icons-react'
+import { Text, Group, ActionIcon, Tooltip, Badge, Stack, Modal, Textarea, ScrollArea, Button } from '@mantine/core'
+import { IconDownload, IconEye, IconCopy, IconSelect } from '@tabler/icons-react'
 import { PlanDagNodeType, OutputNodeConfig } from '../../../../types/plan-dag'
 import { isNodeConfigured } from '../../../../utils/planDagValidation'
 import { EXPORT_NODE_OUTPUT, ExportNodeOutputResult } from '../../../../graphql/export'
@@ -36,6 +36,7 @@ export const OutputNode = memo((props: OutputNodeProps) => {
   const [previewOpen, setPreviewOpen] = useState(false)
   const [previewContent, setPreviewContent] = useState('')
   const [previewLoading, setPreviewLoading] = useState(false)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const config = data.config as OutputNodeConfig
 
@@ -135,6 +136,21 @@ export const OutputNode = memo((props: OutputNodeProps) => {
     })
   }
 
+  const handleSelectAll = () => {
+    if (textareaRef.current) {
+      textareaRef.current.select()
+    }
+  }
+
+  const handleCopyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(previewContent)
+      console.log('Content copied to clipboard')
+    } catch (error) {
+      console.error('Failed to copy to clipboard:', error)
+    }
+  }
+
   // Custom label badges for output node
   const labelBadges = !isConfigured ? (
     <Badge variant="outline" size="xs" color="orange">
@@ -215,24 +231,42 @@ export const OutputNode = memo((props: OutputNodeProps) => {
         onClose={() => setPreviewOpen(false)}
         title={`Export Preview: ${config.renderTarget || 'Output'}`}
         size="xl"
-        styles={{
-          body: { padding: 0 },
-        }}
       >
-        <ScrollArea h={600} p="md">
-          <Textarea
-            value={previewContent}
-            readOnly
-            minRows={30}
-            autosize
-            styles={{
-              input: {
-                fontFamily: 'monospace',
-                fontSize: '0.875rem',
-              },
-            }}
-          />
-        </ScrollArea>
+        <Stack gap="md">
+          <Group gap="xs">
+            <Button
+              size="xs"
+              variant="light"
+              leftSection={<IconSelect size={16} />}
+              onClick={handleSelectAll}
+            >
+              Select All
+            </Button>
+            <Button
+              size="xs"
+              variant="light"
+              leftSection={<IconCopy size={16} />}
+              onClick={handleCopyToClipboard}
+            >
+              Copy to Clipboard
+            </Button>
+          </Group>
+          <ScrollArea h={600}>
+            <Textarea
+              ref={textareaRef}
+              value={previewContent}
+              readOnly
+              minRows={30}
+              autosize
+              styles={{
+                input: {
+                  fontFamily: 'monospace',
+                  fontSize: '0.875rem',
+                },
+              }}
+            />
+          </ScrollArea>
+        </Stack>
       </Modal>
     </BaseNode>
   )
