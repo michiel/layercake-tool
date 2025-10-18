@@ -605,13 +605,6 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         return
       }
 
-      console.log('[PlanVisualEditor] Creating edge with handles:', {
-        sourceHandle: connection.sourceHandle,
-        targetHandle: connection.targetHandle,
-        source: connection.source,
-        target: connection.target
-      })
-
       const newEdge = {
         id: `edge-${Date.now()}`,
         source: connection.source!,

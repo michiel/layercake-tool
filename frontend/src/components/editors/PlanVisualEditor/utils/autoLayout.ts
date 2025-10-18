@@ -106,14 +106,7 @@ export async function autoLayout(
       } as Node;
     }).filter((node): node is Node => node !== null) ?? [];
 
-    // Update edges to use correct handles based on layout direction
-    const layoutedEdges = edges.map((edge) => ({
-      ...edge,
-      sourceHandle: isHorizontal ? 'output-right' : 'output-bottom',
-      targetHandle: isHorizontal ? 'input-left' : 'input-top',
-    }));
-
-    return { nodes: layoutedNodes, edges: layoutedEdges };
+    return { nodes: layoutedNodes, edges };
   } catch (error) {
     console.error('ELK layout failed:', error);
     // Return original nodes and edges on error

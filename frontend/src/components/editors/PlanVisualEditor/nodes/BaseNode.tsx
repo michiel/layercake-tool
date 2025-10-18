@@ -177,23 +177,30 @@ export const BaseNode = memo(({
         {/* Edge Creation Icon - Top Right */}
         {canHaveOutputs && !readonly && (
           <Tooltip label="Create edge" position="top">
-            <div
+            <Handle
+              type="source"
+              position={Position.Right}
+              id="output-action"
+              isConnectable={!readonly}
+              className="nodrag"
               style={{
                 position: 'absolute',
                 top: 8,
                 right: 8,
+                transform: 'none',
                 zIndex: 10,
-                cursor: 'pointer',
-                color: color,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
                 width: 24,
                 height: 24,
                 borderRadius: '50%',
                 background: '#f8f9fa',
                 border: `1px solid ${color}`,
-                transition: 'all 0.2s ease',
+                color: color,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                transition: 'background 0.2s ease, color 0.2s ease',
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.background = color;
@@ -203,15 +210,9 @@ export const BaseNode = memo(({
                 e.currentTarget.style.background = '#f8f9fa';
                 e.currentTarget.style.color = color;
               }}
-              onMouseDown={(e) => {
-                e.stopPropagation();
-                // This will trigger ReactFlow's connection mode
-                // The actual connection logic is handled by ReactFlow's onConnectStart
-              }}
-              className="nodrag"
             >
               <IconArrowRight size={14} />
-            </div>
+            </Handle>
           </Tooltip>
         )}
 

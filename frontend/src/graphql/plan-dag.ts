@@ -190,8 +190,6 @@ export const UPDATE_PLAN_DAG_EDGE = gql`
       id
       source
       target
-      sourceHandle
-      targetHandle
       metadata {
         label
         dataType

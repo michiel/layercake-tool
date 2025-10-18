@@ -1,4 +1,4 @@
-import { ConnectionLineComponentProps, getBezierPath, Node } from 'reactflow';
+import { ConnectionLineComponentProps, getBezierPath, Node, internalsSymbol } from 'reactflow';
 import { getEdgeParams } from './edgeUtils';
 
 /**
@@ -19,7 +19,9 @@ export function FloatingConnectionLine({
   // Create a virtual target node at the cursor position
   const targetNode = {
     id: 'connection-target',
-    [Symbol.for('rf_internals')]: {
+    position: { x: toX, y: toY },
+    data: {},
+    [internalsSymbol]: {
       width: 1,
       height: 1,
       positionAbsolute: { x: toX, y: toY },

@@ -323,8 +323,6 @@ export interface UpdateEdgeCommand {
   projectId: number
   edgeId: string
   updates: {
-    sourceHandle?: string
-    targetHandle?: string
     metadata?: any
   }
 }

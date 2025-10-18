@@ -74,8 +74,6 @@ const GET_PLAN_DAG = gql`
         id
         source
         target
-        sourceHandle
-        targetHandle
         metadata
       }
       metadata
@@ -1093,8 +1091,6 @@ const ProjectDetailPage = () => {
       yaml += `  - id: "${edge.id}"\n`
       yaml += `    source: "${edge.source}"\n`
       yaml += `    target: "${edge.target}"\n`
-      if (edge.sourceHandle) yaml += `    sourceHandle: "${edge.sourceHandle}"\n`
-      if (edge.targetHandle) yaml += `    targetHandle: "${edge.targetHandle}"\n`
       if (edge.metadata) {
         yaml += `    metadata:\n`
         Object.entries(edge.metadata).forEach(([key, value]) => {

@@ -1,4 +1,4 @@
-import { Node, Position } from 'reactflow';
+import { Node, Position, internalsSymbol } from 'reactflow';
 
 interface Point {
   x: number;
@@ -14,8 +14,32 @@ interface EdgeParams {
   targetPos: Position;
 }
 
-// Symbol to access ReactFlow internals
-const internalsSymbol = Symbol.for('rf_internals');
+type NodeWithInternals = Node & {
+  [internalsSymbol]?: {
+    width?: number;
+    height?: number;
+    positionAbsolute?: { x: number; y: number };
+  };
+};
+
+function getInternals(node: NodeWithInternals) {
+  return node[internalsSymbol] || {};
+}
+
+function getNodeDimensions(node: NodeWithInternals) {
+  const internals = getInternals(node);
+
+  const width = internals.width ?? (node as any).width ?? 0;
+  const height = internals.height ?? (node as any).height ?? 0;
+  const positionAbsolute =
+    internals.positionAbsolute ??
+    {
+      x: node.position?.x ?? 0,
+      y: node.position?.y ?? 0,
+    };
+
+  return { width, height, positionAbsolute };
+}
 
 /**
  * Calculate the intersection point between a line from one node center to another
@@ -25,27 +49,21 @@ const internalsSymbol = Symbol.for('rf_internals');
  * to the intersection node center crosses the intersection node's boundary.
  */
 export function getNodeIntersection(
-  intersectionNode: Node,
-  targetNode: Node
+  intersectionNode: NodeWithInternals,
+  targetNode: NodeWithInternals
 ): Point {
-  // Get node dimensions and position from ReactFlow internals
-  const {
-    width: intersectionNodeWidth,
-    height: intersectionNodeHeight,
-    positionAbsolute: intersectionNodePosition,
-  } = (intersectionNode as any)[internalsSymbol] || {};
-
-  const targetPosition = (targetNode as any)[internalsSymbol]?.positionAbsolute || { x: 0, y: 0 };
+  const intersectionDimensions = getNodeDimensions(intersectionNode);
+  const targetDimensions = getNodeDimensions(targetNode);
 
   // Calculate half-widths for easier math
-  const w = (intersectionNodeWidth ?? 0) / 2;
-  const h = (intersectionNodeHeight ?? 0) / 2;
+  const w = (intersectionDimensions.width ?? 0) / 2;
+  const h = (intersectionDimensions.height ?? 0) / 2;
 
   // Calculate center points of both nodes
-  const x2 = (intersectionNodePosition?.x ?? 0) + w;
-  const y2 = (intersectionNodePosition?.y ?? 0) + h;
-  const x1 = targetPosition.x + ((targetNode as any)[internalsSymbol]?.width ?? 0) / 2;
-  const y1 = targetPosition.y + ((targetNode as any)[internalsSymbol]?.height ?? 0) / 2;
+  const x2 = (intersectionDimensions.positionAbsolute?.x ?? 0) + w;
+  const y2 = (intersectionDimensions.positionAbsolute?.y ?? 0) + h;
+  const x1 = (targetDimensions.positionAbsolute?.x ?? 0) + ((targetDimensions.width ?? 0) / 2);
+  const y1 = (targetDimensions.positionAbsolute?.y ?? 0) + ((targetDimensions.height ?? 0) / 2);
 
   // Calculate the slope of the line between node centers
   // Using diamond-space transformation for axis-aligned intersection
@@ -64,12 +82,15 @@ export function getNodeIntersection(
  * Determine which side (position) of a node an intersection point is closest to.
  * Returns the ReactFlow Position enum value (Top, Right, Bottom, Left).
  */
-export function getEdgePosition(node: Node, intersectionPoint: Point): Position {
-  const nodePosition = (node as any)[internalsSymbol]?.positionAbsolute || { x: 0, y: 0 };
-  const nodeWidth = (node as any)[internalsSymbol]?.width ?? 0;
-  const nodeHeight = (node as any)[internalsSymbol]?.height ?? 0;
+export function getEdgePosition(node: NodeWithInternals, intersectionPoint: Point): Position {
+  const { positionAbsolute, width, height } = getNodeDimensions(node);
 
-  const n = { ...nodePosition, width: nodeWidth, height: nodeHeight };
+  const n = {
+    x: positionAbsolute?.x ?? 0,
+    y: positionAbsolute?.y ?? 0,
+    width: width ?? 0,
+    height: height ?? 0,
+  };
   const nx = Math.round(n.x);
   const ny = Math.round(n.y);
   const px = Math.round(intersectionPoint.x);
@@ -97,7 +118,7 @@ export function getEdgePosition(node: Node, intersectionPoint: Point): Position 
  * Calculate all edge parameters needed to render a floating edge between two nodes.
  * Returns source/target coordinates and positions for edge rendering.
  */
-export function getEdgeParams(source: Node, target: Node): EdgeParams {
+export function getEdgeParams(source: NodeWithInternals, target: NodeWithInternals): EdgeParams {
   const sourceIntersectionPoint = getNodeIntersection(source, target);
   const targetIntersectionPoint = getNodeIntersection(target, source);
 
