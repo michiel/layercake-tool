@@ -504,6 +504,34 @@ export const BaseNode = memo(({
       )}
     </>
   )
+}, (prevProps, nextProps) => {
+  // PERFORMANCE FIX (Phase 1.3): Custom memo comparison to prevent unnecessary re-renders
+  // Return true if props are equal (skip re-render), false if different (allow re-render)
+
+  // Always re-render if these critical props change
+  if (prevProps.id !== nextProps.id) return false
+  if (prevProps.selected !== nextProps.selected) return false
+  if (prevProps.nodeType !== nextProps.nodeType) return false
+
+  // Check if data object reference changed
+  // With Phase 1.1 fix, data should be stable during drag
+  if (prevProps.data === nextProps.data) {
+    // Data reference is same, props are equal
+    return true
+  }
+
+  // Data reference changed, do deep comparison of important fields
+  const prevData = prevProps.data || {}
+  const nextData = nextProps.data || {}
+
+  // Compare critical data fields
+  if (prevData.isUnconfigured !== nextData.isUnconfigured) return false
+  if (prevData.hasValidConfig !== nextData.hasValidConfig) return false
+  if (prevData.config !== nextData.config) return false
+  if (prevData.metadata !== nextData.metadata) return false
+
+  // Props are effectively equal, skip re-render
+  return true
 })
 
 BaseNode.displayName = 'BaseNode'

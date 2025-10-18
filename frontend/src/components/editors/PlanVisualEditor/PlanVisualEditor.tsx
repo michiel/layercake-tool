@@ -267,11 +267,12 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
   // Handle node changes (position, selection, etc.)
   const handleNodesChange = useCallback(
     (changes: NodeChange[]) => {
-      // Always apply changes to ReactFlow for visual updates
+      // PERFORMANCE: Always apply changes to ReactFlow for visual updates (fast)
       onNodesChange(changes)
 
-      // Skip performance tracking and side effects during drag
+      // PERFORMANCE FIX (Phase 1.2): Skip expensive processing during drag
       // Position and dimension changes during drag are cosmetic only - actual save happens in handleNodeDragStop
+      // This prevents triggering validation, sync, and other side effects on every mouse move
       if (isDragging.current) {
         const hasSignificantChanges = changes.some(change =>
           change.type !== 'position' && change.type !== 'dimensions'
@@ -1156,19 +1157,30 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     return nodeConfigMap.get(nodeId) ?? false
   }, [nodeConfigMap])
 
-  // Inject current edges into node data for configuration validation
-  // Must be defined before any early returns to follow Rules of Hooks
+  // PERFORMANCE FIX: Separate node data from positions to prevent re-renders during drag
+  // Create a stable map of node data that only changes when actual data changes, not positions
+  const nodeDataMap = useMemo(() => {
+    const map = new Map<string, any>()
+    nodes.forEach(node => {
+      map.set(node.id, {
+        edges: edges,
+        isUnconfigured: !isNodeFullyConfigured(node.id),
+        projectId: projectId,
+        // Preserve original data
+        ...node.data
+      })
+    })
+    return map
+  }, [edges, isNodeFullyConfigured, projectId, nodeConfigKey]) // Uses nodeConfigKey instead of nodes!
+
+  // Inject enriched data into nodes - only recreates node objects when data actually changes
+  // Position changes don't trigger this memo because nodeDataMap is stable during drag
   const nodesWithEdges = useMemo(() => {
     return nodes.map(node => ({
       ...node,
-      data: {
-        ...node.data,
-        edges: edges, // Inject current edges for validation
-        isUnconfigured: !isNodeFullyConfigured(node.id), // Add unconfigured flag
-        projectId: projectId // Inject projectId for execute button
-      }
+      data: nodeDataMap.get(node.id) || node.data
     }))
-  }, [nodes, edges, isNodeFullyConfigured, projectId])
+  }, [nodes, nodeDataMap])
 
   // Enhance edges with markers and styling based on source node configuration status
   // Must be defined before any early returns to follow Rules of Hooks
