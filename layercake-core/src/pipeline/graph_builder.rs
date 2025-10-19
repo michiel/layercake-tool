@@ -58,6 +58,15 @@ impl GraphBuilder {
         active = active.set_state(ExecutionState::Processing);
         let graph = active.update(&self.db).await?;
 
+        // Publish execution status change
+        #[cfg(feature = "graphql")]
+        crate::graphql::execution_events::publish_graph_status(
+            &self.db,
+            project_id,
+            &node_id,
+            &graph,
+        ).await;
+
         // Fetch upstream sources by reading plan_dag_nodes
         // Upstream can be DataSource nodes OR Graph/Merge nodes
         let mut data_sources_list = Vec::new();
@@ -155,13 +164,32 @@ impl GraphBuilder {
                     }
                 }
 
+                // Publish execution status change
+                #[cfg(feature = "graphql")]
+                crate::graphql::execution_events::publish_graph_status(
+                    &self.db,
+                    project_id,
+                    &node_id,
+                    &updated,
+                ).await;
+
                 Ok(updated)
             }
             Err(e) => {
                 // Update to error state
                 let mut active: graphs::ActiveModel = graph.into();
                 active = active.set_error(e.to_string());
-                let _updated = active.update(&self.db).await?;
+                let updated = active.update(&self.db).await?;
+
+                // Publish execution status change
+                #[cfg(feature = "graphql")]
+                crate::graphql::execution_events::publish_graph_status(
+                    &self.db,
+                    project_id,
+                    &node_id,
+                    &updated,
+                ).await;
+
                 Err(e)
             }
         }

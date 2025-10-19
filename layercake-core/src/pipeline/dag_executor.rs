@@ -238,6 +238,15 @@ impl DagExecutor {
         active = active.set_state(ExecutionState::Processing);
         graph_record = active.update(&self.db).await?;
 
+        // Publish execution status change
+        #[cfg(feature = "graphql")]
+        crate::graphql::execution_events::publish_graph_status(
+            &self.db,
+            project_id,
+            node_id,
+            &graph_record,
+        ).await;
+
         self.persist_graph_contents(graph_record.id, graph).await?;
 
         let mut active: GraphActiveModel = graph_record.into();
@@ -247,7 +256,16 @@ impl DagExecutor {
             graph.nodes.len() as i32,
             graph.edges.len() as i32,
         );
-        active.update(&self.db).await?;
+        let updated = active.update(&self.db).await?;
+
+        // Publish execution status change
+        #[cfg(feature = "graphql")]
+        crate::graphql::execution_events::publish_graph_status(
+            &self.db,
+            project_id,
+            node_id,
+            &updated,
+        ).await;
 
         Ok(())
     }

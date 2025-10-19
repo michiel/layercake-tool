@@ -1,6 +1,8 @@
 #[cfg(feature = "graphql")]
 pub mod context;
 #[cfg(feature = "graphql")]
+pub mod execution_events;
+#[cfg(feature = "graphql")]
 pub mod mutations;
 #[cfg(feature = "graphql")]
 pub mod queries;
