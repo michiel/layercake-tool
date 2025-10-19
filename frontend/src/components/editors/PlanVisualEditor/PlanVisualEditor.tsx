@@ -192,23 +192,18 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
       // Suppress external syncs during delete operations
       setDragging(true)
 
+      // Collect edge IDs to delete BEFORE modifying state
+      // (Must access edges state directly to avoid closure issues)
+      const edgesToDelete = edges.filter(edge => edge.source === nodeId || edge.target === nodeId)
+      const backendEdgeIdsToDelete = edgesToDelete.map(edge =>
+        (edge.data as any)?.originalEdge?.id || edge.id
+      )
+
       // Remove node from local state optimistically
       setNodes((nds) => nds.filter(node => node.id !== nodeId))
 
-      // Remove edges connected to this node and collect backend edge IDs
-      const backendEdgeIdsToDelete: string[] = []
-      setEdges((eds) => {
-        const filtered = eds.filter(edge => {
-          if (edge.source === nodeId || edge.target === nodeId) {
-            // Extract backend edge ID (consistent with other edge deletion code)
-            const backendEdgeId = (edge.data as any)?.originalEdge?.id || edge.id
-            backendEdgeIdsToDelete.push(backendEdgeId)
-            return false
-          }
-          return true
-        })
-        return filtered
-      })
+      // Remove edges connected to this node
+      setEdges((eds) => eds.filter(edge => edge.source !== nodeId && edge.target !== nodeId))
 
       // Persist deletions to backend
       mutations.deleteNode(nodeId)
@@ -217,7 +212,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
       // Re-enable external syncs after a short delay to allow mutations to complete
       setTimeout(() => setDragging(false), 100)
     }
-  }, [setNodes, setEdges, mutations, setDragging])
+  }, [setNodes, setEdges, mutations, setDragging, edges])
 
   // Switch to plan-dag-canvas document when component mounts
   useEffect(() => {
@@ -1158,11 +1153,12 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     const map = new Map<string, any>()
     nodes.forEach(node => {
       map.set(node.id, {
+        // Preserve original data first
+        ...node.data,
+        // Then override with calculated/injected values
         edges: edges,
         isUnconfigured: !isNodeFullyConfigured(node.id),
-        projectId: projectId,
-        // Preserve original data
-        ...node.data
+        projectId: projectId
       })
     })
     return map
