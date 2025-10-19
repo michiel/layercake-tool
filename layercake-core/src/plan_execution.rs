@@ -195,8 +195,10 @@ fn apply_graph_transformations(
         graph.insert_newlines_in_edge_labels(edge_label_insert_newlines_at);
     }
 
-    // Aggregate any duplicate edges
-    graph.aggregate_edges();
+    // Aggregate any duplicate edges if configured
+    if graph_config.aggregate_edges {
+        graph.aggregate_edges();
+    }
 
     Ok(())
 }

@@ -134,32 +134,234 @@ pub struct GraphNodeMetadata {
 }
 
 // Transform Node Configuration
-#[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
+#[derive(SimpleObject, InputObject, Clone, Debug, Serialize)]
 #[graphql(input_name = "TransformNodeConfigInput")]
 pub struct TransformNodeConfig {
-    // Removed: input_graph_ref - input connections handled by incoming edges
-    // Removed: output_graph_ref - output connections handled by outgoing edges
-    pub transform_type: TransformType,
-    pub transform_config: TransformConfig,
+    pub transforms: Vec<GraphTransform>,
+}
+
+impl<'de> Deserialize<'de> for TransformNodeConfig {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let wire = TransformNodeConfigWire::deserialize(deserializer)?;
+        if let Some(transforms) = wire.transforms {
+            Ok(TransformNodeConfig {
+                transforms: transforms
+                    .into_iter()
+                    .map(GraphTransform::with_default_enabled)
+                    .collect(),
+            })
+        } else if let Some(transform_type) = wire.transform_type {
+            let legacy_config = wire.transform_config.unwrap_or_default();
+            let transforms = legacy_config.into_graph_transforms(transform_type);
+            Ok(TransformNodeConfig { transforms })
+        } else {
+            Ok(TransformNodeConfig {
+                transforms: Vec::new(),
+            })
+        }
+    }
+}
+
+#[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
+#[graphql(input_name = "GraphTransformInput")]
+pub struct GraphTransform {
+    pub kind: GraphTransformKind,
+    #[serde(default)]
+    #[graphql(default)]
+    pub params: GraphTransformParams,
+}
+
+impl GraphTransform {
+    fn with_default_enabled(self) -> Self {
+        let mut transform = self;
+        if transform.params.enabled.is_none() {
+            transform.params.enabled = Some(true);
+        }
+        transform
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.params.enabled.unwrap_or(true)
+    }
 }
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
-pub enum TransformType {
+pub enum GraphTransformKind {
+    PartitionDepthLimit,
+    PartitionWidthLimit,
+    NodeLabelMaxLength,
+    NodeLabelInsertNewlines,
+    EdgeLabelMaxLength,
+    EdgeLabelInsertNewlines,
+    InvertGraph,
+    GenerateHierarchy,
+    AggregateEdges,
+}
+
+#[derive(SimpleObject, InputObject, Clone, Debug, Default, Serialize, Deserialize)]
+#[graphql(input_name = "GraphTransformParamsInput")]
+pub struct GraphTransformParams {
+    pub max_partition_depth: Option<i32>,
+    pub max_partition_width: Option<i32>,
+    pub node_label_max_length: Option<usize>,
+    pub node_label_insert_newlines_at: Option<usize>,
+    pub edge_label_max_length: Option<usize>,
+    pub edge_label_insert_newlines_at: Option<usize>,
+    pub enabled: Option<bool>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct TransformNodeConfigWire {
+    #[serde(default)]
+    transforms: Option<Vec<GraphTransform>>,
+    #[serde(default)]
+    #[serde(alias = "transformType")]
+    transform_type: Option<LegacyTransformType>,
+    #[serde(default)]
+    #[serde(alias = "transformConfig")]
+    transform_config: Option<LegacyTransformConfig>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+enum LegacyTransformType {
     PartitionDepthLimit,
     InvertGraph,
     FilterNodes,
     FilterEdges,
 }
 
-#[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
-#[graphql(input_name = "TransformConfigInput")]
-pub struct TransformConfig {
-    pub max_partition_depth: Option<i32>,
-    pub max_partition_width: Option<i32>,
-    pub generate_hierarchy: Option<bool>,
-    pub invert_graph: Option<bool>,
-    pub node_filter: Option<String>,
-    pub edge_filter: Option<String>,
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct LegacyTransformConfig {
+    max_partition_depth: Option<i32>,
+    max_partition_width: Option<i32>,
+    generate_hierarchy: Option<bool>,
+    invert_graph: Option<bool>,
+    node_filter: Option<String>,
+    edge_filter: Option<String>,
+}
+
+impl LegacyTransformConfig {
+    fn into_graph_transforms(self, transform_type: LegacyTransformType) -> Vec<GraphTransform> {
+        let mut transforms = Vec::new();
+
+        match transform_type {
+            LegacyTransformType::PartitionDepthLimit => {
+                if let Some(depth) = self.max_partition_depth.filter(|d| *d > 0) {
+                    transforms.push(GraphTransform {
+                        kind: GraphTransformKind::PartitionDepthLimit,
+                        params: GraphTransformParams {
+                            max_partition_depth: Some(depth),
+                            enabled: Some(true),
+                            ..Default::default()
+                        },
+                    });
+                }
+                if let Some(width) = self.max_partition_width.filter(|w| *w > 0) {
+                    transforms.push(GraphTransform {
+                        kind: GraphTransformKind::PartitionWidthLimit,
+                        params: GraphTransformParams {
+                            max_partition_width: Some(width),
+                            enabled: Some(true),
+                            ..Default::default()
+                        },
+                    });
+                }
+                if self.generate_hierarchy.unwrap_or(false) {
+                    transforms.push(GraphTransform {
+                        kind: GraphTransformKind::GenerateHierarchy,
+                        params: GraphTransformParams {
+                            enabled: Some(true),
+                            ..Default::default()
+                        },
+                    });
+                }
+            }
+            LegacyTransformType::InvertGraph => {
+                if self.invert_graph.unwrap_or(true) {
+                    transforms.push(GraphTransform {
+                        kind: GraphTransformKind::InvertGraph,
+                        params: GraphTransformParams {
+                            enabled: Some(true),
+                            ..Default::default()
+                        },
+                    });
+                }
+            }
+            LegacyTransformType::FilterNodes | LegacyTransformType::FilterEdges => {}
+        }
+
+        // Legacy pipeline always aggregated edges; preserve unless explicitly disabled later
+        transforms.push(GraphTransform {
+            kind: GraphTransformKind::AggregateEdges,
+            params: GraphTransformParams {
+                enabled: Some(true),
+                ..Default::default()
+            },
+        });
+
+        transforms
+    }
+}
+
+impl TransformNodeConfig {
+    pub fn to_graph_config(&self) -> crate::plan::GraphConfig {
+        let mut config = crate::plan::GraphConfig::default();
+
+        for transform in &self.transforms {
+            if !transform.is_enabled() {
+                continue;
+            }
+            match transform.kind {
+                GraphTransformKind::PartitionDepthLimit => {
+                    if let Some(depth) = transform.params.max_partition_depth {
+                        config.max_partition_depth = depth;
+                    }
+                }
+                GraphTransformKind::PartitionWidthLimit => {
+                    if let Some(width) = transform.params.max_partition_width {
+                        config.max_partition_width = width;
+                    }
+                }
+                GraphTransformKind::NodeLabelMaxLength => {
+                    if let Some(length) = transform.params.node_label_max_length {
+                        config.node_label_max_length = length;
+                    }
+                }
+                GraphTransformKind::NodeLabelInsertNewlines => {
+                    if let Some(wrap) = transform.params.node_label_insert_newlines_at {
+                        config.node_label_insert_newlines_at = wrap;
+                    }
+                }
+                GraphTransformKind::EdgeLabelMaxLength => {
+                    if let Some(length) = transform.params.edge_label_max_length {
+                        config.edge_label_max_length = length;
+                    }
+                }
+                GraphTransformKind::EdgeLabelInsertNewlines => {
+                    if let Some(wrap) = transform.params.edge_label_insert_newlines_at {
+                        config.edge_label_insert_newlines_at = wrap;
+                    }
+                }
+                GraphTransformKind::InvertGraph => {
+                    config.invert_graph = true;
+                }
+                GraphTransformKind::GenerateHierarchy => {
+                    config.generate_hierarchy = true;
+                }
+                GraphTransformKind::AggregateEdges => {
+                    config.aggregate_edges = transform.params.enabled.unwrap_or(true);
+                }
+            }
+        }
+
+        config
+    }
 }
 
 // Merge Node Configuration
@@ -246,6 +448,7 @@ pub struct GraphConfig {
     pub max_partition_depth: Option<i32>,
     pub max_partition_width: Option<i32>,
     pub invert_graph: Option<bool>,
+    pub aggregate_edges: Option<bool>,
     pub node_label_max_length: Option<i32>,
     pub node_label_insert_newlines_at: Option<i32>,
     pub edge_label_max_length: Option<i32>,
