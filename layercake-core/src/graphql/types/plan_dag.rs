@@ -1,8 +1,10 @@
+use anyhow::{anyhow, Result as AnyResult};
 use async_graphql::*;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::database::entities::{data_sources, plan_dag_edges, plan_dag_nodes};
+use crate::graph::Graph;
 
 // Position for ReactFlow nodes
 #[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
@@ -186,6 +188,100 @@ impl GraphTransform {
     pub fn is_enabled(&self) -> bool {
         self.params.enabled.unwrap_or(true)
     }
+
+    pub fn apply_to(&self, graph: &mut Graph) -> AnyResult<bool> {
+        if matches!(self.kind, GraphTransformKind::AggregateEdges) {
+            if self.is_enabled() {
+                graph.aggregate_edges();
+            }
+            return Ok(true);
+        }
+
+        if !self.is_enabled() {
+            return Ok(false);
+        }
+
+        match self.kind {
+            GraphTransformKind::PartitionDepthLimit => {
+                let depth = self.params.max_partition_depth.ok_or_else(|| {
+                    anyhow!("PartitionDepthLimit transform requires max_partition_depth")
+                })?;
+                if depth <= 0 {
+                    return Err(anyhow!("max_partition_depth must be greater than zero"));
+                }
+                graph
+                    .modify_graph_limit_partition_depth(depth)
+                    .map_err(|e| anyhow!(e))?;
+            }
+            GraphTransformKind::PartitionWidthLimit => {
+                let width = self.params.max_partition_width.ok_or_else(|| {
+                    anyhow!("PartitionWidthLimit transform requires max_partition_width")
+                })?;
+                if width <= 0 {
+                    return Err(anyhow!("max_partition_width must be greater than zero"));
+                }
+                graph
+                    .modify_graph_limit_partition_width(width)
+                    .map_err(|e| anyhow!(e))?;
+            }
+            GraphTransformKind::NodeLabelMaxLength => {
+                let length = self.params.node_label_max_length.ok_or_else(|| {
+                    anyhow!("NodeLabelMaxLength transform requires node_label_max_length")
+                })?;
+                if length == 0 {
+                    return Err(anyhow!("node_label_max_length must be greater than zero"));
+                }
+                graph.truncate_node_labels(length);
+            }
+            GraphTransformKind::NodeLabelInsertNewlines => {
+                let wrap_at = self.params.node_label_insert_newlines_at.ok_or_else(|| {
+                    anyhow!(
+                        "NodeLabelInsertNewlines transform requires node_label_insert_newlines_at"
+                    )
+                })?;
+                if wrap_at == 0 {
+                    return Err(anyhow!(
+                        "node_label_insert_newlines_at must be greater than zero"
+                    ));
+                }
+                graph.insert_newlines_in_node_labels(wrap_at);
+            }
+            GraphTransformKind::EdgeLabelMaxLength => {
+                let length = self.params.edge_label_max_length.ok_or_else(|| {
+                    anyhow!("EdgeLabelMaxLength transform requires edge_label_max_length")
+                })?;
+                if length == 0 {
+                    return Err(anyhow!("edge_label_max_length must be greater than zero"));
+                }
+                graph.truncate_edge_labels(length);
+            }
+            GraphTransformKind::EdgeLabelInsertNewlines => {
+                let wrap_at = self.params.edge_label_insert_newlines_at.ok_or_else(|| {
+                    anyhow!(
+                        "EdgeLabelInsertNewlines transform requires edge_label_insert_newlines_at"
+                    )
+                })?;
+                if wrap_at == 0 {
+                    return Err(anyhow!(
+                        "edge_label_insert_newlines_at must be greater than zero"
+                    ));
+                }
+                graph.insert_newlines_in_edge_labels(wrap_at);
+            }
+            GraphTransformKind::InvertGraph => {
+                *graph = graph.invert_graph().map_err(|e| anyhow!(e))?;
+            }
+            GraphTransformKind::GenerateHierarchy => {
+                // Placeholder – hierarchy generation handled during export using GraphConfig
+            }
+            GraphTransformKind::AggregateEdges => {
+                // Handled above
+                unreachable!("AggregateEdges should have been handled earlier");
+            }
+        }
+
+        Ok(false)
+    }
 }
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
@@ -310,6 +406,28 @@ impl LegacyTransformConfig {
 }
 
 impl TransformNodeConfig {
+    pub fn apply_transforms(&self, graph: &mut Graph) -> AnyResult<()> {
+        if self.transforms.is_empty() {
+            return Err(anyhow!(
+                "TransformNode requires at least one transform to execute"
+            ));
+        }
+
+        let mut aggregate_handled = false;
+        for transform in &self.transforms {
+            let handled = transform.apply_to(graph)?;
+            if handled {
+                aggregate_handled = true;
+            }
+        }
+
+        if !aggregate_handled {
+            graph.aggregate_edges();
+        }
+
+        Ok(())
+    }
+
     pub fn to_graph_config(&self) -> crate::plan::GraphConfig {
         let mut config = crate::plan::GraphConfig::default();
 
@@ -361,6 +479,131 @@ impl TransformNodeConfig {
         }
 
         config
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::graph::{Edge, Layer, Node};
+
+    fn sample_graph() -> Graph {
+        Graph {
+            name: "Sample".to_string(),
+            nodes: vec![
+                Node {
+                    id: "A".to_string(),
+                    label: "Alpha".to_string(),
+                    layer: "layer1".to_string(),
+                    is_partition: false,
+                    belongs_to: None,
+                    weight: 1,
+                    comment: None,
+                },
+                Node {
+                    id: "B".to_string(),
+                    label: "Beta".to_string(),
+                    layer: "layer1".to_string(),
+                    is_partition: false,
+                    belongs_to: None,
+                    weight: 1,
+                    comment: None,
+                },
+            ],
+            edges: vec![
+                Edge {
+                    id: "e1".to_string(),
+                    source: "A".to_string(),
+                    target: "B".to_string(),
+                    label: "EdgeLabelLong".to_string(),
+                    layer: "layer1".to_string(),
+                    weight: 1,
+                    comment: None,
+                },
+                Edge {
+                    id: "e2".to_string(),
+                    source: "A".to_string(),
+                    target: "B".to_string(),
+                    label: "EdgeLabelLong".to_string(),
+                    layer: "layer1".to_string(),
+                    weight: 1,
+                    comment: None,
+                },
+            ],
+            layers: vec![Layer {
+                id: "layer1".to_string(),
+                label: "Layer 1".to_string(),
+                background_color: "FFFFFF".to_string(),
+                text_color: "000000".to_string(),
+                border_color: "000000".to_string(),
+            }],
+        }
+    }
+
+    #[test]
+    fn apply_transforms_runs_default_aggregate() {
+        let mut graph = sample_graph();
+        let config = TransformNodeConfig {
+            transforms: vec![GraphTransform {
+                kind: GraphTransformKind::NodeLabelMaxLength,
+                params: GraphTransformParams {
+                    node_label_max_length: Some(3),
+                    ..Default::default()
+                },
+            }],
+        };
+
+        config
+            .apply_transforms(&mut graph)
+            .expect("transform should succeed");
+
+        assert_eq!(graph.nodes[0].label, "Alp");
+        assert_eq!(graph.edges.len(), 1);
+        assert_eq!(graph.edges[0].weight, 2);
+    }
+
+    #[test]
+    fn apply_transforms_respects_disabled_aggregate() {
+        let mut graph = sample_graph();
+        let config = TransformNodeConfig {
+            transforms: vec![GraphTransform {
+                kind: GraphTransformKind::AggregateEdges,
+                params: GraphTransformParams {
+                    enabled: Some(false),
+                    ..Default::default()
+                },
+            }],
+        };
+
+        config
+            .apply_transforms(&mut graph)
+            .expect("transform should succeed");
+
+        assert_eq!(graph.edges.len(), 2);
+    }
+
+    #[test]
+    fn apply_transforms_errors_without_required_params() {
+        let mut graph = sample_graph();
+        let config = TransformNodeConfig {
+            transforms: vec![GraphTransform {
+                kind: GraphTransformKind::PartitionDepthLimit,
+                params: GraphTransformParams::default(),
+            }],
+        };
+
+        let err = config.apply_transforms(&mut graph).unwrap_err();
+        assert!(
+            err.to_string().contains("max_partition_depth"),
+            "expected missing parameter error, got {err}"
+        );
+    }
+
+    #[test]
+    fn apply_transforms_requires_non_empty_config() {
+        let mut graph = sample_graph();
+        let config = TransformNodeConfig { transforms: vec![] };
+        assert!(config.apply_transforms(&mut graph).is_err());
     }
 }
 

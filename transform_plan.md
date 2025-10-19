@@ -54,6 +54,7 @@
   4. Persist the transformed graph as a new graph record (never mutate upstream data) and emit execution metadata (similar to GraphNode builder). Store reference in an output `GraphNode` or update node execution state payload.
   5. Return meaningful execution errors (e.g., missing upstream graph, invalid parameter) and mark node status for downstream updates.
 - Add unit tests for the conversion helpers and an integration test in `layercake-core/tests` validating that a serialized TransformNode config yields expected graph changes after execution.
+- **Status:** ✅ `DagExecutor` now materializes upstream graphs, applies ordered transforms (with default edge aggregation), persists results as new graph records with metadata/source hashes, and unit tests cover default aggregation, disabled aggregation, and parameter validation.
 
 ### 4. Expand GraphQL API Surface
 - Update GraphQL schema (`layercake-core/src/graphql/types/plan_dag.rs`) to expose the new transform list to the frontend. Regenerate schema artifacts if applicable.

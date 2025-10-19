@@ -1,9 +1,18 @@
-use anyhow::{anyhow, Result};
-use sea_orm::DatabaseConnection;
+use anyhow::{anyhow, Context, Result};
+use chrono::Utc;
+use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
+use serde_json::{json, Map as JsonMap, Value as JsonValue};
+use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet, VecDeque};
 
-use crate::database::entities::plan_dag_nodes;
+use crate::database::entities::graphs::ActiveModel as GraphActiveModel;
+use crate::database::entities::graphs::{Column as GraphColumn, Entity as GraphEntity};
+use crate::database::entities::{graph_edges, graph_nodes, graphs, plan_dag_nodes, ExecutionState};
+use crate::graphql::types::plan_dag::TransformNodeConfig;
+use crate::pipeline::layer_operations::insert_layers_to_db;
+use crate::pipeline::types::LayerData;
 use crate::pipeline::{DatasourceImporter, GraphBuilder, MergeBuilder};
+use crate::services::graph_service::GraphService;
 
 /// DAG executor that processes nodes in topological order
 pub struct DagExecutor {
@@ -107,14 +116,323 @@ impl DagExecutor {
                 // Output nodes deliver exports on demand; no proactive execution required
                 return Ok(());
             }
-            "TransformNode" | "CopyNode" => {
-                // TODO: Implement these node types in future phases
+            "TransformNode" => {
+                self.execute_transform_node(project_id, node_id, &node_name, node, nodes, edges)
+                    .await?;
+            }
+            "CopyNode" => {
                 return Err(anyhow!("Node type {} not yet implemented", node.node_type));
             }
             _ => {
                 return Err(anyhow!("Unknown node type: {}", node.node_type));
             }
         }
+
+        Ok(())
+    }
+
+    async fn execute_transform_node(
+        &self,
+        project_id: i32,
+        node_id: &str,
+        node_name: &str,
+        node: &plan_dag_nodes::Model,
+        nodes: &[plan_dag_nodes::Model],
+        edges: &[(String, String)],
+    ) -> Result<()> {
+        let config: TransformNodeConfig = serde_json::from_str(&node.config_json)
+            .with_context(|| format!("Failed to parse transform config for node {}", node_id))?;
+
+        let upstream_ids = self.get_upstream_nodes(node_id, edges);
+        if upstream_ids.len() != 1 {
+            return Err(anyhow!(
+                "TransformNode {} expects exactly one upstream graph, found {}",
+                node_id,
+                upstream_ids.len()
+            ));
+        }
+        let upstream_node_id = &upstream_ids[0];
+
+        let upstream_node = nodes
+            .iter()
+            .find(|n| &n.id == upstream_node_id)
+            .ok_or_else(|| anyhow!("Upstream node {} not found", upstream_node_id))?;
+
+        match upstream_node.node_type.as_str() {
+            "GraphNode" | "MergeNode" | "TransformNode" => {}
+            other => {
+                return Err(anyhow!(
+                    "TransformNode {} cannot consume from node type {} (node {})",
+                    node_id,
+                    other,
+                    upstream_node_id
+                ));
+            }
+        }
+
+        let upstream_graph = GraphEntity::find()
+            .filter(GraphColumn::ProjectId.eq(project_id))
+            .filter(GraphColumn::NodeId.eq(upstream_node_id))
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| {
+                anyhow!(
+                    "No graph output found for upstream node {}",
+                    upstream_node_id
+                )
+            })?;
+
+        let graph_service = GraphService::new(self.db.clone());
+        let mut graph = graph_service
+            .build_graph_from_dag_graph(upstream_graph.id)
+            .await
+            .with_context(|| {
+                format!(
+                    "Failed to materialize graph for upstream node {}",
+                    upstream_node_id
+                )
+            })?;
+
+        config
+            .apply_transforms(&mut graph)
+            .with_context(|| format!("Failed to execute transforms for node {}", node_id))?;
+
+        graph.name = node_name.to_string();
+
+        self.persist_transformed_graph(
+            project_id,
+            node_id,
+            node_name,
+            &config,
+            &upstream_graph,
+            &graph,
+        )
+        .await
+    }
+
+    async fn persist_transformed_graph(
+        &self,
+        project_id: i32,
+        node_id: &str,
+        node_name: &str,
+        config: &TransformNodeConfig,
+        upstream_graph: &graphs::Model,
+        graph: &crate::graph::Graph,
+    ) -> Result<()> {
+        let metadata = Some(json!({
+            "transforms": config.transforms,
+            "upstreamGraphId": upstream_graph.id,
+        }));
+
+        let mut graph_record = self
+            .get_or_create_graph_record(project_id, node_id, node_name, metadata.clone())
+            .await?;
+
+        let transform_hash = self.compute_transform_hash(node_id, upstream_graph, config)?;
+
+        if graph_record.source_hash.as_deref() == Some(&transform_hash) {
+            return Ok(());
+        }
+
+        let mut active: GraphActiveModel = graph_record.clone().into();
+        active = active.set_state(ExecutionState::Processing);
+        graph_record = active.update(&self.db).await?;
+
+        self.persist_graph_contents(graph_record.id, graph).await?;
+
+        let mut active: GraphActiveModel = graph_record.into();
+        active.metadata = Set(metadata);
+        active = active.set_completed(
+            transform_hash,
+            graph.nodes.len() as i32,
+            graph.edges.len() as i32,
+        );
+        active.update(&self.db).await?;
+
+        Ok(())
+    }
+
+    async fn get_or_create_graph_record(
+        &self,
+        project_id: i32,
+        node_id: &str,
+        node_name: &str,
+        metadata: Option<JsonValue>,
+    ) -> Result<graphs::Model> {
+        if let Some(mut graph) = GraphEntity::find()
+            .filter(GraphColumn::ProjectId.eq(project_id))
+            .filter(GraphColumn::NodeId.eq(node_id))
+            .one(&self.db)
+            .await?
+        {
+            let mut needs_update = false;
+            let mut active: GraphActiveModel = graph.clone().into();
+
+            if graph.name != node_name {
+                active.name = Set(node_name.to_string());
+                needs_update = true;
+            }
+
+            if graph.metadata != metadata {
+                active.metadata = Set(metadata.clone());
+                needs_update = true;
+            }
+
+            if needs_update {
+                active = active.set_updated_at();
+                graph = active.update(&self.db).await?;
+            }
+
+            Ok(graph)
+        } else {
+            let graph = GraphActiveModel {
+                project_id: Set(project_id),
+                node_id: Set(node_id.to_string()),
+                name: Set(node_name.to_string()),
+                metadata: Set(metadata.clone()),
+                ..GraphActiveModel::new()
+            }
+            .insert(&self.db)
+            .await?;
+            Ok(graph)
+        }
+    }
+
+    fn compute_transform_hash(
+        &self,
+        node_id: &str,
+        upstream_graph: &graphs::Model,
+        config: &TransformNodeConfig,
+    ) -> Result<String> {
+        let mut hasher = Sha256::new();
+        hasher.update(node_id.as_bytes());
+        hasher.update(upstream_graph.id.to_le_bytes());
+        hasher.update(upstream_graph.updated_at.timestamp_micros().to_le_bytes());
+        if let Some(hash) = &upstream_graph.source_hash {
+            hasher.update(hash.as_bytes());
+        }
+        let serialized = serde_json::to_vec(config)?;
+        hasher.update(&serialized);
+        Ok(format!("{:x}", hasher.finalize()))
+    }
+
+    async fn persist_graph_contents(
+        &self,
+        graph_id: i32,
+        graph: &crate::graph::Graph,
+    ) -> Result<()> {
+        self.clear_graph_data(graph_id).await?;
+
+        for node in &graph.nodes {
+            let attrs = node
+                .comment
+                .as_ref()
+                .map(|comment| json!({ "comment": comment }));
+
+            let model = graph_nodes::ActiveModel {
+                id: Set(node.id.clone()),
+                graph_id: Set(graph_id),
+                label: Set(Some(node.label.clone())),
+                layer: Set(Some(node.layer.clone())),
+                weight: Set(Some(node.weight as f64)),
+                is_partition: Set(node.is_partition),
+                belongs_to: Set(node.belongs_to.clone()),
+                attrs: Set(attrs),
+                created_at: Set(Utc::now()),
+            };
+
+            model.insert(&self.db).await?;
+        }
+
+        for edge in &graph.edges {
+            let attrs = edge
+                .comment
+                .as_ref()
+                .map(|comment| json!({ "comment": comment }));
+
+            let model = graph_edges::ActiveModel {
+                id: Set(edge.id.clone()),
+                graph_id: Set(graph_id),
+                source: Set(edge.source.clone()),
+                target: Set(edge.target.clone()),
+                label: Set(Some(edge.label.clone())),
+                layer: Set(Some(edge.layer.clone())),
+                weight: Set(Some(edge.weight as f64)),
+                attrs: Set(attrs),
+                created_at: Set(Utc::now()),
+            };
+
+            model.insert(&self.db).await?;
+        }
+
+        let mut layer_map = HashMap::new();
+        for layer in &graph.layers {
+            let mut properties = JsonMap::new();
+            if !layer.background_color.is_empty() {
+                properties.insert(
+                    "background_color".to_string(),
+                    JsonValue::String(layer.background_color.clone()),
+                );
+            }
+            if !layer.border_color.is_empty() {
+                properties.insert(
+                    "border_color".to_string(),
+                    JsonValue::String(layer.border_color.clone()),
+                );
+            }
+            if !layer.text_color.is_empty() {
+                properties.insert(
+                    "text_color".to_string(),
+                    JsonValue::String(layer.text_color.clone()),
+                );
+            }
+
+            let properties_json = if properties.is_empty() {
+                None
+            } else {
+                Some(serde_json::to_string(&JsonValue::Object(properties))?)
+            };
+
+            let color = if layer.background_color.is_empty() {
+                None
+            } else {
+                Some(layer.background_color.clone())
+            };
+
+            layer_map.insert(
+                layer.id.clone(),
+                LayerData {
+                    name: layer.label.clone(),
+                    color,
+                    properties: properties_json,
+                },
+            );
+        }
+
+        insert_layers_to_db(&self.db, graph_id, layer_map).await?;
+
+        Ok(())
+    }
+
+    async fn clear_graph_data(&self, graph_id: i32) -> Result<()> {
+        use crate::database::entities::graph_edges::{Column as EdgeColumn, Entity as EdgeEntity};
+        use crate::database::entities::graph_nodes::{Column as NodeColumn, Entity as NodeEntity};
+        use crate::database::entities::layers::{Column as LayerColumn, Entity as LayerEntity};
+
+        EdgeEntity::delete_many()
+            .filter(EdgeColumn::GraphId.eq(graph_id))
+            .exec(&self.db)
+            .await?;
+
+        NodeEntity::delete_many()
+            .filter(NodeColumn::GraphId.eq(graph_id))
+            .exec(&self.db)
+            .await?;
+
+        LayerEntity::delete_many()
+            .filter(LayerColumn::GraphId.eq(graph_id))
+            .exec(&self.db)
+            .await?;
 
         Ok(())
     }
