@@ -987,8 +987,9 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
 
         // Optimistically add node to local state (since subscription echo is suppressed)
         // Create a minimal Plan DAG with just the new node to convert
+        // Use unique version to avoid cache collisions (don't rely on stale planDag.version)
         const tempPlanDag: PlanDag = {
-          version: String((parseInt(planDag?.version || '0') || 0) + 1),
+          version: `temp-node-${createdNode.id}-${Date.now()}`,
           nodes: [createdNode],
           edges: [],
           metadata: planDag?.metadata || {
@@ -1003,13 +1004,13 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         const converted = ReactFlowAdapter.planDagToReactFlow(tempPlanDag);
         const reactFlowNode = converted.nodes[0];
 
-        // Add node-specific data
+        // Add node-specific data with current edges state (not stale planDag.edges)
         reactFlowNode.data = {
           ...reactFlowNode.data,
           onEdit: handleNodeEdit,
           onDelete: handleNodeDelete,
           readonly,
-          edges: planDag?.edges || [],
+          edges: edges, // Use current edges state to avoid stale closure
           projectId: projectId
         };
 
@@ -1055,8 +1056,9 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
               console.log('[PlanVisualEditor] Edge created successfully:', createdEdge.id);
 
               // Optimistically add edge to local state (since subscription echo is suppressed)
+              // Use unique version to avoid cache collisions (don't rely on stale planDag.version)
               const tempEdgePlanDag: PlanDag = {
-                version: String((parseInt(planDag?.version || '0') || 0) + 2),
+                version: `temp-edge-${createdEdge.id}-${Date.now()}`,
                 nodes: [],
                 edges: [createdEdge],
                 metadata: planDag?.metadata || {
