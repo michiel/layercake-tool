@@ -22,7 +22,7 @@ import {
 } from '@tabler/icons-react'
 
 import { PlanDagNodeType, NodeConfig, NodeMetadata, DataSourceNodeConfig, ReactFlowEdge, PlanDagNode, PlanDag } from '../../../types/plan-dag'
-import { validateConnectionWithCycleDetection, canAcceptMultipleInputs } from '../../../utils/planDagValidation'
+import { validateConnectionWithCycleDetection, canAcceptMultipleInputs, isNodeConfigured } from '../../../utils/planDagValidation'
 import { ReactFlowAdapter } from '../../../adapters/ReactFlowAdapter'
 
 // Import node types constant
@@ -1132,25 +1132,18 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     const map = new Map<string, boolean>()
 
     nodes.forEach(node => {
-      // Check basic config validity
-      const hasValidConfig = node.data?.hasValidConfig !== false
-      if (!hasValidConfig) {
-        map.set(node.id, false)
-        return
-      }
-
-      // For DataSource nodes, also check if dataSourceId is set
-      if (node.data?.nodeType === 'DATA_SOURCE') {
-        const config = node.data?.config as any
-        map.set(node.id, !!(config?.dataSourceId))
-        return
-      }
-
-      map.set(node.id, true)
+      // Use the comprehensive isNodeConfigured validation that checks edges
+      const configured = isNodeConfigured(
+        node.data?.nodeType || PlanDagNodeType.DATA_SOURCE,
+        node.id,
+        edges,
+        node.data?.hasValidConfig !== false
+      )
+      map.set(node.id, configured)
     })
 
     return map
-  }, [nodeConfigKey])
+  }, [nodeConfigKey, edges])
 
   // Fast O(1) lookup helper using the memoized map
   const isNodeFullyConfigured = useCallback((nodeId: string): boolean => {
