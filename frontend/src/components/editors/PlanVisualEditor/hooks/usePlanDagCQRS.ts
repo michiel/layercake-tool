@@ -100,27 +100,34 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
     memoryWarningThreshold: 150, // MB
   })
 
-  // Refs for stable comparisons
-  const previousPlanDagRef = useRef<PlanDag | null>(null)
-  const stablePlanDagRef = useRef<PlanDag | null>(null)
-  const subscriptionRef = useRef<any>(null)
-  const initializedRef = useRef(false)
-  const previousChangeIdRef = useRef<number>(0)
-  const isSyncingFromExternalRef = useRef<boolean>(false)
-  const isDraggingRef = useRef<boolean>(false)
+  // Consolidated state refs for better organisation and debugging
+  const editorStateRef = useRef({
+    planDag: {
+      current: null as PlanDag | null,
+      previous: null as PlanDag | null,
+      stable: null as PlanDag | null,
+    },
+    sync: {
+      isDragging: false,
+      isExternalSync: false,
+      isInitialized: false,
+      previousChangeId: 0,
+    },
+    subscriptions: null as any,
+  })
 
   // Stable plan DAG with change detection
   const stablePlanDag = useMemo(() => {
     if (!planDag) return null
 
-    const isNewData = !previousPlanDagRef.current || !planDagEqual(previousPlanDagRef.current, planDag)
+    const isNewData = !editorStateRef.current.planDag.previous || !planDagEqual(editorStateRef.current.planDag.previous, planDag)
     if (isNewData) {
       console.log('[usePlanDagCQRS] Plan DAG data changed, updating stable reference')
-      previousPlanDagRef.current = planDag
-      stablePlanDagRef.current = planDag
+      editorStateRef.current.planDag.previous = planDag
+      editorStateRef.current.planDag.stable = planDag
     }
 
-    return stablePlanDagRef.current
+    return editorStateRef.current.planDag.stable
   }, [planDag])
 
   // TODO: Re-implement validation in Phase 3
@@ -197,13 +204,13 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
   // Sync ReactFlow state when external data changes - FIXED: prevent infinite loop
   useEffect(() => {
     // Skip if we're currently syncing from external changes (prevents React 18 double render issues)
-    if (isSyncingFromExternalRef.current) {
+    if (editorStateRef.current.sync.isExternalSync) {
       return
     }
 
     // Skip syncing during drag operations to prevent subscription echo interference
     // Position changes during drag are cosmetic only - actual save happens in handleNodeDragStop
-    if (isDraggingRef.current) {
+    if (editorStateRef.current.sync.isDragging) {
       return
     }
 
@@ -259,28 +266,28 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
           currentEdges: edges.length,
           reason
         })
-        isSyncingFromExternalRef.current = true
+        editorStateRef.current.sync.isExternalSync = true
         setNodes(reactFlowData.nodes)
         setEdges(reactFlowData.edges)
-        previousChangeIdRef.current = reactFlowDataChange.changeId
+        editorStateRef.current.sync.previousChangeId = reactFlowDataChange.changeId
         // Use setTimeout to clear the flag after state updates have propagated
         setTimeout(() => {
-          isSyncingFromExternalRef.current = false
+          editorStateRef.current.sync.isExternalSync = false
         }, 0)
       }
     }
     // Depend on reactFlowDataChange to detect all changes (positions, length, etc.)
-  }, [reactFlowDataChange, reactFlowData, nodes, edges])
+  }, [reactFlowDataChange, reactFlowData, nodes, edges, setNodes, setEdges])
 
   // Load initial data and setup subscription - FIXED: prevent infinite loop
   useEffect(() => {
     // Only run setup once per project to prevent infinite loops
-    if (initializedRef.current) {
+    if (editorStateRef.current.sync.isInitialized) {
       return
     }
 
     console.log('[usePlanDagCQRS] Setting up data loading and subscription for project:', projectId)
-    initializedRef.current = true
+    editorStateRef.current.sync.isInitialized = true
 
     const loadInitialData = async () => {
       try {
@@ -306,9 +313,9 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
     }
 
     // Setup delta-based subscription for efficient real-time updates
-    const subscription = cqrsService.subscribeToDeltaUpdates(
+    const deltaSubscription = cqrsService.subscribeToDeltaUpdates(
       projectId,
-      () => stablePlanDagRef.current, // Get current Plan DAG for patch application
+      () => editorStateRef.current.planDag.stable, // Get current Plan DAG for patch application
       (updatedPlanDag) => {
         console.log('[usePlanDagCQRS] Received delta update via JSON Patch subscription')
         performanceMonitor.trackEvent('websocketMessages')
@@ -327,17 +334,58 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
       }
     )
 
-    subscriptionRef.current = subscription
+    // Setup execution status subscription for real-time status updates
+    const executionStatusSubscription = cqrsService.subscribeToExecutionStatusUpdates(
+      projectId,
+      (nodeId, executionData) => {
+        console.log('[usePlanDagCQRS] Received execution status update for node:', nodeId, executionData)
+        performanceMonitor.trackEvent('websocketMessages')
+
+        // Update Plan DAG with execution status
+        setPlanDag(current => {
+          if (!current) return current
+
+          const updated = {
+            ...current,
+            nodes: current.nodes.map(n =>
+              n.id === nodeId
+                ? { ...n, ...executionData }
+                : n
+            )
+          }
+
+          // Update stable ref immediately to prevent sync from using stale data
+          editorStateRef.current.planDag.stable = updated
+          editorStateRef.current.planDag.previous = updated
+
+          return updated
+        })
+      },
+      (error) => {
+        console.error('[usePlanDagCQRS] Execution status subscription error:', error)
+      }
+    )
+
+    editorStateRef.current.subscriptions = {
+      delta: deltaSubscription,
+      executionStatus: executionStatusSubscription,
+    }
     loadInitialData()
 
     return () => {
-      if (subscriptionRef.current) {
-        subscriptionRef.current.unsubscribe()
-        subscriptionRef.current = null
+      if (editorStateRef.current.subscriptions) {
+        // Unsubscribe from both subscriptions
+        if (editorStateRef.current.subscriptions.delta) {
+          editorStateRef.current.subscriptions.delta.unsubscribe()
+        }
+        if (editorStateRef.current.subscriptions.executionStatus) {
+          editorStateRef.current.subscriptions.executionStatus.unsubscribe()
+        }
+        editorStateRef.current.subscriptions = null
       }
-      initializedRef.current = false
+      editorStateRef.current.sync.isInitialized = false
     }
-  }, [projectId])  // Only depend on projectId to prevent infinite loops
+  }, [projectId])  // Only depend on projectId to prevent circular dependencies
 
   // Actions
   const savePlanDag = useCallback(async () => {
@@ -372,7 +420,7 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
 
   // Drag state control
   const setDragging = useCallback((dragging: boolean) => {
-    isDraggingRef.current = dragging
+    editorStateRef.current.sync.isDragging = dragging
   }, [])
 
   // Optimistic update for planDag (used after mutations to prevent stale data syncs)
@@ -382,8 +430,8 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
       const updated = updater(current)
       if (updated) {
         // Update stable ref immediately to prevent sync from using stale data
-        stablePlanDagRef.current = updated
-        previousPlanDagRef.current = updated
+        editorStateRef.current.planDag.stable = updated
+        editorStateRef.current.planDag.previous = updated
       }
       return updated
     })

@@ -741,6 +741,22 @@ pub struct GraphExecutionMetadata {
     pub error_message: Option<String>,
 }
 
+// Node execution status change event for subscriptions
+#[derive(Clone, Debug, SimpleObject)]
+pub struct NodeExecutionStatusEvent {
+    #[graphql(name = "projectId")]
+    pub project_id: i32,
+    #[graphql(name = "nodeId")]
+    pub node_id: String,
+    #[graphql(name = "nodeType")]
+    pub node_type: PlanDagNodeType,
+    #[graphql(name = "datasourceExecution")]
+    pub datasource_execution: Option<DataSourceExecutionMetadata>,
+    #[graphql(name = "graphExecution")]
+    pub graph_execution: Option<GraphExecutionMetadata>,
+    pub timestamp: String,
+}
+
 // Plan DAG Node Structure
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PlanDagNode {

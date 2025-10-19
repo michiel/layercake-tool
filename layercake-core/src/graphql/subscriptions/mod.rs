@@ -7,7 +7,7 @@ use tokio::sync::broadcast;
 use tokio::sync::RwLock;
 
 use crate::graphql::context::GraphQLContext;
-use crate::graphql::types::{PlanDagDeltaEvent, PlanDagEdge, PlanDagNode};
+use crate::graphql::types::{NodeExecutionStatusEvent, PlanDagDeltaEvent, PlanDagEdge, PlanDagNode};
 // REMOVED: CursorPosition import - user presence now handled via WebSocket only
 
 pub struct Subscription;
@@ -306,6 +306,46 @@ impl Subscription {
 
         Ok(Box::pin(stream))
     }
+
+    /// Subscribe to node execution status changes for efficient real-time updates
+    async fn node_execution_status_changed(
+        &self,
+        ctx: &Context<'_>,
+        project_id: i32,
+    ) -> Result<Pin<Box<dyn Stream<Item = NodeExecutionStatusEvent> + Send>>> {
+        let _context = ctx.data::<GraphQLContext>()?;
+
+        // Get or create broadcaster for this project
+        let broadcaster = get_execution_status_broadcaster(project_id).await;
+        let mut receiver = broadcaster.subscribe();
+
+        // Stream execution status events for this project
+        let stream = async_stream::stream! {
+            loop {
+                match receiver.recv().await {
+                    Ok(event) => {
+                        if event.project_id == project_id {
+                            yield event;
+                        }
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(skipped)) => {
+                        tracing::warn!(
+                            "Execution status receiver lagged for project {}, skipped {} messages",
+                            project_id,
+                            skipped
+                        );
+                        continue;
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                        tracing::info!("Execution status channel closed for project {}", project_id);
+                        break;
+                    }
+                }
+            }
+        };
+
+        Ok(Box::pin(stream))
+    }
 }
 
 // Global storage for plan broadcasters
@@ -314,6 +354,9 @@ lazy_static::lazy_static! {
         Arc::new(RwLock::new(HashMap::new()));
 
     static ref DELTA_BROADCASTERS: Arc<RwLock<HashMap<i32, broadcast::Sender<PlanDagDeltaEvent>>>> =
+        Arc::new(RwLock::new(HashMap::new()));
+
+    static ref EXECUTION_STATUS_BROADCASTERS: Arc<RwLock<HashMap<i32, broadcast::Sender<NodeExecutionStatusEvent>>>> =
         Arc::new(RwLock::new(HashMap::new()));
 }
 
@@ -437,6 +480,46 @@ pub async fn publish_delta_event(event: PlanDagDeltaEvent) -> Result<(), String>
                 event.project_id
             );
             Err("Failed to broadcast delta event".to_string())
+        }
+    }
+}
+
+/// Get or create an execution status broadcaster for a specific project
+async fn get_execution_status_broadcaster(project_id: i32) -> broadcast::Sender<NodeExecutionStatusEvent> {
+    // Fast path: Try read lock first
+    {
+        let broadcasters = EXECUTION_STATUS_BROADCASTERS.read().await;
+        if let Some(sender) = broadcasters.get(&project_id) {
+            return sender.clone();
+        }
+    }
+
+    // Slow path: Create broadcaster with write lock
+    let mut broadcasters = EXECUTION_STATUS_BROADCASTERS.write().await;
+
+    // Double-check pattern
+    if let Some(sender) = broadcasters.get(&project_id) {
+        sender.clone()
+    } else {
+        let (sender, _) = broadcast::channel(1000);
+        broadcasters.insert(project_id, sender.clone());
+        sender
+    }
+}
+
+/// Publish an execution status event to all subscribers of a project
+pub async fn publish_execution_status_event(event: NodeExecutionStatusEvent) -> Result<(), String> {
+    let broadcaster = get_execution_status_broadcaster(event.project_id).await;
+
+    match broadcaster.send(event.clone()) {
+        Ok(_) => Ok(()),
+        Err(_) => {
+            tracing::debug!(
+                "Failed to broadcast execution status event for project {} - no active receivers",
+                event.project_id
+            );
+            // Don't treat this as an error since it's normal for no one to be listening
+            Ok(())
         }
     }
 }

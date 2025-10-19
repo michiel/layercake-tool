@@ -310,6 +310,34 @@ export const PLAN_DAG_DELTA_SUBSCRIPTION = gql`
   }
 `
 
+// Execution status subscription for real-time status updates
+export const NODE_EXECUTION_STATUS_SUBSCRIPTION = gql`
+  subscription NodeExecutionStatusChanged($projectId: Int!) {
+    nodeExecutionStatusChanged(projectId: $projectId) {
+      projectId
+      nodeId
+      nodeType
+      datasourceExecution {
+        dataSourceId
+        filename
+        status
+        processedAt
+        executionState
+        errorMessage
+      }
+      graphExecution {
+        graphId
+        nodeCount
+        edgeCount
+        executionState
+        computedDate
+        errorMessage
+      }
+      timestamp
+    }
+  }
+`
+
 // Collaboration Mutations
 
 export const JOIN_PROJECT_COLLABORATION = gql`

@@ -65,6 +65,15 @@ impl DatasourceImporter {
 
         let datasource = datasource.insert(&self.db).await?;
 
+        // Publish initial execution status (Processing)
+        #[cfg(feature = "graphql")]
+        crate::graphql::execution_events::publish_datasource_status(
+            &self.db,
+            datasource.project_id,
+            &datasource.node_id,
+            &datasource,
+        ).await;
+
         // Import data based on file type
         let result = match (extension.to_lowercase().as_str(), file_type) {
             ("csv", "nodes") => self.import_csv_nodes(&datasource, &file_path, b',').await,
@@ -77,17 +86,45 @@ impl DatasourceImporter {
 
         match result {
             Ok((row_count, column_info)) => {
+                // Save values before moving datasource
+                let project_id = datasource.project_id;
+                let node_id = datasource.node_id.clone();
+
                 // Update to completed state
                 let mut active: datasources::ActiveModel = datasource.into();
                 active = active.set_completed(row_count as i32, column_info);
                 let updated = active.update(&self.db).await?;
+
+                // Publish execution status change
+                #[cfg(feature = "graphql")]
+                crate::graphql::execution_events::publish_datasource_status(
+                    &self.db,
+                    project_id,
+                    &node_id,
+                    &updated,
+                ).await;
+
                 Ok(updated)
             }
             Err(e) => {
+                // Save values before moving datasource
+                let project_id = datasource.project_id;
+                let node_id = datasource.node_id.clone();
+
                 // Update to error state
                 let mut active: datasources::ActiveModel = datasource.into();
                 active = active.set_error(e.to_string());
-                let _updated = active.update(&self.db).await?;
+                let updated = active.update(&self.db).await?;
+
+                // Publish execution status change
+                #[cfg(feature = "graphql")]
+                crate::graphql::execution_events::publish_datasource_status(
+                    &self.db,
+                    project_id,
+                    &node_id,
+                    &updated,
+                ).await;
+
                 Err(e)
             }
         }

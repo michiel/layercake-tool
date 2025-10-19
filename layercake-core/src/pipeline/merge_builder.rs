@@ -54,6 +54,15 @@ impl MergeBuilder {
         active = active.set_state(ExecutionState::Processing);
         let graph = active.update(&self.db).await?;
 
+        // Publish execution status change
+        #[cfg(feature = "graphql")]
+        crate::graphql::execution_events::publish_graph_status(
+            &self.db,
+            project_id,
+            &node_id,
+            &graph,
+        ).await;
+
         // Fetch upstream data sources by reading plan_dag_nodes configs
         let mut data_sources_list = Vec::new();
         for upstream_id in &upstream_node_ids {
@@ -106,13 +115,33 @@ impl MergeBuilder {
                 let mut active: graphs::ActiveModel = graph.into();
                 active = active.set_completed(source_hash, node_count as i32, edge_count as i32);
                 let updated = active.update(&self.db).await?;
+
+                // Publish execution status change
+                #[cfg(feature = "graphql")]
+                crate::graphql::execution_events::publish_graph_status(
+                    &self.db,
+                    project_id,
+                    &node_id,
+                    &updated,
+                ).await;
+
                 Ok(updated)
             }
             Err(e) => {
                 // Update to error state
                 let mut active: graphs::ActiveModel = graph.into();
                 active = active.set_error(e.to_string());
-                let _updated = active.update(&self.db).await?;
+                let updated = active.update(&self.db).await?;
+
+                // Publish execution status change
+                #[cfg(feature = "graphql")]
+                crate::graphql::execution_events::publish_graph_status(
+                    &self.db,
+                    project_id,
+                    &node_id,
+                    &updated,
+                ).await;
+
                 Err(e)
             }
         }

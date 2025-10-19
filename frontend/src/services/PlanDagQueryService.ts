@@ -240,6 +240,49 @@ export class PlanDagQueryService {
       }
     })
   }
+
+  // Execution status subscription for real-time updates
+  subscribeToExecutionStatus(
+    query: SubscribeToExecutionStatusQuery,
+    onUpdate: (nodeId: string, executionData: any) => void,
+    onError?: (error: Error) => void
+  ) {
+    console.log('[PlanDagQueryService] Setting up execution status subscription for project:', query.projectId)
+
+    const subscription = this.apollo.subscribe({
+      query: PlanDagGraphQL.NODE_EXECUTION_STATUS_SUBSCRIPTION,
+      variables: { projectId: query.projectId }
+    })
+
+    return subscription.subscribe({
+      next: (result: any) => {
+        const statusData = result.data?.nodeExecutionStatusChanged
+
+        if (statusData) {
+          console.log('[PlanDagQueryService] Received execution status update:', {
+            nodeId: statusData.nodeId,
+            datasourceState: statusData.datasourceExecution?.executionState,
+            graphState: statusData.graphExecution?.executionState,
+          })
+
+          // Build execution data object
+          const executionData: any = {}
+          if (statusData.datasourceExecution) {
+            executionData.datasourceExecution = statusData.datasourceExecution
+          }
+          if (statusData.graphExecution) {
+            executionData.graphExecution = statusData.graphExecution
+          }
+
+          onUpdate(statusData.nodeId, executionData)
+        }
+      },
+      error: (error: any) => {
+        console.error('[PlanDagQueryService] Execution status subscription error:', error)
+        onError?.(error)
+      }
+    })
+  }
 }
 
 // Query Types
@@ -261,8 +304,13 @@ export interface WatchPlanDagQuery {
   projectId: number
 }
 
+export interface SubscribeToExecutionStatusQuery {
+  projectId: number
+}
+
 export type PlanDagQuery =
   | GetPlanDagQuery
   | SubscribeToPlanDagQuery
   | InvalidateCacheQuery
   | WatchPlanDagQuery
+  | SubscribeToExecutionStatusQuery
