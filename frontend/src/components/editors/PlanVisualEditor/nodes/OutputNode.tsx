@@ -170,68 +170,70 @@ export const OutputNode = memo((props: OutputNodeProps) => {
     : data.metadata
 
   return (
-    <BaseNode
-      {...props}
-      nodeType={PlanDagNodeType.OUTPUT}
-      config={config}
-      metadata={displayMetadata}
-      onEdit={() => onEdit?.(props.id)}
-      onDelete={() => onDelete?.(props.id)}
-      readonly={readonly}
-      edges={edges}
-      hasValidConfig={hasValidConfig}
-      labelBadges={labelBadges}
-    >
-      <Stack gap="xs">
-        {/* Download and preview buttons */}
-        {!readonly && isConfigured && (
-          <Group justify="center" gap="xs">
-            <Tooltip label="Preview export">
-              <ActionIcon
-                size="lg"
-                variant="light"
-                color="gray"
-                radius="xl"
-                data-action-icon="preview"
-                loading={previewLoading}
-                onMouseDown={(e) => {
-                  e.stopPropagation()
-                  e.preventDefault()
-                  handlePreview()
-                }}
-              >
-                <IconEye size="0.75rem" />
-              </ActionIcon>
-            </Tooltip>
-            <Tooltip label="Download export">
-              <ActionIcon
-                size="lg"
-                variant="light"
-                color="blue"
-                radius="xl"
-                data-action-icon="download"
-                loading={downloading}
-                onMouseDown={(e) => {
-                  e.stopPropagation()
-                  e.preventDefault()
-                  handleDownload()
-                }}
-              >
-                <IconDownload size="0.75rem" />
-              </ActionIcon>
-            </Tooltip>
-          </Group>
-        )}
+    <>
+      <BaseNode
+        {...props}
+        nodeType={PlanDagNodeType.OUTPUT}
+        config={config}
+        metadata={displayMetadata}
+        onEdit={() => onEdit?.(props.id)}
+        onDelete={() => onDelete?.(props.id)}
+        readonly={readonly}
+        edges={edges}
+        hasValidConfig={hasValidConfig}
+        labelBadges={labelBadges}
+      >
+        <Stack gap="xs">
+          {/* Download and preview buttons */}
+          {!readonly && isConfigured && (
+            <Group justify="center" gap="xs">
+              <Tooltip label="Preview export">
+                <ActionIcon
+                  size="lg"
+                  variant="light"
+                  color="gray"
+                  radius="xl"
+                  data-action-icon="preview"
+                  loading={previewLoading}
+                  onMouseDown={(e) => {
+                    e.stopPropagation()
+                    e.preventDefault()
+                    handlePreview()
+                  }}
+                >
+                  <IconEye size="0.75rem" />
+                </ActionIcon>
+              </Tooltip>
+              <Tooltip label="Download export">
+                <ActionIcon
+                  size="lg"
+                  variant="light"
+                  color="blue"
+                  radius="xl"
+                  data-action-icon="download"
+                  loading={downloading}
+                  onMouseDown={(e) => {
+                    e.stopPropagation()
+                    e.preventDefault()
+                    handleDownload()
+                  }}
+                >
+                  <IconDownload size="0.75rem" />
+                </ActionIcon>
+              </Tooltip>
+            </Group>
+          )}
 
-        {/* Output metadata */}
-        {config.outputPath && (
-          <Text size="xs" c="dimmed" ff="monospace" lineClamp={1}>
-            {config.outputPath}
-          </Text>
-        )}
-      </Stack>
+          {/* Output metadata */}
+          {config.outputPath && (
+            <Text size="xs" c="dimmed" ff="monospace" lineClamp={1}>
+              {config.outputPath}
+            </Text>
+          )}
+        </Stack>
+      </BaseNode>
 
-      {/* Preview Dialog */}
+      {/* Preview Dialog - Rendered outside BaseNode to avoid ReactFlow node clipping */}
       <Modal
         opened={previewOpen}
         onClose={() => setPreviewOpen(false)}
@@ -274,7 +276,7 @@ export const OutputNode = memo((props: OutputNodeProps) => {
           </ScrollArea>
         </Stack>
       </Modal>
-    </BaseNode>
+    </>
   )
 })
 

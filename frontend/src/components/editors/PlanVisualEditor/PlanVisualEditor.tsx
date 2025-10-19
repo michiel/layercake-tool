@@ -1319,19 +1319,22 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
             // Prevent selection when clicking on action icons (edit/delete)
             const target = event.target as HTMLElement
             const isActionIcon = target.closest('[data-action-icon]')
-            console.log('onNodeClick - target:', target, 'isActionIcon:', isActionIcon, 'node:', node)
             if (isActionIcon) {
-              event.stopPropagation()
-              event.preventDefault()
               // Manually trigger the appropriate handler
               const actionType = isActionIcon.getAttribute('data-action-icon')
-              console.log('Action icon clicked:', actionType, 'nodeId:', node.id)
               if (actionType === 'edit') {
+                event.stopPropagation()
+                event.preventDefault()
                 handleNodeEdit(node.id)
+                return
               } else if (actionType === 'delete') {
+                event.stopPropagation()
+                event.preventDefault()
                 handleNodeDelete(node.id)
+                return
               }
-              return
+              // For other actions like 'preview' and 'download', let the node's own handlers work
+              // Don't stop propagation - the action buttons handle their own events
             }
           }}
           nodeTypes={NODE_TYPES}
