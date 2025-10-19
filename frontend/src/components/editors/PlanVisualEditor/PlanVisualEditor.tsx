@@ -195,12 +195,14 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
       // Remove node from local state optimistically
       setNodes((nds) => nds.filter(node => node.id !== nodeId))
 
-      // Remove edges connected to this node
-      const edgesToDelete: string[] = []
+      // Remove edges connected to this node and collect backend edge IDs
+      const backendEdgeIdsToDelete: string[] = []
       setEdges((eds) => {
         const filtered = eds.filter(edge => {
           if (edge.source === nodeId || edge.target === nodeId) {
-            edgesToDelete.push(edge.id)
+            // Extract backend edge ID (consistent with other edge deletion code)
+            const backendEdgeId = (edge.data as any)?.originalEdge?.id || edge.id
+            backendEdgeIdsToDelete.push(backendEdgeId)
             return false
           }
           return true
@@ -210,7 +212,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
 
       // Persist deletions to backend
       mutations.deleteNode(nodeId)
-      edgesToDelete.forEach(edgeId => mutations.deleteEdge(edgeId))
+      backendEdgeIdsToDelete.forEach(edgeId => mutations.deleteEdge(edgeId))
 
       // Re-enable external syncs after a short delay to allow mutations to complete
       setTimeout(() => setDragging(false), 100)
