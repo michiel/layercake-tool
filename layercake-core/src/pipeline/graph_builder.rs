@@ -82,7 +82,7 @@ impl GraphBuilder {
                     }
                     data_sources_list.push(data_source);
                 }
-                "GraphNode" | "MergeNode" => {
+                "GraphNode" | "MergeNode" | "TransformNode" => {
                     // Read from graphs table and convert to data_source-like structure
                     let graph = self.get_upstream_graph(project_id, upstream_id).await?;
 
