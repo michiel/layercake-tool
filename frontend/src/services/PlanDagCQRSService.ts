@@ -55,6 +55,7 @@ export class PlanDagCQRSService {
       getPlanDag: this.queryService.getPlanDag.bind(this.queryService),
       subscribeToPlanDagChanges: this.queryService.subscribeToPlanDagChanges.bind(this.queryService),
       subscribeToPlanDagDeltas: this.queryService.subscribeToPlanDagDeltas.bind(this.queryService),
+      subscribeToExecutionStatus: this.queryService.subscribeToExecutionStatus.bind(this.queryService),
       watchPlanDag: this.queryService.watchPlanDag.bind(this.queryService),
       invalidateCache: this.queryService.invalidateCache.bind(this.queryService)
     }
@@ -183,6 +184,21 @@ export class PlanDagCQRSService {
     return this.queries.subscribeToPlanDagDeltas(
       { projectId },
       getCurrentPlanDag,
+      onUpdate,
+      onError
+    )
+  }
+
+  // Execution status subscription for real-time status updates
+  subscribeToExecutionStatusUpdates(
+    projectId: number,
+    onUpdate: (nodeId: string, executionData: any) => void,
+    onError?: (error: Error) => void
+  ) {
+    console.log('[PlanDagCQRSService] Setting up execution status subscription')
+
+    return this.queries.subscribeToExecutionStatus(
+      { projectId },
       onUpdate,
       onError
     )
