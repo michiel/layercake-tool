@@ -99,6 +99,22 @@ impl GraphEditService {
         Ok(())
     }
 
+    async fn set_graph_pending_state(&self, graph_id: i32, has_pending: bool) -> Result<()> {
+        use crate::database::entities::graphs::{self, Entity as Graphs};
+
+        let graph = Graphs::find_by_id(graph_id)
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Graph not found"))?;
+
+        let mut active_model: graphs::ActiveModel = graph.into();
+        active_model.has_pending_edits = Set(has_pending);
+        active_model.updated_at = Set(chrono::Utc::now());
+
+        active_model.update(&self.db).await?;
+        Ok(())
+    }
+
     /// Get all edits for a graph in sequence order
     ///
     /// # Arguments
@@ -290,6 +306,10 @@ impl GraphEditService {
 
         // Update last_replay_at
         self.mark_graph_replayed(graph_id).await?;
+
+        if self.get_edit_count(graph_id, true).await? == 0 {
+            self.set_graph_pending_state(graph_id, false).await?;
+        }
 
         info!(
             "Replay complete for graph {}: {} applied, {} skipped, {} failed",

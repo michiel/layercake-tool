@@ -2229,10 +2229,15 @@ impl Mutation {
             .await
             .map_err(|e| Error::new(format!("Failed to execute node: {}", e)))?;
 
+        executor
+            .execute_affected_nodes(project_id, plan.id, &node_id, &nodes, &edges)
+            .await
+            .map_err(|e| Error::new(format!("Failed to execute downstream nodes: {}", e)))?;
+
         Ok(NodeExecutionResult {
             success: true,
             message: format!(
-                "Node {} and its dependencies executed successfully",
+                "Node {} executed successfully; downstream graphs refreshed",
                 node_id
             ),
             node_id,

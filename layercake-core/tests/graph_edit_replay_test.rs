@@ -594,4 +594,5 @@ async fn test_graph_metadata_after_replay() {
 
     assert!(updated_graph.last_replay_at.is_some());
     assert_eq!(updated_graph.last_edit_sequence, 1);
+    assert_eq!(updated_graph.has_pending_edits, false);
 }
