@@ -56,18 +56,34 @@ export interface GraphNodeConfig {
 }
 
 // Transform Node Configuration
+export type GraphTransformKind =
+  | 'PartitionDepthLimit'
+  | 'PartitionWidthLimit'
+  | 'NodeLabelMaxLength'
+  | 'NodeLabelInsertNewlines'
+  | 'EdgeLabelMaxLength'
+  | 'EdgeLabelInsertNewlines'
+  | 'InvertGraph'
+  | 'GenerateHierarchy'
+  | 'AggregateEdges';
+
+export interface GraphTransformParams {
+  maxPartitionDepth?: number;
+  maxPartitionWidth?: number;
+  nodeLabelMaxLength?: number;
+  nodeLabelInsertNewlinesAt?: number;
+  edgeLabelMaxLength?: number;
+  edgeLabelInsertNewlinesAt?: number;
+  enabled?: boolean;
+}
+
+export interface GraphTransform {
+  kind: GraphTransformKind;
+  params: GraphTransformParams;
+}
+
 export interface TransformNodeConfig {
-  // Removed: inputGraphRef - input connections handled by incoming edges
-  // Removed: outputGraphRef - output connections handled by outgoing edges
-  transformType: 'PartitionDepthLimit' | 'InvertGraph' | 'FilterNodes' | 'FilterEdges';
-  transformConfig: {
-    maxPartitionDepth?: number;
-    maxPartitionWidth?: number;
-    generateHierarchy?: boolean;
-    invertGraph?: boolean;
-    nodeFilter?: string;
-    edgeFilter?: string;
-  };
+  transforms: GraphTransform[];
 }
 
 // Merge Node Configuration

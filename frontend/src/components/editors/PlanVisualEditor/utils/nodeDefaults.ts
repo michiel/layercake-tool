@@ -38,8 +38,12 @@ export const getDefaultNodeConfig = (type: PlanDagNodeType): NodeConfig => {
 
     case PlanDagNodeType.TRANSFORM:
       return {
-        transformType: 'PartitionDepthLimit',
-        transformConfig: {}
+        transforms: [
+          {
+            kind: 'AggregateEdges',
+            params: { enabled: true }
+          }
+        ]
       };
 
     case PlanDagNodeType.MERGE:

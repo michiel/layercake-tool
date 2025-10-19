@@ -21,7 +21,7 @@
 - Ensure JSON serialization remains stable for persistence in `plan_dag_nodes.config_json`.
 - Include `generate_hierarchy` as its own transform type so users can trigger hierarchy generation separately from exports.
 - Replace the current `transformType` / `transformConfig` fields with `transforms: Vec<GraphTransform>` in Rust and `GraphTransform[]` in TypeScript. Maintain backward compatibility by deserializing legacy configs into the new structure (single-entry shim) to avoid breaking existing drafts.
-- **Status:** ✅ Rust GraphQL schema now exposes `GraphTransformKind`, `GraphTransform`, and `GraphTransformParams`, legacy config migrates into the new array, and `GraphConfig` defaults (including `aggregate_edges`) were added. TypeScript mirror pending in frontend step.
+- **Status:** ✅ Rust GraphQL schema now exposes `GraphTransformKind`, `GraphTransform`, and `GraphTransformParams`, legacy config migrates into the new array, and `GraphConfig` defaults (including `aggregate_edges`) were added.
 
 ### 2. Map Descriptors to Existing GraphConfig
 - Implement `impl GraphTransform { fn apply(&self, graph: &mut Graph) -> anyhow::Result<()> }` or convert all transforms into a `GraphConfig` via `TransformNodeConfig::to_graph_config(&self)`.
@@ -73,6 +73,7 @@
   - Persist `aggregateEdges` as a checkbox rather than implicit flag to give users control; default it to checked when a new transform block is added.
 - Update TransformNode badge/body (`frontend/src/components/editors/PlanVisualEditor/nodes/TransformNode.tsx` and `BaseNode` metadata) to display a concise summary (e.g., `Invert → Truncate Node Labels (32)`).
 - Adjust DAG validation (`frontend/src/utils/planDagValidation.ts`) to recognize a node as configured when `transforms.length > 0`.
+- **Status:** ✅ Frontend types now model `GraphTransform` arrays, node defaults inject aggregate edges, and the TransformNode editor supports ordered lists with add/remove/reorder controls, per-transform inputs, and validation of required parameters.
 
 ### 6. Persistence & Migration
 - Write a migration script or runtime adapter that upgrades stored `TransformNode` configs when plans are loaded:
