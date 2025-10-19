@@ -797,7 +797,9 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
             isUnconfigured: true, // Mark as unconfigured (will show orange highlight)
             onEdit: () => handleNodeEdit(backendNodeId),
             onDelete: () => handleNodeDelete(backendNodeId),
-            readonly: false
+            readonly: false,
+            edges: edges, // Required by nodes that check edge configuration
+            projectId: projectId // Required by OutputNode for export mutations
           }
         };
 
@@ -1007,7 +1009,8 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
           onEdit: handleNodeEdit,
           onDelete: handleNodeDelete,
           readonly,
-          edges: planDag?.edges || []
+          edges: planDag?.edges || [],
+          projectId: projectId
         };
 
         setNodes((nds) => [...nds, reactFlowNode]);
