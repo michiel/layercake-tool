@@ -1,22 +1,22 @@
 use layercake;
 
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// Compares the text content of files in two directories.
 /// Assumes both directories contain the same filenames.
-fn compare_directories(dir1: &str, dir2: &str) -> Result<(), String> {
-    let path1 = Path::new(dir1);
-    let path2 = Path::new(dir2);
+fn compare_directories(dir1: &Path, dir2: &Path) -> Result<(), String> {
+    let path1 = dir1;
+    let path2 = dir2;
 
     if !path1.exists() || !path2.exists() {
         return Err("One or both directories do not exist".to_string());
     }
 
     let entries1 =
-        fs::read_dir(path1).map_err(|e| format!("Failed to read directory {}: {}", dir1, e))?;
+        fs::read_dir(path1).map_err(|e| format!("Failed to read directory {}: {}", path1.display(), e))?;
     let entries2 =
-        fs::read_dir(path2).map_err(|e| format!("Failed to read directory {}: {}", dir2, e))?;
+        fs::read_dir(path2).map_err(|e| format!("Failed to read directory {}: {}", path2.display(), e))?;
 
     let mut files1: Vec<_> = entries1
         .filter_map(Result::ok)
@@ -59,12 +59,31 @@ fn compare_directories(dir1: &str, dir2: &str) -> Result<(), String> {
 
 #[test]
 fn reference_exports() {
-    layercake::plan_execution::execute_plan("sample/ref/plan.yaml".to_string(), false).unwrap();
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let plan_path = manifest_dir.join("../sample/ref/plan.yaml");
+    let output_dir = manifest_dir.join("out");
+    let reference_dir = manifest_dir.join("tests/reference-output");
 
-    let dir1 = "tests/reference-output";
-    let dir2 = "out/";
+    if output_dir.exists() {
+        fs::remove_dir_all(&output_dir).ok();
+    }
 
-    match compare_directories(dir1, dir2) {
+    layercake::plan_execution::execute_plan(
+        plan_path
+            .clone()
+            .to_string_lossy()
+            .into_owned(),
+        false,
+    )
+    .unwrap();
+
+    assert!(
+        output_dir.exists(),
+        "Expected output directory {} to exist after plan execution",
+        output_dir.display()
+    );
+
+    match compare_directories(&reference_dir, &output_dir) {
         Ok(_) => (),
         Err(e) => panic!("Test failed: {}", e),
     }
