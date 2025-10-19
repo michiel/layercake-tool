@@ -1071,7 +1071,11 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
               const convertedEdge = ReactFlowAdapter.planDagToReactFlow(tempEdgePlanDag);
               const reactFlowEdge = convertedEdge.edges[0];
 
-              setEdges((eds) => [...eds, reactFlowEdge]);
+              // Only add if not already present (avoid duplicates from subscription updates)
+              setEdges((eds) => {
+                const exists = eds.some(e => e.id === reactFlowEdge.id)
+                return exists ? eds : [...eds, reactFlowEdge]
+              });
               } else {
                 console.warn('[PlanVisualEditor] Invalid connection:', validation.errorMessage);
               }
