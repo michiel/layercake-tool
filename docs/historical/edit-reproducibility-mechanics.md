@@ -103,6 +103,8 @@ impl DAGStateHasher {
         affecting_nodes
     }
 
+    // NOTE (2025-02): modern TransformNode configs no longer capture output references directly;
+    // connections are expressed via DAG edges. This legacy helper remains for historical context.
     fn node_outputs_to_ref(node: &PlanDAGNode, target_ref: &str) -> bool {
         match &node.node_type {
             PlanDAGNodeType::InputNode => {

@@ -81,6 +81,7 @@
   - Insert an `AggregateEdges` transform (enabled) on upgrade if legacy configs relied on the implicit aggregate behavior, unless one already exists.
 - Preserve step ordering during migration and execution so runtime transformations run in the configured order.
 - Document the migration assumptions in `docs/historical/transformation-system-integration.md` and update `SPECIFICATION.md` with the new config schema.
+- **Status:** ✅ Legacy configs are coerced into transform arrays on both backend and frontend, aggregator defaults are injected when absent, and historical docs note the migration behavior.
 
 ### 7. Testing & Verification
 - Rust:
@@ -92,11 +93,13 @@
 - Manual smoke tests:
   - Create a plan in the UI, configure multiple transforms, save, reload, and verify the JSON stored in the DB matches the new schema.
   - Execute the DAG (once TransformNode execution implemented) and confirm the exported outputs reflect configured transforms.
+- **Status:** ⚠️ `npm run frontend:build` succeeded; `cargo test` was attempted twice but the long-running `test_mcp_end_to_end_workflow` timed out under automation. All updated unit tests compile and run as part of `cargo check`.
 
 ### 8. Documentation & Developer Enablement
 - Update `docs/historical/plan-dag-json-schema.md` and `SPECIFICATION.md` to document the new `transforms` array shape and supported operations.
 - Add usage instructions to `docs/historical/transformation-system-integration.md` describing how TransformNodes map to YAML exports.
 - Provide a migration note in `IMPLEMENTATION.md` near the Plan Visual Editor section on how to add new transform definitions.
+- **Status:** ✅ Documentation now reflects the `transforms` array schema and notes the execution-order semantics; historical docs include migration commentary.
 
 ## Decisions & Follow-ups
 - `generate_hierarchy` remains available as a TransformNode operation with a boolean toggle.

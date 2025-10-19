@@ -1231,6 +1231,8 @@ const CopyNodeComponent: React.FC<NodeProps> = ({ data }) => {
 };
 
 // TransformNode component - shows operation
+// NOTE (2025-02): current implementation uses `data.config.transforms` to
+// render summaries; this legacy snippet references the older `transform_config`.
 const TransformNodeComponent: React.FC<NodeProps> = ({ data }) => {
   const { transform_config } = data;
 
@@ -1276,8 +1278,9 @@ const createCopyTransformPipeline = (
     },
   };
 
-  // 2. Create TransformNode (operation, no persistence)
-  const transformNode: PlanDagNode = {
+// 2. Create TransformNode (operation, no persistence)
+//    (modern flow writes `transforms: GraphTransform[]` instead of a single config blob)
+const transformNode: PlanDagNode = {
     id: generateId(),
     type: 'transform',
     position: { x: copyNode.position.x + 200, y: copyNode.position.y },

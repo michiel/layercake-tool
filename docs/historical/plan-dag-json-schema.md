@@ -252,42 +252,39 @@ Applies transformations using existing transformation system.
 
 ```typescript
 interface TransformNodeConfig {
-  inputGraphRef: string;       // Source graph reference
-  outputGraphRef: string;      // Target graph reference
-  transformType: TransformationType;
-  transformConfig: TransformConfig;
+  transforms: GraphTransform[];
 }
 
-type TransformationType =
-  | "PartitionDepthLimit"      // modify_graph_limit_partition_depth
-  | "PartitionWidthLimit"      // modify_graph_limit_partition_width
-  | "InvertGraph"              // invert_graph
-  | "AggregateEdges"           // aggregate_edges
-  | "LabelTransform"           // truncate/newline operations
-  | "Custom";                  // Custom transformation
+type GraphTransformKind =
+  | 'PartitionDepthLimit'
+  | 'PartitionWidthLimit'
+  | 'NodeLabelMaxLength'
+  | 'NodeLabelInsertNewlines'
+  | 'EdgeLabelMaxLength'
+  | 'EdgeLabelInsertNewlines'
+  | 'InvertGraph'
+  | 'GenerateHierarchy'
+  | 'AggregateEdges';
 
-interface TransformConfig {
-  // Partition operations
+interface GraphTransform {
+  kind: GraphTransformKind;
+  params: GraphTransformParams;
+}
+
+interface GraphTransformParams {
   maxPartitionDepth?: number;
   maxPartitionWidth?: number;
-
-  // Hierarchy operations
-  generateHierarchy?: boolean;
-
-  // Graph operations
-  invertGraph?: boolean;
-  aggregateEdges?: boolean;
-
-  // Label operations
   nodeLabelMaxLength?: number;
   nodeLabelInsertNewlinesAt?: number;
   edgeLabelMaxLength?: number;
   edgeLabelInsertNewlinesAt?: number;
-
-  // Custom transformation (maps to existing ExportProfileGraphConfig)
-  customConfig?: ExportProfileGraphConfig;
+  enabled?: boolean;
 }
 ```
+
+> **Notes**
+> - `AggregateEdges` is appended by default and can be disabled via `params.enabled = false`.
+> - Transformations are executed strictly in array order, allowing users to mix depth/width limits, label adjustments, and inversion in a single node.
 
 ### 4. MergeNode
 

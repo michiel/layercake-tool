@@ -31,6 +31,11 @@ The existing layercake transformation system is robust and well-designed, locate
 
 ### 1. TransformNode Mapping
 
+**Update (2025-02):** `TransformNodeConfig` now serializes as an ordered `transforms: GraphTransform[]` list.
+Legacy `transform_type` / `transform_config` payloads are coerced during deserialization to preserve
+backwards compatibility. Execution applies each transform in sequence and records the resulting graph
+along with the transform metadata.
+
 The new TransformNode must integrate seamlessly with existing transformations:
 
 ```rust
