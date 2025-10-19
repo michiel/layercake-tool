@@ -1,8 +1,12 @@
 use layercake as layercake_core;
-use layercake_core::database::entities::graphs;
+use chrono::Utc;
+use layercake_core::database::entities::{graphs, plan_dag_nodes, plans, projects};
 use layercake_core::database::migrations::Migrator;
 use layercake_core::services::GraphEditService;
-use sea_orm::{ActiveModelTrait, Database, DatabaseConnection, DbErr, Set};
+use sea_orm::{
+    ActiveModelTrait, ActiveValue, ColumnTrait, Database, DatabaseConnection, DbErr, EntityTrait,
+    QueryFilter, Set,
+};
 use sea_orm_migration::MigratorTrait;
 
 /// Create an in-memory SQLite database for testing
@@ -21,12 +25,52 @@ async fn create_test_graph(
     project_id: i32,
     name: &str,
 ) -> Result<graphs::Model, DbErr> {
-    let graph = graphs::ActiveModel {
-        project_id: Set(project_id),
-        name: Set(name.to_string()),
-        node_id: Set(format!("test_node_{}", uuid::Uuid::new_v4())),
-        ..Default::default()
+    if projects::Entity::find_by_id(project_id).one(db).await?.is_none() {
+        let mut project = projects::ActiveModel::new();
+        project.id = Set(project_id);
+        project.name = Set(format!("Test Project {}", project_id));
+        project.description = Set(Some("Test project".to_string()));
+        project.insert(db).await?;
+    }
+
+    let plan = if let Some(plan) = plans::Entity::find()
+        .filter(plans::Column::ProjectId.eq(project_id))
+        .one(db)
+        .await?
+    {
+        plan
+    } else {
+        let plan = plans::ActiveModel {
+            id: ActiveValue::NotSet,
+            project_id: Set(project_id),
+            name: Set(format!("Test Plan {}", uuid::Uuid::new_v4())),
+            yaml_content: Set("{}".to_string()),
+            dependencies: Set(None),
+            status: Set("draft".to_string()),
+            version: Set(1),
+            created_at: Set(Utc::now()),
+            updated_at: Set(Utc::now()),
+        };
+        plan.insert(db).await?
     };
+
+    let dag_node_id = format!("test_node_{}", uuid::Uuid::new_v4());
+    let mut dag_node = plan_dag_nodes::ActiveModel::new();
+    dag_node.id = Set(dag_node_id.clone());
+    dag_node.plan_id = Set(plan.id);
+    dag_node.node_type = Set("GraphNode".to_string());
+    dag_node.position_x = Set(0.0);
+    dag_node.position_y = Set(0.0);
+    dag_node.source_position = Set(None);
+    dag_node.target_position = Set(None);
+    dag_node.metadata_json = Set("{}".to_string());
+    dag_node.config_json = Set("{}".to_string());
+    dag_node.insert(db).await?;
+
+    let mut graph = graphs::ActiveModel::new();
+    graph.project_id = Set(project_id);
+    graph.name = Set(name.to_string());
+    graph.node_id = Set(dag_node_id);
 
     graph.insert(db).await
 }

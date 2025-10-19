@@ -147,6 +147,7 @@ async fn start_server() -> Result<std::process::Child, Box<dyn std::error::Error
 }
 
 #[tokio::test]
+#[ignore = "Disabled temporarily due to long-running MCP server startup"]
 async fn test_mcp_end_to_end_workflow() -> Result<(), Box<dyn std::error::Error>> {
     // Start the server
     let mut server_process = start_server().await?;

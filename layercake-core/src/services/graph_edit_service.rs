@@ -2,8 +2,8 @@ use super::graph_edit_applicator::{ApplyResult, GraphEditApplicator};
 use crate::database::entities::graph_edits::{self, Entity as GraphEdits};
 use anyhow::Result;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
-    QueryOrder, Set,
+    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait,
+    QueryFilter, QueryOrder, Set,
 };
 use tracing::{debug, info, warn};
 
@@ -47,7 +47,7 @@ impl GraphEditService {
 
         // Create the edit record
         let edit = graph_edits::ActiveModel {
-            id: Set(Default::default()),
+            id: ActiveValue::NotSet,
             graph_id: Set(graph_id),
             target_type: Set(target_type),
             target_id: Set(target_id),
