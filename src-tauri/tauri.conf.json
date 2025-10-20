@@ -17,12 +17,19 @@
         "width": 1200,
         "height": 800,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "incognito": false,
+        "clearAllBrowsingDataOnClose": false,
+        "webview": {
+          "userAgent": "Layercake/0.2.4",
+          "devtools": true
+        }
       }
     ],
     "security": {
       "csp": null
-    }
+    },
+    "macOSPrivateApi": true
   },
   "bundle": {
     "active": true,

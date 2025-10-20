@@ -132,6 +132,14 @@ function createApolloClient(): ApolloClient {
       // Retry connection on network errors
       return true
     },
+    retryAttempts: 10, // Retry up to 10 times
+    retryWait: async (retries) => {
+      // Exponential backoff with max 10 seconds
+      const delay = Math.min(1000 * Math.pow(2, retries), 10000)
+      await new Promise(resolve => setTimeout(resolve, delay))
+    },
+    lazy: false, // Force connection immediately instead of waiting for first subscription
+    keepAlive: 10000, // Send ping every 10 seconds to keep connection alive
     on: {
       connected: () => console.log('[GraphQL WebSocket] Connected to', currentWsUrl),
       connecting: () => console.log('[GraphQL WebSocket] Connecting to', currentWsUrl),

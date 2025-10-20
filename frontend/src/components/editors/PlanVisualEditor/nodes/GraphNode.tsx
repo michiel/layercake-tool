@@ -284,7 +284,7 @@ export const GraphNode = memo((props: GraphNodeProps) => {
                   onMouseDown={(e) => {
                     e.stopPropagation()
                     e.preventDefault()
-                    navigate(`/projects/${projectId}/graphs/${resolvedGraphId}/edit`)
+                    navigate(`/projects/${projectId}/plan-nodes/${resolvedGraphId}/edit`)
                   }}
                 >
                   <IconExternalLink size="0.75rem" />
