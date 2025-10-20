@@ -39,7 +39,37 @@ if (isTauriApp()) {
 
   // Initialize Tauri server connection
   initializeTauriServer()
-    .then(() => {
+    .then(async () => {
+      // Clear all caches on Tauri startup to ensure fresh state
+      console.log('[Tauri] Clearing all caches on startup')
+
+      // Clear browser caches
+      if ('caches' in window) {
+        try {
+          const names = await caches.keys()
+          await Promise.all(names.map(name => caches.delete(name)))
+          console.log('[Tauri] Cleared browser caches:', names)
+        } catch (error) {
+          console.warn('[Tauri] Failed to clear browser caches:', error)
+        }
+      }
+
+      // Clear local storage
+      try {
+        localStorage.clear()
+        console.log('[Tauri] Cleared localStorage')
+      } catch (error) {
+        console.warn('[Tauri] Failed to clear localStorage:', error)
+      }
+
+      // Clear session storage
+      try {
+        sessionStorage.clear()
+        console.log('[Tauri] Cleared sessionStorage')
+      } catch (error) {
+        console.warn('[Tauri] Failed to clear sessionStorage:', error)
+      }
+
       // Server is ready, render the app
       root.render(
         <React.StrictMode>
