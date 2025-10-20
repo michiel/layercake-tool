@@ -1,6 +1,7 @@
 import React from 'react';
 import { Group, Text, ActionIcon, useMantineColorScheme } from '@mantine/core';
-import { IconSun, IconMoon, IconWifi, IconWifiOff, IconGraph, IconLoader } from '@tabler/icons-react';
+import { IconSun, IconMoon, IconWifi, IconWifiOff, IconGraph, IconLoader, IconRefresh } from '@tabler/icons-react';
+import { useApolloClient } from '@apollo/client/react';
 import { UserPresenceIndicator } from '../collaboration/UserPresenceIndicator';
 import { ConnectionState } from '../../types/websocket';
 
@@ -20,9 +21,26 @@ export const TopBar: React.FC<TopBarProps> = ({
   onNavigateHome
 }) => {
   const { colorScheme, toggleColorScheme } = useMantineColorScheme();
+  const apolloClient = useApolloClient();
   const isDark = colorScheme === 'dark';
   const isOnline = connectionState === ConnectionState.CONNECTED;
   const isConnecting = connectionState === ConnectionState.CONNECTING;
+
+  const handleClearCache = () => {
+    // Clear Apollo cache
+    apolloClient.clearStore().catch((error) => {
+      console.error('Failed to clear Apollo cache:', error);
+    });
+
+    // Clear localStorage
+    localStorage.clear();
+
+    // Clear sessionStorage
+    sessionStorage.clear();
+
+    // Reload the page
+    window.location.reload();
+  };
 
   return (
     <Group h={60} px="md" justify="space-between"
@@ -52,6 +70,17 @@ export const TopBar: React.FC<TopBarProps> = ({
           title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
         >
           {isDark ? <IconSun size="1.2rem" /> : <IconMoon size="1.2rem" />}
+        </ActionIcon>
+
+        {/* Clear cache and reload */}
+        <ActionIcon
+          variant="subtle"
+          size="lg"
+          onClick={handleClearCache}
+          title="Clear cache and reload"
+          color="gray"
+        >
+          <IconRefresh size="1.2rem" />
         </ActionIcon>
 
         {/* Connection status indicator */}
