@@ -114,6 +114,13 @@ export const PlanNodesPage: React.FC<PlanNodesPageProps> = () => {
   })
 
   const graphs: Graph[] = data?.graphs || []
+  const graphsByNodeId = React.useMemo(() => {
+    const map = new Map<string, Graph>()
+    graphs.forEach((graph) => {
+      map.set(graph.nodeId, graph)
+    })
+    return map
+  }, [graphs])
 
   const handleNavigate = (route: string) => {
     navigate(route)
@@ -170,6 +177,49 @@ export const PlanNodesPage: React.FC<PlanNodesPageProps> = () => {
     }
   }
 
+  const planNodes = React.useMemo(() => {
+    const nodes = planDagData?.getPlanDag?.nodes || []
+    return nodes.map((node: any) => {
+      const graph = graphsByNodeId.get(node.id)
+      const metadata = node.metadata || {}
+      const label = metadata.label || graph?.name || node.id
+      const graphExecution = node.graphExecution || {}
+      const datasourceExecution = node.datasourceExecution || {}
+      const executionState =
+        graphExecution.executionState ||
+        datasourceExecution.executionState ||
+        graph?.executionState ||
+        datasourceExecution.status ||
+        'NOT_STARTED'
+      const nodeCount =
+        graphExecution.nodeCount !== undefined
+          ? graphExecution.nodeCount
+          : graph?.nodeCount ?? null
+      const edgeCount =
+        graphExecution.edgeCount !== undefined
+          ? graphExecution.edgeCount
+          : graph?.edgeCount ?? null
+      const layerCount = graph?.layers?.length ?? null
+      const updatedAt =
+        graphExecution.computedDate ||
+        graph?.updatedAt ||
+        datasourceExecution.processedAt ||
+        null
+
+      return {
+        nodeId: node.id as string,
+        nodeType: node.nodeType as string,
+        label: label as string,
+        executionState: executionState as string,
+        nodeCount: nodeCount as number | null,
+        edgeCount: edgeCount as number | null,
+        layerCount: layerCount as number | null,
+        updatedAt: updatedAt as string | null,
+        graph,
+      }
+    })
+  }, [graphsByNodeId, planDagData])
+
   if (!selectedProject) {
     return (
       <Container size="xl">
@@ -195,7 +245,7 @@ export const PlanNodesPage: React.FC<PlanNodesPageProps> = () => {
           <div>
             <Title order={1}>Plan Nodes</Title>
             <Text size="sm" c="dimmed" mt="xs">
-              Plan nodes that produce graph outputs
+              Review every plan node and track execution progress across datasources and graphs
             </Text>
           </div>
           <Group gap="xs">
@@ -217,13 +267,13 @@ export const PlanNodesPage: React.FC<PlanNodesPageProps> = () => {
 
         <Card withBorder>
           <LoadingOverlay visible={loading} />
-          {graphs.length === 0 && !loading ? (
+          {planNodes.length === 0 && !loading ? (
             <Stack align="center" py="xl" gap="md">
               <IconGraph size={48} color="gray" />
               <div style={{ textAlign: 'center' }}>
                 <Title order={3}>No Plan Nodes</Title>
                 <Text c="dimmed" mb="md">
-                  No graph-producing nodes in your plan yet.
+                  Define plan nodes to see data source and graph execution details.
                 </Text>
                 <Button
                   leftSection={<IconPlus size={16} />}
@@ -249,19 +299,36 @@ export const PlanNodesPage: React.FC<PlanNodesPageProps> = () => {
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
-                  {graphs.map((graph) => {
-                    const executionState = graph.executionState || 'NOT_STARTED'
-                    const isRunning = executingGraphId === graph.id || isExecutionInProgress(executionState)
-                    const nodeType = nodeTypeMap.get(graph.nodeId) || 'Unknown'
+                  {planNodes.map((planNode) => {
+                    const { graph, nodeType } = planNode
+                    const executionState = planNode.executionState || 'NOT_STARTED'
+                    const isRunning =
+                      (graph && executingGraphId === graph.id) ||
+                      isExecutionInProgress(executionState)
+                    const nodeCount =
+                      planNode.nodeCount !== null && planNode.nodeCount !== undefined
+                        ? planNode.nodeCount
+                        : '—'
+                    const edgeCount =
+                      planNode.edgeCount !== null && planNode.edgeCount !== undefined
+                        ? planNode.edgeCount
+                        : '—'
+                    const layerCount =
+                      planNode.layerCount !== null && planNode.layerCount !== undefined
+                        ? planNode.layerCount
+                        : '—'
+                    const updatedDisplay = planNode.updatedAt
+                      ? formatDateTime(planNode.updatedAt)
+                      : '—'
 
                     return (
-                      <Table.Tr key={graph.id}>
+                      <Table.Tr key={planNode.nodeId}>
                         <Table.Td>
-                          <Text fw={500}>{graph.name}</Text>
+                          <Text fw={500}>{planNode.label}</Text>
                         </Table.Td>
                         <Table.Td>
                           <Badge variant="dot" color="cyan">
-                            {nodeType}
+                            {nodeTypeMap.get(planNode.nodeId) || nodeType}
                           </Badge>
                         </Table.Td>
                         <Table.Td>
@@ -275,61 +342,69 @@ export const PlanNodesPage: React.FC<PlanNodesPageProps> = () => {
                         </Table.Td>
                         <Table.Td>
                           <Badge variant="light" color="blue">
-                            {graph.nodeCount}
+                            {nodeCount}
                           </Badge>
                         </Table.Td>
                         <Table.Td>
                           <Badge variant="light" color="grape">
-                            {graph.edgeCount}
+                            {edgeCount}
                           </Badge>
                         </Table.Td>
                         <Table.Td>
                           <Badge variant="light" color="teal">
-                            {graph.layers?.length ?? 0}
+                            {layerCount}
                           </Badge>
                         </Table.Td>
                         <Table.Td>
                           <Text size="sm" c="dimmed">
-                            {formatDateTime(graph.updatedAt)}
+                            {updatedDisplay}
                           </Text>
                         </Table.Td>
                         <Table.Td>
-                          <Menu shadow="md" width={220}>
-                            <Menu.Target>
-                              <ActionIcon variant="subtle">
-                                <IconDots size={16} />
-                              </ActionIcon>
-                            </Menu.Target>
-                            <Menu.Dropdown>
-                              <Menu.Item
-                                leftSection={<IconGraph size={14} />}
-                                onClick={() => navigate(`/projects/${projectId}/plan-nodes/${graph.id}/edit`)}
-                              >
-                                Open Graph Editor
-                              </Menu.Item>
-                              <Menu.Item
-                                leftSection={<IconEdit size={14} />}
-                                onClick={() => handleEdit(graph)}
-                              >
-                                Rename
-                              </Menu.Item>
-                              <Menu.Item
-                                leftSection={<IconRefresh size={14} />}
-                                onClick={() => handleReprocess(graph)}
-                                disabled={isRunning}
-                              >
-                                Reprocess
-                              </Menu.Item>
-                              <Menu.Divider />
-                              <Menu.Item
-                                leftSection={<IconTrash size={14} />}
-                                color="red"
-                                onClick={() => handleDelete(graph)}
-                              >
-                                Delete
-                              </Menu.Item>
-                            </Menu.Dropdown>
-                          </Menu>
+                          {graph ? (
+                            <Menu shadow="md" width={220}>
+                              <Menu.Target>
+                                <ActionIcon variant="subtle">
+                                  <IconDots size={16} />
+                                </ActionIcon>
+                              </Menu.Target>
+                              <Menu.Dropdown>
+                                <Menu.Item
+                                  leftSection={<IconGraph size={14} />}
+                                  onClick={() =>
+                                    navigate(`/projects/${projectId}/plan-nodes/${graph.id}/edit`)
+                                  }
+                                >
+                                  Open Graph Editor
+                                </Menu.Item>
+                                <Menu.Item
+                                  leftSection={<IconEdit size={14} />}
+                                  onClick={() => handleEdit(graph)}
+                                >
+                                  Rename
+                                </Menu.Item>
+                                <Menu.Item
+                                  leftSection={<IconRefresh size={14} />}
+                                  onClick={() => handleReprocess(graph)}
+                                  disabled={isRunning}
+                                >
+                                  Reprocess
+                                </Menu.Item>
+                                <Menu.Divider />
+                                <Menu.Item
+                                  leftSection={<IconTrash size={14} />}
+                                  color="red"
+                                  onClick={() => handleDelete(graph)}
+                                >
+                                  Delete
+                                </Menu.Item>
+                              </Menu.Dropdown>
+                            </Menu>
+                          ) : (
+                            <Text size="sm" c="dimmed">
+                              No actions
+                            </Text>
+                          )}
                         </Table.Td>
                       </Table.Tr>
                     )
