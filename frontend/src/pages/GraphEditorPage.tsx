@@ -124,7 +124,7 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
   };
 
   const handleBack = () => {
-    navigate(`/projects/${projectId}/graphs`);
+    navigate(`/projects/${projectId}/plan-nodes`);
   };
 
   // Callback to capture ReactFlow setters for optimistic updates

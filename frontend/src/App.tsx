@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Routes, Route, useNavigate, useParams, useLocation } from 'react-router-dom'
 import { AppShell, Group, Title, Stack, Button, Container, Text, Card, Badge, Alert, Modal, Select, FileButton, ActionIcon, Tooltip } from '@mantine/core'
-import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconFileImport, IconDownload, IconChevronLeft, IconChevronRight, IconFolderPlus } from '@tabler/icons-react'
+import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconFileImport, IconDownload, IconChevronLeft, IconChevronRight, IconFolderPlus, IconNetwork } from '@tabler/icons-react'
 import { useQuery, useMutation } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import { Breadcrumbs } from './components/common/Breadcrumbs'
@@ -105,7 +105,11 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   // Get current route info for navigation highlighting
   const isActiveRoute = (path: string) => {
     if (path === '/') return location.pathname === '/'
-    return location.pathname.startsWith(path)
+    if (!location.pathname.startsWith(path)) {
+      return false
+    }
+    const nextChar = location.pathname.charAt(path.length)
+    return nextChar === '' || nextChar === '/'
   }
 
   // Extract project info from current path for navbar
@@ -195,7 +199,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                 <div style={{ height: '1px', backgroundColor: '#e9ecef', margin: '8px 0' }} />
                 <Tooltip label="Project" position="right" disabled={!navCollapsed}>
                   <Button
-                    variant={isActiveRoute(`/projects/${projectId}`) && !isActiveRoute(`/projects/${projectId}/plan`) && !isActiveRoute(`/projects/${projectId}/datasources`) && !isActiveRoute(`/projects/${projectId}/graphs`) ? 'filled' : 'light'}
+                    variant={isActiveRoute(`/projects/${projectId}`) && !isActiveRoute(`/projects/${projectId}/datasources`) && !isActiveRoute(`/projects/${projectId}/plan`) && !isActiveRoute(`/projects/${projectId}/plan-nodes`) && !isActiveRoute(`/projects/${projectId}/graphs`) ? 'filled' : 'light'}
                     fullWidth={!navCollapsed}
                     leftSection={navCollapsed ? undefined : <IconFolderPlus size={16} />}
                     onClick={() => navigate(`/projects/${projectId}`)}
@@ -203,18 +207,6 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                     style={navCollapsed ? { justifyContent: 'center' } : undefined}
                   >
                     {navCollapsed ? <IconFolderPlus size={16} /> : 'Project'}
-                  </Button>
-                </Tooltip>
-                <Tooltip label="Plan" position="right" disabled={!navCollapsed}>
-                  <Button
-                    variant={isActiveRoute(`/projects/${projectId}/plan`) ? 'filled' : 'light'}
-                    fullWidth={!navCollapsed}
-                    leftSection={navCollapsed ? undefined : <IconGraph size={16} />}
-                    onClick={() => navigate(`/projects/${projectId}/plan`)}
-                    px={navCollapsed ? 'xs' : undefined}
-                    style={navCollapsed ? { justifyContent: 'center' } : undefined}
-                  >
-                    {navCollapsed ? <IconGraph size={16} /> : 'Plan'}
                   </Button>
                 </Tooltip>
                 <Tooltip label="Data Sources" position="right" disabled={!navCollapsed}>
@@ -229,16 +221,40 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                     {navCollapsed ? <IconFileDatabase size={16} /> : 'Data Sources'}
                   </Button>
                 </Tooltip>
+                <Tooltip label="Plan" position="right" disabled={!navCollapsed}>
+                  <Button
+                    variant={isActiveRoute(`/projects/${projectId}/plan`) ? 'filled' : 'light'}
+                    fullWidth={!navCollapsed}
+                    leftSection={navCollapsed ? undefined : <IconGraph size={16} />}
+                    onClick={() => navigate(`/projects/${projectId}/plan`)}
+                    px={navCollapsed ? 'xs' : undefined}
+                    style={navCollapsed ? { justifyContent: 'center' } : undefined}
+                  >
+                    {navCollapsed ? <IconGraph size={16} /> : 'Plan'}
+                  </Button>
+                </Tooltip>
+                <Tooltip label="Plan Nodes" position="right" disabled={!navCollapsed}>
+                  <Button
+                    variant={isActiveRoute(`/projects/${projectId}/plan-nodes`) ? 'filled' : 'light'}
+                    fullWidth={!navCollapsed}
+                    leftSection={navCollapsed ? undefined : <IconNetwork size={16} />}
+                    onClick={() => navigate(`/projects/${projectId}/plan-nodes`)}
+                    px={navCollapsed ? 'xs' : undefined}
+                    style={navCollapsed ? { justifyContent: 'center' } : undefined}
+                  >
+                    {navCollapsed ? <IconNetwork size={16} /> : 'Plan Nodes'}
+                  </Button>
+                </Tooltip>
                 <Tooltip label="Graphs" position="right" disabled={!navCollapsed}>
                   <Button
                     variant={isActiveRoute(`/projects/${projectId}/graphs`) ? 'filled' : 'light'}
                     fullWidth={!navCollapsed}
-                    leftSection={navCollapsed ? undefined : <IconGraph size={16} />}
+                    leftSection={navCollapsed ? undefined : <IconDatabase size={16} />}
                     onClick={() => navigate(`/projects/${projectId}/graphs`)}
                     px={navCollapsed ? 'xs' : undefined}
                     style={navCollapsed ? { justifyContent: 'center' } : undefined}
                   >
-                    {navCollapsed ? <IconGraph size={16} /> : 'Graphs'}
+                    {navCollapsed ? <IconDatabase size={16} /> : 'Graphs'}
                   </Button>
                 </Tooltip>
               </>
@@ -1139,8 +1155,14 @@ const ProjectDetailPage = () => {
       primary: true,
     },
     {
+      title: 'Plan Nodes',
+      description: 'Review every node in the Plan DAG with execution status and type',
+      icon: <IconNetwork size={20} />,
+      onClick: () => navigate(`/projects/${projectId}/plan-nodes`),
+    },
+    {
       title: 'Graphs',
-      description: 'Manage graph entities for this project',
+      description: 'Browse materialized graph outputs with quick access actions',
       icon: <IconDatabase size={20} />,
       onClick: () => navigate(`/projects/${projectId}/graphs`),
     },
@@ -1313,6 +1335,7 @@ const PlanEditorPage = () => {
   )
 }
 
+import { PlanNodesPage } from './components/graphs/PlanNodesPage'
 import { GraphsPage } from './components/graphs/GraphsPage'
 import { GraphEditorPage } from './pages/GraphEditorPage'
 import { DatabaseSettings } from './components/settings/DatabaseSettings'
@@ -1343,12 +1366,17 @@ function App() {
               <PlanEditorPage />
             </ErrorBoundary>
           } />
+          <Route path="/projects/:projectId/plan-nodes" element={
+            <ErrorBoundary>
+              <PlanNodesPage />
+            </ErrorBoundary>
+          } />
           <Route path="/projects/:projectId/graphs" element={
             <ErrorBoundary>
               <GraphsPage />
             </ErrorBoundary>
           } />
-          <Route path="/projects/:projectId/graphs/:graphId/edit" element={
+          <Route path="/projects/:projectId/plan-nodes/:graphId/edit" element={
             <ErrorBoundary>
               <GraphEditorPage />
             </ErrorBoundary>

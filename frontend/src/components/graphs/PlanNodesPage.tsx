@@ -9,12 +9,14 @@ import {
   Stack,
   Card,
   Text,
+  ActionIcon,
   Modal,
   Alert,
+  Table,
   LoadingOverlay,
   TextInput,
   Badge,
-  SimpleGrid
+  Menu
 } from '@mantine/core'
 import {
   IconPlus,
@@ -23,6 +25,7 @@ import {
   IconTrash,
   IconAlertCircle,
   IconRefresh,
+  IconDots,
   IconCheck,
   IconClock,
   IconX
@@ -30,8 +33,8 @@ import {
 import { gql } from '@apollo/client'
 import { Breadcrumbs } from '../common/Breadcrumbs'
 import { Graph, GET_GRAPHS, CREATE_GRAPH, UPDATE_GRAPH, DELETE_GRAPH, EXECUTE_NODE } from '../../graphql/graphs'
-import { GET_PLAN_DAG } from '../../graphql/plan-dag'
 import { getExecutionStateColor, getExecutionStateLabel, isExecutionInProgress } from '../../graphql/preview'
+import { GET_PLAN_DAG } from '../../graphql/plan-dag'
 
 const GET_PROJECTS = gql`
   query GetProjects {
@@ -42,7 +45,7 @@ const GET_PROJECTS = gql`
   }
 `
 
-interface GraphsPageProps {}
+interface PlanNodesPageProps {}
 
 const formatDateTime = (value: string) => {
   const date = new Date(value)
@@ -63,7 +66,7 @@ const getExecutionStateIcon = (state: string) => {
   }
 }
 
-export const GraphsPage: React.FC<GraphsPageProps> = () => {
+export const PlanNodesPage: React.FC<PlanNodesPageProps> = () => {
   const navigate = useNavigate()
   const { projectId } = useParams<{ projectId: string }>()
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
@@ -84,6 +87,16 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
     fetchPolicy: 'cache-and-network'
   })
 
+  // Create a map of nodeId to nodeType from plan DAG
+  const nodeTypeMap = React.useMemo(() => {
+    const map = new Map<string, string>()
+    const nodes = planDagData?.getPlanDag?.nodes || []
+    nodes.forEach((node: any) => {
+      map.set(node.id, node.nodeType)
+    })
+    return map
+  }, [planDagData])
+
   const [createGraph, { loading: createLoading }] = useMutation(CREATE_GRAPH, {
     refetchQueries: [{ query: GET_GRAPHS, variables: { projectId: parseInt(projectId || '0') } }]
   })
@@ -101,19 +114,6 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
   })
 
   const graphs: Graph[] = data?.graphs || []
-  const nodeTypeMap = React.useMemo(() => {
-    const map = new Map<string, string>()
-    const nodes = planDagData?.getPlanDag?.nodes || []
-    nodes.forEach((node: any) => {
-      map.set(node.id, node.nodeType)
-    })
-    return map
-  }, [planDagData])
-
-  const graphNodes = React.useMemo(
-    () => graphs.filter((graph) => nodeTypeMap.get(graph.nodeId) === 'GraphNode'),
-    [graphs, nodeTypeMap]
-  )
 
   const handleNavigate = (route: string) => {
     navigate(route)
@@ -187,15 +187,15 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
         <Breadcrumbs
           projectName={selectedProject.name}
           projectId={selectedProject.id}
-          currentPage="Graphs"
+          currentPage="Plan Nodes"
           onNavigate={handleNavigate}
         />
 
         <Group justify="space-between" mb="md">
           <div>
-            <Title order={1}>Graphs</Title>
+            <Title order={1}>Plan Nodes</Title>
             <Text size="sm" c="dimmed" mt="xs">
-              Manage graph entities for this project
+              Plan nodes that produce graph outputs
             </Text>
           </div>
           <Group gap="xs">
@@ -215,114 +215,128 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
           </Alert>
         )}
 
-        <Card withBorder p="lg" style={{ position: 'relative' }}>
+        <Card withBorder>
           <LoadingOverlay visible={loading} />
-          {graphNodes.length === 0 && !loading ? (
+          {graphs.length === 0 && !loading ? (
             <Stack align="center" py="xl" gap="md">
               <IconGraph size={48} color="gray" />
               <div style={{ textAlign: 'center' }}>
-                <Title order={3}>No Graph Nodes</Title>
+                <Title order={3}>No Plan Nodes</Title>
                 <Text c="dimmed" mb="md">
-                  Create a graph node or run your plan to materialize one.
+                  No graph-producing nodes in your plan yet.
                 </Text>
                 <Button
                   leftSection={<IconPlus size={16} />}
                   onClick={handleCreate}
                 >
-                  Create Graph Node
+                  Create First Graph Node
                 </Button>
               </div>
             </Stack>
           ) : (
-            <SimpleGrid cols={{ base: 1, sm: 1, md: 2, xl: 3 }} spacing="lg">
-              {graphNodes.map((graph) => {
-                const executionState = graph.executionState || 'NOT_STARTED'
-                const isRunning =
-                  executingGraphId === graph.id || isExecutionInProgress(executionState)
-                const nodeType = nodeTypeMap.get(graph.nodeId) || 'GraphNode'
-                const lastUpdated = graph.updatedAt ? formatDateTime(graph.updatedAt) : '—'
-                const layerCount = graph.layers?.length ?? 0
+            <Table.ScrollContainer minWidth={900}>
+              <Table striped highlightOnHover>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>Name</Table.Th>
+                    <Table.Th>Node Type</Table.Th>
+                    <Table.Th>Status</Table.Th>
+                    <Table.Th>Nodes</Table.Th>
+                    <Table.Th>Edges</Table.Th>
+                    <Table.Th>Layers</Table.Th>
+                    <Table.Th>Updated</Table.Th>
+                    <Table.Th>Actions</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {graphs.map((graph) => {
+                    const executionState = graph.executionState || 'NOT_STARTED'
+                    const isRunning = executingGraphId === graph.id || isExecutionInProgress(executionState)
+                    const nodeType = nodeTypeMap.get(graph.nodeId) || 'Unknown'
 
-                return (
-                  <Card key={graph.id} withBorder shadow="xs" padding="lg" radius="md">
-                    <Stack gap="sm">
-                      <Group justify="space-between" align="flex-start">
-                        <div>
-                          <Text fw={600}>{graph.name}</Text>
-                          <Group gap="xs" mt={4}>
-                            <Badge variant="dot" color="cyan">
-                              {nodeType}
-                            </Badge>
-                          </Group>
-                        </div>
-                        <Badge
-                          variant="light"
-                          color={getExecutionStateColor(executionState)}
-                          leftSection={getExecutionStateIcon(executionState)}
-                        >
-                          {getExecutionStateLabel(executionState)}
-                        </Badge>
-                      </Group>
-
-                      <Group gap="xs" wrap="wrap">
-                        <Badge variant="light" color="blue">
-                          Nodes: {graph.nodeCount}
-                        </Badge>
-                        <Badge variant="light" color="grape">
-                          Edges: {graph.edgeCount}
-                        </Badge>
-                        <Badge variant="light" color="teal">
-                          Layers: {layerCount}
-                        </Badge>
-                      </Group>
-                      <Text size="sm" c="dimmed">
-                        Last updated {lastUpdated}
-                      </Text>
-
-                      <Group gap="sm" wrap="wrap">
-                        <Button
-                          size="xs"
-                          variant="light"
-                          leftSection={<IconGraph size={14} />}
-                          onClick={() =>
-                            navigate(`/projects/${projectId}/plan-nodes/${graph.id}/edit`)
-                          }
-                        >
-                          Open Graph Editor
-                        </Button>
-                        <Button
-                          size="xs"
-                          variant="light"
-                          leftSection={<IconEdit size={14} />}
-                          onClick={() => handleEdit(graph)}
-                        >
-                          Edit Properties
-                        </Button>
-                        <Button
-                          size="xs"
-                          variant="light"
-                          leftSection={<IconRefresh size={14} />}
-                          onClick={() => handleReprocess(graph)}
-                          disabled={isRunning}
-                          loading={executingGraphId === graph.id}
-                        >
-                          Reprocess
-                        </Button>
-                        <Button
-                          size="xs"
-                          variant="light"
-                          color="red"
-                          leftSection={<IconTrash size={14} />}
-                          onClick={() => handleDelete(graph)}
-                        >
-                          Delete
-                        </Button>
-                      </Group>
-                    </Stack>
-                  </Card>
-                )
-              })}
-            </SimpleGrid>
+                    return (
+                      <Table.Tr key={graph.id}>
+                        <Table.Td>
+                          <Text fw={500}>{graph.name}</Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <Badge variant="dot" color="cyan">
+                            {nodeType}
+                          </Badge>
+                        </Table.Td>
+                        <Table.Td>
+                          <Badge
+                            variant="light"
+                            color={getExecutionStateColor(executionState)}
+                            leftSection={getExecutionStateIcon(executionState)}
+                          >
+                            {getExecutionStateLabel(executionState)}
+                          </Badge>
+                        </Table.Td>
+                        <Table.Td>
+                          <Badge variant="light" color="blue">
+                            {graph.nodeCount}
+                          </Badge>
+                        </Table.Td>
+                        <Table.Td>
+                          <Badge variant="light" color="grape">
+                            {graph.edgeCount}
+                          </Badge>
+                        </Table.Td>
+                        <Table.Td>
+                          <Badge variant="light" color="teal">
+                            {graph.layers?.length ?? 0}
+                          </Badge>
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="sm" c="dimmed">
+                            {formatDateTime(graph.updatedAt)}
+                          </Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <Menu shadow="md" width={220}>
+                            <Menu.Target>
+                              <ActionIcon variant="subtle">
+                                <IconDots size={16} />
+                              </ActionIcon>
+                            </Menu.Target>
+                            <Menu.Dropdown>
+                              <Menu.Item
+                                leftSection={<IconGraph size={14} />}
+                                onClick={() => navigate(`/projects/${projectId}/plan-nodes/${graph.id}/edit`)}
+                              >
+                                Open Graph Editor
+                              </Menu.Item>
+                              <Menu.Item
+                                leftSection={<IconEdit size={14} />}
+                                onClick={() => handleEdit(graph)}
+                              >
+                                Rename
+                              </Menu.Item>
+                              <Menu.Item
+                                leftSection={<IconRefresh size={14} />}
+                                onClick={() => handleReprocess(graph)}
+                                disabled={isRunning}
+                              >
+                                Reprocess
+                              </Menu.Item>
+                              <Menu.Divider />
+                              <Menu.Item
+                                leftSection={<IconTrash size={14} />}
+                                color="red"
+                                onClick={() => handleDelete(graph)}
+                              >
+                                Delete
+                              </Menu.Item>
+                            </Menu.Dropdown>
+                          </Menu>
+                        </Table.Td>
+                      </Table.Tr>
+                    )
+                  })}
+                </Table.Tbody>
+              </Table>
+            </Table.ScrollContainer>
           )}
         </Card>
       </Container>
