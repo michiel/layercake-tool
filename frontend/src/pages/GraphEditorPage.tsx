@@ -559,7 +559,8 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
           <Breadcrumbs
             projectName={selectedProject.name}
             projectId={selectedProject.id}
-            currentPage={`Graphs > ${graph.name}`}
+            sections={[{ title: 'Graphs', href: `/projects/${projectId}/graphs` }]}
+            currentPage={graph.name}
             onNavigate={handleNavigate}
           />
 
