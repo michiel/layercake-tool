@@ -19,10 +19,8 @@
         "resizable": true,
         "fullscreen": false,
         "incognito": false,
-        "webview": {
-          "userAgent": "Layercake/0.2.4",
-          "devtools": true
-        }
+        "userAgent": "Layercake/0.2.4",
+        "devtools": true
       }
     ],
     "security": {
