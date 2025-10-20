@@ -12,6 +12,7 @@ interface BreadcrumbsProps {
   projectName?: string
   projectId?: number
   currentPage?: string
+  sections?: Array<{ title: string; href?: string }>
   onNavigate?: (path: string) => void
 }
 
@@ -19,6 +20,7 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({
   projectName,
   projectId,
   currentPage,
+  sections,
   onNavigate
 }) => {
 
@@ -51,6 +53,17 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({
       title: projectName,
       href: `/projects/${projectId}`,
       icon: getIcon('projects'),
+    })
+  }
+
+  // Add optional intermediate sections
+  if (sections && sections.length > 0) {
+    sections.forEach(section => {
+      items.push({
+        title: section.title,
+        href: section.href,
+        icon: section.href ? getIcon(section.title) : undefined,
+      })
     })
   }
 
