@@ -50,6 +50,12 @@ Remove the quarantine attribute from the binary,
 xattr -d com.apple.quarantine ./layercake
 ```
 
+Or from the DMG installation
+
+```
+xattr -d com.apple.quarantine /Applications/Layercake.app
+```
+
 ## Concepts
 
 Nodes come in two types, partition and non-partition nodes. Partition nodes are used to group nodes together, and are used to create a hierarchy in the graph.
