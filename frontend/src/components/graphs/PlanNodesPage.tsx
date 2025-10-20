@@ -127,7 +127,7 @@ export const PlanNodesPage: React.FC<PlanNodesPageProps> = () => {
     fetchPolicy: 'cache-and-network'
   })
 
-  const { data: planDagData } = useQuery(GET_PLAN_DAG, {
+  const { data: planDagData } = useQuery<PlanDagResponse>(GET_PLAN_DAG, {
     variables: { projectId: parseInt(projectId || '0') },
     fetchPolicy: 'cache-and-network'
   })
@@ -136,7 +136,7 @@ export const PlanNodesPage: React.FC<PlanNodesPageProps> = () => {
   const nodeTypeMap = React.useMemo(() => {
     const map = new Map<string, string>()
     const nodes = planDagData?.getPlanDag?.nodes || []
-    nodes.forEach((node: any) => {
+    nodes.forEach((node) => {
       map.set(node.id, node.nodeType)
     })
     return map
