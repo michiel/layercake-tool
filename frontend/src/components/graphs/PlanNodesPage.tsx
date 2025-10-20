@@ -47,6 +47,51 @@ const GET_PROJECTS = gql`
 
 interface PlanNodesPageProps {}
 
+interface PlanDagDatasourceExecution {
+  dataSourceId?: number
+  filename?: string
+  status?: string
+  processedAt?: string
+  executionState?: string
+}
+
+interface PlanDagGraphExecution {
+  graphId?: number
+  nodeCount?: number
+  edgeCount?: number
+  executionState?: string
+  computedDate?: string
+}
+
+interface PlanDagNode {
+  id: string
+  nodeType: string
+  metadata?: {
+    label?: string
+    description?: string
+  }
+  graphExecution?: PlanDagGraphExecution
+  datasourceExecution?: PlanDagDatasourceExecution
+}
+
+interface PlanDagResponse {
+  getPlanDag: {
+    nodes: PlanDagNode[]
+  }
+}
+
+interface PlanNodeRow {
+  nodeId: string
+  nodeType: string
+  label: string
+  executionState: string
+  nodeCount: number | null
+  edgeCount: number | null
+  layerCount: number | null
+  updatedAt: string | null
+  graph: Graph | undefined
+}
+
 const formatDateTime = (value: string) => {
   const date = new Date(value)
   return date.toLocaleString()
@@ -177,9 +222,9 @@ export const PlanNodesPage: React.FC<PlanNodesPageProps> = () => {
     }
   }
 
-  const planNodes = React.useMemo(() => {
+  const planNodes: PlanNodeRow[] = React.useMemo(() => {
     const nodes = planDagData?.getPlanDag?.nodes || []
-    return nodes.map((node: any) => {
+    return nodes.map<PlanNodeRow>((node) => {
       const graph = graphsByNodeId.get(node.id)
       const metadata = node.metadata || {}
       const label = metadata.label || graph?.name || node.id
@@ -193,11 +238,11 @@ export const PlanNodesPage: React.FC<PlanNodesPageProps> = () => {
         'NOT_STARTED'
       const nodeCount =
         graphExecution.nodeCount !== undefined
-          ? graphExecution.nodeCount
+          ? graphExecution.nodeCount ?? null
           : graph?.nodeCount ?? null
       const edgeCount =
         graphExecution.edgeCount !== undefined
-          ? graphExecution.edgeCount
+          ? graphExecution.edgeCount ?? null
           : graph?.edgeCount ?? null
       const layerCount = graph?.layers?.length ?? null
       const updatedAt =
@@ -207,14 +252,14 @@ export const PlanNodesPage: React.FC<PlanNodesPageProps> = () => {
         null
 
       return {
-        nodeId: node.id as string,
-        nodeType: node.nodeType as string,
-        label: label as string,
-        executionState: executionState as string,
-        nodeCount: nodeCount as number | null,
-        edgeCount: edgeCount as number | null,
-        layerCount: layerCount as number | null,
-        updatedAt: updatedAt as string | null,
+        nodeId: node.id,
+        nodeType: node.nodeType,
+        label,
+        executionState,
+        nodeCount,
+        edgeCount,
+        layerCount,
+        updatedAt,
         graph,
       }
     })

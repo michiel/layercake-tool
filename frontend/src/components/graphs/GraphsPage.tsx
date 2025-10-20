@@ -79,7 +79,18 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
     fetchPolicy: 'cache-and-network'
   })
 
-  const { data: planDagData } = useQuery(GET_PLAN_DAG, {
+  interface PlanDagNode {
+    id: string
+    nodeType: string
+  }
+
+  interface PlanDagResponse {
+    getPlanDag: {
+      nodes: PlanDagNode[]
+    }
+  }
+
+  const { data: planDagData } = useQuery<PlanDagResponse>(GET_PLAN_DAG, {
     variables: { projectId: parseInt(projectId || '0') },
     fetchPolicy: 'cache-and-network'
   })
@@ -104,7 +115,7 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
   const nodeTypeMap = React.useMemo(() => {
     const map = new Map<string, string>()
     const nodes = planDagData?.getPlanDag?.nodes || []
-    nodes.forEach((node: any) => {
+    nodes.forEach((node) => {
       map.set(node.id, node.nodeType)
     })
     return map
