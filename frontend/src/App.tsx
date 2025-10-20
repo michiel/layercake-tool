@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Routes, Route, useNavigate, useParams, useLocation } from 'react-router-dom'
-import { AppShell, Group, Title, Stack, Button, Container, Text, Card, Badge, Alert, Modal, Select, FileButton, ActionIcon, Tooltip } from '@mantine/core'
+import { AppShell, Group, Title, Stack, Button, Text, Card, Badge, Alert, Modal, Select, FileButton, ActionIcon, Tooltip } from '@mantine/core'
 import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconFileImport, IconDownload, IconChevronLeft, IconChevronRight, IconFolderPlus, IconNetwork } from '@tabler/icons-react'
 import { useQuery, useMutation } from '@apollo/client/react'
 import { gql } from '@apollo/client'
@@ -732,7 +732,7 @@ const ProjectsPage = () => {
   const selectedSample = sampleOptions.find(option => option.value === selectedSampleKey)
 
   return (
-    <Container size="xl">
+    <PageContainer>
       <Breadcrumbs currentPage="Projects" onNavigate={handleNavigate} />
 
       <Group justify="space-between" mb="md">
@@ -984,7 +984,7 @@ const ProjectsPage = () => {
           </Group>
         </Stack>
       </Modal>
-    </Container>
+    </PageContainer>
   )
 }
 
@@ -1122,21 +1122,21 @@ const ProjectDetailPage = () => {
   // Show loading state while projects are being fetched
   if (projectsLoading) {
     return (
-      <Container size="xl">
+      <PageContainer>
         <Text>Loading project...</Text>
-      </Container>
+      </PageContainer>
     )
   }
 
   // Only show "not found" if loading is complete and project doesn't exist
   if (!selectedProject) {
     return (
-      <Container size="xl">
+      <PageContainer>
         <Title order={1}>Project Not Found</Title>
         <Button onClick={() => navigate('/projects')} mt="md">
           Back to Projects
         </Button>
-      </Container>
+      </PageContainer>
     )
   }
 
@@ -1176,7 +1176,7 @@ const ProjectDetailPage = () => {
   ]
 
   return (
-    <Container size="xl">
+    <PageContainer>
       <Breadcrumbs
         projectName={selectedProject.name}
         projectId={selectedProject.id}
@@ -1259,7 +1259,7 @@ const ProjectDetailPage = () => {
           </Card>
         ))}
       </Stack>
-    </Container>
+    </PageContainer>
   )
 }
 
@@ -1289,21 +1289,21 @@ const PlanEditorPage = () => {
   // Show loading state while projects are being fetched
   if (projectsLoading) {
     return (
-      <Container size="xl">
+      <PageContainer>
         <Text>Loading project...</Text>
-      </Container>
+      </PageContainer>
     )
   }
 
   // Only show "not found" if loading is complete and project doesn't exist
   if (!selectedProject) {
     return (
-      <Container size="xl">
+      <PageContainer>
         <Title order={1}>Project Not Found</Title>
         <Button onClick={() => navigate('/projects')} mt="md">
           Back to Projects
         </Button>
-      </Container>
+      </PageContainer>
     )
   }
 
@@ -1339,6 +1339,7 @@ import { PlanNodesPage } from './components/graphs/PlanNodesPage'
 import { GraphsPage } from './components/graphs/GraphsPage'
 import { GraphEditorPage } from './pages/GraphEditorPage'
 import { DatabaseSettings } from './components/settings/DatabaseSettings'
+import PageContainer from './components/layout/PageContainer'
 
 // Main App component with routing
 function App() {
@@ -1398,13 +1399,13 @@ function App() {
           } />
           <Route path="*" element={
             <ErrorBoundary>
-              <Container size="xl">
+              <PageContainer>
                 <Title order={1}>Page Not Found</Title>
                 <Text mb="md">The page you're looking for doesn't exist.</Text>
                 <Button onClick={() => window.location.href = '/'}>
                   Go Home
                 </Button>
-              </Container>
+              </PageContainer>
             </ErrorBoundary>
           } />
         </Routes>

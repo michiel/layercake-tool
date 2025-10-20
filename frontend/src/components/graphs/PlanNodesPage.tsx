@@ -2,7 +2,6 @@ import React, { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation } from '@apollo/client/react'
 import {
-  Container,
   Title,
   Group,
   Button,
@@ -32,6 +31,7 @@ import {
 } from '@tabler/icons-react'
 import { gql } from '@apollo/client'
 import { Breadcrumbs } from '../common/Breadcrumbs'
+import PageContainer from '../layout/PageContainer'
 import { Graph, GET_GRAPHS, CREATE_GRAPH, UPDATE_GRAPH, DELETE_GRAPH, EXECUTE_NODE } from '../../graphql/graphs'
 import { getExecutionStateColor, getExecutionStateLabel, isExecutionInProgress } from '../../graphql/preview'
 import { GET_PLAN_DAG } from '../../graphql/plan-dag'
@@ -222,18 +222,18 @@ export const PlanNodesPage: React.FC<PlanNodesPageProps> = () => {
 
   if (!selectedProject) {
     return (
-      <Container size="xl">
+      <PageContainer>
         <Title order={1}>Project Not Found</Title>
         <Button onClick={() => navigate('/projects')} mt="md">
           Back to Projects
         </Button>
-      </Container>
+      </PageContainer>
     )
   }
 
   return (
     <>
-      <Container size="xl">
+      <PageContainer>
         <Breadcrumbs
           projectName={selectedProject.name}
           projectId={selectedProject.id}
@@ -414,7 +414,7 @@ export const PlanNodesPage: React.FC<PlanNodesPageProps> = () => {
             </Table.ScrollContainer>
           )}
         </Card>
-      </Container>
+      </PageContainer>
 
       <Modal
         opened={deleteModalOpen}

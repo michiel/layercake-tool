@@ -2,7 +2,6 @@ import React, { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation } from '@apollo/client/react'
 import {
-  Container,
   Title,
   Group,
   Button,
@@ -37,6 +36,7 @@ import { useQuery as useProjectsQuery } from '@apollo/client/react'
 import { Breadcrumbs } from '../common/Breadcrumbs'
 import { DataSourceUploader } from './DataSourceUploader'
 import { BulkDataSourceUploader } from './BulkDataSourceUploader'
+import PageContainer from '../layout/PageContainer'
 import {
   GET_DATASOURCES,
   DELETE_DATASOURCE,
@@ -319,18 +319,18 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
 
   if (!selectedProject) {
     return (
-      <Container size="xl">
+      <PageContainer>
         <Title order={1}>Project Not Found</Title>
         <Button onClick={() => navigate('/projects')} mt="md">
           Back to Projects
         </Button>
-      </Container>
+      </PageContainer>
     )
   }
 
   return (
     <>
-      <Container size="xl">
+      <PageContainer>
         <Breadcrumbs
           projectName={selectedProject.name}
           projectId={selectedProject.id}
@@ -550,7 +550,7 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
             </Table.ScrollContainer>
           )}
         </Card>
-      </Container>
+      </PageContainer>
 
       {/* Delete Confirmation Modal */}
       <Modal

@@ -2,7 +2,6 @@ import React, { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation } from '@apollo/client/react'
 import {
-  Container,
   Title,
   Group,
   Button,
@@ -31,6 +30,7 @@ import { gql } from '@apollo/client'
 import { Breadcrumbs } from '../common/Breadcrumbs'
 import { Graph, GET_GRAPHS, CREATE_GRAPH, UPDATE_GRAPH, DELETE_GRAPH, EXECUTE_NODE } from '../../graphql/graphs'
 import { GET_PLAN_DAG } from '../../graphql/plan-dag'
+import PageContainer from '../layout/PageContainer'
 import { getExecutionStateColor, getExecutionStateLabel, isExecutionInProgress } from '../../graphql/preview'
 
 const GET_PROJECTS = gql`
@@ -172,18 +172,18 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
 
   if (!selectedProject) {
     return (
-      <Container size="xl">
+      <PageContainer>
         <Title order={1}>Project Not Found</Title>
         <Button onClick={() => navigate('/projects')} mt="md">
           Back to Projects
         </Button>
-      </Container>
+      </PageContainer>
     )
   }
 
   return (
     <>
-      <Container size="xl">
+      <PageContainer>
         <Breadcrumbs
           projectName={selectedProject.name}
           projectId={selectedProject.id}
@@ -325,7 +325,7 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
             </SimpleGrid>
           )}
         </Card>
-      </Container>
+      </PageContainer>
 
       <Modal
         opened={deleteModalOpen}
