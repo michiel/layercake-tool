@@ -38,9 +38,14 @@ import {
   detectFileFormat,
   formatFileSize
 } from '../../graphql/datasources'
+import {
+  CREATE_LIBRARY_SOURCE,
+  CreateLibrarySourceInput
+} from '../../graphql/librarySources'
 
 interface DataSourceUploaderProps {
-  projectId: number
+  projectId?: number
+  mode?: 'project' | 'library'
   opened: boolean
   onClose: () => void
   onSuccess?: (dataSource: any) => void
@@ -55,6 +60,7 @@ interface FileInfo {
 
 export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
   projectId,
+  mode = 'project',
   opened,
   onClose,
   onSuccess
@@ -67,6 +73,12 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
   const [createDataSource, { loading: createLoading, error: createError }] = useMutation(
     CREATE_DATASOURCE_FROM_FILE
   )
+  const [createLibrarySource, { loading: createLibraryLoading, error: createLibraryError }] =
+    useMutation(CREATE_LIBRARY_SOURCE)
+
+  const isLibraryMode = mode === 'library'
+  const mutationLoading = isLibraryMode ? createLibraryLoading : createLoading
+  const mutationError = isLibraryMode ? createLibraryError : createError
 
   const form = useForm({
     initialValues: {
@@ -179,21 +191,46 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
       const fileContent = await fileToBase64(selectedFile.file)
       setUploadProgress(30)
 
-      const input: CreateDataSourceInput = {
-        projectId,
-        name: values.name,
-        description: values.description || undefined,
-        filename: selectedFile.file.name,
-        fileContent,
-        fileFormat: selectedFile.format,
-        dataType: values.dataType as DataType
-      }
-
       setUploadProgress(50)
 
-      const result = await createDataSource({
-        variables: { input }
-      })
+      let createdRecord: any = null
+
+      if (isLibraryMode) {
+        const input: CreateLibrarySourceInput = {
+          name: values.name,
+          description: values.description || undefined,
+          filename: selectedFile.file.name,
+          fileContent,
+          fileFormat: selectedFile.format,
+          dataType: values.dataType as DataType
+        }
+
+        const result = await createLibrarySource({
+          variables: { input }
+        })
+
+        createdRecord = (result.data as any)?.createLibrarySource || null
+      } else {
+        if (projectId === undefined) {
+          throw new Error('projectId is required to create a project data source')
+        }
+
+        const input: CreateDataSourceInput = {
+          projectId,
+          name: values.name,
+          description: values.description || undefined,
+          filename: selectedFile.file.name,
+          fileContent,
+          fileFormat: selectedFile.format,
+          dataType: values.dataType as DataType
+        }
+
+        const result = await createDataSource({
+          variables: { input }
+        })
+
+        createdRecord = (result.data as any)?.createDataSourceFromFile || null
+      }
 
       setUploadProgress(100)
 
@@ -203,15 +240,15 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
       setPreviewData(null)
       setUploadProgress(0)
 
-      if (onSuccess && result.data) {
-        onSuccess((result.data as any).createDataSourceFromFile)
+      if (onSuccess && createdRecord) {
+        onSuccess(createdRecord)
       }
 
       onClose()
     } catch (error) {
       console.error('Upload failed:', error)
       setUploadProgress(0)
-      // Error will be shown through createError
+      // Error will surface through mutationError
     }
   }
 
@@ -239,13 +276,14 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
 
   const isValidFileFormat = selectedFile?.format !== null
   const availableDataTypes = selectedFile ? getAvailableDataTypes(selectedFile.format) : []
+  const modalTitle = isLibraryMode ? 'Add Library Source' : 'Upload Data Source'
 
   return (
     <>
       <Modal
         opened={opened}
         onClose={handleClose}
-        title="Upload Data Source"
+        title={modalTitle}
         size="lg"
       >
         <form onSubmit={form.onSubmit(handleSubmit)}>
@@ -400,13 +438,13 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
             )}
 
             {/* Error Display */}
-            {createError && (
+            {mutationError && (
               <Alert
                 icon={<IconAlertCircle size={16} />}
                 title="Upload Failed"
                 color="red"
               >
-                {createError.message}
+                {mutationError.message}
               </Alert>
             )}
 
@@ -417,12 +455,12 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
 
             {/* Action Buttons */}
             <Group justify="flex-end" gap="sm">
-              <Button variant="light" onClick={handleClose} disabled={createLoading}>
+              <Button variant="light" onClick={handleClose} disabled={mutationLoading}>
                 Cancel
               </Button>
               <Button
                 type="submit"
-                loading={createLoading}
+                loading={mutationLoading}
                 disabled={!selectedFile || !isValidFileFormat}
                 leftSection={uploadProgress === 100 ? <IconCheck size={16} /> : <IconUpload size={16} />}
               >

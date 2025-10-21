@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Routes, Route, useNavigate, useParams, useLocation } from 'react-router-dom'
 import { AppShell, Group, Title, Stack, Button, Text, Card, Badge, Alert, Modal, Select, FileButton, ActionIcon, Tooltip } from '@mantine/core'
-import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconFileImport, IconDownload, IconChevronLeft, IconChevronRight, IconFolderPlus, IconNetwork } from '@tabler/icons-react'
+import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconFileImport, IconDownload, IconChevronLeft, IconChevronRight, IconFolderPlus, IconNetwork, IconBooks } from '@tabler/icons-react'
 import { useQuery, useMutation } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import { Breadcrumbs } from './components/common/Breadcrumbs'
@@ -9,6 +9,7 @@ import { PlanVisualEditor } from './components/editors/PlanVisualEditor/PlanVisu
 import { ErrorBoundary } from './components/common/ErrorBoundary'
 import { DataSourcesPage } from './components/datasources/DataSourcesPage'
 import { DataSourceEditor } from './components/datasources/DataSourceEditor'
+import { LibrarySourcesPage } from './components/library/LibrarySourcesPage'
 import { CreateProjectModal } from './components/project/CreateProjectModal'
 import { TopBar } from './components/layout/TopBar'
 import { useCollaborationV2 } from './hooks/useCollaborationV2'
@@ -178,6 +179,18 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                 style={navCollapsed ? { justifyContent: 'center' } : undefined}
               >
                 {navCollapsed ? <IconServer size={16} /> : 'Home'}
+              </Button>
+            </Tooltip>
+            <Tooltip label="Library" position="right" disabled={!navCollapsed}>
+              <Button
+                variant={isActiveRoute('/library') ? 'filled' : 'light'}
+                fullWidth={!navCollapsed}
+                leftSection={navCollapsed ? undefined : <IconBooks size={16} />}
+                onClick={() => navigate('/library')}
+                px={navCollapsed ? 'xs' : undefined}
+                style={navCollapsed ? { justifyContent: 'center' } : undefined}
+              >
+                {navCollapsed ? <IconBooks size={16} /> : 'Library'}
               </Button>
             </Tooltip>
             <Tooltip label="Projects" position="right" disabled={!navCollapsed}>
@@ -1350,6 +1363,11 @@ function App() {
           <Route path="/" element={
             <ErrorBoundary>
               <HomePage />
+            </ErrorBoundary>
+          } />
+          <Route path="/library" element={
+            <ErrorBoundary>
+              <LibrarySourcesPage />
             </ErrorBoundary>
           } />
           <Route path="/projects" element={

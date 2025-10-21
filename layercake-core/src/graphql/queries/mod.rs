@@ -2,8 +2,8 @@ use async_graphql::*;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
 use crate::database::entities::{
-    data_sources, graph_edges, graph_nodes, graphs, layers, plan_dag_edges, plan_dag_nodes, plans,
-    project_collaborators, projects, user_sessions, users,
+    data_sources, graph_edges, graph_nodes, graphs, layers, library_sources, plan_dag_edges,
+    plan_dag_nodes, plans, project_collaborators, projects, user_sessions, users,
 };
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::graph::Graph;
@@ -17,7 +17,7 @@ use crate::graphql::types::project::Project;
 use crate::graphql::types::sample_project::SampleProject;
 use crate::graphql::types::{
     DataSource, DataSourcePreview, GraphEdgePreview, GraphEdit, GraphNodePreview, GraphPreview,
-    Layer, ProjectCollaborator, TableColumn, TableRow, User, UserSession,
+    Layer, LibrarySource, ProjectCollaborator, TableColumn, TableRow, User, UserSession,
 };
 use crate::services::{
     graph_edit_service::GraphEditService, sample_project_service::SampleProjectService,
@@ -480,6 +480,24 @@ impl Query {
             .into_iter()
             .map(DataSource::from)
             .collect())
+    }
+
+    /// Get all library sources
+    async fn library_sources(&self, ctx: &Context<'_>) -> Result<Vec<LibrarySource>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let sources = library_sources::Entity::find().all(&context.db).await?;
+
+        Ok(sources.into_iter().map(LibrarySource::from).collect())
+    }
+
+    /// Get a single library source by ID
+    async fn library_source(&self, ctx: &Context<'_>, id: i32) -> Result<Option<LibrarySource>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let source = library_sources::Entity::find_by_id(id)
+            .one(&context.db)
+            .await?;
+
+        Ok(source.map(LibrarySource::from))
     }
 
     /// Get all Graphs for a project

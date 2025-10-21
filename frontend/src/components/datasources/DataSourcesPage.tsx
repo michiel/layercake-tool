@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation } from '@apollo/client/react'
 import {
@@ -30,7 +30,8 @@ import {
   IconClock,
   IconX,
   IconFileExport,
-  IconFileUpload
+  IconFileUpload,
+  IconBooks
 } from '@tabler/icons-react'
 import { useQuery as useProjectsQuery } from '@apollo/client/react'
 import { Breadcrumbs } from '../common/Breadcrumbs'
@@ -49,6 +50,12 @@ import {
   getDataTypeDisplayName,
   getStatusColor
 } from '../../graphql/datasources'
+
+import {
+  GET_LIBRARY_SOURCES,
+  IMPORT_LIBRARY_SOURCES,
+  LibrarySource
+} from '../../graphql/librarySources'
 
 import { gql } from '@apollo/client'
 
@@ -69,6 +76,7 @@ interface DataSourcesPageProps {}
 export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
   const navigate = useNavigate()
   const { projectId } = useParams<{ projectId: string }>()
+  const projectNumericId = parseInt(projectId || '0')
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [selectedDataSource, setSelectedDataSource] = useState<DataSource | null>(null)
   const [uploaderOpen, setUploaderOpen] = useState(false)
@@ -76,6 +84,9 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set())
   const [exportFormatModalOpen, setExportFormatModalOpen] = useState(false)
   const [importModalOpen, setImportModalOpen] = useState(false)
+  const [libraryImportModalOpen, setLibraryImportModalOpen] = useState(false)
+  const [selectedLibraryRows, setSelectedLibraryRows] = useState<Set<number>>(new Set())
+  const [librarySelectionError, setLibrarySelectionError] = useState<string | null>(null)
 
   // Query for project info
   const { data: projectsData } = useProjectsQuery<{
@@ -88,7 +99,7 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
     }>
   }>(GET_PROJECTS)
   const projects = projectsData?.projects || []
-  const selectedProject = projects.find(p => p.id === parseInt(projectId || '0'))
+  const selectedProject = projects.find(p => p.id === projectNumericId)
 
   // Query for DataSources
   const {
@@ -97,8 +108,18 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
     error: dataSourcesError,
     refetch: refetchDataSources
   } = useQuery(GET_DATASOURCES, {
-    variables: { projectId: parseInt(projectId || '0') },
+    variables: { projectId: projectNumericId },
     errorPolicy: 'all',
+    fetchPolicy: 'cache-and-network'
+  })
+
+  const {
+    data: librarySourcesData,
+    loading: librarySourcesLoading,
+    error: librarySourcesError,
+    refetch: refetchLibrarySources
+  } = useQuery(GET_LIBRARY_SOURCES, {
+    skip: !libraryImportModalOpen,
     fetchPolicy: 'cache-and-network'
   })
 
@@ -107,8 +128,21 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
   const [reprocessDataSource, { loading: reprocessLoading }] = useMutation(REPROCESS_DATASOURCE)
   const [exportDataSources] = useMutation(EXPORT_DATASOURCES)
   const [importDataSources] = useMutation(IMPORT_DATASOURCES)
+  const [importLibrarySources, { loading: libraryImportLoading, error: libraryImportError }] =
+    useMutation(IMPORT_LIBRARY_SOURCES)
 
   const dataSources: DataSource[] = (dataSourcesData as any)?.dataSources || []
+  const librarySources: LibrarySource[] = (librarySourcesData as any)?.librarySources || []
+
+  useEffect(() => {
+    if (!libraryImportModalOpen) {
+      setSelectedLibraryRows(new Set())
+      setLibrarySelectionError(null)
+      return
+    }
+
+    refetchLibrarySources()
+  }, [libraryImportModalOpen, refetchLibrarySources])
 
   const handleNavigate = (route: string) => {
     navigate(route)
@@ -198,6 +232,62 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
     }
   }
 
+  const toggleLibraryRowSelection = (id: number) => {
+    setSelectedLibraryRows((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
+  const toggleLibrarySelectAll = () => {
+    if (selectedLibraryRows.size === librarySources.length) {
+      setSelectedLibraryRows(new Set())
+    } else {
+      setSelectedLibraryRows(new Set(librarySources.map(ls => ls.id)))
+    }
+  }
+
+  const handleOpenLibraryImport = () => {
+    setLibrarySelectionError(null)
+    setSelectedLibraryRows(new Set())
+    setLibraryImportModalOpen(true)
+  }
+
+  const handleImportFromLibrary = async () => {
+    if (selectedLibraryRows.size === 0) {
+      setLibrarySelectionError('Select at least one library source to import')
+      return
+    }
+
+    if (!Number.isFinite(projectNumericId)) {
+      setLibrarySelectionError('Project context is missing or invalid')
+      return
+    }
+
+    try {
+      await importLibrarySources({
+        variables: {
+          input: {
+            projectId: projectNumericId,
+            librarySourceIds: Array.from(selectedLibraryRows)
+          }
+        }
+      })
+
+      await refetchDataSources()
+      setLibraryImportModalOpen(false)
+      setSelectedLibraryRows(new Set())
+      setLibrarySelectionError(null)
+    } catch (err) {
+      console.error('Failed to import library sources', err)
+    }
+  }
+
   const handleExportClick = () => {
     setExportFormatModalOpen(true)
   }
@@ -210,7 +300,7 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
       const result = await exportDataSources({
         variables: {
           input: {
-            projectId: parseInt(projectId || '0'),
+            projectId: projectNumericId,
             dataSourceIds: Array.from(selectedRows),
             format: format.toUpperCase()
           }
@@ -278,7 +368,7 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
         const result = await importDataSources({
           variables: {
             input: {
-              projectId: parseInt(projectId || '0'),
+              projectId: projectNumericId,
               fileContent: base64,
               filename: file.name
             }
@@ -360,6 +450,13 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
               variant="light"
             >
               Import
+            </Button>
+            <Button
+              leftSection={<IconBooks size={16} />}
+              onClick={handleOpenLibraryImport}
+              variant="light"
+            >
+              Import from Library
             </Button>
             <Button
               leftSection={<IconPlus size={16} />}
@@ -577,9 +674,128 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
         </Group>
       </Modal>
 
+      {/* Import from Library Modal */}
+      <Modal
+        opened={libraryImportModalOpen}
+        onClose={() => setLibraryImportModalOpen(false)}
+        title="Import from Library"
+        size="xl"
+      >
+        <Stack gap="md">
+          <Text size="sm" c="dimmed">
+            Select one or more library sources to copy into this project. Imported items appear in the project list and can be edited independently.
+          </Text>
+
+          {librarySourcesError && (
+            <Alert icon={<IconAlertCircle size={16} />} color="red">
+              {librarySourcesError.message}
+            </Alert>
+          )}
+
+          {libraryImportError && (
+            <Alert icon={<IconAlertCircle size={16} />} color="red">
+              {libraryImportError.message}
+            </Alert>
+          )}
+
+          {librarySelectionError && (
+            <Alert icon={<IconAlertCircle size={16} />} color="orange">
+              {librarySelectionError}
+            </Alert>
+          )}
+
+          <div style={{ position: 'relative' }}>
+            <LoadingOverlay visible={librarySourcesLoading || libraryImportLoading} />
+            {librarySources.length === 0 && !librarySourcesLoading ? (
+              <Stack align="center" py="lg" gap="xs">
+                <Text fw={500}>No library sources available</Text>
+                <Text size="sm" c="dimmed" ta="center" style={{ maxWidth: 360 }}>
+                  Add sources from the Library page before importing them into this project.
+                </Text>
+              </Stack>
+            ) : (
+              <Table.ScrollContainer minWidth={700}>
+                <Table striped highlightOnHover>
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th style={{ width: 40 }}>
+                        <Checkbox
+                          checked={selectedLibraryRows.size === librarySources.length && librarySources.length > 0}
+                          indeterminate={selectedLibraryRows.size > 0 && selectedLibraryRows.size < librarySources.length}
+                          onChange={toggleLibrarySelectAll}
+                        />
+                      </Table.Th>
+                      <Table.Th>Name</Table.Th>
+                      <Table.Th>Format</Table.Th>
+                      <Table.Th>Data Type</Table.Th>
+                      <Table.Th>Status</Table.Th>
+                      <Table.Th>Processed</Table.Th>
+                      <Table.Th>Size</Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {librarySources.map((source) => (
+                      <Table.Tr key={source.id}>
+                        <Table.Td>
+                          <Checkbox
+                            checked={selectedLibraryRows.has(source.id)}
+                            onChange={() => toggleLibraryRowSelection(source.id)}
+                            aria-label={`Select ${source.name}`}
+                          />
+                        </Table.Td>
+                        <Table.Td>
+                          <Stack gap={2}>
+                            <Text fw={500}>{source.name}</Text>
+                            {source.description && (
+                              <Text size="sm" c="dimmed">
+                                {source.description}
+                              </Text>
+                            )}
+                          </Stack>
+                        </Table.Td>
+                        <Table.Td>{getFileFormatDisplayName(source.fileFormat)}</Table.Td>
+                        <Table.Td>{getDataTypeDisplayName(source.dataType)}</Table.Td>
+                        <Table.Td>
+                          <Badge color={getStatusColor(source.status)} variant="light">
+                            {source.status === 'processing'
+                              ? 'Processing'
+                              : source.status === 'error'
+                                ? 'Error'
+                                : 'Active'}
+                          </Badge>
+                        </Table.Td>
+                        <Table.Td>
+                          {source.processedAt
+                            ? new Date(source.processedAt).toLocaleString()
+                            : '—'}
+                        </Table.Td>
+                        <Table.Td>{formatFileSize(source.fileSize)}</Table.Td>
+                      </Table.Tr>
+                    ))}
+                  </Table.Tbody>
+                </Table>
+              </Table.ScrollContainer>
+            )}
+          </div>
+
+          <Group justify="flex-end">
+            <Button variant="light" onClick={() => setLibraryImportModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleImportFromLibrary}
+              loading={libraryImportLoading}
+              disabled={librarySources.length === 0}
+            >
+              Import Selected ({selectedLibraryRows.size})
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
       {/* DataSource Uploader Modal */}
       <DataSourceUploader
-        projectId={parseInt(projectId || '0')}
+        projectId={projectNumericId}
         opened={uploaderOpen}
         onClose={() => setUploaderOpen(false)}
         onSuccess={(dataSource) => {
@@ -590,7 +806,7 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
 
       {/* Bulk DataSource Uploader Modal */}
       <BulkDataSourceUploader
-        projectId={parseInt(projectId || '0')}
+        projectId={projectNumericId}
         opened={bulkUploaderOpen}
         onClose={() => setBulkUploaderOpen(false)}
         onSuccess={() => {

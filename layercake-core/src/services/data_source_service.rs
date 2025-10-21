@@ -1,12 +1,9 @@
 use anyhow::{anyhow, Result};
-use csv::ReaderBuilder;
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
-use serde_json::{json, Value};
-use std::collections::HashMap;
 
 use crate::database::entities::data_sources::{self, DataType, FileFormat};
 use crate::database::entities::{plan_dag_edges, plan_dag_nodes, projects};
-use crate::services::file_type_detection;
+use crate::services::{file_type_detection, source_processing};
 
 /// Service for managing DataSources with file processing capabilities
 #[derive(Clone)]
@@ -116,31 +113,29 @@ impl DataSourceService {
         let data_source = data_source.insert(&self.db).await?;
 
         // Process the file
-        let updated_data_source = match self
-            .process_file(&file_format, &data_type, &file_data)
-            .await
-        {
-            Ok(graph_json) => {
-                // Update with successful processing
-                let mut active_model: data_sources::ActiveModel = data_source.into();
-                active_model.graph_json = Set(graph_json);
-                active_model.status = Set("active".to_string());
-                active_model.processed_at = Set(Some(chrono::Utc::now()));
-                active_model.updated_at = Set(chrono::Utc::now());
+        let updated_data_source =
+            match source_processing::process_file(&file_format, &data_type, &file_data).await {
+                Ok(graph_json) => {
+                    // Update with successful processing
+                    let mut active_model: data_sources::ActiveModel = data_source.into();
+                    active_model.graph_json = Set(graph_json);
+                    active_model.status = Set("active".to_string());
+                    active_model.processed_at = Set(Some(chrono::Utc::now()));
+                    active_model.updated_at = Set(chrono::Utc::now());
 
-                active_model.update(&self.db).await?
-            }
-            Err(e) => {
-                // Update with error
-                let mut active_model: data_sources::ActiveModel = data_source.into();
-                active_model.status = Set("error".to_string());
-                active_model.error_message = Set(Some(e.to_string()));
-                active_model.updated_at = Set(chrono::Utc::now());
+                    active_model.update(&self.db).await?
+                }
+                Err(e) => {
+                    // Update with error
+                    let mut active_model: data_sources::ActiveModel = data_source.into();
+                    active_model.status = Set("error".to_string());
+                    active_model.error_message = Set(Some(e.to_string()));
+                    active_model.updated_at = Set(chrono::Utc::now());
 
-                let _updated = active_model.update(&self.db).await?;
-                return Err(e);
-            }
-        };
+                    let _updated = active_model.update(&self.db).await?;
+                    return Err(e);
+                }
+            };
 
         Ok(updated_data_source)
     }
@@ -273,29 +268,27 @@ impl DataSourceService {
         let data_source = active_model.update(&self.db).await?;
 
         // Process the new file
-        let updated_data_source = match self
-            .process_file(&file_format, &data_type, &file_data)
-            .await
-        {
-            Ok(graph_json) => {
-                let mut active_model: data_sources::ActiveModel = data_source.into();
-                active_model.graph_json = Set(graph_json);
-                active_model.status = Set("active".to_string());
-                active_model.processed_at = Set(Some(chrono::Utc::now()));
-                active_model.updated_at = Set(chrono::Utc::now());
+        let updated_data_source =
+            match source_processing::process_file(&file_format, &data_type, &file_data).await {
+                Ok(graph_json) => {
+                    let mut active_model: data_sources::ActiveModel = data_source.into();
+                    active_model.graph_json = Set(graph_json);
+                    active_model.status = Set("active".to_string());
+                    active_model.processed_at = Set(Some(chrono::Utc::now()));
+                    active_model.updated_at = Set(chrono::Utc::now());
 
-                active_model.update(&self.db).await?
-            }
-            Err(e) => {
-                let mut active_model: data_sources::ActiveModel = data_source.into();
-                active_model.status = Set("error".to_string());
-                active_model.error_message = Set(Some(e.to_string()));
-                active_model.updated_at = Set(chrono::Utc::now());
+                    active_model.update(&self.db).await?
+                }
+                Err(e) => {
+                    let mut active_model: data_sources::ActiveModel = data_source.into();
+                    active_model.status = Set("error".to_string());
+                    active_model.error_message = Set(Some(e.to_string()));
+                    active_model.updated_at = Set(chrono::Utc::now());
 
-                let _updated = active_model.update(&self.db).await?;
-                return Err(e);
-            }
-        };
+                    let _updated = active_model.update(&self.db).await?;
+                    return Err(e);
+                }
+            };
 
         Ok(updated_data_source)
     }
@@ -369,9 +362,12 @@ impl DataSourceService {
         let data_source = active_model.update(&self.db).await?;
 
         // Process the file
-        let updated_data_source = match self
-            .process_file(&file_format, &data_type, &data_source.blob)
-            .await
+        let updated_data_source = match source_processing::process_file(
+            &file_format,
+            &data_type,
+            &data_source.blob,
+        )
+        .await
         {
             Ok(graph_json) => {
                 let mut active_model: data_sources::ActiveModel = data_source.into();
@@ -395,296 +391,11 @@ impl DataSourceService {
 
         Ok(updated_data_source)
     }
-
-    /// Process uploaded file data into graph JSON
-    async fn process_file(
-        &self,
-        file_format: &FileFormat,
-        data_type: &DataType,
-        file_data: &[u8],
-    ) -> Result<String> {
-        match (file_format, data_type) {
-            (FileFormat::Csv, DataType::Nodes) => {
-                self.process_delimited_nodes(file_data, b',').await
-            }
-            (FileFormat::Csv, DataType::Edges) => {
-                self.process_delimited_edges(file_data, b',').await
-            }
-            (FileFormat::Csv, DataType::Layers) => {
-                self.process_delimited_layers(file_data, b',').await
-            }
-            (FileFormat::Tsv, DataType::Nodes) => {
-                self.process_delimited_nodes(file_data, b'\t').await
-            }
-            (FileFormat::Tsv, DataType::Edges) => {
-                self.process_delimited_edges(file_data, b'\t').await
-            }
-            (FileFormat::Tsv, DataType::Layers) => {
-                self.process_delimited_layers(file_data, b'\t').await
-            }
-            (FileFormat::Json, DataType::Graph) => self.process_json_graph(file_data).await,
-            _ => Err(anyhow!("Invalid format/type combination")),
-        }
-    }
-
-    /// Process delimited nodes file (CSV or TSV)
-    async fn process_delimited_nodes(&self, file_data: &[u8], delimiter: u8) -> Result<String> {
-        let content = String::from_utf8(file_data.to_vec())?;
-        let mut reader = ReaderBuilder::new()
-            .has_headers(true)
-            .delimiter(delimiter)
-            .from_reader(content.as_bytes());
-
-        let headers = reader.headers()?.clone();
-        let mut nodes = Vec::new();
-
-        // Validate required headers
-        if !headers.iter().any(|h| h == "id") || !headers.iter().any(|h| h == "label") {
-            return Err(anyhow!("CSV must contain 'id' and 'label' columns"));
-        }
-
-        for result in reader.records() {
-            let record = result?;
-            let mut node = HashMap::new();
-
-            // Process each field
-            for (i, field) in record.iter().enumerate() {
-                if let Some(header) = headers.get(i) {
-                    match header {
-                        "id" => {
-                            node.insert("id".to_string(), json!(field));
-                        }
-                        "label" => {
-                            node.insert("label".to_string(), json!(field));
-                        }
-                        "layer" => {
-                            if !field.is_empty() {
-                                node.insert("layer".to_string(), json!(field));
-                            }
-                        }
-                        "x" => {
-                            if let Ok(x) = field.parse::<f64>() {
-                                node.insert("x".to_string(), json!(x));
-                            }
-                        }
-                        "y" => {
-                            if let Ok(y) = field.parse::<f64>() {
-                                node.insert("y".to_string(), json!(y));
-                            }
-                        }
-                        _ => {
-                            // Store as metadata, skip empty strings
-                            if !field.is_empty() {
-                                node.insert(header.to_string(), json!(field));
-                            }
-                        }
-                    };
-                }
-            }
-
-            nodes.push(json!(node));
-        }
-
-        let graph_json = json!({
-            "nodes": nodes,
-            "edges": [],
-            "layers": []
-        });
-
-        Ok(serde_json::to_string(&graph_json)?)
-    }
-
-    /// Process delimited edges file (CSV or TSV)
-    async fn process_delimited_edges(&self, file_data: &[u8], delimiter: u8) -> Result<String> {
-        let content = String::from_utf8(file_data.to_vec())?;
-        let mut reader = ReaderBuilder::new()
-            .has_headers(true)
-            .delimiter(delimiter)
-            .from_reader(content.as_bytes());
-
-        let headers = reader.headers()?.clone();
-        let mut edges = Vec::new();
-
-        // Validate required headers
-        let required_headers = ["id", "source", "target"];
-        for required in &required_headers {
-            if !headers.iter().any(|h| h == *required) {
-                return Err(anyhow!("CSV must contain '{}' column", required));
-            }
-        }
-
-        for result in reader.records() {
-            let record = result?;
-            let mut edge = HashMap::new();
-
-            for (i, field) in record.iter().enumerate() {
-                if let Some(header) = headers.get(i) {
-                    match header {
-                        "id" | "source" | "target" => {
-                            edge.insert(header.to_string(), json!(field));
-                        }
-                        "label" => {
-                            if !field.is_empty() {
-                                edge.insert(header.to_string(), json!(field));
-                            }
-                        }
-                        "weight" => {
-                            if let Ok(weight) = field.parse::<f64>() {
-                                edge.insert("weight".to_string(), json!(weight));
-                            }
-                        }
-                        _ => {
-                            // Store as metadata, skip empty strings
-                            if !field.is_empty() {
-                                edge.insert(header.to_string(), json!(field));
-                            }
-                        }
-                    };
-                }
-            }
-
-            edges.push(json!(edge));
-        }
-
-        let graph_json = json!({
-            "nodes": [],
-            "edges": edges,
-            "layers": []
-        });
-
-        Ok(serde_json::to_string(&graph_json)?)
-    }
-
-    /// Process delimited layers file (CSV or TSV)
-    async fn process_delimited_layers(&self, file_data: &[u8], delimiter: u8) -> Result<String> {
-        let content = String::from_utf8(file_data.to_vec())?;
-        let mut reader = ReaderBuilder::new()
-            .has_headers(true)
-            .delimiter(delimiter)
-            .from_reader(content.as_bytes());
-
-        let headers = reader.headers()?.clone();
-        println!("CSV Headers: {:?}", headers);
-        let mut layers = Vec::new();
-
-        // Validate required headers: must have ('id' or 'layer') and 'label'
-        let has_id_col = headers.iter().any(|h| h == "id" || h == "layer");
-        let has_label_col = headers.iter().any(|h| h == "label");
-
-        if !has_id_col || !has_label_col {
-            return Err(anyhow!(
-                "CSV must contain 'label' and either 'id' or 'layer' columns"
-            ));
-        }
-
-        for result in reader.records() {
-            let record = result?;
-            println!("CSV Record: {:?}", record);
-            let mut layer = HashMap::new();
-
-            for (i, field) in record.iter().enumerate() {
-                if let Some(header) = headers.get(i) {
-                    let key = if header == "layer" { "id" } else { header };
-                    match key {
-                        "id" | "label" => {
-                            layer.insert(key.to_string(), json!(field));
-                        }
-                        "description" => {
-                            if !field.is_empty() {
-                                layer.insert(key.to_string(), json!(field));
-                            }
-                        }
-                        "color" | "background" => {
-                            if !field.is_empty() {
-                                layer.insert("background_color".to_string(), json!(field));
-                            }
-                        }
-                        "border" => {
-                            if !field.is_empty() {
-                                layer.insert("border_color".to_string(), json!(field));
-                            }
-                        }
-                        "text" => {
-                            if !field.is_empty() {
-                                layer.insert("text_color".to_string(), json!(field));
-                            }
-                        }
-                        "z_index" => {
-                            if let Ok(z) = field.parse::<i32>() {
-                                layer.insert("z_index".to_string(), json!(z));
-                            }
-                        }
-                        _ => {
-                            // Store as metadata, skip empty strings
-                            if !field.is_empty() {
-                                layer.insert(key.to_string(), json!(field));
-                            }
-                        }
-                    };
-                }
-            }
-
-            layers.push(json!(layer));
-        }
-
-        let graph_json = json!({
-            "nodes": [],
-            "edges": [],
-            "layers": layers
-        });
-
-        Ok(serde_json::to_string(&graph_json)?)
-    }
-
-    /// Process JSON graph file
-    async fn process_json_graph(&self, file_data: &[u8]) -> Result<String> {
-        let content = String::from_utf8(file_data.to_vec())?;
-        let graph_data: Value = serde_json::from_str(&content)?;
-
-        // Validate graph structure
-        if !graph_data.is_object() {
-            return Err(anyhow!("JSON must be an object"));
-        }
-
-        let obj = graph_data
-            .as_object()
-            .ok_or_else(|| anyhow!("JSON data is not a valid object"))?;
-
-        // Ensure required fields exist
-        if !obj.contains_key("nodes") || !obj.contains_key("edges") || !obj.contains_key("layers") {
-            return Err(anyhow!(
-                "JSON must contain 'nodes', 'edges', and 'layers' arrays"
-            ));
-        }
-
-        // Validate that they are arrays
-        if !obj["nodes"].is_array() || !obj["edges"].is_array() || !obj["layers"].is_array() {
-            return Err(anyhow!("'nodes', 'edges', and 'layers' must be arrays"));
-        }
-
-        // Return the validated JSON
-        Ok(serde_json::to_string(&graph_data)?)
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[tokio::test]
-    async fn test_process_csv_nodes() {
-        let service = DataSourceService::new(
-            // Mock database connection would go here
-            DatabaseConnection::default(),
-        );
-
-        let csv_data =
-            b"id,label,layer,x,y\nnode1,Node 1,layer1,10.5,20.5\nnode2,Node 2,layer1,30.0,40.0";
-
-        // This test would work with proper database setup
-        // let result = service.process_csv_nodes(csv_data).await;
-        // assert!(result.is_ok());
-    }
 
     #[test]
     fn test_file_format_detection() {

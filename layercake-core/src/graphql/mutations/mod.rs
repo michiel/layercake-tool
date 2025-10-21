@@ -16,6 +16,7 @@ use crate::services::datasource_bulk_service::DataSourceBulkService;
 use crate::services::export_service::ExportService;
 use crate::services::graph_edit_service::GraphEditService;
 use crate::services::graph_service::GraphService;
+use crate::services::library_source_service::LibrarySourceService;
 use crate::services::sample_project_service::SampleProjectService;
 
 use crate::graphql::types::graph::{CreateGraphInput, CreateLayerInput, Graph, UpdateGraphInput};
@@ -29,10 +30,12 @@ use crate::graphql::types::plan_dag::{
 };
 use crate::graphql::types::project::{CreateProjectInput, Project, UpdateProjectInput};
 use crate::graphql::types::{
-    BulkUploadDataSourceInput, CreateDataSourceInput, DataSource, ExportDataSourcesInput,
-    ExportDataSourcesResult, ImportDataSourcesInput, ImportDataSourcesResult,
-    InviteCollaboratorInput, LoginInput, LoginResponse, ProjectCollaborator, RegisterResponse,
-    RegisterUserInput, UpdateCollaboratorRoleInput, UpdateDataSourceInput, UpdateUserInput, User,
+    BulkUploadDataSourceInput, CreateDataSourceInput, CreateLibrarySourceInput, DataSource,
+    ExportDataSourcesInput, ExportDataSourcesResult, ImportDataSourcesInput,
+    ImportDataSourcesResult, ImportLibrarySourcesInput, InviteCollaboratorInput, LibrarySource,
+    LoginInput, LoginResponse, ProjectCollaborator, RegisterResponse, RegisterUserInput,
+    UpdateCollaboratorRoleInput, UpdateDataSourceInput, UpdateLibrarySourceInput, UpdateUserInput,
+    User,
 };
 
 pub struct Mutation;
@@ -42,7 +45,13 @@ fn generate_node_id(
     node_type: &crate::graphql::types::PlanDagNodeType,
     existing_nodes: &[PlanDagNode],
 ) -> String {
-    generate_node_id_from_ids(node_type, &existing_nodes.iter().map(|n| n.id.as_str()).collect::<Vec<_>>())
+    generate_node_id_from_ids(
+        node_type,
+        &existing_nodes
+            .iter()
+            .map(|n| n.id.as_str())
+            .collect::<Vec<_>>(),
+    )
 }
 
 /// Generate a unique node ID based on node type and existing node IDs
@@ -319,9 +328,10 @@ impl Mutation {
         // Insert new Plan DAG edges
         for edge in &plan_dag.edges {
             // Generate ID if not provided
-            let edge_id = edge.id.clone().unwrap_or_else(|| {
-                generate_edge_id(&edge.source, &edge.target)
-            });
+            let edge_id = edge
+                .id
+                .clone()
+                .unwrap_or_else(|| generate_edge_id(&edge.source, &edge.target));
 
             let metadata_json = serde_json::to_string(&edge.metadata)?;
 
@@ -1670,28 +1680,27 @@ impl Mutation {
 
         // Export to the requested format
         let file_bytes = match input.format {
-            crate::graphql::types::SpreadsheetFormat::XLSX => {
-                bulk_service
-                    .export_to_xlsx(&input.data_source_ids)
-                    .await
-                    .map_err(|e| Error::new(format!("Failed to export datasources: {}", e)))?
-            }
-            crate::graphql::types::SpreadsheetFormat::ODS => {
-                bulk_service
-                    .export_to_ods(&input.data_source_ids)
-                    .await
-                    .map_err(|e| Error::new(format!("Failed to export datasources: {}", e)))?
-            }
+            crate::graphql::types::SpreadsheetFormat::XLSX => bulk_service
+                .export_to_xlsx(&input.data_source_ids)
+                .await
+                .map_err(|e| Error::new(format!("Failed to export datasources: {}", e)))?,
+            crate::graphql::types::SpreadsheetFormat::ODS => bulk_service
+                .export_to_ods(&input.data_source_ids)
+                .await
+                .map_err(|e| Error::new(format!("Failed to export datasources: {}", e)))?,
         };
 
         // Encode as base64
-        use base64::{Engine as _, engine::general_purpose};
+        use base64::{engine::general_purpose, Engine as _};
         let encoded = general_purpose::STANDARD.encode(&file_bytes);
 
         Ok(ExportDataSourcesResult {
             file_content: encoded,
-            filename: format!("datasources_export_{}.{}",
-                chrono::Utc::now().timestamp(), format_str),
+            filename: format!(
+                "datasources_export_{}.{}",
+                chrono::Utc::now().timestamp(),
+                format_str
+            ),
             format: format_str.to_string(),
         })
     }
@@ -1706,9 +1715,12 @@ impl Mutation {
         let bulk_service = DataSourceBulkService::new(context.db.clone());
 
         // Decode base64 file content
-        use base64::{Engine as _, engine::general_purpose};
-        tracing::info!("Importing datasources from file: {} (base64 length: {})",
-            input.filename, input.file_content.len());
+        use base64::{engine::general_purpose, Engine as _};
+        tracing::info!(
+            "Importing datasources from file: {} (base64 length: {})",
+            input.filename,
+            input.file_content.len()
+        );
 
         let file_bytes = general_purpose::STANDARD
             .decode(&input.file_content)
@@ -1728,7 +1740,9 @@ impl Mutation {
                 .await
                 .map_err(|e| Error::new(format!("Failed to import datasources: {}", e)))?
         } else {
-            return Err(Error::new("Only XLSX and ODS formats are supported for import"));
+            return Err(Error::new(
+                "Only XLSX and ODS formats are supported for import",
+            ));
         };
 
         // Fetch the imported datasources to return
@@ -1748,6 +1762,145 @@ impl Mutation {
             created_count: result.created_count,
             updated_count: result.updated_count,
         })
+    }
+
+    /// Create a new LibrarySource from uploaded file
+    async fn create_library_source(
+        &self,
+        ctx: &Context<'_>,
+        input: CreateLibrarySourceInput,
+    ) -> Result<LibrarySource> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let service = LibrarySourceService::new(context.db.clone());
+
+        let CreateLibrarySourceInput {
+            name,
+            description,
+            filename,
+            file_content,
+            file_format,
+            data_type,
+        } = input;
+
+        use base64::Engine;
+        let file_bytes = base64::engine::general_purpose::STANDARD
+            .decode(&file_content)
+            .map_err(|e| Error::new(format!("Failed to decode base64 file content: {}", e)))?;
+
+        let file_format: crate::database::entities::data_sources::FileFormat = file_format.into();
+        let data_type: crate::database::entities::data_sources::DataType = data_type.into();
+
+        let model = service
+            .create_from_file(
+                name,
+                description,
+                filename,
+                file_format,
+                data_type,
+                file_bytes,
+            )
+            .await
+            .map_err(|e| Error::new(format!("Failed to create library source: {}", e)))?;
+
+        Ok(LibrarySource::from(model))
+    }
+
+    /// Update an existing LibrarySource metadata and optionally replace its file
+    async fn update_library_source(
+        &self,
+        ctx: &Context<'_>,
+        id: i32,
+        input: UpdateLibrarySourceInput,
+    ) -> Result<LibrarySource> {
+        if input.file_content.is_none() && input.filename.is_some() {
+            return Err(Error::new(
+                "filename can only be changed when fileContent is provided",
+            ));
+        }
+
+        let context = ctx.data::<GraphQLContext>()?;
+        let service = LibrarySourceService::new(context.db.clone());
+
+        let mut current = if let Some(file_content) = &input.file_content {
+            use base64::Engine;
+            let file_bytes = base64::engine::general_purpose::STANDARD
+                .decode(file_content)
+                .map_err(|e| Error::new(format!("Failed to decode base64 file content: {}", e)))?;
+
+            let filename = if let Some(filename) = &input.filename {
+                filename.clone()
+            } else {
+                service
+                    .get_by_id(id)
+                    .await
+                    .map_err(|e| Error::new(format!("Failed to load library source: {}", e)))?
+                    .ok_or_else(|| Error::new("Library source not found"))?
+                    .filename
+            };
+
+            service
+                .update_file(id, filename, file_bytes)
+                .await
+                .map_err(|e| Error::new(format!("Failed to update library source file: {}", e)))?
+        } else {
+            service
+                .get_by_id(id)
+                .await
+                .map_err(|e| Error::new(format!("Failed to load library source: {}", e)))?
+                .ok_or_else(|| Error::new("Library source not found"))?
+        };
+
+        if input.name.is_some() || input.description.is_some() {
+            current = service
+                .update(id, input.name.clone(), input.description.clone())
+                .await
+                .map_err(|e| Error::new(format!("Failed to update library source: {}", e)))?;
+        }
+
+        Ok(LibrarySource::from(current))
+    }
+
+    /// Delete a LibrarySource
+    async fn delete_library_source(&self, ctx: &Context<'_>, id: i32) -> Result<bool> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let service = LibrarySourceService::new(context.db.clone());
+
+        service
+            .delete(id)
+            .await
+            .map_err(|e| Error::new(format!("Failed to delete library source: {}", e)))?;
+
+        Ok(true)
+    }
+
+    /// Reprocess the stored file for a LibrarySource
+    async fn reprocess_library_source(&self, ctx: &Context<'_>, id: i32) -> Result<LibrarySource> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let service = LibrarySourceService::new(context.db.clone());
+
+        let model = service
+            .reprocess(id)
+            .await
+            .map_err(|e| Error::new(format!("Failed to reprocess library source: {}", e)))?;
+
+        Ok(LibrarySource::from(model))
+    }
+
+    /// Import one or more LibrarySources into a project as project-scoped DataSources
+    async fn import_library_sources(
+        &self,
+        ctx: &Context<'_>,
+        input: ImportLibrarySourcesInput,
+    ) -> Result<Vec<DataSource>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let service = LibrarySourceService::new(context.db.clone());
+
+        let models = service
+            .import_many_into_project(input.project_id, &input.library_source_ids)
+            .await
+            .map_err(|e| Error::new(format!("Failed to import library sources: {}", e)))?;
+
+        Ok(models.into_iter().map(DataSource::from).collect())
     }
 
     /// Create a new Graph
@@ -1847,13 +2000,10 @@ impl Mutation {
             .await?;
 
         // Convert belongs_to to Option<Option<String>> for service call
-        let belongs_to_param = belongs_to.as_ref().map(|b| {
-            if b.is_empty() {
-                None
-            } else {
-                Some(b.clone())
-            }
-        });
+        let belongs_to_param =
+            belongs_to
+                .as_ref()
+                .map(|b| if b.is_empty() { None } else { Some(b.clone()) });
 
         // Update the node
         let node = graph_service
