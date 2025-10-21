@@ -44,7 +44,7 @@ jobs:
             librsvg2-dev
 
       - name: Install Tauri CLI
-        run: cargo install tauri-cli --locked
+        run: cargo install tauri-cli --version "2.8.4" --locked
 
       - name: Install frontend dependencies
         run: npm run frontend:install

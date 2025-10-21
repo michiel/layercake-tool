@@ -63,7 +63,7 @@ jobs:
           strip: true
           force-use-cross: false
       - name: Install Tauri CLI
-        run: cargo install tauri-cli --version "^2.0" --locked
+        run: cargo install tauri-cli --version "2.8.4" --locked
       - name: Build Tauri desktop bundle
         shell: bash
         run: |
