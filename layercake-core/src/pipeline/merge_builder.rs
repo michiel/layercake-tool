@@ -57,11 +57,9 @@ impl MergeBuilder {
         // Publish execution status change
         #[cfg(feature = "graphql")]
         crate::graphql::execution_events::publish_graph_status(
-            &self.db,
-            project_id,
-            &node_id,
-            &graph,
-        ).await;
+            &self.db, project_id, &node_id, &graph,
+        )
+        .await;
 
         // Fetch upstream data sources by reading plan_dag_nodes configs
         let mut data_sources_list = Vec::new();
@@ -119,11 +117,9 @@ impl MergeBuilder {
                 // Publish execution status change
                 #[cfg(feature = "graphql")]
                 crate::graphql::execution_events::publish_graph_status(
-                    &self.db,
-                    project_id,
-                    &node_id,
-                    &updated,
-                ).await;
+                    &self.db, project_id, &node_id, &updated,
+                )
+                .await;
 
                 Ok(updated)
             }
@@ -136,11 +132,9 @@ impl MergeBuilder {
                 // Publish execution status change
                 #[cfg(feature = "graphql")]
                 crate::graphql::execution_events::publish_graph_status(
-                    &self.db,
-                    project_id,
-                    &node_id,
-                    &updated,
-                ).await;
+                    &self.db, project_id, &node_id, &updated,
+                )
+                .await;
 
                 Err(e)
             }

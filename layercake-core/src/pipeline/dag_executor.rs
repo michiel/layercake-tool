@@ -245,7 +245,8 @@ impl DagExecutor {
             project_id,
             node_id,
             &graph_record,
-        ).await;
+        )
+        .await;
 
         self.persist_graph_contents(graph_record.id, graph).await?;
 
@@ -261,11 +262,9 @@ impl DagExecutor {
         // Publish execution status change
         #[cfg(feature = "graphql")]
         crate::graphql::execution_events::publish_graph_status(
-            &self.db,
-            project_id,
-            node_id,
-            &updated,
-        ).await;
+            &self.db, project_id, node_id, &updated,
+        )
+        .await;
 
         Ok(())
     }

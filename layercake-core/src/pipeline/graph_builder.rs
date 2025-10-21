@@ -61,11 +61,9 @@ impl GraphBuilder {
         // Publish execution status change
         #[cfg(feature = "graphql")]
         crate::graphql::execution_events::publish_graph_status(
-            &self.db,
-            project_id,
-            &node_id,
-            &graph,
-        ).await;
+            &self.db, project_id, &node_id, &graph,
+        )
+        .await;
 
         // Fetch upstream sources by reading plan_dag_nodes
         // Upstream can be DataSource nodes OR Graph/Merge nodes
@@ -167,11 +165,9 @@ impl GraphBuilder {
                 // Publish execution status change
                 #[cfg(feature = "graphql")]
                 crate::graphql::execution_events::publish_graph_status(
-                    &self.db,
-                    project_id,
-                    &node_id,
-                    &updated,
-                ).await;
+                    &self.db, project_id, &node_id, &updated,
+                )
+                .await;
 
                 Ok(updated)
             }
@@ -184,11 +180,9 @@ impl GraphBuilder {
                 // Publish execution status change
                 #[cfg(feature = "graphql")]
                 crate::graphql::execution_events::publish_graph_status(
-                    &self.db,
-                    project_id,
-                    &node_id,
-                    &updated,
-                ).await;
+                    &self.db, project_id, &node_id, &updated,
+                )
+                .await;
 
                 Err(e)
             }

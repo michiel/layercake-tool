@@ -2,7 +2,6 @@
 ///
 /// This module provides convenience functions to publish execution status
 /// updates via GraphQL subscriptions when datasources or graphs change state.
-
 use crate::database::entities::{datasources, graphs};
 use crate::graphql::subscriptions::publish_execution_status_event;
 use crate::graphql::types::*;

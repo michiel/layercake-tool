@@ -13,10 +13,10 @@ fn compare_directories(dir1: &Path, dir2: &Path) -> Result<(), String> {
         return Err("One or both directories do not exist".to_string());
     }
 
-    let entries1 =
-        fs::read_dir(path1).map_err(|e| format!("Failed to read directory {}: {}", path1.display(), e))?;
-    let entries2 =
-        fs::read_dir(path2).map_err(|e| format!("Failed to read directory {}: {}", path2.display(), e))?;
+    let entries1 = fs::read_dir(path1)
+        .map_err(|e| format!("Failed to read directory {}: {}", path1.display(), e))?;
+    let entries2 = fs::read_dir(path2)
+        .map_err(|e| format!("Failed to read directory {}: {}", path2.display(), e))?;
 
     let mut files1: Vec<_> = entries1
         .filter_map(Result::ok)
@@ -69,10 +69,7 @@ fn reference_exports() {
     }
 
     layercake::plan_execution::execute_plan(
-        plan_path
-            .clone()
-            .to_string_lossy()
-            .into_owned(),
+        plan_path.clone().to_string_lossy().into_owned(),
         false,
     )
     .unwrap();

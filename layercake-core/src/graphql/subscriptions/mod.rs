@@ -7,7 +7,9 @@ use tokio::sync::broadcast;
 use tokio::sync::RwLock;
 
 use crate::graphql::context::GraphQLContext;
-use crate::graphql::types::{NodeExecutionStatusEvent, PlanDagDeltaEvent, PlanDagEdge, PlanDagNode};
+use crate::graphql::types::{
+    NodeExecutionStatusEvent, PlanDagDeltaEvent, PlanDagEdge, PlanDagNode,
+};
 // REMOVED: CursorPosition import - user presence now handled via WebSocket only
 
 pub struct Subscription;
@@ -485,7 +487,9 @@ pub async fn publish_delta_event(event: PlanDagDeltaEvent) -> Result<(), String>
 }
 
 /// Get or create an execution status broadcaster for a specific project
-async fn get_execution_status_broadcaster(project_id: i32) -> broadcast::Sender<NodeExecutionStatusEvent> {
+async fn get_execution_status_broadcaster(
+    project_id: i32,
+) -> broadcast::Sender<NodeExecutionStatusEvent> {
     // Fast path: Try read lock first
     {
         let broadcasters = EXECUTION_STATUS_BROADCASTERS.read().await;

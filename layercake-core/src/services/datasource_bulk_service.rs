@@ -2,10 +2,10 @@ use anyhow::{Context, Result};
 use icu_locid::locale;
 use rust_xlsxwriter::*;
 use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, Set};
-use spreadsheet_ods::{WorkBook, Sheet, Value};
+use spreadsheet_ods::{Sheet, Value, WorkBook};
 
 use crate::database::entities::data_sources;
-use crate::database::entities::data_sources::{FileFormat, DataType};
+use crate::database::entities::data_sources::{DataType, FileFormat};
 use crate::services::data_source_service::DataSourceService;
 
 pub struct DataSourceBulkService {
@@ -79,16 +79,17 @@ impl DataSourceBulkService {
 
     /// Convert graph_json to CSV rows
     fn graph_json_to_csv_rows(graph_json: &str, data_type: &str) -> Result<Vec<Vec<String>>> {
-        let data: serde_json::Value = serde_json::from_str(graph_json)
-            .context("Failed to parse graph_json")?;
+        let data: serde_json::Value =
+            serde_json::from_str(graph_json).context("Failed to parse graph_json")?;
 
         let array = match data_type {
             "nodes" => data.get("nodes"),
             "edges" => data.get("edges"),
             "layers" => data.get("layers"),
             _ => None,
-        }.and_then(|v| v.as_array())
-         .ok_or_else(|| anyhow::anyhow!("No {} array in graph_json", data_type))?;
+        }
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| anyhow::anyhow!("No {} array in graph_json", data_type))?;
 
         if array.is_empty() {
             return Ok(Vec::new());
@@ -112,7 +113,8 @@ impl DataSourceBulkService {
             if let Some(obj) = item.as_object() {
                 let mut row = Vec::new();
                 for header in &headers {
-                    let value = obj.get(header)
+                    let value = obj
+                        .get(header)
                         .map(|v| match v {
                             serde_json::Value::String(s) => s.clone(),
                             serde_json::Value::Number(n) => n.to_string(),
@@ -151,7 +153,8 @@ impl DataSourceBulkService {
         for ds in &datasources {
             *name_counts.entry(&ds.name).or_insert(0) += 1;
         }
-        let duplicates: Vec<&String> = name_counts.iter()
+        let duplicates: Vec<&String> = name_counts
+            .iter()
             .filter(|(_, &count)| count > 1)
             .map(|(&name, _)| name)
             .collect();
@@ -159,7 +162,11 @@ impl DataSourceBulkService {
         if !duplicates.is_empty() {
             return Err(anyhow::anyhow!(
                 "Cannot export: duplicate datasource names found: {}",
-                duplicates.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ")
+                duplicates
+                    .iter()
+                    .map(|s| s.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
             ));
         }
 
@@ -169,8 +176,12 @@ impl DataSourceBulkService {
             let worksheet = workbook.add_worksheet();
             worksheet.set_name(&sheet_name)?;
 
-            tracing::info!("Exporting datasource {} ({}) to sheet {}",
-                datasource.id, datasource.name, sheet_name);
+            tracing::info!(
+                "Exporting datasource {} ({}) to sheet {}",
+                datasource.id,
+                datasource.name,
+                sheet_name
+            );
 
             // Convert graph_json to CSV rows
             match Self::graph_json_to_csv_rows(&datasource.graph_json, &datasource.data_type) {
@@ -189,7 +200,11 @@ impl DataSourceBulkService {
                     tracing::info!("Wrote {} rows to sheet {}", rows.len(), sheet_name);
                 }
                 Err(e) => {
-                    tracing::warn!("Failed to convert datasource {} to CSV: {}", datasource.id, e);
+                    tracing::warn!(
+                        "Failed to convert datasource {} to CSV: {}",
+                        datasource.id,
+                        e
+                    );
                     // Write error message to sheet
                     worksheet.write_string(0, 0, "Error")?;
                     worksheet.write_string(0, 1, &format!("Failed to export: {}", e))?;
@@ -198,9 +213,7 @@ impl DataSourceBulkService {
         }
 
         // Save to buffer
-        workbook
-            .save_to_buffer()
-            .context("Failed to generate XLSX")
+        workbook.save_to_buffer().context("Failed to generate XLSX")
     }
 
     /// Export datasources to ODS format
@@ -224,7 +237,8 @@ impl DataSourceBulkService {
         for ds in &datasources {
             *name_counts.entry(&ds.name).or_insert(0) += 1;
         }
-        let duplicates: Vec<&String> = name_counts.iter()
+        let duplicates: Vec<&String> = name_counts
+            .iter()
             .filter(|(_, &count)| count > 1)
             .map(|(&name, _)| name)
             .collect();
@@ -232,7 +246,11 @@ impl DataSourceBulkService {
         if !duplicates.is_empty() {
             return Err(anyhow::anyhow!(
                 "Cannot export: duplicate datasource names found: {}",
-                duplicates.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ")
+                duplicates
+                    .iter()
+                    .map(|s| s.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
             ));
         }
 
@@ -241,8 +259,12 @@ impl DataSourceBulkService {
             let sheet_name = datasource.name.clone();
             let mut sheet = Sheet::new(&sheet_name);
 
-            tracing::info!("Exporting datasource {} ({}) to sheet {}",
-                datasource.id, datasource.name, sheet_name);
+            tracing::info!(
+                "Exporting datasource {} ({}) to sheet {}",
+                datasource.id,
+                datasource.name,
+                sheet_name
+            );
 
             // Convert graph_json to CSV rows
             match Self::graph_json_to_csv_rows(&datasource.graph_json, &datasource.data_type) {
@@ -254,14 +276,22 @@ impl DataSourceBulkService {
                             if let Ok(num) = value.parse::<f64>() {
                                 sheet.set_value(row_idx as u32, col_idx as u32, Value::Number(num));
                             } else {
-                                sheet.set_value(row_idx as u32, col_idx as u32, Value::Text(value.clone()));
+                                sheet.set_value(
+                                    row_idx as u32,
+                                    col_idx as u32,
+                                    Value::Text(value.clone()),
+                                );
                             }
                         }
                     }
                     tracing::info!("Wrote {} rows to sheet {}", rows.len(), sheet_name);
                 }
                 Err(e) => {
-                    tracing::warn!("Failed to convert datasource {} to CSV: {}", datasource.id, e);
+                    tracing::warn!(
+                        "Failed to convert datasource {} to CSV: {}",
+                        datasource.id,
+                        e
+                    );
                     // Write error message to sheet
                     sheet.set_value(0, 0, Value::Text("Error".to_string()));
                     sheet.set_value(0, 1, Value::Text(format!("Failed to export: {}", e)));
@@ -285,17 +315,16 @@ impl DataSourceBulkService {
         project_id: i32,
         xlsx_data: &[u8],
     ) -> Result<DataSourceImportResult> {
-        use calamine::{open_workbook_from_rs, Reader, Xlsx, Data};
+        use calamine::{open_workbook_from_rs, Data, Reader, Xlsx};
         use std::io::Cursor;
 
         tracing::info!("Importing XLSX file with {} bytes", xlsx_data.len());
 
         let cursor = Cursor::new(xlsx_data);
-        let mut workbook: Xlsx<_> = open_workbook_from_rs(cursor)
-            .map_err(|e| {
-                tracing::error!("Failed to open XLSX: {:?}", e);
-                anyhow::anyhow!("Failed to open XLSX file: {:?}", e)
-            })?;
+        let mut workbook: Xlsx<_> = open_workbook_from_rs(cursor).map_err(|e| {
+            tracing::error!("Failed to open XLSX: {:?}", e);
+            anyhow::anyhow!("Failed to open XLSX file: {:?}", e)
+        })?;
 
         let mut created_count = 0;
         let mut updated_count = 0;
@@ -312,7 +341,12 @@ impl DataSourceBulkService {
             tracing::info!("Processing sheet: {}", sheet_name);
 
             if let Ok(range) = workbook.worksheet_range(&sheet_name) {
-                tracing::info!("Sheet '{}' dimensions: {}x{}", sheet_name, range.height(), range.width());
+                tracing::info!(
+                    "Sheet '{}' dimensions: {}x{}",
+                    sheet_name,
+                    range.height(),
+                    range.width()
+                );
 
                 if range.height() == 0 || range.width() == 0 {
                     tracing::warn!("Skipping empty sheet: {}", sheet_name);
@@ -330,8 +364,9 @@ impl DataSourceBulkService {
                 tracing::info!("Sheet headers: {:?}", headers);
 
                 // Infer data type
-                let data_type = Self::infer_data_type(&sheet_name, &headers)
-                    .ok_or_else(|| anyhow::anyhow!("Could not infer data type for sheet: {}", sheet_name))?;
+                let data_type = Self::infer_data_type(&sheet_name, &headers).ok_or_else(|| {
+                    anyhow::anyhow!("Could not infer data type for sheet: {}", sheet_name)
+                })?;
 
                 tracing::info!("Inferred data type: {:?}", data_type);
 
@@ -346,38 +381,49 @@ impl DataSourceBulkService {
                     .filter(data_sources::Column::ProjectId.eq(project_id))
                     .filter(data_sources::Column::Name.eq(sheet_name.clone()))
                     .one(&self.db)
-                    .await? {
-                    tracing::info!("Found existing datasource '{}' (id: {}) - updating", sheet_name, existing.id);
+                    .await?
+                {
+                    tracing::info!(
+                        "Found existing datasource '{}' (id: {}) - updating",
+                        sheet_name,
+                        existing.id
+                    );
 
                     // Update the datasource with new CSV data
                     let filename = format!("{}.csv", existing.name);
-                    let datasource = service.update_file(
-                        existing.id,
-                        filename,
-                        csv_data,
-                    ).await?;
+                    let datasource = service.update_file(existing.id, filename, csv_data).await?;
 
                     updated_count += 1;
                     imported_ids.push(datasource.id);
-                    tracing::info!("Updated datasource: {} (id: {})", datasource.name, datasource.id);
+                    tracing::info!(
+                        "Updated datasource: {} (id: {})",
+                        datasource.name,
+                        datasource.id
+                    );
                     continue;
                 }
 
                 // Create new datasource
                 let filename = format!("{}.csv", sheet_name);
-                let datasource = service.create_from_file(
-                    project_id,
-                    sheet_name.clone(),
-                    Some(format!("Imported from spreadsheet")),
-                    filename,
-                    FileFormat::Csv,
-                    data_type,
-                    csv_data,
-                ).await?;
+                let datasource = service
+                    .create_from_file(
+                        project_id,
+                        sheet_name.clone(),
+                        Some(format!("Imported from spreadsheet")),
+                        filename,
+                        FileFormat::Csv,
+                        data_type,
+                        csv_data,
+                    )
+                    .await?;
 
                 created_count += 1;
                 imported_ids.push(datasource.id);
-                tracing::info!("Created datasource: {} with id: {}", sheet_name, datasource.id);
+                tracing::info!(
+                    "Created datasource: {} with id: {}",
+                    sheet_name,
+                    datasource.id
+                );
             }
         }
 
@@ -395,17 +441,16 @@ impl DataSourceBulkService {
         project_id: i32,
         ods_data: &[u8],
     ) -> Result<DataSourceImportResult> {
-        use calamine::{open_workbook_from_rs, Reader, Ods, Data};
+        use calamine::{open_workbook_from_rs, Data, Ods, Reader};
         use std::io::Cursor;
 
         tracing::info!("Importing ODS file with {} bytes", ods_data.len());
 
         let cursor = Cursor::new(ods_data);
-        let mut workbook: Ods<_> = open_workbook_from_rs(cursor)
-            .map_err(|e| {
-                tracing::error!("Failed to open ODS: {:?}", e);
-                anyhow::anyhow!("Failed to open ODS file: {:?}", e)
-            })?;
+        let mut workbook: Ods<_> = open_workbook_from_rs(cursor).map_err(|e| {
+            tracing::error!("Failed to open ODS: {:?}", e);
+            anyhow::anyhow!("Failed to open ODS file: {:?}", e)
+        })?;
 
         let mut created_count = 0;
         let mut updated_count = 0;
@@ -422,7 +467,12 @@ impl DataSourceBulkService {
             tracing::info!("Processing sheet: {}", sheet_name);
 
             if let Ok(range) = workbook.worksheet_range(&sheet_name) {
-                tracing::info!("Sheet '{}' dimensions: {}x{}", sheet_name, range.height(), range.width());
+                tracing::info!(
+                    "Sheet '{}' dimensions: {}x{}",
+                    sheet_name,
+                    range.height(),
+                    range.width()
+                );
 
                 if range.height() == 0 || range.width() == 0 {
                     tracing::warn!("Skipping empty sheet: {}", sheet_name);
@@ -440,8 +490,9 @@ impl DataSourceBulkService {
                 tracing::info!("Sheet headers: {:?}", headers);
 
                 // Infer data type
-                let data_type = Self::infer_data_type(&sheet_name, &headers)
-                    .ok_or_else(|| anyhow::anyhow!("Could not infer data type for sheet: {}", sheet_name))?;
+                let data_type = Self::infer_data_type(&sheet_name, &headers).ok_or_else(|| {
+                    anyhow::anyhow!("Could not infer data type for sheet: {}", sheet_name)
+                })?;
 
                 tracing::info!("Inferred data type: {:?}", data_type);
 
@@ -456,38 +507,49 @@ impl DataSourceBulkService {
                     .filter(data_sources::Column::ProjectId.eq(project_id))
                     .filter(data_sources::Column::Name.eq(sheet_name.clone()))
                     .one(&self.db)
-                    .await? {
-                    tracing::info!("Found existing datasource '{}' (id: {}) - updating", sheet_name, existing.id);
+                    .await?
+                {
+                    tracing::info!(
+                        "Found existing datasource '{}' (id: {}) - updating",
+                        sheet_name,
+                        existing.id
+                    );
 
                     // Update the datasource with new CSV data
                     let filename = format!("{}.csv", existing.name);
-                    let datasource = service.update_file(
-                        existing.id,
-                        filename,
-                        csv_data,
-                    ).await?;
+                    let datasource = service.update_file(existing.id, filename, csv_data).await?;
 
                     updated_count += 1;
                     imported_ids.push(datasource.id);
-                    tracing::info!("Updated datasource: {} (id: {})", datasource.name, datasource.id);
+                    tracing::info!(
+                        "Updated datasource: {} (id: {})",
+                        datasource.name,
+                        datasource.id
+                    );
                     continue;
                 }
 
                 // Create new datasource
                 let filename = format!("{}.csv", sheet_name);
-                let datasource = service.create_from_file(
-                    project_id,
-                    sheet_name.clone(),
-                    Some(format!("Imported from spreadsheet")),
-                    filename,
-                    FileFormat::Csv,
-                    data_type,
-                    csv_data,
-                ).await?;
+                let datasource = service
+                    .create_from_file(
+                        project_id,
+                        sheet_name.clone(),
+                        Some(format!("Imported from spreadsheet")),
+                        filename,
+                        FileFormat::Csv,
+                        data_type,
+                        csv_data,
+                    )
+                    .await?;
 
                 created_count += 1;
                 imported_ids.push(datasource.id);
-                tracing::info!("Created datasource: {} with id: {}", sheet_name, datasource.id);
+                tracing::info!(
+                    "Created datasource: {} with id: {}",
+                    sheet_name,
+                    datasource.id
+                );
             }
         }
 

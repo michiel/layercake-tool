@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use rust_xlsxwriter::*;
     use calamine::{open_workbook_from_rs, Reader, Xlsx};
+    use rust_xlsxwriter::*;
     use std::io::Cursor;
 
     #[test]
@@ -20,13 +20,15 @@ mod tests {
         let buffer = workbook.save_to_buffer().unwrap();
 
         println!("Generated XLSX buffer size: {} bytes", buffer.len());
-        println!("First 4 bytes: {:02x} {:02x} {:02x} {:02x}",
-            buffer[0], buffer[1], buffer[2], buffer[3]);
+        println!(
+            "First 4 bytes: {:02x} {:02x} {:02x} {:02x}",
+            buffer[0], buffer[1], buffer[2], buffer[3]
+        );
 
         // Try to read with calamine
         let cursor = Cursor::new(&buffer);
-        let mut xlsx: Xlsx<_> = open_workbook_from_rs(cursor)
-            .expect("Failed to open XLSX with calamine");
+        let mut xlsx: Xlsx<_> =
+            open_workbook_from_rs(cursor).expect("Failed to open XLSX with calamine");
 
         // Get the sheet
         let sheet_names = xlsx.sheet_names();
@@ -35,7 +37,8 @@ mod tests {
         assert!(sheet_names.contains(&"test_sheet".to_string()));
 
         // Read the range
-        let range = xlsx.worksheet_range("test_sheet")
+        let range = xlsx
+            .worksheet_range("test_sheet")
             .expect("Failed to get worksheet");
 
         println!("Range dimensions: {}x{}", range.height(), range.width());

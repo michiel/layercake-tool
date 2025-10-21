@@ -72,7 +72,8 @@ impl DatasourceImporter {
             datasource.project_id,
             &datasource.node_id,
             &datasource,
-        ).await;
+        )
+        .await;
 
         // Import data based on file type
         let result = match (extension.to_lowercase().as_str(), file_type) {
@@ -98,11 +99,9 @@ impl DatasourceImporter {
                 // Publish execution status change
                 #[cfg(feature = "graphql")]
                 crate::graphql::execution_events::publish_datasource_status(
-                    &self.db,
-                    project_id,
-                    &node_id,
-                    &updated,
-                ).await;
+                    &self.db, project_id, &node_id, &updated,
+                )
+                .await;
 
                 Ok(updated)
             }
@@ -119,11 +118,9 @@ impl DatasourceImporter {
                 // Publish execution status change
                 #[cfg(feature = "graphql")]
                 crate::graphql::execution_events::publish_datasource_status(
-                    &self.db,
-                    project_id,
-                    &node_id,
-                    &updated,
-                ).await;
+                    &self.db, project_id, &node_id, &updated,
+                )
+                .await;
 
                 Err(e)
             }

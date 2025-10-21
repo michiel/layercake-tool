@@ -1,5 +1,5 @@
-use layercake as layercake_core;
 use chrono::Utc;
+use layercake as layercake_core;
 use layercake_core::database::entities::{
     graph_edges, graph_nodes, graphs, layers, plan_dag_nodes, plans, projects,
 };
@@ -24,7 +24,11 @@ async fn create_test_graph(
     project_id: i32,
     name: &str,
 ) -> Result<graphs::Model, DbErr> {
-    if projects::Entity::find_by_id(project_id).one(db).await?.is_none() {
+    if projects::Entity::find_by_id(project_id)
+        .one(db)
+        .await?
+        .is_none()
+    {
         let mut project = projects::ActiveModel::new();
         project.id = Set(project_id);
         project.name = Set(format!("Test Project {}", project_id));
