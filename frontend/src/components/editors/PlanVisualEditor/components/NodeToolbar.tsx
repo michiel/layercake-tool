@@ -10,17 +10,24 @@ import {
 } from '@tabler/icons-react';
 import { PlanDagNodeType } from '../../../../types/plan-dag';
 
+const isTauri = !!(window as any).__TAURI__;
+
 interface DraggableNodeProps {
   type: PlanDagNodeType;
   label: string;
   icon: React.ReactNode;
   color: string;
   onDragStart: (event: React.DragEvent, nodeType: PlanDagNodeType) => void;
+  onPointerDragStart: (event: React.MouseEvent, nodeType: PlanDagNodeType) => void;
 }
 
-const DraggableNode: React.FC<DraggableNodeProps> = ({ type, label, icon, color, onDragStart }) => {
+const DraggableNode: React.FC<DraggableNodeProps> = ({ type, label, icon, color, onDragStart, onPointerDragStart }) => {
   const handleDragStart = (event: React.DragEvent) => {
     onDragStart(event, type);
+  };
+
+  const handleMouseDown = (event: React.MouseEvent) => {
+    onPointerDragStart(event, type);
   };
 
   return (
@@ -40,8 +47,9 @@ const DraggableNode: React.FC<DraggableNodeProps> = ({ type, label, icon, color,
             opacity: 0.8
           }
         }}
-        draggable
+        draggable={!isTauri}
         onDragStart={handleDragStart}
+        onMouseDown={handleMouseDown}
       >
         <ActionIcon
           variant="transparent"
@@ -67,10 +75,11 @@ const DraggableNode: React.FC<DraggableNodeProps> = ({ type, label, icon, color,
 
 interface NodeToolbarProps {
   onNodeDragStart: (event: React.DragEvent, nodeType: PlanDagNodeType) => void;
+  onNodePointerDragStart: (event: React.MouseEvent, nodeType: PlanDagNodeType) => void;
   readonly?: boolean;
 }
 
-export const NodeToolbar: React.FC<NodeToolbarProps> = ({ onNodeDragStart, readonly = false }) => {
+export const NodeToolbar: React.FC<NodeToolbarProps> = ({ onNodeDragStart, onNodePointerDragStart, readonly = false }) => {
   if (readonly) {
     return null;
   }
@@ -128,6 +137,7 @@ export const NodeToolbar: React.FC<NodeToolbarProps> = ({ onNodeDragStart, reado
             icon={nodeType.icon}
             color={nodeType.color}
             onDragStart={onNodeDragStart}
+            onPointerDragStart={onNodePointerDragStart}
           />
         ))}
       </Group>

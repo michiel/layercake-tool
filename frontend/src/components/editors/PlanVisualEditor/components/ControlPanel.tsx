@@ -37,9 +37,12 @@ interface ControlPanelProps {
   onlineUsers: any[]
 
   // Node drag props
-  onNodeDragStart: (event: React.DragEvent, nodeType: PlanDagNodeType) => void
-  readonly?: boolean
+  onNodeDragStart: (event: React.DragEvent, nodeType: PlanDagNodeType) => void;
+  onNodePointerDragStart: (event: React.MouseEvent, nodeType: PlanDagNodeType) => void;
+  readonly?: boolean;
 }
+
+const isTauri = !!(window as any).__TAURI__;
 
 export const ControlPanel = ({
   validationLoading,
@@ -55,6 +58,7 @@ export const ControlPanel = ({
   hasError,
   onlineUsers,
   onNodeDragStart,
+  onNodePointerDragStart,
   readonly = false
 }: ControlPanelProps) => {
   const nodeTypes = [
@@ -102,6 +106,12 @@ export const ControlPanel = ({
     }
   };
 
+  const handleNodePointerDragStart = (event: React.MouseEvent, nodeType: PlanDagNodeType) => {
+    if (!readonly) {
+      onNodePointerDragStart(event, nodeType);
+    }
+  };
+
   return (
     <Panel position="top-left">
       <Stack gap="xs" style={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', padding: '12px', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
@@ -116,8 +126,9 @@ export const ControlPanel = ({
                     size="xs"
                     variant="light"
                     style={{ backgroundColor: nodeType.color, color: 'white', cursor: 'grab' }}
-                    draggable
+                    draggable={!isTauri}
                     onDragStart={(event) => handleNodeDragStart(event, nodeType.type)}
+                    onMouseDown={(event) => handleNodePointerDragStart(event, nodeType.type)}
                   >
                     {nodeType.icon}
                   </ActionIcon>

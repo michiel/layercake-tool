@@ -16,7 +16,7 @@ import ReactFlow, {
   Edge,
   MarkerType
 } from 'reactflow'
-import { Stack, Alert, Loader, Text } from '@mantine/core'
+import { Stack, Alert, Loader, Text, Paper } from '@mantine/core'
 import {
   IconAlertCircle
 } from '@tabler/icons-react'
@@ -61,7 +61,10 @@ interface PlanVisualEditorProps {
   collaboration?: any // Project-level collaboration instance from App.tsx
 }
 
+const isTauri = !!(window as any).__TAURI__;
+
 const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly = false, focusNodeId, collaboration }: PlanVisualEditorProps) => {
+  const reactFlowWrapper = useRef<HTMLDivElement>(null);
   // Get ReactFlow instance for fit view and screen position conversion
   const { fitView, screenToFlowPosition } = useReactFlow();
 
@@ -76,6 +79,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     outputGraphRef: ''
   } as DataSourceNodeConfig)
   const [configNodeMetadata, setConfigNodeMetadata] = useState<NodeMetadata>({ label: '', description: '' })
+  const [draggingNode, setDraggingNode] = useState<{ type: PlanDagNodeType, position: { x: number, y: number } } | null>(null);
 
   // Node type selector for edge drop
   const [showNodeTypeMenu, setShowNodeTypeMenu] = useState(false)
@@ -737,17 +741,20 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
 
   // Drag and drop handlers for creating new nodes
   const handleNodeDragStart = useCallback((event: React.DragEvent, nodeType: PlanDagNodeType) => {
+    if (isTauri) return;
     event.dataTransfer.setData('application/reactflow', nodeType);
     event.dataTransfer.effectAllowed = 'move';
   }, []);
 
   const handleDragOver = useCallback((event: React.DragEvent) => {
+    if (isTauri) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
   }, []);
 
   const handleDrop = useCallback(
     (event: React.DragEvent) => {
+      if (isTauri) return;
       event.preventDefault();
 
       const nodeType = event.dataTransfer.getData('application/reactflow') as PlanDagNodeType;
@@ -844,6 +851,107 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     },
     [screenToFlowPosition, setNodes, handleNodeEdit, handleNodeDelete, mutations, projectId]
   );
+
+  const handlePointerDrop = (nodeType: PlanDagNodeType, position: { x: number, y: number }) => {
+    // Get default configuration and metadata
+    const config = getDefaultNodeConfig(nodeType);
+    const metadata = getDefaultNodeMetadata(nodeType);
+
+    // Persist to database via GraphQL mutation - backend will generate ID
+    const planDagNode: Partial<PlanDagNode> = {
+      nodeType,
+      position,
+      metadata,
+      config: JSON.stringify(config)
+    };
+
+    mutations.addNode(planDagNode).then((createdNode) => {
+      const backendNodeId = createdNode.id;
+      const newNode: Node = {
+        id: backendNodeId,
+        type: nodeType,
+        position,
+        data: {
+          nodeType,
+          label: metadata.label,
+          config,
+          metadata,
+          isUnconfigured: true,
+          onEdit: () => handleNodeEdit(backendNodeId),
+          onDelete: () => handleNodeDelete(backendNodeId),
+          readonly: false,
+          edges: edges,
+          projectId: projectId
+        }
+      };
+      setNodes((nds) => nds.concat(newNode));
+    }).catch(async (err) => {
+      console.error('Failed to add node to database:', err);
+      if (err.message?.includes('Plan not found for project') ||
+          err.graphQLErrors?.some((e: any) => e.message?.includes('Plan not found for project'))) {
+        console.log('Plan not found, initializing empty Plan DAG first...');
+        try {
+          await mutations.updatePlanDag({
+            version: '1.0.0',
+            nodes: [{
+              nodeType: planDagNode.nodeType!,
+              position: planDagNode.position!,
+              metadata: planDagNode.metadata!,
+              config: planDagNode.config!
+            }],
+            edges: [],
+            metadata: {
+              version: '1.0.0',
+              name: `Plan DAG for Project ${projectId}`,
+              description: 'Auto-generated Plan DAG',
+              created: new Date().toISOString(),
+              lastModified: new Date().toISOString(),
+              author: 'user'
+            }
+          });
+          console.log('Plan DAG initialized successfully');
+        } catch (initError) {
+          console.error('Failed to initialize Plan DAG:', initError);
+        }
+      }
+    });
+  };
+
+  const handleNodePointerDragStart = (event: React.MouseEvent, nodeType: PlanDagNodeType) => {
+    if (!isTauri || !reactFlowWrapper.current) return;
+
+    const reactFlowBounds = reactFlowWrapper.current.getBoundingClientRect();
+    const position = screenToFlowPosition({
+      x: event.clientX - reactFlowBounds.left,
+      y: event.clientY - reactFlowBounds.top,
+    });
+
+    setDraggingNode({ type: nodeType, position });
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const position = screenToFlowPosition({
+        x: moveEvent.clientX - reactFlowBounds.left,
+        y: moveEvent.clientY - reactFlowBounds.top,
+      });
+      setDraggingNode(prev => prev ? { ...prev, position } : null);
+    };
+
+    const onMouseUp = (upEvent: MouseEvent) => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+
+      const finalPosition = screenToFlowPosition({
+        x: upEvent.clientX - reactFlowBounds.left,
+        y: upEvent.clientY - reactFlowBounds.top,
+      });
+
+      handlePointerDrop(nodeType, finalPosition);
+      setDraggingNode(null);
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  };
 
   // Context menu handlers
   const handleContextMenu = useCallback((event: React.MouseEvent) => {
@@ -1268,6 +1376,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         canDistribute={advancedOps.canDistribute}
         readonly={readonly}
         onNodeDragStart={handleNodeDragStart}
+        onNodePointerDragStart={handleNodePointerDragStart}
         onDuplicate={advancedOps.handleDuplicate}
         onCopy={advancedOps.handleCopy}
         onPaste={advancedOps.handlePaste}
@@ -1289,6 +1398,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
       />
 
       <div
+        ref={reactFlowWrapper}
         style={{ flex: 1, position: 'relative' }}
         onMouseMove={handleMouseMove}
         onDragOver={handleDragOver}
@@ -1296,6 +1406,23 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         onContextMenu={handleContextMenu}
         onClick={handleCanvasClick}
       >
+        {draggingNode && (
+          <Paper
+            shadow="sm"
+            p="sm"
+            radius="md"
+            style={{
+              position: 'absolute',
+              left: draggingNode.position.x,
+              top: draggingNode.position.y,
+              zIndex: 1000,
+              pointerEvents: 'none',
+              transform: 'translate(-50%, -50%)',
+            }}
+          >
+            <Text>{draggingNode.type}</Text>
+          </Paper>
+        )}
         <ReactFlow
           nodes={nodesWithEdges}
           edges={edgesWithMarkers}

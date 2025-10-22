@@ -34,6 +34,7 @@ interface AdvancedToolbarProps {
   canDistribute: boolean;
   readonly?: boolean;
   onNodeDragStart: (event: React.DragEvent, nodeType: PlanDagNodeType) => void;
+  onNodePointerDragStart: (event: React.MouseEvent, nodeType: PlanDagNodeType) => void;
   onDuplicate: () => void;
   onCopy: () => void;
   onPaste: () => void;
@@ -54,6 +55,8 @@ interface AdvancedToolbarProps {
   onFitView: () => void;
 }
 
+const isTauri = !!(window as any).__TAURI__;
+
 export const AdvancedToolbar: React.FC<AdvancedToolbarProps> = ({
   selectedNodeCount,
   hasClipboardData,
@@ -62,6 +65,7 @@ export const AdvancedToolbar: React.FC<AdvancedToolbarProps> = ({
   canDistribute,
   readonly = false,
   onNodeDragStart,
+  onNodePointerDragStart,
   onDuplicate,
   onCopy,
   onPaste,
@@ -126,6 +130,10 @@ export const AdvancedToolbar: React.FC<AdvancedToolbarProps> = ({
     onNodeDragStart(event, nodeType);
   };
 
+  const handleNodePointerDragStart = (event: React.MouseEvent, nodeType: PlanDagNodeType) => {
+    onNodePointerDragStart(event, nodeType);
+  };
+
   return (
     <Group gap="xs" p="md" style={{ borderBottom: '1px solid #e9ecef' }}>
       {/* Node Palette */}
@@ -137,8 +145,9 @@ export const AdvancedToolbar: React.FC<AdvancedToolbarProps> = ({
               size="sm"
               variant="light"
               style={{ backgroundColor: nodeType.color, color: 'white', cursor: 'grab' }}
-              draggable
+              draggable={!isTauri}
               onDragStart={(event) => handleNodeDragStart(event, nodeType.type)}
+              onMouseDown={(event) => handleNodePointerDragStart(event, nodeType.type)}
             >
               {nodeType.icon}
             </ActionIcon>
