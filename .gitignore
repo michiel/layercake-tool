@@ -6,6 +6,7 @@ tmp/
 *log
 node_modules/
 **/node_modules/
+.npm-cache/
 
 # Development logs
 backend.log
