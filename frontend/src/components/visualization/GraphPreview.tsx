@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import ForceGraph from 'force-graph';
 import { Pane } from 'tweakpane';
 
@@ -196,6 +196,39 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
     }
   }, [data, computeSignature]);
 
+  const layerStyles = useMemo(() => {
+    const normalizeColor = (value?: string) => {
+      if (!value) return undefined;
+      return value.startsWith('#') ? value : `#${value}`;
+    };
+
+    const defaults = {
+      nodeColor: '#4c6ef5',
+      borderColor: '#364fc7',
+      textColor: '#f8f9fa',
+      linkColor: '#94a3b8'
+    };
+
+    const styles = new Map<string, typeof defaults>();
+    data.layers?.forEach((layer) => {
+      const key = layer.layerId || layer.name || 'default';
+      styles.set(key, {
+        nodeColor: normalizeColor(layer.backgroundColor) || defaults.nodeColor,
+        borderColor: normalizeColor(layer.borderColor) || defaults.borderColor,
+        textColor: normalizeColor(layer.textColor) || defaults.textColor,
+        linkColor: normalizeColor(layer.borderColor) || defaults.linkColor
+      });
+    });
+
+    return {
+      defaults,
+      getStyle(layerId?: string) {
+        if (!layerId) return defaults;
+        return styles.get(layerId) || defaults;
+      }
+    };
+  }, [data.layers]);
+
   // Initialize graph when data changes
   useEffect(() => {
     if (!graphContainerRef.current) return;
@@ -239,13 +272,14 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
     });
 
     // Initialize force-graph
+    const getLayerStyle = layerStyles.getStyle;
+
     const graph = (ForceGraph as any)()(graphContainerRef.current)
       .width(currentWidth)
       .height(currentHeight)
       .graphData(data)
       .nodeId('id')
       .nodeLabel('name')
-      .nodeColor((node: any) => layerColorMap.get(node.layer) || '#999999')
       .nodeCanvasObject((node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
         const p = paramsRef.current;
         const label = node.name;
@@ -254,28 +288,29 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
         const textWidth = ctx.measureText(label).width;
         const bckgDimensions = [textWidth, fontSize].map(n => n + fontSize * 0.2);
 
-        // Draw node circle
-        ctx.fillStyle = node.color;
+        const style = getLayerStyle(node.layer);
+
         ctx.beginPath();
+        ctx.fillStyle = style.nodeColor;
+        ctx.strokeStyle = style.borderColor;
+        ctx.lineWidth = 2 / globalScale;
         ctx.arc(node.x, node.y, p.nodeRadius, 0, 2 * Math.PI, false);
         ctx.fill();
+        ctx.stroke();
 
-        // Draw text background
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
         ctx.fillRect(
           node.x - bckgDimensions[0] / 2,
-          node.y - bckgDimensions[1] / 2,
+          node.y - p.nodeRadius - bckgDimensions[1] - fontSize * 0.2,
           bckgDimensions[0],
           bckgDimensions[1]
         );
 
-        // Draw text
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillStyle = '#000';
-        ctx.fillText(label, node.x, node.y);
+        ctx.fillStyle = style.textColor;
+        ctx.fillText(label, node.x, node.y - p.nodeRadius - bckgDimensions[1] / 2 - fontSize * 0.2);
 
-        // Set node area for pointer detection
         (node as any).__bckgDimensions = bckgDimensions;
       })
       .nodePointerAreaPaint((node: any, color: string, ctx: CanvasRenderingContext2D) => {
@@ -289,16 +324,12 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
             bckgDimensions[1]
           );
       })
-      .linkLabel('name')
-      .linkColor((link: any) => layerColorMap.get(link.layer) || '#999999')
+      .linkColor((link: any) => getLayerStyle(link.layer).linkColor)
       .linkWidth(params.linkWidth)
       .linkDirectionalArrowLength(params.linkArrowLength)
       .linkDirectionalArrowRelPos(1)
       .linkCanvasObjectMode(() => 'after')
       .linkCanvasObject((link: any, ctx: CanvasRenderingContext2D) => {
-        const p = paramsRef.current;
-        const LABEL_NODE_MARGIN = 1.5;
-
         const start = link.source;
         const end = link.target;
 
@@ -313,9 +344,6 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
 
         const relLink = { x: end.x - start.x, y: end.y - start.y };
 
-        const maxTextLength =
-          Math.sqrt(Math.pow(relLink.x, 2) + Math.pow(relLink.y, 2)) - LABEL_NODE_MARGIN * 2;
-
         let textAngle = Math.atan2(relLink.y, relLink.x);
         // Maintain label vertical orientation for legibility
         if (textAngle > Math.PI / 2) textAngle = -(Math.PI - textAngle);
@@ -323,27 +351,25 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
 
         const label = link.name || '';
 
-        // Estimate text size
-        const fontSize = Math.min(p.linkLabelMaxSize, maxTextLength / label.length);
+        ctx.save();
+        ctx.translate(textPos.x, textPos.y);
+        ctx.rotate(textAngle);
+
+        const fontSize = params.linkLabelMaxSize;
         ctx.font = `${fontSize}px Sans-Serif`;
         const textWidth = ctx.measureText(label).width;
 
-        if (textWidth > 0 && textWidth <= maxTextLength) {
-          // Draw text background
-          ctx.save();
-          ctx.translate(textPos.x, textPos.y);
-          ctx.rotate(textAngle);
-
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-          ctx.fillRect(-textWidth / 2, -fontSize / 2, textWidth, fontSize);
-
-          // Draw text
+        if (textWidth > 0) {
+          const style = getLayerStyle(link.layer);
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+          ctx.fillRect(-textWidth / 2 - 4, -fontSize / 2 - 2, textWidth + 8, fontSize + 4);
+          ctx.fillStyle = style.textColor;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.fillStyle = '#000';
           ctx.fillText(label, 0, 0);
-          ctx.restore();
         }
+
+        ctx.restore();
       })
       .d3AlphaDecay(params.alphaDecay)
       .d3VelocityDecay(params.velocityDecay);
