@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation } from '@apollo/client/react'
 import {
@@ -24,14 +24,19 @@ import {
   IconRefresh,
   IconCheck,
   IconClock,
-  IconX
+  IconX,
+  IconChartDots,
+  IconTable
 } from '@tabler/icons-react'
 import { gql } from '@apollo/client'
 import { Breadcrumbs } from '../common/Breadcrumbs'
-import { Graph, GET_GRAPHS, CREATE_GRAPH, UPDATE_GRAPH, DELETE_GRAPH, EXECUTE_NODE } from '../../graphql/graphs'
-import { GET_PLAN_DAG } from '../../graphql/plan-dag'
+import { Graph, GET_GRAPHS, CREATE_GRAPH, UPDATE_GRAPH, DELETE_GRAPH, EXECUTE_NODE, GET_GRAPH_DETAILS } from '../../graphql/graphs'
+import { GET_PLAN_DAG, UPDATE_PLAN_DAG_NODE } from '../../graphql/plan-dag'
 import PageContainer from '../layout/PageContainer'
 import { getExecutionStateColor, getExecutionStateLabel, isExecutionInProgress } from '../../graphql/preview'
+import { GraphDataDialog } from '../editors/PlanVisualEditor/dialogs/GraphDataDialog'
+import { GraphPreviewDialog } from '../visualization/GraphPreviewDialog'
+import { GraphData } from '../visualization/GraphPreview'
 
 const GET_PROJECTS = gql`
   query GetProjects {
@@ -63,6 +68,49 @@ const getExecutionStateIcon = (state: string) => {
   }
 }
 
+const toGraphPreviewData = (graph?: Graph | null): GraphData | null => {
+  if (!graph) return null
+
+  const normalizeAttrs = (attrs: any): Record<string, string> => {
+    if (!attrs) return {}
+    const result: Record<string, string> = {}
+    Object.entries(attrs).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        result[key] = String(value)
+      }
+    })
+    return result
+  }
+
+  return {
+    nodes: (graph.graphNodes || []).map((node) => ({
+      id: node.id,
+      name: node.label || node.id,
+      layer: node.layer || 'default',
+      attrs: {
+        ...normalizeAttrs(node.attrs),
+        is_partition: node.isPartition ? 'true' : 'false',
+        belongs_to: node.belongsTo ? String(node.belongsTo) : ''
+      }
+    })),
+    links: (graph.graphEdges || []).map((edge) => ({
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
+      name: edge.label || '',
+      layer: edge.layer || 'default',
+      attrs: normalizeAttrs(edge.attrs)
+    })),
+    layers: (graph.layers || []).map((layer) => ({
+      layerId: layer.layerId,
+      name: layer.name,
+      backgroundColor: layer.properties?.background_color,
+      borderColor: layer.properties?.border_color,
+      textColor: layer.properties?.text_color
+    }))
+  }
+}
+
 export const GraphsPage: React.FC<GraphsPageProps> = () => {
   const navigate = useNavigate()
   const { projectId } = useParams<{ projectId: string }>()
@@ -70,6 +118,9 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [selectedGraph, setSelectedGraph] = useState<Graph | null>(null)
   const [executingGraphId, setExecutingGraphId] = useState<number | null>(null)
+  const [previewGraphId, setPreviewGraphId] = useState<number | null>(null)
+  const [previewTitle, setPreviewTitle] = useState<string>('Graph Preview')
+  const [dataDialogGraphId, setDataDialogGraphId] = useState<number | null>(null)
 
   const { data: projectsData } = useQuery<{ projects: Array<{ id: number; name: string }> }>(GET_PROJECTS)
   const selectedProject = projectsData?.projects.find((p: { id: number; name: string }) => p.id === parseInt(projectId || '0'))
@@ -103,6 +154,8 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
     refetchQueries: [{ query: GET_GRAPHS, variables: { projectId: parseInt(projectId || '0') } }]
   })
 
+  const [updatePlanDagNode] = useMutation(UPDATE_PLAN_DAG_NODE)
+
   const [deleteGraph, { loading: deleteLoading }] = useMutation(DELETE_GRAPH, {
     refetchQueries: [{ query: GET_GRAPHS, variables: { projectId: parseInt(projectId || '0') } }]
   })
@@ -111,8 +164,19 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
     refetchQueries: [{ query: GET_GRAPHS, variables: { projectId: parseInt(projectId || '0') } }]
   })
 
+  const { data: previewDetails, loading: previewLoading, error: previewError } = useQuery<{ graph: Graph }>(
+    GET_GRAPH_DETAILS,
+    {
+      variables: { id: previewGraphId ?? 0 },
+      skip: previewGraphId === null,
+      fetchPolicy: 'network-only'
+    }
+  )
+
+  const previewData = useMemo(() => toGraphPreviewData(previewDetails?.graph), [previewDetails])
+
   const graphs: Graph[] = data?.graphs || []
-  const nodeTypeMap = React.useMemo(() => {
+  const nodeTypeMap = useMemo(() => {
     const map = new Map<string, string>()
     const nodes = planDagData?.getPlanDag?.nodes || []
     nodes.forEach((node) => {
@@ -121,7 +185,7 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
     return map
   }, [planDagData])
 
-  const graphNodes = React.useMemo(
+  const graphNodes = useMemo(
     () => graphs.filter((graph) => nodeTypeMap.get(graph.nodeId) === 'GraphNode'),
     [graphs, nodeTypeMap]
   )
@@ -156,6 +220,17 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
   const handleSave = async (values: { name: string }) => {
     if (selectedGraph) {
       await updateGraph({ variables: { id: selectedGraph.id, input: { name: values.name } } })
+      await updatePlanDagNode({
+        variables: {
+          projectId: parseInt(projectId || '0'),
+          nodeId: selectedGraph.nodeId,
+          updates: {
+            metadata: {
+              label: values.name
+            }
+          }
+        }
+      })
     } else {
       // For creation, we need to generate a nodeId internally or derive it.
       // For now, we'll use a placeholder. This will be handled by the backend.
@@ -304,6 +379,25 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
                         <Button
                           size="xs"
                           variant="light"
+                          leftSection={<IconChartDots size={14} />}
+                          onClick={() => {
+                            setPreviewGraphId(graph.id)
+                            setPreviewTitle(`Graph Preview: ${graph.name}`)
+                          }}
+                        >
+                          Preview
+                        </Button>
+                        <Button
+                          size="xs"
+                          variant="light"
+                          leftSection={<IconTable size={14} />}
+                          onClick={() => setDataDialogGraphId(graph.id)}
+                        >
+                          View Data
+                        </Button>
+                        <Button
+                          size="xs"
+                          variant="light"
                           leftSection={<IconEdit size={14} />}
                           onClick={() => handleEdit(graph)}
                         >
@@ -372,6 +466,25 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
           loading={createLoading || updateLoading}
         />
       </Modal>
+
+      <GraphDataDialog
+        opened={dataDialogGraphId !== null}
+        onClose={() => setDataDialogGraphId(null)}
+        graphId={dataDialogGraphId}
+        title={dataDialogGraphId ? `Graph Data: ${graphs.find((g) => g.id === dataDialogGraphId)?.name ?? ''}` : 'Graph Data'}
+      />
+
+      <GraphPreviewDialog
+        opened={previewGraphId !== null}
+        onClose={() => {
+          setPreviewGraphId(null)
+          setPreviewTitle('Graph Preview')
+        }}
+        data={previewData}
+        title={previewTitle}
+        loading={previewLoading}
+        error={previewError?.message ?? null}
+      />
     </>
   )
 }

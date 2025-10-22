@@ -44,6 +44,8 @@ import { usePlanDagCQRS } from './hooks/usePlanDagCQRS'
 import { useAdvancedOperations } from './hooks/useAdvancedOperations'
 import { getDefaultNodeConfig, getDefaultNodeMetadata } from './utils/nodeDefaults'
 import { autoLayout } from './utils/autoLayout'
+import { useMutation } from '@apollo/client/react'
+import { UPDATE_GRAPH } from '../../../graphql/graphs'
 
 // Import floating edge components
 import { FloatingEdge } from './edges/FloatingEdge'
@@ -97,6 +99,7 @@ const sanitizeNodeMetadata = (raw: any, fallback?: NodeMetadata): NodeMetadata =
 
 const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly = false, focusNodeId, collaboration }: PlanVisualEditorProps) => {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const [updateGraphNameMutation] = useMutation(UPDATE_GRAPH)
   // Get ReactFlow instance for fit view and screen position conversion
   const { fitView, screenToFlowPosition } = useReactFlow();
 
@@ -723,7 +726,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
   )
 
   const handleNodeConfigSave = useCallback(
-    (nodeId: string, config: NodeConfig, metadata: NodeMetadata) => {
+    async (nodeId: string, config: NodeConfig, metadata: NodeMetadata) => {
       const preparedConfig = parseNodeConfigValue(config)
       const sanitizedMetadata = sanitizeNodeMetadata(metadata)
 
@@ -745,16 +748,34 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         )
       )
 
-      mutations
-        .updateNode(nodeId, {
+      const nodeRecord = nodesRef.current.find((node) => node.id === nodeId)
+      const nodeType = nodeRecord?.data?.nodeType as PlanDagNodeType | undefined
+      const existingLabel = (nodeRecord?.data?.metadata?.label || '').trim()
+      const nextLabel = sanitizedMetadata.label?.trim()
+      const graphIdForNode = nodeRecord?.data?.graphExecution?.graphId
+
+      try {
+        if (
+          nodeType === PlanDagNodeType.GRAPH &&
+          graphIdForNode &&
+          nextLabel &&
+          nextLabel.length > 0 &&
+          nextLabel !== existingLabel
+        ) {
+          await updateGraphNameMutation({
+            variables: {
+              id: graphIdForNode,
+              input: { name: nextLabel }
+            }
+          })
+        }
+
+        const updatedNode = await mutations.updateNode(nodeId, {
           config: preparedConfig,
           metadata: sanitizedMetadata
         })
-        .then((updatedNode) => {
-          if (!updatedNode) {
-            return
-          }
 
+        if (updatedNode) {
           const serverConfig = parseNodeConfigValue(updatedNode.config)
           const serverMetadata = sanitizeNodeMetadata(updatedNode.metadata, sanitizedMetadata)
 
@@ -777,13 +798,13 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
           )
 
           console.log('[PlanVisualEditor] Node configuration synchronized with backend:', nodeId)
-        })
-        .catch((error) => {
-          console.error('[PlanVisualEditor] Failed to update node configuration:', error)
-          alert(`Failed to update node configuration: ${error.message}`)
-        })
+        }
+      } catch (error: any) {
+        console.error('[PlanVisualEditor] Failed to update node configuration:', error)
+        alert(`Failed to update node configuration: ${error.message || error}`)
+      }
     },
-    [handleNodeDelete, handleNodeEdit, mutations, setNodes]
+    [handleNodeDelete, handleNodeEdit, mutations, setNodes, updateGraphNameMutation]
   )
 
   // Handle viewport changes to track current zoom/pan state

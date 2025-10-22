@@ -14,6 +14,7 @@ import { useNavigate } from 'react-router-dom'
 import { BaseNode } from './BaseNode'
 import { usePlanDagCQRSMutations } from '../../../../hooks/usePlanDagCQRSMutations'
 import { showErrorNotification, showSuccessNotification } from '../../../../utils/notifications'
+import { UPDATE_GRAPH } from '../../../../graphql/graphs'
 
 interface GraphNodeProps extends NodeProps {
   onEdit?: (nodeId: string) => void
@@ -30,13 +31,32 @@ export const GraphNode = memo((props: GraphNodeProps) => {
   // Get project ID from context
   const projectId = data.projectId as number | undefined
   const { updateNode } = usePlanDagCQRSMutations({ projectId: projectId || 0 })
+  const [updateGraphName] = useMutation(UPDATE_GRAPH)
 
   const config = data.config as GraphNodeConfig
 
   const handleLabelChange = async (newLabel: string) => {
+    const trimmedLabel = newLabel.trim()
+    const currentLabel = (data.metadata?.label || '').trim()
+
+    if (trimmedLabel.length === 0 || trimmedLabel === currentLabel) {
+      return
+    }
+
     try {
+      const resolvedGraphId = data.graphExecution?.graphId || null
+
+      if (resolvedGraphId) {
+        await updateGraphName({
+          variables: {
+            id: resolvedGraphId,
+            input: { name: trimmedLabel }
+          }
+        })
+      }
+
       await updateNode(props.id, {
-        metadata: { ...data.metadata, label: newLabel }
+        metadata: { ...data.metadata, label: trimmedLabel }
       })
     } catch (error) {
       console.error('Failed to update node label:', error)

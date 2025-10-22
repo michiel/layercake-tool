@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react';
-import { Modal, Tabs, Group, Title, ActionIcon } from '@mantine/core';
-import { IconLayout2, IconHierarchy, IconX } from '@tabler/icons-react';
+import { Modal, Tabs, Group, Title, ActionIcon, Stack, Loader, Alert, Text } from '@mantine/core';
+import { IconLayout2, IconHierarchy, IconX, IconAlertCircle } from '@tabler/icons-react';
 import { GraphPreview, GraphData } from './GraphPreview';
 
 interface GraphPreviewDialogProps {
@@ -8,9 +8,11 @@ interface GraphPreviewDialogProps {
   onClose: () => void;
   data: GraphData | null;
   title?: string;
+  loading?: boolean;
+  error?: string | null;
 }
 
-export const GraphPreviewDialog = ({ opened, onClose, data, title }: GraphPreviewDialogProps) => {
+export const GraphPreviewDialog = ({ opened, onClose, data, title, loading = false, error }: GraphPreviewDialogProps) => {
   const [tab, setTab] = useState<string | null>('flow');
 
   const normalizedData = useMemo(() => {
@@ -81,33 +83,50 @@ export const GraphPreviewDialog = ({ opened, onClose, data, title }: GraphPrevie
           <IconX size={18} />
         </ActionIcon>
       </Group>
-      <Tabs value={tab} onChange={setTab}>
-        <Tabs.List>
-          <Tabs.Tab value="flow" leftSection={<IconLayout2 size={16} />}>
-            Flow
-          </Tabs.Tab>
-          <Tabs.Tab value="hierarchy" leftSection={<IconHierarchy size={16} />}>
-            Hierarchy
-          </Tabs.Tab>
-        </Tabs.List>
+      {loading ? (
+        <Stack align="center" justify="center" style={{ height: '70vh' }} gap="sm">
+          <Loader />
+          <Text c="dimmed">Loading graph preview…</Text>
+        </Stack>
+      ) : error ? (
+        <Alert icon={<IconAlertCircle size={16} />} color="red">
+          {error}
+        </Alert>
+      ) : data ? (
+        <Tabs value={tab} onChange={setTab}>
+          <Tabs.List>
+            <Tabs.Tab value="flow" leftSection={<IconLayout2 size={16} />}>
+              Flow
+            </Tabs.Tab>
+            <Tabs.Tab value="hierarchy" leftSection={<IconHierarchy size={16} />}>
+              Hierarchy
+            </Tabs.Tab>
+          </Tabs.List>
 
-        <Tabs.Panel value="flow" pt="md" style={{ height: '75vh' }}>
-          {normalizedData.flow && (
-            <GraphPreview
-              key={`flow-${normalizedData.flow.nodes.length}-${normalizedData.flow.links.length}-${tab}`}
-              data={normalizedData.flow}
-            />
-          )}
-        </Tabs.Panel>
-        <Tabs.Panel value="hierarchy" pt="md" style={{ height: '75vh' }}>
-          {normalizedData.hierarchy && (
-            <GraphPreview
-              key={`hierarchy-${normalizedData.hierarchy.nodes.length}-${normalizedData.hierarchy.links.length}-${tab}`}
-              data={normalizedData.hierarchy}
-            />
-          )}
-        </Tabs.Panel>
-      </Tabs>
+          <Tabs.Panel value="flow" pt="md" style={{ height: '75vh' }}>
+            {normalizedData.flow ? (
+              <GraphPreview
+                key={`flow-${normalizedData.flow.nodes.length}-${normalizedData.flow.links.length}-${tab}`}
+                data={normalizedData.flow}
+              />
+            ) : (
+              <Text c="dimmed">No flow data available.</Text>
+            )}
+          </Tabs.Panel>
+          <Tabs.Panel value="hierarchy" pt="md" style={{ height: '75vh' }}>
+            {normalizedData.hierarchy ? (
+              <GraphPreview
+                key={`hierarchy-${normalizedData.hierarchy.nodes.length}-${normalizedData.hierarchy.links.length}-${tab}`}
+                data={normalizedData.hierarchy}
+              />
+            ) : (
+              <Text c="dimmed">No hierarchy data available.</Text>
+            )}
+          </Tabs.Panel>
+        </Tabs>
+      ) : (
+        <Text c="dimmed">No preview data available.</Text>
+      )}
     </Modal>
   );
 };
