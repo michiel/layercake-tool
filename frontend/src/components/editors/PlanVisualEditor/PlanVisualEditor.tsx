@@ -208,8 +208,16 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
       cqrsService.commands.createNode({ projectId, nodeType: node.nodeType || 'DataSource', node }),
     addEdge: (edge: Partial<any>) =>
       cqrsService.commands.createEdge({ projectId, edge: edge as any }),
-    updateNode: (nodeId: string, updates: Partial<PlanDagNode>) =>
-      cqrsService.commands.updateNode({ projectId, nodeId, updates }),
+    updateNode: (nodeId: string, updates: Partial<PlanDagNode>) => {
+      const serializedUpdates = { ...updates } as any
+      if (serializedUpdates.config !== undefined) {
+        serializedUpdates.config =
+          typeof serializedUpdates.config === 'string'
+            ? serializedUpdates.config
+            : JSON.stringify(serializedUpdates.config ?? {})
+      }
+      return cqrsService.commands.updateNode({ projectId, nodeId, updates: serializedUpdates })
+    },
     deleteNode: (nodeId: string) =>
       cqrsService.commands.deleteNode({ projectId, nodeId }),
     deleteEdge: (edgeId: string) =>
