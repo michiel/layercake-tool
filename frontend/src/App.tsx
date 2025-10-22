@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Routes, Route, useNavigate, useParams, useLocation } from 'react-router-dom'
-import { AppShell, Group, Title, Stack, Button, Text, Card, Badge, Alert, Modal, Select, FileButton, ActionIcon, Tooltip } from '@mantine/core'
-import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconFileImport, IconDownload, IconChevronLeft, IconChevronRight, IconFolderPlus, IconNetwork, IconBooks } from '@tabler/icons-react'
+import { AppShell, Group, Title, Stack, Button, Text, Card, Badge, Alert, Modal, Select, ActionIcon, Tooltip } from '@mantine/core'
+import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconDownload, IconChevronLeft, IconChevronRight, IconFolderPlus, IconNetwork, IconBooks } from '@tabler/icons-react'
 import { useQuery, useMutation } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import { Breadcrumbs } from './components/common/Breadcrumbs'
@@ -584,11 +584,6 @@ const HomePage = () => {
 const ProjectsPage = () => {
   const navigate = useNavigate()
   const [createModalOpened, setCreateModalOpened] = useState(false)
-  const [importModalOpened, setImportModalOpened] = useState(false)
-  const [selectedProjectForImport, setSelectedProjectForImport] = useState<number | null>(null)
-  const [importFile, setImportFile] = useState<File | null>(null)
-  const [importLoading, setImportLoading] = useState(false)
-  const [importError, setImportError] = useState<string | null>(null)
   const [sampleModalOpened, setSampleModalOpened] = useState(false)
   const [selectedSampleKey, setSelectedSampleKey] = useState<string | null>(null)
   const [sampleError, setSampleError] = useState<string | null>(null)
@@ -635,17 +630,6 @@ const ProjectsPage = () => {
     }
   })
 
-  const [importPlanYaml] = useMutation(gql`
-    mutation ImportPlanYaml($projectId: Int!, $yamlContent: String!) {
-      importPlanYaml(projectId: $projectId, yamlContent: $yamlContent) {
-        success
-        message
-        nodeCount
-        edgeCount
-      }
-    }
-  `)
-
   const handleNavigate = (route: string) => {
     navigate(route)
   }
@@ -668,41 +652,6 @@ const ProjectsPage = () => {
       deleteProject({ variables: { id: projectId } });
     }
   };
-
-  const handleImportClick = () => {
-    setImportModalOpened(true)
-  }
-
-  const handleImportProject = async () => {
-    if (!selectedProjectForImport || !importFile) {
-      setImportError('Please select a project and upload a YAML file')
-      return
-    }
-
-    setImportLoading(true)
-    setImportError(null)
-
-    try {
-      const yamlContent = await importFile.text()
-      const result = await importPlanYaml({
-        variables: {
-          projectId: selectedProjectForImport,
-          yamlContent,
-        },
-      })
-
-      if ((result.data as any)?.importPlanYaml?.success) {
-        setImportModalOpened(false)
-        setImportFile(null)
-        setSelectedProjectForImport(null)
-        navigate(`/projects/${selectedProjectForImport}/plan`)
-      }
-    } catch (error: any) {
-      setImportError(error.message || 'Failed to import plan')
-    } finally {
-      setImportLoading(false)
-    }
-  }
 
   const handleOpenSampleModal = () => {
     setSampleError(null)
@@ -760,13 +709,6 @@ const ProjectsPage = () => {
             onClick={handleOpenSampleModal}
           >
             Add Sample Project
-          </Button>
-          <Button
-            variant="light"
-            leftSection={<IconFileImport size={16} />}
-            onClick={handleImportClick}
-          >
-            Import Plan
           </Button>
         </Group>
       </Group>
@@ -923,80 +865,6 @@ const ProjectsPage = () => {
         </Stack>
       </Modal>
 
-      <Modal
-        opened={importModalOpened}
-        onClose={() => {
-          setImportModalOpened(false)
-          setImportFile(null)
-          setSelectedProjectForImport(null)
-          setImportError(null)
-        }}
-        title="Import Plan from YAML"
-        size="md"
-      >
-        <Stack gap="md">
-          <Text size="sm" c="dimmed">
-            Import a plan.yaml file to automatically create a DAG structure with nodes and edges.
-          </Text>
-
-          <Select
-            label="Target Project"
-            placeholder="Select a project"
-            data={projects.map(p => ({ value: p.id.toString(), label: p.name }))}
-            value={selectedProjectForImport?.toString() || null}
-            onChange={(value) => setSelectedProjectForImport(value ? parseInt(value) : null)}
-            required
-          />
-
-          <div>
-            <Text size="sm" fw={500} mb={4}>
-              YAML File
-            </Text>
-            <FileButton
-              onChange={setImportFile}
-              accept=".yaml,.yml"
-            >
-              {(props) => (
-                <Button {...props} variant="light" fullWidth>
-                  {importFile ? importFile.name : 'Select YAML file'}
-                </Button>
-              )}
-            </FileButton>
-            {importFile && (
-              <Text size="xs" c="dimmed" mt={4}>
-                Selected: {importFile.name} ({(importFile.size / 1024).toFixed(2)} KB)
-              </Text>
-            )}
-          </div>
-
-          {importError && (
-            <Alert color="red" title="Import Failed">
-              {importError}
-            </Alert>
-          )}
-
-          <Group justify="flex-end" gap="xs">
-            <Button
-              variant="subtle"
-              onClick={() => {
-                setImportModalOpened(false)
-                setImportFile(null)
-                setSelectedProjectForImport(null)
-                setImportError(null)
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleImportProject}
-              loading={importLoading}
-              disabled={!selectedProjectForImport || !importFile}
-            >
-              Import
-            </Button>
-          </Group>
-        </Stack>
-      </Modal>
     </PageContainer>
   )
 }

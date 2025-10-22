@@ -72,6 +72,8 @@ export const GraphPreview3D = ({ data, width, height }: GraphPreview3DProps) => 
     const graphInstance: any = createGraph()
     graphInstance(containerRef.current)
 
+    const nodeRadius = 4.5
+
     graphInstance
       .width(graphWidth)
       .height(graphHeight)
@@ -80,10 +82,36 @@ export const GraphPreview3D = ({ data, width, height }: GraphPreview3DProps) => 
         nodes: data.nodes.map(node => ({ ...node })),
         links: data.links.map(link => ({ ...link }))
       })
-      .nodeAutoColorBy((node: any) => node.layer || 'default')
-      .nodeOpacity(0.95)
-      .nodeRelSize(6)
       .nodeLabel((node: any) => node.name || node.id)
+      .nodeOpacity(0.95)
+      .nodeThreeObject((node: any) => {
+        const style = layerStyles.getStyle(node.layer)
+        const group = new THREE.Group()
+
+        const sphereGeometry = new THREE.SphereGeometry(nodeRadius, 16, 16)
+        const sphereMaterial = new THREE.MeshStandardMaterial({
+          color: style.nodeColor,
+          emissive: style.nodeColor,
+          emissiveIntensity: 0.35,
+          roughness: 0.4,
+          metalness: 0.1
+        })
+        const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial)
+        group.add(sphere)
+
+        const sprite = new SpriteText(node.name || node.id)
+        sprite.color = '#e2e8f0'
+        sprite.backgroundColor = 'rgba(15, 23, 42, 0.85)'
+        sprite.padding = 4
+        sprite.borderWidth = 0
+        sprite.textHeight = nodeRadius * 2.2
+        ;(sprite as any).material.depthWrite = false
+        sprite.position.set(0, nodeRadius * 2.8, 0)
+        group.add(sprite)
+
+        return group
+      })
+      .nodeThreeObjectExtend(true)
       .linkColor((link: any) => layerStyles.getStyle(link.layer).linkColor)
       .linkOpacity(0.85)
       .linkDirectionalArrowColor((link: any) => layerStyles.getStyle(link.layer).linkColor)
