@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Stack, Select, Loader, Alert, Text } from '@mantine/core';
+import { Stack, Select, Loader, Alert, Text, TextInput } from '@mantine/core';
 import { IconAlertCircle } from '@tabler/icons-react';
 import { useQuery } from '@apollo/client/react';
 import { gql } from '@apollo/client';
-import { DataSourceNodeConfig } from '../../../../types/plan-dag';
+import { DataSourceNodeConfig, NodeMetadata } from '../../../../types/plan-dag';
 
 // GraphQL query for available data sources
 const GET_AVAILABLE_DATA_SOURCES = gql`
@@ -37,6 +37,8 @@ interface DataSourceNodeConfigFormProps {
   setConfig: (config: DataSourceNodeConfig) => void;
   setIsValid: (isValid: boolean) => void;
   projectId: number;
+  metadata: NodeMetadata;
+  setMetadata: React.Dispatch<React.SetStateAction<NodeMetadata>>;
 }
 
 export const DataSourceNodeConfigForm: React.FC<DataSourceNodeConfigFormProps> = ({
@@ -44,15 +46,22 @@ export const DataSourceNodeConfigForm: React.FC<DataSourceNodeConfigFormProps> =
   setConfig,
   setIsValid,
   projectId,
+  metadata,
+  setMetadata,
 }) => {
   const [localConfig, setLocalConfig] = useState<DataSourceNodeConfig>({
     ...config,
   });
+  const [nodeName, setNodeName] = useState<string>(metadata?.label ?? '');
 
   const { data, loading, error } = useQuery<GetAvailableDataSourcesData>(GET_AVAILABLE_DATA_SOURCES, {
     variables: { projectId },
     skip: !projectId,
   });
+
+  useEffect(() => {
+    setNodeName(metadata?.label ?? '');
+  }, [metadata]);
 
   // Update parent config when local config changes
   useEffect(() => {
@@ -61,19 +70,43 @@ export const DataSourceNodeConfigForm: React.FC<DataSourceNodeConfigFormProps> =
 
   // Validate configuration
   useEffect(() => {
-    // Valid if data source is selected (output goes to outgoing edge)
-    const isValid = !!localConfig.dataSourceId;
+    const isValid = !!localConfig.dataSourceId && nodeName.trim().length > 0;
     setIsValid(isValid);
-  }, [localConfig, setIsValid]);
+  }, [localConfig.dataSourceId, nodeName, setIsValid]);
+
+  const handleNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = event.currentTarget.value;
+    setNodeName(value);
+    setMetadata(prev => ({
+      ...prev,
+      label: value,
+    }));
+  };
 
   const handleDataSourceChange = (value: string | null) => {
     if (value) {
       const dataSourceId = parseInt(value, 10);
+      const previousSelection = data?.dataSources?.find(ds => ds.id === localConfig.dataSourceId);
+      const newSelection = data?.dataSources?.find(ds => ds.id === dataSourceId);
 
       setLocalConfig(prev => ({
         ...prev,
         dataSourceId,
       }));
+
+      if (newSelection) {
+        const currentName = nodeName.trim();
+        if (
+          currentName.length === 0 ||
+          (previousSelection && currentName === previousSelection.name)
+        ) {
+          setNodeName(newSelection.name);
+          setMetadata(prev => ({
+            ...prev,
+            label: newSelection.name,
+          }));
+        }
+      }
     } else {
       setLocalConfig(prev => ({
         ...prev,
@@ -118,6 +151,14 @@ export const DataSourceNodeConfigForm: React.FC<DataSourceNodeConfigFormProps> =
 
   return (
     <Stack gap="md">
+      <TextInput
+        label="Node Name"
+        placeholder="Enter a name for this node"
+        required
+        value={nodeName}
+        onChange={handleNameChange}
+      />
+
       <Select
         label="Data Source"
         placeholder="Select a data source"

@@ -63,6 +63,38 @@ interface PlanVisualEditorProps {
 
 const isTauri = !!(window as any).__TAURI__;
 
+const parseNodeConfigValue = (value: any) => {
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value)
+    } catch (error) {
+      console.warn('[PlanVisualEditor] Failed to parse node config JSON', error)
+      return value
+    }
+  }
+
+  return value
+}
+
+const sanitizeNodeMetadata = (raw: any, fallback?: NodeMetadata): NodeMetadata => {
+  if (raw && typeof raw === 'object') {
+    const { label, description } = raw as any
+    const metadata: NodeMetadata = {
+      label: typeof label === 'string' ? label : fallback?.label ?? ''
+    }
+
+    const resolvedDescription =
+      typeof description === 'string' ? description : fallback?.description
+    if (resolvedDescription && resolvedDescription.length > 0) {
+      metadata.description = resolvedDescription
+    }
+
+    return metadata
+  }
+
+  return fallback ? { ...fallback } : { label: '' }
+}
+
 const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly = false, focusNodeId, collaboration }: PlanVisualEditorProps) => {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   // Get ReactFlow instance for fit view and screen position conversion
@@ -682,34 +714,69 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     [nodes, edges]
   )
 
-  const handleNodeConfigSave = useCallback((nodeId: string, config: NodeConfig, metadata: NodeMetadata) => {
-    setNodes((nodes) =>
-      nodes.map((node) =>
-        node.id === nodeId
-          ? {
-              ...node,
-              data: {
-                ...node.data,
-                config,
-                metadata,
-                label: metadata.label, // Update the label for ReactFlow
-                onEdit: () => handleNodeEdit(nodeId),
-                onDelete: () => handleNodeDelete(nodeId),
-              },
-            }
-          : node
-      )
-    )
-    // Remove __typename from metadata before sending to backend
-    const { __typename, ...cleanedMetadata } = metadata as any;
+  const handleNodeConfigSave = useCallback(
+    (nodeId: string, config: NodeConfig, metadata: NodeMetadata) => {
+      const preparedConfig = parseNodeConfigValue(config)
+      const sanitizedMetadata = sanitizeNodeMetadata(metadata)
 
-    // Save changes to backend
-    mutations.updateNode(nodeId, {
-      config: JSON.stringify(config),
-      metadata: cleanedMetadata
-    })
-    console.log('Node configuration updated:', nodeId, config, cleanedMetadata)
-  }, [setNodes, handleNodeEdit, handleNodeDelete, mutations])
+      setNodes((nodes) =>
+        nodes.map((node) =>
+          node.id === nodeId
+            ? {
+                ...node,
+                data: {
+                  ...node.data,
+                  config: preparedConfig,
+                  metadata: sanitizedMetadata,
+                  label: sanitizedMetadata.label,
+                  onEdit: () => handleNodeEdit(nodeId),
+                  onDelete: () => handleNodeDelete(nodeId)
+                }
+              }
+            : node
+        )
+      )
+
+      mutations
+        .updateNode(nodeId, {
+          config: preparedConfig,
+          metadata: sanitizedMetadata
+        })
+        .then((updatedNode) => {
+          if (!updatedNode) {
+            return
+          }
+
+          const serverConfig = parseNodeConfigValue(updatedNode.config)
+          const serverMetadata = sanitizeNodeMetadata(updatedNode.metadata, sanitizedMetadata)
+
+          setNodes((nodes) =>
+            nodes.map((node) =>
+              node.id === nodeId
+                ? {
+                    ...node,
+                    data: {
+                      ...node.data,
+                      config: serverConfig,
+                      metadata: serverMetadata,
+                      label: serverMetadata.label,
+                      onEdit: () => handleNodeEdit(nodeId),
+                      onDelete: () => handleNodeDelete(nodeId)
+                    }
+                  }
+                : node
+            )
+          )
+
+          console.log('[PlanVisualEditor] Node configuration synchronized with backend:', nodeId)
+        })
+        .catch((error) => {
+          console.error('[PlanVisualEditor] Failed to update node configuration:', error)
+          alert(`Failed to update node configuration: ${error.message}`)
+        })
+    },
+    [handleNodeDelete, handleNodeEdit, mutations, setNodes]
+  )
 
   // Handle viewport changes to track current zoom/pan state
   const handleViewportChange: OnMove = useCallback((_event, viewport: Viewport) => {

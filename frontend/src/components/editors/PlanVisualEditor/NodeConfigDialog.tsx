@@ -1,6 +1,6 @@
 import React from 'react';
 import { Modal, Button, Group, Text } from '@mantine/core';
-import { PlanDagNodeType } from '../../../types/plan-dag';
+import { PlanDagNodeType, NodeMetadata } from '../../../types/plan-dag';
 import { DataSourceNodeConfigForm } from './forms/DataSourceNodeConfigForm';
 import { TransformNodeConfigForm } from './forms/TransformNodeConfigForm';
 import { MergeNodeConfigForm } from './forms/MergeNodeConfigForm';
@@ -19,6 +19,21 @@ interface NodeConfigDialogProps {
   metadata: any;
 }
 
+const sanitizeMetadata = (raw: any): NodeMetadata => {
+  if (raw && typeof raw === 'object') {
+    const { label, description } = raw as any;
+    const metadata: NodeMetadata = {
+      label: typeof label === 'string' ? label : '',
+    };
+    if (typeof description === 'string' && description.length > 0) {
+      metadata.description = description;
+    }
+    return metadata;
+  }
+
+  return { label: '' };
+};
+
 export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
   opened,
   onClose,
@@ -30,13 +45,13 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
   metadata: initialMetadata,
 }) => {
   const [config, setConfig] = React.useState(initialConfig);
-  const [metadata, setMetadata] = React.useState(initialMetadata);
+  const [metadata, setMetadata] = React.useState<NodeMetadata>(sanitizeMetadata(initialMetadata));
   const [isValid, setIsValid] = React.useState(false);
 
   React.useEffect(() => {
     if (opened) {
       setConfig(initialConfig);
-      setMetadata(initialMetadata);
+      setMetadata(sanitizeMetadata(initialMetadata));
     }
   }, [opened, initialConfig, initialMetadata]);
 
@@ -57,9 +72,21 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
 
     switch (nodeType) {
       case PlanDagNodeType.DATA_SOURCE:
-        return <DataSourceNodeConfigForm {...commonProps} />;
+        return (
+          <DataSourceNodeConfigForm
+            {...commonProps}
+            metadata={metadata}
+            setMetadata={setMetadata}
+          />
+        );
       case PlanDagNodeType.GRAPH:
-        return <GraphNodeConfigForm {...commonProps} />;
+        return (
+          <GraphNodeConfigForm
+            {...commonProps}
+            metadata={metadata}
+            setMetadata={setMetadata}
+          />
+        );
       case PlanDagNodeType.TRANSFORM:
         return <TransformNodeConfigForm {...commonProps} />;
       case PlanDagNodeType.MERGE:
