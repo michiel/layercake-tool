@@ -10,10 +10,10 @@ pub mod graph_edit_service;
 pub mod graph_service;
 pub mod import_service;
 pub mod library_source_service;
-pub mod source_processing;
 pub mod plan_dag_service;
 pub mod project_service;
 pub mod sample_project_service;
+pub mod source_processing;
 pub mod validation;
 
 pub use authorization::*;

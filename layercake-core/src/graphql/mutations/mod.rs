@@ -5,10 +5,12 @@ use chrono::Utc;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 
 use crate::database::entities::{
-    plan_dag_edges, plan_dag_nodes, plans, project_collaborators, projects, user_sessions, users,
+    data_sources, plan_dag_edges, plan_dag_nodes, plans, project_collaborators, projects,
+    user_sessions, users,
 };
 use crate::graphql::context::GraphQLContext;
 use crate::services::auth_service::AuthService;
+use serde_json::{Map, Value};
 
 use crate::pipeline::DagExecutor;
 use crate::services::data_source_service::DataSourceService;
@@ -518,6 +520,9 @@ impl Mutation {
             .await?
             .ok_or_else(|| Error::new("Node not found"))?;
 
+        let node_type = node.node_type.clone();
+        let mut metadata_json_current = node.metadata_json.clone();
+
         let mut node_active: plan_dag_nodes::ActiveModel = node.into();
         let mut patch_ops = Vec::new();
         let _config_updated = false;
@@ -540,6 +545,7 @@ impl Mutation {
         if let Some(metadata) = updates.metadata {
             let metadata_json_str = serde_json::to_string(&metadata)?;
             node_active.metadata_json = Set(metadata_json_str.clone());
+            metadata_json_current = metadata_json_str.clone();
 
             // Generate metadata delta
             if let Some(patch) = plan_dag_delta::generate_node_update_patch(
@@ -565,6 +571,55 @@ impl Mutation {
                 &current_nodes,
             ) {
                 patch_ops.push(patch);
+            }
+
+            if node_type == "DataSourceNode" {
+                if let Ok(config_value) = serde_json::from_str::<Value>(&config) {
+                    if let Some(data_source_id) =
+                        config_value.get("dataSourceId").and_then(|v| v.as_i64())
+                    {
+                        if let Some(data_source) =
+                            data_sources::Entity::find_by_id(data_source_id as i32)
+                                .one(&context.db)
+                                .await?
+                        {
+                            let mut metadata_obj =
+                                serde_json::from_str::<Value>(&metadata_json_current)
+                                    .ok()
+                                    .and_then(|value| value.as_object().cloned())
+                                    .unwrap_or_else(|| Map::new());
+
+                            let needs_update = match metadata_obj.get("label") {
+                                Some(Value::String(current_label))
+                                    if current_label == &data_source.name =>
+                                {
+                                    false
+                                }
+                                _ => true,
+                            };
+
+                            if needs_update {
+                                metadata_obj.insert(
+                                    "label".to_string(),
+                                    Value::String(data_source.name.clone()),
+                                );
+                                let metadata_value = Value::Object(metadata_obj);
+                                metadata_json_current = metadata_value.to_string();
+                                node_active.metadata_json = Set(metadata_json_current.clone());
+
+                                if let Some(patch) = plan_dag_delta::generate_node_update_patch(
+                                    &node_id,
+                                    "metadata",
+                                    serde_json::from_str(&metadata_json_current)
+                                        .unwrap_or(Value::Null),
+                                    &current_nodes,
+                                ) {
+                                    patch_ops.push(patch);
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
