@@ -16,8 +16,8 @@
     "@tweakpane/core": "^2.0.5",
     "@types/react": "^19.1.13",
     "@types/react-dom": "^19.1.9",
-    "@types/three": "^0.161.0",
     "@types/react-router-dom": "^5.3.3",
+    "@types/three": "^0.161.0",
     "@vitejs/plugin-react": "^5.0.3",
     "typescript": "^5.9.2",
     "vite": "^7.1.6"
@@ -45,6 +45,7 @@
     "react-router-dom": "^7.9.1",
     "reactflow": "^11.11.4",
     "three": "^0.161.0",
+    "three-fly-controls": "^2.0.0",
     "three-spritetext": "^1.9.4",
     "tweakpane": "^4.0.5"
   }

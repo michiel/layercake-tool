@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import ForceGraph3D from '3d-force-graph'
 import SpriteText from 'three-spritetext'
 import * as THREE from 'three'
+import FlyControls from 'three-fly-controls'
 import { GraphData } from './GraphPreview'
 
 interface GraphPreview3DProps {
@@ -27,6 +28,8 @@ const DEFAULT_STYLE: LayerStyle = {
 export const GraphPreview3D = ({ data, width, height }: GraphPreview3DProps) => {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const graphRef = useRef<any>(null)
+  const controlsRef = useRef<any>(null)
+  const animationFrameRef = useRef<number | null>(null)
   const resizeObserverRef = useRef<ResizeObserver | null>(null)
 
   const layerStyles = useMemo(() => {
@@ -68,9 +71,7 @@ export const GraphPreview3D = ({ data, width, height }: GraphPreview3DProps) => 
     const graphWidth = width || containerRef.current.clientWidth || 800
     const graphHeight = height || containerRef.current.clientHeight || 600
 
-    const createGraph = ForceGraph3D as unknown as () => any
-    const graphInstance: any = createGraph()
-    graphInstance(containerRef.current)
+    const graphInstance: any = (ForceGraph3D as unknown as (container: HTMLElement) => any)(containerRef.current)
 
     const nodeRadius = 4.5
 
@@ -117,7 +118,9 @@ export const GraphPreview3D = ({ data, width, height }: GraphPreview3DProps) => 
       .linkDirectionalArrowColor((link: any) => layerStyles.getStyle(link.layer).linkColor)
       .linkDirectionalArrowLength(6)
       .linkDirectionalArrowRelPos(1)
-      .linkDirectionalParticles(0)
+      .linkDirectionalParticles(4)
+      .linkDirectionalParticleWidth(1.5)
+      .linkDirectionalParticleSpeed(() => 0.006)
       .linkThreeObjectExtend(true)
 
     graphInstance.linkThreeObject((link: any) => {
@@ -144,6 +147,26 @@ export const GraphPreview3D = ({ data, width, height }: GraphPreview3DProps) => 
 
     graphRef.current = graphInstance
 
+    requestAnimationFrame(() => {
+      if (!graphRef.current) return
+      const flyControls = new FlyControls(
+        graphInstance.camera(),
+        graphInstance.renderer()?.domElement || containerRef.current
+      )
+      flyControls.movementSpeed = 50
+      flyControls.rollSpeed = 0.5
+      flyControls.dragToLook = true
+      flyControls.autoForward = false
+      controlsRef.current = flyControls
+      graphInstance.controls(flyControls)
+    })
+
+    const animate = () => {
+      controlsRef.current?.update(0.016)
+      animationFrameRef.current = requestAnimationFrame(animate)
+    }
+    animationFrameRef.current = requestAnimationFrame(animate)
+
     // Lighting tweaks for readability
     const scene = graphInstance.scene()
     if (scene) {
@@ -158,6 +181,11 @@ export const GraphPreview3D = ({ data, width, height }: GraphPreview3DProps) => 
     graphInstance.zoomToFit(400, 10)
 
     return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current)
+        animationFrameRef.current = null
+      }
+      controlsRef.current = null
       if (graphRef.current) {
         graphRef.current._destructor?.()
         graphRef.current = null

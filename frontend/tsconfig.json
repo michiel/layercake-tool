@@ -30,6 +30,6 @@
       "@/utils/*": ["src/utils/*"]
     }
   },
-  "include": ["src", "src/types/global.d.ts"],
+  "include": ["src", "src/types/global.d.ts", "src/types"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

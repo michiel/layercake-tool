@@ -197,37 +197,20 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
   }, [data, computeSignature]);
 
   const layerStyles = useMemo(() => {
-    const normalizeColor = (value?: string) => {
-      if (!value) return undefined;
-      return value.startsWith('#') ? value : `#${value}`;
-    };
-
     const defaults = {
       nodeColor: '#4c6ef5',
       borderColor: '#364fc7',
-      textColor: '#f8f9fa',
-      linkColor: '#94a3b8'
+      textColor: '#f8fafc',
+      linkColor: '#64748b'
     };
-
-    const styles = new Map<string, typeof defaults>();
-    data.layers?.forEach((layer) => {
-      const key = layer.layerId || layer.name || 'default';
-      styles.set(key, {
-        nodeColor: normalizeColor(layer.backgroundColor) || defaults.nodeColor,
-        borderColor: normalizeColor(layer.borderColor) || defaults.borderColor,
-        textColor: normalizeColor(layer.textColor) || defaults.textColor,
-        linkColor: normalizeColor(layer.borderColor) || defaults.linkColor
-      });
-    });
 
     return {
       defaults,
-      getStyle(layerId?: string) {
-        if (!layerId) return defaults;
-        return styles.get(layerId) || defaults;
+      getStyle(_layerId?: string) {
+        return defaults;
       }
     };
-  }, [data.layers]);
+  }, []);
 
   // Initialize graph when data changes
   useEffect(() => {
@@ -279,7 +262,7 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
       .height(currentHeight)
       .graphData(data)
       .nodeId('id')
-      .nodeLabel('name')
+      .nodeLabel((node: any) => node.name || node.id)
       .nodeCanvasObject((node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
         const p = paramsRef.current;
         const label = node.name;
@@ -298,7 +281,7 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
         ctx.fill();
         ctx.stroke();
 
-        ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
         ctx.fillRect(
           node.x - bckgDimensions[0] / 2,
           node.y - p.nodeRadius - bckgDimensions[1] - fontSize * 0.2,
@@ -308,7 +291,7 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
 
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillStyle = style.textColor;
+        ctx.fillStyle = '#f8fafc';
         ctx.fillText(label, node.x, node.y - p.nodeRadius - bckgDimensions[1] / 2 - fontSize * 0.2);
 
         (node as any).__bckgDimensions = bckgDimensions;
@@ -360,10 +343,9 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
         const textWidth = ctx.measureText(label).width;
 
         if (textWidth > 0) {
-          const style = getLayerStyle(link.layer);
-          ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
           ctx.fillRect(-textWidth / 2 - 4, -fontSize / 2 - 2, textWidth + 8, fontSize + 4);
-          ctx.fillStyle = style.textColor;
+          ctx.fillStyle = '#f8fafc';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText(label, 0, 0);
