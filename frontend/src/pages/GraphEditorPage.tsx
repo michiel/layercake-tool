@@ -111,16 +111,30 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
     }
   );
 
-  const [updateGraphNode] = useMutation(UPDATE_GRAPH_NODE);
-  const [updateGraphEdge] = useMutation(UPDATE_GRAPH_EDGE);
+  const graphRefetchQueries = [{ query: GET_GRAPH_DETAILS, variables: { id: parseInt(graphId || '0') } }];
+
+  const [updateGraphNode] = useMutation(UPDATE_GRAPH_NODE, {
+    refetchQueries: graphRefetchQueries
+  });
+  const [updateGraphEdge] = useMutation(UPDATE_GRAPH_EDGE, {
+    refetchQueries: graphRefetchQueries
+  });
   const [updateLayerProperties] = useMutation(UPDATE_LAYER_PROPERTIES);
   const [createLayer] = useMutation(CREATE_LAYER, {
-    refetchQueries: [{ query: GET_GRAPH_DETAILS, variables: { id: parseInt(graphId || '0') } }]
+    refetchQueries: graphRefetchQueries
   });
-  const [addGraphNode] = useMutation(ADD_GRAPH_NODE);
-  const [addGraphEdge] = useMutation(ADD_GRAPH_EDGE);
-  const [deleteGraphEdge] = useMutation(DELETE_GRAPH_EDGE);
-  const [deleteGraphNode] = useMutation(DELETE_GRAPH_NODE);
+  const [addGraphNode] = useMutation(ADD_GRAPH_NODE, {
+    refetchQueries: graphRefetchQueries
+  });
+  const [addGraphEdge] = useMutation(ADD_GRAPH_EDGE, {
+    refetchQueries: graphRefetchQueries
+  });
+  const [deleteGraphEdge] = useMutation(DELETE_GRAPH_EDGE, {
+    refetchQueries: graphRefetchQueries
+  });
+  const [deleteGraphNode] = useMutation(DELETE_GRAPH_NODE, {
+    refetchQueries: graphRefetchQueries
+  });
 
   const graph: Graph | null = graphData?.graph || null;
 
