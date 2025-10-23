@@ -440,13 +440,17 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
       });
     }
 
-    // Send mutation to server
+    // Send mutation to server without cache update to avoid viewport shift
+    // Cache will be updated by polling (every 10s) or manual refetch
     updateGraphNode({
       variables: {
         graphId: parseInt(graphId),
         nodeId,
         label: newLabel,
       },
+      update: () => {
+        // Skip cache update for label-only changes to prevent viewport shift
+      }
     }).catch(error => {
       console.error('Failed to update node label:', error);
       // TODO: Rollback optimistic update on error
@@ -472,13 +476,17 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
       });
     }
 
-    // Send mutation to server
+    // Send mutation to server without cache update to avoid viewport shift
+    // Cache will be updated by polling (every 10s) or manual refetch
     updateGraphEdge({
       variables: {
         graphId: parseInt(graphId),
         edgeId,
         label: newLabel,
       },
+      update: () => {
+        // Skip cache update for label-only changes to prevent viewport shift
+      }
     }).catch(error => {
       console.error('Failed to update edge label:', error);
       // TODO: Rollback optimistic update on error
