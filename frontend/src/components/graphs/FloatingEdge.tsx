@@ -18,17 +18,22 @@ function getNodeIntersection(intersectionNode: Node, targetNode: Node) {
   } = intersectionNode;
   const targetPosition = targetNode.positionAbsolute;
 
-  if (!intersectionNodeWidth || !intersectionNodeHeight || !intersectionNodePosition || !targetPosition) {
+  // Fallback to center position if dimensions are missing
+  if (!intersectionNodePosition || !targetPosition) {
     return { x: 0, y: 0 };
   }
 
-  const w = intersectionNodeWidth / 2;
-  const h = intersectionNodeHeight / 2;
+  // Use default dimensions if not provided
+  const nodeWidth = intersectionNodeWidth || 170;
+  const nodeHeight = intersectionNodeHeight || 50;
+
+  const w = nodeWidth / 2;
+  const h = nodeHeight / 2;
 
   const x2 = intersectionNodePosition.x + w;
   const y2 = intersectionNodePosition.y + h;
-  const x1 = targetPosition.x + (targetNode.width || 0) / 2;
-  const y1 = targetPosition.y + (targetNode.height || 0) / 2;
+  const x1 = targetPosition.x + (targetNode.width || 170) / 2;
+  const y1 = targetPosition.y + (targetNode.height || 50) / 2;
 
   const xx1 = (x1 - x2) / (2 * w) - (y1 - y2) / (2 * h);
   const yy1 = (x1 - x2) / (2 * w) + (y1 - y2) / (2 * h);
