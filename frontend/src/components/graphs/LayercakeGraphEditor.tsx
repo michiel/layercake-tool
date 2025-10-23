@@ -543,18 +543,49 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
         return `manual-node-${Date.now()}-${Math.random().toString(16).slice(2)}`;
       };
 
+      // Find parent container if drop position is inside one
+      let parentNode: string | undefined;
+      let relativePosition = position;
+
+      const containerNodes = nodes.filter(n => n.type === 'group');
+      for (const container of containerNodes) {
+        const containerWidth = (container.width || container.style?.width || 200) as number;
+        const containerHeight = (container.height || container.style?.height || 200) as number;
+
+        // Check if drop position is within container bounds
+        if (
+          position.x >= container.position.x &&
+          position.x <= container.position.x + containerWidth &&
+          position.y >= container.position.y &&
+          position.y <= container.position.y + containerHeight
+        ) {
+          parentNode = container.id;
+          // Make position relative to parent
+          relativePosition = {
+            x: position.x - container.position.x,
+            y: position.y - container.position.y,
+          };
+          break; // Use the first matching container
+        }
+      }
+
       const newNode: Node = {
         id: generateNodeId(),
         type: isPartition ? 'group' : 'default',
-        position,
+        position: relativePosition,
         data: {
           label: isPartition ? 'New Container' : 'New Node',
           isPartition,
+          belongsTo: parentNode,
         },
         style: {
           width: isPartition ? 200 : undefined,
           height: isPartition ? 200 : undefined,
         },
+        ...(parentNode ? {
+          parentNode,
+          extent: 'parent' as const,
+        } : {}),
       };
 
       setNodes((nds) => nds.concat(newNode));
@@ -564,7 +595,7 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
         onNodeAdd(newNode);
       }
     },
-    [screenToFlowPosition, setNodes, onNodeAdd]
+    [screenToFlowPosition, setNodes, onNodeAdd, nodes]
   );
 
   return (

@@ -226,6 +226,9 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
   const handleNodeAdd = useCallback((node: FlowNode) => {
     if (!graphId) return;
 
+    // Extract belongsTo from either node.parentNode or node.data.belongsTo
+    const belongsTo = node.parentNode || node.data?.belongsTo;
+
     addGraphNode({
       variables: {
         graphId: parseInt(graphId),
@@ -233,7 +236,7 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
         label: node.data?.label || 'New Node',
         layer: node.data?.layer,
         isPartition: node.data?.isPartition || false,
-        belongsTo: node.data?.belongsTo,
+        belongsTo: belongsTo,
         weight: node.data?.weight,
         attrs: node.data?.attrs,
       },
