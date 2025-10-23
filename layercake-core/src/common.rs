@@ -110,7 +110,7 @@ pub fn get_handlebars() -> Handlebars<'static> {
                 let mut result = String::new();
 
                 if !children.is_empty() {
-                    result += &format!("{}subgraph {}\n", indent, label);
+                    result += &format!("{}subgraph \"{}\"\n", indent, label);
                     let children_rendered: Vec<String> = children.iter().map(|child| {
                         render_tree(child.clone(), acc + 1)
                     }).collect();
