@@ -216,6 +216,30 @@ impl GraphService {
         Ok(inserted)
     }
 
+    pub async fn delete_graph_node(
+        &self,
+        graph_id: i32,
+        node_id: String,
+    ) -> Result<graph_nodes::Model> {
+        use sea_orm::{EntityTrait, QueryFilter};
+
+        let node = GraphNodes::find()
+            .filter(graph_nodes::Column::GraphId.eq(graph_id))
+            .filter(graph_nodes::Column::Id.eq(&node_id))
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Graph node not found"))?;
+
+        // Delete the node
+        GraphNodes::delete_many()
+            .filter(graph_nodes::Column::GraphId.eq(graph_id))
+            .filter(graph_nodes::Column::Id.eq(&node_id))
+            .exec(&self.db)
+            .await?;
+
+        Ok(node)
+    }
+
     pub async fn update_graph_node(
         &self,
         graph_id: i32,

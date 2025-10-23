@@ -284,6 +284,12 @@ export const DELETE_GRAPH_EDGE = gql`
   }
 `
 
+export const DELETE_GRAPH_NODE = gql`
+  mutation DeleteGraphNode($graphId: Int!, $nodeId: String!) {
+    deleteGraphNode(graphId: $graphId, nodeId: $nodeId)
+  }
+`
+
 export const UPDATE_LAYER_PROPERTIES = gql`
   mutation UpdateLayerProperties(
     $id: Int!

@@ -9,7 +9,7 @@ import { LayercakeGraphEditor, GraphViewMode, GraphOrientation, HierarchyViewMod
 import { PropertiesAndLayersPanel } from '../components/graphs/PropertiesAndLayersPanel';
 import EditHistoryModal from '../components/graphs/EditHistoryModal';
 import { ReactFlowProvider, Node as FlowNode, Edge as FlowEdge } from 'reactflow';
-import { Graph, GraphNode, UPDATE_GRAPH_NODE, UPDATE_LAYER_PROPERTIES, GET_GRAPH_EDIT_COUNT, CREATE_LAYER, ADD_GRAPH_NODE, ADD_GRAPH_EDGE, DELETE_GRAPH_EDGE } from '../graphql/graphs';
+import { Graph, GraphNode, UPDATE_GRAPH_NODE, UPDATE_LAYER_PROPERTIES, GET_GRAPH_EDIT_COUNT, CREATE_LAYER, ADD_GRAPH_NODE, ADD_GRAPH_EDGE, DELETE_GRAPH_EDGE, DELETE_GRAPH_NODE } from '../graphql/graphs';
 import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
 
 declare global {
@@ -119,6 +119,7 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
   const [addGraphNode] = useMutation(ADD_GRAPH_NODE);
   const [addGraphEdge] = useMutation(ADD_GRAPH_EDGE);
   const [deleteGraphEdge] = useMutation(DELETE_GRAPH_EDGE);
+  const [deleteGraphNode] = useMutation(DELETE_GRAPH_NODE);
 
   const graph: Graph | null = graphData?.graph || null;
 
@@ -245,6 +246,20 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
       // TODO: Rollback optimistic update on error
     });
   }, [graphId, addGraphNode]);
+
+  const handleNodeDelete = useCallback((nodeId: string) => {
+    if (!graphId) return;
+
+    deleteGraphNode({
+      variables: {
+        graphId: parseInt(graphId),
+        nodeId,
+      },
+    }).catch(error => {
+      console.error('Failed to delete node:', error);
+      // TODO: Rollback optimistic update on error
+    });
+  }, [graphId, deleteGraphNode]);
 
   // Initialize layer visibility when graph loads
   useEffect(() => {
@@ -710,6 +725,7 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
               minEdgeLength={minEdgeLength}
               onNodeUpdate={handleNodeUpdate}
               onNodeAdd={handleNodeAdd}
+              onNodeDelete={handleNodeDelete}
               onEdgeAdd={handleEdgeAdd}
               onEdgeDelete={handleEdgeDelete}
             />

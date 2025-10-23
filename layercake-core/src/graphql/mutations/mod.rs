@@ -2433,6 +2433,51 @@ impl Mutation {
         }
     }
 
+    /// Delete a node from a graph
+    async fn delete_graph_node(
+        &self,
+        ctx: &Context<'_>,
+        graph_id: i32,
+        node_id: String,
+    ) -> Result<bool> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let graph_service = GraphService::new(context.db.clone());
+        let edit_service = GraphEditService::new(context.db.clone());
+
+        // Fetch current node to get old values for edit record
+        let old_node = graph_service
+            .delete_graph_node(graph_id, node_id.clone())
+            .await
+            .map_err(|e| Error::new(format!("Failed to delete graph node: {}", e)))?;
+
+        // Create edit record for the deletion
+        let node_data = serde_json::json!({
+            "id": old_node.id,
+            "label": old_node.label,
+            "layer": old_node.layer,
+            "is_partition": old_node.is_partition,
+            "belongs_to": old_node.belongs_to,
+            "weight": old_node.weight,
+            "attrs": old_node.attrs,
+        });
+
+        let _ = edit_service
+            .create_edit(
+                graph_id,
+                "node".to_string(),
+                node_id,
+                "delete".to_string(),
+                None,
+                Some(node_data),
+                None,
+                None,
+                true,
+            )
+            .await;
+
+        Ok(true)
+    }
+
     /// Bulk update graph nodes and layers in a single transaction
     async fn bulk_update_graph_data(
         &self,

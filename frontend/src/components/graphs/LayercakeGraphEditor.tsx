@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useEffect, useCallback, useMemo, useRef, useState } from 'react';
 import ReactFlow, {
   Controls,
   Background,
@@ -42,6 +42,7 @@ interface LayercakeGraphEditorProps {
   minEdgeLength?: number;
   onNodeUpdate?: (nodeId: string, updates: { belongsTo?: string }) => void;
   onNodeAdd?: (node: Node) => void;
+  onNodeDelete?: (nodeId: string) => void;
   onEdgeAdd?: (edge: Edge) => void;
   onEdgeDelete?: (edgeId: string) => void;
 }
@@ -62,6 +63,7 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
   minEdgeLength = 50,
   onNodeUpdate,
   onNodeAdd,
+  onNodeDelete,
   onEdgeAdd,
   onEdgeDelete,
 }) => {
@@ -72,6 +74,8 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
   const selectedNodeIdsRef = useRef<string[]>([]);
   const prevFitViewTriggerRef = useRef<number | undefined>(undefined);
   const manualEdgesRef = useRef<Edge[]>([]);
+  const [selectedNodes, setSelectedNodes] = useState<string[]>([]);
+  const [selectedEdges, setSelectedEdges] = useState<string[]>([]);
 
   const nodeTypes = useMemo(() => ({ group: GroupNode }), []);
   const edgeTypes = useMemo(() => ({ floating: FloatingEdge }), []);
@@ -281,16 +285,20 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
   }, [layerVisibility, renderGraph, setNodes, setEdges]);
 
   // Handle node selection
-  const handleSelectionChange = useCallback(({ nodes }: { nodes: Node[] }) => {
+  const handleSelectionChange = useCallback(({ nodes, edges }: { nodes: Node[]; edges: Edge[] }) => {
     // Filter out label nodes (they end with '-label')
-    const selectedNodes = nodes.filter(node => !node.id.endsWith('-label'));
+    const filteredNodes = nodes.filter(node => !node.id.endsWith('-label'));
 
     // Update ref to preserve selection across re-layouts
-    selectedNodeIdsRef.current = selectedNodes.map(node => node.id);
+    selectedNodeIdsRef.current = filteredNodes.map(node => node.id);
+
+    // Track selected nodes and edges for delete
+    setSelectedNodes(filteredNodes.map(n => n.id));
+    setSelectedEdges(edges.map(e => e.id));
 
     if (onNodeSelect) {
-      if (selectedNodes.length > 0) {
-        onNodeSelect(selectedNodes[0].id);
+      if (filteredNodes.length > 0) {
+        onNodeSelect(filteredNodes[0].id);
       } else {
         onNodeSelect(null);
       }
@@ -597,6 +605,42 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
     },
     [screenToFlowPosition, setNodes, onNodeAdd, nodes]
   );
+
+  // Handle delete key for selected nodes and edges
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Check if Delete or Backspace is pressed
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        // Prevent default backspace navigation
+        event.preventDefault();
+
+        // Delete selected nodes
+        if (selectedNodes.length > 0 && onNodeDelete) {
+          selectedNodes.forEach(nodeId => {
+            onNodeDelete(nodeId);
+          });
+          // Remove from local state
+          setNodes(nds => nds.filter(n => !selectedNodes.includes(n.id)));
+          setSelectedNodes([]);
+        }
+
+        // Delete selected edges
+        if (selectedEdges.length > 0 && onEdgeDelete) {
+          selectedEdges.forEach(edgeId => {
+            onEdgeDelete(edgeId);
+          });
+          // Remove from local state
+          setEdges(eds => eds.filter(e => !selectedEdges.includes(e.id)));
+          setSelectedEdges([]);
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [selectedNodes, selectedEdges, onNodeDelete, onEdgeDelete, setNodes, setEdges]);
 
   return (
     <div
