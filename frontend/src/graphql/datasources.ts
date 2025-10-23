@@ -140,9 +140,9 @@ export const REPROCESS_DATASOURCE = gql`
 `
 
 // Mutation to update graph JSON data
-export const UPDATE_GRAPH_JSON = gql`
-  mutation UpdateGraphJson($id: Int!, $graphJson: String!) {
-    updateGraphJson(id: $id, graphJson: $graphJson) {
+export const UPDATE_DATASOURCE_GRAPH_DATA = gql`
+  mutation UpdateDataSourceGraphData($id: Int!, $graphJson: String!) {
+    updateDataSourceGraphData(id: $id, graphJson: $graphJson) {
       id
       projectId
       name

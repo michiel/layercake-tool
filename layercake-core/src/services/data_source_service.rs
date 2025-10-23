@@ -225,6 +225,27 @@ impl DataSourceService {
         Ok(updated)
     }
 
+    /// Update DataSource graph data (graph_json) directly
+    /// Updates processed_at timestamp to trigger downstream re-execution
+    pub async fn update_graph_data(
+        &self,
+        id: i32,
+        graph_json: String,
+    ) -> Result<data_sources::Model> {
+        let data_source = self
+            .get_by_id(id)
+            .await?
+            .ok_or_else(|| anyhow!("DataSource not found"))?;
+
+        let mut active_model: data_sources::ActiveModel = data_source.into();
+        active_model.graph_json = Set(graph_json);
+        active_model.processed_at = Set(Some(chrono::Utc::now()));
+        active_model.updated_at = Set(chrono::Utc::now());
+
+        let updated = active_model.update(&self.db).await?;
+        Ok(updated)
+    }
+
     /// Update DataSource file and reprocess
     pub async fn update_file(
         &self,

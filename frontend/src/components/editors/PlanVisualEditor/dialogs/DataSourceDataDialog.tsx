@@ -1,8 +1,8 @@
 import React from 'react';
 import { Modal, Stack, Alert, Loader, Text } from '@mantine/core';
 import { IconAlertCircle } from '@tabler/icons-react';
-import { useQuery } from '@apollo/client/react';
-import { GET_DATASOURCE, DataSource } from '../../../../graphql/datasources';
+import { useQuery, useMutation } from '@apollo/client/react';
+import { GET_DATASOURCE, DataSource, UPDATE_DATASOURCE_GRAPH_DATA } from '../../../../graphql/datasources';
 import { GraphSpreadsheetEditor, GraphData } from '../../../editors/GraphSpreadsheetEditor/GraphSpreadsheetEditor';
 
 interface DataSourceDataDialogProps {
@@ -18,11 +18,13 @@ export const DataSourceDataDialog: React.FC<DataSourceDataDialogProps> = ({
   dataSourceId,
   title = 'Data Source Data'
 }) => {
-  const { data, loading, error } = useQuery<{ dataSource: DataSource }>(GET_DATASOURCE, {
+  const { data, loading, error, refetch } = useQuery<{ dataSource: DataSource }>(GET_DATASOURCE, {
     variables: { id: dataSourceId },
     skip: !opened || !dataSourceId,
     fetchPolicy: 'network-only'
   });
+
+  const [updateDataSourceGraphData] = useMutation(UPDATE_DATASOURCE_GRAPH_DATA);
 
   const getGraphData = (): GraphData | null => {
     if (!data?.dataSource) return null;
@@ -63,10 +65,31 @@ export const DataSourceDataDialog: React.FC<DataSourceDataDialogProps> = ({
   };
 
   const handleSave = async (graphData: GraphData) => {
-    // Update graph JSON for datasource
-    // This would require a mutation to update the datasource's graphJson field
-    console.log('Save datasource data:', graphData);
-    // TODO: Implement UPDATE_GRAPH_JSON mutation call here
+    if (!dataSourceId) return;
+
+    try {
+      // Convert GraphData back to the format expected by the backend
+      const graphJson = JSON.stringify({
+        nodes: graphData.nodes,
+        edges: graphData.edges,
+        layers: graphData.layers
+      });
+
+      await updateDataSourceGraphData({
+        variables: {
+          id: dataSourceId,
+          graphJson
+        }
+      });
+
+      // Refetch to show updated data
+      await refetch();
+
+      console.log('Datasource data saved successfully');
+    } catch (error) {
+      console.error('Failed to save datasource data:', error);
+      throw error;
+    }
   };
 
   return (

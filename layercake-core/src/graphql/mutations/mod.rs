@@ -1719,6 +1719,24 @@ impl Mutation {
         Ok(DataSource::from(data_source))
     }
 
+    /// Update DataSource graph data directly
+    async fn update_data_source_graph_data(
+        &self,
+        ctx: &Context<'_>,
+        id: i32,
+        graph_json: String,
+    ) -> Result<DataSource> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let data_source_service = DataSourceService::new(context.db.clone());
+
+        let data_source = data_source_service
+            .update_graph_data(id, graph_json)
+            .await
+            .map_err(|e| Error::new(format!("Failed to update DataSource graph data: {}", e)))?;
+
+        Ok(DataSource::from(data_source))
+    }
+
     /// Export data sources as spreadsheet (XLSX or ODS)
     async fn export_data_sources(
         &self,

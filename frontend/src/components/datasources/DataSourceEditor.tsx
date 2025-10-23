@@ -38,7 +38,7 @@ import {
   GET_DATASOURCE,
   UPDATE_DATASOURCE,
   REPROCESS_DATASOURCE,
-  UPDATE_GRAPH_JSON,
+  UPDATE_DATASOURCE_GRAPH_DATA,
   DataSource,
   UpdateDataSourceInput,
   formatFileSize,
@@ -98,7 +98,7 @@ export const DataSourceEditor: React.FC<DataSourceEditorProps> = () => {
   // Mutations
   const [updateDataSource, { loading: updateLoading }] = useMutation(UPDATE_DATASOURCE)
   const [reprocessDataSource, { loading: reprocessLoading }] = useMutation(REPROCESS_DATASOURCE)
-  const [updateGraphJson] = useMutation(UPDATE_GRAPH_JSON)
+  const [updateDataSourceGraphData] = useMutation(UPDATE_DATASOURCE_GRAPH_DATA)
 
   const dataSource: DataSource | null = (dataSourceData as any)?.dataSource || null
 
@@ -229,7 +229,7 @@ export const DataSourceEditor: React.FC<DataSourceEditorProps> = () => {
     if (!dataSource) return
 
     try {
-      await updateGraphJson({
+      await updateDataSourceGraphData({
         variables: {
           id: dataSource.id,
           graphJson: JSON.stringify(graphData)
