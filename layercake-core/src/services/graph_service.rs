@@ -186,6 +186,36 @@ impl GraphService {
         Ok(())
     }
 
+    pub async fn add_graph_node(
+        &self,
+        graph_id: i32,
+        node_id: String,
+        label: Option<String>,
+        layer: Option<String>,
+        is_partition: bool,
+        belongs_to: Option<String>,
+        weight: Option<f64>,
+        attrs: Option<serde_json::Value>,
+    ) -> Result<graph_nodes::Model> {
+        use sea_orm::{ActiveModelTrait, Set};
+
+        let now = chrono::Utc::now();
+        let active_model = graph_nodes::ActiveModel {
+            id: Set(node_id),
+            graph_id: Set(graph_id),
+            label: Set(label),
+            layer: Set(layer),
+            is_partition: Set(is_partition),
+            belongs_to: Set(belongs_to),
+            weight: Set(weight),
+            attrs: Set(attrs),
+            created_at: Set(now),
+        };
+
+        let inserted = active_model.insert(&self.db).await?;
+        Ok(inserted)
+    }
+
     pub async fn update_graph_node(
         &self,
         graph_id: i32,

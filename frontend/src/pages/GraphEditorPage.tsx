@@ -9,7 +9,7 @@ import { LayercakeGraphEditor, GraphViewMode, GraphOrientation, HierarchyViewMod
 import { PropertiesAndLayersPanel } from '../components/graphs/PropertiesAndLayersPanel';
 import EditHistoryModal from '../components/graphs/EditHistoryModal';
 import { ReactFlowProvider, Node as FlowNode, Edge as FlowEdge } from 'reactflow';
-import { Graph, GraphNode, UPDATE_GRAPH_NODE, UPDATE_LAYER_PROPERTIES, GET_GRAPH_EDIT_COUNT, CREATE_LAYER, ADD_GRAPH_EDGE, DELETE_GRAPH_EDGE } from '../graphql/graphs';
+import { Graph, GraphNode, UPDATE_GRAPH_NODE, UPDATE_LAYER_PROPERTIES, GET_GRAPH_EDIT_COUNT, CREATE_LAYER, ADD_GRAPH_NODE, ADD_GRAPH_EDGE, DELETE_GRAPH_EDGE } from '../graphql/graphs';
 import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
 
 declare global {
@@ -116,6 +116,7 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
   const [createLayer] = useMutation(CREATE_LAYER, {
     refetchQueries: [{ query: GET_GRAPH_DETAILS, variables: { id: parseInt(graphId || '0') } }]
   });
+  const [addGraphNode] = useMutation(ADD_GRAPH_NODE);
   const [addGraphEdge] = useMutation(ADD_GRAPH_EDGE);
   const [deleteGraphEdge] = useMutation(DELETE_GRAPH_EDGE);
 
@@ -221,6 +222,26 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
       // TODO: Rollback optimistic update on error
     });
   }, [graphId, deleteGraphEdge]);
+
+  const handleNodeAdd = useCallback((node: FlowNode) => {
+    if (!graphId) return;
+
+    addGraphNode({
+      variables: {
+        graphId: parseInt(graphId),
+        id: node.id,
+        label: node.data?.label || 'New Node',
+        layer: node.data?.layer,
+        isPartition: node.data?.isPartition || false,
+        belongsTo: node.data?.belongsTo,
+        weight: node.data?.weight,
+        attrs: node.data?.attrs,
+      },
+    }).catch(error => {
+      console.error('Failed to add node:', error);
+      // TODO: Rollback optimistic update on error
+    });
+  }, [graphId, addGraphNode]);
 
   // Initialize layer visibility when graph loads
   useEffect(() => {
@@ -685,6 +706,7 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
               rankSpacing={rankSpacing}
               minEdgeLength={minEdgeLength}
               onNodeUpdate={handleNodeUpdate}
+              onNodeAdd={handleNodeAdd}
               onEdgeAdd={handleEdgeAdd}
               onEdgeDelete={handleEdgeDelete}
             />

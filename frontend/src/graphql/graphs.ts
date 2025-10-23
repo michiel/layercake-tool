@@ -214,6 +214,38 @@ export const UPDATE_GRAPH_NODE = gql`
   }
 `
 
+export const ADD_GRAPH_NODE = gql`
+  mutation AddGraphNode(
+    $graphId: Int!
+    $id: String!
+    $label: String
+    $layer: String
+    $isPartition: Boolean!
+    $belongsTo: String
+    $weight: Float
+    $attrs: JSON
+  ) {
+    addGraphNode(
+      graphId: $graphId
+      id: $id
+      label: $label
+      layer: $layer
+      isPartition: $isPartition
+      belongsTo: $belongsTo
+      weight: $weight
+      attrs: $attrs
+    ) {
+      id
+      label
+      layer
+      isPartition
+      belongsTo
+      weight
+      attrs
+    }
+  }
+`
+
 export const ADD_GRAPH_EDGE = gql`
   mutation AddGraphEdge(
     $graphId: Int!

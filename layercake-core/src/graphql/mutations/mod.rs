@@ -2230,6 +2230,65 @@ impl Mutation {
         Ok(crate::graphql::types::layer::Layer::from(layer))
     }
 
+    /// Add a new node to a graph
+    async fn add_graph_node(
+        &self,
+        ctx: &Context<'_>,
+        graph_id: i32,
+        id: String,
+        label: Option<String>,
+        layer: Option<String>,
+        is_partition: bool,
+        belongs_to: Option<String>,
+        weight: Option<f64>,
+        attrs: Option<crate::graphql::types::scalars::JSON>,
+    ) -> Result<crate::graphql::types::graph_node::GraphNode> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let graph_service = GraphService::new(context.db.clone());
+        let edit_service = GraphEditService::new(context.db.clone());
+
+        // Create the new node
+        let node = graph_service
+            .add_graph_node(
+                graph_id,
+                id.clone(),
+                label.clone(),
+                layer.clone(),
+                is_partition,
+                belongs_to.clone(),
+                weight,
+                attrs.clone(),
+            )
+            .await
+            .map_err(|e| Error::new(format!("Failed to add graph node: {}", e)))?;
+
+        // Create edit record for the new node
+        let node_data = serde_json::json!({
+            "id": id,
+            "label": label,
+            "layer": layer,
+            "is_partition": is_partition,
+            "belongs_to": belongs_to,
+            "weight": weight,
+            "attrs": attrs,
+        });
+
+        let _ = edit_service
+            .create_edit(
+                graph_id,
+                "node".to_string(),
+                id.clone(),
+                "create".to_string(),
+                None,
+                None,
+                Some(node_data),
+                None,
+            )
+            .await;
+
+        Ok(crate::graphql::types::graph_node::GraphNode::from(node))
+    }
+
     /// Add a new edge to a graph
     async fn add_graph_edge(
         &self,

@@ -41,6 +41,7 @@ interface LayercakeGraphEditorProps {
   rankSpacing?: number;
   minEdgeLength?: number;
   onNodeUpdate?: (nodeId: string, updates: { belongsTo?: string }) => void;
+  onNodeAdd?: (node: Node) => void;
   onEdgeAdd?: (edge: Edge) => void;
   onEdgeDelete?: (edgeId: string) => void;
 }
@@ -60,12 +61,13 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
   rankSpacing = 75,
   minEdgeLength = 50,
   onNodeUpdate,
+  onNodeAdd,
   onEdgeAdd,
   onEdgeDelete,
 }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-  const { fitView } = useReactFlow();
+  const { fitView, screenToFlowPosition } = useReactFlow();
   const isInitialLoad = useRef(true);
   const selectedNodeIdsRef = useRef<string[]>([]);
   const prevFitViewTriggerRef = useRef<number | undefined>(undefined);
@@ -514,8 +516,64 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
     });
   }, [mode, setEdges, onEdgeAdd]);
 
+  const handleDragOver = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  }, []);
+
+  const handleDrop = useCallback(
+    (event: React.DragEvent) => {
+      event.preventDefault();
+
+      const type = event.dataTransfer.getData('application/reactflow');
+      if (type !== 'node') return;
+
+      const nodeType = event.dataTransfer.getData('nodeType');
+      const isPartition = nodeType === 'container';
+
+      const position = screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+
+      const generateNodeId = () => {
+        if (typeof globalThis !== 'undefined' && globalThis.crypto?.randomUUID) {
+          return `manual-node-${globalThis.crypto.randomUUID()}`;
+        }
+        return `manual-node-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      };
+
+      const newNode: Node = {
+        id: generateNodeId(),
+        type: isPartition ? 'group' : 'default',
+        position,
+        data: {
+          label: isPartition ? 'New Container' : 'New Node',
+          isPartition,
+        },
+        style: {
+          width: isPartition ? 200 : undefined,
+          height: isPartition ? 200 : undefined,
+        },
+      };
+
+      setNodes((nds) => nds.concat(newNode));
+
+      // Persist the node server-side
+      if (onNodeAdd) {
+        onNodeAdd(newNode);
+      }
+    },
+    [screenToFlowPosition, setNodes, onNodeAdd]
+  );
+
   return (
-    <div style={{ width: '100%', height: '100%' }} ref={wrapperRef}>
+    <div
+      style={{ width: '100%', height: '100%' }}
+      ref={wrapperRef}
+      onDrop={handleDrop}
+      onDragOver={handleDragOver}
+    >
       <ReactFlow
         nodes={nodes}
         edges={edges}

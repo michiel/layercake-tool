@@ -74,8 +74,55 @@ export const PropertiesAndLayersPanel: React.FC<PropertiesAndLayersPanelProps> =
       <Accordion
         multiple
         variant="separated"
-        defaultValue={['layout-options', 'node-properties', 'layers']}
+        defaultValue={['add-nodes', 'layout-options', 'node-properties', 'layers']}
       >
+        <Accordion.Item value="add-nodes">
+          <Accordion.Control>Add Nodes</Accordion.Control>
+          <Accordion.Panel>
+            <Stack gap="xs">
+              <Paper
+                p="sm"
+                style={{
+                  cursor: 'grab',
+                  border: '2px dashed #dee2e6',
+                  backgroundColor: '#f8f9fa',
+                  textAlign: 'center',
+                  userSelect: 'none',
+                }}
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('application/reactflow', 'node');
+                  e.dataTransfer.setData('nodeType', 'regular');
+                  e.dataTransfer.effectAllowed = 'move';
+                }}
+                draggable
+              >
+                <Text size="sm" fw={500}>Node</Text>
+                <Text size="xs" c="dimmed">Regular node</Text>
+              </Paper>
+
+              <Paper
+                p="sm"
+                style={{
+                  cursor: 'grab',
+                  border: '2px dashed #dee2e6',
+                  backgroundColor: '#f8f9fa',
+                  textAlign: 'center',
+                  userSelect: 'none',
+                }}
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('application/reactflow', 'node');
+                  e.dataTransfer.setData('nodeType', 'container');
+                  e.dataTransfer.effectAllowed = 'move';
+                }}
+                draggable
+              >
+                <Text size="sm" fw={500}>Container</Text>
+                <Text size="xs" c="dimmed">Partition node</Text>
+              </Paper>
+            </Stack>
+          </Accordion.Panel>
+        </Accordion.Item>
+
         <Accordion.Item value="layout-options">
           <Accordion.Control>Layout Options</Accordion.Control>
           <Accordion.Panel>
