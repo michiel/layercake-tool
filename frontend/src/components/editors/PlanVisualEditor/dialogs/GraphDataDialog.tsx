@@ -2,7 +2,16 @@ import React from 'react';
 import { Modal, Stack, Alert, Loader, Text } from '@mantine/core';
 import { IconAlertCircle } from '@tabler/icons-react';
 import { useQuery, useMutation } from '@apollo/client/react';
-import { GET_GRAPH_DETAILS, Graph, BULK_UPDATE_GRAPH_DATA } from '../../../../graphql/graphs';
+import {
+  GET_GRAPH_DETAILS,
+  Graph,
+  BULK_UPDATE_GRAPH_DATA,
+  ADD_GRAPH_NODE,
+  ADD_GRAPH_EDGE,
+  DELETE_GRAPH_NODE,
+  DELETE_GRAPH_EDGE,
+  CREATE_LAYER
+} from '../../../../graphql/graphs';
 import { GraphSpreadsheetEditor, GraphData } from '../../../editors/GraphSpreadsheetEditor/GraphSpreadsheetEditor';
 
 interface GraphDataDialogProps {
@@ -25,6 +34,11 @@ export const GraphDataDialog: React.FC<GraphDataDialogProps> = ({
   });
 
   const [bulkUpdateGraphData] = useMutation(BULK_UPDATE_GRAPH_DATA);
+  const [addGraphNode] = useMutation(ADD_GRAPH_NODE);
+  const [addGraphEdge] = useMutation(ADD_GRAPH_EDGE);
+  const [deleteGraphNode] = useMutation(DELETE_GRAPH_NODE);
+  const [deleteGraphEdge] = useMutation(DELETE_GRAPH_EDGE);
+  const [createLayer] = useMutation(CREATE_LAYER);
 
   const getGraphData = (): GraphData | null => {
     if (!data?.graph) return null;
@@ -63,34 +77,36 @@ export const GraphDataDialog: React.FC<GraphDataDialogProps> = ({
     try {
       const oldGraph = data.graph;
 
-      // Helper to normalize values for comparison (treats empty string and undefined as same)
+      // Helper to normalize values for comparison
       const normalizeValue = (val: any) => {
         if (val === '' || val === null || val === undefined) return undefined;
         return val;
       };
 
-      const changedNodes: any[] = [];
-      const changedLayers: any[] = [];
+      const oldNodeIds = new Set(oldGraph.graphNodes.map(n => n.id));
+      const newNodeIds = new Set(newGraphData.nodes.map(n => n.id));
+      const oldEdgeIds = new Set(oldGraph.graphEdges.map(e => e.id));
+      const newEdgeIds = new Set(newGraphData.edges.map(e => e.id));
+      const oldLayerIds = new Set(oldGraph.layers.map(l => l.layerId));
 
-      // Collect changed nodes
+      // Identify added nodes
+      const addedNodes = newGraphData.nodes.filter(n => !oldNodeIds.has(n.id));
+
+      // Identify deleted nodes
+      const deletedNodeIds = Array.from(oldNodeIds).filter(id => !newNodeIds.has(id));
+
+      // Identify updated nodes
+      const updatedNodes: any[] = [];
       for (const newNode of newGraphData.nodes) {
         const oldNode = oldGraph.graphNodes.find(n => n.id === newNode.id);
         if (!oldNode) continue;
 
-        // Normalize values for comparison
         const oldLabel = normalizeValue(oldNode.label);
         const newLabel = normalizeValue(newNode.label);
         const oldLayer = normalizeValue(oldNode.layer);
         const newLayer = normalizeValue(newNode.layer);
 
-        // Check if fields actually changed
-        const labelChanged = oldLabel !== newLabel;
-        const layerChanged = oldLayer !== newLayer;
-
-        // Build attrs object excluding standard fields
         const { id, label, layer, is_partition, belongs_to, comment, ...customAttrs } = newNode;
-
-        // Remove empty/undefined values from custom attrs
         const cleanedCustomAttrs: Record<string, any> = {};
         for (const [key, value] of Object.entries(customAttrs)) {
           const normalized = normalizeValue(value);
@@ -102,30 +118,35 @@ export const GraphDataDialog: React.FC<GraphDataDialogProps> = ({
         const oldAttrs = oldNode.attrs || {};
         const attrsChanged = JSON.stringify(cleanedCustomAttrs) !== JSON.stringify(oldAttrs);
 
-        if (labelChanged || layerChanged || attrsChanged) {
-          changedNodes.push({
+        if (oldLabel !== newLabel || oldLayer !== newLayer || attrsChanged) {
+          updatedNodes.push({
             nodeId: newNode.id,
-            label: labelChanged ? newLabel : null,
-            layer: layerChanged ? newLayer : null,
+            label: oldLabel !== newLabel ? newLabel : null,
+            layer: oldLayer !== newLayer ? newLayer : null,
             attrs: attrsChanged ? cleanedCustomAttrs : null,
           });
         }
       }
 
-      // Collect changed layers
+      // Identify added edges
+      const addedEdges = newGraphData.edges.filter(e => !oldEdgeIds.has(e.id));
+
+      // Identify deleted edges
+      const deletedEdgeIds = Array.from(oldEdgeIds).filter(id => !newEdgeIds.has(id));
+
+      // Identify added layers (will create them)
+      const addedLayers = newGraphData.layers.filter(l => !oldLayerIds.has(l.id));
+
+      // Identify updated layers
+      const updatedLayers: any[] = [];
       for (const newLayer of newGraphData.layers) {
         const oldLayer = oldGraph.layers.find(l => l.layerId === newLayer.id);
         if (!oldLayer) continue;
 
-        // Normalize values for comparison
         const oldName = normalizeValue(oldLayer.name);
         const newName = normalizeValue(newLayer.label);
-        const nameChanged = oldName !== newName;
 
-        // Build properties object, excluding id and label
         const { id, label, ...properties } = newLayer;
-
-        // Clean properties - remove empty/undefined values
         const cleanedProperties: Record<string, any> = {};
         for (const [key, value] of Object.entries(properties)) {
           const normalized = normalizeValue(value);
@@ -137,35 +158,119 @@ export const GraphDataDialog: React.FC<GraphDataDialogProps> = ({
         const oldProperties = oldLayer.properties || {};
         const propertiesChanged = JSON.stringify(cleanedProperties) !== JSON.stringify(oldProperties);
 
-        if (nameChanged || propertiesChanged) {
-          changedLayers.push({
+        if (oldName !== newName || propertiesChanged) {
+          updatedLayers.push({
             id: oldLayer.id,
-            name: nameChanged ? newName : null,
+            name: oldName !== newName ? newName : null,
             properties: propertiesChanged ? cleanedProperties : null,
           });
         }
       }
 
-      if (changedNodes.length === 0 && changedLayers.length === 0) {
-        console.log('No changes detected');
-        return;
+      console.log(`Changes: ${addedNodes.length} new nodes, ${deletedNodeIds.length} deleted nodes, ${updatedNodes.length} updated nodes`);
+      console.log(`Changes: ${addedEdges.length} new edges, ${deletedEdgeIds.length} deleted edges`);
+      console.log(`Changes: ${addedLayers.length} new layers, ${updatedLayers.length} updated layers`);
+
+      // Delete nodes first (to avoid constraint issues)
+      for (const nodeId of deletedNodeIds) {
+        await deleteGraphNode({
+          variables: { graphId: parseInt(String(graphId)), nodeId }
+        });
       }
 
-      console.log(`Saving ${changedNodes.length} node(s) and ${changedLayers.length} layer(s) in bulk...`);
+      // Delete edges
+      for (const edgeId of deletedEdgeIds) {
+        await deleteGraphEdge({
+          variables: { graphId: parseInt(String(graphId)), edgeId }
+        });
+      }
 
-      // Single bulk update call
-      await bulkUpdateGraphData({
-        variables: {
-          graphId: graphId,
-          nodes: changedNodes.length > 0 ? changedNodes : null,
-          layers: changedLayers.length > 0 ? changedLayers : null,
+      // Add new nodes
+      for (const node of addedNodes) {
+        const { id, label, layer, is_partition, belongs_to, comment, ...customAttrs } = node;
+        const cleanedAttrs: Record<string, any> = {};
+        for (const [key, value] of Object.entries(customAttrs)) {
+          const normalized = normalizeValue(value);
+          if (normalized !== undefined) {
+            cleanedAttrs[key] = normalized;
+          }
         }
-      });
+
+        await addGraphNode({
+          variables: {
+            graphId: parseInt(String(graphId)),
+            id,
+            label: label || id,
+            layer,
+            isPartition: is_partition || false,
+            belongsTo: belongs_to,
+            attrs: Object.keys(cleanedAttrs).length > 0 ? cleanedAttrs : null,
+          }
+        });
+      }
+
+      // Add new edges
+      for (const edge of addedEdges) {
+        const { id, source, target, label, layer, comment, ...customAttrs } = edge;
+        const cleanedAttrs: Record<string, any> = {};
+        for (const [key, value] of Object.entries(customAttrs)) {
+          const normalized = normalizeValue(value);
+          if (normalized !== undefined) {
+            cleanedAttrs[key] = normalized;
+          }
+        }
+
+        await addGraphEdge({
+          variables: {
+            graphId: parseInt(String(graphId)),
+            id,
+            source,
+            target,
+            label: label || '',
+            layer,
+            attrs: Object.keys(cleanedAttrs).length > 0 ? cleanedAttrs : null,
+          }
+        });
+      }
+
+      // Add new layers
+      for (const layer of addedLayers) {
+        const { id, label, ...properties } = layer;
+        const cleanedProperties: Record<string, any> = {};
+        for (const [key, value] of Object.entries(properties)) {
+          const normalized = normalizeValue(value);
+          if (normalized !== undefined) {
+            cleanedProperties[key] = normalized;
+          }
+        }
+
+        await createLayer({
+          variables: {
+            input: {
+              graphId: parseInt(String(graphId)),
+              layerId: id,
+              name: label || id,
+              properties: Object.keys(cleanedProperties).length > 0 ? cleanedProperties : null,
+            }
+          }
+        });
+      }
+
+      // Update existing nodes/layers in bulk if there are any
+      if (updatedNodes.length > 0 || updatedLayers.length > 0) {
+        await bulkUpdateGraphData({
+          variables: {
+            graphId: parseInt(String(graphId)),
+            nodes: updatedNodes.length > 0 ? updatedNodes : null,
+            layers: updatedLayers.length > 0 ? updatedLayers : null,
+          }
+        });
+      }
 
       // Refetch the graph data to show updated values
       await refetch();
 
-      console.log(`Updated successfully`);
+      console.log(`Save completed successfully`);
     } catch (error) {
       console.error('Failed to save graph data:', error);
       throw error;
