@@ -192,6 +192,12 @@ export const getLayoutedElements = async (
       const borderColor = layerStyle?.borderColor || DEFAULT_GROUP_BORDER;
       const bgColor = layerStyle?.backgroundColor || DEFAULT_GROUP_BG;
 
+      // Ensure minimum size for empty containers
+      const minContainerWidth = 250;
+      const minContainerHeight = 150;
+      const containerWidth = Math.max(elkNode.width || minContainerWidth, minContainerWidth);
+      const containerHeight = Math.max(elkNode.height || minContainerHeight, minContainerHeight);
+
       reactFlowNodes.push({
         id: elkNode.id,
         position: { x: elkNode.x || 0, y: elkNode.y || 0 },
@@ -199,9 +205,11 @@ export const getLayoutedElements = async (
           label: groupLabel,
         },
         type: 'group',
+        width: containerWidth,
+        height: containerHeight,
         style: {
-          width: elkNode.width || undefined,
-          height: elkNode.height || undefined,
+          width: containerWidth,
+          height: containerHeight,
           backgroundColor: bgColor,
           border: `2px solid ${borderColor}`,
           borderRadius: '8px',
@@ -266,6 +274,8 @@ export const getLayoutedElements = async (
             color: layerStyle?.textColor || DEFAULT_NODE_TEXT,
           },
         },
+        width: elkNode.width,
+        height: elkNode.height,
         style: {
           zIndex: 50, // Regular nodes above edges (10) and groups (negative)
           backgroundColor: layerStyle?.backgroundColor || DEFAULT_NODE_BG,
