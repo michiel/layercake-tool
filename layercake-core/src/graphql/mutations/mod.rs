@@ -2230,6 +2230,141 @@ impl Mutation {
         Ok(crate::graphql::types::layer::Layer::from(layer))
     }
 
+    /// Add a new edge to a graph
+    async fn add_graph_edge(
+        &self,
+        ctx: &Context<'_>,
+        graph_id: i32,
+        id: String,
+        source: String,
+        target: String,
+        label: Option<String>,
+        layer: Option<String>,
+        weight: Option<f64>,
+        attrs: Option<crate::graphql::types::scalars::JSON>,
+    ) -> Result<crate::graphql::types::graph_edge::GraphEdge> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let edit_service = GraphEditService::new(context.db.clone());
+
+        use crate::database::entities::graph_edges::{ActiveModel as GraphEdgeActiveModel, Entity as GraphEdges};
+        use sea_orm::{ActiveValue::Set, EntityTrait};
+
+        // Create the new edge
+        let now = chrono::Utc::now();
+        let edge_model = GraphEdgeActiveModel {
+            id: Set(id.clone()),
+            graph_id: Set(graph_id),
+            source: Set(source.clone()),
+            target: Set(target.clone()),
+            label: Set(label.clone()),
+            layer: Set(layer.clone()),
+            weight: Set(weight),
+            attrs: Set(attrs.clone()),
+            created_at: Set(now),
+        };
+
+        GraphEdges::insert(edge_model)
+            .exec_without_returning(&context.db)
+            .await
+            .map_err(|e| Error::new(format!("Failed to insert graph edge: {}", e)))?;
+
+        // Create edit record for the new edge
+        let edge_data = serde_json::json!({
+            "id": id,
+            "source": source,
+            "target": target,
+            "label": label,
+            "layer": layer,
+            "weight": weight,
+            "attrs": attrs,
+        });
+
+        let _ = edit_service
+            .create_edit(
+                graph_id,
+                "edge".to_string(),
+                id.clone(),
+                "create".to_string(),
+                None,
+                None,
+                Some(edge_data),
+                None,
+            )
+            .await;
+
+        // Fetch the inserted edge to return
+        use crate::database::entities::graph_edges::Column as EdgeColumn;
+        use sea_orm::{ColumnTrait, QueryFilter};
+
+        let edge = GraphEdges::find()
+            .filter(EdgeColumn::GraphId.eq(graph_id))
+            .filter(EdgeColumn::Id.eq(&id))
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| Error::new("Failed to fetch inserted edge"))?;
+
+        Ok(crate::graphql::types::graph_edge::GraphEdge::from(edge))
+    }
+
+    /// Delete an edge from a graph
+    async fn delete_graph_edge(
+        &self,
+        ctx: &Context<'_>,
+        graph_id: i32,
+        edge_id: String,
+    ) -> Result<bool> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let edit_service = GraphEditService::new(context.db.clone());
+
+        use crate::database::entities::graph_edges::{Column as EdgeColumn, Entity as GraphEdges};
+        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+
+        // Fetch current edge to get old values for edit record
+        let old_edge = GraphEdges::find()
+            .filter(EdgeColumn::GraphId.eq(graph_id))
+            .filter(EdgeColumn::Id.eq(&edge_id))
+            .one(&context.db)
+            .await?;
+
+        if let Some(old_edge) = old_edge {
+            // Create edit record for the deletion
+            let edge_data = serde_json::json!({
+                "id": old_edge.id,
+                "source": old_edge.source,
+                "target": old_edge.target,
+                "label": old_edge.label,
+                "layer": old_edge.layer,
+                "weight": old_edge.weight,
+                "attrs": old_edge.attrs,
+            });
+
+            let _ = edit_service
+                .create_edit(
+                    graph_id,
+                    "edge".to_string(),
+                    edge_id.clone(),
+                    "delete".to_string(),
+                    None,
+                    Some(edge_data),
+                    None,
+                    None,
+                )
+                .await;
+
+            // Delete the edge
+            GraphEdges::delete_many()
+                .filter(EdgeColumn::GraphId.eq(graph_id))
+                .filter(EdgeColumn::Id.eq(&edge_id))
+                .exec(&context.db)
+                .await
+                .map_err(|e| Error::new(format!("Failed to delete graph edge: {}", e)))?;
+
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
     /// Bulk update graph nodes and layers in a single transaction
     async fn bulk_update_graph_data(
         &self,

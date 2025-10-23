@@ -1,5 +1,18 @@
 import React, { useEffect, useCallback, useMemo, useRef } from 'react';
-import ReactFlow, { Controls, Background, MiniMap, useNodesState, useEdgesState, useReactFlow, BackgroundVariant, Node, Edge } from 'reactflow';
+import ReactFlow, {
+  Controls,
+  Background,
+  MiniMap,
+  useNodesState,
+  useEdgesState,
+  useReactFlow,
+  BackgroundVariant,
+  Node,
+  Edge,
+  Connection,
+  EdgeChange,
+  MarkerType,
+} from 'reactflow';
 
 import 'reactflow/dist/style.css';
 import '../../styles/reactFlow.css'; // Custom styles
@@ -28,6 +41,8 @@ interface LayercakeGraphEditorProps {
   rankSpacing?: number;
   minEdgeLength?: number;
   onNodeUpdate?: (nodeId: string, updates: { belongsTo?: string }) => void;
+  onEdgeAdd?: (edge: Edge) => void;
+  onEdgeDelete?: (edgeId: string) => void;
 }
 
 export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
@@ -45,6 +60,8 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
   rankSpacing = 75,
   minEdgeLength = 50,
   onNodeUpdate,
+  onEdgeAdd,
+  onEdgeDelete,
 }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -52,9 +69,39 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
   const isInitialLoad = useRef(true);
   const selectedNodeIdsRef = useRef<string[]>([]);
   const prevFitViewTriggerRef = useRef<number | undefined>(undefined);
+  const manualEdgesRef = useRef<Edge[]>([]);
 
   const nodeTypes = useMemo(() => ({ group: GroupNode }), []);
   const edgeTypes = useMemo(() => ({ floating: FloatingEdge }), []);
+
+  const mergeEdgesWithManual = useCallback((baseEdges: Edge[]): Edge[] => {
+    if (mode !== 'flow' || manualEdgesRef.current.length === 0) {
+      return baseEdges;
+    }
+
+    const connectionKey = (edge: Edge) =>
+      `${edge.source || ''}::${edge.sourceHandle || ''}->${edge.target || ''}::${edge.targetHandle || ''}`;
+
+    const baseConnectionKeys = new Set(baseEdges.map(connectionKey));
+    const survivingManualEdges = manualEdgesRef.current.filter(edge => {
+      const key = connectionKey(edge);
+      if (baseConnectionKeys.has(key)) {
+        return false;
+      }
+      return true;
+    });
+
+    manualEdgesRef.current = survivingManualEdges;
+
+    if (survivingManualEdges.length === 0) {
+      return baseEdges;
+    }
+
+    const baseEdgeIds = new Set(baseEdges.map(edge => edge.id));
+    const manualToAdd = survivingManualEdges.filter(edge => !baseEdgeIds.has(edge.id));
+
+    return manualToAdd.length > 0 ? [...baseEdges, ...manualToAdd] : baseEdges;
+  }, [mode]);
 
   const renderGraph = useMemo(() => {
     if (!graph) {
@@ -149,7 +196,7 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
       }));
 
       setNodes(nodesWithSelection);
-      setEdges(layouted.edges);
+      setEdges(mergeEdgesWithManual(layouted.edges));
 
       if (shouldFitView || isInitialLoad.current) {
         window.requestAnimationFrame(() => {
@@ -158,7 +205,7 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
         });
       }
     },
-    [renderGraph, setNodes, setEdges, fitView, orientation, mode, groupingEnabled, hierarchyViewMode, nodeSpacing, rankSpacing, minEdgeLength]
+    [renderGraph, setNodes, setEdges, fitView, orientation, mode, groupingEnabled, hierarchyViewMode, nodeSpacing, rankSpacing, minEdgeLength, mergeEdgesWithManual]
   );
 
   useEffect(() => {
@@ -389,13 +436,92 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
     return '#555';
   }, []);
 
+  const handleEdgesChange = useCallback((changes: EdgeChange[]) => {
+    onEdgesChange(changes);
+
+    if (!changes || changes.length === 0) {
+      return;
+    }
+
+    const removedIds = changes
+      .filter(change => change.type === 'remove')
+      .map(change => change.id)
+      .filter((id): id is string => typeof id === 'string');
+
+    if (removedIds.length > 0) {
+      // Clean up manual edges bookkeeping
+      manualEdgesRef.current = manualEdgesRef.current.filter(edge => !removedIds.includes(edge.id));
+
+      // Persist deletions server-side
+      if (onEdgeDelete) {
+        removedIds.forEach(edgeId => {
+          onEdgeDelete(edgeId);
+        });
+      }
+    }
+  }, [onEdgesChange, onEdgeDelete]);
+
+  const handleConnect = useCallback((connection: Connection) => {
+    if (mode !== 'flow') return;
+
+    const { source, target } = connection;
+    if (!source || !target) return;
+
+    const generateEdgeId = () => {
+      if (typeof globalThis !== 'undefined' && globalThis.crypto?.randomUUID) {
+        return `manual-edge-${globalThis.crypto.randomUUID()}`;
+      }
+
+      return `manual-edge-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    };
+
+    setEdges(currentEdges => {
+      const alreadyExists = currentEdges.some(edge =>
+        edge.source === source &&
+        edge.target === target &&
+        (edge.sourceHandle ?? null) === (connection.sourceHandle ?? null) &&
+        (edge.targetHandle ?? null) === (connection.targetHandle ?? null)
+      );
+
+      if (alreadyExists) {
+        return currentEdges;
+      }
+
+      const newEdge: Edge = {
+        id: generateEdgeId(),
+        source,
+        target,
+        sourceHandle: connection.sourceHandle,
+        targetHandle: connection.targetHandle,
+        type: 'floating',
+        markerEnd: { type: MarkerType.ArrowClosed },
+        style: {
+          zIndex: 10,
+          strokeWidth: 2,
+          stroke: '#b1b1b7',
+        },
+        data: {},
+      };
+
+      manualEdgesRef.current = [...manualEdgesRef.current, newEdge];
+
+      // Persist the edge server-side
+      if (onEdgeAdd) {
+        onEdgeAdd(newEdge);
+      }
+
+      return [...currentEdges, newEdge];
+    });
+  }, [mode, setEdges, onEdgeAdd]);
+
   return (
     <div style={{ width: '100%', height: '100%' }} ref={wrapperRef}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
+        onEdgesChange={handleEdgesChange}
+        onConnect={handleConnect}
         onSelectionChange={handleSelectionChange}
         onNodeDragStop={handleNodeDragStop}
         nodeTypes={nodeTypes}

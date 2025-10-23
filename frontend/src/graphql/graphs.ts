@@ -214,6 +214,44 @@ export const UPDATE_GRAPH_NODE = gql`
   }
 `
 
+export const ADD_GRAPH_EDGE = gql`
+  mutation AddGraphEdge(
+    $graphId: Int!
+    $id: String!
+    $source: String!
+    $target: String!
+    $label: String
+    $layer: String
+    $weight: Float
+    $attrs: JSON
+  ) {
+    addGraphEdge(
+      graphId: $graphId
+      id: $id
+      source: $source
+      target: $target
+      label: $label
+      layer: $layer
+      weight: $weight
+      attrs: $attrs
+    ) {
+      id
+      source
+      target
+      label
+      layer
+      weight
+      attrs
+    }
+  }
+`
+
+export const DELETE_GRAPH_EDGE = gql`
+  mutation DeleteGraphEdge($graphId: Int!, $edgeId: String!) {
+    deleteGraphEdge(graphId: $graphId, edgeId: $edgeId)
+  }
+`
+
 export const UPDATE_LAYER_PROPERTIES = gql`
   mutation UpdateLayerProperties(
     $id: Int!

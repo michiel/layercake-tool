@@ -9,7 +9,7 @@ import { LayercakeGraphEditor, GraphViewMode, GraphOrientation, HierarchyViewMod
 import { PropertiesAndLayersPanel } from '../components/graphs/PropertiesAndLayersPanel';
 import EditHistoryModal from '../components/graphs/EditHistoryModal';
 import { ReactFlowProvider, Node as FlowNode, Edge as FlowEdge } from 'reactflow';
-import { Graph, GraphNode, UPDATE_GRAPH_NODE, UPDATE_LAYER_PROPERTIES, GET_GRAPH_EDIT_COUNT, CREATE_LAYER } from '../graphql/graphs';
+import { Graph, GraphNode, UPDATE_GRAPH_NODE, UPDATE_LAYER_PROPERTIES, GET_GRAPH_EDIT_COUNT, CREATE_LAYER, ADD_GRAPH_EDGE, DELETE_GRAPH_EDGE } from '../graphql/graphs';
 import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
 
 declare global {
@@ -116,6 +116,8 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
   const [createLayer] = useMutation(CREATE_LAYER, {
     refetchQueries: [{ query: GET_GRAPH_DETAILS, variables: { id: parseInt(graphId || '0') } }]
   });
+  const [addGraphEdge] = useMutation(ADD_GRAPH_EDGE);
+  const [deleteGraphEdge] = useMutation(DELETE_GRAPH_EDGE);
 
   const graph: Graph | null = graphData?.graph || null;
 
@@ -185,6 +187,40 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
       // TODO: Rollback optimistic update on error
     });
   }, [graphId, updateGraphNode]);
+
+  const handleEdgeAdd = useCallback((edge: FlowEdge) => {
+    if (!graphId) return;
+
+    addGraphEdge({
+      variables: {
+        graphId: parseInt(graphId),
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        label: edge.label,
+        layer: edge.data?.layer,
+        weight: edge.data?.weight,
+        attrs: edge.data?.attrs,
+      },
+    }).catch(error => {
+      console.error('Failed to add edge:', error);
+      // TODO: Rollback optimistic update on error
+    });
+  }, [graphId, addGraphEdge]);
+
+  const handleEdgeDelete = useCallback((edgeId: string) => {
+    if (!graphId) return;
+
+    deleteGraphEdge({
+      variables: {
+        graphId: parseInt(graphId),
+        edgeId,
+      },
+    }).catch(error => {
+      console.error('Failed to delete edge:', error);
+      // TODO: Rollback optimistic update on error
+    });
+  }, [graphId, deleteGraphEdge]);
 
   // Initialize layer visibility when graph loads
   useEffect(() => {
@@ -649,6 +685,8 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
               rankSpacing={rankSpacing}
               minEdgeLength={minEdgeLength}
               onNodeUpdate={handleNodeUpdate}
+              onEdgeAdd={handleEdgeAdd}
+              onEdgeDelete={handleEdgeDelete}
             />
           </ReactFlowProvider>
         </div>
