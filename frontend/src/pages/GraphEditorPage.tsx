@@ -111,29 +111,174 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
     }
   );
 
-  const graphRefetchQueries = [{ query: GET_GRAPH_DETAILS, variables: { id: parseInt(graphId || '0') } }];
-
   const [updateGraphNode] = useMutation(UPDATE_GRAPH_NODE, {
-    refetchQueries: graphRefetchQueries
+    update(cache, { data }: any) {
+      if (!data?.updateGraphNode) return;
+      const existingData = cache.readQuery<{ graph: Graph }>({
+        query: GET_GRAPH_DETAILS,
+        variables: { id: parseInt(graphId || '0') }
+      });
+      if (!existingData?.graph) return;
+
+      cache.writeQuery({
+        query: GET_GRAPH_DETAILS,
+        variables: { id: parseInt(graphId || '0') },
+        data: {
+          graph: {
+            ...existingData.graph,
+            graphNodes: existingData.graph.graphNodes.map(n =>
+              n.id === data.updateGraphNode.id ? { ...n, ...data.updateGraphNode } : n
+            )
+          }
+        }
+      });
+    }
   });
+
   const [updateGraphEdge] = useMutation(UPDATE_GRAPH_EDGE, {
-    refetchQueries: graphRefetchQueries
+    update(cache, { data }: any) {
+      if (!data?.updateGraphEdge) return;
+      const existingData = cache.readQuery<{ graph: Graph }>({
+        query: GET_GRAPH_DETAILS,
+        variables: { id: parseInt(graphId || '0') }
+      });
+      if (!existingData?.graph) return;
+
+      cache.writeQuery({
+        query: GET_GRAPH_DETAILS,
+        variables: { id: parseInt(graphId || '0') },
+        data: {
+          graph: {
+            ...existingData.graph,
+            graphEdges: existingData.graph.graphEdges.map(e =>
+              e.id === data.updateGraphEdge.id ? { ...e, ...data.updateGraphEdge } : e
+            )
+          }
+        }
+      });
+    }
   });
-  const [updateLayerProperties] = useMutation(UPDATE_LAYER_PROPERTIES);
+
+  const [updateLayerProperties] = useMutation(UPDATE_LAYER_PROPERTIES, {
+    update(cache, { data }: any) {
+      if (!data?.updateLayerProperties) return;
+      const existingData = cache.readQuery<{ graph: Graph }>({
+        query: GET_GRAPH_DETAILS,
+        variables: { id: parseInt(graphId || '0') }
+      });
+      if (!existingData?.graph) return;
+
+      cache.writeQuery({
+        query: GET_GRAPH_DETAILS,
+        variables: { id: parseInt(graphId || '0') },
+        data: {
+          graph: {
+            ...existingData.graph,
+            layers: existingData.graph.layers.map(l =>
+              l.id === data.updateLayerProperties.id ? { ...l, ...data.updateLayerProperties } : l
+            )
+          }
+        }
+      });
+    }
+  });
+
   const [createLayer] = useMutation(CREATE_LAYER, {
-    refetchQueries: graphRefetchQueries
+    refetchQueries: [{ query: GET_GRAPH_DETAILS, variables: { id: parseInt(graphId || '0') } }]
   });
+
   const [addGraphNode] = useMutation(ADD_GRAPH_NODE, {
-    refetchQueries: graphRefetchQueries
+    update(cache, { data }: any) {
+      if (!data?.addGraphNode) return;
+      const existingData = cache.readQuery<{ graph: Graph }>({
+        query: GET_GRAPH_DETAILS,
+        variables: { id: parseInt(graphId || '0') }
+      });
+      if (!existingData?.graph) return;
+
+      cache.writeQuery({
+        query: GET_GRAPH_DETAILS,
+        variables: { id: parseInt(graphId || '0') },
+        data: {
+          graph: {
+            ...existingData.graph,
+            graphNodes: [...existingData.graph.graphNodes, data.addGraphNode],
+            nodeCount: existingData.graph.nodeCount + 1
+          }
+        }
+      });
+    }
   });
+
   const [addGraphEdge] = useMutation(ADD_GRAPH_EDGE, {
-    refetchQueries: graphRefetchQueries
+    update(cache, { data }: any) {
+      if (!data?.addGraphEdge) return;
+      const existingData = cache.readQuery<{ graph: Graph }>({
+        query: GET_GRAPH_DETAILS,
+        variables: { id: parseInt(graphId || '0') }
+      });
+      if (!existingData?.graph) return;
+
+      cache.writeQuery({
+        query: GET_GRAPH_DETAILS,
+        variables: { id: parseInt(graphId || '0') },
+        data: {
+          graph: {
+            ...existingData.graph,
+            graphEdges: [...existingData.graph.graphEdges, data.addGraphEdge],
+            edgeCount: existingData.graph.edgeCount + 1
+          }
+        }
+      });
+    }
   });
+
   const [deleteGraphEdge] = useMutation(DELETE_GRAPH_EDGE, {
-    refetchQueries: graphRefetchQueries
+    update(cache, { data: mutationData }: any) {
+      if (!mutationData?.deleteGraphEdge) return;
+      const existingData = cache.readQuery<{ graph: Graph }>({
+        query: GET_GRAPH_DETAILS,
+        variables: { id: parseInt(graphId || '0') }
+      });
+      if (!existingData?.graph) return;
+
+      const edgeId = mutationData.deleteGraphEdge;
+      cache.writeQuery({
+        query: GET_GRAPH_DETAILS,
+        variables: { id: parseInt(graphId || '0') },
+        data: {
+          graph: {
+            ...existingData.graph,
+            graphEdges: existingData.graph.graphEdges.filter(e => e.id !== edgeId),
+            edgeCount: existingData.graph.edgeCount - 1
+          }
+        }
+      });
+    }
   });
+
   const [deleteGraphNode] = useMutation(DELETE_GRAPH_NODE, {
-    refetchQueries: graphRefetchQueries
+    update(cache, { data: mutationData }: any) {
+      if (!mutationData?.deleteGraphNode) return;
+      const existingData = cache.readQuery<{ graph: Graph }>({
+        query: GET_GRAPH_DETAILS,
+        variables: { id: parseInt(graphId || '0') }
+      });
+      if (!existingData?.graph) return;
+
+      const nodeId = mutationData.deleteGraphNode;
+      cache.writeQuery({
+        query: GET_GRAPH_DETAILS,
+        variables: { id: parseInt(graphId || '0') },
+        data: {
+          graph: {
+            ...existingData.graph,
+            graphNodes: existingData.graph.graphNodes.filter(n => n.id !== nodeId),
+            nodeCount: existingData.graph.nodeCount - 1
+          }
+        }
+      });
+    }
   });
 
   const graph: Graph | null = graphData?.graph || null;
