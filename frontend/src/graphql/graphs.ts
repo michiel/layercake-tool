@@ -278,6 +278,31 @@ export const ADD_GRAPH_EDGE = gql`
   }
 `
 
+export const UPDATE_GRAPH_EDGE = gql`
+  mutation UpdateGraphEdge(
+    $graphId: Int!
+    $edgeId: String!
+    $label: String
+    $layer: String
+    $attrs: JSON
+  ) {
+    updateGraphEdge(
+      graphId: $graphId
+      edgeId: $edgeId
+      label: $label
+      layer: $layer
+      attrs: $attrs
+    ) {
+      id
+      source
+      target
+      label
+      layer
+      attrs
+    }
+  }
+`
+
 export const DELETE_GRAPH_EDGE = gql`
   mutation DeleteGraphEdge($graphId: Int!, $edgeId: String!) {
     deleteGraphEdge(graphId: $graphId, edgeId: $edgeId)

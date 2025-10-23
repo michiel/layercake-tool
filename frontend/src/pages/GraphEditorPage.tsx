@@ -9,7 +9,7 @@ import { LayercakeGraphEditor, GraphViewMode, GraphOrientation, HierarchyViewMod
 import { PropertiesAndLayersPanel } from '../components/graphs/PropertiesAndLayersPanel';
 import EditHistoryModal from '../components/graphs/EditHistoryModal';
 import { ReactFlowProvider, Node as FlowNode, Edge as FlowEdge } from 'reactflow';
-import { Graph, GraphNode, UPDATE_GRAPH_NODE, UPDATE_LAYER_PROPERTIES, GET_GRAPH_EDIT_COUNT, CREATE_LAYER, ADD_GRAPH_NODE, ADD_GRAPH_EDGE, DELETE_GRAPH_EDGE, DELETE_GRAPH_NODE } from '../graphql/graphs';
+import { Graph, GraphNode, UPDATE_GRAPH_NODE, UPDATE_LAYER_PROPERTIES, GET_GRAPH_EDIT_COUNT, CREATE_LAYER, ADD_GRAPH_NODE, ADD_GRAPH_EDGE, UPDATE_GRAPH_EDGE, DELETE_GRAPH_EDGE, DELETE_GRAPH_NODE } from '../graphql/graphs';
 import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
 
 declare global {
@@ -112,6 +112,7 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
   );
 
   const [updateGraphNode] = useMutation(UPDATE_GRAPH_NODE);
+  const [updateGraphEdge] = useMutation(UPDATE_GRAPH_EDGE);
   const [updateLayerProperties] = useMutation(UPDATE_LAYER_PROPERTIES);
   const [createLayer] = useMutation(CREATE_LAYER, {
     refetchQueries: [{ query: GET_GRAPH_DETAILS, variables: { id: parseInt(graphId || '0') } }]
@@ -260,6 +261,70 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
       // TODO: Rollback optimistic update on error
     });
   }, [graphId, deleteGraphNode]);
+
+  const handleNodeLabelChange = useCallback((nodeId: string, newLabel: string) => {
+    if (!graphId) return;
+
+    // Optimistic update: immediately update the node label in ReactFlow
+    if (setNodesRef.current) {
+      setNodesRef.current(currentNodes => {
+        return currentNodes.map(node => {
+          // Update the main node or its label node
+          if (node.id === nodeId || node.id === `${nodeId}-label`) {
+            return {
+              ...node,
+              data: { ...node.data, label: newLabel }
+            };
+          }
+          return node;
+        });
+      });
+    }
+
+    // Send mutation to server
+    updateGraphNode({
+      variables: {
+        graphId: parseInt(graphId),
+        nodeId,
+        label: newLabel,
+      },
+    }).catch(error => {
+      console.error('Failed to update node label:', error);
+      // TODO: Rollback optimistic update on error
+    });
+  }, [graphId, updateGraphNode]);
+
+  const handleEdgeLabelChange = useCallback((edgeId: string, newLabel: string) => {
+    if (!graphId) return;
+
+    // Optimistic update: immediately update the edge label in ReactFlow
+    if (setEdgesRef.current) {
+      setEdgesRef.current(currentEdges => {
+        return currentEdges.map(edge => {
+          if (edge.id === edgeId) {
+            return {
+              ...edge,
+              label: newLabel,
+              data: { ...edge.data, label: newLabel }
+            };
+          }
+          return edge;
+        });
+      });
+    }
+
+    // Send mutation to server
+    updateGraphEdge({
+      variables: {
+        graphId: parseInt(graphId),
+        edgeId,
+        label: newLabel,
+      },
+    }).catch(error => {
+      console.error('Failed to update edge label:', error);
+      // TODO: Rollback optimistic update on error
+    });
+  }, [graphId, updateGraphEdge]);
 
   // Initialize layer visibility when graph loads
   useEffect(() => {
@@ -728,6 +793,8 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
               onNodeDelete={handleNodeDelete}
               onEdgeAdd={handleEdgeAdd}
               onEdgeDelete={handleEdgeDelete}
+              onNodeLabelChange={handleNodeLabelChange}
+              onEdgeLabelChange={handleEdgeLabelChange}
             />
           </ReactFlowProvider>
         </div>

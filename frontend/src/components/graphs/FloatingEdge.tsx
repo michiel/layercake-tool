@@ -1,9 +1,13 @@
-import React, { useCallback } from 'react';
-import { useStore, getStraightPath, EdgeProps, Node } from 'reactflow';
+import React, { useCallback, useState, useRef, useEffect } from 'react';
+import { useStore, getStraightPath, EdgeProps, Node, EdgeLabelRenderer } from 'reactflow';
 
 interface GetFloatingEdgeParams {
   sourceNode: Node;
   targetNode: Node;
+}
+
+interface FloatingEdgeProps extends EdgeProps {
+  onLabelChange?: (edgeId: string, newLabel: string) => void;
 }
 
 function getNodeIntersection(intersectionNode: Node, targetNode: Node) {
@@ -49,9 +53,34 @@ function getFloatingEdgeParams({ sourceNode, targetNode }: GetFloatingEdgeParams
   };
 }
 
-export const FloatingEdge: React.FC<EdgeProps> = ({ id, source, target, markerEnd, style }) => {
+export const FloatingEdge: React.FC<FloatingEdgeProps> = ({
+  id,
+  source,
+  target,
+  markerEnd,
+  style,
+  label: initialLabel,
+  data,
+  selected,
+  onLabelChange
+}) => {
   const sourceNode = useStore(useCallback((store) => store.nodeInternals.get(source), [source]));
   const targetNode = useStore(useCallback((store) => store.nodeInternals.get(target), [target]));
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [label, setLabel] = useState<string>(String(initialLabel || data?.label || ''));
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setLabel(String(initialLabel || data?.label || ''));
+  }, [initialLabel, data?.label]);
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
 
   if (!sourceNode || !targetNode) {
     return null;
@@ -69,15 +98,98 @@ export const FloatingEdge: React.FC<EdgeProps> = ({ id, source, target, markerEn
     targetY: ty,
   });
 
+  // Calculate label position at the center of the edge
+  const labelX = (sx + tx) / 2;
+  const labelY = (sy + ty) / 2;
+
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsEditing(true);
+  };
+
+  const handleSave = () => {
+    const currentLabel = String(initialLabel || data?.label || '');
+    if (onLabelChange && label !== currentLabel) {
+      onLabelChange(id, label);
+    }
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setLabel(String(initialLabel || data?.label || ''));
+    setIsEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSave();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      handleCancel();
+    }
+  };
+
+  const handleBlur = () => {
+    handleCancel();
+  };
+
+  const handleInputClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+  };
+
   return (
-    <g className="react-flow__edge">
-      <path
-        id={id}
-        className="react-flow__edge-path"
-        d={edgePath}
-        markerEnd={markerEnd}
-        style={style}
-      />
-    </g>
+    <>
+      <g className="react-flow__edge">
+        <path
+          id={id}
+          className="react-flow__edge-path"
+          d={edgePath}
+          markerEnd={markerEnd}
+          style={style}
+        />
+      </g>
+      {(label || isEditing) && (
+        <EdgeLabelRenderer>
+          <div
+            style={{
+              position: 'absolute',
+              transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+              pointerEvents: 'all',
+              backgroundColor: isEditing ? '#fff' : 'rgba(255, 255, 255, 0.9)',
+              padding: '2px 6px',
+              borderRadius: '3px',
+              fontSize: '10px',
+              border: isEditing ? '2px solid #1a73e8' : selected ? '2px solid #1a73e8' : '1px solid transparent',
+              cursor: isEditing ? 'text' : 'pointer',
+            }}
+            onDoubleClick={handleDoubleClick}
+          >
+            {isEditing ? (
+              <input
+                ref={inputRef}
+                type="text"
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onBlur={handleBlur}
+                onClick={handleInputClick}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  outline: 'none',
+                  font: 'inherit',
+                  color: '#000',
+                  padding: 0,
+                  width: `${Math.max(50, label.length * 7)}px`,
+                }}
+              />
+            ) : (
+              <div>{label}</div>
+            )}
+          </div>
+        </EdgeLabelRenderer>
+      )}
+    </>
   );
 };

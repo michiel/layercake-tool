@@ -21,6 +21,8 @@ import { Graph } from '../../graphql/graphs';
 import { getLayoutedElements } from '../../utils/graphUtils';
 import { GroupNode } from './GroupNode';
 import { FloatingEdge } from './FloatingEdge';
+import { EditableNode } from './EditableNode';
+import { EditableLabelNode } from './EditableLabelNode';
 
 export type GraphViewMode = 'flow' | 'hierarchy';
 export type GraphOrientation = 'vertical' | 'horizontal';
@@ -45,6 +47,8 @@ interface LayercakeGraphEditorProps {
   onNodeDelete?: (nodeId: string) => void;
   onEdgeAdd?: (edge: Edge) => void;
   onEdgeDelete?: (edgeId: string) => void;
+  onNodeLabelChange?: (nodeId: string, newLabel: string) => void;
+  onEdgeLabelChange?: (edgeId: string, newLabel: string) => void;
 }
 
 export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
@@ -66,6 +70,8 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
   onNodeDelete,
   onEdgeAdd,
   onEdgeDelete,
+  onNodeLabelChange,
+  onEdgeLabelChange,
 }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -77,8 +83,15 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
   const [selectedNodes, setSelectedNodes] = useState<string[]>([]);
   const [selectedEdges, setSelectedEdges] = useState<string[]>([]);
 
-  const nodeTypes = useMemo(() => ({ group: GroupNode }), []);
-  const edgeTypes = useMemo(() => ({ floating: FloatingEdge }), []);
+  const nodeTypes = useMemo(() => ({
+    group: GroupNode,
+    editable: (props: any) => <EditableNode {...props} onLabelChange={onNodeLabelChange} />,
+    labelNode: (props: any) => <EditableLabelNode {...props} onLabelChange={onNodeLabelChange} />,
+  }), [onNodeLabelChange]);
+
+  const edgeTypes = useMemo(() => ({
+    floating: (props: any) => <FloatingEdge {...props} onLabelChange={onEdgeLabelChange} />,
+  }), [onEdgeLabelChange]);
 
   const mergeEdgesWithManual = useCallback((baseEdges: Edge[]): Edge[] => {
     if (mode !== 'flow' || manualEdgesRef.current.length === 0) {

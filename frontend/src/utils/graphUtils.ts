@@ -218,8 +218,14 @@ export const getLayoutedElements = async (
       // Add label as a separate node with high z-index
       reactFlowNodes.push({
         id: `${elkNode.id}-label`,
+        type: 'labelNode',
         position: { x: 10, y: 6 },
-        data: { label: groupLabel },
+        data: {
+          label: groupLabel,
+          style: {
+            color: layerStyle?.textColor || '#666',
+          },
+        },
         draggable: false,
         selectable: false,
         connectable: false,
@@ -230,7 +236,6 @@ export const getLayoutedElements = async (
           fontWeight: '500',
           color: layerStyle?.textColor || '#666',
           padding: 0,
-          pointerEvents: 'none',
           zIndex: 100,
           minWidth: 'auto',
           width: 'auto',
@@ -251,8 +256,16 @@ export const getLayoutedElements = async (
 
       reactFlowNodes.push({
         id: elkNode.id,
+        type: 'editable',
         position: { x: elkNode.x || 0, y: elkNode.y || 0 },
-        data: { label: elkNode.labels?.[0]?.text || elkNode.id },
+        data: {
+          label: elkNode.labels?.[0]?.text || elkNode.id,
+          style: {
+            backgroundColor: layerStyle?.backgroundColor || DEFAULT_NODE_BG,
+            border: `1px solid ${layerStyle?.borderColor || DEFAULT_NODE_BORDER}`,
+            color: layerStyle?.textColor || DEFAULT_NODE_TEXT,
+          },
+        },
         style: {
           zIndex: 50, // Regular nodes above edges (10) and groups (negative)
           backgroundColor: layerStyle?.backgroundColor || DEFAULT_NODE_BG,
