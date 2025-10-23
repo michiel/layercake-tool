@@ -2087,6 +2087,7 @@ impl Mutation {
                             old_node.label.as_ref().map(|l| serde_json::json!(l)),
                             Some(serde_json::json!(new_label)),
                             None,
+                            true,
                         )
                         .await;
                 }
@@ -2109,6 +2110,7 @@ impl Mutation {
                             },
                             Some(serde_json::json!(new_layer)),
                             None,
+                            true,
                         )
                         .await;
                 }
@@ -2126,6 +2128,7 @@ impl Mutation {
                             old_node.attrs.clone(),
                             Some(new_attrs.clone()),
                             None,
+                            true,
                         )
                         .await;
                 }
@@ -2143,6 +2146,7 @@ impl Mutation {
                             old_node.belongs_to.as_ref().map(|b| serde_json::json!(b)),
                             new_belongs_to.as_ref().map(|b| serde_json::json!(b)),
                             None,
+                            true,
                         )
                         .await;
                 }
@@ -2189,6 +2193,7 @@ impl Mutation {
                             Some(serde_json::json!(old_layer.name)),
                             Some(serde_json::json!(new_name)),
                             None,
+                            true,
                         )
                         .await;
                 }
@@ -2221,6 +2226,7 @@ impl Mutation {
                             old_props,
                             Some(new_properties.clone()),
                             None,
+                            true,
                         )
                         .await;
                 }
@@ -2283,6 +2289,7 @@ impl Mutation {
                 None,
                 Some(node_data),
                 None,
+                true,
             )
             .await;
 
@@ -2348,6 +2355,7 @@ impl Mutation {
                 None,
                 Some(edge_data),
                 None,
+                true,
             )
             .await;
 
@@ -2407,6 +2415,7 @@ impl Mutation {
                     Some(edge_data),
                     None,
                     None,
+                    true,
                 )
                 .await;
 
@@ -2477,6 +2486,7 @@ impl Mutation {
                                     old_node.label.as_ref().map(|l| serde_json::json!(l)),
                                     Some(serde_json::json!(new_label)),
                                     None,
+                                    true,
                                 )
                                 .await;
                         }
@@ -2499,6 +2509,7 @@ impl Mutation {
                                     },
                                     Some(serde_json::json!(new_layer)),
                                     None,
+                                    true,
                                 )
                                 .await;
                         }
@@ -2516,6 +2527,7 @@ impl Mutation {
                                     old_node.attrs.clone(),
                                     Some(new_attrs.clone()),
                                     None,
+                                    true,
                                 )
                                 .await;
                         }
@@ -2554,6 +2566,7 @@ impl Mutation {
                                     Some(serde_json::json!(old_layer.name)),
                                     Some(serde_json::json!(new_name)),
                                     None,
+                                    true,
                                 )
                                 .await;
                         }
@@ -2575,6 +2588,7 @@ impl Mutation {
                                     old_props,
                                     Some(new_properties.clone()),
                                     None,
+                                    true,
                                 )
                                 .await;
                         }
@@ -2787,6 +2801,7 @@ impl Mutation {
                 input.old_value,
                 input.new_value,
                 input.created_by,
+                false, // External edit - not yet applied, will be replayed
             )
             .await
             .map_err(|e| Error::new(format!("Failed to create graph edit: {}", e)))?;

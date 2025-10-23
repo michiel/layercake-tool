@@ -31,6 +31,7 @@ impl GraphEditService {
     /// * `old_value` - Previous value (for updates/deletes)
     /// * `new_value` - New value (for creates/updates)
     /// * `created_by` - Optional user ID
+    /// * `applied` - Whether the edit has already been applied (true for manual edits, false for edits awaiting replay)
     pub async fn create_edit(
         &self,
         graph_id: i32,
@@ -41,6 +42,7 @@ impl GraphEditService {
         old_value: Option<serde_json::Value>,
         new_value: Option<serde_json::Value>,
         created_by: Option<i32>,
+        applied: bool,
     ) -> Result<graph_edits::Model> {
         // Get the next sequence number for this graph
         let next_sequence = self.get_next_sequence_number(graph_id).await?;
@@ -56,15 +58,15 @@ impl GraphEditService {
             old_value: Set(old_value),
             new_value: Set(new_value),
             sequence_number: Set(next_sequence),
-            applied: Set(false),
+            applied: Set(applied),
             created_at: Set(chrono::Utc::now()),
             created_by: Set(created_by),
         };
 
         let edit = edit.insert(&self.db).await?;
 
-        // Update the graph's last_edit_sequence and has_pending_edits
-        self.update_graph_edit_metadata(graph_id, next_sequence)
+        // Update the graph's last_edit_sequence and has_pending_edits (only if not applied)
+        self.update_graph_edit_metadata(graph_id, next_sequence, applied)
             .await?;
 
         Ok(edit)
@@ -82,7 +84,7 @@ impl GraphEditService {
     }
 
     /// Update graph metadata after creating an edit
-    async fn update_graph_edit_metadata(&self, graph_id: i32, sequence_number: i32) -> Result<()> {
+    async fn update_graph_edit_metadata(&self, graph_id: i32, sequence_number: i32, applied: bool) -> Result<()> {
         use crate::database::entities::graphs::{self, Entity as Graphs};
 
         let graph = Graphs::find_by_id(graph_id)
@@ -92,7 +94,10 @@ impl GraphEditService {
 
         let mut active_model: graphs::ActiveModel = graph.into();
         active_model.last_edit_sequence = Set(sequence_number);
-        active_model.has_pending_edits = Set(true);
+        // Only mark as pending if the edit is not yet applied
+        if !applied {
+            active_model.has_pending_edits = Set(true);
+        }
         active_model.updated_at = Set(chrono::Utc::now());
 
         active_model.update(&self.db).await?;
