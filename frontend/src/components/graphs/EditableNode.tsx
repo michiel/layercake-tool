@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { NodeProps } from 'reactflow';
+import { NodeProps, Handle, Position } from 'reactflow';
 
 interface EditableNodeProps extends NodeProps {
   onLabelChange?: (nodeId: string, newLabel: string) => void;
@@ -57,41 +57,47 @@ export const EditableNode: React.FC<EditableNodeProps> = ({ id, data, selected, 
   };
 
   return (
-    <div
-      style={{
-        padding: '10px 20px',
-        borderRadius: '3px',
-        background: data.style?.backgroundColor || '#ffffff',
-        border: isEditing ? '2px solid #1a73e8' : selected ? '2px solid #1a73e8' : '1px solid transparent',
-        color: data.style?.color || '#000000',
-        minWidth: '150px',
-        textAlign: 'center',
-        cursor: isEditing ? 'text' : 'default',
-      }}
-      onDoubleClick={handleDoubleClick}
-    >
-      {isEditing ? (
-        <input
-          ref={inputRef}
-          type="text"
-          value={label}
-          onChange={(e) => setLabel(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onBlur={handleBlur}
-          onClick={handleInputClick}
-          style={{
-            width: '100%',
-            border: 'none',
-            background: 'transparent',
-            outline: 'none',
-            textAlign: 'center',
-            font: 'inherit',
-            color: 'inherit',
-          }}
-        />
-      ) : (
-        <div>{label}</div>
-      )}
-    </div>
+    <>
+      <Handle type="target" position={Position.Top} />
+      <Handle type="target" position={Position.Left} />
+      <div
+        style={{
+          padding: '10px 20px',
+          borderRadius: '3px',
+          background: data.style?.backgroundColor || '#ffffff',
+          border: isEditing ? '2px solid #1a73e8' : selected ? '2px solid #1a73e8' : '1px solid transparent',
+          color: data.style?.color || '#000000',
+          minWidth: '150px',
+          textAlign: 'center',
+          cursor: isEditing ? 'text' : 'default',
+        }}
+        onDoubleClick={handleDoubleClick}
+      >
+        {isEditing ? (
+          <input
+            ref={inputRef}
+            type="text"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onBlur={handleBlur}
+            onClick={handleInputClick}
+            style={{
+              width: '100%',
+              border: 'none',
+              background: 'transparent',
+              outline: 'none',
+              textAlign: 'center',
+              font: 'inherit',
+              color: 'inherit',
+            }}
+          />
+        ) : (
+          <div>{label}</div>
+        )}
+      </div>
+      <Handle type="source" position={Position.Right} />
+      <Handle type="source" position={Position.Bottom} />
+    </>
   );
 };
