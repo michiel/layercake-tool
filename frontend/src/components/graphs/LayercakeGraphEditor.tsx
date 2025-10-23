@@ -316,9 +316,8 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
     // Skip only label nodes
     if (node.id.endsWith('-label')) return;
 
-    // Find the graph node to get its original belongsTo
+    // Find the graph node to get its original belongsTo (may be undefined for manual nodes)
     const graphNode = renderGraph.graphNodes.find(gn => gn.id === node.id);
-    if (!graphNode) return;
 
     // Helper to get absolute position of a node (accounting for parent offsets)
     const getAbsolutePosition = (n: Node): { x: number; y: number } => {
@@ -405,18 +404,37 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
       }
     }
 
-    const originalParent = graphNode.belongsTo || undefined;
+    const originalParent = graphNode?.belongsTo || undefined;
 
-    // Check if parent changed
+    // Check if parent changed (or if this is a manual node being reparented for the first time)
     if (newParent !== originalParent) {
       const nodeType = node.type === 'group' ? 'Subflow' : 'Node';
       console.log(`${nodeType} ${node.id} parent changed from ${originalParent || 'root'} to ${newParent || 'root'}`);
-      // Update belongsTo relationship
-      onNodeUpdate(node.id, {
-        belongsTo: newParent || ''  // Empty string means no parent (root level)
-      });
+
+      // Update local state to set parent immediately
+      setNodes(nds => nds.map(n => {
+        if (n.id === node.id) {
+          return {
+            ...n,
+            parentNode: newParent,
+            extent: newParent ? ('parent' as const) : undefined,
+            data: {
+              ...n.data,
+              belongsTo: newParent,
+            },
+          };
+        }
+        return n;
+      }));
+
+      // Update backend only if the node exists in the backend graph
+      if (graphNode) {
+        onNodeUpdate(node.id, {
+          belongsTo: newParent || ''  // Empty string means no parent (root level)
+        });
+      }
     }
-  }, [mode, hierarchyViewMode, onNodeUpdate, renderGraph, nodes]);
+  }, [mode, hierarchyViewMode, onNodeUpdate, renderGraph, nodes, setNodes]);
 
   // Minimap node color customization
   const minimapNodeColor = useCallback((node: Node) => {
@@ -590,6 +608,11 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
           width: isPartition ? 200 : undefined,
           height: isPartition ? 200 : undefined,
         },
+        // Set top-level width/height for containers so drag detection works
+        ...(isPartition ? {
+          width: 200,
+          height: 200,
+        } : {}),
         ...(parentNode ? {
           parentNode,
           extent: 'parent' as const,
