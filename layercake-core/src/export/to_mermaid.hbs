@@ -10,6 +10,6 @@ flowchart {{config.orientation}}
 {{/each}}
 
 {{#each flow_edges as |edge|}}
- {{edge.source}} -->{{#if edge.label}}|{{edge.label}}|{{/if}} {{edge.target}}
+ {{edge.source}} -->{{#if edge.label}}|"{{edge.label}}"|{{/if}} {{edge.target}}
 {{/each}}
 
