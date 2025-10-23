@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Tabs, Stack, Button, Group, Text, Table, TextInput, ScrollArea } from '@mantine/core';
-import { IconTable, IconDeviceFloppy } from '@tabler/icons-react';
+import { IconTable, IconDeviceFloppy, IconClipboard } from '@tabler/icons-react';
 
 export interface GraphNode {
   id: string;
@@ -111,6 +111,118 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
     }
   };
 
+  // Parse CSV from clipboard
+  const parseCSV = (csvText: string): Record<string, any>[] => {
+    const lines = csvText.trim().split('\n');
+    if (lines.length < 2) return [];
+
+    // Parse header
+    const headers = lines[0].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(h =>
+      h.trim().replace(/^"|"$/g, '')
+    );
+
+    // Parse rows
+    const rows: Record<string, any>[] = [];
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(v =>
+        v.trim().replace(/^"|"$/g, '')
+      );
+
+      if (values.length !== headers.length) continue;
+
+      const row: Record<string, any> = {};
+      headers.forEach((header, idx) => {
+        row[header] = values[idx];
+      });
+      rows.push(row);
+    }
+
+    return rows;
+  };
+
+  const handlePasteNodes = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      const parsedData = parseCSV(text);
+
+      if (parsedData.length === 0) {
+        alert('No valid CSV data found in clipboard');
+        return;
+      }
+
+      const newNodes: GraphNode[] = parsedData.map(row => ({
+        id: row.id || '',
+        label: row.label || '',
+        layer: row.layer,
+        is_partition: row.is_partition === 'true' || row.is_partition === '1',
+        belongs_to: row.belongs_to,
+        comment: row.comment,
+        ...row
+      }));
+
+      setLocalNodes(newNodes);
+      setHasChanges(true);
+    } catch (error) {
+      console.error('Failed to paste nodes:', error);
+      alert('Failed to read from clipboard. Please ensure you have copied CSV data.');
+    }
+  };
+
+  const handlePasteEdges = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      const parsedData = parseCSV(text);
+
+      if (parsedData.length === 0) {
+        alert('No valid CSV data found in clipboard');
+        return;
+      }
+
+      const newEdges: GraphEdge[] = parsedData.map(row => ({
+        id: row.id || '',
+        source: row.source || '',
+        target: row.target || '',
+        label: row.label,
+        layer: row.layer,
+        comment: row.comment,
+        ...row
+      }));
+
+      setLocalEdges(newEdges);
+      setHasChanges(true);
+    } catch (error) {
+      console.error('Failed to paste edges:', error);
+      alert('Failed to read from clipboard. Please ensure you have copied CSV data.');
+    }
+  };
+
+  const handlePasteLayers = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      const parsedData = parseCSV(text);
+
+      if (parsedData.length === 0) {
+        alert('No valid CSV data found in clipboard');
+        return;
+      }
+
+      const newLayers: GraphLayer[] = parsedData.map(row => ({
+        id: row.id || '',
+        label: row.label || '',
+        background_color: row.background_color,
+        text_color: row.text_color,
+        border_color: row.border_color,
+        ...row
+      }));
+
+      setLocalLayers(newLayers);
+      setHasChanges(true);
+    } catch (error) {
+      console.error('Failed to paste layers:', error);
+      alert('Failed to read from clipboard. Please ensure you have copied CSV data.');
+    }
+  };
+
   return (
     <Stack gap="md">
       <Group justify="space-between">
@@ -120,16 +232,50 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
           {activeTab === 'layers' && `${localLayers.length} layers`}
         </Text>
 
-        {!readOnly && (
-          <Button
-            leftSection={<IconDeviceFloppy size={16} />}
-            onClick={handleSave}
-            disabled={!hasChanges}
-            loading={saving}
-          >
-            Save Changes
-          </Button>
-        )}
+        <Group gap="xs">
+          {!readOnly && (
+            <>
+              {activeTab === 'nodes' && (
+                <Button
+                  leftSection={<IconClipboard size={16} />}
+                  onClick={handlePasteNodes}
+                  variant="light"
+                  size="sm"
+                >
+                  Paste Nodes
+                </Button>
+              )}
+              {activeTab === 'edges' && (
+                <Button
+                  leftSection={<IconClipboard size={16} />}
+                  onClick={handlePasteEdges}
+                  variant="light"
+                  size="sm"
+                >
+                  Paste Edges
+                </Button>
+              )}
+              {activeTab === 'layers' && (
+                <Button
+                  leftSection={<IconClipboard size={16} />}
+                  onClick={handlePasteLayers}
+                  variant="light"
+                  size="sm"
+                >
+                  Paste Layers
+                </Button>
+              )}
+              <Button
+                leftSection={<IconDeviceFloppy size={16} />}
+                onClick={handleSave}
+                disabled={!hasChanges}
+                loading={saving}
+              >
+                Save Changes
+              </Button>
+            </>
+          )}
+        </Group>
       </Group>
 
       <Tabs value={activeTab} onChange={setActiveTab}>
