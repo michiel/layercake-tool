@@ -1,8 +1,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { Modal, Tabs, Group, Title, ActionIcon, Stack, Loader, Alert, Text } from '@mantine/core';
-import { IconLayout2, IconHierarchy, IconX, IconAlertCircle, IconBoxAlignBottom } from '@tabler/icons-react';
+import { IconLayout2, IconHierarchy, IconX, IconAlertCircle } from '@tabler/icons-react';
 import { GraphPreview, GraphData } from './GraphPreview';
-import { GraphPreview3D } from './GraphPreview3D';
 
 interface GraphPreviewDialogProps {
   opened: boolean;
@@ -102,9 +101,6 @@ export const GraphPreviewDialog = ({ opened, onClose, data, title, loading = fal
           <Tabs.Tab value="hierarchy" leftSection={<IconHierarchy size={16} />}>
             Hierarchy
           </Tabs.Tab>
-          <Tabs.Tab value="flow3d" leftSection={<IconBoxAlignBottom size={16} />}>
-            Flow 3D
-          </Tabs.Tab>
         </Tabs.List>
 
           <Tabs.Panel value="flow" pt="md" style={{ height: '75vh' }}>
@@ -125,16 +121,6 @@ export const GraphPreviewDialog = ({ opened, onClose, data, title, loading = fal
             />
           ) : (
             <Text c="dimmed">No hierarchy data available.</Text>
-          )}
-        </Tabs.Panel>
-        <Tabs.Panel value="flow3d" pt="md" style={{ height: '75vh' }}>
-          {normalizedData.flow ? (
-            <GraphPreview3D
-              key={`flow3d-${normalizedData.flow.nodes.length}-${normalizedData.flow.links.length}`}
-              data={normalizedData.flow}
-            />
-          ) : (
-            <Text c="dimmed">No flow data available.</Text>
           )}
         </Tabs.Panel>
       </Tabs>

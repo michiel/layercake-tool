@@ -17,7 +17,6 @@
     "@types/react": "^19.1.13",
     "@types/react-dom": "^19.1.9",
     "@types/react-router-dom": "^5.3.3",
-    "@types/three": "^0.161.0",
     "@vitejs/plugin-react": "^5.0.3",
     "typescript": "^5.9.2",
     "vite": "^7.1.6"
@@ -33,7 +32,6 @@
     "@tauri-apps/api": "^2.0.0",
     "@tauri-apps/plugin-dialog": "^2.4.0",
     "@tauri-apps/plugin-shell": "^2.3.1",
-    "3d-force-graph": "^1.74.5",
     "elkjs": "^0.11.0",
     "fast-json-patch": "^3.1.1",
     "force-graph": "^1.51.0",
@@ -44,9 +42,6 @@
     "react-dom": "^19.1.1",
     "react-router-dom": "^7.9.1",
     "reactflow": "^11.11.4",
-    "three": "^0.161.0",
-    "three-fly-controls": "^2.0.0",
-    "three-spritetext": "^1.9.4",
     "tweakpane": "^4.0.5"
   }
 }
