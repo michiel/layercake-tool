@@ -14,6 +14,7 @@ pub struct Model {
     pub weight: Option<f64>,
     pub is_partition: bool,
     pub belongs_to: Option<String>,
+    pub datasource_id: Option<i32>,
     #[sea_orm(column_type = "JsonBinary")]
     pub attrs: Option<serde_json::Value>,
     pub created_at: ChronoDateTimeUtc,

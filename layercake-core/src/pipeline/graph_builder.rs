@@ -417,6 +417,7 @@ impl GraphBuilder {
                                     .filter(|s| !s.is_empty())
                                     .map(|s| s.to_string()),
                                 attrs: Some(node_val.clone()),
+                                datasource_id: Some(ds.id),
                             };
 
                             all_nodes.insert(id, node);
@@ -448,6 +449,7 @@ impl GraphBuilder {
                                 layer: edge_val["layer"].as_str().map(|s| s.to_string()),
                                 weight: edge_val["weight"].as_f64(),
                                 attrs: Some(edge_val.clone()),
+                                datasource_id: Some(ds.id),
                             };
 
                             all_edges.push(edge);
@@ -473,6 +475,7 @@ impl GraphBuilder {
                                     .filter(|s| !s.is_empty())
                                     .map(|s| s.to_string()),
                                 attrs: Some(node_val.clone()),
+                                datasource_id: Some(ds.id),
                             };
 
                             all_nodes.insert(id, node);
@@ -502,6 +505,7 @@ impl GraphBuilder {
                                 layer: edge_val["layer"].as_str().map(|s| s.to_string()),
                                 weight: edge_val["weight"].as_f64(),
                                 attrs: Some(edge_val.clone()),
+                                datasource_id: Some(ds.id),
                             };
 
                             all_edges.push(edge);
@@ -566,6 +570,7 @@ impl GraphBuilder {
                                 name,
                                 color,
                                 properties: properties_json,
+                                datasource_id: Some(ds.id),
                             };
 
                             all_layers.insert(layer_id, layer);
@@ -631,6 +636,7 @@ impl GraphBuilder {
                                 name,
                                 color,
                                 properties: properties_json,
+                                datasource_id: Some(ds.id),
                             };
 
                             all_layers.insert(layer_id, layer);
@@ -692,6 +698,7 @@ impl GraphBuilder {
                 weight: Set(node_data.weight),
                 is_partition: Set(node_data.is_partition),
                 belongs_to: Set(node_data.belongs_to),
+                datasource_id: Set(node_data.datasource_id),
                 attrs: Set(node_data.attrs),
                 created_at: Set(chrono::Utc::now()),
             };
@@ -710,6 +717,7 @@ impl GraphBuilder {
                 label: Set(edge_data.label),
                 layer: Set(edge_data.layer),
                 weight: Set(edge_data.weight),
+                datasource_id: Set(edge_data.datasource_id),
                 attrs: Set(edge_data.attrs),
                 created_at: Set(chrono::Utc::now()),
             };
@@ -754,6 +762,7 @@ impl GraphBuilder {
                 is_partition: parse_is_partition(&data["is_partition"]),
                 belongs_to: data["belongs_to"].as_str().map(|s| s.to_string()),
                 attrs: Some(data.clone()),
+                datasource_id: Some(datasource.id),
             };
 
             nodes.insert(id, node);
@@ -801,6 +810,7 @@ impl GraphBuilder {
                 layer: data["layer"].as_str().map(|s| s.to_string()),
                 weight: data["weight"].as_f64(),
                 attrs: Some(data.clone()),
+                datasource_id: Some(datasource.id),
             };
 
             edges.push(edge);
@@ -843,6 +853,7 @@ impl GraphBuilder {
                     is_partition: node_val["is_partition"].as_bool().unwrap_or(false),
                     belongs_to: node_val["belongs_to"].as_str().map(|s| s.to_string()),
                     attrs: Some(node_val.clone()),
+                    datasource_id: Some(datasource.id),
                 };
 
                 nodes.insert(id, node);
@@ -874,6 +885,7 @@ impl GraphBuilder {
                     layer: edge_val["layer"].as_str().map(|s| s.to_string()),
                     weight: edge_val["weight"].as_f64(),
                     attrs: Some(edge_val.clone()),
+                    datasource_id: Some(datasource.id),
                 };
 
                 edges.push(edge);
@@ -920,6 +932,7 @@ struct NodeData {
     is_partition: bool,
     belongs_to: Option<String>,
     attrs: Option<Value>,
+    datasource_id: Option<i32>,
 }
 
 /// Internal edge data structure
@@ -931,6 +944,7 @@ struct EdgeData {
     layer: Option<String>,
     weight: Option<f64>,
     attrs: Option<Value>,
+    datasource_id: Option<i32>,
 }
 
 // LayerData now imported from super::types (was previously defined here)

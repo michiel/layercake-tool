@@ -28,6 +28,7 @@ pub async fn insert_layers_to_db(
             layer_id: Set(layer_id),
             name: Set(layer_data.name),
             color: Set(layer_data.color),
+            datasource_id: Set(layer_data.datasource_id),
             properties: Set(layer_data.properties),
             ..Default::default()
         };
@@ -64,6 +65,7 @@ pub async fn load_layers_from_db(
             name: db_layer.name,
             color: db_layer.color,
             properties: db_layer.properties,
+            datasource_id: db_layer.datasource_id,
         };
         all_layers.insert(db_layer.layer_id, layer);
     }
@@ -88,6 +90,7 @@ mod tests {
                 name: "Test Layer".to_string(),
                 color: Some("#FF0000".to_string()),
                 properties: Some(r#"{"z_index":1}"#.to_string()),
+                datasource_id: None,
             },
         );
 

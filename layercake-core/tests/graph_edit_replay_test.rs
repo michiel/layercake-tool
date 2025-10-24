@@ -93,6 +93,7 @@ async fn create_test_node(
         belongs_to: Set(None),
         weight: Set(None),
         attrs: Set(None),
+        datasource_id: Set(None),
         created_at: Set(Utc::now()),
     };
     node.insert(db).await
@@ -124,6 +125,7 @@ async fn test_replay_node_updates() {
             Some(serde_json::json!("Original Label 1")),
             Some(serde_json::json!("Updated Label 1")),
             None,
+            false,
         )
         .await
         .unwrap();
@@ -138,6 +140,7 @@ async fn test_replay_node_updates() {
             Some(serde_json::json!("Original Label 2")),
             Some(serde_json::json!("Updated Label 2")),
             None,
+            false,
         )
         .await
         .unwrap();
@@ -198,6 +201,7 @@ async fn test_replay_with_missing_targets() {
             Some(serde_json::json!("Label 1")),
             Some(serde_json::json!("Updated")),
             None,
+            false,
         )
         .await
         .unwrap();
@@ -212,6 +216,7 @@ async fn test_replay_with_missing_targets() {
             Some(serde_json::json!("Old")),
             Some(serde_json::json!("New")),
             None,
+            false,
         )
         .await
         .unwrap();
@@ -256,6 +261,7 @@ async fn test_replay_idempotence() {
             Some(serde_json::json!("Original")),
             Some(serde_json::json!("Updated")),
             None,
+            false,
         )
         .await
         .unwrap();
@@ -306,6 +312,7 @@ async fn test_replay_sequence_ordering() {
             Some(serde_json::json!("Start")),
             Some(serde_json::json!("Step 1")),
             None,
+            false,
         )
         .await
         .unwrap();
@@ -320,6 +327,7 @@ async fn test_replay_sequence_ordering() {
             Some(serde_json::json!("Step 1")),
             Some(serde_json::json!("Step 2")),
             None,
+            false,
         )
         .await
         .unwrap();
@@ -334,6 +342,7 @@ async fn test_replay_sequence_ordering() {
             Some(serde_json::json!("Step 2")),
             Some(serde_json::json!("Final")),
             None,
+            false,
         )
         .await
         .unwrap();
@@ -387,6 +396,7 @@ async fn test_replay_node_create_and_edge_create() {
                 "attrs": {}
             })),
             None,
+            false,
         )
         .await
         .unwrap();
@@ -407,6 +417,7 @@ async fn test_replay_node_create_and_edge_create() {
                 "layer": "default"
             })),
             None,
+            false,
         )
         .await
         .unwrap();
@@ -473,6 +484,7 @@ async fn test_replay_edge_without_source_target() {
                 "label": "orphan"
             })),
             None,
+            false,
         )
         .await
         .unwrap();
@@ -513,6 +525,7 @@ async fn test_replay_layer_operations() {
                 }
             })),
             None,
+            false,
         )
         .await
         .unwrap();
@@ -528,6 +541,7 @@ async fn test_replay_layer_operations() {
             Some(serde_json::json!({"background_color": "ffffff"})),
             Some(serde_json::json!({"background_color": "ff0000"})),
             None,
+            false,
         )
         .await
         .unwrap();
@@ -579,6 +593,7 @@ async fn test_applicator_node_delete() {
             Some(serde_json::json!({"label": "Delete Me"})),
             None,
             None,
+            false,
         )
         .await
         .unwrap();
@@ -626,6 +641,7 @@ async fn test_graph_metadata_after_replay() {
             Some(serde_json::json!("Test")),
             Some(serde_json::json!("Updated")),
             None,
+            false,
         )
         .await
         .unwrap();

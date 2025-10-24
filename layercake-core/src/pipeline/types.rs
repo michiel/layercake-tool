@@ -6,4 +6,5 @@ pub(crate) struct LayerData {
     pub name: String,
     pub color: Option<String>,
     pub properties: Option<String>, // JSON string
+    pub datasource_id: Option<i32>,
 }

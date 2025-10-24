@@ -499,6 +499,7 @@ mod tests {
                     belongs_to: None,
                     weight: 1,
                     comment: None,
+                    datasource: None,
                 },
                 Node {
                     id: "B".to_string(),
@@ -508,6 +509,7 @@ mod tests {
                     belongs_to: None,
                     weight: 1,
                     comment: None,
+                    datasource: None,
                 },
             ],
             edges: vec![
@@ -519,6 +521,7 @@ mod tests {
                     layer: "layer1".to_string(),
                     weight: 1,
                     comment: None,
+                    datasource: None,
                 },
                 Edge {
                     id: "e2".to_string(),
@@ -528,6 +531,7 @@ mod tests {
                     layer: "layer1".to_string(),
                     weight: 1,
                     comment: None,
+                    datasource: None,
                 },
             ],
             layers: vec![Layer {
@@ -536,6 +540,7 @@ mod tests {
                 background_color: "FFFFFF".to_string(),
                 text_color: "000000".to_string(),
                 border_color: "000000".to_string(),
+                datasource: None,
             }],
         }
     }

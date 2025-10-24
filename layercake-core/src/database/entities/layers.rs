@@ -10,6 +10,7 @@ pub struct Model {
     pub layer_id: String,
     pub name: String,
     pub color: Option<String>,
+    pub datasource_id: Option<i32>,
     pub properties: Option<String>, // JSON
 }
 

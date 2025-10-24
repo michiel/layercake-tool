@@ -2145,6 +2145,7 @@ impl Mutation {
             name: Set(input.name),
             color: Set(None),
             properties: Set(None),
+            datasource_id: Set(None),
         };
 
         let inserted_layer = layer
@@ -2452,6 +2453,7 @@ impl Mutation {
             layer: Set(layer.clone()),
             weight: Set(weight),
             attrs: Set(attrs.clone()),
+            datasource_id: Set(None),
             created_at: Set(now),
         };
 

@@ -110,6 +110,7 @@ impl Graph {
                         layer: parent.layer.clone(),
                         weight: 1,
                         comment: None,
+                        datasource: None,
                     });
                 }
                 // If parent node not found, skip this edge - could log warning if needed
@@ -429,6 +430,7 @@ impl Graph {
                         belongs_to: Some(node.id),
                         weight: 0,
                         comment: node.comment.clone(),
+                        datasource: None,
                     }
                 };
 
@@ -528,6 +530,7 @@ impl Graph {
             belongs_to: None,
             weight: 0,
             comment: None,
+            datasource: None,
         });
 
         fn edge_label(edge: &Edge) -> String {
@@ -549,6 +552,7 @@ impl Graph {
                 belongs_to: Some("inverted_root".to_string()),
                 weight: edge.weight,
                 comment: edge.comment.clone(),
+                datasource: None,
             };
             inverted_graph.nodes.push(new_node.clone());
             edge_to_node_map.insert((edge.source.clone(), edge.target.clone()), new_node);
@@ -598,6 +602,7 @@ impl Graph {
                         layer: node.layer.clone(),
                         weight: 1,
                         comment: None,
+                        datasource: None,
                     });
                     edge_counter += 1; // Increment the counter for the next edge
                 }
@@ -783,6 +788,7 @@ pub struct Node {
     pub belongs_to: Option<String>,
     pub weight: i32,
     pub comment: Option<String>,
+    pub datasource: Option<i32>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -795,6 +801,7 @@ pub struct TreeNode {
     pub belongs_to: Option<String>,
     pub weight: i32,
     pub comment: Option<String>,
+    pub datasource: Option<i32>,
     pub children: Vec<TreeNode>,
 }
 
@@ -809,6 +816,7 @@ impl TreeNode {
             belongs_to: node.belongs_to.clone(),
             weight: node.weight,
             comment: node.comment.clone(),
+            datasource: node.datasource,
             children: Vec::new(),
         }
     }
@@ -823,6 +831,7 @@ pub struct Edge {
     pub layer: String,
     pub weight: i32,
     pub comment: Option<String>,
+    pub datasource: Option<i32>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -832,6 +841,7 @@ pub struct Layer {
     pub background_color: String,
     pub text_color: String,
     pub border_color: String,
+    pub datasource: Option<i32>,
 }
 
 impl Layer {
@@ -848,6 +858,7 @@ impl Layer {
             background_color: background_color.to_string(),
             text_color: text_color.to_string(),
             border_color: border_color.to_string(),
+            datasource: None,
         }
     }
 }
@@ -921,6 +932,7 @@ impl Node {
                     comment
                 }
             },
+            datasource: None,
         })
     }
 }
@@ -956,6 +968,7 @@ impl Edge {
                     comment.map(|c| format!("\"{}\"", c))
                 }
             },
+            datasource: None,
         })
     }
 }
@@ -968,6 +981,7 @@ impl Layer {
             background_color: get_stripped_value(record, 2, "background")?,
             border_color: get_stripped_value(record, 3, "border_color")?,
             text_color: get_stripped_value(record, 4, "text_color")?,
+            datasource: None,
         })
     }
 }
@@ -990,6 +1004,7 @@ mod tests {
                     belongs_to: None,
                     weight: 1,
                     comment: None,
+                    datasource: None,
                 },
                 Node {
                     id: "2".to_string(),
@@ -999,6 +1014,7 @@ mod tests {
                     belongs_to: Some("1".to_string()),
                     weight: 1,
                     comment: None,
+                    datasource: None,
                 },
                 Node {
                     id: "3".to_string(),
@@ -1008,6 +1024,7 @@ mod tests {
                     belongs_to: Some("1".to_string()),
                     weight: 1,
                     comment: None,
+                    datasource: None,
                 },
             ],
             edges: vec![
@@ -1020,6 +1037,7 @@ mod tests {
                     layer: "Layer1".to_string(),
                     weight: 1,
                     comment: None,
+                    datasource: None,
                 },
             ],
             layers: vec![Layer {
@@ -1028,6 +1046,7 @@ mod tests {
                 background_color: "FFFFFF".to_string(),
                 text_color: "000000".to_string(),
                 border_color: "000000".to_string(),
+                datasource: None,
             }],
         }
     }
@@ -1045,6 +1064,7 @@ mod tests {
                     belongs_to: None,
                     weight: 1,
                     comment: None,
+                    datasource: None,
                 },
                 // Children under root1
                 Node {
@@ -1055,6 +1075,7 @@ mod tests {
                     belongs_to: Some("root1".to_string()),
                     weight: 1,
                     comment: None,
+                    datasource: None,
                 },
                 Node {
                     id: "child2".to_string(),
@@ -1064,6 +1085,7 @@ mod tests {
                     belongs_to: Some("root1".to_string()),
                     weight: 1,
                     comment: None,
+                    datasource: None,
                 },
                 Node {
                     id: "child3".to_string(),
@@ -1073,6 +1095,7 @@ mod tests {
                     belongs_to: Some("root1".to_string()),
                     weight: 1,
                     comment: None,
+                    datasource: None,
                 },
                 Node {
                     id: "child4".to_string(),
@@ -1082,6 +1105,7 @@ mod tests {
                     belongs_to: Some("root1".to_string()),
                     weight: 1,
                     comment: None,
+                    datasource: None,
                 },
                 // Another root
                 Node {
@@ -1092,6 +1116,7 @@ mod tests {
                     belongs_to: None,
                     weight: 1,
                     comment: None,
+                    datasource: None,
                 },
                 // Children under root2
                 Node {
@@ -1102,6 +1127,7 @@ mod tests {
                     belongs_to: Some("root2".to_string()),
                     weight: 1,
                     comment: None,
+                    datasource: None,
                 },
                 Node {
                     id: "child6".to_string(),
@@ -1111,6 +1137,7 @@ mod tests {
                     belongs_to: Some("root2".to_string()),
                     weight: 1,
                     comment: None,
+                    datasource: None,
                 },
             ],
             edges: vec![
@@ -1122,6 +1149,7 @@ mod tests {
                     layer: "layer1".to_string(),
                     weight: 1,
                     comment: None,
+                    datasource: None,
                 },
                 Edge {
                     id: "e2".to_string(),
@@ -1131,6 +1159,7 @@ mod tests {
                     layer: "layer1".to_string(),
                     weight: 1,
                     comment: None,
+                    datasource: None,
                 },
                 Edge {
                     id: "e3".to_string(),
@@ -1140,6 +1169,7 @@ mod tests {
                     layer: "layer1".to_string(),
                     weight: 1,
                     comment: None,
+                    datasource: None,
                 },
                 Edge {
                     id: "e4".to_string(),
@@ -1149,6 +1179,7 @@ mod tests {
                     layer: "layer2".to_string(),
                     weight: 1,
                     comment: None,
+                    datasource: None,
                 },
                 Edge {
                     id: "e5".to_string(),
@@ -1158,6 +1189,7 @@ mod tests {
                     layer: "layer2".to_string(),
                     weight: 1,
                     comment: None,
+                    datasource: None,
                 },
             ],
             layers: vec![
@@ -1167,6 +1199,7 @@ mod tests {
                     background_color: "FFFFFF".to_string(),
                     text_color: "000000".to_string(),
                     border_color: "000000".to_string(),
+                    datasource: None,
                 },
                 Layer {
                     id: "layer2".to_string(),
@@ -1174,6 +1207,7 @@ mod tests {
                     background_color: "EEEEEE".to_string(),
                     text_color: "000000".to_string(),
                     border_color: "000000".to_string(),
+                    datasource: None,
                 },
                 Layer {
                     id: "aggregated".to_string(),
@@ -1181,6 +1215,7 @@ mod tests {
                     background_color: "222222".to_string(),
                     text_color: "FFFFFF".to_string(),
                     border_color: "DDDDDD".to_string(),
+                    datasource: None,
                 },
             ],
         }
@@ -1225,6 +1260,7 @@ mod tests {
             "weight": 1,
             "depth": 0,
             "comment": "null",
+            "datasource": null,
             "children": [
                 {
                     "id": "2",
@@ -1234,6 +1270,7 @@ mod tests {
                     "belongs_to": "1",
                     "depth": 1,
                     "comment": "null",
+                    "datasource": null,
                     "weight": 1,
                     "children": []
                 },
@@ -1245,6 +1282,7 @@ mod tests {
                     "belongs_to": "1",
                     "depth": 1,
                     "comment": "null",
+                    "datasource": null,
                     "weight": 1,
                     "children": []
                 }
@@ -1339,6 +1377,7 @@ mod tests {
                     belongs_to: None,
                     weight: 1,
                     comment: None,
+                    datasource: None,
                 },
                 // Level 1
                 Node {
@@ -1349,6 +1388,7 @@ mod tests {
                     belongs_to: Some("root".to_string()),
                     weight: 1,
                     comment: None,
+                    datasource: None,
                 },
                 // Level 2
                 Node {
@@ -1359,6 +1399,7 @@ mod tests {
                     belongs_to: Some("level1_1".to_string()),
                     weight: 1,
                     comment: None,
+                    datasource: None,
                 },
                 // Level 3
                 Node {
@@ -1369,6 +1410,7 @@ mod tests {
                     belongs_to: Some("level2_1".to_string()),
                     weight: 1,
                     comment: None,
+                    datasource: None,
                 },
                 Node {
                     id: "level3_2".to_string(),
@@ -1378,6 +1420,7 @@ mod tests {
                     belongs_to: Some("level2_1".to_string()),
                     weight: 1,
                     comment: None,
+                    datasource: None,
                 },
             ],
             edges: vec![Edge {
@@ -1388,6 +1431,7 @@ mod tests {
                 layer: "layer1".to_string(),
                 weight: 1,
                 comment: None,
+                datasource: None,
             }],
             layers: vec![Layer {
                 id: "layer1".to_string(),
@@ -1395,6 +1439,7 @@ mod tests {
                 background_color: "FFFFFF".to_string(),
                 text_color: "000000".to_string(),
                 border_color: "000000".to_string(),
+                datasource: None,
             }],
         };
 
@@ -1436,6 +1481,7 @@ mod tests {
                     belongs_to: None,
                     weight: 1,
                     comment: None,
+                    datasource: None,
                 },
                 Node {
                     id: "2".to_string(),
@@ -1445,6 +1491,7 @@ mod tests {
                     belongs_to: None,
                     weight: 1,
                     comment: None,
+                    datasource: None,
                 },
             ],
             edges: vec![
@@ -1457,6 +1504,7 @@ mod tests {
                     layer: "layer1".to_string(),
                     weight: 1,
                     comment: None,
+                    datasource: None,
                 },
                 Edge {
                     id: "e2".to_string(),
@@ -1466,6 +1514,7 @@ mod tests {
                     layer: "layer1".to_string(),
                     weight: 2,
                     comment: None,
+                    datasource: None,
                 },
                 Edge {
                     id: "e3".to_string(),
@@ -1475,6 +1524,7 @@ mod tests {
                     layer: "layer1".to_string(),
                     weight: 3,
                     comment: None,
+                    datasource: None,
                 },
             ],
             layers: vec![Layer {
@@ -1483,6 +1533,7 @@ mod tests {
                 background_color: "FFFFFF".to_string(),
                 text_color: "000000".to_string(),
                 border_color: "000000".to_string(),
+                datasource: None,
             }],
         };
 
@@ -1531,6 +1582,7 @@ mod tests {
                     belongs_to: None,
                     weight: 1,
                     comment: None,
+                    datasource: None,
                 },
                 // Non-partition node
                 Node {
@@ -1541,6 +1593,7 @@ mod tests {
                     belongs_to: Some("1".to_string()), // Belongs to partition node 1
                     weight: 1,
                     comment: None,
+                    datasource: None,
                 },
             ],
             edges: vec![
@@ -1553,6 +1606,7 @@ mod tests {
                     layer: "layer1".to_string(),
                     weight: 1,
                     comment: None,
+                    datasource: None,
                 },
             ],
             layers: vec![Layer {
@@ -1561,6 +1615,7 @@ mod tests {
                 background_color: "FFFFFF".to_string(),
                 text_color: "000000".to_string(),
                 border_color: "000000".to_string(),
+                datasource: None,
             }],
         };
 
@@ -1584,6 +1639,7 @@ mod tests {
                 belongs_to: None,
                 weight: 1,
                 comment: None,
+                datasource: None,
             }],
             edges: vec![
                 // Edge with missing target
@@ -1595,6 +1651,7 @@ mod tests {
                     layer: "layer1".to_string(),
                     weight: 1,
                     comment: None,
+                    datasource: None,
                 },
             ],
             layers: vec![Layer {
@@ -1603,6 +1660,7 @@ mod tests {
                 background_color: "FFFFFF".to_string(),
                 text_color: "000000".to_string(),
                 border_color: "000000".to_string(),
+                datasource: None,
             }],
         };
 

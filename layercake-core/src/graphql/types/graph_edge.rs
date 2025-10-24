@@ -12,6 +12,8 @@ pub struct GraphEdge {
     pub layer: Option<String>,
     pub weight: Option<f64>,
     pub attrs: Option<serde_json::Value>,
+    #[graphql(name = "datasourceId")]
+    pub datasource_id: Option<i32>,
     #[graphql(name = "createdAt")]
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
@@ -27,6 +29,7 @@ impl From<crate::database::entities::graph_edges::Model> for GraphEdge {
             layer: model.layer,
             weight: model.weight,
             attrs: model.attrs,
+            datasource_id: model.datasource_id,
             created_at: model.created_at,
         }
     }

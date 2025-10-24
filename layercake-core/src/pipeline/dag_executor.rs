@@ -354,6 +354,7 @@ impl DagExecutor {
                 weight: Set(Some(node.weight as f64)),
                 is_partition: Set(node.is_partition),
                 belongs_to: Set(node.belongs_to.clone()),
+                datasource_id: Set(node.datasource),
                 attrs: Set(attrs),
                 created_at: Set(Utc::now()),
             };
@@ -375,6 +376,7 @@ impl DagExecutor {
                 label: Set(Some(edge.label.clone())),
                 layer: Set(Some(edge.layer.clone())),
                 weight: Set(Some(edge.weight as f64)),
+                datasource_id: Set(edge.datasource),
                 attrs: Set(attrs),
                 created_at: Set(Utc::now()),
             };
@@ -422,6 +424,7 @@ impl DagExecutor {
                     name: layer.label.clone(),
                     color,
                     properties: properties_json,
+                    datasource_id: layer.datasource,
                 },
             );
         }

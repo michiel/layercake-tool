@@ -97,6 +97,7 @@ async fn test_create_edit_with_sequence() {
             Some(serde_json::json!("Old Label")),
             Some(serde_json::json!("New Label")),
             None,
+            false,
         )
         .await
         .unwrap();
@@ -115,6 +116,7 @@ async fn test_create_edit_with_sequence() {
             Some(serde_json::json!("layer1")),
             Some(serde_json::json!("layer2")),
             None,
+            false,
         )
         .await
         .unwrap();
@@ -142,6 +144,7 @@ async fn test_get_edits_for_graph() {
                 Some(serde_json::json!(format!("Old {}", i))),
                 Some(serde_json::json!(format!("New {}", i))),
                 None,
+                false,
             )
             .await
             .unwrap();
@@ -175,6 +178,7 @@ async fn test_mark_edit_applied() {
             Some(serde_json::json!("Old Label")),
             Some(serde_json::json!("New Label")),
             None,
+            false,
         )
         .await
         .unwrap();
@@ -212,6 +216,7 @@ async fn test_clear_graph_edits() {
                 None,
                 Some(serde_json::json!({"label": format!("Node {}", i)})),
                 None,
+                false,
             )
             .await
             .unwrap();
@@ -253,6 +258,7 @@ async fn test_edit_count() {
                 None,
                 Some(serde_json::json!(i)),
                 None,
+                false,
             )
             .await
             .unwrap();
@@ -295,6 +301,7 @@ async fn test_graph_metadata_updated() {
             None,
             Some(serde_json::json!("test")),
             None,
+            false,
         )
         .await
         .unwrap();
@@ -333,6 +340,7 @@ async fn test_multiple_graphs_independent_sequences() {
                 None,
                 Some(serde_json::json!(i)),
                 None,
+                false,
             )
             .await
             .unwrap();
@@ -350,6 +358,7 @@ async fn test_multiple_graphs_independent_sequences() {
                 None,
                 Some(serde_json::json!(i)),
                 None,
+                false,
             )
             .await
             .unwrap();

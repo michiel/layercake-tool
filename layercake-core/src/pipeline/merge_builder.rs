@@ -350,6 +350,7 @@ impl MergeBuilder {
                 weight: Set(node_data.weight),
                 is_partition: Set(node_data.is_partition),
                 belongs_to: Set(node_data.belongs_to),
+                datasource_id: Set(node_data.datasource_id),
                 attrs: Set(node_data.attrs),
                 created_at: Set(chrono::Utc::now()),
             };
@@ -368,6 +369,7 @@ impl MergeBuilder {
                 label: Set(edge_data.label),
                 layer: Set(edge_data.layer),
                 weight: Set(edge_data.weight),
+                datasource_id: Set(edge_data.datasource_id),
                 attrs: Set(edge_data.attrs),
                 created_at: Set(chrono::Utc::now()),
             };
@@ -410,6 +412,7 @@ impl MergeBuilder {
                                 .filter(|s| !s.is_empty())
                                 .map(|s| s.to_string()),
                             attrs: Some(node_val.clone()),
+                            datasource_id: None,
                         };
 
                         all_nodes.insert(id, node);
@@ -440,6 +443,7 @@ impl MergeBuilder {
                             layer: edge_val["layer"].as_str().map(|s| s.to_string()),
                             weight: edge_val["weight"].as_f64(),
                             attrs: Some(edge_val.clone()),
+                            datasource_id: None,
                         };
 
                         all_edges.push(edge);
@@ -465,6 +469,7 @@ impl MergeBuilder {
                                 .filter(|s| !s.is_empty())
                                 .map(|s| s.to_string()),
                             attrs: Some(node_val.clone()),
+                            datasource_id: None,
                         };
 
                         all_nodes.insert(id, node);
@@ -494,6 +499,7 @@ impl MergeBuilder {
                             layer: edge_val["layer"].as_str().map(|s| s.to_string()),
                             weight: edge_val["weight"].as_f64(),
                             attrs: Some(edge_val.clone()),
+                            datasource_id: None,
                         };
 
                         all_edges.push(edge);
@@ -553,6 +559,7 @@ impl MergeBuilder {
                             name,
                             color,
                             properties: properties_json,
+                            datasource_id: None,
                         };
 
                         all_layers.insert(layer_id, layer);
@@ -592,6 +599,7 @@ impl MergeBuilder {
                     is_partition: node.is_partition,
                     belongs_to: node.belongs_to,
                     attrs: node.attrs,
+                    datasource_id: node.datasource_id,
                 },
             );
         }
@@ -611,6 +619,7 @@ impl MergeBuilder {
                 layer: edge.layer,
                 weight: edge.weight,
                 attrs: edge.attrs,
+                datasource_id: edge.datasource_id,
             });
         }
 
@@ -671,6 +680,7 @@ struct NodeData {
     is_partition: bool,
     belongs_to: Option<String>,
     attrs: Option<serde_json::Value>,
+    datasource_id: Option<i32>,
 }
 
 /// Internal edge data structure
@@ -682,6 +692,7 @@ struct EdgeData {
     layer: Option<String>,
     weight: Option<f64>,
     attrs: Option<serde_json::Value>,
+    datasource_id: Option<i32>,
 }
 
 // LayerData now imported from super::types (was previously defined here)

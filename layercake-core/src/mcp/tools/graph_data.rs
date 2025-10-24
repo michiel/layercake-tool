@@ -567,6 +567,7 @@ async fn upsert_node(
             is_partition: Set(is_partition),
             belongs_to: Set(belongs_to),
             attrs: Set(attrs),
+            datasource_id: Set(None),
             created_at: Set(Utc::now()),
         };
         node.insert(db).await?;
@@ -703,6 +704,7 @@ async fn upsert_edge(
             layer: Set(layer),
             weight: Set(weight),
             attrs: Set(attrs),
+            datasource_id: Set(None),
             created_at: Set(Utc::now()),
         };
         edge.insert(db).await?;

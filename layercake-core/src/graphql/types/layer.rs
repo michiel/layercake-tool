@@ -23,6 +23,7 @@ pub struct Layer {
     pub name: String,
     pub color: Option<String>,
     pub properties: Option<JSON>,
+    pub datasource_id: Option<i32>,
 }
 
 impl From<layers::Model> for Layer {
@@ -36,6 +37,7 @@ impl From<layers::Model> for Layer {
             name: model.name,
             color: model.color,
             properties,
+            datasource_id: model.datasource_id,
         }
     }
 }
