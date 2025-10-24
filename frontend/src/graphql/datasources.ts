@@ -66,6 +66,28 @@ export const CREATE_DATASOURCE_FROM_FILE = gql`
   }
 `
 
+// Mutation to create a new empty DataSource (without file upload)
+export const CREATE_EMPTY_DATASOURCE = gql`
+  mutation CreateEmptyDataSource($input: CreateEmptyDataSourceInput!) {
+    createEmptyDataSource(input: $input) {
+      id
+      projectId
+      name
+      description
+      fileFormat
+      dataType
+      filename
+      graphJson
+      status
+      errorMessage
+      fileSize
+      processedAt
+      createdAt
+      updatedAt
+    }
+  }
+`
+
 // Mutation to bulk upload multiple DataSources with auto-detection
 export const BULK_UPLOAD_DATASOURCES = gql`
   mutation BulkUploadDataSources($projectId: Int!, $files: [BulkUploadDataSourceInput!]!) {
@@ -261,6 +283,13 @@ export interface CreateDataSourceInput {
   filename: string
   fileContent: string // Base64 encoded file content
   fileFormat: FileFormat
+  dataType: DataType
+}
+
+export interface CreateEmptyDataSourceInput {
+  projectId: number
+  name: string
+  description?: string
   dataType: DataType
 }
 

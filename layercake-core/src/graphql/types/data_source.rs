@@ -120,6 +120,16 @@ pub struct CreateDataSourceInput {
 }
 
 #[derive(InputObject)]
+pub struct CreateEmptyDataSourceInput {
+    #[graphql(name = "projectId")]
+    pub project_id: i32,
+    pub name: String,
+    pub description: Option<String>,
+    #[graphql(name = "dataType")]
+    pub data_type: DataSourceDataType,
+}
+
+#[derive(InputObject)]
 pub struct UpdateDataSourceInput {
     pub name: Option<String>,
     pub description: Option<String>,

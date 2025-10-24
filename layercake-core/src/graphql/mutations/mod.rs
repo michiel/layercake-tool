@@ -32,12 +32,12 @@ use crate::graphql::types::plan_dag::{
 };
 use crate::graphql::types::project::{CreateProjectInput, Project, UpdateProjectInput};
 use crate::graphql::types::{
-    BulkUploadDataSourceInput, CreateDataSourceInput, CreateLibrarySourceInput, DataSource,
-    ExportDataSourcesInput, ExportDataSourcesResult, ImportDataSourcesInput,
-    ImportDataSourcesResult, ImportLibrarySourcesInput, InviteCollaboratorInput, LibrarySource,
-    LoginInput, LoginResponse, ProjectCollaborator, RegisterResponse, RegisterUserInput,
-    UpdateCollaboratorRoleInput, UpdateDataSourceInput, UpdateLibrarySourceInput, UpdateUserInput,
-    User,
+    BulkUploadDataSourceInput, CreateDataSourceInput, CreateEmptyDataSourceInput,
+    CreateLibrarySourceInput, DataSource, ExportDataSourcesInput, ExportDataSourcesResult,
+    ImportDataSourcesInput, ImportDataSourcesResult, ImportLibrarySourcesInput,
+    InviteCollaboratorInput, LibrarySource, LoginInput, LoginResponse, ProjectCollaborator,
+    RegisterResponse, RegisterUserInput, UpdateCollaboratorRoleInput, UpdateDataSourceInput,
+    UpdateLibrarySourceInput, UpdateUserInput, User,
 };
 
 pub struct Mutation;
@@ -1489,6 +1489,114 @@ impl Mutation {
         let config_json = serde_json::to_string(&serde_json::json!({
             "dataSourceId": data_source.id,
             "filename": input.filename,
+            "dataType": data_source.data_type.to_lowercase()
+        }))?;
+
+        let dag_node = plan_dag_nodes::ActiveModel {
+            id: Set(node_id.clone()),
+            plan_id: Set(plan.id),
+            node_type: Set("DataSourceNode".to_string()),
+            position_x: Set(position_x),
+            position_y: Set(position_y),
+            source_position: Set(None),
+            target_position: Set(None),
+            metadata_json: Set(metadata_json),
+            config_json: Set(config_json),
+            created_at: Set(Utc::now()),
+            updated_at: Set(Utc::now()),
+        };
+
+        let inserted_node = dag_node.insert(&context.db).await?;
+        let result_node = PlanDagNode::from(inserted_node);
+
+        // Generate JSON Patch delta for node addition
+        let patch_op = plan_dag_delta::generate_node_add_patch(&result_node, node_index);
+
+        // Increment plan version
+        let new_version = plan_dag_delta::increment_plan_version(&context.db, plan.id).await?;
+
+        // Broadcast delta event
+        let user_id = "demo_user".to_string(); // TODO: Get from auth context
+        plan_dag_delta::publish_plan_dag_delta(
+            input.project_id,
+            new_version,
+            user_id,
+            vec![patch_op],
+        )
+        .await
+        .ok(); // Non-fatal if broadcast fails
+
+        Ok(DataSource::from(data_source))
+    }
+
+    /// Create a new empty DataSource (without file upload)
+    async fn create_empty_data_source(
+        &self,
+        ctx: &Context<'_>,
+        input: CreateEmptyDataSourceInput,
+    ) -> Result<DataSource> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let data_source_service = DataSourceService::new(context.db.clone());
+
+        // Convert GraphQL enum to database enum
+        let data_type = input.data_type.into();
+
+        let data_source = data_source_service
+            .create_empty(
+                input.project_id,
+                input.name.clone(),
+                input.description,
+                data_type,
+            )
+            .await
+            .map_err(|e| Error::new(format!("Failed to create empty DataSource: {}", e)))?;
+
+        // Automatically add a DataSourceNode to the Plan DAG
+        let timestamp = chrono::Utc::now().timestamp_millis();
+        let node_id = format!("datasourcenode_{}_{:08x}", timestamp, data_source.id);
+
+        // Find or create a plan for this project
+        let plan = match plans::Entity::find()
+            .filter(plans::Column::ProjectId.eq(input.project_id))
+            .one(&context.db)
+            .await?
+        {
+            Some(plan) => plan,
+            None => {
+                // Auto-create a plan if one doesn't exist
+                let now = chrono::Utc::now();
+                let new_plan = plans::ActiveModel {
+                    id: sea_orm::ActiveValue::NotSet,
+                    project_id: Set(input.project_id),
+                    name: Set(format!("Plan for Project {}", input.project_id)),
+                    yaml_content: Set("".to_string()),
+                    dependencies: Set(None),
+                    status: Set("draft".to_string()),
+                    version: Set(1),
+                    created_at: Set(now),
+                    updated_at: Set(now),
+                };
+                new_plan.insert(&context.db).await?
+            }
+        };
+
+        // Fetch current state to determine node index and position
+        let (current_nodes, _) =
+            plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
+        let node_index = current_nodes.len();
+
+        // Calculate position: stack vertically with some spacing
+        let position_x = 100.0;
+        let position_y = 100.0 + (node_index as f64 * 120.0);
+
+        // Create the DAG node metadata and config
+        let metadata_json = serde_json::to_string(&serde_json::json!({
+            "label": input.name
+        }))?;
+
+        let config_json = serde_json::to_string(&serde_json::json!({
+            "dataSourceId": data_source.id,
+            "filename": data_source.filename,
             "dataType": data_source.data_type.to_lowercase()
         }))?;
 

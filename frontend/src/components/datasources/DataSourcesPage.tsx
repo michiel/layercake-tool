@@ -30,20 +30,17 @@ import {
   IconClock,
   IconX,
   IconFileExport,
-  IconFileUpload,
   IconBooks
 } from '@tabler/icons-react'
 import { useQuery as useProjectsQuery } from '@apollo/client/react'
 import { Breadcrumbs } from '../common/Breadcrumbs'
 import { DataSourceUploader } from './DataSourceUploader'
-import { BulkDataSourceUploader } from './BulkDataSourceUploader'
 import PageContainer from '../layout/PageContainer'
 import {
   GET_DATASOURCES,
   DELETE_DATASOURCE,
   REPROCESS_DATASOURCE,
   EXPORT_DATASOURCES,
-  IMPORT_DATASOURCES,
   DataSource,
   formatFileSize,
   getFileFormatDisplayName,
@@ -80,10 +77,8 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [selectedDataSource, setSelectedDataSource] = useState<DataSource | null>(null)
   const [uploaderOpen, setUploaderOpen] = useState(false)
-  const [bulkUploaderOpen, setBulkUploaderOpen] = useState(false)
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set())
   const [exportFormatModalOpen, setExportFormatModalOpen] = useState(false)
-  const [importModalOpen, setImportModalOpen] = useState(false)
   const [libraryImportModalOpen, setLibraryImportModalOpen] = useState(false)
   const [selectedLibraryRows, setSelectedLibraryRows] = useState<Set<number>>(new Set())
   const [librarySelectionError, setLibrarySelectionError] = useState<string | null>(null)
@@ -127,7 +122,6 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
   const [deleteDataSource, { loading: deleteLoading }] = useMutation(DELETE_DATASOURCE)
   const [reprocessDataSource, { loading: reprocessLoading }] = useMutation(REPROCESS_DATASOURCE)
   const [exportDataSources] = useMutation(EXPORT_DATASOURCES)
-  const [importDataSources] = useMutation(IMPORT_DATASOURCES)
   const [importLibrarySources, { loading: libraryImportLoading, error: libraryImportError }] =
     useMutation(IMPORT_LIBRARY_SOURCES)
 
@@ -150,10 +144,6 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
 
   const handleCreateNew = () => {
     setUploaderOpen(true)
-  }
-
-  const handleBulkUpload = () => {
-    setBulkUploaderOpen(true)
   }
 
   const handleEdit = (dataSource: DataSource) => {
@@ -342,58 +332,6 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
     }
   }
 
-  const handleImportClick = () => {
-    setImportModalOpen(true)
-  }
-
-  const handleImport = async (file: File) => {
-    console.log('Importing file:', file.name)
-
-    try {
-      // Read file as ArrayBuffer then convert to base64
-      const reader = new FileReader()
-      reader.onload = async (e) => {
-        const arrayBuffer = e.target?.result as ArrayBuffer
-
-        // Convert ArrayBuffer to base64
-        const bytes = new Uint8Array(arrayBuffer)
-        let binary = ''
-        for (let i = 0; i < bytes.byteLength; i++) {
-          binary += String.fromCharCode(bytes[i])
-        }
-        const base64 = btoa(binary)
-
-        console.log('File read successfully, size:', arrayBuffer.byteLength, 'bytes')
-
-        const result = await importDataSources({
-          variables: {
-            input: {
-              projectId: projectNumericId,
-              fileContent: base64,
-              filename: file.name
-            }
-          }
-        })
-
-        const data = (result.data as any)?.importDataSources
-        if (data) {
-          console.log(`Imported: ${data.createdCount} created, ${data.updatedCount} updated`)
-          await refetchDataSources()
-          const message = `Successfully imported datasources:\n` +
-            `• ${data.createdCount} created\n` +
-            `• ${data.updatedCount} updated`
-          alert(message)
-          setImportModalOpen(false)
-        }
-      }
-      reader.readAsArrayBuffer(file)
-    } catch (error) {
-      console.error('Failed to import datasources:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      alert(`Failed to import datasources: ${errorMessage}`)
-    }
-  }
-
   const getStatusIcon = (status: DataSource['status']) => {
     switch (status) {
       case 'active':
@@ -445,13 +383,6 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
               Export ({selectedRows.size})
             </Button>
             <Button
-              leftSection={<IconFileUpload size={16} />}
-              onClick={handleImportClick}
-              variant="light"
-            >
-              Import
-            </Button>
-            <Button
               leftSection={<IconBooks size={16} />}
               onClick={handleOpenLibraryImport}
               variant="light"
@@ -461,15 +392,8 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
             <Button
               leftSection={<IconPlus size={16} />}
               onClick={handleCreateNew}
-              variant="light"
             >
-              Upload Single File
-            </Button>
-            <Button
-              leftSection={<IconPlus size={16} />}
-              onClick={handleBulkUpload}
-            >
-              Bulk Upload
+              New
             </Button>
           </Group>
         </Group>
@@ -500,7 +424,7 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
                   leftSection={<IconPlus size={16} />}
                   onClick={handleCreateNew}
                 >
-                  Upload First Data Source
+                  Create First Data Source
                 </Button>
               </div>
             </Stack>
@@ -798,19 +722,8 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
         projectId={projectNumericId}
         opened={uploaderOpen}
         onClose={() => setUploaderOpen(false)}
-        onSuccess={(dataSource) => {
-          console.log('DataSource created:', dataSource)
-          refetchDataSources()
-        }}
-      />
-
-      {/* Bulk DataSource Uploader Modal */}
-      <BulkDataSourceUploader
-        projectId={projectNumericId}
-        opened={bulkUploaderOpen}
-        onClose={() => setBulkUploaderOpen(false)}
         onSuccess={() => {
-          console.log('Bulk upload completed')
+          console.log('DataSource created')
           refetchDataSources()
         }}
       />
@@ -842,37 +755,6 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
             Export as ODS (OpenDocument)
           </Button>
         </Stack>
-      </Modal>
-
-      {/* Import Data Sources Modal */}
-      <Modal
-        opened={importModalOpen}
-        onClose={() => setImportModalOpen(false)}
-        title="Import Data Sources"
-      >
-        <Text mb="md">
-          Upload an XLSX or ODS file containing data sources. Each sheet will be imported as a data source.
-          If a sheet name matches an existing data source name in this project, it will update that data source.
-          Otherwise, a new data source will be created.
-        </Text>
-
-        <input
-          type="file"
-          accept=".xlsx,.ods"
-          onChange={(e) => {
-            const file = e.target.files?.[0]
-            if (file) {
-              handleImport(file)
-            }
-          }}
-          style={{ marginBottom: '1rem' }}
-        />
-
-        <Group justify="flex-end" gap="sm">
-          <Button variant="light" onClick={() => setImportModalOpen(false)}>
-            Cancel
-          </Button>
-        </Group>
       </Modal>
     </>
   )

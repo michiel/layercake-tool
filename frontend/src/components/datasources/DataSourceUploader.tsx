@@ -14,7 +14,10 @@ import {
   Progress,
   ActionIcon,
   Center,
-  Select
+  Select,
+  Tabs,
+  FileButton,
+  List
 } from '@mantine/core'
 import {
   IconUpload,
@@ -30,7 +33,12 @@ import { useForm } from '@mantine/form'
 // Note: Using simple file input instead of dropzone for now
 import {
   CREATE_DATASOURCE_FROM_FILE,
+  CREATE_EMPTY_DATASOURCE,
+  BULK_UPLOAD_DATASOURCES,
+  IMPORT_DATASOURCES,
   CreateDataSourceInput,
+  CreateEmptyDataSourceInput,
+  BulkUploadDataSourceInput,
   FileFormat,
   DataType,
   getFileFormatDisplayName,
@@ -48,7 +56,7 @@ interface DataSourceUploaderProps {
   mode?: 'project' | 'library'
   opened: boolean
   onClose: () => void
-  onSuccess?: (dataSource: any) => void
+  onSuccess?: () => void
 }
 
 interface FileInfo {
@@ -58,6 +66,12 @@ interface FileInfo {
   preview?: string
 }
 
+interface BulkFileWithData {
+  file: File
+  name: string
+  base64: string
+}
+
 export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
   projectId,
   mode = 'project',
@@ -65,20 +79,40 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
   onClose,
   onSuccess
 }) => {
+  const [activeTab, setActiveTab] = useState<string>('upload')
   const [selectedFile, setSelectedFile] = useState<FileInfo | null>(null)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [previewData, setPreviewData] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // State for bulk upload
+  const [bulkFiles, setBulkFiles] = useState<BulkFileWithData[]>([])
+
+  // State for import sheet
+  const [importFile, setImportFile] = useState<File | null>(null)
+
   const [createDataSource, { loading: createLoading, error: createError }] = useMutation(
     CREATE_DATASOURCE_FROM_FILE
   )
+  const [createEmptyDataSource, { loading: createEmptyLoading, error: createEmptyError }] = useMutation(
+    CREATE_EMPTY_DATASOURCE
+  )
   const [createLibrarySource, { loading: createLibraryLoading, error: createLibraryError }] =
     useMutation(CREATE_LIBRARY_SOURCE)
+  const [bulkUploadDataSources, { loading: bulkLoading, error: bulkError }] = useMutation(
+    BULK_UPLOAD_DATASOURCES
+  )
+  const [importDataSources, { loading: importLoading, error: importError }] = useMutation(
+    IMPORT_DATASOURCES
+  )
 
   const isLibraryMode = mode === 'library'
-  const mutationLoading = isLibraryMode ? createLibraryLoading : createLoading
-  const mutationError = isLibraryMode ? createLibraryError : createError
+  const mutationLoading = isLibraryMode
+    ? createLibraryLoading
+    : (activeTab === 'empty' ? createEmptyLoading : activeTab === 'bulk' ? bulkLoading : activeTab === 'import' ? importLoading : createLoading)
+  const mutationError = isLibraryMode
+    ? createLibraryError
+    : (activeTab === 'empty' ? createEmptyError : activeTab === 'bulk' ? bulkError : activeTab === 'import' ? importError : createError)
 
   const form = useForm({
     initialValues: {
@@ -92,8 +126,13 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
     }
   })
 
-  // Get available data types based on file format
+  // Get available data types based on file format or active tab
   const getAvailableDataTypes = (format: FileFormat | null): DataType[] => {
+    if (activeTab === 'empty') {
+      // For empty datasources, all types are available
+      return [DataType.NODES, DataType.EDGES, DataType.LAYERS, DataType.GRAPH]
+    }
+
     if (!format) return []
     if (format === FileFormat.CSV || format === FileFormat.TSV) {
       return [DataType.NODES, DataType.EDGES, DataType.LAYERS]
@@ -166,6 +205,28 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
     }
   }
 
+  // Handlers for bulk upload
+  const handleBulkFilesSelected = async (selectedFiles: File[]) => {
+    const newFiles: BulkFileWithData[] = []
+
+    for (const file of selectedFiles) {
+      const base64 = await fileToBase64(file)
+      const name = file.name.replace(/\.[^/.]+$/, '')
+
+      newFiles.push({
+        file,
+        name,
+        base64
+      })
+    }
+
+    setBulkFiles([...bulkFiles, ...newFiles])
+  }
+
+  const handleRemoveBulkFile = (index: number) => {
+    setBulkFiles(bulkFiles.filter((_, i) => i !== index))
+  }
+
   // Convert file to base64
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -182,54 +243,124 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
   }
 
   const handleSubmit = async (values: { name: string; description: string; dataType: string }) => {
-    if (!selectedFile || !selectedFile.format) return
-
     try {
       setUploadProgress(10)
 
-      // Convert file to base64
-      const fileContent = await fileToBase64(selectedFile.file)
-      setUploadProgress(30)
-
-      setUploadProgress(50)
-
-      let createdRecord: any = null
-
-      if (isLibraryMode) {
-        const input: CreateLibrarySourceInput = {
-          name: values.name,
-          description: values.description || undefined,
-          filename: selectedFile.file.name,
-          fileContent,
-          fileFormat: selectedFile.format,
-          dataType: values.dataType as DataType
+      if (activeTab === 'bulk') {
+        // Handle bulk upload
+        if (projectId === undefined) {
+          throw new Error('projectId is required to create project data sources')
         }
 
-        const result = await createLibrarySource({
-          variables: { input }
+        if (bulkFiles.length === 0) return
+
+        const filesInput: BulkUploadDataSourceInput[] = bulkFiles.map(f => ({
+          name: f.name,
+          description: `Uploaded from ${f.file.name}`,
+          filename: f.file.name,
+          fileContent: f.base64
+        }))
+
+        setUploadProgress(50)
+
+        await bulkUploadDataSources({
+          variables: {
+            projectId,
+            files: filesInput
+          }
         })
 
-        createdRecord = (result.data as any)?.createLibrarySource || null
-      } else {
+        setBulkFiles([])
+      } else if (activeTab === 'import') {
+        // Handle import from spreadsheet
+        if (projectId === undefined) {
+          throw new Error('projectId is required to import data sources')
+        }
+
+        if (!importFile) return
+
+        // Read file as base64
+        const arrayBuffer = await importFile.arrayBuffer()
+        const bytes = new Uint8Array(arrayBuffer)
+        let binary = ''
+        for (let i = 0; i < bytes.byteLength; i++) {
+          binary += String.fromCharCode(bytes[i])
+        }
+        const base64 = btoa(binary)
+
+        setUploadProgress(50)
+
+        await importDataSources({
+          variables: {
+            input: {
+              projectId,
+              fileContent: base64,
+              filename: importFile.name
+            }
+          }
+        })
+
+        setImportFile(null)
+      } else if (activeTab === 'empty') {
+        // Create empty datasource
         if (projectId === undefined) {
           throw new Error('projectId is required to create a project data source')
         }
 
-        const input: CreateDataSourceInput = {
+        const input: CreateEmptyDataSourceInput = {
           projectId,
           name: values.name,
           description: values.description || undefined,
-          filename: selectedFile.file.name,
-          fileContent,
-          fileFormat: selectedFile.format,
           dataType: values.dataType as DataType
         }
 
-        const result = await createDataSource({
+        setUploadProgress(50)
+
+        await createEmptyDataSource({
           variables: { input }
         })
+      } else {
+        // Upload single file
+        if (!selectedFile || !selectedFile.format) return
 
-        createdRecord = (result.data as any)?.createDataSourceFromFile || null
+        // Convert file to base64
+        const fileContent = await fileToBase64(selectedFile.file)
+        setUploadProgress(30)
+
+        setUploadProgress(50)
+
+        if (isLibraryMode) {
+          const input: CreateLibrarySourceInput = {
+            name: values.name,
+            description: values.description || undefined,
+            filename: selectedFile.file.name,
+            fileContent,
+            fileFormat: selectedFile.format,
+            dataType: values.dataType as DataType
+          }
+
+          await createLibrarySource({
+            variables: { input }
+          })
+        } else {
+          if (projectId === undefined) {
+            throw new Error('projectId is required to create a project data source')
+          }
+
+          const input: CreateDataSourceInput = {
+            projectId,
+            name: values.name,
+            description: values.description || undefined,
+            filename: selectedFile.file.name,
+            fileContent,
+            fileFormat: selectedFile.format,
+            dataType: values.dataType as DataType
+          }
+
+          await createDataSource({
+            variables: { input }
+          })
+        }
       }
 
       setUploadProgress(100)
@@ -238,15 +369,17 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
       form.reset()
       setSelectedFile(null)
       setPreviewData(null)
+      setBulkFiles([])
+      setImportFile(null)
       setUploadProgress(0)
 
-      if (onSuccess && createdRecord) {
-        onSuccess(createdRecord)
+      if (onSuccess) {
+        onSuccess()
       }
 
       onClose()
     } catch (error) {
-      console.error('Upload failed:', error)
+      console.error('Operation failed:', error)
       setUploadProgress(0)
       // Error will surface through mutationError
     }
@@ -257,7 +390,10 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
     form.reset()
     setSelectedFile(null)
     setPreviewData(null)
+    setBulkFiles([])
+    setImportFile(null)
     setUploadProgress(0)
+    setActiveTab('upload')
     onClose()
   }
 
@@ -274,9 +410,327 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
     }
   }
 
+  // Render functions for each tab
+  const renderUploadTab = () => {
+    if (!selectedFile) {
+      return (
+        <>
+          <Card
+            withBorder
+            style={{
+              minHeight: 220,
+              cursor: 'pointer',
+              borderStyle: 'dashed',
+              borderWidth: '2px'
+            }}
+            onClick={handleManualFileSelect}
+          >
+            <Group justify="center" gap="xl" style={{ minHeight: 180 }}>
+              <IconCloudUpload size={52} stroke={1.5} />
+              <div>
+                <Text size="xl" inline>
+                  Click to select file
+                </Text>
+                <Text size="sm" c="dimmed" inline mt={7}>
+                  Upload CSV, TSV, or JSON file for your data source
+                </Text>
+              </div>
+            </Group>
+          </Card>
+          <Center>
+            <Text size="sm" c="dimmed">or</Text>
+          </Center>
+          <Button
+            variant="light"
+            fullWidth
+            leftSection={<IconFile size={16} />}
+            onClick={handleManualFileSelect}
+          >
+            Choose File from Computer
+          </Button>
+        </>
+      )
+    }
+
+    return (
+      <>
+        <Card withBorder>
+          <Group justify="space-between" align="flex-start">
+            <Group>
+              {getFileIcon(selectedFile.format)}
+              <div>
+                <Text fw={500}>{selectedFile.file.name}</Text>
+                <Group gap="xs" mt="xs">
+                  <Badge
+                    variant="light"
+                    color={isValidFileFormat ? 'blue' : 'red'}
+                    size="sm"
+                  >
+                    {isValidFileFormat && selectedFile.format
+                      ? getFileFormatDisplayName(selectedFile.format)
+                      : 'Unknown Format'
+                    }
+                  </Badge>
+                  <Text size="sm" c="dimmed">
+                    {formatFileSize(selectedFile.file.size)}
+                  </Text>
+                </Group>
+              </div>
+            </Group>
+            <ActionIcon
+              variant="subtle"
+              color="red"
+              onClick={handleRemoveFile}
+            >
+              <IconX size={16} />
+            </ActionIcon>
+          </Group>
+
+          {!isValidFileFormat && (
+            <Alert
+              icon={<IconAlertCircle size={16} />}
+              title="Unsupported File Format"
+              color="orange"
+              mt="md"
+            >
+              Please upload a CSV (.csv), TSV (.tsv), or JSON (.json) file.
+            </Alert>
+          )}
+
+          {previewData && isValidFileFormat && (
+            <div style={{ marginTop: '12px' }}>
+              <Text size="sm" fw={500} mb="xs">Preview:</Text>
+              <Text
+                size="xs"
+                ff="monospace"
+                style={{
+                  backgroundColor: 'var(--mantine-color-gray-0)',
+                  padding: '8px',
+                  borderRadius: '4px',
+                  whiteSpace: 'pre-wrap',
+                  maxHeight: '120px',
+                  overflow: 'auto'
+                }}
+              >
+                {previewData}
+              </Text>
+            </div>
+          )}
+        </Card>
+
+        {isValidFileFormat && (
+          <>
+            <Select
+              label="Data Type"
+              placeholder="Select what kind of data this file contains"
+              required
+              data={availableDataTypes.map(type => ({
+                value: type,
+                label: getDataTypeDisplayName(type)
+              }))}
+              {...form.getInputProps('dataType')}
+              description={
+                selectedFile?.format === FileFormat.JSON
+                  ? 'JSON files must contain a complete graph structure'
+                  : 'Choose whether this file contains nodes, edges, or layers'
+              }
+            />
+
+            <TextInput
+              label="Name"
+              placeholder="Enter a name for this data source"
+              required
+              {...form.getInputProps('name')}
+            />
+
+            <Textarea
+              label="Description"
+              placeholder="Optional description of what this data contains"
+              rows={3}
+              {...form.getInputProps('description')}
+            />
+          </>
+        )}
+      </>
+    )
+  }
+
+  const renderEmptyTab = () => {
+    return (
+      <>
+        <Alert icon={<IconAlertCircle size={16} />} color="blue" mb="md">
+          Create an empty data source that can be filled with data using the graph editor.
+        </Alert>
+
+        <Select
+          label="Data Type"
+          placeholder="Select what kind of data this will contain"
+          required
+          data={availableDataTypes.map(type => ({
+            value: type,
+            label: getDataTypeDisplayName(type)
+          }))}
+          {...form.getInputProps('dataType')}
+          description="Choose what type of data this datasource will contain"
+        />
+
+        <TextInput
+          label="Name"
+          placeholder="Enter a name for this data source"
+          required
+          {...form.getInputProps('name')}
+        />
+
+        <Textarea
+          label="Description"
+          placeholder="Optional description of what this data will contain"
+          rows={3}
+          {...form.getInputProps('description')}
+        />
+      </>
+    )
+  }
+
+  const renderImportTab = () => {
+    return (
+      <>
+        <Alert icon={<IconAlertCircle size={16} />} color="blue" mb="md">
+          Upload an XLSX or ODS file containing data sources. Each sheet will be imported as a data source.
+          If a sheet name matches an existing data source, it will be updated.
+        </Alert>
+
+        <FileButton
+          onChange={setImportFile}
+          accept=".xlsx,.ods"
+        >
+          {(props) => (
+            <Button
+              {...props}
+              leftSection={<IconUpload size={16} />}
+              variant="light"
+              fullWidth
+            >
+              Select Spreadsheet File (.xlsx or .ods)
+            </Button>
+          )}
+        </FileButton>
+
+        {importFile && (
+          <Card withBorder>
+            <Group justify="space-between">
+              <div>
+                <Text fw={500}>{importFile.name}</Text>
+                <Text size="sm" c="dimmed">{formatFileSize(importFile.size)}</Text>
+              </div>
+              <ActionIcon
+                variant="subtle"
+                color="red"
+                onClick={() => setImportFile(null)}
+              >
+                <IconX size={16} />
+              </ActionIcon>
+            </Group>
+          </Card>
+        )}
+      </>
+    )
+  }
+
+  const renderBulkTab = () => {
+    const totalSize = bulkFiles.reduce((sum, f) => sum + f.file.size, 0)
+
+    return (
+      <>
+        <Alert icon={<IconAlertCircle size={16} />} color="blue" mb="md">
+          Upload multiple CSV, TSV, or JSON files at once. File types will be automatically detected.
+        </Alert>
+
+        <FileButton
+          onChange={handleBulkFilesSelected}
+          accept=".csv,.tsv,.json"
+          multiple
+        >
+          {(props) => (
+            <Button
+              {...props}
+              leftSection={<IconUpload size={16} />}
+              variant="light"
+              fullWidth
+              disabled={mutationLoading}
+            >
+              Select Files
+            </Button>
+          )}
+        </FileButton>
+
+        {bulkFiles.length > 0 && (
+          <>
+            <Alert icon={<IconCheck size={16} />} color="blue">
+              {bulkFiles.length} file{bulkFiles.length > 1 ? 's' : ''} selected ({formatFileSize(totalSize)})
+            </Alert>
+
+            <List spacing="xs" size="sm">
+              {bulkFiles.map((fileData, index) => (
+                <List.Item key={index}>
+                  <Group justify="space-between">
+                    <div>
+                      <Text size="sm" fw={500}>{fileData.name}</Text>
+                      <Group gap="xs">
+                        <Text size="xs" c="dimmed">{fileData.file.name}</Text>
+                        <Badge size="xs" variant="light">
+                          {formatFileSize(fileData.file.size)}
+                        </Badge>
+                      </Group>
+                    </div>
+                    <ActionIcon
+                      color="red"
+                      variant="subtle"
+                      onClick={() => handleRemoveBulkFile(index)}
+                      disabled={mutationLoading}
+                    >
+                      <IconX size={16} />
+                    </ActionIcon>
+                  </Group>
+                </List.Item>
+              ))}
+            </List>
+          </>
+        )}
+
+        {bulkFiles.length === 0 && (
+          <Alert icon={<IconAlertCircle size={16} />} color="gray">
+            No files selected. Click "Select Files" to choose files to upload.
+          </Alert>
+        )}
+      </>
+    )
+  }
+
   const isValidFileFormat = selectedFile?.format !== null
-  const availableDataTypes = selectedFile ? getAvailableDataTypes(selectedFile.format) : []
-  const modalTitle = isLibraryMode ? 'Add Library Source' : 'Upload Data Source'
+  const availableDataTypes = activeTab === 'empty'
+    ? getAvailableDataTypes(null)
+    : (selectedFile ? getAvailableDataTypes(selectedFile.format) : [])
+  const modalTitle = isLibraryMode ? 'Add Library Source' : 'New Data Source'
+
+  // Determine if submit should be disabled
+  const isSubmitDisabled = () => {
+    if (mutationLoading) return true
+    if (activeTab === 'upload') return !selectedFile || !isValidFileFormat
+    if (activeTab === 'empty') return false
+    if (activeTab === 'bulk') return bulkFiles.length === 0
+    if (activeTab === 'import') return !importFile
+    return false
+  }
+
+  // Determine submit button text
+  const getSubmitButtonText = () => {
+    if (uploadProgress === 100) return 'Complete!'
+    if (activeTab === 'upload') return 'Upload Data Source'
+    if (activeTab === 'empty') return 'Create Data Source'
+    if (activeTab === 'bulk') return `Upload ${bulkFiles.length} File${bulkFiles.length !== 1 ? 's' : ''}`
+    if (activeTab === 'import') return 'Import Data Sources'
+    return 'Submit'
+  }
 
   return (
     <>
@@ -284,158 +738,49 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
         opened={opened}
         onClose={handleClose}
         title={modalTitle}
-        size="lg"
+        size="xl"
       >
         <form onSubmit={form.onSubmit(handleSubmit)}>
           <Stack gap="md">
-            {/* File Upload Area */}
-            {!selectedFile ? (
-              <>
-                <Card
-                  withBorder
-                  style={{
-                    minHeight: 220,
-                    cursor: 'pointer',
-                    borderStyle: 'dashed',
-                    borderWidth: '2px'
-                  }}
-                  onClick={handleManualFileSelect}
-                >
-                  <Group justify="center" gap="xl" style={{ minHeight: 180 }}>
-                    <IconCloudUpload size={52} stroke={1.5} />
-                    <div>
-                      <Text size="xl" inline>
-                        Click to select files
-                      </Text>
-                      <Text size="sm" c="dimmed" inline mt={7}>
-                        Upload CSV, TSV, or JSON files for your data source
-                      </Text>
-                      <Text size="xs" c="dimmed" mt="md">
-                        Supported formats:
-                      </Text>
-                      <ul style={{ fontSize: '12px', color: 'var(--mantine-color-dimmed)', margin: '4px 0' }}>
-                        <li>CSV/TSV Nodes - id, label, layer, x, y, ...</li>
-                        <li>CSV/TSV Edges - id, source, target, label, ...</li>
-                        <li>CSV/TSV Layers - id, label, color, ...</li>
-                        <li>JSON Graph - {'{nodes: [], edges: [], layers: []}'}</li>
-                      </ul>
-                    </div>
-                  </Group>
-                </Card>
+            {/* Tabs - only show for project mode */}
+            {!isLibraryMode && (
+              <Tabs value={activeTab} onChange={(value) => {
+                setActiveTab(value || 'upload')
+                setSelectedFile(null)
+                setPreviewData(null)
+                form.setFieldValue('dataType', '')
+              }}>
+                <Tabs.List>
+                  <Tabs.Tab value="upload">Upload File</Tabs.Tab>
+                  <Tabs.Tab value="empty">Create Empty</Tabs.Tab>
+                  <Tabs.Tab value="import">Import Sheet</Tabs.Tab>
+                  <Tabs.Tab value="bulk">Bulk Import</Tabs.Tab>
+                </Tabs.List>
 
-                <Center>
-                  <Text size="sm" c="dimmed">or</Text>
-                </Center>
+                {/* Upload Tab */}
+                <Tabs.Panel value="upload" pt="md">
+                  {renderUploadTab()}
+                </Tabs.Panel>
 
-                <Button
-                  variant="light"
-                  fullWidth
-                  leftSection={<IconFile size={16} />}
-                  onClick={handleManualFileSelect}
-                >
-                  Choose File from Computer
-                </Button>
-              </>
-            ) : (
-              <Card withBorder>
-                <Group justify="space-between" align="flex-start">
-                  <Group>
-                    {getFileIcon(selectedFile.format)}
-                    <div>
-                      <Text fw={500}>{selectedFile.file.name}</Text>
-                      <Group gap="xs" mt="xs">
-                        <Badge
-                          variant="light"
-                          color={isValidFileFormat ? 'blue' : 'red'}
-                          size="sm"
-                        >
-                          {isValidFileFormat && selectedFile.format
-                            ? getFileFormatDisplayName(selectedFile.format)
-                            : 'Unknown Format'
-                          }
-                        </Badge>
-                        <Text size="sm" c="dimmed">
-                          {formatFileSize(selectedFile.file.size)}
-                        </Text>
-                      </Group>
-                    </div>
-                  </Group>
-                  <ActionIcon
-                    variant="subtle"
-                    color="red"
-                    onClick={handleRemoveFile}
-                  >
-                    <IconX size={16} />
-                  </ActionIcon>
-                </Group>
+                {/* Create Empty Tab */}
+                <Tabs.Panel value="empty" pt="md">
+                  {renderEmptyTab()}
+                </Tabs.Panel>
 
-                {!isValidFileFormat && (
-                  <Alert
-                    icon={<IconAlertCircle size={16} />}
-                    title="Unsupported File Format"
-                    color="orange"
-                    mt="md"
-                  >
-                    Please upload a CSV (.csv), TSV (.tsv), or JSON (.json) file.
-                  </Alert>
-                )}
+                {/* Import Sheet Tab */}
+                <Tabs.Panel value="import" pt="md">
+                  {renderImportTab()}
+                </Tabs.Panel>
 
-                {previewData && isValidFileFormat && (
-                  <div style={{ marginTop: '12px' }}>
-                    <Text size="sm" fw={500} mb="xs">Preview:</Text>
-                    <Text
-                      size="xs"
-                      ff="monospace"
-                      style={{
-                        backgroundColor: 'var(--mantine-color-gray-0)',
-                        padding: '8px',
-                        borderRadius: '4px',
-                        whiteSpace: 'pre-wrap',
-                        maxHeight: '120px',
-                        overflow: 'auto'
-                      }}
-                    >
-                      {previewData}
-                    </Text>
-                  </div>
-                )}
-              </Card>
+                {/* Bulk Import Tab */}
+                <Tabs.Panel value="bulk" pt="md">
+                  {renderBulkTab()}
+                </Tabs.Panel>
+              </Tabs>
             )}
 
-            {/* Form Fields */}
-            {selectedFile && isValidFileFormat && (
-              <>
-                <Select
-                  label="Data Type"
-                  placeholder="Select what kind of data this file contains"
-                  required
-                  data={availableDataTypes.map(type => ({
-                    value: type,
-                    label: getDataTypeDisplayName(type)
-                  }))}
-                  {...form.getInputProps('dataType')}
-                  description={
-                    selectedFile.format === FileFormat.JSON
-                      ? 'JSON files must contain a complete graph structure'
-                      : 'Choose whether this file contains nodes, edges, or layers'
-                  }
-                />
-
-                <TextInput
-                  label="Name"
-                  placeholder="Enter a name for this data source"
-                  required
-                  {...form.getInputProps('name')}
-                />
-
-                <Textarea
-                  label="Description"
-                  placeholder="Optional description of what this data contains"
-                  rows={3}
-                  {...form.getInputProps('description')}
-                />
-              </>
-            )}
+            {/* Library mode UI (simplified) */}
+            {isLibraryMode && renderUploadTab()}
 
             {/* Error Display */}
             {mutationError && (
@@ -461,10 +806,10 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
               <Button
                 type="submit"
                 loading={mutationLoading}
-                disabled={!selectedFile || !isValidFileFormat}
+                disabled={isSubmitDisabled()}
                 leftSection={uploadProgress === 100 ? <IconCheck size={16} /> : <IconUpload size={16} />}
               >
-                {uploadProgress === 100 ? 'Complete!' : 'Upload Data Source'}
+                {getSubmitButtonText()}
               </Button>
             </Group>
           </Stack>

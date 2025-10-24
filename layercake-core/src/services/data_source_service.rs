@@ -57,6 +57,48 @@ impl DataSourceService {
         .await
     }
 
+    /// Create a new empty DataSource without file data
+    pub async fn create_empty(
+        &self,
+        project_id: i32,
+        name: String,
+        description: Option<String>,
+        data_type: DataType,
+    ) -> Result<data_sources::Model> {
+        // Validate project exists
+        let _project = projects::Entity::find_by_id(project_id)
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| anyhow!("Project not found"))?;
+
+        // Create empty graph data based on data type
+        let empty_graph_json = match data_type {
+            DataType::Nodes => r#"{"nodes":[],"edges":[],"layers":[]}"#,
+            DataType::Edges => r#"{"nodes":[],"edges":[],"layers":[]}"#,
+            DataType::Layers => r#"{"nodes":[],"edges":[],"layers":[]}"#,
+            DataType::Graph => r#"{"nodes":[],"edges":[],"layers":[]}"#,
+        };
+
+        // Create DataSource record without file data
+        let data_source = data_sources::ActiveModel {
+            project_id: Set(project_id),
+            name: Set(name),
+            description: Set(description),
+            file_format: Set("json".to_string()), // Use JSON as default format for empty datasources
+            data_type: Set(data_type.as_str().to_string()),
+            filename: Set(format!("{}.json", chrono::Utc::now().timestamp())),
+            blob: Set(Vec::new()),
+            file_size: Set(0),
+            status: Set("active".to_string()),
+            graph_json: Set(empty_graph_json.to_string()),
+            processed_at: Set(Some(chrono::Utc::now())),
+            ..data_sources::ActiveModel::new()
+        };
+
+        let data_source = data_source.insert(&self.db).await?;
+        Ok(data_source)
+    }
+
     /// Create a new DataSource from uploaded file data
     pub async fn create_from_file(
         &self,
