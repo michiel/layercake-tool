@@ -352,6 +352,7 @@ impl MergeBuilder {
                 belongs_to: Set(node_data.belongs_to),
                 datasource_id: Set(node_data.datasource_id),
                 attrs: Set(node_data.attrs),
+                comment: Set(None),
                 created_at: Set(chrono::Utc::now()),
             };
 
@@ -371,6 +372,7 @@ impl MergeBuilder {
                 weight: Set(edge_data.weight),
                 datasource_id: Set(edge_data.datasource_id),
                 attrs: Set(edge_data.attrs),
+                comment: Set(None),
                 created_at: Set(chrono::Utc::now()),
             };
 
@@ -517,35 +519,34 @@ impl MergeBuilder {
 
                         let name = layer_val["label"].as_str().unwrap_or(&layer_id).to_string();
 
-                        let color = layer_val["color"]
+                        let background_color = layer_val["background_color"]
                             .as_str()
                             .filter(|s| !s.is_empty())
                             .map(|s| s.to_string());
 
-                        // Extract properties (background_color, border_color, text_color, etc.)
+                        let text_color = layer_val["text_color"]
+                            .as_str()
+                            .filter(|s| !s.is_empty())
+                            .map(|s| s.to_string());
+
+                        let border_color = layer_val["border_color"]
+                            .as_str()
+                            .filter(|s| !s.is_empty())
+                            .map(|s| s.to_string());
+
+                        let comment = layer_val["comment"]
+                            .as_str()
+                            .filter(|s| !s.is_empty())
+                            .map(|s| s.to_string());
+
+                        // Extract other properties
                         let mut properties = serde_json::Map::new();
-                        if let Some(bg) = layer_val["background_color"].as_str() {
-                            if !bg.is_empty() {
-                                properties.insert(
-                                    "background_color".to_string(),
-                                    serde_json::Value::String(bg.to_string()),
-                                );
-                            }
-                        }
-                        if let Some(border) = layer_val["border_color"].as_str() {
-                            if !border.is_empty() {
-                                properties.insert(
-                                    "border_color".to_string(),
-                                    serde_json::Value::String(border.to_string()),
-                                );
-                            }
-                        }
-                        if let Some(text) = layer_val["text_color"].as_str() {
-                            if !text.is_empty() {
-                                properties.insert(
-                                    "text_color".to_string(),
-                                    serde_json::Value::String(text.to_string()),
-                                );
+                        if let Some(obj) = layer_val.as_object() {
+                            for (key, value) in obj {
+                                // Skip fields that are now first-class fields
+                                if !matches!(key.as_str(), "id" | "label" | "background_color" | "text_color" | "border_color" | "comment") {
+                                    properties.insert(key.clone(), value.clone());
+                                }
                             }
                         }
 
@@ -557,7 +558,10 @@ impl MergeBuilder {
 
                         let layer = LayerData {
                             name,
-                            color,
+                            background_color,
+                            text_color,
+                            border_color,
+                            comment,
                             properties: properties_json,
                             datasource_id: None,
                         };
@@ -641,7 +645,7 @@ impl MergeBuilder {
     async fn clear_graph_data(&self, graph_id: i32) -> Result<()> {
         use crate::database::entities::graph_edges::{Column as EdgeColumn, Entity as EdgeEntity};
         use crate::database::entities::graph_nodes::{Column as NodeColumn, Entity as NodeEntity};
-        use crate::database::entities::layers::{Column as LayerColumn, Entity as LayerEntity};
+        use crate::database::entities::graph_layers::{Column as LayerColumn, Entity as LayerEntity};
         use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
         // Delete edges

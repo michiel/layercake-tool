@@ -15,12 +15,12 @@ const DEFAULT_GROUP_BORDER = '#999';
 const getLayerStyle = (layerId: string | undefined, layerMap: Map<string, Layer>) => {
   if (!layerId) return null;
   const layer = layerMap.get(layerId);
-  if (!layer?.properties) return null;
+  if (!layer) return null;
 
   return {
-    backgroundColor: layer.properties.background_color ? `#${layer.properties.background_color}` : null,
-    borderColor: layer.properties.border_color ? `#${layer.properties.border_color}` : null,
-    textColor: layer.properties.text_color ? `#${layer.properties.text_color}` : null,
+    backgroundColor: layer.backgroundColor ? `#${layer.backgroundColor}` : null,
+    borderColor: layer.borderColor ? `#${layer.borderColor}` : null,
+    textColor: layer.textColor ? `#${layer.textColor}` : null,
   };
 };
 

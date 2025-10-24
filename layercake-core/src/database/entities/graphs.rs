@@ -59,8 +59,8 @@ pub enum Relation {
     GraphEdges,
     #[sea_orm(has_many = "super::graph_edits::Entity")]
     GraphEdits,
-    #[sea_orm(has_many = "super::layers::Entity")]
-    Layers,
+    #[sea_orm(has_many = "super::graph_layers::Entity")]
+    GraphLayers,
 }
 
 impl Related<super::projects::Entity> for Entity {
@@ -93,9 +93,9 @@ impl Related<super::graph_edits::Entity> for Entity {
     }
 }
 
-impl Related<super::layers::Entity> for Entity {
+impl Related<super::graph_layers::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::Layers.def()
+        Relation::GraphLayers.def()
     }
 }
 

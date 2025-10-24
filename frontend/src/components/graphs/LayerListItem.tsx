@@ -24,14 +24,14 @@ export const LayerListItem: React.FC<LayerListItemProps> = ({
   const [borderPickerOpen, setBorderPickerOpen] = useState(false);
   const [textPickerOpen, setTextPickerOpen] = useState(false);
 
-  const backgroundColor = layer.properties?.background_color
-    ? `#${layer.properties.background_color}`
+  const backgroundColor = layer.backgroundColor
+    ? `#${layer.backgroundColor}`
     : '#f0f0f0';
-  const borderColor = layer.properties?.border_color
-    ? `#${layer.properties.border_color}`
+  const borderColor = layer.borderColor
+    ? `#${layer.borderColor}`
     : '#999';
-  const textColor = layer.properties?.text_color
-    ? `#${layer.properties.text_color}`
+  const textColor = layer.textColor
+    ? `#${layer.textColor}`
     : '#000';
 
   const handleColorChange = (colorType: 'background' | 'border' | 'text', color: string) => {

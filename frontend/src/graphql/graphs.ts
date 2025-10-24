@@ -4,13 +4,12 @@ export interface Layer {
   id: number;
   layerId: string;
   name: string;
-  color?: string;
-  properties?: {
-    background_color?: string;
-    border_color?: string;
-    text_color?: string;
-    [key: string]: any;
-  };
+  backgroundColor?: string;
+  textColor?: string;
+  borderColor?: string;
+  comment?: string;
+  properties?: any;
+  datasourceId?: number;
 }
 
 export interface GraphNode {
@@ -97,8 +96,12 @@ export const GET_GRAPHS = gql`
         id
         layerId
         name
-        color
+        backgroundColor
+        textColor
+        borderColor
+        comment
         properties
+        datasourceId
       }
     }
   }
@@ -119,8 +122,12 @@ export const GET_GRAPH_DETAILS = gql`
         id
         layerId
         name
-        color
+        backgroundColor
+        textColor
+        borderColor
+        comment
         properties
+        datasourceId
       }
       graphNodes {
         id
@@ -172,8 +179,12 @@ export const CREATE_LAYER = gql`
       id
       layerId
       name
-      color
+      backgroundColor
+      textColor
+      borderColor
+      comment
       properties
+      datasourceId
     }
   }
 `

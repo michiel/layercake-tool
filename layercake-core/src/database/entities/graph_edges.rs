@@ -14,6 +14,7 @@ pub struct Model {
     pub label: Option<String>,
     pub layer: Option<String>,
     pub weight: Option<f64>,
+    pub comment: Option<String>,
     pub datasource_id: Option<i32>,
     #[sea_orm(column_type = "JsonBinary")]
     pub attrs: Option<serde_json::Value>,

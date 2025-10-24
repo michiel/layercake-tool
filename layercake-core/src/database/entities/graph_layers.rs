@@ -2,14 +2,17 @@ use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
-#[sea_orm(table_name = "layers")]
+#[sea_orm(table_name = "graph_layers")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
     pub graph_id: i32,
     pub layer_id: String,
     pub name: String,
-    pub color: Option<String>,
+    pub background_color: Option<String>,
+    pub text_color: Option<String>,
+    pub border_color: Option<String>,
+    pub comment: Option<String>,
     pub datasource_id: Option<i32>,
     pub properties: Option<String>, // JSON
 }

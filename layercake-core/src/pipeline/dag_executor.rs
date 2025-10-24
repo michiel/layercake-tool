@@ -356,6 +356,7 @@ impl DagExecutor {
                 belongs_to: Set(node.belongs_to.clone()),
                 datasource_id: Set(node.datasource),
                 attrs: Set(attrs),
+                comment: Set(node.comment.clone()),
                 created_at: Set(Utc::now()),
             };
 
@@ -378,6 +379,7 @@ impl DagExecutor {
                 weight: Set(Some(edge.weight as f64)),
                 datasource_id: Set(edge.datasource),
                 attrs: Set(attrs),
+                comment: Set(edge.comment.clone()),
                 created_at: Set(Utc::now()),
             };
 
@@ -386,25 +388,8 @@ impl DagExecutor {
 
         let mut layer_map = HashMap::new();
         for layer in &graph.layers {
-            let mut properties = JsonMap::new();
-            if !layer.background_color.is_empty() {
-                properties.insert(
-                    "background_color".to_string(),
-                    JsonValue::String(layer.background_color.clone()),
-                );
-            }
-            if !layer.border_color.is_empty() {
-                properties.insert(
-                    "border_color".to_string(),
-                    JsonValue::String(layer.border_color.clone()),
-                );
-            }
-            if !layer.text_color.is_empty() {
-                properties.insert(
-                    "text_color".to_string(),
-                    JsonValue::String(layer.text_color.clone()),
-                );
-            }
+            let properties = JsonMap::new();
+            // Only include other properties, not the color fields which are now first-class
 
             let properties_json = if properties.is_empty() {
                 None
@@ -412,17 +397,32 @@ impl DagExecutor {
                 Some(serde_json::to_string(&JsonValue::Object(properties))?)
             };
 
-            let color = if layer.background_color.is_empty() {
+            let background_color = if layer.background_color.is_empty() {
                 None
             } else {
                 Some(layer.background_color.clone())
+            };
+
+            let text_color = if layer.text_color.is_empty() {
+                None
+            } else {
+                Some(layer.text_color.clone())
+            };
+
+            let border_color = if layer.border_color.is_empty() {
+                None
+            } else {
+                Some(layer.border_color.clone())
             };
 
             layer_map.insert(
                 layer.id.clone(),
                 LayerData {
                     name: layer.label.clone(),
-                    color,
+                    background_color,
+                    text_color,
+                    border_color,
+                    comment: None, // Layer struct doesn't have comment field
                     properties: properties_json,
                     datasource_id: layer.datasource,
                 },
@@ -437,7 +437,7 @@ impl DagExecutor {
     async fn clear_graph_data(&self, graph_id: i32) -> Result<()> {
         use crate::database::entities::graph_edges::{Column as EdgeColumn, Entity as EdgeEntity};
         use crate::database::entities::graph_nodes::{Column as NodeColumn, Entity as NodeEntity};
-        use crate::database::entities::layers::{Column as LayerColumn, Entity as LayerEntity};
+        use crate::database::entities::graph_layers::{Column as LayerColumn, Entity as LayerEntity};
 
         EdgeEntity::delete_many()
             .filter(EdgeColumn::GraphId.eq(graph_id))

@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use icu_locid::locale;
 use rust_xlsxwriter::*;
-use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, Set};
+use sea_orm::{DatabaseConnection, EntityTrait};
 use spreadsheet_ods::{Sheet, Value, WorkBook};
 
 use crate::database::entities::data_sources;

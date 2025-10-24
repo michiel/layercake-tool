@@ -2136,14 +2136,17 @@ impl Mutation {
     ) -> Result<crate::graphql::types::Layer> {
         let context = ctx.data::<GraphQLContext>()?;
 
-        use crate::database::entities::layers;
+        use crate::database::entities::graph_layers;
 
-        let layer = layers::ActiveModel {
+        let layer = graph_layers::ActiveModel {
             id: sea_orm::ActiveValue::NotSet,
             graph_id: Set(input.graph_id),
             layer_id: Set(input.layer_id),
             name: Set(input.name),
-            color: Set(None),
+            background_color: Set(None),
+            text_color: Set(None),
+            border_color: Set(None),
+            comment: Set(None),
             properties: Set(None),
             datasource_id: Set(None),
         };
@@ -2296,7 +2299,7 @@ impl Mutation {
         let edit_service = GraphEditService::new(context.db.clone());
 
         // Fetch current layer to get old values
-        use crate::database::entities::layers::Entity as Layers;
+        use crate::database::entities::graph_layers::Entity as Layers;
 
         let old_layer = Layers::find_by_id(id).one(&context.db).await?;
 
@@ -2454,6 +2457,7 @@ impl Mutation {
             weight: Set(weight),
             attrs: Set(attrs.clone()),
             datasource_id: Set(None),
+            comment: Set(None),
             created_at: Set(now),
         };
 
@@ -2619,7 +2623,7 @@ impl Mutation {
         let edit_service = GraphEditService::new(context.db.clone());
 
         use crate::database::entities::graph_nodes::{Column as NodeColumn, Entity as GraphNodes};
-        use crate::database::entities::layers::Entity as Layers;
+        use crate::database::entities::graph_layers::Entity as Layers;
         use sea_orm::{ColumnTrait, QueryFilter};
 
         // Update nodes

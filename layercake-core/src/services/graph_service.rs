@@ -1,6 +1,6 @@
 use crate::database::entities::{
     graph_edges, graph_edges::Entity as GraphEdges, graph_nodes, graph_nodes::Entity as GraphNodes,
-    layers, layers::Entity as Layers, plan_dag_edges, plan_dag_nodes,
+    graph_layers, graph_layers::Entity as Layers, plan_dag_edges, plan_dag_nodes,
 };
 use crate::graph::{Edge, Graph, Layer, Node};
 use anyhow::Result;
@@ -15,10 +15,10 @@ impl GraphService {
         Self { db }
     }
 
-    /// Get database layers for a graph
-    pub async fn get_layers_for_graph(&self, graph_id: i32) -> Result<Vec<layers::Model>> {
+    /// Get database graph_layers for a graph
+    pub async fn get_layers_for_graph(&self, graph_id: i32) -> Result<Vec<graph_layers::Model>> {
         let db_layers = Layers::find()
-            .filter(layers::Column::GraphId.eq(graph_id))
+            .filter(graph_layers::Column::GraphId.eq(graph_id))
             .all(&self.db)
             .await?;
         Ok(db_layers)
@@ -45,14 +45,14 @@ impl GraphService {
             .all(&self.db)
             .await?;
 
-        // Get unique layers from nodes
+        // Get unique graph_layers from nodes
         use std::collections::HashSet;
         let unique_layers: HashSet<String> = db_graph_nodes
             .iter()
             .filter_map(|n| n.layer.clone())
             .collect();
 
-        // Create default layers
+        // Create default graph_layers
         let graph_layers: Vec<Layer> = unique_layers
             .into_iter()
             .map(|layer_id| Layer {
@@ -213,6 +213,7 @@ impl GraphService {
             weight: Set(weight),
             attrs: Set(attrs),
             datasource_id: Set(None),
+            comment: Set(None),
             created_at: Set(now),
         };
 
@@ -289,7 +290,7 @@ impl GraphService {
         layer_id: i32,
         name: Option<String>,
         properties: Option<serde_json::Value>,
-    ) -> Result<layers::Model> {
+    ) -> Result<graph_layers::Model> {
         use sea_orm::{ActiveModelTrait, Set};
 
         let layer = Layers::find_by_id(layer_id)
@@ -297,7 +298,7 @@ impl GraphService {
             .await?
             .ok_or_else(|| anyhow::anyhow!("Layer not found"))?;
 
-        let mut active_model: layers::ActiveModel = layer.into();
+        let mut active_model: graph_layers::ActiveModel = layer.into();
 
         if let Some(name) = name {
             active_model.name = Set(name);

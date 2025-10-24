@@ -63,9 +63,10 @@ export const GraphDataDialog: React.FC<GraphDataDialogProps> = ({
       layers: data.graph.layers.map(layer => ({
         id: layer.layerId,
         label: layer.name,
-        background_color: layer.properties?.background_color,
-        text_color: layer.properties?.text_color,
-        border_color: layer.properties?.border_color,
+        background_color: layer.backgroundColor,
+        text_color: layer.textColor,
+        border_color: layer.borderColor,
+        comment: layer.comment,
         ...layer.properties
       }))
     };

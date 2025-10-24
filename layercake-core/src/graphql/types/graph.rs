@@ -1,7 +1,7 @@
 use async_graphql::*;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
-use crate::database::entities::{graph_edges, graph_nodes, layers};
+use crate::database::entities::{graph_edges, graph_nodes, graph_layers};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::graph_edge::GraphEdge;
 use crate::graphql::types::graph_node::GraphNode;
@@ -47,14 +47,15 @@ impl Graph {
         Ok(Project::from(project))
     }
 
-    async fn layers(&self, ctx: &Context<'_>) -> Result<Vec<Layer>> {
+    #[graphql(name = "layers")]
+    async fn graph_layers(&self, ctx: &Context<'_>) -> Result<Vec<Layer>> {
         let context = ctx.data::<GraphQLContext>()?;
-        let layers = layers::Entity::find()
-            .filter(layers::Column::GraphId.eq(self.id))
+        let graph_layers = graph_layers::Entity::find()
+            .filter(graph_layers::Column::GraphId.eq(self.id))
             .all(&context.db)
             .await?;
 
-        Ok(layers.into_iter().map(Layer::from).collect())
+        Ok(graph_layers.into_iter().map(Layer::from).collect())
     }
 
     async fn graph_nodes(&self, ctx: &Context<'_>) -> Result<Vec<GraphNode>> {

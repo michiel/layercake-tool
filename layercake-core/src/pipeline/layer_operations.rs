@@ -3,7 +3,7 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, Qu
 use std::collections::HashMap;
 
 use super::types::LayerData;
-use crate::database::entities::layers;
+use crate::database::entities::graph_layers;
 
 /// Insert layers from a HashMap into the database for a given graph
 ///
@@ -23,11 +23,14 @@ pub async fn insert_layers_to_db(
     all_layers: HashMap<String, LayerData>,
 ) -> Result<()> {
     for (layer_id, layer_data) in all_layers {
-        let layer = layers::ActiveModel {
+        let layer = graph_layers::ActiveModel {
             graph_id: Set(graph_id),
             layer_id: Set(layer_id),
             name: Set(layer_data.name),
-            color: Set(layer_data.color),
+            background_color: Set(layer_data.background_color),
+            text_color: Set(layer_data.text_color),
+            border_color: Set(layer_data.border_color),
+            comment: Set(layer_data.comment),
             datasource_id: Set(layer_data.datasource_id),
             properties: Set(layer_data.properties),
             ..Default::default()
@@ -54,8 +57,8 @@ pub async fn load_layers_from_db(
     db: &DatabaseConnection,
     graph_id: i32,
 ) -> Result<HashMap<String, LayerData>> {
-    let db_layers = layers::Entity::find()
-        .filter(layers::Column::GraphId.eq(graph_id))
+    let db_layers = graph_layers::Entity::find()
+        .filter(graph_layers::Column::GraphId.eq(graph_id))
         .all(db)
         .await?;
 
@@ -63,7 +66,10 @@ pub async fn load_layers_from_db(
     for db_layer in db_layers {
         let layer = LayerData {
             name: db_layer.name,
-            color: db_layer.color,
+            background_color: db_layer.background_color,
+            text_color: db_layer.text_color,
+            border_color: db_layer.border_color,
+            comment: db_layer.comment,
             properties: db_layer.properties,
             datasource_id: db_layer.datasource_id,
         };
@@ -88,7 +94,10 @@ mod tests {
             "layer1".to_string(),
             LayerData {
                 name: "Test Layer".to_string(),
-                color: Some("#FF0000".to_string()),
+                background_color: Some("#FF0000".to_string()),
+                text_color: None,
+                border_color: None,
+                comment: None,
                 properties: Some(r#"{"z_index":1}"#.to_string()),
                 datasource_id: None,
             },

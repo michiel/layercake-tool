@@ -16,9 +16,9 @@ pub mod datasources;
 pub mod execution_state;
 pub mod graph_edges;
 pub mod graph_edits;
+pub mod graph_layers;
 pub mod graph_nodes;
 pub mod graphs;
-pub mod layers;
 
 // Re-export specific entities to avoid naming conflicts
 pub use execution_state::ExecutionState;

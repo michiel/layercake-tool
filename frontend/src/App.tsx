@@ -62,7 +62,7 @@ const CREATE_SAMPLE_PROJECT = gql`
 // Query to fetch Plan DAG for download
 const GET_PLAN_DAG = gql`
   query GetPlanDag($projectId: Int!) {
-    planDag(projectId: $projectId) {
+    getPlanDag(projectId: $projectId) {
       version
       nodes {
         id

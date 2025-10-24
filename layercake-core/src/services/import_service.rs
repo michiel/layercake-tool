@@ -5,7 +5,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use tracing::warn;
 
-use crate::database::entities::layers;
+use crate::database::entities::graph_layers;
 
 pub struct ImportService {
     db: DatabaseConnection,
@@ -31,26 +31,32 @@ impl ImportService {
 
             let layer_id = record.get(0).unwrap_or("").to_string();
             let name = record.get(1).unwrap_or(&layer_id).to_string();
-            let color = record.get(2).and_then(|s| {
-                if s.is_empty() {
-                    None
-                } else {
-                    Some(s.to_string())
-                }
-            });
 
             if layer_id.is_empty() {
                 warn!("Skipping layer with empty ID");
                 continue;
             }
 
-            // Collect additional properties
+            // Extract color fields and other properties from headers
+            let mut background_color = None;
+            let mut text_color = None;
+            let mut border_color = None;
+            let mut comment = None;
             let mut properties = HashMap::new();
+
             for (i, value) in record.iter().enumerate() {
-                if i >= 3 && i < headers.len() {
-                    if let Some(header) = headers.get(i) {
-                        if !value.is_empty() {
-                            properties.insert(header.to_string(), Value::String(value.to_string()));
+                if let Some(header) = headers.get(i) {
+                    if !value.is_empty() {
+                        match header {
+                            "background_color" => background_color = Some(value.to_string()),
+                            "text_color" => text_color = Some(value.to_string()),
+                            "border_color" => border_color = Some(value.to_string()),
+                            "comment" => comment = Some(value.to_string()),
+                            // Skip layer_id and name columns (0 and 1)
+                            _ if i > 1 => {
+                                properties.insert(header.to_string(), Value::String(value.to_string()));
+                            }
+                            _ => {}
                         }
                     }
                 }
@@ -62,11 +68,14 @@ impl ImportService {
                 Some(serde_json::to_string(&properties)?)
             };
 
-            let layer = layers::ActiveModel {
+            let layer = graph_layers::ActiveModel {
                 graph_id: Set(graph_id),
                 layer_id: Set(layer_id),
                 name: Set(name),
-                color: Set(color),
+                background_color: Set(background_color),
+                text_color: Set(text_color),
+                border_color: Set(border_color),
+                comment: Set(comment),
                 properties: Set(properties_json),
                 ..Default::default()
             };

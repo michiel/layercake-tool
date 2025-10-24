@@ -9,7 +9,7 @@ use crate::database::entities::{
     graph_edges::{self, Entity as GraphEdges},
     graph_edits,
     graph_nodes::{self, Entity as GraphNodes},
-    layers::{self, Entity as Layers},
+    graph_layers::{self, Entity as Layers},
 };
 
 /// Result of applying a single edit
@@ -116,6 +116,7 @@ impl GraphEditApplicator {
             weight: Set(None),
             attrs: Set(attrs),
             datasource_id: Set(None),
+            comment: Set(None),
             created_at: Set(chrono::Utc::now()),
         };
 
@@ -287,6 +288,7 @@ impl GraphEditApplicator {
             weight: Set(None),
             attrs: Set(attrs),
             datasource_id: Set(None),
+            comment: Set(None),
             created_at: Set(chrono::Utc::now()),
         };
 
@@ -376,8 +378,8 @@ impl GraphEditApplicator {
     async fn create_layer(&self, edit: &graph_edits::Model) -> Result<ApplyResult> {
         // Check if layer already exists
         let existing = Layers::find()
-            .filter(layers::Column::GraphId.eq(edit.graph_id))
-            .filter(layers::Column::LayerId.eq(&edit.target_id))
+            .filter(graph_layers::Column::GraphId.eq(edit.graph_id))
+            .filter(graph_layers::Column::LayerId.eq(&edit.target_id))
             .one(&self.db)
             .await?;
 
@@ -403,17 +405,35 @@ impl GraphEditApplicator {
             .map(serde_json::to_string)
             .transpose()?;
 
-        let color = new_value
-            .get("color")
+        let background_color = new_value
+            .get("background_color")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
 
-        let layer = layers::ActiveModel {
+        let text_color = new_value
+            .get("text_color")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+
+        let border_color = new_value
+            .get("border_color")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+
+        let comment = new_value
+            .get("comment")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+
+        let layer = graph_layers::ActiveModel {
             id: Set(Default::default()),
             graph_id: Set(edit.graph_id),
             layer_id: Set(edit.target_id.clone()),
             name: Set(name),
-            color: Set(color),
+            background_color: Set(background_color),
+            text_color: Set(text_color),
+            border_color: Set(border_color),
+            comment: Set(comment),
             properties: Set(properties),
             datasource_id: Set(None),
         };
@@ -427,8 +447,8 @@ impl GraphEditApplicator {
 
     async fn update_layer(&self, edit: &graph_edits::Model) -> Result<ApplyResult> {
         let layer = Layers::find()
-            .filter(layers::Column::GraphId.eq(edit.graph_id))
-            .filter(layers::Column::LayerId.eq(&edit.target_id))
+            .filter(graph_layers::Column::GraphId.eq(edit.graph_id))
+            .filter(graph_layers::Column::LayerId.eq(&edit.target_id))
             .one(&self.db)
             .await?;
 
@@ -438,7 +458,7 @@ impl GraphEditApplicator {
             });
         };
 
-        let mut active_model: layers::ActiveModel = layer.into();
+        let mut active_model: graph_layers::ActiveModel = layer.into();
 
         if let Some(field_name) = &edit.field_name {
             if let Some(new_value) = &edit.new_value {
@@ -448,8 +468,17 @@ impl GraphEditApplicator {
                             active_model.name = Set(name.to_string());
                         }
                     }
-                    "color" => {
-                        active_model.color = Set(new_value.as_str().map(|s| s.to_string()));
+                    "background_color" => {
+                        active_model.background_color = Set(new_value.as_str().map(|s| s.to_string()));
+                    }
+                    "text_color" => {
+                        active_model.text_color = Set(new_value.as_str().map(|s| s.to_string()));
+                    }
+                    "border_color" => {
+                        active_model.border_color = Set(new_value.as_str().map(|s| s.to_string()));
+                    }
+                    "comment" => {
+                        active_model.comment = Set(new_value.as_str().map(|s| s.to_string()));
                     }
                     "properties" => {
                         let properties_string = serde_json::to_string(new_value)?;
@@ -476,8 +505,8 @@ impl GraphEditApplicator {
 
     async fn delete_layer(&self, edit: &graph_edits::Model) -> Result<ApplyResult> {
         let result = Layers::delete_many()
-            .filter(layers::Column::GraphId.eq(edit.graph_id))
-            .filter(layers::Column::LayerId.eq(&edit.target_id))
+            .filter(graph_layers::Column::GraphId.eq(edit.graph_id))
+            .filter(graph_layers::Column::LayerId.eq(&edit.target_id))
             .exec(&self.db)
             .await?;
 

@@ -2,7 +2,7 @@ use async_graphql::*;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
 use crate::database::entities::{
-    data_sources, graph_edges, graph_nodes, graphs, layers, library_sources, plan_dag_edges,
+    data_sources, graph_edges, graph_nodes, graphs, graph_layers, library_sources, plan_dag_edges,
     plan_dag_nodes, plans, project_collaborators, projects, user_sessions, users,
 };
 use crate::graphql::context::GraphQLContext;
@@ -753,9 +753,9 @@ impl Query {
             .all(&context.db)
             .await?;
 
-        // Get all layers for this graph
-        let db_layers = layers::Entity::find()
-            .filter(layers::Column::GraphId.eq(graph.id))
+        // Get all graph_layers for this graph
+        let db_layers = graph_layers::Entity::find()
+            .filter(graph_layers::Column::GraphId.eq(graph.id))
             .all(&context.db)
             .await?;
 

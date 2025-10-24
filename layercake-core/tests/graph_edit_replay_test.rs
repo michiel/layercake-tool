@@ -1,7 +1,7 @@
 use chrono::Utc;
 use layercake as layercake_core;
 use layercake_core::database::entities::{
-    graph_edges, graph_nodes, graphs, layers, plan_dag_nodes, plans, projects,
+    graph_edges, graph_layers, graph_nodes, graphs, plan_dag_nodes, plans, projects,
 };
 use layercake_core::database::migrations::Migrator;
 use layercake_core::services::{ApplyResult, GraphEditApplicator, GraphEditService};
@@ -94,6 +94,7 @@ async fn create_test_node(
         weight: Set(None),
         attrs: Set(None),
         datasource_id: Set(None),
+        comment: Set(None),
         created_at: Set(Utc::now()),
     };
     node.insert(db).await
@@ -553,7 +554,7 @@ async fn test_replay_layer_operations() {
     assert_eq!(summary.applied, 2);
 
     // Verify layer exists with updated properties
-    use layercake_core::database::entities::layers::{Column, Entity as Layers};
+    use layercake_core::database::entities::graph_layers::{Column, Entity as Layers};
     use sea_orm::{ColumnTrait, QueryFilter};
 
     let layer = Layers::find()

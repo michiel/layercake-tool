@@ -17,7 +17,7 @@ use crate::database::entities::{
     graph_edges::{self, Column as GraphEdgeColumn, Entity as GraphEdges},
     graph_nodes::{self, Column as GraphNodeColumn, Entity as GraphNodes},
     graphs::{self, Column as GraphColumn, Entity as Graphs},
-    layers::{Column as LayerColumn, Entity as Layers},
+    graph_layers::{Column as LayerColumn, Entity as Layers},
     plan_dag_nodes,
 };
 use crate::mcp::tools::{create_success_response, get_optional_param, get_required_param};
@@ -30,7 +30,7 @@ pub fn get_graph_data_tools() -> Vec<Tool> {
     vec![
         Tool {
             name: "import_csv".to_string(),
-            description: "Import graph data (nodes, edges, layers) from CSV content".to_string(),
+            description: "Import graph data (nodes, edges, graph_layers) from CSV content".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -48,7 +48,7 @@ pub fn get_graph_data_tools() -> Vec<Tool> {
                     },
                     "layers_csv": {
                         "type": "string",
-                        "description": "CSV content describing layers (optional)"
+                        "description": "CSV content describing graph_layers (optional)"
                     }
                 },
                 "required": ["project_id"],
@@ -79,7 +79,7 @@ pub fn get_graph_data_tools() -> Vec<Tool> {
         },
         Tool {
             name: "get_graph_data".to_string(),
-            description: "Retrieve graph structure (nodes, edges, layers)".to_string(),
+            description: "Retrieve graph structure (nodes, edges, graph_layers)".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -149,7 +149,7 @@ pub async fn import_csv(
         layers_imported = service
             .import_layers_from_csv(graph.id, layers_csv)
             .await
-            .map_err(|e| internal_error("Failed to import layers CSV", e))?;
+            .map_err(|e| internal_error("Failed to import graph_layers CSV", e))?;
     }
 
     update_graph_counts(db, graph.id)
@@ -202,7 +202,7 @@ pub async fn export_graph(
         let summary = json!({
             "nodes": graph_data.nodes,
             "edges": graph_data.edges,
-            "layers": graph_data.layers,
+            "graph_layers": graph_data.layers,
         });
         serde_json::to_string_pretty(&summary)
             .map_err(|e| internal_error("Failed to serialize graph data", e))?
@@ -262,14 +262,14 @@ pub async fn get_graph_data(
         .filter(LayerColumn::GraphId.eq(graph.id))
         .count(db)
         .await
-        .map_err(|e| internal_error("Failed to count layers", e))?;
+        .map_err(|e| internal_error("Failed to count graph_layers", e))?;
 
     let mut result = json!({
         "project_id": project_id,
         "graph_id": graph.id,
         "nodes": { "count": node_count },
         "edges": { "count": edge_count },
-        "layers": { "count": layer_count }
+        "graph_layers": { "count": layer_count }
     });
 
     if include_nodes {
@@ -337,13 +337,16 @@ pub async fn get_graph_data(
                     "id": layer.id,
                     "layer_id": layer.layer_id,
                     "name": layer.name,
-                    "color": layer.color,
+                    "background_color": layer.background_color,
+                    "text_color": layer.text_color,
+                    "border_color": layer.border_color,
+                    "comment": layer.comment,
                     "properties": layer.properties
                 })
             })
             .collect();
 
-        result["layers"]["samples"] = Value::Array(values);
+        result["graph_layers"]["samples"] = Value::Array(values);
     }
 
     create_success_response(&result)
@@ -568,6 +571,7 @@ async fn upsert_node(
             belongs_to: Set(belongs_to),
             attrs: Set(attrs),
             datasource_id: Set(None),
+            comment: Set(None),
             created_at: Set(Utc::now()),
         };
         node.insert(db).await?;
@@ -705,6 +709,7 @@ async fn upsert_edge(
             weight: Set(weight),
             attrs: Set(attrs),
             datasource_id: Set(None),
+            comment: Set(None),
             created_at: Set(Utc::now()),
         };
         edge.insert(db).await?;

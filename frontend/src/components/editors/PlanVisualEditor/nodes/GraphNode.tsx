@@ -144,9 +144,9 @@ export const GraphNode = memo((props: GraphNodeProps) => {
       layers: graphPreview.layers?.map((layer) => ({
         layerId: layer.layerId,
         name: layer.name,
-        backgroundColor: layer.properties?.background_color,
-        borderColor: layer.properties?.border_color,
-        textColor: layer.properties?.text_color,
+        backgroundColor: layer.backgroundColor,
+        borderColor: layer.borderColor,
+        textColor: layer.textColor,
       })),
     }
   }

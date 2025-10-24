@@ -747,19 +747,18 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
 
                 // Update node style based on new layer
                 const newLayer = graph.layers.find(l => l.layerId === newValue);
-                if (newLayer?.properties) {
-                  const props = newLayer.properties;
+                if (newLayer) {
                   const newStyle = { ...node.style };
 
-                  if (props.background_color) {
-                    newStyle.backgroundColor = `#${props.background_color}`;
+                  if (newLayer.backgroundColor) {
+                    newStyle.backgroundColor = `#${newLayer.backgroundColor}`;
                   }
-                  if (props.border_color) {
-                    newStyle.borderColor = `#${props.border_color}`;
-                    newStyle.border = `${node.type === 'group' ? '2px' : '1px'} solid #${props.border_color}`;
+                  if (newLayer.borderColor) {
+                    newStyle.borderColor = `#${newLayer.borderColor}`;
+                    newStyle.border = `${node.type === 'group' ? '2px' : '1px'} solid #${newLayer.borderColor}`;
                   }
-                  if (props.text_color) {
-                    newStyle.color = `#${props.text_color}`;
+                  if (newLayer.textColor) {
+                    newStyle.color = `#${newLayer.textColor}`;
                   }
 
                   updatedNode.style = newStyle;
@@ -771,7 +770,7 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
           });
         }
       } else if (targetType === 'layer' && operation === 'update' && fieldName === 'properties' && newValue) {
-        // Apply layer property changes to all nodes/edges with this layer
+        // Apply layer property changes to all nodes/edges with this layer (legacy format)
         const layerId = targetId;
         const newProperties = newValue;
 
@@ -808,6 +807,50 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
               const newStyle = { ...edge.style };
               if (newProperties.border_color || newProperties.text_color) {
                 newStyle.stroke = `#${newProperties.border_color || newProperties.text_color}`;
+              }
+
+              return { ...edge, style: newStyle };
+            });
+          });
+        }
+      } else if (targetType === 'layer' && operation === 'update' && (fieldName === 'background_color' || fieldName === 'text_color' || fieldName === 'border_color')) {
+        // Apply individual color field changes to all nodes/edges with this layer
+        const layerId = targetId;
+        const layer = graph.layers.find(l => l.layerId === layerId);
+
+        if (setNodesRef.current && layer) {
+          setNodesRef.current(currentNodes => {
+            return currentNodes.map(node => {
+              const graphNode = graph.graphNodes.find(gn => gn.id === node.id);
+              if (!graphNode || graphNode.layer !== layerId) return node;
+
+              const newStyle = { ...node.style };
+
+              if (layer.backgroundColor) {
+                newStyle.backgroundColor = `#${layer.backgroundColor}`;
+              }
+              if (layer.borderColor) {
+                newStyle.borderColor = `#${layer.borderColor}`;
+                newStyle.border = `${node.type === 'group' ? '2px' : '1px'} solid #${layer.borderColor}`;
+              }
+              if (layer.textColor) {
+                newStyle.color = `#${layer.textColor}`;
+              }
+
+              return { ...node, style: newStyle };
+            });
+          });
+        }
+
+        if (setEdgesRef.current && layer) {
+          setEdgesRef.current(currentEdges => {
+            return currentEdges.map(edge => {
+              const graphEdge = graph.graphEdges.find(ge => ge.id === edge.id);
+              if (!graphEdge || graphEdge.layer !== layerId) return edge;
+
+              const newStyle = { ...edge.style };
+              if (layer.borderColor || layer.textColor) {
+                newStyle.stroke = `#${layer.borderColor || layer.textColor}`;
               }
 
               return { ...edge, style: newStyle };
