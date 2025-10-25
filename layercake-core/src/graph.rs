@@ -527,9 +527,8 @@ impl Graph {
         use std::collections::HashSet;
 
         // Collect all valid node IDs
-        let valid_node_ids: HashSet<String> = self.nodes.iter()
-            .map(|node| node.id.clone())
-            .collect();
+        let valid_node_ids: HashSet<String> =
+            self.nodes.iter().map(|node| node.id.clone()).collect();
 
         let original_count = self.edges.len();
         self.edges.retain(|edge| {
@@ -828,6 +827,7 @@ pub struct Node {
     pub belongs_to: Option<String>,
     pub weight: i32,
     pub comment: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub datasource: Option<i32>,
 }
 
@@ -841,6 +841,7 @@ pub struct TreeNode {
     pub belongs_to: Option<String>,
     pub weight: i32,
     pub comment: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub datasource: Option<i32>,
     pub children: Vec<TreeNode>,
 }
@@ -871,6 +872,7 @@ pub struct Edge {
     pub layer: String,
     pub weight: i32,
     pub comment: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub datasource: Option<i32>,
 }
 
@@ -881,6 +883,7 @@ pub struct Layer {
     pub background_color: String,
     pub text_color: String,
     pub border_color: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub datasource: Option<i32>,
 }
 
@@ -1300,7 +1303,6 @@ mod tests {
             "weight": 1,
             "depth": 0,
             "comment": "null",
-            "datasource": null,
             "children": [
                 {
                     "id": "2",
@@ -1310,7 +1312,6 @@ mod tests {
                     "belongs_to": "1",
                     "depth": 1,
                     "comment": "null",
-                    "datasource": null,
                     "weight": 1,
                     "children": []
                 },
@@ -1322,7 +1323,6 @@ mod tests {
                     "belongs_to": "1",
                     "depth": 1,
                     "comment": "null",
-                    "datasource": null,
                     "weight": 1,
                     "children": []
                 }

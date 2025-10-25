@@ -8,7 +8,9 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use crate::database::entities::graphs::ActiveModel as GraphActiveModel;
 use crate::database::entities::graphs::{Column as GraphColumn, Entity as GraphEntity};
 use crate::database::entities::{graph_edges, graph_nodes, graphs, plan_dag_nodes, ExecutionState};
-use crate::graphql::types::plan_dag::{FilterNodeConfig, TransformNodeConfig};
+use crate::graphql::types::plan_dag::{
+    FilterEvaluationContext, FilterNodeConfig, TransformNodeConfig,
+};
 use crate::pipeline::layer_operations::insert_layers_to_db;
 use crate::pipeline::types::LayerData;
 use crate::pipeline::{DatasourceImporter, GraphBuilder, MergeBuilder};
@@ -277,7 +279,14 @@ impl DagExecutor {
             })?;
 
         config
-            .apply_filters(&mut graph)
+            .apply_filters(
+                &mut graph,
+                &FilterEvaluationContext {
+                    db: &self.db,
+                    graph_id: upstream_graph.id,
+                },
+            )
+            .await
             .with_context(|| format!("Failed to execute filters for node {}", node_id))?;
 
         graph.name = node_name.to_string();
@@ -596,8 +605,10 @@ impl DagExecutor {
 
     async fn clear_graph_data(&self, graph_id: i32) -> Result<()> {
         use crate::database::entities::graph_edges::{Column as EdgeColumn, Entity as EdgeEntity};
+        use crate::database::entities::graph_layers::{
+            Column as LayerColumn, Entity as LayerEntity,
+        };
         use crate::database::entities::graph_nodes::{Column as NodeColumn, Entity as NodeEntity};
-        use crate::database::entities::graph_layers::{Column as LayerColumn, Entity as LayerEntity};
 
         EdgeEntity::delete_many()
             .filter(EdgeColumn::GraphId.eq(graph_id))

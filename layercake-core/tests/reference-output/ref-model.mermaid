@@ -3,12 +3,12 @@
 ---
 flowchart TB
 
-subgraph Root
-  subgraph Management A
-    subgraph Management A/A
+subgraph "Root"
+  subgraph "Management A"
+    subgraph "Management A/A"
       drone_02["Drone"]
     end
-    subgraph Management A/B
+    subgraph "Management A/B"
       drone_03["Drone"]
       drone_04["Drone"]
       drone_05["Drone"]
@@ -21,9 +21,9 @@ subgraph Root
     drone_23["Drone"]
     drone_24["Drone"]
   end
-  subgraph Management B
-    subgraph Management B/A
-      subgraph Management B/A/B
+  subgraph "Management B"
+    subgraph "Management B/A"
+      subgraph "Management B/A/B"
         drone_31["Drone"]
         drone_32["Drone"]
         drone_33["Drone"]
@@ -39,8 +39,8 @@ subgraph Root
       drone_11["Drone"]
       drone_12["Drone"]
     end
-    subgraph Management B/B
-      subgraph Management B/B/A
+    subgraph "Management B/B"
+      subgraph "Management B/B/A"
         drone_37["Drone"]
         drone_38["Drone"]
         drone_39["Drone"]
@@ -63,51 +63,51 @@ subgraph Root
 end
 
 
- drone_03 --> drone_09
- drone_03 --> drone_31
- drone_04 --> drone_35
- drone_05 --> drone_17
- drone_05 --> drone_28
- drone_05 --> drone_30
- drone_06 --> drone_02
- drone_06 --> drone_03
- drone_06 --> drone_35
- drone_09 --> drone_02
- drone_09 --> drone_10
- drone_10 --> drone_38
- drone_11 --> drone_09
- drone_13 --> drone_24
- drone_14 --> drone_39
- drone_15 --> drone_07
- drone_15 --> drone_23
- drone_17 --> drone_10
- drone_17 --> drone_24
- drone_18 --> drone_17
- drone_18 --> drone_21
- drone_18 --> drone_22
- drone_19 --> drone_15
- drone_23 --> drone_15
- drone_23 --> drone_25
- drone_25 --> drone_24
- drone_26 --> drone_13
- drone_26 --> drone_21
- drone_26 --> drone_32
- drone_27 --> drone_06
- drone_28 --> drone_40
- drone_29 --> drone_23
- drone_29 --> drone_26
- drone_30 --> drone_25
- drone_31 --> drone_12
- drone_31 --> drone_33
- drone_32 --> drone_02
- drone_32 --> drone_33
- drone_35 --> drone_30
- drone_36 --> drone_19
- drone_37 --> drone_02
- drone_37 --> drone_12
- drone_38 --> drone_16
- drone_38 --> drone_36
- drone_40 --> drone_19
- drone_40 --> drone_33
- drone_40 --> drone_38
+ drone_03 -->|"link"| drone_09
+ drone_03 -->|"link"| drone_31
+ drone_04 -->|"link"| drone_35
+ drone_05 -->|"link"| drone_17
+ drone_05 -->|"link"| drone_28
+ drone_05 -->|"link"| drone_30
+ drone_06 -->|"link"| drone_02
+ drone_06 -->|"link"| drone_03
+ drone_06 -->|"link"| drone_35
+ drone_09 -->|"link"| drone_02
+ drone_09 -->|"link"| drone_10
+ drone_10 -->|"link"| drone_38
+ drone_11 -->|"link"| drone_09
+ drone_13 -->|"link"| drone_24
+ drone_14 -->|"link"| drone_39
+ drone_15 -->|"link"| drone_07
+ drone_15 -->|"link"| drone_23
+ drone_17 -->|"link"| drone_10
+ drone_17 -->|"link"| drone_24
+ drone_18 -->|"link"| drone_17
+ drone_18 -->|"link"| drone_21
+ drone_18 -->|"link"| drone_22
+ drone_19 -->|"link"| drone_15
+ drone_23 -->|"link"| drone_15
+ drone_23 -->|"link"| drone_25
+ drone_25 -->|"link"| drone_24
+ drone_26 -->|"link"| drone_13
+ drone_26 -->|"link"| drone_21
+ drone_26 -->|"link"| drone_32
+ drone_27 -->|"link"| drone_06
+ drone_28 -->|"link"| drone_40
+ drone_29 -->|"link"| drone_23
+ drone_29 -->|"link"| drone_26
+ drone_30 -->|"link"| drone_25
+ drone_31 -->|"link"| drone_12
+ drone_31 -->|"link"| drone_33
+ drone_32 -->|"link"| drone_02
+ drone_32 -->|"link"| drone_33
+ drone_35 -->|"link"| drone_30
+ drone_36 -->|"link"| drone_19
+ drone_37 -->|"link"| drone_02
+ drone_37 -->|"link"| drone_12
+ drone_38 -->|"link"| drone_16
+ drone_38 -->|"link"| drone_36
+ drone_40 -->|"link"| drone_19
+ drone_40 -->|"link"| drone_33
+ drone_40 -->|"link"| drone_38
 
