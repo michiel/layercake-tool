@@ -3,6 +3,7 @@ import {
   IconDatabase,
   IconNetwork,
   IconTransform,
+  IconFilter,
   IconGitMerge,
   IconCopy,
   IconFileExport,
@@ -38,6 +39,7 @@ export const getOperationCategory = (nodeType: PlanDagNodeType): OperationCatego
     case PlanDagNodeType.GRAPH:
       return OperationCategory.GRAPH
     case PlanDagNodeType.TRANSFORM:
+    case PlanDagNodeType.FILTER:
     case PlanDagNodeType.MERGE:
     case PlanDagNodeType.COPY:
       return OperationCategory.OPERATION
@@ -69,6 +71,8 @@ export const getNodeIcon = (nodeType: PlanDagNodeType, size: string | number = '
       return <IconNetwork {...iconProps} />
     case PlanDagNodeType.TRANSFORM:
       return <IconTransform {...iconProps} />
+    case PlanDagNodeType.FILTER:
+      return <IconFilter {...iconProps} />
     case PlanDagNodeType.MERGE:
       return <IconGitMerge {...iconProps} />
     case PlanDagNodeType.COPY:
@@ -91,6 +95,8 @@ export const getNodeTypeLabel = (nodeType: PlanDagNodeType): string => {
       return 'Graph'
     case PlanDagNodeType.TRANSFORM:
       return 'Transform'
+    case PlanDagNodeType.FILTER:
+      return 'Filter'
     case PlanDagNodeType.MERGE:
       return 'Merge'
     case PlanDagNodeType.COPY:
