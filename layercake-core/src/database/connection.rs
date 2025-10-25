@@ -13,7 +13,7 @@ pub async fn establish_connection(database_url: &str) -> Result<DatabaseConnecti
         .idle_timeout(Duration::from_secs(300)) // 5 minutes
         .max_lifetime(Duration::from_secs(3600)) // 1 hour
         .sqlx_logging(true)
-        .sqlx_logging_level(tracing::log::LevelFilter::Info);
+        .sqlx_logging_level(tracing::log::LevelFilter::Debug);
 
     Database::connect(opt).await
 }
