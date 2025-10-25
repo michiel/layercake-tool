@@ -297,6 +297,7 @@ impl Mutation {
     /// **DEPRECATED**: This bulk replace operation conflicts with delta-based updates.
     /// Use individual node/edge mutations instead for better real-time collaboration.
     /// See PLAN.md Phase 2 for migration strategy.
+    #[graphql(deprecation = "This bulk replace operation conflicts with delta-based real-time updates. Use addPlanDagNode, updatePlanDagNode, deletePlanDagNode, addPlanDagEdge, and deletePlanDagEdge mutations instead for better collaboration support.")]
     async fn update_plan_dag(
         &self,
         ctx: &Context<'_>,
