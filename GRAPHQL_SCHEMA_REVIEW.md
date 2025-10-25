@@ -1072,16 +1072,35 @@ fn validate_project_name(name: &str) -> bool {
 
 **Goals**: Improve code organisation and reduce technical debt
 
+**Status**: **IN PROGRESS** (Started 2025-10-26)
+
 **Tasks**:
-1. ✅ Refactor mutations into domain modules
+1. 📋 Document mutation refactoring strategy
+   - Created `docs/MUTATION_REFACTORING_PLAN.md` with detailed architecture
+   - Created example domain modules: `mutations/project.rs` and `mutations/plan.rs`
+   - Deferred full implementation - requires frontend coordination and testing
 2. ✅ Implement structured error handling
-3. ✅ Document migration guides
-4. ✅ Update frontend to use new APIs
+   - Created `layercake-core/src/graphql/errors.rs` with StructuredError helper
+   - Added machine-readable error codes (NOT_FOUND, VALIDATION_FAILED, etc.)
+   - Created `docs/ERROR_HANDLING_GUIDE.md` with usage examples
+3. 📋 Document migration guides
+   - Error handling migration included in ERROR_HANDLING_GUIDE.md
+   - Mutation migration strategy in MUTATION_REFACTORING_PLAN.md
+4. ⏳ Update frontend to use new patterns (pending implementation)
 
 **Success Criteria**:
-- Mutations file < 500 lines
-- Consistent error structure across all endpoints
-- Frontend uses domain-specific mutations
+- 📋 Mutations refactoring plan documented (DOCUMENTED - ready for implementation)
+- ✅ Structured error handling system implemented (COMPLETE)
+- ✅ Migration guides available (COMPLETE)
+- ⏳ Frontend updates pending actual implementation
+
+**Deliverables**:
+- Created: `layercake-core/src/graphql/errors.rs` (structured error handling)
+- Modified: `layercake-core/src/graphql/mod.rs` (export errors module)
+- Created: `layercake-core/src/graphql/mutations/project.rs` (example module)
+- Created: `layercake-core/src/graphql/mutations/plan.rs` (example module)
+- Created: `docs/MUTATION_REFACTORING_PLAN.md` (refactoring guide)
+- Created: `docs/ERROR_HANDLING_GUIDE.md` (error handling documentation)
 
 ### Phase 3: Consistency & Clean-up (Weeks 9-12)
 

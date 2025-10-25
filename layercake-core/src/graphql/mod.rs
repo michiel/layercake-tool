@@ -1,6 +1,8 @@
 #[cfg(feature = "graphql")]
 pub mod context;
 #[cfg(feature = "graphql")]
+pub mod errors;
+#[cfg(feature = "graphql")]
 pub mod execution_events;
 #[cfg(feature = "graphql")]
 pub mod mutations;
@@ -15,5 +17,7 @@ pub mod types;
 
 #[cfg(feature = "graphql")]
 pub use context::*;
+#[cfg(feature = "graphql")]
+pub use errors::*;
 #[cfg(feature = "graphql")]
 pub use schema::*;
