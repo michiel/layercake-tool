@@ -176,6 +176,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     cqrsService,
     setDragging,
     updatePlanDagOptimistically,
+    refreshData,
   } = planDagState
 
   // Keep nodesRef updated for handleNodeEdit
@@ -1113,6 +1114,8 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
   const [executePlan, { loading: executing }] = useMutation(EXECUTE_PLAN, {
     onCompleted: (data: any) => {
       showSuccessNotification('Execution Started', data.executePlan.message);
+      // Refresh the plan DAG data to update node execution states on the canvas
+      refreshData();
     },
     onError: (error: any) => {
       showErrorNotification('Execution Failed', error.message);
@@ -1122,6 +1125,8 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
   const [stopExecution, { loading: stopping }] = useMutation(STOP_PLAN_EXECUTION, {
     onCompleted: (data: any) => {
       showSuccessNotification('Execution Stopped', data.stopPlanExecution.message);
+      // Refresh the plan DAG data to update node execution states on the canvas
+      refreshData();
     },
     onError: (error: any) => {
       showErrorNotification('Stop Failed', error.message);
@@ -1131,6 +1136,8 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
   const [clearExecution, { loading: clearing }] = useMutation(CLEAR_PROJECT_EXECUTION, {
     onCompleted: (data: any) => {
       showSuccessNotification('Execution State Cleared', data.clearProjectExecution.message);
+      // Refresh the plan DAG data to update node execution states on the canvas
+      refreshData();
     },
     onError: (error: any) => {
       showErrorNotification('Clear Failed', error.message);
