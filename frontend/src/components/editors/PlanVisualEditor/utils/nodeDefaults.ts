@@ -46,6 +46,11 @@ export const getDefaultNodeConfig = (type: PlanDagNodeType): NodeConfig => {
         ]
       };
 
+    case PlanDagNodeType.FILTER:
+      return {
+        filters: []
+      };
+
     case PlanDagNodeType.MERGE:
       return {
         mergeStrategy: 'Union',
@@ -76,6 +81,7 @@ export const getDefaultNodeMetadata = (type: PlanDagNodeType): NodeMetadata => {
     [PlanDagNodeType.DATA_SOURCE]: 'Data Source',
     [PlanDagNodeType.GRAPH]: 'Graph',
     [PlanDagNodeType.TRANSFORM]: 'Transform',
+    [PlanDagNodeType.FILTER]: 'Filter',
     [PlanDagNodeType.MERGE]: 'Merge',
     [PlanDagNodeType.COPY]: 'Copy',
     [PlanDagNodeType.OUTPUT]: 'Output'
@@ -91,6 +97,7 @@ export const getNodeColors = () => ({
   [PlanDagNodeType.DATA_SOURCE]: '#51cf66',
   [PlanDagNodeType.GRAPH]: '#339af0',
   [PlanDagNodeType.TRANSFORM]: '#ff8cc8',
+  [PlanDagNodeType.FILTER]: '#a78bfa',
   [PlanDagNodeType.MERGE]: '#ffd43b',
   [PlanDagNodeType.COPY]: '#74c0fc',
   [PlanDagNodeType.OUTPUT]: '#ff6b6b'
