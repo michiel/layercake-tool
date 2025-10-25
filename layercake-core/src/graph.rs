@@ -502,6 +502,46 @@ impl Graph {
         self.edges = edge_map.values().cloned().collect();
     }
 
+    /// Remove nodes that have no edges connected to them (no incoming or outgoing edges)
+    pub fn remove_unconnected_nodes(&mut self) {
+        use std::collections::HashSet;
+
+        // Collect all node IDs that are referenced in edges
+        let mut connected_nodes = HashSet::new();
+        for edge in &self.edges {
+            connected_nodes.insert(edge.source.clone());
+            connected_nodes.insert(edge.target.clone());
+        }
+
+        let original_count = self.nodes.len();
+        self.nodes.retain(|node| connected_nodes.contains(&node.id));
+        let removed_count = original_count - self.nodes.len();
+
+        if removed_count > 0 {
+            debug!("Removed {} unconnected nodes", removed_count);
+        }
+    }
+
+    /// Remove edges where either the source or target node doesn't exist
+    pub fn remove_dangling_edges(&mut self) {
+        use std::collections::HashSet;
+
+        // Collect all valid node IDs
+        let valid_node_ids: HashSet<String> = self.nodes.iter()
+            .map(|node| node.id.clone())
+            .collect();
+
+        let original_count = self.edges.len();
+        self.edges.retain(|edge| {
+            valid_node_ids.contains(&edge.source) && valid_node_ids.contains(&edge.target)
+        });
+        let removed_count = original_count - self.edges.len();
+
+        if removed_count > 0 {
+            debug!("Removed {} dangling edges", removed_count);
+        }
+    }
+
     pub fn invert_graph(&mut self) -> Result<Graph, String> {
         /*
          * Invert the graph

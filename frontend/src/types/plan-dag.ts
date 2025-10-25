@@ -27,6 +27,7 @@ export enum PlanDagNodeType {
   DATA_SOURCE = 'DataSourceNode',
   GRAPH = 'GraphNode',
   TRANSFORM = 'TransformNode',
+  FILTER = 'FilterNode',
   MERGE = 'MergeNode',
   COPY = 'CopyNode',
   OUTPUT = 'OutputNode'
@@ -86,6 +87,30 @@ export interface TransformNodeConfig {
   transforms: GraphTransform[];
 }
 
+// Filter Node Configuration
+export type GraphFilterKind =
+  | 'Preset'
+  | 'QueryText';
+
+export type FilterPresetType =
+  | 'RemoveUnconnectedNodes'
+  | 'RemoveDanglingEdges';
+
+export interface GraphFilterParams {
+  preset?: FilterPresetType;
+  queryText?: string;
+  enabled?: boolean;
+}
+
+export interface GraphFilter {
+  kind: GraphFilterKind;
+  params: GraphFilterParams;
+}
+
+export interface FilterNodeConfig {
+  filters: GraphFilter[];
+}
+
 // Merge Node Configuration
 export interface MergeNodeConfig {
   // Removed: inputRefs - inputs come from incoming edges
@@ -128,6 +153,7 @@ export type NodeConfig =
   | DataSourceNodeConfig
   | GraphNodeConfig
   | TransformNodeConfig
+  | FilterNodeConfig
   | MergeNodeConfig
   | CopyNodeConfig
   | OutputNodeConfig;

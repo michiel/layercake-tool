@@ -4,6 +4,7 @@ import {
   IconDatabase,
   IconNetwork,
   IconTransform,
+  IconFilter,
   IconGitMerge,
   IconCopy,
   IconFileExport,
@@ -60,6 +61,12 @@ export const AdvancedToolbar: React.FC<AdvancedToolbarProps> = ({
       type: PlanDagNodeType.TRANSFORM,
       label: 'Transform',
       icon: <IconTransform size="0.7rem" />,
+      color: '#8b5cf6' // Violet-500
+    },
+    {
+      type: PlanDagNodeType.FILTER,
+      label: 'Filter',
+      icon: <IconFilter size="0.7rem" />,
       color: '#8b5cf6' // Violet-500
     },
     {

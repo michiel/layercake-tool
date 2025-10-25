@@ -51,6 +51,8 @@ pub enum PlanDagNodeType {
     Graph,
     #[graphql(name = "TransformNode")]
     Transform,
+    #[graphql(name = "FilterNode")]
+    Filter,
     #[graphql(name = "MergeNode")]
     Merge,
     #[graphql(name = "CopyNode")]
@@ -612,6 +614,91 @@ mod tests {
     }
 }
 
+// Filter Node Configuration
+#[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
+#[graphql(input_name = "FilterNodeConfigInput")]
+pub struct FilterNodeConfig {
+    pub filters: Vec<GraphFilter>,
+}
+
+impl FilterNodeConfig {
+    pub fn apply_filters(&self, graph: &mut Graph) -> AnyResult<()> {
+        for filter in &self.filters {
+            if !filter.is_enabled() {
+                continue;
+            }
+            filter.apply_to(graph)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
+#[graphql(input_name = "GraphFilterInput")]
+pub struct GraphFilter {
+    pub kind: GraphFilterKind,
+    #[serde(default)]
+    #[graphql(default)]
+    pub params: GraphFilterParams,
+}
+
+impl GraphFilter {
+    pub fn is_enabled(&self) -> bool {
+        self.params.enabled.unwrap_or(true)
+    }
+
+    pub fn apply_to(&self, graph: &mut Graph) -> AnyResult<()> {
+        if !self.is_enabled() {
+            return Ok(());
+        }
+
+        match self.kind {
+            GraphFilterKind::Preset => {
+                if let Some(preset) = &self.params.preset {
+                    match preset {
+                        FilterPresetType::RemoveUnconnectedNodes => {
+                            // Remove nodes that have no edges connected to them
+                            graph.remove_unconnected_nodes();
+                        }
+                        FilterPresetType::RemoveDanglingEdges => {
+                            // Remove edges where either source or target node doesn't exist
+                            graph.remove_dangling_edges();
+                        }
+                    }
+                }
+            }
+            GraphFilterKind::QueryText => {
+                // QueryText is currently unimplemented
+                return Err(anyhow!(
+                    "QueryText filter is not yet implemented"
+                ));
+            }
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
+pub enum GraphFilterKind {
+    Preset,
+    QueryText,
+}
+
+#[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
+pub enum FilterPresetType {
+    RemoveUnconnectedNodes,
+    RemoveDanglingEdges,
+}
+
+#[derive(SimpleObject, InputObject, Clone, Debug, Default, Serialize, Deserialize)]
+#[graphql(input_name = "GraphFilterParamsInput")]
+pub struct GraphFilterParams {
+    pub preset: Option<FilterPresetType>,
+    pub query_text: Option<String>,
+    pub enabled: Option<bool>,
+}
+
 // Merge Node Configuration
 #[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
 #[graphql(input_name = "MergeNodeConfigInput")]
@@ -709,6 +796,7 @@ pub enum NodeConfig {
     DataSource(DataSourceNodeConfig),
     Graph(GraphNodeConfig),
     Transform(TransformNodeConfig),
+    Filter(FilterNodeConfig),
     Merge(MergeNodeConfig),
     Copy(CopyNodeConfig),
     Output(OutputNodeConfig),

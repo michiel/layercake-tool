@@ -3,6 +3,7 @@ import { Modal, Button, Group, Text } from '@mantine/core';
 import { PlanDagNodeType, NodeMetadata } from '../../../types/plan-dag';
 import { DataSourceNodeConfigForm } from './forms/DataSourceNodeConfigForm';
 import { TransformNodeConfigForm } from './forms/TransformNodeConfigForm';
+import { FilterNodeConfigForm } from './forms/FilterNodeConfigForm';
 import { MergeNodeConfigForm } from './forms/MergeNodeConfigForm';
 import { OutputNodeConfigForm } from './forms/OutputNodeConfigForm';
 import { GraphNodeConfigForm } from './forms/GraphNodeConfigForm';
@@ -89,6 +90,8 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
         );
       case PlanDagNodeType.TRANSFORM:
         return <TransformNodeConfigForm {...commonProps} />;
+      case PlanDagNodeType.FILTER:
+        return <FilterNodeConfigForm {...commonProps} />;
       case PlanDagNodeType.MERGE:
         return <MergeNodeConfigForm {...commonProps} />;
       case PlanDagNodeType.COPY:
@@ -108,6 +111,8 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
         return 'Graph';
       case PlanDagNodeType.TRANSFORM:
         return 'Transform';
+      case PlanDagNodeType.FILTER:
+        return 'Filter';
       case PlanDagNodeType.MERGE:
         return 'Merge';
       case PlanDagNodeType.COPY:

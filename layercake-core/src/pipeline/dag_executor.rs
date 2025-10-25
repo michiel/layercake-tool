@@ -8,7 +8,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use crate::database::entities::graphs::ActiveModel as GraphActiveModel;
 use crate::database::entities::graphs::{Column as GraphColumn, Entity as GraphEntity};
 use crate::database::entities::{graph_edges, graph_nodes, graphs, plan_dag_nodes, ExecutionState};
-use crate::graphql::types::plan_dag::TransformNodeConfig;
+use crate::graphql::types::plan_dag::{FilterNodeConfig, TransformNodeConfig};
 use crate::pipeline::layer_operations::insert_layers_to_db;
 use crate::pipeline::types::LayerData;
 use crate::pipeline::{DatasourceImporter, GraphBuilder, MergeBuilder};
@@ -120,6 +120,10 @@ impl DagExecutor {
                 self.execute_transform_node(project_id, node_id, &node_name, node, nodes, edges)
                     .await?;
             }
+            "FilterNode" => {
+                self.execute_filter_node(project_id, node_id, &node_name, node, nodes, edges)
+                    .await?;
+            }
             "CopyNode" => {
                 return Err(anyhow!("Node type {} not yet implemented", node.node_type));
             }
@@ -210,6 +214,85 @@ impl DagExecutor {
         .await
     }
 
+    async fn execute_filter_node(
+        &self,
+        project_id: i32,
+        node_id: &str,
+        node_name: &str,
+        node: &plan_dag_nodes::Model,
+        nodes: &[plan_dag_nodes::Model],
+        edges: &[(String, String)],
+    ) -> Result<()> {
+        let config: FilterNodeConfig = serde_json::from_str(&node.config_json)
+            .with_context(|| format!("Failed to parse filter config for node {}", node_id))?;
+
+        let upstream_ids = self.get_upstream_nodes(node_id, edges);
+        if upstream_ids.len() != 1 {
+            return Err(anyhow!(
+                "FilterNode {} expects exactly one upstream graph, found {}",
+                node_id,
+                upstream_ids.len()
+            ));
+        }
+        let upstream_node_id = &upstream_ids[0];
+
+        let upstream_node = nodes
+            .iter()
+            .find(|n| &n.id == upstream_node_id)
+            .ok_or_else(|| anyhow!("Upstream node {} not found", upstream_node_id))?;
+
+        match upstream_node.node_type.as_str() {
+            "GraphNode" | "MergeNode" | "TransformNode" | "FilterNode" => {}
+            other => {
+                return Err(anyhow!(
+                    "FilterNode {} cannot consume from node type {} (node {})",
+                    node_id,
+                    other,
+                    upstream_node_id
+                ));
+            }
+        }
+
+        let upstream_graph = GraphEntity::find()
+            .filter(GraphColumn::ProjectId.eq(project_id))
+            .filter(GraphColumn::NodeId.eq(upstream_node_id))
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| {
+                anyhow!(
+                    "No graph output found for upstream node {}",
+                    upstream_node_id
+                )
+            })?;
+
+        let graph_service = GraphService::new(self.db.clone());
+        let mut graph = graph_service
+            .build_graph_from_dag_graph(upstream_graph.id)
+            .await
+            .with_context(|| {
+                format!(
+                    "Failed to materialize graph for upstream node {}",
+                    upstream_node_id
+                )
+            })?;
+
+        config
+            .apply_filters(&mut graph)
+            .with_context(|| format!("Failed to execute filters for node {}", node_id))?;
+
+        graph.name = node_name.to_string();
+
+        self.persist_filtered_graph(
+            project_id,
+            node_id,
+            node_name,
+            &config,
+            &upstream_graph,
+            &graph,
+        )
+        .await
+    }
+
     async fn persist_transformed_graph(
         &self,
         project_id: i32,
@@ -254,6 +337,65 @@ impl DagExecutor {
         active.metadata = Set(metadata);
         active = active.set_completed(
             transform_hash,
+            graph.nodes.len() as i32,
+            graph.edges.len() as i32,
+        );
+        let updated = active.update(&self.db).await?;
+
+        // Publish execution status change
+        #[cfg(feature = "graphql")]
+        crate::graphql::execution_events::publish_graph_status(
+            &self.db, project_id, node_id, &updated,
+        )
+        .await;
+
+        Ok(())
+    }
+
+    async fn persist_filtered_graph(
+        &self,
+        project_id: i32,
+        node_id: &str,
+        node_name: &str,
+        config: &FilterNodeConfig,
+        upstream_graph: &graphs::Model,
+        graph: &crate::graph::Graph,
+    ) -> Result<()> {
+        let metadata = Some(json!({
+            "filters": config.filters,
+            "upstreamGraphId": upstream_graph.id,
+        }));
+
+        let mut graph_record = self
+            .get_or_create_graph_record(project_id, node_id, node_name, metadata.clone())
+            .await?;
+
+        let filter_hash = self.compute_filter_hash(node_id, upstream_graph, config)?;
+
+        if graph_record.source_hash.as_deref() == Some(&filter_hash) {
+            return Ok(());
+        }
+
+        let mut active: GraphActiveModel = graph_record.clone().into();
+        active = active.set_state(ExecutionState::Processing);
+        graph_record = active.update(&self.db).await?;
+
+        // Publish execution status change
+        #[cfg(feature = "graphql")]
+        crate::graphql::execution_events::publish_graph_status(
+            &self.db,
+            project_id,
+            node_id,
+            &graph_record,
+        )
+        .await;
+
+        self.persist_graph_contents(graph_record.id, graph).await?;
+
+        let mut active: GraphActiveModel = graph_record.into();
+        active.metadata = Set(metadata);
+        active = active.set_completed(
+            filter_hash,
             graph.nodes.len() as i32,
             graph.edges.len() as i32,
         );
@@ -320,6 +462,24 @@ impl DagExecutor {
         node_id: &str,
         upstream_graph: &graphs::Model,
         config: &TransformNodeConfig,
+    ) -> Result<String> {
+        let mut hasher = Sha256::new();
+        hasher.update(node_id.as_bytes());
+        hasher.update(upstream_graph.id.to_le_bytes());
+        hasher.update(upstream_graph.updated_at.timestamp_micros().to_le_bytes());
+        if let Some(hash) = &upstream_graph.source_hash {
+            hasher.update(hash.as_bytes());
+        }
+        let serialized = serde_json::to_vec(config)?;
+        hasher.update(&serialized);
+        Ok(format!("{:x}", hasher.finalize()))
+    }
+
+    fn compute_filter_hash(
+        &self,
+        node_id: &str,
+        upstream_graph: &graphs::Model,
+        config: &FilterNodeConfig,
     ) -> Result<String> {
         let mut hasher = Sha256::new();
         hasher.update(node_id.as_bytes());
