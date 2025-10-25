@@ -9,7 +9,10 @@ import {
   IconFileExport,
   IconArrowRight,
   IconArrowDown,
-  IconZoomScan
+  IconZoomScan,
+  IconPlayerPlay,
+  IconPlayerStop,
+  IconTrash
 } from '@tabler/icons-react';
 import { PlanDagNodeType } from '../../../../types/plan-dag';
 
@@ -20,6 +23,9 @@ interface AdvancedToolbarProps {
   onAutoLayoutHorizontal: () => void;
   onAutoLayoutVertical: () => void;
   onFitView: () => void;
+  onPlay: () => void;
+  onStop: () => void;
+  onClear: () => void;
 }
 
 const isTauri = !!(window as any).__TAURI__;
@@ -31,6 +37,9 @@ export const AdvancedToolbar: React.FC<AdvancedToolbarProps> = ({
   onAutoLayoutHorizontal,
   onAutoLayoutVertical,
   onFitView,
+  onPlay,
+  onStop,
+  onClear,
 }) => {
   if (readonly) return null;
 
@@ -82,50 +91,74 @@ export const AdvancedToolbar: React.FC<AdvancedToolbarProps> = ({
   };
 
   return (
-    <Group gap="xs" p="md" style={{ borderBottom: '1px solid #e9ecef' }}>
-      {/* Node Palette */}
-      <Group gap={4}>
-        <Text size="xs" fw={500} c="gray.6">Nodes:</Text>
-        {nodeTypes.map((nodeType) => (
-          <Tooltip key={nodeType.type} label={`Drag to add ${nodeType.label}`}>
-            <ActionIcon
-              size="sm"
-              variant="light"
-              style={{ backgroundColor: nodeType.color, color: 'white', cursor: 'grab' }}
-              draggable={!isTauri}
-              onDragStart={(event) => handleNodeDragStart(event, nodeType.type)}
-              onMouseDown={(event) => handleNodePointerDragStart(event, nodeType.type)}
-            >
-              {nodeType.icon}
+    <Group gap="xs" p="md" style={{ borderBottom: '1px solid #e9ecef' }} justify="space-between">
+      {/* Left side - Node Palette, Auto-Layout, Fit View */}
+      <Group gap="xs">
+        {/* Node Palette */}
+        <Group gap={4}>
+          <Text size="xs" fw={500} c="gray.6">Nodes:</Text>
+          {nodeTypes.map((nodeType) => (
+            <Tooltip key={nodeType.type} label={`Drag to add ${nodeType.label}`}>
+              <ActionIcon
+                size="sm"
+                variant="light"
+                style={{ backgroundColor: nodeType.color, color: 'white', cursor: 'grab' }}
+                draggable={!isTauri}
+                onDragStart={(event) => handleNodeDragStart(event, nodeType.type)}
+                onMouseDown={(event) => handleNodePointerDragStart(event, nodeType.type)}
+              >
+                {nodeType.icon}
+              </ActionIcon>
+            </Tooltip>
+          ))}
+        </Group>
+
+        {/* Auto-Layout Operations */}
+        <Divider orientation="vertical" />
+        <Text size="xs" c="dimmed">Auto-layout:</Text>
+        <Group gap="xs">
+          <Tooltip label="Auto-layout Horizontal" position="bottom">
+            <ActionIcon variant="subtle" color="blue" onClick={onAutoLayoutHorizontal}>
+              <IconArrowRight size="1rem" />
             </ActionIcon>
           </Tooltip>
-        ))}
+
+          <Tooltip label="Auto-layout Vertical" position="bottom">
+            <ActionIcon variant="subtle" color="blue" onClick={onAutoLayoutVertical}>
+              <IconArrowDown size="1rem" />
+            </ActionIcon>
+          </Tooltip>
+        </Group>
+
+        {/* Fit View */}
+        <Divider orientation="vertical" />
+        <Tooltip label="Fit View (Zoom to see all nodes)" position="bottom">
+          <ActionIcon variant="subtle" color="gray" onClick={onFitView}>
+            <IconZoomScan size="1rem" />
+          </ActionIcon>
+        </Tooltip>
       </Group>
 
-      {/* Auto-Layout Operations */}
-      <Divider orientation="vertical" />
-      <Text size="xs" c="dimmed">Auto-layout:</Text>
+      {/* Right side - Execution Controls */}
       <Group gap="xs">
-        <Tooltip label="Auto-layout Horizontal" position="bottom">
-          <ActionIcon variant="subtle" color="blue" onClick={onAutoLayoutHorizontal}>
-            <IconArrowRight size="1rem" />
+        <Tooltip label="Stop execution" position="bottom">
+          <ActionIcon variant="subtle" color="red" onClick={onStop}>
+            <IconPlayerStop size="1.2rem" />
           </ActionIcon>
         </Tooltip>
 
-        <Tooltip label="Auto-layout Vertical" position="bottom">
-          <ActionIcon variant="subtle" color="blue" onClick={onAutoLayoutVertical}>
-            <IconArrowDown size="1rem" />
+        <Tooltip label="Clear execution state (reset all nodes)" position="bottom">
+          <ActionIcon variant="subtle" color="orange" onClick={onClear}>
+            <IconTrash size="1.2rem" />
+          </ActionIcon>
+        </Tooltip>
+
+        <Tooltip label="Execute DAG (optimal execution)" position="bottom">
+          <ActionIcon variant="filled" color="green" onClick={onPlay}>
+            <IconPlayerPlay size="1.2rem" />
           </ActionIcon>
         </Tooltip>
       </Group>
-
-      {/* Fit View */}
-      <Divider orientation="vertical" />
-      <Tooltip label="Fit View (Zoom to see all nodes)" position="bottom">
-        <ActionIcon variant="subtle" color="gray" onClick={onFitView}>
-          <IconZoomScan size="1rem" />
-        </ActionIcon>
-      </Tooltip>
     </Group>
   );
 };

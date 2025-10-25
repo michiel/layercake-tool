@@ -1107,6 +1107,25 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     fitView({ padding: 0.2, includeHiddenNodes: false, duration: 300 });
   }, [fitView]);
 
+  // Execution control handlers
+  const handlePlay = useCallback(() => {
+    console.log('[PlanVisualEditor] Execute DAG requested');
+    // TODO: Implement optimal DAG execution
+    alert('Execute DAG - Feature to be implemented');
+  }, []);
+
+  const handleStop = useCallback(() => {
+    console.log('[PlanVisualEditor] Stop execution requested');
+    // TODO: Implement stop execution
+    alert('Stop Execution - Feature to be implemented');
+  }, []);
+
+  const handleClear = useCallback(() => {
+    console.log('[PlanVisualEditor] Clear execution state requested');
+    // TODO: Implement clear execution state (keep edits, config, datasources)
+    alert('Clear Execution State - Feature to be implemented');
+  }, []);
+
   // Handle connection start - track source node
   const handleConnectStart = useCallback(
     (_event: any, params: { nodeId: string | null; handleId: string | null }) => {
@@ -1444,7 +1463,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         }
       `}</style>
 
-      {/* Simplified Toolbar - Node palette, auto-layout, and fit view only */}
+      {/* Simplified Toolbar - Node palette, auto-layout, fit view, and execution controls */}
       <AdvancedToolbar
         readonly={readonly}
         onNodeDragStart={handleNodeDragStart}
@@ -1452,6 +1471,9 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         onAutoLayoutHorizontal={handleAutoLayoutHorizontal}
         onAutoLayoutVertical={handleAutoLayoutVertical}
         onFitView={handleFitView}
+        onPlay={handlePlay}
+        onStop={handleStop}
+        onClear={handleClear}
       />
 
       <div
