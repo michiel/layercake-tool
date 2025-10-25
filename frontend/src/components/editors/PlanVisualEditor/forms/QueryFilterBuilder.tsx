@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import {
   Card,
   Stack,
@@ -244,12 +244,27 @@ export const QueryFilterBuilder: React.FC<QueryFilterBuilderProps> = ({ value, o
     });
   }, [mergedConfig.ruleGroup]);
 
-  const handleConfigChange = (partial: Partial<QueryFilterConfig>) => {
+  const handleConfigChange = useCallback((partial: Partial<QueryFilterConfig>) => {
     onChange({
       ...mergedConfig,
       ...partial,
     });
-  };
+  }, [mergedConfig, onChange]);
+
+  const ruleGroupJsonRef = useRef(JSON.stringify(mergedConfig.ruleGroup));
+
+  useEffect(() => {
+    ruleGroupJsonRef.current = JSON.stringify(mergedConfig.ruleGroup);
+  }, [mergedConfig.ruleGroup]);
+
+  const handleRuleGroupChange = useCallback((ruleGroup: RuleGroupType) => {
+    const nextJson = JSON.stringify(ruleGroup);
+    if (nextJson === ruleGroupJsonRef.current) {
+      return;
+    }
+    ruleGroupJsonRef.current = nextJson;
+    handleConfigChange({ ruleGroup });
+  }, [handleConfigChange]);
 
   const safeTargets: QueryFilterTarget[] = mergedConfig.targets?.length
     ? mergedConfig.targets
@@ -344,7 +359,7 @@ export const QueryFilterBuilder: React.FC<QueryFilterBuilderProps> = ({ value, o
           <QueryBuilder
             fields={availableFields}
             query={mergedConfig.ruleGroup}
-            onQueryChange={ruleGroup => handleConfigChange({ ruleGroup })}
+            onQueryChange={handleRuleGroupChange}
             controlClassnames={{ queryBuilder: 'lc-query-builder' }}
           />
         </Stack>
