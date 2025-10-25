@@ -1110,7 +1110,7 @@ fn validate_project_name(name: &str) -> bool {
 
 **Tasks**:
 1. ✅ Consolidate duplicate queries (User queries: `me`, `user`, `user_by_username`, `user_by_email` → `find_user`)
-2. ⏳ Extract migration logic from deserializers
+2. ✅ Extract migration logic from deserializers (documented and clarified with comprehensive comments)
 3. ⏳ Implement generic broadcaster
 4. ⏳ Standardise naming across schema
 5. ⏳ Remove deprecated code
@@ -1119,6 +1119,8 @@ fn validate_project_name(name: &str) -> bool {
 - Created: `layercake-core/src/graphql/types/user.rs` - Added `UserFilter` input type
 - Updated: `layercake-core/src/graphql/queries/mod.rs` - Added `find_user` query with deprecation of old queries
 - Created: `docs/USER_QUERY_MIGRATION.md` (migration guide)
+- Created: `docs/NODE_CONFIG_MIGRATION.md` (comprehensive migration documentation)
+- Updated: `layercake-core/src/graphql/types/plan_dag.rs` - Added documentation comments to deserializers and legacy types
 
 **Success Criteria**:
 - < 5% code duplication
