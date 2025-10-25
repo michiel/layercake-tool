@@ -20,7 +20,10 @@ use crate::server::websocket::websocket_handler;
 #[cfg(feature = "graphql")]
 use crate::services::{ExportService, GraphService, ImportService, PlanDagService};
 #[cfg(feature = "graphql")]
-use async_graphql::{Request, Response as GraphQLResponse, Schema};
+use async_graphql::{
+    parser::types::{DocumentOperations, OperationType, Selection},
+    Request, Response as GraphQLResponse, Schema,
+};
 #[cfg(feature = "graphql")]
 use std::sync::Arc;
 
@@ -158,7 +161,40 @@ async fn graphql_handler(
     Json(req): Json<Request>,
 ) -> Json<GraphQLResponse> {
     tracing::debug!("GraphQL request received");
+    let mut req = req;
+    let mutation_log = capture_mutation_log_info(&mut req);
     let response = state.graphql_schema.execute(req).await;
+
+    if let Some(info) = mutation_log {
+        let has_errors = !response.errors.is_empty();
+        let status = if has_errors { "ERROR" } else { "OK" };
+
+        if has_errors {
+            let error_summary = response
+                .errors
+                .iter()
+                .map(|err| err.message.as_str())
+                .collect::<Vec<_>>()
+                .join(" | ");
+            tracing::info!(
+                target: "graphql::mutation",
+                "mutation={} status={} params={} error={}",
+                info.field_name,
+                status,
+                info.params_json,
+                error_summary
+            );
+        } else {
+            tracing::info!(
+                target: "graphql::mutation",
+                "mutation={} status={} params={}",
+                info.field_name,
+                status,
+                info.params_json
+            );
+        }
+    }
+
     tracing::debug!("GraphQL request completed");
     Json(response)
 }
@@ -168,6 +204,53 @@ async fn graphql_playground() -> impl axum::response::IntoResponse {
     axum::response::Html(async_graphql::http::playground_source(
         async_graphql::http::GraphQLPlaygroundConfig::new("/graphql"),
     ))
+}
+
+#[cfg(feature = "graphql")]
+struct MutationLogInfo {
+    field_name: String,
+    params_json: String,
+}
+
+#[cfg(feature = "graphql")]
+fn capture_mutation_log_info(req: &mut Request) -> Option<MutationLogInfo> {
+    let operation_name_owned = req.operation_name.clone();
+    let doc = req.parsed_query().ok()?;
+    let operation_name = operation_name_owned.as_deref();
+
+    let op = match &doc.operations {
+        DocumentOperations::Single(operation) => operation,
+        DocumentOperations::Multiple(map) => {
+            let name = operation_name?;
+            map.get(name)?
+        }
+    };
+
+    if op.node.ty != OperationType::Mutation {
+        return None;
+    }
+
+    let field_name =
+        op.node
+            .selection_set
+            .node
+            .items
+            .iter()
+            .find_map(|selection| match &selection.node {
+                Selection::Field(field) => Some(field.node.name.node.to_string()),
+                _ => None,
+            })?;
+
+    let params_json = serde_json::json!({
+        "operationName": operation_name_owned,
+        "variables": req.variables.clone(),
+    })
+    .to_string();
+
+    Some(MutationLogInfo {
+        field_name,
+        params_json,
+    })
 }
 
 #[cfg(feature = "graphql")]
