@@ -22,8 +22,10 @@ const formatFilter = (filter: GraphFilter): string | null => {
   switch (kind) {
     case 'Preset':
       return params.preset ? FRIENDLY_NAMES[params.preset] || params.preset : 'Preset filter'
-    case 'QueryText':
-      return params.queryText ? `Query: ${params.queryText}` : 'Query text filter'
+    case 'Query': {
+      const targets = params.queryConfig?.targets?.join(', ') || 'nodes'
+      return params.queryConfig ? `Query filter (${targets})` : 'Query filter'
+    }
     default:
       return kind
   }

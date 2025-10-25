@@ -5,6 +5,8 @@
  * the visual editing data structures for Plan DAGs in ReactFlow.
  */
 
+import type { RuleGroupType } from 'react-querybuilder';
+
 // Position interface for ReactFlow nodes
 export interface Position {
   x: number;
@@ -88,17 +90,27 @@ export interface TransformNodeConfig {
 }
 
 // Filter Node Configuration
-export type GraphFilterKind =
-  | 'Preset'
-  | 'QueryText';
+export type GraphFilterKind = 'Preset' | 'Query';
 
 export type FilterPresetType =
   | 'RemoveUnconnectedNodes'
   | 'RemoveDanglingEdges';
 
+export type QueryFilterTarget = 'nodes' | 'edges' | 'layers';
+export type QueryLinkPruningMode = 'autoDropDanglingEdges' | 'retainEdges' | 'dropOrphanNodes';
+
+export interface QueryFilterConfig {
+  targets: QueryFilterTarget[];
+  mode: 'include' | 'exclude';
+  linkPruningMode: QueryLinkPruningMode;
+  ruleGroup: RuleGroupType;
+  fieldMetadataVersion: string;
+  notes?: string;
+}
+
 export interface GraphFilterParams {
   preset?: FilterPresetType;
-  queryText?: string;
+  queryConfig?: QueryFilterConfig;
   enabled?: boolean;
 }
 

@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::database::entities::{data_sources, plan_dag_edges, plan_dag_nodes};
 use crate::graph::Graph;
+use crate::graphql::types::scalars::JSON;
 
 // Position for ReactFlow nodes
 #[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
@@ -667,11 +668,8 @@ impl GraphFilter {
                     }
                 }
             }
-            GraphFilterKind::QueryText => {
-                // QueryText is currently unimplemented
-                return Err(anyhow!(
-                    "QueryText filter is not yet implemented"
-                ));
+            GraphFilterKind::Query => {
+                return Err(anyhow!("Query filter is not yet implemented"));
             }
         }
 
@@ -682,7 +680,7 @@ impl GraphFilter {
 #[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub enum GraphFilterKind {
     Preset,
-    QueryText,
+    Query,
 }
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
@@ -693,10 +691,58 @@ pub enum FilterPresetType {
 
 #[derive(SimpleObject, InputObject, Clone, Debug, Default, Serialize, Deserialize)]
 #[graphql(input_name = "GraphFilterParamsInput")]
+#[serde(rename_all = "camelCase")]
 pub struct GraphFilterParams {
     pub preset: Option<FilterPresetType>,
-    pub query_text: Option<String>,
+    #[graphql(name = "queryConfig")]
+    pub query_config: Option<QueryFilterConfig>,
     pub enabled: Option<bool>,
+}
+
+#[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
+#[graphql(input_name = "QueryFilterConfigInput")]
+#[serde(rename_all = "camelCase")]
+pub struct QueryFilterConfig {
+    pub targets: Vec<QueryFilterTarget>,
+    pub mode: QueryFilterMode,
+    #[graphql(name = "linkPruningMode")]
+    pub link_pruning_mode: QueryLinkPruningMode,
+    #[graphql(name = "ruleGroup")]
+    pub rule_group: JSON,
+    #[graphql(name = "fieldMetadataVersion")]
+    pub field_metadata_version: String,
+    pub notes: Option<String>,
+}
+
+#[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum QueryFilterTarget {
+    #[graphql(name = "nodes")]
+    Nodes,
+    #[graphql(name = "edges")]
+    Edges,
+    #[graphql(name = "layers")]
+    Layers,
+}
+
+#[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum QueryFilterMode {
+    #[graphql(name = "include")]
+    Include,
+    #[graphql(name = "exclude")]
+    Exclude,
+}
+
+#[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum QueryLinkPruningMode {
+    #[graphql(name = "autoDropDanglingEdges")]
+    AutoDropDanglingEdges,
+    #[graphql(name = "retainEdges")]
+    RetainEdges,
+    #[graphql(name = "dropOrphanNodes")]
+    DropOrphanNodes,
 }
 
 // Merge Node Configuration

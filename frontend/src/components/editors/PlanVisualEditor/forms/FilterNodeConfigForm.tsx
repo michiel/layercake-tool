@@ -19,6 +19,7 @@ import {
   GraphFilterKind,
   FilterPresetType,
   FilterNodeConfig,
+  QueryFilterConfig,
 } from '../../../../types/plan-dag';
 
 interface FilterNodeConfigFormProps {
@@ -32,7 +33,7 @@ type FilterParamKey = keyof GraphFilter['params'];
 
 const FILTER_KIND_OPTIONS: { value: GraphFilterKind; label: string }[] = [
   { value: 'Preset', label: 'Preset Filter' },
-  { value: 'QueryText', label: 'Query Text Filter' },
+  { value: 'Query', label: 'Query Filter' },
 ];
 
 const PRESET_OPTIONS: { value: FilterPresetType; label: string }[] = [
@@ -40,12 +41,20 @@ const PRESET_OPTIONS: { value: FilterPresetType; label: string }[] = [
   { value: 'RemoveDanglingEdges', label: 'Remove Dangling Edges' },
 ];
 
+const getDefaultQueryConfig = (): QueryFilterConfig => ({
+  targets: ['nodes'],
+  mode: 'include',
+  linkPruningMode: 'autoDropDanglingEdges',
+  ruleGroup: { combinator: 'and', rules: [] },
+  fieldMetadataVersion: 'v1',
+});
+
 const getDefaultParams = (kind: GraphFilterKind): GraphFilter['params'] => {
   switch (kind) {
     case 'Preset':
       return { preset: 'RemoveUnconnectedNodes', enabled: true };
-    case 'QueryText':
-      return { queryText: '', enabled: true };
+    case 'Query':
+      return { queryConfig: getDefaultQueryConfig(), enabled: true };
     default:
       return { enabled: true };
   }
@@ -82,9 +91,8 @@ const isFilterValid = (filter: GraphFilter): boolean => {
   switch (filter.kind) {
     case 'Preset':
       return Boolean(filter.params.preset);
-    case 'QueryText':
-      // Query text is currently unimplemented, so we just allow it to exist
-      return true;
+    case 'Query':
+      return !!filter.params.queryConfig;
     default:
       return true;
   }
@@ -122,10 +130,10 @@ export const FilterNodeConfigForm: React.FC<FilterNodeConfigFormProps> = ({
     setIsValid(isValid);
   }, [localFilters, setIsValid]);
 
-  const updateFilterParam = (
+  const updateFilterParam = <K extends FilterParamKey>(
     index: number,
-    key: FilterParamKey,
-    value: string | boolean | undefined
+    key: K,
+    value: GraphFilter['params'][K]
   ) => {
     setLocalFilters(prev => {
       const copy = [...prev];
@@ -206,20 +214,26 @@ export const FilterNodeConfigForm: React.FC<FilterNodeConfigFormProps> = ({
             />
           </Stack>
         );
-      case 'QueryText':
+      case 'Query':
         return (
           <Stack gap="xs">
             <TextInput
-              label="Query Text"
-              description="Filter using query text (currently unimplemented)"
-              value={filter.params.queryText ?? ''}
-              onChange={event => updateFilterParam(index, 'queryText', event.currentTarget.value)}
-              placeholder="Enter query text..."
+              label="Query Filter"
+              description="Advanced query builder coming soon"
+              value={filter.params.queryConfig?.notes ?? ''}
+              onChange={event =>
+                updateFilterParam(index, 'queryConfig', {
+                  ...(filter.params.queryConfig ?? getDefaultQueryConfig()),
+                  notes: event.currentTarget.value,
+                })
+              }
+              placeholder="Add an optional note..."
               disabled
             />
             <Alert icon={<IconInfoCircle size="1rem" />} color="yellow">
               <Text size="sm">
-                Query text filtering is not yet implemented and will be available in a future update.
+                Query filtering is under construction. Notes can be added now; query builder integration will
+                land shortly.
               </Text>
             </Alert>
             <Switch
