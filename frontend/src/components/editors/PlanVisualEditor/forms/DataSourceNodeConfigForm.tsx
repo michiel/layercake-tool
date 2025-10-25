@@ -52,15 +52,19 @@ export const DataSourceNodeConfigForm: React.FC<DataSourceNodeConfigFormProps> =
   const [localConfig, setLocalConfig] = useState<DataSourceNodeConfig>({
     ...config,
   });
+  const lastSentConfigRef = React.useRef<DataSourceNodeConfig>(localConfig);
 
   const { data, loading, error } = useQuery<GetAvailableDataSourcesData>(GET_AVAILABLE_DATA_SOURCES, {
     variables: { projectId },
     skip: !projectId,
   });
 
-  // Update parent config when local config changes
+  // Update parent config when local config changes (but avoid loops)
   useEffect(() => {
-    setConfig(localConfig);
+    if (JSON.stringify(localConfig) !== JSON.stringify(lastSentConfigRef.current)) {
+      setConfig(localConfig);
+      lastSentConfigRef.current = localConfig;
+    }
   }, [localConfig, setConfig]);
 
   // Validate configuration

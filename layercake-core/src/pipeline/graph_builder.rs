@@ -7,7 +7,7 @@ use super::layer_operations::insert_layers_to_db;
 use super::types::LayerData;
 use crate::database::entities::ExecutionState;
 use crate::database::entities::{
-    data_sources, datasources, graph_edges, graph_nodes, graphs, graph_layers, plan_dag_nodes,
+    data_sources, datasources, graph_edges, graph_layers, graph_nodes, graphs, plan_dag_nodes,
 };
 use crate::services::GraphEditService;
 use tracing::{info, warn};
@@ -522,7 +522,8 @@ impl GraphBuilder {
                     }
 
                     // Extract graph_layers from graph JSON
-                    if let Some(layers_array) = graph_data.get("graph_layers").and_then(|v| v.as_array())
+                    if let Some(layers_array) =
+                        graph_data.get("graph_layers").and_then(|v| v.as_array())
                     {
                         for layer_val in layers_array {
                             let layer_id = layer_val["id"]
@@ -562,7 +563,14 @@ impl GraphBuilder {
                             if let Some(obj) = layer_val.as_object() {
                                 for (key, value) in obj {
                                     // Skip fields that are now first-class fields
-                                    if !matches!(key.as_str(), "id" | "label" | "background_color" | "text_color" | "border_color" | "comment") {
+                                    if !matches!(
+                                        key.as_str(),
+                                        "id" | "label"
+                                            | "background_color"
+                                            | "text_color"
+                                            | "border_color"
+                                            | "comment"
+                                    ) {
                                         properties.insert(key.clone(), value.clone());
                                     }
                                 }
@@ -590,7 +598,8 @@ impl GraphBuilder {
                 }
                 "graph_layers" => {
                     // Extract graph_layers from datasource
-                    if let Some(layers_array) = graph_data.get("graph_layers").and_then(|v| v.as_array())
+                    if let Some(layers_array) =
+                        graph_data.get("graph_layers").and_then(|v| v.as_array())
                     {
                         for layer_val in layers_array {
                             let layer_id = layer_val["id"]
@@ -630,7 +639,14 @@ impl GraphBuilder {
                             if let Some(obj) = layer_val.as_object() {
                                 for (key, value) in obj {
                                     // Skip fields that are now first-class fields
-                                    if !matches!(key.as_str(), "id" | "label" | "background_color" | "text_color" | "border_color" | "comment") {
+                                    if !matches!(
+                                        key.as_str(),
+                                        "id" | "label"
+                                            | "background_color"
+                                            | "text_color"
+                                            | "border_color"
+                                            | "comment"
+                                    ) {
                                         properties.insert(key.clone(), value.clone());
                                     }
                                 }
@@ -913,8 +929,10 @@ impl GraphBuilder {
     /// Clear existing graph data
     async fn clear_graph_data(&self, graph_id: i32) -> Result<()> {
         use crate::database::entities::graph_edges::{Column as EdgeColumn, Entity as EdgeEntity};
+        use crate::database::entities::graph_layers::{
+            Column as LayerColumn, Entity as LayerEntity,
+        };
         use crate::database::entities::graph_nodes::{Column as NodeColumn, Entity as NodeEntity};
-        use crate::database::entities::graph_layers::{Column as LayerColumn, Entity as LayerEntity};
         use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
         // Delete edges

@@ -1,6 +1,6 @@
 use crate::database::entities::{
-    graph_edges, graph_edges::Entity as GraphEdges, graph_nodes, graph_nodes::Entity as GraphNodes,
-    graph_layers, graph_layers::Entity as Layers, plan_dag_edges, plan_dag_nodes,
+    graph_edges, graph_edges::Entity as GraphEdges, graph_layers, graph_layers::Entity as Layers,
+    graph_nodes, graph_nodes::Entity as GraphNodes, plan_dag_edges, plan_dag_nodes,
 };
 use crate::graph::{Edge, Graph, Layer, Node};
 use anyhow::Result;

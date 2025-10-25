@@ -84,7 +84,12 @@ impl GraphEditService {
     }
 
     /// Update graph metadata after creating an edit
-    async fn update_graph_edit_metadata(&self, graph_id: i32, sequence_number: i32, applied: bool) -> Result<()> {
+    async fn update_graph_edit_metadata(
+        &self,
+        graph_id: i32,
+        sequence_number: i32,
+        applied: bool,
+    ) -> Result<()> {
         use crate::database::entities::graphs::{self, Entity as Graphs};
 
         let graph = Graphs::find_by_id(graph_id)

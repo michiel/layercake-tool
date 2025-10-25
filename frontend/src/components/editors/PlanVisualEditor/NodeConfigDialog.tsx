@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { Modal, Button, Group, Text } from '@mantine/core';
 import { PlanDagNodeType, NodeMetadata } from '../../../types/plan-dag';
 import { DataSourceNodeConfigForm } from './forms/DataSourceNodeConfigForm';
@@ -45,14 +45,19 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
   config: initialConfig,
   metadata: initialMetadata,
 }) => {
-  const [config, setConfig] = React.useState(initialConfig);
-  const [metadata, setMetadata] = React.useState<NodeMetadata>(sanitizeMetadata(initialMetadata));
-  const [isValid, setIsValid] = React.useState(false);
+  const [config, setConfigState] = React.useState(initialConfig);
+  const [metadata, setMetadataState] = React.useState<NodeMetadata>(sanitizeMetadata(initialMetadata));
+  const [isValid, setIsValidState] = React.useState(false);
+
+  // Memoize setters to prevent infinite loops in child components
+  const setConfig = useCallback((newConfig: React.SetStateAction<any>) => setConfigState(newConfig), []);
+  const setMetadata = useCallback((newMetadata: React.SetStateAction<NodeMetadata>) => setMetadataState(newMetadata), []);
+  const setIsValid = useCallback((valid: React.SetStateAction<boolean>) => setIsValidState(valid), []);
 
   React.useEffect(() => {
     if (opened) {
-      setConfig(initialConfig);
-      setMetadata(sanitizeMetadata(initialMetadata));
+      setConfigState(initialConfig);
+      setMetadataState(sanitizeMetadata(initialMetadata));
     }
   }, [opened, initialConfig, initialMetadata]);
 

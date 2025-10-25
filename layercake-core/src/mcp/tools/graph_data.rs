@@ -15,9 +15,9 @@ use serde_json::{json, Map, Value};
 use crate::database::entities::execution_state::ExecutionState;
 use crate::database::entities::{
     graph_edges::{self, Column as GraphEdgeColumn, Entity as GraphEdges},
+    graph_layers::{Column as LayerColumn, Entity as Layers},
     graph_nodes::{self, Column as GraphNodeColumn, Entity as GraphNodes},
     graphs::{self, Column as GraphColumn, Entity as Graphs},
-    graph_layers::{Column as LayerColumn, Entity as Layers},
     plan_dag_nodes,
 };
 use crate::mcp::tools::{create_success_response, get_optional_param, get_required_param};
@@ -30,7 +30,8 @@ pub fn get_graph_data_tools() -> Vec<Tool> {
     vec![
         Tool {
             name: "import_csv".to_string(),
-            description: "Import graph data (nodes, edges, graph_layers) from CSV content".to_string(),
+            description: "Import graph data (nodes, edges, graph_layers) from CSV content"
+                .to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {

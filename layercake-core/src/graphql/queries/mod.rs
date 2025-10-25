@@ -2,7 +2,7 @@ use async_graphql::*;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
 use crate::database::entities::{
-    data_sources, graph_edges, graph_nodes, graphs, graph_layers, library_sources, plan_dag_edges,
+    data_sources, graph_edges, graph_layers, graph_nodes, graphs, library_sources, plan_dag_edges,
     plan_dag_nodes, plans, project_collaborators, projects, user_sessions, users,
 };
 use crate::graphql::context::GraphQLContext;

@@ -40,6 +40,7 @@
     "graphql-ws": "^6.0.6",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
+    "react-querybuilder": "^8.11.1",
     "react-router-dom": "^7.9.1",
     "reactflow": "^11.11.4",
     "tweakpane": "^4.0.5"

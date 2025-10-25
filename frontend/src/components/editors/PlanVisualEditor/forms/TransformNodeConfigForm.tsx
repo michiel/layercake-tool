@@ -194,19 +194,24 @@ export const TransformNodeConfigForm: React.FC<TransformNodeConfigFormProps> = (
   const [localTransforms, setLocalTransforms] = useState<GraphTransform[]>(
     normalizeTransforms(initialConfig.transforms ?? [])
   );
+  const lastSentConfigRef = React.useRef<GraphTransform[]>(localTransforms);
 
   // Sync incoming config (e.g. when switching nodes)
   useEffect(() => {
     const normalized = normalizeTransforms(coerceTransformConfig(config).transforms ?? []);
     if (!transformsEqual(normalized, localTransforms)) {
       setLocalTransforms(normalized);
+      lastSentConfigRef.current = normalized;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config]);
 
-  // Update parent config when local config changes
+  // Update parent config when local config changes (but avoid loops)
   useEffect(() => {
-    setConfig({ transforms: localTransforms });
+    if (!transformsEqual(localTransforms, lastSentConfigRef.current)) {
+      setConfig({ transforms: localTransforms });
+      lastSentConfigRef.current = localTransforms;
+    }
   }, [localTransforms, setConfig]);
 
   // Validate configuration

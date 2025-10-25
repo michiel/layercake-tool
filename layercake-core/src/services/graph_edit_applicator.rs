@@ -8,8 +8,8 @@ use tracing::{debug, warn};
 use crate::database::entities::{
     graph_edges::{self, Entity as GraphEdges},
     graph_edits,
-    graph_nodes::{self, Entity as GraphNodes},
     graph_layers::{self, Entity as Layers},
+    graph_nodes::{self, Entity as GraphNodes},
 };
 
 /// Result of applying a single edit
@@ -469,7 +469,8 @@ impl GraphEditApplicator {
                         }
                     }
                     "background_color" => {
-                        active_model.background_color = Set(new_value.as_str().map(|s| s.to_string()));
+                        active_model.background_color =
+                            Set(new_value.as_str().map(|s| s.to_string()));
                     }
                     "text_color" => {
                         active_model.text_color = Set(new_value.as_str().map(|s| s.to_string()));

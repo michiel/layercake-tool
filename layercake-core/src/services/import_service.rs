@@ -54,7 +54,8 @@ impl ImportService {
                             "comment" => comment = Some(value.to_string()),
                             // Skip layer_id and name columns (0 and 1)
                             _ if i > 1 => {
-                                properties.insert(header.to_string(), Value::String(value.to_string()));
+                                properties
+                                    .insert(header.to_string(), Value::String(value.to_string()));
                             }
                             _ => {}
                         }

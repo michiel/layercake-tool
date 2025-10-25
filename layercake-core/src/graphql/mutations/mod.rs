@@ -2479,7 +2479,9 @@ impl Mutation {
         let context = ctx.data::<GraphQLContext>()?;
         let edit_service = GraphEditService::new(context.db.clone());
 
-        use crate::database::entities::graph_edges::{ActiveModel as GraphEdgeActiveModel, Entity as GraphEdges};
+        use crate::database::entities::graph_edges::{
+            ActiveModel as GraphEdgeActiveModel, Entity as GraphEdges,
+        };
         use sea_orm::{ActiveValue::Set, EntityTrait};
 
         // Create the new edge
@@ -2659,8 +2661,8 @@ impl Mutation {
         let graph_service = GraphService::new(context.db.clone());
         let edit_service = GraphEditService::new(context.db.clone());
 
-        use crate::database::entities::graph_nodes::{Column as NodeColumn, Entity as GraphNodes};
         use crate::database::entities::graph_layers::Entity as Layers;
+        use crate::database::entities::graph_nodes::{Column as NodeColumn, Entity as GraphNodes};
         use sea_orm::{ColumnTrait, QueryFilter};
 
         // Update nodes

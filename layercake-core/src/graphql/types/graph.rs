@@ -1,7 +1,7 @@
 use async_graphql::*;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
-use crate::database::entities::{graph_edges, graph_nodes, graph_layers};
+use crate::database::entities::{graph_edges, graph_layers, graph_nodes};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::graph_edge::GraphEdge;
 use crate::graphql::types::graph_node::GraphNode;

@@ -544,7 +544,14 @@ impl MergeBuilder {
                         if let Some(obj) = layer_val.as_object() {
                             for (key, value) in obj {
                                 // Skip fields that are now first-class fields
-                                if !matches!(key.as_str(), "id" | "label" | "background_color" | "text_color" | "border_color" | "comment") {
+                                if !matches!(
+                                    key.as_str(),
+                                    "id" | "label"
+                                        | "background_color"
+                                        | "text_color"
+                                        | "border_color"
+                                        | "comment"
+                                ) {
                                     properties.insert(key.clone(), value.clone());
                                 }
                             }
@@ -644,8 +651,10 @@ impl MergeBuilder {
     /// Clear existing graph data
     async fn clear_graph_data(&self, graph_id: i32) -> Result<()> {
         use crate::database::entities::graph_edges::{Column as EdgeColumn, Entity as EdgeEntity};
+        use crate::database::entities::graph_layers::{
+            Column as LayerColumn, Entity as LayerEntity,
+        };
         use crate::database::entities::graph_nodes::{Column as NodeColumn, Entity as NodeEntity};
-        use crate::database::entities::graph_layers::{Column as LayerColumn, Entity as LayerEntity};
         use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
         // Delete edges

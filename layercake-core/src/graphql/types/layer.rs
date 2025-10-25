@@ -1,7 +1,7 @@
 use async_graphql::*;
 use sea_orm::EntityTrait;
 
-use crate::database::entities::{graphs, graph_layers};
+use crate::database::entities::{graph_layers, graphs};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::graph::Graph;
 use crate::graphql::types::scalars::JSON;
