@@ -1111,7 +1111,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
   }, [fitView]);
 
   // Execution control mutations
-  const [executePlan, { loading: executing }] = useMutation(EXECUTE_PLAN, {
+  const [executePlan] = useMutation(EXECUTE_PLAN, {
     onCompleted: (data: any) => {
       showSuccessNotification('Execution Started', data.executePlan.message);
       // Refresh the plan DAG data to update node execution states on the canvas
@@ -1122,7 +1122,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     },
   });
 
-  const [stopExecution, { loading: stopping }] = useMutation(STOP_PLAN_EXECUTION, {
+  const [stopExecution] = useMutation(STOP_PLAN_EXECUTION, {
     onCompleted: (data: any) => {
       showSuccessNotification('Execution Stopped', data.stopPlanExecution.message);
       // Refresh the plan DAG data to update node execution states on the canvas
@@ -1133,7 +1133,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     },
   });
 
-  const [clearExecution, { loading: clearing }] = useMutation(CLEAR_PROJECT_EXECUTION, {
+  const [clearExecution] = useMutation(CLEAR_PROJECT_EXECUTION, {
     onCompleted: (data: any) => {
       showSuccessNotification('Execution State Cleared', data.clearProjectExecution.message);
       // Refresh the plan DAG data to update node execution states on the canvas

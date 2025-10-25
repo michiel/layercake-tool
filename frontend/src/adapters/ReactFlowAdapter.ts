@@ -9,12 +9,6 @@ import { PlanDag, PlanDagNode, ReactFlowEdge } from '../types/plan-dag'
 export class ReactFlowAdapter {
   private static readonly CONVERSION_CACHE = new Map<string, any>()
 
-  // Clear cache on module load to pick up FilterNode fix
-  private static readonly _clearCacheOnInit = (() => {
-    ReactFlowAdapter.clearCache()
-    return true
-  })()
-
   /**
    * Convert Plan DAG to ReactFlow format
    * Pure transformation with memoization for performance
@@ -383,3 +377,6 @@ interface ValidationResult {
   errors: string[]
   warnings: string[]
 }
+
+// Clear cache on module load to ensure FilterNode type mappings are picked up
+ReactFlowAdapter.clearCache()
