@@ -1,26 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import {
-  Stack,
-  Select,
-  TextInput,
-  Switch,
-  Alert,
-  Text,
-  Card,
-  Group,
-  ActionIcon,
-  Button,
-  Tooltip,
-  Divider,
-} from '@mantine/core';
+import { Stack, Select, Switch, Alert, Text, Card, Group, ActionIcon, Button, Tooltip, Divider } from '@mantine/core';
 import { IconInfoCircle, IconTrash, IconPlus, IconArrowUp, IconArrowDown } from '@tabler/icons-react';
-import {
-  GraphFilter,
-  GraphFilterKind,
-  FilterPresetType,
-  FilterNodeConfig,
-  QueryFilterConfig,
-} from '../../../../types/plan-dag';
+import { GraphFilter, GraphFilterKind, FilterPresetType, FilterNodeConfig } from '../../../../types/plan-dag';
+import { QueryFilterBuilder, createDefaultQueryFilterConfig } from './QueryFilterBuilder';
 
 interface FilterNodeConfigFormProps {
   config: FilterNodeConfig;
@@ -41,20 +23,12 @@ const PRESET_OPTIONS: { value: FilterPresetType; label: string }[] = [
   { value: 'RemoveDanglingEdges', label: 'Remove Dangling Edges' },
 ];
 
-const getDefaultQueryConfig = (): QueryFilterConfig => ({
-  targets: ['nodes'],
-  mode: 'include',
-  linkPruningMode: 'autoDropDanglingEdges',
-  ruleGroup: { combinator: 'and', rules: [] },
-  fieldMetadataVersion: 'v1',
-});
-
 const getDefaultParams = (kind: GraphFilterKind): GraphFilter['params'] => {
   switch (kind) {
     case 'Preset':
       return { preset: 'RemoveUnconnectedNodes', enabled: true };
     case 'Query':
-      return { queryConfig: getDefaultQueryConfig(), enabled: true };
+      return { queryConfig: createDefaultQueryFilterConfig(), enabled: true };
     default:
       return { enabled: true };
   }
@@ -217,25 +191,10 @@ export const FilterNodeConfigForm: React.FC<FilterNodeConfigFormProps> = ({
       case 'Query':
         return (
           <Stack gap="xs">
-            <TextInput
-              label="Query Filter"
-              description="Advanced query builder coming soon"
-              value={filter.params.queryConfig?.notes ?? ''}
-              onChange={event =>
-                updateFilterParam(index, 'queryConfig', {
-                  ...(filter.params.queryConfig ?? getDefaultQueryConfig()),
-                  notes: event.currentTarget.value,
-                })
-              }
-              placeholder="Add an optional note..."
-              disabled
+            <QueryFilterBuilder
+              value={filter.params.queryConfig}
+              onChange={config => updateFilterParam(index, 'queryConfig', config)}
             />
-            <Alert icon={<IconInfoCircle size="1rem" />} color="yellow">
-              <Text size="sm">
-                Query filtering is under construction. Notes can be added now; query builder integration will
-                land shortly.
-              </Text>
-            </Alert>
             <Switch
               label="Enabled"
               description="Enable or disable this filter"

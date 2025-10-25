@@ -24,7 +24,11 @@ const formatFilter = (filter: GraphFilter): string | null => {
       return params.preset ? FRIENDLY_NAMES[params.preset] || params.preset : 'Preset filter'
     case 'Query': {
       const targets = params.queryConfig?.targets?.join(', ') || 'nodes'
-      return params.queryConfig ? `Query filter (${targets})` : 'Query filter'
+      if (!params.queryConfig) {
+        return 'Query filter'
+      }
+      const modeLabel = params.queryConfig.mode === 'exclude' ? 'Exclude' : 'Include'
+      return `${modeLabel} → ${targets}`
     }
     default:
       return kind

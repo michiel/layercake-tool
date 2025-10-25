@@ -85,6 +85,6 @@
 
 ## Status
 - [x] Data model + enum rename applied across TypeScript and GraphQL/Rust types.
-- [ ] Frontend query builder integration.
+- [x] Frontend query builder integration (react-querybuilder UI, multi-entity targeting, config persistence).
 - [ ] Backend query compiler and execution pipeline.
 - [ ] Tests, documentation, and UX validation.
