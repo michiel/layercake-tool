@@ -45,7 +45,10 @@ const GET_GRAPH_DETAILS = gql`
         id
         layerId
         name
-        color
+        backgroundColor
+        textColor
+        borderColor
+        comment
         properties
       }
       graphNodes {

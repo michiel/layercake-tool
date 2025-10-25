@@ -65,7 +65,10 @@ export const GET_GRAPH_PREVIEW = gql`
         id
         layerId
         name
-        color
+        backgroundColor
+        textColor
+        borderColor
+        comment
         properties
       }
       nodeCount

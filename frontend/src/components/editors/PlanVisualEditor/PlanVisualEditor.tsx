@@ -39,9 +39,7 @@ import { NodeTypeSelector } from './dialogs/NodeTypeSelector'
 
 // Import extracted components and hooks
 import { AdvancedToolbar } from './components/AdvancedToolbar'
-import { ContextMenu } from './components/ContextMenu'
 import { usePlanDagCQRS } from './hooks/usePlanDagCQRS'
-import { useAdvancedOperations } from './hooks/useAdvancedOperations'
 import { getDefaultNodeConfig, getDefaultNodeMetadata } from './utils/nodeDefaults'
 import { autoLayout } from './utils/autoLayout'
 import { useMutation } from '@apollo/client/react'
@@ -289,24 +287,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     position: { x: number; y: number };
   }>({ opened: false, position: { x: 0, y: 0 } })
 
-  // Advanced operations hook with delete callbacks
-  const handleBulkDeleteNodes = useCallback((nodeIds: string[]) => {
-    nodeIds.forEach(nodeId => mutations.deleteNode(nodeId))
-  }, [mutations])
-
-  const handleBulkDeleteEdges = useCallback((edgeIds: string[]) => {
-    edgeIds.forEach(edgeId => mutations.deleteEdge(edgeId))
-  }, [mutations])
-
-  const advancedOps = useAdvancedOperations({
-    nodes,
-    edges,
-    setNodes,
-    setEdges,
-    readonly,
-    onDeleteNodes: handleBulkDeleteNodes,
-    onDeleteEdges: handleBulkDeleteEdges,
-  })
+  // Advanced operations removed - keeping only auto-layout and fit view
 
   // Handle node changes (position, selection, etc.)
   const handleNodesChange = useCallback(
@@ -1463,31 +1444,11 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         }
       `}</style>
 
-      {/* Advanced Operations Toolbar */}
+      {/* Simplified Toolbar - Node palette, auto-layout, and fit view only */}
       <AdvancedToolbar
-        selectedNodeCount={advancedOps.selectedNodes.length}
-        hasClipboardData={advancedOps.hasClipboardData}
-        clipboardInfo={advancedOps.clipboardInfo}
-        canAlign={advancedOps.canAlign}
-        canDistribute={advancedOps.canDistribute}
         readonly={readonly}
         onNodeDragStart={handleNodeDragStart}
         onNodePointerDragStart={handleNodePointerDragStart}
-        onDuplicate={advancedOps.handleDuplicate}
-        onCopy={advancedOps.handleCopy}
-        onPaste={advancedOps.handlePaste}
-        onCut={advancedOps.handleCut}
-        onDelete={advancedOps.handleDelete}
-        onSelectAll={advancedOps.handleSelectAll}
-        onDeselectAll={advancedOps.handleDeselectAll}
-        onAlignLeft={advancedOps.handleAlignLeft}
-        onAlignRight={advancedOps.handleAlignRight}
-        onAlignTop={advancedOps.handleAlignTop}
-        onAlignBottom={advancedOps.handleAlignBottom}
-        onAlignCenterHorizontal={() => advancedOps.handleAlignCenter('horizontal')}
-        onAlignCenterVertical={() => advancedOps.handleAlignCenter('vertical')}
-        onDistributeHorizontal={() => advancedOps.handleDistribute('horizontal')}
-        onDistributeVertical={() => advancedOps.handleDistribute('vertical')}
         onAutoLayoutHorizontal={handleAutoLayoutHorizontal}
         onAutoLayoutVertical={handleAutoLayoutVertical}
         onFitView={handleFitView}
@@ -1648,32 +1609,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         onSelect={handleNodeTypeSelect}
       />
 
-      {/* Context Menu for advanced operations */}
-      <ContextMenu
-        opened={contextMenu.opened}
-        onClose={handleCloseContextMenu}
-        position={contextMenu.position}
-        selectedNodeCount={advancedOps.selectedNodes.length}
-        hasClipboardData={advancedOps.hasClipboardData}
-        canAlign={advancedOps.canAlign}
-        canDistribute={advancedOps.canDistribute}
-        readonly={readonly}
-        onDuplicate={advancedOps.handleDuplicate}
-        onCopy={advancedOps.handleCopy}
-        onPaste={advancedOps.handlePaste}
-        onCut={advancedOps.handleCut}
-        onDelete={advancedOps.handleDelete}
-        onSelectAll={advancedOps.handleSelectAll}
-        onDeselectAll={advancedOps.handleDeselectAll}
-        onAlignLeft={advancedOps.handleAlignLeft}
-        onAlignRight={advancedOps.handleAlignRight}
-        onAlignTop={advancedOps.handleAlignTop}
-        onAlignBottom={advancedOps.handleAlignBottom}
-        onAlignCenterHorizontal={() => advancedOps.handleAlignCenter('horizontal')}
-        onAlignCenterVertical={() => advancedOps.handleAlignCenter('vertical')}
-        onDistributeHorizontal={() => advancedOps.handleDistribute('horizontal')}
-        onDistributeVertical={() => advancedOps.handleDistribute('vertical')}
-      />
+      {/* Context Menu removed - advanced operations no longer available */}
     </Stack>
   )
 }
