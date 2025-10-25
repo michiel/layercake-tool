@@ -221,6 +221,48 @@ export interface NodeExecutionResult {
   nodeId: string;
 }
 
+// Execute Plan (DAG) Mutation
+export const EXECUTE_PLAN = gql`
+  mutation ExecutePlan($id: Int!) {
+    executePlan(id: $id) {
+      success
+      message
+      outputFiles
+    }
+  }
+`;
+
+export interface PlanExecutionResult {
+  success: boolean;
+  message: string;
+  outputFiles: string[];
+}
+
+// Clear Project Execution State Mutation (resets all graph data, keeps config and datasources)
+export const CLEAR_PROJECT_EXECUTION = gql`
+  mutation ClearProjectExecution($projectId: Int!) {
+    clearProjectExecution(projectId: $projectId) {
+      success
+      message
+    }
+  }
+`;
+
+// Stop Plan Execution Mutation
+export const STOP_PLAN_EXECUTION = gql`
+  mutation StopPlanExecution($projectId: Int!) {
+    stopPlanExecution(projectId: $projectId) {
+      success
+      message
+    }
+  }
+`;
+
+export interface ExecutionActionResult {
+  success: boolean;
+  message: string;
+}
+
 // Helper to get execution state color
 export function getExecutionStateColor(state: string): string {
   switch (state) {

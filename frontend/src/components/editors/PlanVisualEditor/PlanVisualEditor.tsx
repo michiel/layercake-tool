@@ -44,6 +44,8 @@ import { getDefaultNodeConfig, getDefaultNodeMetadata } from './utils/nodeDefaul
 import { autoLayout } from './utils/autoLayout'
 import { useMutation } from '@apollo/client/react'
 import { UPDATE_GRAPH } from '../../../graphql/graphs'
+import { EXECUTE_PLAN, CLEAR_PROJECT_EXECUTION, STOP_PLAN_EXECUTION } from '../../../graphql/preview'
+import { showSuccessNotification, showErrorNotification } from '../../../utils/notifications'
 
 // Import floating edge components
 import { FloatingEdge } from './edges/FloatingEdge'
@@ -1107,24 +1109,84 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     fitView({ padding: 0.2, includeHiddenNodes: false, duration: 300 });
   }, [fitView]);
 
+  // Execution control mutations
+  const [executePlan, { loading: executing }] = useMutation(EXECUTE_PLAN, {
+    onCompleted: (data: any) => {
+      showSuccessNotification('Execution Started', data.executePlan.message);
+    },
+    onError: (error: any) => {
+      showErrorNotification('Execution Failed', error.message);
+    },
+  });
+
+  const [stopExecution, { loading: stopping }] = useMutation(STOP_PLAN_EXECUTION, {
+    onCompleted: (data: any) => {
+      showSuccessNotification('Execution Stopped', data.stopPlanExecution.message);
+    },
+    onError: (error: any) => {
+      showErrorNotification('Stop Failed', error.message);
+    },
+  });
+
+  const [clearExecution, { loading: clearing }] = useMutation(CLEAR_PROJECT_EXECUTION, {
+    onCompleted: (data: any) => {
+      showSuccessNotification('Execution State Cleared', data.clearProjectExecution.message);
+    },
+    onError: (error: any) => {
+      showErrorNotification('Clear Failed', error.message);
+    },
+  });
+
   // Execution control handlers
   const handlePlay = useCallback(() => {
-    console.log('[PlanVisualEditor] Execute DAG requested');
-    // TODO: Implement optimal DAG execution
-    alert('Execute DAG - Feature to be implemented');
-  }, []);
+    if (!projectId) {
+      showErrorNotification('Error', 'No project ID available');
+      return;
+    }
+
+    console.log('[PlanVisualEditor] Execute DAG requested for project:', projectId);
+
+    executePlan({
+      variables: {
+        id: projectId
+      }
+    });
+  }, [projectId, executePlan]);
 
   const handleStop = useCallback(() => {
-    console.log('[PlanVisualEditor] Stop execution requested');
-    // TODO: Implement stop execution
-    alert('Stop Execution - Feature to be implemented');
-  }, []);
+    if (!projectId) {
+      showErrorNotification('Error', 'No project ID available');
+      return;
+    }
+
+    console.log('[PlanVisualEditor] Stop execution requested for project:', projectId);
+
+    stopExecution({
+      variables: {
+        projectId: projectId
+      }
+    });
+  }, [projectId, stopExecution]);
 
   const handleClear = useCallback(() => {
-    console.log('[PlanVisualEditor] Clear execution state requested');
-    // TODO: Implement clear execution state (keep edits, config, datasources)
-    alert('Clear Execution State - Feature to be implemented');
-  }, []);
+    if (!projectId) {
+      showErrorNotification('Error', 'No project ID available');
+      return;
+    }
+
+    // Confirm before clearing
+    if (!confirm('This will reset all execution state for all nodes (graph data will be cleared, but configuration and datasources will be kept). Continue?')) {
+      return;
+    }
+
+    console.log('[PlanVisualEditor] Clear execution state requested for project:', projectId);
+
+    clearExecution({
+      variables: {
+        projectId: projectId
+      }
+    });
+  }, [projectId, clearExecution]);
 
   // Handle connection start - track source node
   const handleConnectStart = useCallback(
