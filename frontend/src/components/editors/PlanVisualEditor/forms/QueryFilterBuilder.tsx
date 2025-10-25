@@ -149,15 +149,31 @@ export const createDefaultQueryFilterConfig = (): QueryFilterConfig => ({
 });
 
 const ensureConfig = (config?: QueryFilterConfig): QueryFilterConfig => {
+  if (!config) {
+    return createDefaultQueryFilterConfig();
+  }
+
+  const needsTargets = !config.targets || config.targets.length === 0;
+  const needsRuleGroup = !config.ruleGroup;
+  const needsLinkPruning = !config.linkPruningMode;
+  const needsMode = !config.mode;
+  const needsVersion = !config.fieldMetadataVersion;
+
+  if (!needsTargets && !needsRuleGroup && !needsLinkPruning && !needsMode && !needsVersion) {
+    return config;
+  }
+
   const defaults = createDefaultQueryFilterConfig();
+
   return {
-    ...defaults,
     ...config,
-    targets: config?.targets?.length ? config.targets : defaults.targets,
-    ruleGroup: config?.ruleGroup ?? defaults.ruleGroup,
-    linkPruningMode: config?.linkPruningMode ?? defaults.linkPruningMode,
-    mode: config?.mode ?? defaults.mode,
-    fieldMetadataVersion: config?.fieldMetadataVersion ?? defaults.fieldMetadataVersion,
+    targets: needsTargets ? defaults.targets : config.targets,
+    ruleGroup: needsRuleGroup ? defaults.ruleGroup : config.ruleGroup,
+    linkPruningMode: needsLinkPruning ? defaults.linkPruningMode : config.linkPruningMode,
+    mode: needsMode ? defaults.mode : config.mode,
+    fieldMetadataVersion: needsVersion
+      ? defaults.fieldMetadataVersion
+      : config.fieldMetadataVersion,
   };
 };
 

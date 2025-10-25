@@ -39,10 +39,17 @@ const normalizeFilters = (filters: GraphFilter[]): GraphFilter[] => {
     .filter(Boolean)
     .map(filter => {
       const params = filter.params || {};
+      const normalizedParams =
+        filter.kind === 'Query'
+          ? {
+              ...params,
+              queryConfig: params.queryConfig ?? createDefaultQueryFilterConfig(),
+            }
+          : params;
       return {
         kind: filter.kind,
         params: {
-          ...params,
+          ...normalizedParams,
           enabled: params.enabled ?? true,
         },
       };
