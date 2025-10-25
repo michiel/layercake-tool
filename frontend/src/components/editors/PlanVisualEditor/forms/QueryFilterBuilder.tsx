@@ -211,6 +211,7 @@ export const QueryFilterBuilder: React.FC<QueryFilterBuilderProps> = ({ value, o
       const next = [...prev];
       const existingNames = new Set(next.map(field => field.name));
       const referencedNames = collectFieldNames(mergedConfig.ruleGroup);
+      let mutated = false;
       referencedNames.forEach(name => {
         if (!BASE_FIELD_NAMES.has(name) && !existingNames.has(name)) {
           next.push({
@@ -220,9 +221,10 @@ export const QueryFilterBuilder: React.FC<QueryFilterBuilderProps> = ({ value, o
             operators: TEXT_OPERATORS,
           });
           existingNames.add(name);
+          mutated = true;
         }
       });
-      return next;
+      return mutated ? next : prev;
     });
   }, [mergedConfig.ruleGroup]);
 
