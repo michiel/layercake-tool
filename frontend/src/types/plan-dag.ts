@@ -90,12 +90,6 @@ export interface TransformNodeConfig {
 }
 
 // Filter Node Configuration
-export type GraphFilterKind = 'Preset' | 'Query';
-
-export type FilterPresetType =
-  | 'RemoveUnconnectedNodes'
-  | 'RemoveDanglingEdges';
-
 export type QueryFilterTarget = 'nodes' | 'edges' | 'layers';
 export type QueryLinkPruningMode = 'autoDropDanglingEdges' | 'retainEdges' | 'dropOrphanNodes';
 
@@ -108,19 +102,8 @@ export interface QueryFilterConfig {
   notes?: string;
 }
 
-export interface GraphFilterParams {
-  preset?: FilterPresetType;
-  queryConfig?: QueryFilterConfig;
-  enabled?: boolean;
-}
-
-export interface GraphFilter {
-  kind: GraphFilterKind;
-  params: GraphFilterParams;
-}
-
 export interface FilterNodeConfig {
-  filters: GraphFilter[];
+  query: QueryFilterConfig;
 }
 
 // Merge Node Configuration

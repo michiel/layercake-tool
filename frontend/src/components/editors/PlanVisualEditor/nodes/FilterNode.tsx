@@ -2,37 +2,21 @@ import { memo, useMemo } from 'react'
 import { NodeProps } from 'reactflow'
 import { Stack, Text } from '@mantine/core'
 import { BaseNode } from './BaseNode'
-import { PlanDagNodeType, GraphFilter } from '../../../../types/plan-dag'
+import { PlanDagNodeType, QueryFilterConfig } from '../../../../types/plan-dag'
 import { usePlanDagCQRSMutations } from '../../../../hooks/usePlanDagCQRSMutations'
+import { extractQueryConfigFromRaw } from '../forms/filterConfigUtils'
 
-type FilterConfig = { filters?: GraphFilter[] }
+type FilterConfig = { query?: QueryFilterConfig; filters?: unknown }
 
-const FRIENDLY_NAMES: Record<string, string> = {
-  RemoveUnconnectedNodes: 'Remove unconnected nodes',
-  RemoveDanglingEdges: 'Remove dangling edges',
-}
-
-const formatFilter = (filter: GraphFilter): string | null => {
-  const { kind, params = {} } = filter
-
-  if (params.enabled === false) {
-    return null
+const formatQuerySummary = (queryConfig: QueryFilterConfig | null): string => {
+  if (!queryConfig) {
+    return 'No query configured'
   }
-
-  switch (kind) {
-    case 'Preset':
-      return params.preset ? FRIENDLY_NAMES[params.preset] || params.preset : 'Preset filter'
-    case 'Query': {
-      const targets = params.queryConfig?.targets?.join(', ') || 'nodes'
-      if (!params.queryConfig) {
-        return 'Query filter'
-      }
-      const modeLabel = params.queryConfig.mode === 'exclude' ? 'Exclude' : 'Include'
-      return `${modeLabel} → ${targets}`
-    }
-    default:
-      return kind
-  }
+  const targets = queryConfig.targets?.length ? queryConfig.targets.join(', ') : 'nodes'
+  const modeLabel = queryConfig.mode === 'exclude' ? 'Exclude' : 'Include'
+  const rules = Array.isArray(queryConfig.ruleGroup?.rules) ? queryConfig.ruleGroup.rules.length : 0
+  const ruleLabel = rules === 0 ? 'no rules' : `${rules} rule${rules === 1 ? '' : 's'}`
+  return `${modeLabel} (${targets}, ${ruleLabel})`
 }
 
 const parseConfig = (config: unknown): FilterConfig => {
@@ -63,17 +47,8 @@ export const FilterNode = memo((props: FilterNodeProps) => {
   const { updateNode } = usePlanDagCQRSMutations({ projectId: projectId || 0 })
 
   const parsedConfig = useMemo(() => parseConfig(data.config), [data.config])
-  const filterSummary = useMemo(() => {
-    const filters = Array.isArray(parsedConfig.filters) ? parsedConfig.filters : []
-    if (!filters.length) {
-      return 'No filters configured'
-    }
-    const parts = filters
-      .map(formatFilter)
-      .filter((value): value is string => Boolean(value))
-
-    return parts.length ? parts.join(' → ') : 'Filters configured'
-  }, [parsedConfig.filters])
+  const queryConfig = useMemo(() => extractQueryConfigFromRaw(parsedConfig), [parsedConfig])
+  const filterSummary = useMemo(() => formatQuerySummary(queryConfig), [queryConfig])
 
   const handleLabelChange = async (newLabel: string) => {
     try {

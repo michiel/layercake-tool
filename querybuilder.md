@@ -1,14 +1,14 @@
 # Query Builder Integration Plan
 
 ## Goal
-- Replace the deprecated "Query Text Filter" option in the Filter node with a first-class `Query` filter powered by [`react-querybuilder`] so users can build nested conditions across nodes, edges, and layers.
-- Persist each query’s configuration JSON in `GraphFilter` so DAG executions are reproducible and auditable.
-- Compile the saved query JSON into SQL/SeaORM predicates that execute against `graph_nodes`, `graph_edges`, and `graph_layers` before materializing filtered graphs.
+- Filter nodes execute a single query powered by [`react-querybuilder`], replacing the legacy “preset + multi-filter stack” UI entirely.
+- Each filter node persists a canonical `QueryFilterConfig` JSON payload so DAG executions remain reproducible and auditable.
+- The backend compiles that JSON into SQL/SeaORM predicates that run against `graph_nodes`, `graph_edges`, and `graph_layers` before materializing filtered graphs (with configurable pruning).
 
 ## Feasibility Snapshot
-- **Frontend**: `react-querybuilder` is already installed. It can be wrapped with Mantine components, fed with our entity-specific field lists, and the resulting `RuleGroupType` can be serialized directly into the plan node config.
-- **Backend**: Filter nodes already load upstream graphs through SeaORM-backed SQLite tables that expose every field we need. SQLite JSON1 (`json_extract`) lets us query arbitrary `attrs.*` keys, so a Rust query-compiler module can translate the builder config into `Condition`s executed server-side.
-- **Data model**: `GraphFilterParams` (TS + GraphQL + Rust) currently holds `preset/query_text/enabled`. We can replace the unused `query_text` with a strongly typed `query_config` payload without DB migrations because plan configs are stored as JSON blobs.
+- **Frontend**: `react-querybuilder` ships with the necessary primitives; we wrap it with Mantine controls, surface entity-specific fields, and serialize the `RuleGroupType` JSON into the node config.
+- **Backend**: Filter nodes already hydrate upstream graphs from SQLite via SeaORM. SQLite JSON1 (`json_extract`) supports arbitrary `attrs.*` lookups, so the Rust query compiler can emit parameterized SQL safely.
+- **Data model**: `FilterNodeConfig` now consists of a single `query: QueryFilterConfig`. Stored plans that still contain `filters: GraphFilter[]` are auto-upgraded in both the UI and backend, so no DB migration is required.
 
 ## Confirmed Requirements
 1. **Multi-entity queries** – one query can include rules for nodes, edges, and layers simultaneously.
@@ -19,57 +19,23 @@
 
 ## Proposed Implementation Plan
 1. **Data model & schema updates**
-   - Rename the enum variant and UI label from `QueryText` to `Query` in TypeScript, GraphQL, and Rust.
-   - Define the new config payload:
-     ```ts
-     type QueryFilterTarget = 'nodes' | 'edges' | 'layers';
-     type QueryFilterTargets = QueryFilterTarget[];
-     type QueryLinkPruningMode = 'autoDropDanglingEdges' | 'retainEdges' | 'dropOrphanNodes';
-
-     interface QueryFilterConfig {
-       targets: QueryFilterTargets;      // multi-entity selection
-       mode: 'include' | 'exclude';      // keep vs. remove matching rows
-       linkPruningMode: QueryLinkPruningMode;
-       ruleGroup: RuleGroupType;         // react-querybuilder JSON schema
-       fieldMetadataVersion: string;     // future-proofing
-       notes?: string;                   // optional TODOs for future augments
-     }
-     ```
-   - Encode entity context inside each rule’s `field` (e.g., `node.label`, `edge.attrs.priority`). This allows a single `ruleGroup` to mix targets.
-   - Update `GraphFilterParams` to drop `query_text` and add `query_config: Option<QueryFilterConfig>` (with matching TS/GraphQL mirror).
+   - Replace `filters: GraphFilter[]` with `query: QueryFilterConfig` in TypeScript, GraphQL, and Rust.
+   - Provide a serde shim that can deserialize the legacy multi-filter payload, extract the first query definition, normalize it, and drop preset-only entries.
+   - Normalize every saved query (targets default to nodes, rule group defaults to `{ combinator: 'and', rules: [] }`, metadata version defaults to `v1`) before persisting or executing.
 
 2. **Frontend integration (react-querybuilder)**
-   - Implement `QueryFilterBuilder` (e.g., `frontend/src/components/editors/PlanVisualEditor/forms/QueryFilterBuilder.tsx`) that:
-     - Wraps `<QueryBuilder />` with Mantine-styled controls.
-     - Offers multiselect for entity targets, include/exclude toggle, link-pruning dropdown, and optional notes textarea.
-     - Presents fields grouped by entity with clear prefixes, plus a simple text input for manual `attrs.*` keys.
-     - Restricts operators to the subset the backend supports (`=`, `!=`, `<`, `<=`, `>`, `>=`, `between`, `in`, `contains`, `startsWith`, `endsWith`).
-   - Replace the disabled text input in `FilterNodeConfigForm` with the new builder when the user selects `Query`.
-   - Ensure configs round-trip: loading a node pre-populates the builder, and editing updates `query_config` in `GraphFilter.params`.
+   - Expose a single `QueryFilterBuilder` inside the Filter node dialog (no add/remove list, no preset dropdown).
+   - Summarize the configured query directly in the node body (mode + targets + rule count) so users can scan plans quickly.
+   - Migrate any legacy configs client-side when nodes are loaded to avoid crashes while editing.
 
-3. **Backend query compilation**
-   - Add `layercake-core/src/filters/query.rs` containing:
-     - Rust equivalents of `QueryFilterConfig`, `RuleGroup`, `Rule`, etc. (derive `Serialize/Deserialize`).
-     - A compiler that walks the `ruleGroup`, and for each entity prefix, emits a SeaORM `Condition`.
-     - Operator translation logic that maps builder operators to SQLite expressions, always using bound parameters. For JSON attributes emit `Expr::cust("json_extract(attrs, ?)")`.
-     - `mode` handling: `include` → `IN (matches)`; `exclude` → `NOT IN (matches)`.
-     - `TODO` placeholders (with `tracing::warn!`) for future aggregation/cross-entity functionality so the config format stays forward-compatible.
+3. **Backend query compilation & execution**
+   - Invoke the existing SQL compiler once per Filter node execution, using the normalized `QueryFilterConfig`.
+   - Maintain include/exclude semantics and link-pruning behavior (auto-drop dangling edges, retain edges, or drop orphan nodes) as part of the single query execution.
+   - Store `metadata.query` alongside the filtered graph so executions remain auditable, and keep a legacy parser for stored configs that still include `filters`.
 
-4. **Filter node execution path**
-   - Update `FilterNodeConfig::apply_filters` so `GraphFilterKind::Query`:
-     - Executes the compiler for each targeted entity, retrieving the matching IDs per table from SQLite (before building the in-memory `Graph`).
-     - Applies include/exclude semantics to the loaded graph data, then enforces the chosen `linkPruningMode`:
-       - `autoDropDanglingEdges`: remove edges referencing missing nodes automatically.
-       - `retainEdges`: keep edges even if endpoints were removed (documented risk).
-       - `dropOrphanNodes`: when filtering edges, optionally drop nodes that lose all incident edges.
-     - Persists the resulting graph via the existing `persist_filtered_graph`.
-   - Record metrics / debug logs describing how many entities were kept/dropped to help tune performance.
-
-5. **Testing, validation, docs**
-   - Rust unit tests for the compiler: nested groups, numeric vs. text comparisons, include vs. exclude, JSON attribute rules.
-   - Integration test in `layercake-core/tests` exercising a Filter node with multi-entity rules to ensure graph consistency.
-   - React Testing Library test confirming the builder UI saves/loads `query_config`.
-   - Update docs/README to include instructions for building query filters, supported operators, and link-pruning behavior.
+4. **Testing, validation, docs**
+   - Run `npm run frontend:build` and `cargo test -p layercake-core`; the end-to-end integration test regenerates the reference Mermaid export, which has been updated to the new template output.
+   - This document and any user-facing materials will note that filter presets/multi-filter stacks have been removed in favor of the query builder.
 
 ## Risks & Considerations
 - **Operator parity**: the UI must only expose operators the backend understands, or we risk runtime compile errors.

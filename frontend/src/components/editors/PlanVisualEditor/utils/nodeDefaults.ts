@@ -48,7 +48,13 @@ export const getDefaultNodeConfig = (type: PlanDagNodeType): NodeConfig => {
 
     case PlanDagNodeType.FILTER:
       return {
-        filters: []
+        query: {
+          targets: ['nodes'],
+          mode: 'include',
+          linkPruningMode: 'autoDropDanglingEdges',
+          ruleGroup: { combinator: 'and', rules: [] },
+          fieldMetadataVersion: 'v1'
+        }
       };
 
     case PlanDagNodeType.MERGE:

@@ -371,7 +371,7 @@ impl DagExecutor {
         graph: &crate::graph::Graph,
     ) -> Result<()> {
         let metadata = Some(json!({
-            "filters": config.filters,
+            "query": config.query,
             "upstreamGraphId": upstream_graph.id,
         }));
 

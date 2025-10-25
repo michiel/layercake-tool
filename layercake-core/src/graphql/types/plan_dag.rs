@@ -2,7 +2,11 @@ use anyhow::{anyhow, Context, Result as AnyResult};
 use async_graphql::*;
 use chrono::{DateTime, Utc};
 use sea_orm::{ConnectionTrait, DatabaseConnection, FromQueryResult, Statement, Value};
-use serde::{Deserialize, Serialize};
+use serde::{
+    de::{self, Deserializer},
+    Deserialize, Serialize,
+};
+use serde_json::json;
 use std::collections::HashSet;
 use tracing::warn;
 
@@ -619,10 +623,48 @@ mod tests {
 }
 
 // Filter Node Configuration
-#[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
+#[derive(SimpleObject, InputObject, Clone, Debug, Serialize)]
 #[graphql(input_name = "FilterNodeConfigInput")]
 pub struct FilterNodeConfig {
-    pub filters: Vec<GraphFilter>,
+    pub query: QueryFilterConfig,
+}
+
+impl<'de> Deserialize<'de> for FilterNodeConfig {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct FilterNodeConfigWire {
+            query: Option<QueryFilterConfig>,
+            filters: Option<Vec<LegacyGraphFilter>>,
+        }
+
+        let wire = FilterNodeConfigWire::deserialize(deserializer)?;
+
+        if let Some(query) = wire.query {
+            return Ok(Self {
+                query: query.normalized(),
+            });
+        }
+
+        if let Some(filters) = wire.filters {
+            for filter in filters {
+                if filter.is_query() {
+                    if let Some(query) = filter.params.and_then(|params| params.query_config) {
+                        return Ok(Self {
+                            query: query.normalized(),
+                        });
+                    }
+                }
+            }
+        }
+
+        Err(de::Error::custom(
+            "FilterNodeConfig must include a query definition",
+        ))
+    }
 }
 
 pub struct FilterEvaluationContext<'a> {
@@ -636,87 +678,9 @@ impl FilterNodeConfig {
         graph: &mut Graph,
         context: &FilterEvaluationContext<'_>,
     ) -> AnyResult<()> {
-        for filter in &self.filters {
-            if !filter.is_enabled() {
-                continue;
-            }
-            filter.apply_to(graph, context).await?;
-        }
-        Ok(())
+        let normalized = self.query.normalized();
+        query_filter_executor::apply_query_filter(graph, context, &normalized).await
     }
-}
-
-#[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
-#[graphql(input_name = "GraphFilterInput")]
-pub struct GraphFilter {
-    pub kind: GraphFilterKind,
-    #[serde(default)]
-    #[graphql(default)]
-    pub params: GraphFilterParams,
-}
-
-impl GraphFilter {
-    pub fn is_enabled(&self) -> bool {
-        self.params.enabled.unwrap_or(true)
-    }
-
-    pub async fn apply_to(
-        &self,
-        graph: &mut Graph,
-        context: &FilterEvaluationContext<'_>,
-    ) -> AnyResult<()> {
-        if !self.is_enabled() {
-            return Ok(());
-        }
-
-        match self.kind {
-            GraphFilterKind::Preset => {
-                if let Some(preset) = &self.params.preset {
-                    match preset {
-                        FilterPresetType::RemoveUnconnectedNodes => {
-                            graph.remove_unconnected_nodes();
-                        }
-                        FilterPresetType::RemoveDanglingEdges => {
-                            graph.remove_dangling_edges();
-                        }
-                    }
-                }
-            }
-            GraphFilterKind::Query => {
-                let config = self
-                    .params
-                    .query_config
-                    .as_ref()
-                    .ok_or_else(|| anyhow!("Query filter missing configuration"))?;
-
-                query_filter_executor::apply_query_filter(graph, context, config).await?;
-            }
-        }
-
-        Ok(())
-    }
-}
-
-#[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
-pub enum GraphFilterKind {
-    Preset,
-    Query,
-}
-
-#[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
-pub enum FilterPresetType {
-    RemoveUnconnectedNodes,
-    RemoveDanglingEdges,
-}
-
-#[derive(SimpleObject, InputObject, Clone, Debug, Default, Serialize, Deserialize)]
-#[graphql(input_name = "GraphFilterParamsInput")]
-#[serde(rename_all = "camelCase")]
-pub struct GraphFilterParams {
-    pub preset: Option<FilterPresetType>,
-    #[graphql(name = "queryConfig")]
-    pub query_config: Option<QueryFilterConfig>,
-    pub enabled: Option<bool>,
 }
 
 #[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
@@ -732,6 +696,29 @@ pub struct QueryFilterConfig {
     #[graphql(name = "fieldMetadataVersion")]
     pub field_metadata_version: String,
     pub notes: Option<String>,
+}
+
+impl QueryFilterConfig {
+    pub fn normalized(&self) -> Self {
+        let mut normalized = self.clone();
+        if normalized.targets.is_empty() {
+            normalized.targets = vec![QueryFilterTarget::Nodes];
+        }
+        if normalized.rule_group.is_null() {
+            normalized.rule_group = default_rule_group();
+        }
+        if normalized.field_metadata_version.trim().is_empty() {
+            normalized.field_metadata_version = "v1".to_string();
+        }
+        normalized
+    }
+}
+
+fn default_rule_group() -> JSON {
+    json!({
+        "combinator": "and",
+        "rules": []
+    })
 }
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
@@ -763,6 +750,29 @@ pub enum QueryLinkPruningMode {
     RetainEdges,
     #[graphql(name = "dropOrphanNodes")]
     DropOrphanNodes,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LegacyGraphFilter {
+    kind: Option<String>,
+    params: Option<LegacyGraphFilterParams>,
+}
+
+impl LegacyGraphFilter {
+    fn is_query(&self) -> bool {
+        self.kind
+            .as_deref()
+            .map(|k| k.eq_ignore_ascii_case("query") || k.eq_ignore_ascii_case("querytext"))
+            .unwrap_or(false)
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LegacyGraphFilterParams {
+    #[serde(rename = "queryConfig")]
+    query_config: Option<QueryFilterConfig>,
 }
 
 mod query_filter_executor {

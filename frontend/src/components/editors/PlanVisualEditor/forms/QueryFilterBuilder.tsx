@@ -148,7 +148,7 @@ export const createDefaultQueryFilterConfig = (): QueryFilterConfig => ({
   fieldMetadataVersion: 'v1',
 });
 
-const ensureConfig = (config?: QueryFilterConfig): QueryFilterConfig => {
+export const normalizeQueryFilterConfig = (config?: QueryFilterConfig): QueryFilterConfig => {
   if (!config) {
     return createDefaultQueryFilterConfig();
   }
@@ -218,9 +218,23 @@ interface QueryFilterBuilderProps {
 }
 
 export const QueryFilterBuilder: React.FC<QueryFilterBuilderProps> = ({ value, onChange }) => {
-  const mergedConfig = useMemo(() => ensureConfig(value), [value]);
+  const mergedConfig = useMemo(() => normalizeQueryFilterConfig(value), [value]);
+  const mergedConfigRef = useRef(mergedConfig);
+  const onChangeRef = useRef(onChange);
+  const lastEmittedConfigRef = useRef<string>(JSON.stringify(mergedConfig));
   const [customFieldInput, setCustomFieldInput] = useState('');
   const [customFields, setCustomFields] = useState<EntityField[]>([]);
+
+  // Keep refs in sync with latest props
+  useEffect(() => {
+    mergedConfigRef.current = mergedConfig;
+    // Update lastEmittedConfigRef when value prop changes from parent
+    lastEmittedConfigRef.current = JSON.stringify(mergedConfig);
+  }, [mergedConfig]);
+
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
 
   useEffect(() => {
     setCustomFields(prev => {
@@ -244,12 +258,20 @@ export const QueryFilterBuilder: React.FC<QueryFilterBuilderProps> = ({ value, o
     });
   }, [mergedConfig.ruleGroup]);
 
+  // Stable callback - no dependencies that change frequently
   const handleConfigChange = useCallback((partial: Partial<QueryFilterConfig>) => {
-    onChange({
-      ...mergedConfig,
+    const nextConfig = {
+      ...mergedConfigRef.current,
       ...partial,
-    });
-  }, [mergedConfig, onChange]);
+    };
+    const nextJson = JSON.stringify(nextConfig);
+
+    // Only call onChange if config actually changed
+    if (nextJson !== lastEmittedConfigRef.current) {
+      lastEmittedConfigRef.current = nextJson;
+      onChangeRef.current(nextConfig);
+    }
+  }, []);
 
   const ruleGroupJsonRef = useRef(JSON.stringify(mergedConfig.ruleGroup));
 
