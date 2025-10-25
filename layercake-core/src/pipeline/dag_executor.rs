@@ -4,6 +4,7 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, Qu
 use serde_json::{json, Map as JsonMap, Value as JsonValue};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet, VecDeque};
+use tracing::info;
 
 use crate::database::entities::graphs::ActiveModel as GraphActiveModel;
 use crate::database::entities::graphs::{Column as GraphColumn, Entity as GraphEntity};
@@ -89,7 +90,8 @@ impl DagExecutor {
                 let upstream_ids = self.get_upstream_nodes(node_id, edges);
 
                 // Merge data from upstream sources
-                self.merge_builder
+                let graph_record = self
+                    .merge_builder
                     .merge_sources(
                         project_id,
                         plan_id,
@@ -98,6 +100,22 @@ impl DagExecutor {
                         upstream_ids,
                     )
                     .await?;
+
+                let graph_service = GraphService::new(self.db.clone());
+                let graph = graph_service
+                    .build_graph_from_dag_graph(graph_record.id)
+                    .await
+                    .with_context(|| {
+                        format!("Failed to materialize merged graph for node {}", node_id)
+                    })?;
+
+                info!(
+                    "MergeNode {} produced nodes:{}, edges:{}, layers:{}",
+                    node_id,
+                    graph.nodes.len(),
+                    graph.edges.len(),
+                    graph.layers.len()
+                );
             }
             "GraphNode" => {
                 // Get upstream node IDs
@@ -204,6 +222,13 @@ impl DagExecutor {
             .with_context(|| format!("Failed to execute transforms for node {}", node_id))?;
 
         graph.name = node_name.to_string();
+        info!(
+            "TransformNode {} produced nodes:{}, edges:{}, layers:{}",
+            node_id,
+            graph.nodes.len(),
+            graph.edges.len(),
+            graph.layers.len(),
+        );
 
         self.persist_transformed_graph(
             project_id,
@@ -290,6 +315,13 @@ impl DagExecutor {
             .with_context(|| format!("Failed to execute filters for node {}", node_id))?;
 
         graph.name = node_name.to_string();
+        info!(
+            "FilterNode {} produced nodes:{}, edges:{}, layers:{}",
+            node_id,
+            graph.nodes.len(),
+            graph.edges.len(),
+            graph.layers.len(),
+        );
 
         self.persist_filtered_graph(
             project_id,
