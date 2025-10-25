@@ -1056,6 +1056,7 @@ impl From<plan_dag_nodes::Model> for PlanDagNode {
             "DataSourceNode" => PlanDagNodeType::DataSource,
             "GraphNode" => PlanDagNodeType::Graph,
             "TransformNode" => PlanDagNodeType::Transform,
+            "FilterNode" => PlanDagNodeType::Filter,
             "MergeNode" => PlanDagNodeType::Merge,
             "CopyNode" => PlanDagNodeType::Copy,
             "OutputNode" => PlanDagNodeType::Output,
