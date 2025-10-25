@@ -167,6 +167,15 @@ impl ProjectCollaborator {
 // REMOVED: UserPresence type - user presence now handled via WebSocket only (memory-only storage)
 // WebSocket presence data is available through the WebSocket collaboration system at /ws/collaboration
 
+// Input types for queries
+#[derive(InputObject)]
+pub struct UserFilter {
+    pub id: Option<i32>,
+    pub email: Option<String>,
+    pub username: Option<String>,
+    pub session_id: Option<String>,
+}
+
 // Input types for mutations
 #[derive(InputObject)]
 pub struct RegisterUserInput {
