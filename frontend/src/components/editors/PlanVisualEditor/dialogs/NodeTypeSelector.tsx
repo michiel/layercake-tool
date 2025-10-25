@@ -12,6 +12,7 @@ export const NodeTypeSelector = ({ opened, onClose, onSelect }: NodeTypeSelector
   const nodeTypes = [
     PlanDagNodeType.GRAPH,
     PlanDagNodeType.TRANSFORM,
+    PlanDagNodeType.FILTER,
     PlanDagNodeType.MERGE,
     PlanDagNodeType.COPY,
     PlanDagNodeType.OUTPUT,

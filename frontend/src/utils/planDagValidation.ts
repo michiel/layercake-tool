@@ -14,24 +14,36 @@ export const validateConnection = (
       PlanDagNodeType.GRAPH,     // DataSources primarily connect to Graph nodes
       PlanDagNodeType.MERGE,     // Can also merge multiple data sources
       PlanDagNodeType.TRANSFORM, // Or transform data directly
+      PlanDagNodeType.FILTER,    // Or filter data directly
       PlanDagNodeType.OUTPUT,    // Or output directly
     ],
     [PlanDagNodeType.GRAPH]: [
       PlanDagNodeType.GRAPH,       // Graphs can connect to other graphs
       PlanDagNodeType.TRANSFORM,
+      PlanDagNodeType.FILTER,
       PlanDagNodeType.COPY,
       PlanDagNodeType.OUTPUT,
     ],
     [PlanDagNodeType.TRANSFORM]: [
       PlanDagNodeType.GRAPH,       // Transforms can connect to graphs
       PlanDagNodeType.MERGE,
+      PlanDagNodeType.FILTER,
       PlanDagNodeType.COPY,
       PlanDagNodeType.OUTPUT,
       PlanDagNodeType.TRANSFORM, // Allow chaining transforms
     ],
+    [PlanDagNodeType.FILTER]: [
+      PlanDagNodeType.GRAPH,       // Filters can connect to graphs
+      PlanDagNodeType.MERGE,
+      PlanDagNodeType.TRANSFORM,
+      PlanDagNodeType.FILTER,      // Allow chaining filters
+      PlanDagNodeType.COPY,
+      PlanDagNodeType.OUTPUT,
+    ],
     [PlanDagNodeType.MERGE]: [
       PlanDagNodeType.GRAPH,       // Merges can connect to graphs
       PlanDagNodeType.TRANSFORM,
+      PlanDagNodeType.FILTER,
       PlanDagNodeType.MERGE,       // Merges can chain to other merges
       PlanDagNodeType.COPY,
       PlanDagNodeType.OUTPUT,
@@ -39,6 +51,7 @@ export const validateConnection = (
     [PlanDagNodeType.COPY]: [
       PlanDagNodeType.GRAPH,       // Copies can connect to graphs
       PlanDagNodeType.TRANSFORM,
+      PlanDagNodeType.FILTER,
       PlanDagNodeType.OUTPUT,
     ],
     [PlanDagNodeType.OUTPUT]: [], // Output nodes have no outgoing connections
@@ -54,6 +67,7 @@ export const validateConnection = (
         return 'GRAPH_REFERENCE'
       case PlanDagNodeType.DATA_SOURCE:
       case PlanDagNodeType.TRANSFORM:
+      case PlanDagNodeType.FILTER:
       case PlanDagNodeType.MERGE:
       case PlanDagNodeType.COPY:
         return 'GRAPH_DATA'
@@ -99,6 +113,7 @@ export const canAcceptMultipleInputs = (nodeType: PlanDagNodeType): boolean => {
     case PlanDagNodeType.DATA_SOURCE: // DataSource nodes cannot have inputs
     case PlanDagNodeType.GRAPH:       // GraphNodes can have only one input (single DataSource or Merge output)
     case PlanDagNodeType.TRANSFORM:   // TransformNodes can have only one input
+    case PlanDagNodeType.FILTER:      // FilterNodes can have only one input
     case PlanDagNodeType.COPY:        // CopyNodes can have only one input
     case PlanDagNodeType.OUTPUT:      // OutputNodes can have only one input
       return false
@@ -115,6 +130,7 @@ export const canHaveMultipleOutputs = (nodeType: PlanDagNodeType): boolean => {
     case PlanDagNodeType.DATA_SOURCE: // DataSource can have multiple outputs (but not to same target)
     case PlanDagNodeType.GRAPH:       // GraphNodes can have multiple outputs
     case PlanDagNodeType.TRANSFORM:   // TransformNodes can have multiple outputs (but not to same target)
+    case PlanDagNodeType.FILTER:      // FilterNodes can have multiple outputs (but not to same target)
     case PlanDagNodeType.MERGE:       // MergeNodes output graph data and can connect to multiple targets
       return true
     case PlanDagNodeType.COPY:        // CopyNodes output graphs (spec unclear, assuming single)
@@ -135,6 +151,7 @@ export const getRequiredInputCount = (nodeType: PlanDagNodeType): number => {
     case PlanDagNodeType.GRAPH:
       return 1 // Graph nodes can accept inputs from other nodes
     case PlanDagNodeType.TRANSFORM:
+    case PlanDagNodeType.FILTER:
     case PlanDagNodeType.COPY:
     case PlanDagNodeType.OUTPUT:
       return 1 // These require exactly one input
@@ -159,6 +176,7 @@ export const getNodeTypeColor = (nodeType: PlanDagNodeType): string => {
     case PlanDagNodeType.GRAPH:
       return '#3b82f6' // Blue-500
     case PlanDagNodeType.TRANSFORM:
+    case PlanDagNodeType.FILTER:
     case PlanDagNodeType.MERGE:
     case PlanDagNodeType.COPY:
       return '#8b5cf6' // Violet-500
@@ -180,6 +198,8 @@ export const getNodeTypeIcon = (nodeType: PlanDagNodeType): string => {
       return 'sitemap'
     case PlanDagNodeType.TRANSFORM:
       return 'transform'
+    case PlanDagNodeType.FILTER:
+      return 'filter'
     case PlanDagNodeType.MERGE:
       return 'merge'
     case PlanDagNodeType.COPY:
@@ -349,6 +369,10 @@ export const isNodeConfigured = (
       // TransformNodes MUST have one input and one output to be configured
       return inputEdges.length === 1 && outputEdges.length >= 1;
 
+    case PlanDagNodeType.FILTER:
+      // FilterNodes MUST have one input and one output to be configured
+      return inputEdges.length === 1 && outputEdges.length >= 1;
+
     case PlanDagNodeType.OUTPUT:
       // OutputNodes MUST have one input to be configured
       return inputEdges.length === 1;
@@ -391,6 +415,7 @@ export const getMinimumRequiredInputs = (nodeType: PlanDagNodeType): number => {
     case PlanDagNodeType.GRAPH:
       return 0; // GraphNodes can be empty (will show empty preview)
     case PlanDagNodeType.TRANSFORM:
+    case PlanDagNodeType.FILTER:
     case PlanDagNodeType.OUTPUT:
       return 1; // These need exactly one input
     case PlanDagNodeType.MERGE:
@@ -409,6 +434,7 @@ export const getMinimumRequiredOutputs = (nodeType: PlanDagNodeType): number => 
   switch (nodeType) {
     case PlanDagNodeType.DATA_SOURCE:
     case PlanDagNodeType.TRANSFORM:
+    case PlanDagNodeType.FILTER:
     case PlanDagNodeType.COPY:
       return 1; // These must have at least one output
     case PlanDagNodeType.GRAPH:
