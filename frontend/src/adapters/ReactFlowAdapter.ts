@@ -219,6 +219,7 @@ export class ReactFlowAdapter {
       // Database format (snake_case)
       'data_source': 'DataSourceNode',
       'transform': 'TransformNode',
+      'filter': 'FilterNode',
       'merge': 'MergeNode',
       'output': 'OutputNode',
       'copy': 'CopyNode',
@@ -226,6 +227,7 @@ export class ReactFlowAdapter {
       // Backend may return capitalized variants
       'DataSource': 'DataSourceNode',
       'Transform': 'TransformNode',
+      'Filter': 'FilterNode',
       'Merge': 'MergeNode',
       'Output': 'OutputNode',
       'Copy': 'CopyNode',
@@ -233,6 +235,7 @@ export class ReactFlowAdapter {
       // TypeScript enum format (PascalCase) - pass through
       'DataSourceNode': 'DataSourceNode',
       'TransformNode': 'TransformNode',
+      'FilterNode': 'FilterNode',
       'MergeNode': 'MergeNode',
       'OutputNode': 'OutputNode',
       'CopyNode': 'CopyNode',
@@ -254,6 +257,7 @@ export class ReactFlowAdapter {
     const typeMap: Record<string, string> = {
       'DataSourceNode': 'data_source',
       'TransformNode': 'transform',
+      'FilterNode': 'filter',
       'MergeNode': 'merge',
       'OutputNode': 'output',
       'CopyNode': 'copy',
@@ -287,6 +291,11 @@ export class ReactFlowAdapter {
         ...baseStyle,
         borderColor: '#10b981',
         background: '#f0fdf4'
+      },
+      'filter': {
+        ...baseStyle,
+        borderColor: '#8b5cf6',
+        background: '#f5f3ff'
       },
       'merge': {
         ...baseStyle,
