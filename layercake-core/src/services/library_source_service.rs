@@ -1,9 +1,25 @@
-use anyhow::{anyhow, Result};
+use std::collections::HashSet;
+use std::fs;
+use std::io::Cursor;
+use std::path::PathBuf;
+
+use anyhow::{anyhow, Context, Result};
+use csv::ReaderBuilder;
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 
 use crate::database::entities::data_sources::{self, DataType, FileFormat};
 use crate::database::entities::{library_sources, projects};
 use crate::services::source_processing;
+
+const REPO_LIBRARY_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../resources/library");
+
+#[derive(Debug, Clone)]
+pub struct SeedLibraryResult {
+    pub total_remote_files: usize,
+    pub created_count: usize,
+    pub skipped_count: usize,
+    pub failed_files: Vec<String>,
+}
 
 /// Service layer for managing reusable datasource definitions stored in the library
 #[derive(Clone)]
@@ -26,6 +42,85 @@ impl LibrarySourceService {
             .one(&self.db)
             .await?;
         Ok(item)
+    }
+
+    /// Seed the library with files stored under resources/library in the repository
+    pub async fn seed_from_github_library(&self) -> Result<SeedLibraryResult> {
+        let library_dir = PathBuf::from(REPO_LIBRARY_PATH);
+        if !library_dir.is_dir() {
+            return Err(anyhow!(
+                "Repository library directory not found at {}",
+                REPO_LIBRARY_PATH
+            ));
+        }
+
+        let files: Vec<PathBuf> = fs::read_dir(&library_dir)
+            .with_context(|| format!("Failed to read {}", library_dir.display()))?
+            .filter_map(|entry| entry.ok().map(|e| e.path()).filter(|path| path.is_file()))
+            .collect();
+
+        let mut existing_filenames: HashSet<String> = library_sources::Entity::find()
+            .all(&self.db)
+            .await?
+            .into_iter()
+            .map(|model| model.filename)
+            .collect();
+
+        let mut result = SeedLibraryResult {
+            total_remote_files: files.len(),
+            created_count: 0,
+            skipped_count: 0,
+            failed_files: Vec::new(),
+        };
+
+        for path in files {
+            let filename = path
+                .file_name()
+                .and_then(|os| os.to_str())
+                .ok_or_else(|| anyhow!("Invalid filename in {}", path.display()))?
+                .to_string();
+
+            if existing_filenames.contains(&filename) {
+                result.skipped_count += 1;
+                continue;
+            }
+
+            match self.seed_local_file(&path, &filename).await {
+                Ok(_) => {
+                    result.created_count += 1;
+                    existing_filenames.insert(filename);
+                }
+                Err(err) => {
+                    result.failed_files.push(format!("{}: {}", filename, err));
+                }
+            }
+        }
+
+        Ok(result)
+    }
+
+    async fn seed_local_file(&self, path: &PathBuf, filename: &str) -> Result<()> {
+        let file_bytes =
+            fs::read(path).with_context(|| format!("Failed to read {}", path.display()))?;
+
+        let file_format = FileFormat::from_extension(filename)
+            .ok_or_else(|| anyhow!("Unsupported file extension for {}", filename))?;
+
+        let data_type = infer_data_type(filename, &file_format, &file_bytes)?;
+        let name = derive_name(filename);
+        let description = Some("Seeded from resources/library".to_string());
+
+        self.create_from_file(
+            name,
+            description,
+            filename.to_string(),
+            file_format,
+            data_type,
+            file_bytes,
+        )
+        .await?;
+
+        Ok(())
     }
 
     pub async fn create_from_file(
@@ -286,4 +381,99 @@ impl LibrarySourceService {
 
         Ok(items)
     }
+}
+
+fn infer_data_type(filename: &str, file_format: &FileFormat, file_data: &[u8]) -> Result<DataType> {
+    if let Some(dtype) = infer_data_type_from_filename(filename) {
+        if dtype.is_compatible_with_format(file_format) {
+            return Ok(dtype);
+        }
+    }
+
+    match file_format {
+        FileFormat::Json => Ok(DataType::Graph),
+        FileFormat::Csv | FileFormat::Tsv => infer_data_type_from_headers(file_format, file_data),
+    }
+}
+
+fn infer_data_type_from_headers(file_format: &FileFormat, file_data: &[u8]) -> Result<DataType> {
+    let delimiter = file_format
+        .get_delimiter()
+        .ok_or_else(|| anyhow!("Unable to determine delimiter for {:?}", file_format))?;
+
+    let mut reader = ReaderBuilder::new()
+        .has_headers(true)
+        .delimiter(delimiter)
+        .from_reader(Cursor::new(file_data));
+
+    let headers = reader
+        .headers()
+        .map_err(|e| anyhow!("Failed to read headers: {}", e))?;
+
+    let header_set: HashSet<String> = headers.iter().map(|h| h.trim().to_lowercase()).collect();
+
+    for candidate in [DataType::Nodes, DataType::Edges, DataType::Layers] {
+        if candidate
+            .get_expected_headers()
+            .iter()
+            .all(|required| header_set.contains(&required.to_lowercase()))
+        {
+            return Ok(candidate);
+        }
+    }
+
+    Err(anyhow!(
+        "Could not infer data type from headers {:?}",
+        headers
+    ))
+}
+
+fn infer_data_type_from_filename(filename: &str) -> Option<DataType> {
+    let normalized = filename
+        .to_lowercase()
+        .replace(['(', ')', '-', '_', '.', ','], " ");
+    let tokens: Vec<&str> = normalized.split_whitespace().collect();
+
+    if tokens
+        .iter()
+        .any(|token| *token == "nodes" || *token == "node")
+    {
+        return Some(DataType::Nodes);
+    }
+
+    if tokens.iter().any(|token| {
+        *token == "edges"
+            || *token == "edge"
+            || *token == "links"
+            || *token == "link"
+            || *token == "relationships"
+            || *token == "relationship"
+    }) {
+        return Some(DataType::Edges);
+    }
+
+    if tokens
+        .iter()
+        .any(|token| *token == "layers" || *token == "layer")
+    {
+        return Some(DataType::Layers);
+    }
+
+    if tokens
+        .iter()
+        .any(|token| *token == "graph" || *token == "graphs")
+    {
+        return Some(DataType::Graph);
+    }
+
+    None
+}
+
+fn derive_name(filename: &str) -> String {
+    let without_extension = filename
+        .rsplit_once('.')
+        .map(|(name, _)| name)
+        .unwrap_or(filename);
+
+    without_extension.trim().to_string()
 }

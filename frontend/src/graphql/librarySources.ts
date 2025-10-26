@@ -173,6 +173,24 @@ export interface ImportLibrarySourcesInput {
   librarySourceIds: number[]
 }
 
+export const SEED_LIBRARY_SOURCES = gql`
+  mutation SeedLibrarySources {
+    seedLibrarySources {
+      totalRemoteFiles
+      createdCount
+      skippedCount
+      failedFiles
+    }
+  }
+`
+
+export interface SeedLibrarySourcesResult {
+  totalRemoteFiles: number
+  createdCount: number
+  skippedCount: number
+  failedFiles: string[]
+}
+
 // Re-export helpers for UI reuse
 export {
   FileFormat,

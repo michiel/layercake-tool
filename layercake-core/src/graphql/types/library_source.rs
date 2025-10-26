@@ -103,3 +103,26 @@ pub struct ImportLibrarySourcesInput {
     #[graphql(name = "librarySourceIds")]
     pub library_source_ids: Vec<i32>,
 }
+
+#[derive(SimpleObject)]
+pub struct SeedLibrarySourcesResult {
+    #[graphql(name = "totalRemoteFiles")]
+    pub total_remote_files: i32,
+    #[graphql(name = "createdCount")]
+    pub created_count: i32,
+    #[graphql(name = "skippedCount")]
+    pub skipped_count: i32,
+    #[graphql(name = "failedFiles")]
+    pub failed_files: Vec<String>,
+}
+
+impl From<crate::services::library_source_service::SeedLibraryResult> for SeedLibrarySourcesResult {
+    fn from(result: crate::services::library_source_service::SeedLibraryResult) -> Self {
+        Self {
+            total_remote_files: result.total_remote_files as i32,
+            created_count: result.created_count as i32,
+            skipped_count: result.skipped_count as i32,
+            failed_files: result.failed_files,
+        }
+    }
+}

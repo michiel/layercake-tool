@@ -27,6 +27,7 @@ import {
   IconEdit,
   IconFileDownload,
   IconAlertCircle,
+  IconDatabaseImport,
 } from '@tabler/icons-react'
 import { useForm } from '@mantine/form'
 import PageContainer from '../layout/PageContainer'
@@ -38,12 +39,15 @@ import {
   UPDATE_LIBRARY_SOURCE,
   LibrarySource,
   UpdateLibrarySourceInput,
+  SEED_LIBRARY_SOURCES,
+  SeedLibrarySourcesResult,
   formatFileSize,
   getDataTypeDisplayName,
   getFileFormatDisplayName,
   getStatusColor,
   detectFileFormat,
 } from '../../graphql/librarySources'
+import { showErrorNotification, showSuccessNotification } from '../../utils/notifications'
 
 const fileToBase64 = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -76,6 +80,7 @@ export const LibrarySourcesPage: React.FC = () => {
     REPROCESS_LIBRARY_SOURCE
   )
   const [updateLibrarySource, { loading: updateLoading }] = useMutation(UPDATE_LIBRARY_SOURCE)
+  const [seedLibrarySourcesMutation, { loading: seedLoading }] = useMutation(SEED_LIBRARY_SOURCES)
 
   const librarySources: LibrarySource[] = (data as any)?.librarySources || []
 
@@ -124,6 +129,32 @@ export const LibrarySourcesPage: React.FC = () => {
       await refetch()
     } catch (err) {
       console.error('Failed to delete library source', err)
+    }
+  }
+
+  const handleSeedLibrary = async () => {
+    try {
+      const { data } = await seedLibrarySourcesMutation()
+      const result: SeedLibrarySourcesResult | undefined = data?.seedLibrarySources
+
+      if (result) {
+        const summary = `${result.createdCount} added, ${result.skippedCount} skipped out of ${result.totalRemoteFiles}`
+        showSuccessNotification('Library seeded', summary)
+
+        if (result.failedFiles && result.failedFiles.length > 0) {
+          showErrorNotification(
+            'Some files could not be imported',
+            result.failedFiles.join('\n')
+          )
+        }
+      } else {
+        showSuccessNotification('Library seeded', 'No new files were added.')
+      }
+
+      await refetch()
+    } catch (err: any) {
+      console.error('Failed to seed library', err)
+      showErrorNotification('Failed to seed library', err?.message || 'Unknown error')
     }
   }
 
@@ -181,7 +212,7 @@ export const LibrarySourcesPage: React.FC = () => {
     URL.revokeObjectURL(url)
   }
 
-  const busy = loading || deleteLoading || reprocessLoading || updateLoading
+  const busy = loading || deleteLoading || reprocessLoading || updateLoading || seedLoading
 
   return (
     <PageContainer>
@@ -193,12 +224,22 @@ export const LibrarySourcesPage: React.FC = () => {
               Manage reusable data sources that can be imported into any project.
             </Text>
           </div>
-          <Button
-            leftSection={<IconPlus size={16} />}
-            onClick={() => setUploaderOpen(true)}
-          >
-            Add Library Source
-          </Button>
+          <Group gap="xs">
+            <Button
+              variant="light"
+              leftSection={<IconDatabaseImport size={16} />}
+              loading={seedLoading}
+              onClick={handleSeedLibrary}
+            >
+              Seed library
+            </Button>
+            <Button
+              leftSection={<IconPlus size={16} />}
+              onClick={() => setUploaderOpen(true)}
+            >
+              Add Library Source
+            </Button>
+          </Group>
         </Group>
 
         <Card withBorder>

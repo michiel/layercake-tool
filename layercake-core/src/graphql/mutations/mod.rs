@@ -36,8 +36,8 @@ use crate::graphql::types::{
     CreateLibrarySourceInput, DataSource, ExportDataSourcesInput, ExportDataSourcesResult,
     ImportDataSourcesInput, ImportDataSourcesResult, ImportLibrarySourcesInput,
     InviteCollaboratorInput, LibrarySource, LoginInput, LoginResponse, ProjectCollaborator,
-    RegisterResponse, RegisterUserInput, UpdateCollaboratorRoleInput, UpdateDataSourceInput,
-    UpdateLibrarySourceInput, UpdateUserInput, User,
+    RegisterResponse, RegisterUserInput, SeedLibrarySourcesResult, UpdateCollaboratorRoleInput,
+    UpdateDataSourceInput, UpdateLibrarySourceInput, UpdateUserInput, User,
 };
 
 pub struct Mutation;
@@ -297,7 +297,9 @@ impl Mutation {
     /// **DEPRECATED**: This bulk replace operation conflicts with delta-based updates.
     /// Use individual node/edge mutations instead for better real-time collaboration.
     /// See PLAN.md Phase 2 for migration strategy.
-    #[graphql(deprecation = "This bulk replace operation conflicts with delta-based real-time updates. Use addPlanDagNode, updatePlanDagNode, deletePlanDagNode, addPlanDagEdge, and deletePlanDagEdge mutations instead for better collaboration support.")]
+    #[graphql(
+        deprecation = "This bulk replace operation conflicts with delta-based real-time updates. Use addPlanDagNode, updatePlanDagNode, deletePlanDagNode, addPlanDagEdge, and deletePlanDagEdge mutations instead for better collaboration support."
+    )]
     async fn update_plan_dag(
         &self,
         ctx: &Context<'_>,
@@ -2120,6 +2122,19 @@ impl Mutation {
             .map_err(|e| Error::new(format!("Failed to import library sources: {}", e)))?;
 
         Ok(models.into_iter().map(DataSource::from).collect())
+    }
+
+    /// Seed the shared library with the canonical GitHub resources bundle
+    async fn seed_library_sources(&self, ctx: &Context<'_>) -> Result<SeedLibrarySourcesResult> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let service = LibrarySourceService::new(context.db.clone());
+
+        let result = service
+            .seed_from_github_library()
+            .await
+            .map_err(|e| Error::new(format!("Failed to seed library sources: {}", e)))?;
+
+        Ok(SeedLibrarySourcesResult::from(result))
     }
 
     /// Create a new Graph
