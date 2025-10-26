@@ -1,0 +1,8 @@
+id,label,background_color,text_color,border_color
+govern,Govern,800080,FFFFFF,4B0082
+identify,Identify,ADD8E6,0,87CEFA
+protect,Protect,6400,FFFFFF,3CB371
+detect,Detect,FFA500,0,FF4500
+respond,Respond,B22222,FFFFFF,8B0000
+recover,Recover,8080,FFFFFF,00CED1
+asset_class,Asset Classes,A9A9A9,0,696969

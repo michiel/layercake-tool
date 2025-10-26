@@ -1,4 +1,0 @@
-- why are the table graph_nodes and graph_edges prefixed with graph_ but layers is not? update the model to be consistent and rename layers to graph_layers
-- why does layers table have a color property? the first order attributes are background_color, text_color, border_color. do not put those in attrs, keep them at the top level and remove the color property
-- why is comment not an attr for graph_nodes, graph_edges, and graph_layers? make comment a top level attribute for each and don't hide it in attrs
-
