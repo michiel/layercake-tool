@@ -11,6 +11,7 @@ pub mod collaboration;
 pub mod database;
 pub mod server;
 pub mod services;
+pub mod utils;
 
 #[cfg(debug_assertions)]
 pub mod dev_utils;
