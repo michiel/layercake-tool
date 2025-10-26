@@ -3,10 +3,11 @@ use std::fs;
 use std::path::Path;
 use tracing::{error, info};
 
-static SAMPLE_DIR_KVM_CONTROL_FLOW: Dir = include_dir!("../sample/kvm_control_flow");
-static SAMPLE_DIR_ATTACK_TREE: Dir = include_dir!("../sample/attack_tree");
-static SAMPLE_DIR_REF: Dir = include_dir!("../sample/ref");
-static SAMPLE_DIR_DISTRIBUTED_MONOLITH: Dir = include_dir!("../sample/distributed-monolith");
+static SAMPLE_DIR_KVM_CONTROL_FLOW: Dir = include_dir!("../resources/sample-v1/kvm_control_flow");
+static SAMPLE_DIR_ATTACK_TREE: Dir = include_dir!("../resources/sample-v1/attack_tree");
+static SAMPLE_DIR_REF: Dir = include_dir!("../resources/sample-v1/ref");
+static SAMPLE_DIR_DISTRIBUTED_MONOLITH: Dir =
+    include_dir!("../resources/sample-v1/distributed-monolith");
 
 pub fn generate_template(exporter: String) {
     info!("Generating exporter template: {}", exporter);
