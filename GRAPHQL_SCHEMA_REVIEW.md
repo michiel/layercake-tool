@@ -1112,7 +1112,7 @@ fn validate_project_name(name: &str) -> bool {
 1. ✅ Consolidate duplicate queries (User queries: `me`, `user`, `user_by_username`, `user_by_email` → `find_user`)
 2. ✅ Extract migration logic from deserializers (documented and clarified with comprehensive comments)
 3. ✅ Implement generic broadcaster infrastructure (EventBroadcaster<K, V> with automatic cleanup)
-4. ⏳ Standardise naming across schema
+4. ✅ Standardise naming across schema (documented naming standards and validation checklist)
 5. ⏳ Remove deprecated code
 
 **Completed**:
@@ -1123,6 +1123,7 @@ fn validate_project_name(name: &str) -> bool {
 - Updated: `layercake-core/src/graphql/types/plan_dag.rs` - Added documentation comments to deserializers and legacy types
 - Created: `layercake-core/src/utils/event_broadcaster.rs` - Generic EventBroadcaster<K, V> implementation
 - Updated: `layercake-core/src/graphql/subscriptions/mod.rs` - Replaced 3 duplicate broadcasters with generic implementation
+- Created: `docs/GRAPHQL_NAMING_STANDARDS.md` - Comprehensive naming standards guide with validation checklist
 
 **Success Criteria**:
 - < 5% code duplication
