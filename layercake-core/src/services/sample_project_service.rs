@@ -10,7 +10,7 @@ use crate::database::entities::data_sources::{self, DataType, FileFormat};
 use crate::database::entities::{plan_dag_edges, plan_dag_nodes, plans, projects};
 use crate::services::{data_source_service::DataSourceService, graph_service::GraphService};
 
-static SAMPLE_PROJECT_DIR: Dir<'_> = include_dir!("../sample");
+static SAMPLE_PROJECT_DIR: Dir<'_> = include_dir!("../resources/sample-v1");
 
 #[derive(Debug, Clone)]
 pub struct SampleProjectMetadata {

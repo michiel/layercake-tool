@@ -1,0 +1,178 @@
+id,label,layer,is_partition,belongs_to
+cis8_control_1,CIS 1 - Inventory and Control of Enterprise Assets,,TRUE,
+cis8_safeguard_1_1,Establish and Maintain Detailed Enterprise Asset Inventory,identify,FALSE,cis8_control_1
+cis8_safeguard_1_2,Address Unauthorized Assets,respond,FALSE,cis8_control_1
+cis8_safeguard_1_3,Utilize an Active Discovery Tool,detect,FALSE,cis8_control_1
+cis8_safeguard_1_4,Use Dynamic Host Configuration Protocol (DHCP) Logging to Update Enterprise Asset Inventory,identify,FALSE,cis8_control_1
+cis8_safeguard_1_5,Use a Passive Asset Discovery Tool,detect,FALSE,cis8_control_1
+cis8_control_2,CIS 2 - Inventory and Control of Software Assets,,TRUE,
+cis8_safeguard_2_1,Establish and Maintain a Software Inventory,identify,FALSE,cis8_control_2
+cis8_safeguard_2_2,Ensure Authorized Software is Currently Supported,identify,FALSE,cis8_control_2
+cis8_safeguard_2_3,Address Unauthorized Software,respond,FALSE,cis8_control_2
+cis8_safeguard_2_4,Utilize Automated Software Inventory Tools,detect,FALSE,cis8_control_2
+cis8_safeguard_2_5,Allowlist Authorized Software,protect,FALSE,cis8_control_2
+cis8_safeguard_2_6,Allowlist Authorized Libraries,protect,FALSE,cis8_control_2
+cis8_safeguard_2_7,Allowlist Authorized Scripts,protect,FALSE,cis8_control_2
+cis8_control_3,CIS 3 - Data Protection,,TRUE,
+cis8_safeguard_3_1,Establish and Maintain a Data Management Process,govern,FALSE,cis8_control_3
+cis8_safeguard_3_2,Establish and Maintain a Data Inventory,identify,FALSE,cis8_control_3
+cis8_safeguard_3_3,Configure Data Access Control Lists,protect,FALSE,cis8_control_3
+cis8_safeguard_3_4,Enforce Data Retention,protect,FALSE,cis8_control_3
+cis8_safeguard_3_5,Securely Dispose of Data,protect,FALSE,cis8_control_3
+cis8_safeguard_3_6,Encrypt Data on End-User Devices,protect,FALSE,cis8_control_3
+cis8_safeguard_3_7,Establish and Maintain a Data Classification Scheme,identify,FALSE,cis8_control_3
+cis8_safeguard_3_8,Document Data Flows,identify,FALSE,cis8_control_3
+cis8_safeguard_3_9,Encrypt Data on Removable Media,protect,FALSE,cis8_control_3
+cis8_safeguard_3_10,Encrypt Sensitive Data in Transit,protect,FALSE,cis8_control_3
+cis8_safeguard_3_11,Encrypt Sensitive Data at Rest,protect,FALSE,cis8_control_3
+cis8_safeguard_3_12,Segment Data Processing and Storage Based on Sensitivity,protect,FALSE,cis8_control_3
+cis8_safeguard_3_13,Deploy a Data Loss Prevention Solution,protect,FALSE,cis8_control_3
+cis8_safeguard_3_14,Log Sensitive Data Access,detect,FALSE,cis8_control_3
+cis8_control_4,CIS 4 - Secure Configuration of Enterprise Assets and Software,,TRUE,
+cis8_safeguard_4_1,Establish and Maintain a Secure Configuration Process,govern,FALSE,cis8_control_4
+cis8_safeguard_4_2,Establish and Maintain a Secure Configuration Process for Network Infrastructure,govern,FALSE,cis8_control_4
+cis8_safeguard_4_3,Configure Automatic Session Locking on Enterprise Assets,protect,FALSE,cis8_control_4
+cis8_safeguard_4_4,Implement and Manage a Firewall on Servers,protect,FALSE,cis8_control_4
+cis8_safeguard_4_5,Implement and Manage a Firewall on End-User Devices,protect,FALSE,cis8_control_4
+cis8_safeguard_4_6,Securely Manage Enterprise Assets and Software,protect,FALSE,cis8_control_4
+cis8_safeguard_4_7,Manage Default Accounts on Enterprise Assets and Software,protect,FALSE,cis8_control_4
+cis8_safeguard_4_8,Uninstall or Disable Unnecessary Services on Enterprise Assets and Software,protect,FALSE,cis8_control_4
+cis8_safeguard_4_9,Configure Trusted DNS Servers on Enterprise Assets,protect,FALSE,cis8_control_4
+cis8_safeguard_4_10,Enforce Automatic Device Lockout on Portable End-User Devices,protect,FALSE,cis8_control_4
+cis8_safeguard_4_11,Enforce Remote Wipe Capability on Portable End-User Devices,protect,FALSE,cis8_control_4
+cis8_safeguard_4_12,Separate Enterprise Workspaces on Mobile End-User Devices,protect,FALSE,cis8_control_4
+cis8_control_5,CIS 5 - Account Management,,TRUE,
+cis8_safeguard_5_1,Establish and Maintain an Inventory of Accounts,identify,FALSE,cis8_control_5
+cis8_safeguard_5_2,Use Unique Passwords,protect,FALSE,cis8_control_5
+cis8_safeguard_5_3,Disable Dormant Accounts,protect,FALSE,cis8_control_5
+cis8_safeguard_5_4,Restrict Administrator Privileges to Dedicated Administrator Accounts,protect,FALSE,cis8_control_5
+cis8_safeguard_5_5,Establish and Maintain an Inventory of Service Accounts,identify,FALSE,cis8_control_5
+cis8_safeguard_5_6,Centralize Account Management,govern,FALSE,cis8_control_5
+cis8_control_6,CIS 6 - Access Control Management,,TRUE,
+cis8_safeguard_6_1,Establish an Access Granting Process,govern,FALSE,cis8_control_6
+cis8_safeguard_6_2,Establish an Access Revoking Process,govern,FALSE,cis8_control_6
+cis8_safeguard_6_3,Require MFA for Externally-Exposed Applications,protect,FALSE,cis8_control_6
+cis8_safeguard_6_4,Require MFA for Remote Network Access,protect,FALSE,cis8_control_6
+cis8_safeguard_6_5,Require MFA for Administrative Access,protect,FALSE,cis8_control_6
+cis8_safeguard_6_6,Establish and Maintain an Inventory of Authentication and Authorization Systems,identify,FALSE,cis8_control_6
+cis8_safeguard_6_7,Centralize Access Control,protect,FALSE,cis8_control_6
+cis8_safeguard_6_8,Define and Maintain Role-Based Access Control,govern,FALSE,cis8_control_6
+cis8_control_7,CIS 7 - Continuous Vulnerability Management,,TRUE,
+cis8_safeguard_7_1,Establish and Maintain a Vulnerability Management Process,govern,FALSE,cis8_control_7
+cis8_safeguard_7_2,Establish and Maintain a Remediation Process,govern,FALSE,cis8_control_7
+cis8_safeguard_7_3,Perform Automated Operating System Patch Management,protect,FALSE,cis8_control_7
+cis8_safeguard_7_4,Perform Automated Application Patch Management,protect,FALSE,cis8_control_7
+cis8_safeguard_7_5,Perform Automated Vulnerability Scans of Internal Enterprise Assets,identify,FALSE,cis8_control_7
+cis8_safeguard_7_6,Perform Automated Vulnerability Scans of Externally-Exposed Enterprise Assets,identify,FALSE,cis8_control_7
+cis8_safeguard_7_7,Remediate Detected Vulnerabilities,respond,FALSE,cis8_control_7
+cis8_control_8,CIS 8 - Audit Log Management,,TRUE,
+cis8_safeguard_8_1,Establish and Maintain an Audit Log Management Process,govern,FALSE,cis8_control_8
+cis8_safeguard_8_2,Collect Audit Logs,detect,FALSE,cis8_control_8
+cis8_safeguard_8_3,Ensure Adequate Audit Log Storage,protect,FALSE,cis8_control_8
+cis8_safeguard_8_4,Standardize Time Synchronization,protect,FALSE,cis8_control_8
+cis8_safeguard_8_5,Collect Detailed Audit Logs,detect,FALSE,cis8_control_8
+cis8_safeguard_8_6,Collect DNS Query Audit Logs,detect,FALSE,cis8_control_8
+cis8_safeguard_8_7,Collect URL Request Audit Logs,detect,FALSE,cis8_control_8
+cis8_safeguard_8_8,Collect Command-Line Audit Logs,detect,FALSE,cis8_control_8
+cis8_safeguard_8_9,Centralize Audit Logs,detect,FALSE,cis8_control_8
+cis8_safeguard_8_10,Retain Audit Logs,protect,FALSE,cis8_control_8
+cis8_safeguard_8_11,Conduct Audit Log Reviews,detect,FALSE,cis8_control_8
+cis8_safeguard_8_12,Collect Service Provider Logs,detect,FALSE,cis8_control_8
+cis8_control_9,CIS 9 - Email and Web Browser Protections,,TRUE,
+cis8_safeguard_9_1,Ensure Use of Only Fully Supported Browsers and Email Clients,protect,FALSE,cis8_control_9
+cis8_safeguard_9_2,Use DNS Filtering Services,protect,FALSE,cis8_control_9
+cis8_safeguard_9_3,Maintain and Enforce Network-Based URL Filters,protect,FALSE,cis8_control_9
+cis8_safeguard_9_4,Restrict Unnecessary or Unauthorized Browser and Email Client Extensions,protect,FALSE,cis8_control_9
+cis8_safeguard_9_5,Implement DMARC,protect,FALSE,cis8_control_9
+cis8_safeguard_9_6,Block Unnecessary File Types,protect,FALSE,cis8_control_9
+cis8_safeguard_9_7,Deploy and Maintain Email Server Anti-Malware Protections,protect,FALSE,cis8_control_9
+cis8_control_10,CIS 10 - Malware Defenses,,TRUE,
+cis8_safeguard_10_1,Deploy and Maintain Anti-Malware Software,detect,FALSE,cis8_control_10
+cis8_safeguard_10_2,Configure Automatic Anti-Malware Signature Updates,protect,FALSE,cis8_control_10
+cis8_safeguard_10_3,Disable Autorun and Autoplay for Removable Media,protect,FALSE,cis8_control_10
+cis8_safeguard_10_4,Configure Automatic Anti-Malware Scanning of Removable Media,detect,FALSE,cis8_control_10
+cis8_safeguard_10_5,Enable Anti-Exploitation Features,protect,FALSE,cis8_control_10
+cis8_safeguard_10_6,Centrally Manage Anti-Malware Software,protect,FALSE,cis8_control_10
+cis8_safeguard_10_7,Use Behavior-Based Anti-Malware Software,detect,FALSE,cis8_control_10
+cis8_control_11,CIS 11 - Data Recovery,,TRUE,
+cis8_safeguard_11_1,Establish and Maintain a Data Recovery Process,govern,FALSE,cis8_control_11
+cis8_safeguard_11_2,Perform Automated Backups,recover,FALSE,cis8_control_11
+cis8_safeguard_11_3,Protect Recovery Data,protect,FALSE,cis8_control_11
+cis8_safeguard_11_4,Establish and Maintain an Isolated Instance of Recovery Data,recover,FALSE,cis8_control_11
+cis8_safeguard_11_5,Test Data Recovery,recover,FALSE,cis8_control_11
+cis8_control_12,CIS 12 - Network Infrastructure Management,,TRUE,
+cis8_safeguard_12_1,Ensure Network Infrastructure is Up-to-Date,protect,FALSE,cis8_control_12
+cis8_safeguard_12_2,Establish and Maintain a Secure Network Architecture,protect,FALSE,cis8_control_12
+cis8_safeguard_12_3,Securely Manage Network Infrastructure,protect,FALSE,cis8_control_12
+cis8_safeguard_12_4,Establish and Maintain Architecture Diagram(s),govern,FALSE,cis8_control_12
+cis8_safeguard_12_5,"Centralize Network Authentication, Authorization, and Auditing (AAA)",protect,FALSE,cis8_control_12
+cis8_safeguard_12_6,Use of Secure Network Management and Communication Protocols,protect,FALSE,cis8_control_12
+cis8_safeguard_12_7,Ensure Remote Devices Utilize a VPN and are Connecting to an Enterprise’s AAA Infrastructure,protect,FALSE,cis8_control_12
+cis8_safeguard_12_8,Establish and Maintain Dedicated Computing Resources for All Administrative Work,protect,FALSE,cis8_control_12
+cis8_control_13,CIS 13 - Network Monitoring and Defense,,TRUE,
+cis8_safeguard_13_1,Centralize Security Event Alerting,detect,FALSE,cis8_control_13
+cis8_safeguard_13_2,Deploy a Host-Based Intrusion Detection Solution,detect,FALSE,cis8_control_13
+cis8_safeguard_13_3,Deploy a Network Intrusion Detection Solution,detect,FALSE,cis8_control_13
+cis8_safeguard_13_4,Perform Traffic Filtering Between Network Segments,protect,FALSE,cis8_control_13
+cis8_safeguard_13_5,Manage Access Control for Remote Assets,protect,FALSE,cis8_control_13
+cis8_safeguard_13_6,Collect Network Traffic Flow Logs,detect,FALSE,cis8_control_13
+cis8_safeguard_13_7,Deploy a Host-Based Intrusion Prevention Solution,protect,FALSE,cis8_control_13
+cis8_safeguard_13_8,Deploy a Network Intrusion Prevention Solution,protect,FALSE,cis8_control_13
+cis8_safeguard_13_9,Deploy Port-Level Access Control,protect,FALSE,cis8_control_13
+cis8_safeguard_13_10,Perform Application Layer Filtering,protect,FALSE,cis8_control_13
+cis8_safeguard_13_11,Tune Security Event Alerting Thresholds,detect,FALSE,cis8_control_13
+cis8_control_14,CIS 14 - Security Awareness and Skills Training,,TRUE,
+cis8_safeguard_14_1,Establish and Maintain a Security Awareness Program,govern,FALSE,cis8_control_14
+cis8_safeguard_14_2,Train Workforce Members to Recognize Social Engineering Attacks,protect,FALSE,cis8_control_14
+cis8_safeguard_14_3,Train Workforce Members on Authentication Best Practices,protect,FALSE,cis8_control_14
+cis8_safeguard_14_4,Train Workforce on Data Handling Best Practices,protect,FALSE,cis8_control_14
+cis8_safeguard_14_5,Train Workforce Members on Causes of Unintentional Data Exposure,protect,FALSE,cis8_control_14
+cis8_safeguard_14_6,Train Workforce Members on Recognizing and Reporting Security Incidents,protect,FALSE,cis8_control_14
+cis8_safeguard_14_7,Train Workforce on How to Identify and Report if Their Enterprise Assets are Missing Security Updates,protect,FALSE,cis8_control_14
+cis8_safeguard_14_8,Train Workforce on the Dangers of Connecting to and Transmitting Enterprise Data Over Insecure Networks,protect,FALSE,cis8_control_14
+cis8_safeguard_14_9,Conduct Role-Specific Security Awareness and Skills Training,protect,FALSE,cis8_control_14
+cis8_control_15,CIS 15 - Service Provider Management,,TRUE,
+cis8_safeguard_15_1,Establish and Maintain an Inventory of Service Providers,identify,FALSE,cis8_control_15
+cis8_safeguard_15_2,Establish and Maintain a Service Provider Management Policy,govern,FALSE,cis8_control_15
+cis8_safeguard_15_3,Classify Service Providers,govern,FALSE,cis8_control_15
+cis8_safeguard_15_4,Ensure Service Provider Contracts Include Security Requirements,govern,FALSE,cis8_control_15
+cis8_safeguard_15_5,Assess Service Providers,govern,FALSE,cis8_control_15
+cis8_safeguard_15_6,Monitor Service Providers,govern,FALSE,cis8_control_15
+cis8_safeguard_15_7,Securely Decommission Service Providers,protect,FALSE,cis8_control_15
+cis8_control_16,CIS 16 - Application Software Security,,TRUE,
+cis8_safeguard_16_1,Establish and Maintain a Secure Application Development Process,govern,FALSE,cis8_control_16
+cis8_safeguard_16_2,Establish and Maintain a Process to Accept and Address Software Vulnerabilities,govern,FALSE,cis8_control_16
+cis8_safeguard_16_3,Perform Root Cause Analysis on Security Vulnerabilities,detect,FALSE,cis8_control_16
+cis8_safeguard_16_4,Establish and Manage an Inventory of Third-Party Software Components,identify,FALSE,cis8_control_16
+cis8_safeguard_16_5,Use Up-to-Date and Trusted Third-Party Software Components,protect,FALSE,cis8_control_16
+cis8_safeguard_16_6,Establish and Maintain a Severity Rating System and Process for Application Vulnerabilities,govern,FALSE,cis8_control_16
+cis8_safeguard_16_7,Use Standard Hardening Configuration Templates for Application Infrastructure,protect,FALSE,cis8_control_16
+cis8_safeguard_16_8,Separate Production and Non-Production Systems,protect,FALSE,cis8_control_16
+cis8_safeguard_16_9,Train Developers in Application Security Concepts and Secure Coding,protect,FALSE,cis8_control_16
+cis8_safeguard_16_10,Apply Secure Design Principles in Application Architectures,protect,FALSE,cis8_control_16
+cis8_safeguard_16_11,Leverage Vetted Modules or Services for Application Security Components,protect,FALSE,cis8_control_16
+cis8_safeguard_16_12,Implement Code-Level Security Checks,protect,FALSE,cis8_control_16
+cis8_safeguard_16_13,Conduct Application Penetration Testing,detect,FALSE,cis8_control_16
+cis8_safeguard_16_14,Conduct Threat Modeling,protect,FALSE,cis8_control_16
+cis8_control_17,CIS 17 - Incident Response Management,,TRUE,
+cis8_safeguard_17_1,Designate Personnel to Manage Incident Handling,respond,FALSE,cis8_control_17
+cis8_safeguard_17_2,Establish and Maintain Contact Information for Reporting Security Incidents,govern,FALSE,cis8_control_17
+cis8_safeguard_17_3,Establish and Maintain an Enterprise Process for Reporting Incidents,govern,FALSE,cis8_control_17
+cis8_safeguard_17_4,Establish and Maintain an Incident Response Process,govern,FALSE,cis8_control_17
+cis8_safeguard_17_5,Assign Key Roles and Responsibilities,respond,FALSE,cis8_control_17
+cis8_safeguard_17_6,Define Mechanisms for Communicating During Incident Response,respond,FALSE,cis8_control_17
+cis8_safeguard_17_7,Conduct Routine Incident Response Exercises,recover,FALSE,cis8_control_17
+cis8_safeguard_17_8,Conduct Post-Incident Reviews,recover,FALSE,cis8_control_17
+cis8_safeguard_17_9,Establish and Maintain Security Incident Thresholds,recover,FALSE,cis8_control_17
+cis8_control_18,CIS 18 - Penetration Testing,,TRUE,
+cis8_safeguard_18_1,Establish and Maintain a Penetration Testing Program,govern,FALSE,cis8_control_18
+cis8_safeguard_18_2,Perform Periodic External Penetration Tests,detect,FALSE,cis8_control_18
+cis8_safeguard_18_3,Remediate Penetration Test Findings,protect,FALSE,cis8_control_18
+cis8_safeguard_18_4,Validate Security Measures,protect,FALSE,cis8_control_18
+cis8_safeguard_18_5,Perform Periodic Internal Penetration Tests,detect,FALSE,cis8_control_18
+devices,Devices,asset_class,FALSE,
+software,Software,asset_class,FALSE,
+data,Data,asset_class,FALSE,
+documentation,Documentation,asset_class,FALSE,
+users,Users,asset_class,FALSE,
+network,Network,asset_class,FALSE,
