@@ -18,20 +18,22 @@ use tokio::sync::{broadcast, RwLock};
 ///
 /// # Examples
 ///
-/// ```rust
-/// use layercake_core::utils::EventBroadcaster;
+/// ```rust,no_run
+/// use layercake::utils::EventBroadcaster;
 ///
-/// // Create a broadcaster for plan collaboration events
-/// let broadcaster = EventBroadcaster::<String, CollaborationEvent>::new(1000);
+/// # async fn example() {
+/// // Create a broadcaster for string events
+/// let broadcaster = EventBroadcaster::<String, String>::new(1000);
 ///
 /// // Subscribe to a plan's events
-/// let mut receiver = broadcaster.subscribe("plan-123").await;
+/// let mut receiver = broadcaster.subscribe("plan-123".to_string()).await;
 ///
 /// // Publish an event
-/// broadcaster.publish("plan-123", event).await.ok();
+/// broadcaster.publish("plan-123".to_string(), "event data".to_string()).await.ok();
 ///
 /// // Clean up idle channels periodically
 /// broadcaster.cleanup_idle().await;
+/// # }
 /// ```
 pub struct EventBroadcaster<K, V>
 where
@@ -87,18 +89,20 @@ where
     ///
     /// # Returns
     ///
-    /// * `Ok(usize)` - Number of receivers that received the event
-    /// * `Err(String)` - If there are no active receivers
+    /// * `Ok(usize)` - Number of receivers that received the event (0 if no active receivers)
     ///
     /// # Note
     ///
-    /// If there are no active receivers, the channel still exists but the
-    /// event is dropped. Call `cleanup_idle()` periodically to remove unused channels.
+    /// If there are no active receivers, returns Ok(0) and the event is dropped.
+    /// Call `cleanup_idle()` periodically to remove unused channels.
     pub async fn publish(&self, key: K, event: V) -> Result<usize, String> {
         let sender = self.get_or_create(key).await;
-        sender
-            .send(event)
-            .map_err(|_| "No active receivers".to_string())
+        // broadcast::send returns Err when there are no receivers,
+        // but we want to return Ok(0) in that case since the channel exists
+        match sender.send(event) {
+            Ok(count) => Ok(count),
+            Err(_) => Ok(0), // No receivers, but not an error condition
+        }
     }
 
     /// Get the number of active receivers for a specific key.

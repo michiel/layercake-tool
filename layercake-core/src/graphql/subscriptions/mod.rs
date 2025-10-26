@@ -363,17 +363,18 @@ pub async fn publish_collaboration_event(event: CollaborationEvent) -> Result<()
         );
     }
 
-    COLLABORATION_EVENTS
+    let count = COLLABORATION_EVENTS
         .publish(plan_id.clone(), event)
-        .await
-        .map(|_| ())
-        .map_err(|_| {
-            tracing::error!(
-                "Failed to broadcast collaboration event for plan {} - no active receivers",
-                plan_id
-            );
-            "Failed to broadcast collaboration event".to_string()
-        })
+        .await?;
+
+    if count == 0 {
+        tracing::debug!(
+            "No active receivers for collaboration event on plan {}",
+            plan_id
+        );
+    }
+
+    Ok(())
 }
 
 /// Helper function to create collaboration events
@@ -410,17 +411,16 @@ pub fn create_user_event_data(
 pub async fn publish_delta_event(event: PlanDagDeltaEvent) -> Result<(), String> {
     let project_id = event.project_id;
 
-    DELTA_EVENTS
-        .publish(project_id, event)
-        .await
-        .map(|_| ())
-        .map_err(|_| {
-            tracing::error!(
-                "Failed to broadcast delta event for project {} - no active receivers",
-                project_id
-            );
-            "Failed to broadcast delta event".to_string()
-        })
+    let count = DELTA_EVENTS.publish(project_id, event).await?;
+
+    if count == 0 {
+        tracing::debug!(
+            "No active receivers for delta event on project {}",
+            project_id
+        );
+    }
+
+    Ok(())
 }
 
 /// Publish an execution status event to all subscribers of a project
@@ -428,14 +428,14 @@ pub async fn publish_execution_status_event(event: NodeExecutionStatusEvent) -> 
     let project_id = event.project_id;
 
     // Don't treat no receivers as an error - it's normal for no one to be listening
-    match EXECUTION_STATUS_EVENTS.publish(project_id, event).await {
-        Ok(_) => Ok(()),
-        Err(_) => {
-            tracing::debug!(
-                "Failed to broadcast execution status event for project {} - no active receivers",
-                project_id
-            );
-            Ok(())
-        }
+    let count = EXECUTION_STATUS_EVENTS.publish(project_id, event).await?;
+
+    if count == 0 {
+        tracing::debug!(
+            "No active receivers for execution status event on project {}",
+            project_id
+        );
     }
+
+    Ok(())
 }
