@@ -1,10 +1,6 @@
 use async_graphql::*;
 use futures_util::Stream;
-use std::collections::HashMap;
 use std::pin::Pin;
-use std::sync::Arc;
-use tokio::sync::broadcast;
-use tokio::sync::RwLock;
 
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::{
@@ -111,11 +107,6 @@ pub struct PlanDagUpdateData {
     pub metadata: Option<String>, // JSON string for metadata
 }
 
-/// Global subscription broadcaster for managing real-time events
-#[allow(dead_code)]
-pub type SubscriptionBroadcaster =
-    Arc<RwLock<HashMap<String, broadcast::Sender<CollaborationEvent>>>>;
-
 #[Subscription]
 impl Subscription {
     /// Subscribe to Plan DAG updates for a specific plan
@@ -126,9 +117,8 @@ impl Subscription {
     ) -> Result<Pin<Box<dyn Stream<Item = PlanDagUpdateEvent> + Send>>> {
         let _context = ctx.data::<GraphQLContext>()?;
 
-        // Get or create broadcaster for this plan
-        let broadcaster = get_plan_broadcaster(&plan_id).await;
-        let mut receiver = broadcaster.subscribe();
+        // Subscribe to collaboration events for this plan
+        let mut receiver = COLLABORATION_EVENTS.subscribe(plan_id.clone()).await;
 
         // Filter events for Plan DAG updates only
         let stream = async_stream::stream! {
@@ -231,9 +221,8 @@ impl Subscription {
     ) -> Result<Pin<Box<dyn Stream<Item = CollaborationEvent> + Send>>> {
         let _context = ctx.data::<GraphQLContext>()?;
 
-        // Get or create broadcaster for this plan
-        let broadcaster = get_plan_broadcaster(&plan_id).await;
-        let mut receiver = broadcaster.subscribe();
+        // Subscribe to collaboration events for this plan
+        let mut receiver = COLLABORATION_EVENTS.subscribe(plan_id.clone()).await;
 
         // Stream all events for this plan with lag detection
         let plan_id_clone = plan_id.clone();
@@ -277,9 +266,8 @@ impl Subscription {
     ) -> Result<Pin<Box<dyn Stream<Item = PlanDagDeltaEvent> + Send>>> {
         let _context = ctx.data::<GraphQLContext>()?;
 
-        // Get or create broadcaster for this project
-        let broadcaster = get_delta_broadcaster(project_id).await;
-        let mut receiver = broadcaster.subscribe();
+        // Subscribe to delta events for this project
+        let mut receiver = DELTA_EVENTS.subscribe(project_id).await;
 
         // Stream delta events for this project
         let stream = async_stream::stream! {
@@ -317,9 +305,8 @@ impl Subscription {
     ) -> Result<Pin<Box<dyn Stream<Item = NodeExecutionStatusEvent> + Send>>> {
         let _context = ctx.data::<GraphQLContext>()?;
 
-        // Get or create broadcaster for this project
-        let broadcaster = get_execution_status_broadcaster(project_id).await;
-        let mut receiver = broadcaster.subscribe();
+        // Subscribe to execution status events for this project
+        let mut receiver = EXECUTION_STATUS_EVENTS.subscribe(project_id).await;
 
         // Stream execution status events for this project
         let stream = async_stream::stream! {
@@ -350,71 +337,44 @@ impl Subscription {
     }
 }
 
-// Global storage for plan broadcasters
+// Global storage for plan broadcasters using generic EventBroadcaster
 lazy_static::lazy_static! {
-    static ref PLAN_BROADCASTERS: Arc<RwLock<HashMap<String, broadcast::Sender<CollaborationEvent>>>> =
-        Arc::new(RwLock::new(HashMap::new()));
+    static ref COLLABORATION_EVENTS: crate::utils::EventBroadcaster<String, CollaborationEvent> =
+        crate::utils::EventBroadcaster::new(1000);
 
-    static ref DELTA_BROADCASTERS: Arc<RwLock<HashMap<i32, broadcast::Sender<PlanDagDeltaEvent>>>> =
-        Arc::new(RwLock::new(HashMap::new()));
+    static ref DELTA_EVENTS: crate::utils::EventBroadcaster<i32, PlanDagDeltaEvent> =
+        crate::utils::EventBroadcaster::new(1000);
 
-    static ref EXECUTION_STATUS_BROADCASTERS: Arc<RwLock<HashMap<i32, broadcast::Sender<NodeExecutionStatusEvent>>>> =
-        Arc::new(RwLock::new(HashMap::new()));
-}
-
-/// Get or create a broadcaster for a specific plan
-async fn get_plan_broadcaster(plan_id: &str) -> broadcast::Sender<CollaborationEvent> {
-    // Fast path: Try read lock first and immediately release
-    {
-        let broadcasters = PLAN_BROADCASTERS.read().await;
-        if let Some(sender) = broadcasters.get(plan_id) {
-            return sender.clone();
-        }
-        // Lock automatically dropped here
-    }
-
-    // Slow path: Need to create broadcaster with write lock
-    let mut broadcasters = PLAN_BROADCASTERS.write().await;
-
-    // Double-check pattern to avoid race conditions
-    if let Some(sender) = broadcasters.get(plan_id) {
-        sender.clone()
-    } else {
-        let (sender, _) = broadcast::channel(1000); // Buffer size of 1000 events
-        broadcasters.insert(plan_id.to_string(), sender.clone());
-        sender
-    }
+    static ref EXECUTION_STATUS_EVENTS: crate::utils::EventBroadcaster<i32, NodeExecutionStatusEvent> =
+        crate::utils::EventBroadcaster::new(1000);
 }
 
 /// Publish a collaboration event to all subscribers of a plan
 pub async fn publish_collaboration_event(event: CollaborationEvent) -> Result<(), String> {
-    let broadcaster = get_plan_broadcaster(&event.plan_id).await;
+    let plan_id = event.plan_id.clone();
 
-    // Check buffer utilisation for lag detection
-    let receiver_count = broadcaster.receiver_count();
-    if receiver_count > 0 {
-        // Note: tokio broadcast channel doesn't expose buffer usage directly
-        // We can only detect lag when a send fails or receiver reports lag
-        // This is a best-effort warning based on receiver count
-        if receiver_count > 50 {
-            tracing::warn!(
-                "High subscriber count ({}) for plan {}, potential lag risk",
-                receiver_count,
-                event.plan_id
-            );
-        }
+    // Check subscriber count for lag detection
+    let receiver_count = COLLABORATION_EVENTS.receiver_count(&plan_id).await;
+    if receiver_count > 50 {
+        tracing::warn!(
+            "High subscriber count ({}) for plan {}, potential lag risk",
+            receiver_count,
+            plan_id
+        );
     }
 
-    match broadcaster.send(event.clone()) {
-        Ok(_) => Ok(()),
-        Err(_) => {
-            tracing::error!(
-                "Failed to broadcast collaboration event for plan {} - no active receivers",
-                event.plan_id
-            );
-            Err("Failed to broadcast collaboration event".to_string())
-        }
+    let count = COLLABORATION_EVENTS
+        .publish(plan_id.clone(), event)
+        .await?;
+
+    if count == 0 {
+        tracing::debug!(
+            "No active receivers for collaboration event on plan {}",
+            plan_id
+        );
     }
+
+    Ok(())
 }
 
 /// Helper function to create collaboration events
@@ -447,83 +407,35 @@ pub fn create_user_event_data(
     }
 }
 
-/// Get or create a delta broadcaster for a specific project
-async fn get_delta_broadcaster(project_id: i32) -> broadcast::Sender<PlanDagDeltaEvent> {
-    // Fast path: Try read lock first
-    {
-        let broadcasters = DELTA_BROADCASTERS.read().await;
-        if let Some(sender) = broadcasters.get(&project_id) {
-            return sender.clone();
-        }
-    }
-
-    // Slow path: Create broadcaster with write lock
-    let mut broadcasters = DELTA_BROADCASTERS.write().await;
-
-    // Double-check pattern
-    if let Some(sender) = broadcasters.get(&project_id) {
-        sender.clone()
-    } else {
-        let (sender, _) = broadcast::channel(1000);
-        broadcasters.insert(project_id, sender.clone());
-        sender
-    }
-}
-
 /// Publish a delta event to all subscribers of a project
 pub async fn publish_delta_event(event: PlanDagDeltaEvent) -> Result<(), String> {
-    let broadcaster = get_delta_broadcaster(event.project_id).await;
+    let project_id = event.project_id;
 
-    match broadcaster.send(event.clone()) {
-        Ok(_) => Ok(()),
-        Err(_) => {
-            tracing::error!(
-                "Failed to broadcast delta event for project {} - no active receivers",
-                event.project_id
-            );
-            Err("Failed to broadcast delta event".to_string())
-        }
-    }
-}
+    let count = DELTA_EVENTS.publish(project_id, event).await?;
 
-/// Get or create an execution status broadcaster for a specific project
-async fn get_execution_status_broadcaster(
-    project_id: i32,
-) -> broadcast::Sender<NodeExecutionStatusEvent> {
-    // Fast path: Try read lock first
-    {
-        let broadcasters = EXECUTION_STATUS_BROADCASTERS.read().await;
-        if let Some(sender) = broadcasters.get(&project_id) {
-            return sender.clone();
-        }
+    if count == 0 {
+        tracing::debug!(
+            "No active receivers for delta event on project {}",
+            project_id
+        );
     }
 
-    // Slow path: Create broadcaster with write lock
-    let mut broadcasters = EXECUTION_STATUS_BROADCASTERS.write().await;
-
-    // Double-check pattern
-    if let Some(sender) = broadcasters.get(&project_id) {
-        sender.clone()
-    } else {
-        let (sender, _) = broadcast::channel(1000);
-        broadcasters.insert(project_id, sender.clone());
-        sender
-    }
+    Ok(())
 }
 
 /// Publish an execution status event to all subscribers of a project
 pub async fn publish_execution_status_event(event: NodeExecutionStatusEvent) -> Result<(), String> {
-    let broadcaster = get_execution_status_broadcaster(event.project_id).await;
+    let project_id = event.project_id;
 
-    match broadcaster.send(event.clone()) {
-        Ok(_) => Ok(()),
-        Err(_) => {
-            tracing::debug!(
-                "Failed to broadcast execution status event for project {} - no active receivers",
-                event.project_id
-            );
-            // Don't treat this as an error since it's normal for no one to be listening
-            Ok(())
-        }
+    // Don't treat no receivers as an error - it's normal for no one to be listening
+    let count = EXECUTION_STATUS_EVENTS.publish(project_id, event).await?;
+
+    if count == 0 {
+        tracing::debug!(
+            "No active receivers for execution status event on project {}",
+            project_id
+        );
     }
+
+    Ok(())
 }

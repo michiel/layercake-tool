@@ -11,6 +11,7 @@ mod update;
 mod database;
 mod server;
 mod services;
+mod utils;
 
 #[cfg(feature = "graphql")]
 mod graphql;

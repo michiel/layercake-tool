@@ -152,13 +152,23 @@ pub struct TransformNodeConfig {
     pub transforms: Vec<GraphTransform>,
 }
 
+/// Custom deserializer that handles migration from legacy schema v1 to current schema v2.
+///
+/// Supports three input formats:
+/// 1. Current (v2): `{ transforms: [...] }` - Array of transforms
+/// 2. Legacy (v1): `{ transformType: "...", transformConfig: {...} }` - Single transform with config
+/// 3. Empty: `{}` - No transforms (defaults to empty array)
+///
+/// See docs/NODE_CONFIG_MIGRATION.md for detailed migration logic and examples.
 impl<'de> Deserialize<'de> for TransformNodeConfig {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
         let wire = TransformNodeConfigWire::deserialize(deserializer)?;
+
         if let Some(transforms) = wire.transforms {
+            // Current schema v2: array of transforms
             Ok(TransformNodeConfig {
                 transforms: transforms
                     .into_iter()
@@ -166,10 +176,12 @@ impl<'de> Deserialize<'de> for TransformNodeConfig {
                     .collect(),
             })
         } else if let Some(transform_type) = wire.transform_type {
+            // Legacy schema v1: migrate single transform to array
             let legacy_config = wire.transform_config.unwrap_or_default();
             let transforms = legacy_config.into_graph_transforms(transform_type);
             Ok(TransformNodeConfig { transforms })
         } else {
+            // Empty config: no transforms
             Ok(TransformNodeConfig {
                 transforms: Vec::new(),
             })
@@ -319,6 +331,13 @@ pub struct GraphTransformParams {
     pub enabled: Option<bool>,
 }
 
+/// Wire format for deserializing TransformNodeConfig supporting both v1 and v2 schemas.
+///
+/// This struct accepts multiple input formats for backward compatibility:
+/// - `transforms`: Current v2 schema (array of transforms)
+/// - `transformType` + `transformConfig`: Legacy v1 schema (single transform)
+///
+/// See NODE_CONFIG_MIGRATION.md for migration details.
 #[derive(Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 struct TransformNodeConfigWire {
@@ -332,6 +351,10 @@ struct TransformNodeConfigWire {
     transform_config: Option<LegacyTransformConfig>,
 }
 
+/// Legacy schema v1 transform types.
+///
+/// In v1, only one transform type could be specified per node. In v2, multiple
+/// transforms can be combined in an array. This enum defines the v1 transform types.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 enum LegacyTransformType {
@@ -341,6 +364,10 @@ enum LegacyTransformType {
     FilterEdges,
 }
 
+/// Legacy schema v1 transform configuration.
+///
+/// In v1, a single monolithic configuration object held parameters for all transforms.
+/// The migration logic extracts relevant parameters based on the transform_type.
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 struct LegacyTransformConfig {
@@ -353,6 +380,11 @@ struct LegacyTransformConfig {
 }
 
 impl LegacyTransformConfig {
+    /// Migrate legacy v1 configuration to v2 transform array.
+    ///
+    /// Extracts relevant parameters based on transform_type and converts to
+    /// one or more GraphTransform instances. For example, PartitionDepthLimit
+    /// might generate both a depth limit transform and a hierarchy transform.
     fn into_graph_transforms(self, transform_type: LegacyTransformType) -> Vec<GraphTransform> {
         let mut transforms = Vec::new();
 
@@ -629,6 +661,14 @@ pub struct FilterNodeConfig {
     pub query: QueryFilterConfig,
 }
 
+/// Custom deserializer that handles migration from legacy schema v1 to current schema v2.
+///
+/// Supports two input formats:
+/// 1. Current (v2): `{ query: {...} }` - Query builder configuration
+/// 2. Legacy (v1): `{ filters: [{kind: "Query", params: {...}}] }` - Array of filters
+///
+/// Returns error if no valid query configuration is found in either format.
+/// See docs/NODE_CONFIG_MIGRATION.md for detailed migration logic and examples.
 impl<'de> Deserialize<'de> for FilterNodeConfig {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -644,12 +684,14 @@ impl<'de> Deserialize<'de> for FilterNodeConfig {
         let wire = FilterNodeConfigWire::deserialize(deserializer)?;
 
         if let Some(query) = wire.query {
+            // Current schema v2: query builder
             return Ok(Self {
                 query: query.normalized(),
             });
         }
 
         if let Some(filters) = wire.filters {
+            // Legacy schema v1: extract query from filters array
             for filter in filters {
                 if filter.is_query() {
                     if let Some(query) = filter.params.and_then(|params| params.query_config) {
@@ -752,6 +794,11 @@ pub enum QueryLinkPruningMode {
     DropOrphanNodes,
 }
 
+/// Legacy schema v1 filter format.
+///
+/// In v1, filters were specified as an array with a `kind` discriminator.
+/// The "Query" kind contained the query builder configuration. This struct
+/// is used during migration to extract query configurations from legacy plans.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct LegacyGraphFilter {
@@ -760,6 +807,10 @@ struct LegacyGraphFilter {
 }
 
 impl LegacyGraphFilter {
+    /// Check if this legacy filter is a "Query" filter.
+    ///
+    /// Matches both "query" and "querytext" (case-insensitive) for
+    /// backward compatibility with different v1 variants.
     fn is_query(&self) -> bool {
         self.kind
             .as_deref()
@@ -768,6 +819,9 @@ impl LegacyGraphFilter {
     }
 }
 
+/// Parameters for legacy schema v1 filters.
+///
+/// Contains the embedded queryConfig that needs to be extracted during migration.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct LegacyGraphFilterParams {

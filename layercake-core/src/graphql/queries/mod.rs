@@ -17,7 +17,7 @@ use crate::graphql::types::project::Project;
 use crate::graphql::types::sample_project::SampleProject;
 use crate::graphql::types::{
     DataSource, DataSourcePreview, GraphEdgePreview, GraphEdit, GraphNodePreview, GraphPreview,
-    Layer, LibrarySource, ProjectCollaborator, TableColumn, TableRow, User, UserSession,
+    Layer, LibrarySource, ProjectCollaborator, TableColumn, TableRow, User, UserFilter, UserSession,
 };
 use crate::services::{
     graph_edit_service::GraphEditService, sample_project_service::SampleProjectService,
@@ -302,60 +302,89 @@ impl Query {
 
     // Authentication and User Management Queries
 
-    /// Get current user from session
-    async fn me(&self, ctx: &Context<'_>, session_id: String) -> Result<Option<User>> {
+    /// Find user by various filters (id, email, username, or session_id)
+    async fn find_user(&self, ctx: &Context<'_>, filter: UserFilter) -> Result<Option<User>> {
         let context = ctx.data::<GraphQLContext>()?;
 
-        // Find active session
-        let session = user_sessions::Entity::find()
-            .filter(user_sessions::Column::SessionId.eq(&session_id))
-            .filter(user_sessions::Column::IsActive.eq(true))
-            .one(&context.db)
-            .await?;
+        // Handle session_id lookup (equivalent to old 'me' query)
+        if let Some(session_id) = filter.session_id {
+            let session = user_sessions::Entity::find()
+                .filter(user_sessions::Column::SessionId.eq(&session_id))
+                .filter(user_sessions::Column::IsActive.eq(true))
+                .one(&context.db)
+                .await?;
 
-        if let Some(session) = session {
-            // Check if session is not expired
-            if session.expires_at > chrono::Utc::now() {
-                let user = users::Entity::find_by_id(session.user_id)
-                    .one(&context.db)
-                    .await?;
-                Ok(user.map(User::from))
-            } else {
-                Ok(None)
+            if let Some(session) = session {
+                // Check if session is not expired
+                if session.expires_at > chrono::Utc::now() {
+                    let user = users::Entity::find_by_id(session.user_id)
+                        .one(&context.db)
+                        .await?;
+                    return Ok(user.map(User::from));
+                }
             }
-        } else {
-            Ok(None)
+            return Ok(None);
         }
+
+        // Build query based on provided filters
+        let mut query = users::Entity::find();
+
+        if let Some(id) = filter.id {
+            query = query.filter(users::Column::Id.eq(id));
+        }
+        if let Some(email) = filter.email {
+            query = query.filter(users::Column::Email.eq(email));
+        }
+        if let Some(username) = filter.username {
+            query = query.filter(users::Column::Username.eq(username));
+        }
+
+        let user = query.one(&context.db).await?;
+        Ok(user.map(User::from))
+    }
+
+    /// Get current user from session
+    #[graphql(deprecation = "Use find_user(filter: { session_id: \"...\" }) instead for better flexibility and consistency.")]
+    async fn me(&self, ctx: &Context<'_>, session_id: String) -> Result<Option<User>> {
+        self.find_user(ctx, UserFilter {
+            id: None,
+            email: None,
+            username: None,
+            session_id: Some(session_id)
+        }).await
     }
 
     /// Get user by ID
+    #[graphql(deprecation = "Use find_user(filter: { id: ... }) instead for better flexibility and consistency.")]
     async fn user(&self, ctx: &Context<'_>, id: i32) -> Result<Option<User>> {
-        let context = ctx.data::<GraphQLContext>()?;
-        let user = users::Entity::find_by_id(id).one(&context.db).await?;
-
-        Ok(user.map(User::from))
+        self.find_user(ctx, UserFilter {
+            id: Some(id),
+            email: None,
+            username: None,
+            session_id: None
+        }).await
     }
 
     /// Get user by username
+    #[graphql(deprecation = "Use find_user(filter: { username: \"...\" }) instead for better flexibility and consistency.")]
     async fn user_by_username(&self, ctx: &Context<'_>, username: String) -> Result<Option<User>> {
-        let context = ctx.data::<GraphQLContext>()?;
-        let user = users::Entity::find()
-            .filter(users::Column::Username.eq(&username))
-            .one(&context.db)
-            .await?;
-
-        Ok(user.map(User::from))
+        self.find_user(ctx, UserFilter {
+            id: None,
+            email: None,
+            username: Some(username),
+            session_id: None
+        }).await
     }
 
     /// Get user by email
+    #[graphql(deprecation = "Use find_user(filter: { email: \"...\" }) instead for better flexibility and consistency.")]
     async fn user_by_email(&self, ctx: &Context<'_>, email: String) -> Result<Option<User>> {
-        let context = ctx.data::<GraphQLContext>()?;
-        let user = users::Entity::find()
-            .filter(users::Column::Email.eq(&email))
-            .one(&context.db)
-            .await?;
-
-        Ok(user.map(User::from))
+        self.find_user(ctx, UserFilter {
+            id: None,
+            email: Some(email),
+            username: None,
+            session_id: None
+        }).await
     }
 
     // Project Collaboration Queries
