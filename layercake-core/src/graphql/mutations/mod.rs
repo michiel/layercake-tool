@@ -132,7 +132,9 @@ impl Mutation {
         let project = service
             .create_sample_project(&sample_key)
             .await
-            .map_err(|e| Error::new(format!("Failed to create sample project: {}", e)))?;
+            .map_err(|e| {
+                StructuredError::service("SampleProjectService::create_sample_project", e)
+            })?;
 
         Ok(Project::from(project))
     }
@@ -148,14 +150,18 @@ impl Mutation {
 
         let project = projects::Entity::find_by_id(id)
             .one(&context.db)
-            .await?
-            .ok_or_else(|| Error::new("Project not found"))?;
+            .await
+            .map_err(|e| StructuredError::database("projects::Entity::find_by_id", e))?
+            .ok_or_else(|| StructuredError::not_found("Project", id))?;
 
         let mut project: projects::ActiveModel = project.into();
         project.name = Set(input.name);
         project.description = Set(input.description);
 
-        let project = project.update(&context.db).await?;
+        let project = project
+            .update(&context.db)
+            .await
+            .map_err(|e| StructuredError::database("projects::Entity::update", e))?;
         Ok(Project::from(project))
     }
 
@@ -165,12 +171,14 @@ impl Mutation {
 
         let project = projects::Entity::find_by_id(id)
             .one(&context.db)
-            .await?
-            .ok_or_else(|| Error::new("Project not found"))?;
+            .await
+            .map_err(|e| StructuredError::database("projects::Entity::find_by_id", e))?
+            .ok_or_else(|| StructuredError::not_found("Project", id))?;
 
         projects::Entity::delete_by_id(project.id)
             .exec(&context.db)
-            .await?;
+            .await
+            .map_err(|e| StructuredError::database("projects::Entity::delete_by_id", e))?;
 
         Ok(true)
     }
@@ -182,7 +190,10 @@ impl Mutation {
         let dependencies_json = input
             .dependencies
             .map(|deps| serde_json::to_string(&deps))
-            .transpose()?;
+            .transpose()
+            .map_err(|e| {
+                StructuredError::bad_request(format!("Invalid plan dependencies JSON: {}", e))
+            })?;
 
         let plan = plans::ActiveModel {
             project_id: Set(input.project_id),
@@ -193,7 +204,10 @@ impl Mutation {
             ..Default::default()
         };
 
-        let plan = plan.insert(&context.db).await?;
+        let plan = plan
+            .insert(&context.db)
+            .await
+            .map_err(|e| StructuredError::database("plans::Entity::insert", e))?;
         Ok(Plan::from(plan))
     }
 
@@ -208,20 +222,27 @@ impl Mutation {
 
         let plan = plans::Entity::find_by_id(id)
             .one(&context.db)
-            .await?
-            .ok_or_else(|| Error::new("Plan not found"))?;
+            .await
+            .map_err(|e| StructuredError::database("plans::Entity::find_by_id", e))?
+            .ok_or_else(|| StructuredError::not_found("Plan", id))?;
 
         let dependencies_json = input
             .dependencies
             .map(|deps| serde_json::to_string(&deps))
-            .transpose()?;
+            .transpose()
+            .map_err(|e| {
+                StructuredError::bad_request(format!("Invalid plan dependencies JSON: {}", e))
+            })?;
 
         let mut plan: plans::ActiveModel = plan.into();
         plan.name = Set(input.name);
         plan.yaml_content = Set(input.yaml_content);
         plan.dependencies = Set(dependencies_json);
 
-        let plan = plan.update(&context.db).await?;
+        let plan = plan
+            .update(&context.db)
+            .await
+            .map_err(|e| StructuredError::database("plans::Entity::update", e))?;
         Ok(Plan::from(plan))
     }
 
@@ -231,12 +252,14 @@ impl Mutation {
 
         let plan = plans::Entity::find_by_id(id)
             .one(&context.db)
-            .await?
-            .ok_or_else(|| Error::new("Plan not found"))?;
+            .await
+            .map_err(|e| StructuredError::database("plans::Entity::find_by_id", e))?
+            .ok_or_else(|| StructuredError::not_found("Plan", id))?;
 
         plans::Entity::delete_by_id(plan.id)
             .exec(&context.db)
-            .await?;
+            .await
+            .map_err(|e| StructuredError::database("plans::Entity::delete_by_id", e))?;
 
         Ok(true)
     }
@@ -249,14 +272,16 @@ impl Mutation {
         let plan = plans::Entity::find()
             .filter(plans::Column::ProjectId.eq(id))
             .one(&context.db)
-            .await?
-            .ok_or_else(|| Error::new("Plan not found for project"))?;
+            .await
+            .map_err(|e| StructuredError::database("plans::Entity::find (ProjectId)", e))?
+            .ok_or_else(|| StructuredError::not_found("Plan for project", id))?;
 
         // Get all nodes in the plan
         let nodes = plan_dag_nodes::Entity::find()
             .filter(plan_dag_nodes::Column::PlanId.eq(plan.id))
             .all(&context.db)
-            .await?;
+            .await
+            .map_err(|e| StructuredError::database("plan_dag_nodes::Entity::find (PlanId)", e))?;
 
         if nodes.is_empty() {
             return Ok(PlanExecutionResult {
@@ -270,7 +295,8 @@ impl Mutation {
         let edges_models = plan_dag_edges::Entity::find()
             .filter(plan_dag_edges::Column::PlanId.eq(plan.id))
             .all(&context.db)
-            .await?;
+            .await
+            .map_err(|e| StructuredError::database("plan_dag_edges::Entity::find (PlanId)", e))?;
 
         // Convert edges to (source, target) tuples
         let edges: Vec<(String, String)> = edges_models
@@ -284,7 +310,7 @@ impl Mutation {
         executor
             .execute_dag(id, plan.id, &nodes, &edges)
             .await
-            .map_err(|e| Error::new(format!("Failed to execute plan: {}", e)))?;
+            .map_err(|e| StructuredError::service("DagExecutor::execute_dag", e))?;
 
         Ok(PlanExecutionResult {
             success: true,
@@ -312,8 +338,9 @@ impl Mutation {
         // Verify project exists
         let _project = projects::Entity::find_by_id(project_id)
             .one(&context.db)
-            .await?
-            .ok_or_else(|| Error::new("Project not found"))?;
+            .await
+            .map_err(|e| StructuredError::database("projects::Entity::find_by_id", e))?
+            .ok_or_else(|| StructuredError::not_found("Project", project_id))?;
 
         // Clear existing Plan DAG nodes and edges for this project
         plan_dag_nodes::Entity::delete_many()
@@ -1905,7 +1932,9 @@ impl Mutation {
             crate::graphql::types::SpreadsheetFormat::XLSX => bulk_service
                 .export_to_xlsx(&input.data_source_ids)
                 .await
-                .map_err(|e| StructuredError::service("DataSourceBulkService::export_to_xlsx", e))?,
+                .map_err(|e| {
+                    StructuredError::service("DataSourceBulkService::export_to_xlsx", e)
+                })?,
             crate::graphql::types::SpreadsheetFormat::ODS => bulk_service
                 .export_to_ods(&input.data_source_ids)
                 .await
@@ -1955,12 +1984,16 @@ impl Mutation {
             bulk_service
                 .import_from_xlsx(input.project_id, &file_bytes)
                 .await
-                .map_err(|e| StructuredError::service("DataSourceBulkService::import_from_xlsx", e))?
+                .map_err(|e| {
+                    StructuredError::service("DataSourceBulkService::import_from_xlsx", e)
+                })?
         } else if input.filename.to_lowercase().ends_with(".ods") {
             bulk_service
                 .import_from_ods(input.project_id, &file_bytes)
                 .await
-                .map_err(|e| StructuredError::service("DataSourceBulkService::import_from_ods", e))?
+                .map_err(|e| {
+                    StructuredError::service("DataSourceBulkService::import_from_ods", e)
+                })?
         } else {
             return Err(StructuredError::bad_request(
                 "Only XLSX and ODS formats are supported for import",
@@ -2008,7 +2041,9 @@ impl Mutation {
         use base64::Engine;
         let file_bytes = base64::engine::general_purpose::STANDARD
             .decode(&file_content)
-            .map_err(|e| StructuredError::bad_request(format!("Failed to decode base64 file content: {}", e)))?;
+            .map_err(|e| {
+                StructuredError::bad_request(format!("Failed to decode base64 file content: {}", e))
+            })?;
 
         let file_format: crate::database::entities::data_sources::FileFormat = file_format.into();
         let data_type: crate::database::entities::data_sources::DataType = data_type.into();
@@ -2049,7 +2084,12 @@ impl Mutation {
             use base64::Engine;
             let file_bytes = base64::engine::general_purpose::STANDARD
                 .decode(file_content)
-                .map_err(|e| StructuredError::bad_request(format!("Failed to decode base64 file content: {}", e)))?;
+                .map_err(|e| {
+                    StructuredError::bad_request(format!(
+                        "Failed to decode base64 file content: {}",
+                        e
+                    ))
+                })?;
 
             let filename = if let Some(filename) = &input.filename {
                 filename.clone()
@@ -2122,7 +2162,9 @@ impl Mutation {
         let models = service
             .import_many_into_project(input.project_id, &input.library_source_ids)
             .await
-            .map_err(|e| StructuredError::service("LibrarySourceService::import_many_into_project", e))?;
+            .map_err(|e| {
+                StructuredError::service("LibrarySourceService::import_many_into_project", e)
+            })?;
 
         Ok(models.into_iter().map(DataSource::from).collect())
     }
@@ -2132,10 +2174,9 @@ impl Mutation {
         let context = ctx.data::<GraphQLContext>()?;
         let service = LibrarySourceService::new(context.db.clone());
 
-        let result = service
-            .seed_from_github_library()
-            .await
-            .map_err(|e| StructuredError::service("LibrarySourceService::seed_from_github_library", e))?;
+        let result = service.seed_from_github_library().await.map_err(|e| {
+            StructuredError::service("LibrarySourceService::seed_from_github_library", e)
+        })?;
 
         Ok(SeedLibrarySourcesResult::from(result))
     }
