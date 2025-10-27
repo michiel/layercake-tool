@@ -82,26 +82,26 @@ subgraph cluster_root {
       fillcolor="#8194a0"
       color="#dddddd"
       fontcolor="#ffffff"
-      drone_02[label="Drone"]
-    }
+      drone_02 [label="Drone", layer="drone"];
+      }
     subgraph cluster_mgmt_a_b {
       label="Management A/B"
       style=filled
       fillcolor="#8194a0"
       color="#dddddd"
       fontcolor="#ffffff"
-      drone_03[label="Drone"]
-      drone_04[label="Drone"]
-      drone_05[label="Drone"]
+      drone_03 [label="Drone", layer="drone"];
+      drone_04 [label="Drone", layer="drone"];
+      drone_05 [label="Drone", layer="drone"];
+      }
+    drone_01 [label="Drone", layer="drone"];
+    drone_19 [label="Drone", layer="drone"];
+    drone_20 [label="Drone", layer="drone"];
+    drone_21 [label="Drone", layer="drone"];
+    drone_22 [label="Drone", layer="drone"];
+    drone_23 [label="Drone", layer="drone"];
+    drone_24 [label="Drone", layer="drone"];
     }
-    drone_01[label="Drone"]
-    drone_19[label="Drone"]
-    drone_20[label="Drone"]
-    drone_21[label="Drone"]
-    drone_22[label="Drone"]
-    drone_23[label="Drone"]
-    drone_24[label="Drone"]
-  }
   subgraph cluster_mgmt_b {
     label="Management B"
     style=filled
@@ -120,21 +120,21 @@ subgraph cluster_root {
         fillcolor="#8194a0"
         color="#dddddd"
         fontcolor="#ffffff"
-        drone_31[label="Drone"]
-        drone_32[label="Drone"]
-        drone_33[label="Drone"]
-        drone_34[label="Drone"]
-        drone_35[label="Drone"]
-        drone_36[label="Drone"]
+        drone_31 [label="Drone", layer="drone"];
+        drone_32 [label="Drone", layer="drone"];
+        drone_33 [label="Drone", layer="drone"];
+        drone_34 [label="Drone", layer="drone"];
+        drone_35 [label="Drone", layer="drone"];
+        drone_36 [label="Drone", layer="drone"];
+        }
+      drone_06 [label="Drone", layer="drone"];
+      drone_07 [label="Drone", layer="drone"];
+      drone_08 [label="Drone", layer="drone"];
+      drone_09 [label="Drone", layer="drone"];
+      drone_10 [label="Drone", layer="drone"];
+      drone_11 [label="Drone", layer="drone"];
+      drone_12 [label="Drone", layer="drone"];
       }
-      drone_06[label="Drone"]
-      drone_07[label="Drone"]
-      drone_08[label="Drone"]
-      drone_09[label="Drone"]
-      drone_10[label="Drone"]
-      drone_11[label="Drone"]
-      drone_12[label="Drone"]
-    }
     subgraph cluster_mgmt_b_b {
       label="Management B/B"
       style=filled
@@ -147,26 +147,26 @@ subgraph cluster_root {
         fillcolor="#8194a0"
         color="#dddddd"
         fontcolor="#ffffff"
-        drone_37[label="Drone"]
-        drone_38[label="Drone"]
-        drone_39[label="Drone"]
-        drone_40[label="Drone"]
+        drone_37 [label="Drone", layer="drone"];
+        drone_38 [label="Drone", layer="drone"];
+        drone_39 [label="Drone", layer="drone"];
+        drone_40 [label="Drone", layer="drone"];
+        }
+      drone_13 [label="Drone", layer="drone"];
+      drone_14 [label="Drone", layer="drone"];
+      drone_15 [label="Drone", layer="drone"];
+      drone_16 [label="Drone", layer="drone"];
+      drone_17 [label="Drone", layer="drone"];
+      drone_18 [label="Drone", layer="drone"];
       }
-      drone_13[label="Drone"]
-      drone_14[label="Drone"]
-      drone_15[label="Drone"]
-      drone_16[label="Drone"]
-      drone_17[label="Drone"]
-      drone_18[label="Drone"]
+    drone_25 [label="Drone", layer="drone"];
+    drone_26 [label="Drone", layer="drone"];
+    drone_27 [label="Drone", layer="drone"];
+    drone_28 [label="Drone", layer="drone"];
+    drone_29 [label="Drone", layer="drone"];
+    drone_30 [label="Drone", layer="drone"];
     }
-    drone_25[label="Drone"]
-    drone_26[label="Drone"]
-    drone_27[label="Drone"]
-    drone_28[label="Drone"]
-    drone_29[label="Drone"]
-    drone_30[label="Drone"]
   }
-}
 
 
       drone_03 -> drone_09 [label="link" ];

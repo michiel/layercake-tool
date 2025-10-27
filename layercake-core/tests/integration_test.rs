@@ -60,7 +60,7 @@ fn compare_directories(dir1: &Path, dir2: &Path) -> Result<(), String> {
 #[test]
 fn reference_exports() {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let plan_path = manifest_dir.join("../sample/ref/plan.yaml");
+    let plan_path = manifest_dir.join("../resources/sample-v1/ref/plan.yaml");
     let output_dir = manifest_dir.join("out");
     let reference_dir = manifest_dir.join("tests/reference-output");
 
