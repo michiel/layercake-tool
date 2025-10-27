@@ -207,7 +207,8 @@ impl ProjectState {
             if let Err(_) = sender.send(message.clone()).await {
                 tracing::warn!(
                     "Dead connection detected for user {} in project {}, scheduling removal",
-                    user_id, self.project_id
+                    user_id,
+                    self.project_id
                 );
                 dead_connections.push(user_id);
             }
@@ -217,7 +218,8 @@ impl ProjectState {
         for user_id in &dead_connections {
             tracing::info!(
                 "Removing dead connection for user {} from project {}",
-                user_id, self.project_id
+                user_id,
+                self.project_id
             );
             self.connections.remove(user_id);
             self.users.remove(user_id);
@@ -535,7 +537,8 @@ impl ProjectState {
                 if let Err(_) = connection.send(message.clone()).await {
                     tracing::warn!(
                         "Dead connection detected for user {} in project {}, scheduling removal",
-                        target_user_id, self.project_id
+                        target_user_id,
+                        self.project_id
                     );
                     dead_connections.push(target_user_id);
                 }
@@ -546,7 +549,8 @@ impl ProjectState {
         for user_id in dead_connections {
             tracing::info!(
                 "Removing dead connection for user {} from project {}",
-                user_id, self.project_id
+                user_id,
+                self.project_id
             );
             self.connections.remove(&user_id);
             self.users.remove(&user_id);
@@ -592,7 +596,8 @@ impl ProjectState {
                 if let Err(_) = connection.send(message.clone()).await {
                     tracing::warn!(
                         "Dead connection detected for user {} in project {}, scheduling removal",
-                        target_user_id, self.project_id
+                        target_user_id,
+                        self.project_id
                     );
                     dead_connections.push(target_user_id);
                 }
@@ -603,7 +608,8 @@ impl ProjectState {
         for user_id in dead_connections {
             tracing::info!(
                 "Removing dead connection for user {} from project {}",
-                user_id, self.project_id
+                user_id,
+                self.project_id
             );
             self.connections.remove(&user_id);
             self.users.remove(&user_id);

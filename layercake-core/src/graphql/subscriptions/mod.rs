@@ -363,9 +363,7 @@ pub async fn publish_collaboration_event(event: CollaborationEvent) -> Result<()
         );
     }
 
-    let count = COLLABORATION_EVENTS
-        .publish(plan_id.clone(), event)
-        .await?;
+    let count = COLLABORATION_EVENTS.publish(plan_id.clone(), event).await?;
 
     if count == 0 {
         tracing::debug!(

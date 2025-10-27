@@ -29,11 +29,10 @@ pub struct StructuredError;
 impl StructuredError {
     /// Create a "not found" error
     pub fn not_found(resource: &str, id: impl std::fmt::Display) -> Error {
-        Error::new(format!("{} with id '{}' not found", resource, id))
-            .extend_with(|_, e| {
-                e.set("code", "NOT_FOUND");
-                e.set("resource", resource);
-            })
+        Error::new(format!("{} with id '{}' not found", resource, id)).extend_with(|_, e| {
+            e.set("code", "NOT_FOUND");
+            e.set("resource", resource);
+        })
     }
 
     /// Create a "not found" error with custom message
@@ -59,29 +58,31 @@ impl StructuredError {
 
     /// Create a "validation failed" error
     pub fn validation(field: &str, message: impl Into<String>) -> Error {
-        Error::new(format!("Validation failed for '{}': {}", field, message.into()))
-            .extend_with(|_, e| {
-                e.set("code", "VALIDATION_FAILED");
-                e.set("field", field);
-            })
+        Error::new(format!(
+            "Validation failed for '{}': {}",
+            field,
+            message.into()
+        ))
+        .extend_with(|_, e| {
+            e.set("code", "VALIDATION_FAILED");
+            e.set("field", field);
+        })
     }
 
     /// Create a "database error"
     pub fn database(operation: &str, cause: impl std::fmt::Display) -> Error {
-        Error::new(format!("Database error during {}: {}", operation, cause))
-            .extend_with(|_, e| {
-                e.set("code", "DATABASE_ERROR");
-                e.set("operation", operation);
-            })
+        Error::new(format!("Database error during {}: {}", operation, cause)).extend_with(|_, e| {
+            e.set("code", "DATABASE_ERROR");
+            e.set("operation", operation);
+        })
     }
 
     /// Create a "service error"
     pub fn service(service: &str, cause: impl std::fmt::Display) -> Error {
-        Error::new(format!("Service '{}' error: {}", service, cause))
-            .extend_with(|_, e| {
-                e.set("code", "SERVICE_ERROR");
-                e.set("service", service);
-            })
+        Error::new(format!("Service '{}' error: {}", service, cause)).extend_with(|_, e| {
+            e.set("code", "SERVICE_ERROR");
+            e.set("service", service);
+        })
     }
 
     /// Create an "internal error"
@@ -93,11 +94,10 @@ impl StructuredError {
 
     /// Create a "conflict" error
     pub fn conflict(resource: &str, message: impl Into<String>) -> Error {
-        Error::new(format!("{}: {}", resource, message.into()))
-            .extend_with(|_, e| {
-                e.set("code", "CONFLICT");
-                e.set("resource", resource);
-            })
+        Error::new(format!("{}: {}", resource, message.into())).extend_with(|_, e| {
+            e.set("code", "CONFLICT");
+            e.set("resource", resource);
+        })
     }
 
     /// Create a "bad request" error

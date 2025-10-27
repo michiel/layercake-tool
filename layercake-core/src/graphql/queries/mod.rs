@@ -17,7 +17,8 @@ use crate::graphql::types::project::Project;
 use crate::graphql::types::sample_project::SampleProject;
 use crate::graphql::types::{
     DataSource, DataSourcePreview, GraphEdgePreview, GraphEdit, GraphNodePreview, GraphPreview,
-    Layer, LibrarySource, ProjectCollaborator, TableColumn, TableRow, User, UserFilter, UserSession,
+    Layer, LibrarySource, ProjectCollaborator, TableColumn, TableRow, User, UserFilter,
+    UserSession,
 };
 use crate::services::{
     graph_edit_service::GraphEditService, sample_project_service::SampleProjectService,
@@ -344,47 +345,71 @@ impl Query {
     }
 
     /// Get current user from session
-    #[graphql(deprecation = "Use find_user(filter: { session_id: \"...\" }) instead for better flexibility and consistency.")]
+    #[graphql(
+        deprecation = "Use find_user(filter: { session_id: \"...\" }) instead for better flexibility and consistency."
+    )]
     async fn me(&self, ctx: &Context<'_>, session_id: String) -> Result<Option<User>> {
-        self.find_user(ctx, UserFilter {
-            id: None,
-            email: None,
-            username: None,
-            session_id: Some(session_id)
-        }).await
+        self.find_user(
+            ctx,
+            UserFilter {
+                id: None,
+                email: None,
+                username: None,
+                session_id: Some(session_id),
+            },
+        )
+        .await
     }
 
     /// Get user by ID
-    #[graphql(deprecation = "Use find_user(filter: { id: ... }) instead for better flexibility and consistency.")]
+    #[graphql(
+        deprecation = "Use find_user(filter: { id: ... }) instead for better flexibility and consistency."
+    )]
     async fn user(&self, ctx: &Context<'_>, id: i32) -> Result<Option<User>> {
-        self.find_user(ctx, UserFilter {
-            id: Some(id),
-            email: None,
-            username: None,
-            session_id: None
-        }).await
+        self.find_user(
+            ctx,
+            UserFilter {
+                id: Some(id),
+                email: None,
+                username: None,
+                session_id: None,
+            },
+        )
+        .await
     }
 
     /// Get user by username
-    #[graphql(deprecation = "Use find_user(filter: { username: \"...\" }) instead for better flexibility and consistency.")]
+    #[graphql(
+        deprecation = "Use find_user(filter: { username: \"...\" }) instead for better flexibility and consistency."
+    )]
     async fn user_by_username(&self, ctx: &Context<'_>, username: String) -> Result<Option<User>> {
-        self.find_user(ctx, UserFilter {
-            id: None,
-            email: None,
-            username: Some(username),
-            session_id: None
-        }).await
+        self.find_user(
+            ctx,
+            UserFilter {
+                id: None,
+                email: None,
+                username: Some(username),
+                session_id: None,
+            },
+        )
+        .await
     }
 
     /// Get user by email
-    #[graphql(deprecation = "Use find_user(filter: { email: \"...\" }) instead for better flexibility and consistency.")]
+    #[graphql(
+        deprecation = "Use find_user(filter: { email: \"...\" }) instead for better flexibility and consistency."
+    )]
     async fn user_by_email(&self, ctx: &Context<'_>, email: String) -> Result<Option<User>> {
-        self.find_user(ctx, UserFilter {
-            id: None,
-            email: Some(email),
-            username: None,
-            session_id: None
-        }).await
+        self.find_user(
+            ctx,
+            UserFilter {
+                id: None,
+                email: Some(email),
+                username: None,
+                session_id: None,
+            },
+        )
+        .await
     }
 
     // Project Collaboration Queries

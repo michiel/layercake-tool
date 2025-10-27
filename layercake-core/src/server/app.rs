@@ -52,7 +52,9 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
 
         // Spawn background task to cleanup idle broadcast channels
         tokio::spawn(async move {
-            use crate::graphql::subscriptions::{COLLABORATION_EVENTS, DELTA_EVENTS, EXECUTION_STATUS_EVENTS};
+            use crate::graphql::subscriptions::{
+                COLLABORATION_EVENTS, DELTA_EVENTS, EXECUTION_STATUS_EVENTS,
+            };
             use std::time::Duration;
 
             let mut interval = tokio::time::interval(Duration::from_secs(60));
@@ -81,7 +83,9 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
                 if collab_count + delta_count + exec_count > 0 {
                     tracing::debug!(
                         "Active broadcast channels - collaboration: {}, delta: {}, execution: {}",
-                        collab_count, delta_count, exec_count
+                        collab_count,
+                        delta_count,
+                        exec_count
                     );
                 }
             }
