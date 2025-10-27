@@ -1905,11 +1905,11 @@ impl Mutation {
             crate::graphql::types::SpreadsheetFormat::XLSX => bulk_service
                 .export_to_xlsx(&input.data_source_ids)
                 .await
-                .map_err(|e| Error::new(format!("Failed to export datasources: {}", e)))?,
+                .map_err(|e| StructuredError::service("DataSourceBulkService::export_to_xlsx", e))?,
             crate::graphql::types::SpreadsheetFormat::ODS => bulk_service
                 .export_to_ods(&input.data_source_ids)
                 .await
-                .map_err(|e| Error::new(format!("Failed to export datasources: {}", e)))?,
+                .map_err(|e| StructuredError::service("DataSourceBulkService::export_to_ods", e))?,
         };
 
         // Encode as base64
@@ -1946,7 +1946,7 @@ impl Mutation {
 
         let file_bytes = general_purpose::STANDARD
             .decode(&input.file_content)
-            .map_err(|e| Error::new(format!("Invalid base64 content: {}", e)))?;
+            .map_err(|e| StructuredError::bad_request(format!("Invalid base64 content: {}", e)))?;
 
         tracing::info!("Decoded {} bytes from base64", file_bytes.len());
 
@@ -1955,14 +1955,14 @@ impl Mutation {
             bulk_service
                 .import_from_xlsx(input.project_id, &file_bytes)
                 .await
-                .map_err(|e| Error::new(format!("Failed to import datasources: {}", e)))?
+                .map_err(|e| StructuredError::service("DataSourceBulkService::import_from_xlsx", e))?
         } else if input.filename.to_lowercase().ends_with(".ods") {
             bulk_service
                 .import_from_ods(input.project_id, &file_bytes)
                 .await
-                .map_err(|e| Error::new(format!("Failed to import datasources: {}", e)))?
+                .map_err(|e| StructuredError::service("DataSourceBulkService::import_from_ods", e))?
         } else {
-            return Err(Error::new(
+            return Err(StructuredError::bad_request(
                 "Only XLSX and ODS formats are supported for import",
             ));
         };
@@ -1973,7 +1973,8 @@ impl Mutation {
 
         let datasources = data_sources::Entity::find()
             .all(&context.db)
-            .await?
+            .await
+            .map_err(|e| StructuredError::database("data_sources::Entity::find().all", e))?
             .into_iter()
             .filter(|ds| result.imported_ids.contains(&ds.id))
             .map(DataSource::from)
