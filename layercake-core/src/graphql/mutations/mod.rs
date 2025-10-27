@@ -9,6 +9,7 @@ use crate::database::entities::{
     project_collaborators, projects, user_sessions, users, ExecutionState,
 };
 use crate::graphql::context::GraphQLContext;
+use crate::graphql::errors::StructuredError;
 use crate::services::auth_service::AuthService;
 use serde_json::{Map, Value};
 
@@ -2006,7 +2007,7 @@ impl Mutation {
         use base64::Engine;
         let file_bytes = base64::engine::general_purpose::STANDARD
             .decode(&file_content)
-            .map_err(|e| Error::new(format!("Failed to decode base64 file content: {}", e)))?;
+            .map_err(|e| StructuredError::bad_request(format!("Failed to decode base64 file content: {}", e)))?;
 
         let file_format: crate::database::entities::data_sources::FileFormat = file_format.into();
         let data_type: crate::database::entities::data_sources::DataType = data_type.into();
@@ -2021,7 +2022,7 @@ impl Mutation {
                 file_bytes,
             )
             .await
-            .map_err(|e| Error::new(format!("Failed to create library source: {}", e)))?;
+            .map_err(|e| StructuredError::service("LibrarySourceService::create_from_file", e))?;
 
         Ok(LibrarySource::from(model))
     }
@@ -2034,7 +2035,8 @@ impl Mutation {
         input: UpdateLibrarySourceInput,
     ) -> Result<LibrarySource> {
         if input.file_content.is_none() && input.filename.is_some() {
-            return Err(Error::new(
+            return Err(StructuredError::validation(
+                "filename",
                 "filename can only be changed when fileContent is provided",
             ));
         }
@@ -2046,7 +2048,7 @@ impl Mutation {
             use base64::Engine;
             let file_bytes = base64::engine::general_purpose::STANDARD
                 .decode(file_content)
-                .map_err(|e| Error::new(format!("Failed to decode base64 file content: {}", e)))?;
+                .map_err(|e| StructuredError::bad_request(format!("Failed to decode base64 file content: {}", e)))?;
 
             let filename = if let Some(filename) = &input.filename {
                 filename.clone()
@@ -2054,28 +2056,28 @@ impl Mutation {
                 service
                     .get_by_id(id)
                     .await
-                    .map_err(|e| Error::new(format!("Failed to load library source: {}", e)))?
-                    .ok_or_else(|| Error::new("Library source not found"))?
+                    .map_err(|e| StructuredError::service("LibrarySourceService::get_by_id", e))?
+                    .ok_or_else(|| StructuredError::not_found("LibrarySource", id))?
                     .filename
             };
 
             service
                 .update_file(id, filename, file_bytes)
                 .await
-                .map_err(|e| Error::new(format!("Failed to update library source file: {}", e)))?
+                .map_err(|e| StructuredError::service("LibrarySourceService::update_file", e))?
         } else {
             service
                 .get_by_id(id)
                 .await
-                .map_err(|e| Error::new(format!("Failed to load library source: {}", e)))?
-                .ok_or_else(|| Error::new("Library source not found"))?
+                .map_err(|e| StructuredError::service("LibrarySourceService::get_by_id", e))?
+                .ok_or_else(|| StructuredError::not_found("LibrarySource", id))?
         };
 
         if input.name.is_some() || input.description.is_some() {
             current = service
                 .update(id, input.name.clone(), input.description.clone())
                 .await
-                .map_err(|e| Error::new(format!("Failed to update library source: {}", e)))?;
+                .map_err(|e| StructuredError::service("LibrarySourceService::update", e))?;
         }
 
         Ok(LibrarySource::from(current))
@@ -2089,7 +2091,7 @@ impl Mutation {
         service
             .delete(id)
             .await
-            .map_err(|e| Error::new(format!("Failed to delete library source: {}", e)))?;
+            .map_err(|e| StructuredError::service("LibrarySourceService::delete", e))?;
 
         Ok(true)
     }
@@ -2102,7 +2104,7 @@ impl Mutation {
         let model = service
             .reprocess(id)
             .await
-            .map_err(|e| Error::new(format!("Failed to reprocess library source: {}", e)))?;
+            .map_err(|e| StructuredError::service("LibrarySourceService::reprocess", e))?;
 
         Ok(LibrarySource::from(model))
     }
@@ -2119,7 +2121,7 @@ impl Mutation {
         let models = service
             .import_many_into_project(input.project_id, &input.library_source_ids)
             .await
-            .map_err(|e| Error::new(format!("Failed to import library sources: {}", e)))?;
+            .map_err(|e| StructuredError::service("LibrarySourceService::import_many_into_project", e))?;
 
         Ok(models.into_iter().map(DataSource::from).collect())
     }
@@ -2132,7 +2134,7 @@ impl Mutation {
         let result = service
             .seed_from_github_library()
             .await
-            .map_err(|e| Error::new(format!("Failed to seed library sources: {}", e)))?;
+            .map_err(|e| StructuredError::service("LibrarySourceService::seed_from_github_library", e))?;
 
         Ok(SeedLibrarySourcesResult::from(result))
     }
