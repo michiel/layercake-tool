@@ -452,14 +452,16 @@ impl Mutation {
         // Verify project exists
         let _project = projects::Entity::find_by_id(project_id)
             .one(&context.db)
-            .await?
-            .ok_or_else(|| Error::new("Project not found"))?;
+            .await
+            .map_err(|e| StructuredError::database("projects::Entity::find_by_id", e))?
+            .ok_or_else(|| StructuredError::not_found("Project", project_id))?;
 
         // Find or create a plan for this project
         let plan = match plans::Entity::find()
             .filter(plans::Column::ProjectId.eq(project_id))
             .one(&context.db)
-            .await?
+            .await
+            .map_err(|e| StructuredError::database("plans::Entity::find (ProjectId)", e))?
         {
             Some(plan) => plan,
             None => {
@@ -476,13 +478,17 @@ impl Mutation {
                     created_at: Set(now),
                     updated_at: Set(now),
                 };
-                new_plan.insert(&context.db).await?
+                new_plan
+                    .insert(&context.db)
+                    .await
+                    .map_err(|e| StructuredError::database("plans::Entity::insert", e))?
             }
         };
 
         // Fetch current state to determine node index and generate unique ID
-        let (current_nodes, _) =
-            plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
+        let (current_nodes, _) = plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id)
+            .await
+            .map_err(|e| StructuredError::service("plan_dag_delta::fetch_current_plan_dag", e))?;
         let node_index = current_nodes.len();
 
         // Generate unique ID on backend - ignore frontend-provided ID
@@ -498,7 +504,8 @@ impl Mutation {
             crate::graphql::types::PlanDagNodeType::Output => "OutputNode",
         };
 
-        let metadata_json = serde_json::to_string(&node.metadata)?;
+        let metadata_json = serde_json::to_string(&node.metadata)
+            .map_err(|e| StructuredError::bad_request(format!("Invalid node metadata: {}", e)))?;
 
         let dag_node = plan_dag_nodes::ActiveModel {
             id: Set(generated_id),
@@ -514,14 +521,19 @@ impl Mutation {
             updated_at: Set(Utc::now()),
         };
 
-        let inserted_node = dag_node.insert(&context.db).await?;
+        let inserted_node = dag_node
+            .insert(&context.db)
+            .await
+            .map_err(|e| StructuredError::database("plan_dag_nodes::Entity::insert", e))?;
         let result_node = PlanDagNode::from(inserted_node.clone());
 
         // Generate JSON Patch delta for node addition
         let patch_op = plan_dag_delta::generate_node_add_patch(&result_node, node_index);
 
         // Increment plan version
-        let new_version = plan_dag_delta::increment_plan_version(&context.db, plan.id).await?;
+        let new_version = plan_dag_delta::increment_plan_version(&context.db, plan.id)
+            .await
+            .map_err(|e| StructuredError::service("plan_dag_delta::increment_plan_version", e))?;
 
         // Broadcast delta event
         let user_id = "demo_user".to_string(); // TODO: Get from auth context
@@ -552,7 +564,8 @@ impl Mutation {
         let plan = match plans::Entity::find()
             .filter(plans::Column::ProjectId.eq(project_id))
             .one(&context.db)
-            .await?
+            .await
+            .map_err(|e| StructuredError::database("plans::Entity::find (ProjectId)", e))?
         {
             Some(plan) => plan,
             None => {
@@ -569,13 +582,17 @@ impl Mutation {
                     created_at: Set(now),
                     updated_at: Set(now),
                 };
-                new_plan.insert(&context.db).await?
+                new_plan
+                    .insert(&context.db)
+                    .await
+                    .map_err(|e| StructuredError::database("plans::Entity::insert", e))?
             }
         };
 
         // Fetch current state for delta generation
-        let (current_nodes, _) =
-            plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
+        let (current_nodes, _) = plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id)
+            .await
+            .map_err(|e| StructuredError::service("plan_dag_delta::fetch_current_plan_dag", e))?;
 
         // Find the node
         let node = plan_dag_nodes::Entity::find()
@@ -585,8 +602,9 @@ impl Mutation {
                     .and(plan_dag_nodes::Column::Id.eq(&node_id)),
             )
             .one(&context.db)
-            .await?
-            .ok_or_else(|| Error::new("Node not found"))?;
+            .await
+            .map_err(|e| StructuredError::database("plan_dag_nodes::Entity::find", e))?
+            .ok_or_else(|| StructuredError::not_found("Plan DAG node", &node_id))?;
 
         let node_type = node.node_type.clone();
         let mut metadata_json_current = node.metadata_json.clone();
@@ -611,7 +629,9 @@ impl Mutation {
 
         // Update metadata if provided
         if let Some(metadata) = updates.metadata {
-            let metadata_json_str = serde_json::to_string(&metadata)?;
+            let metadata_json_str = serde_json::to_string(&metadata).map_err(|e| {
+                StructuredError::bad_request(format!("Invalid node metadata: {}", e))
+            })?;
             node_active.metadata_json = Set(metadata_json_str.clone());
             metadata_json_current = metadata_json_str.clone();
 
@@ -649,7 +669,10 @@ impl Mutation {
                         if let Some(data_source) =
                             data_sources::Entity::find_by_id(data_source_id as i32)
                                 .one(&context.db)
-                                .await?
+                                .await
+                                .map_err(|e| {
+                                    StructuredError::database("data_sources::Entity::find_by_id", e)
+                                })?
                         {
                             let mut metadata_obj =
                                 serde_json::from_str::<Value>(&metadata_json_current)
@@ -692,12 +715,19 @@ impl Mutation {
         }
 
         node_active.updated_at = Set(Utc::now());
-        let updated_node = node_active.update(&context.db).await?;
+        let updated_node = node_active
+            .update(&context.db)
+            .await
+            .map_err(|e| StructuredError::database("plan_dag_nodes::Entity::update", e))?;
         let result_node = PlanDagNode::from(updated_node.clone());
 
         // Increment plan version and broadcast delta
         if !patch_ops.is_empty() {
-            let new_version = plan_dag_delta::increment_plan_version(&context.db, plan.id).await?;
+            let new_version = plan_dag_delta::increment_plan_version(&context.db, plan.id)
+                .await
+                .map_err(|e| {
+                    StructuredError::service("plan_dag_delta::increment_plan_version", e)
+                })?;
             let user_id = "demo_user".to_string(); // TODO: Get from auth context
             plan_dag_delta::publish_plan_dag_delta(project_id, new_version, user_id, patch_ops)
                 .await
@@ -725,8 +755,9 @@ impl Mutation {
         let plan = plans::Entity::find()
             .filter(plans::Column::ProjectId.eq(project_id))
             .one(&context.db)
-            .await?
-            .ok_or_else(|| Error::new("Plan not found for project"))?;
+            .await
+            .map_err(|e| StructuredError::database("plans::Entity::find (ProjectId)", e))?
+            .ok_or_else(|| StructuredError::not_found("Plan for project", project_id))?;
 
         // Fetch current state for delta generation
         let (current_nodes, current_edges) =
@@ -762,7 +793,8 @@ impl Mutation {
                 ),
             )
             .exec(&context.db)
-            .await?;
+            .await
+            .map_err(|e| StructuredError::database("plan_dag_edges::Entity::delete_many", e))?;
 
         // Delete the node
         let result = plan_dag_nodes::Entity::delete_many()
@@ -772,13 +804,17 @@ impl Mutation {
                     .and(plan_dag_nodes::Column::Id.eq(&node_id)),
             )
             .exec(&context.db)
-            .await?;
+            .await
+            .map_err(|e| StructuredError::database("plan_dag_nodes::Entity::delete_many", e))?;
 
         if result.rows_affected > 0 {
             // Increment plan version and broadcast delta
             if !patch_ops.is_empty() {
-                let new_version =
-                    plan_dag_delta::increment_plan_version(&context.db, plan.id).await?;
+                let new_version = plan_dag_delta::increment_plan_version(&context.db, plan.id)
+                    .await
+                    .map_err(|e| {
+                        StructuredError::service("plan_dag_delta::increment_plan_version", e)
+                    })?;
                 let user_id = "demo_user".to_string(); // TODO: Get from auth context
                 plan_dag_delta::publish_plan_dag_delta(project_id, new_version, user_id, patch_ops)
                     .await
@@ -787,7 +823,7 @@ impl Mutation {
 
             Ok(None)
         } else {
-            Err(Error::new("Node not found"))
+            Err(StructuredError::not_found("Plan DAG node", node_id))
         }
     }
 
@@ -826,14 +862,16 @@ impl Mutation {
         };
 
         // Fetch current state to determine edge index
-        let (_, current_edges) =
-            plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
+        let (_, current_edges) = plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id)
+            .await
+            .map_err(|e| StructuredError::service("plan_dag_delta::fetch_current_plan_dag", e))?;
         let edge_index = current_edges.len();
 
         // Generate unique ID on backend - ignore frontend-provided ID
         let generated_id = generate_edge_id(&edge.source, &edge.target);
 
-        let metadata_json = serde_json::to_string(&edge.metadata)?;
+        let metadata_json = serde_json::to_string(&edge.metadata)
+            .map_err(|e| StructuredError::bad_request(format!("Invalid edge metadata: {}", e)))?;
 
         let dag_edge = plan_dag_edges::ActiveModel {
             id: Set(generated_id),
@@ -846,7 +884,10 @@ impl Mutation {
             updated_at: Set(Utc::now()),
         };
 
-        let inserted_edge = dag_edge.insert(&context.db).await?;
+        let inserted_edge = dag_edge
+            .insert(&context.db)
+            .await
+            .map_err(|e| StructuredError::database("plan_dag_edges::Entity::insert", e))?;
         let result_edge = PlanDagEdge::from(inserted_edge);
 
         // Generate JSON Patch delta for edge addition
@@ -881,12 +922,14 @@ impl Mutation {
         let plan = plans::Entity::find()
             .filter(plans::Column::ProjectId.eq(project_id))
             .one(&context.db)
-            .await?
-            .ok_or_else(|| Error::new("Plan not found for project"))?;
+            .await
+            .map_err(|e| StructuredError::database("plans::Entity::find (ProjectId)", e))?
+            .ok_or_else(|| StructuredError::not_found("Plan for project", project_id))?;
 
         // Fetch current state for delta generation
-        let (_, current_edges) =
-            plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
+        let (_, current_edges) = plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id)
+            .await
+            .map_err(|e| StructuredError::service("plan_dag_delta::fetch_current_plan_dag", e))?;
 
         // Find the edge to get its target node before deletion
         let _deleted_edge_target = current_edges
@@ -908,7 +951,8 @@ impl Mutation {
                     .and(plan_dag_edges::Column::Id.eq(&edge_id)),
             )
             .exec(&context.db)
-            .await?;
+            .await
+            .map_err(|e| StructuredError::database("plan_dag_edges::Entity::delete_many", e))?;
 
         if result.rows_affected > 0 {
             // Increment plan version and broadcast delta
@@ -929,7 +973,7 @@ impl Mutation {
 
             Ok(None)
         } else {
-            Err(Error::new("Edge not found"))
+            Err(StructuredError::not_found("Plan DAG edge", edge_id))
         }
     }
 
@@ -947,8 +991,9 @@ impl Mutation {
         let plan = plans::Entity::find()
             .filter(plans::Column::ProjectId.eq(project_id))
             .one(&context.db)
-            .await?
-            .ok_or_else(|| Error::new("Plan not found for project"))?;
+            .await
+            .map_err(|e| StructuredError::database("plans::Entity::find (ProjectId)", e))?
+            .ok_or_else(|| StructuredError::not_found("Plan for project", project_id))?;
 
         // Find the edge
         let edge = plan_dag_edges::Entity::find()
@@ -958,8 +1003,9 @@ impl Mutation {
                     .and(plan_dag_edges::Column::Id.eq(&edge_id)),
             )
             .one(&context.db)
-            .await?
-            .ok_or_else(|| Error::new("Edge not found"))?;
+            .await
+            .map_err(|e| StructuredError::database("plan_dag_edges::Entity::find", e))?
+            .ok_or_else(|| StructuredError::not_found("Plan DAG edge", &edge_id))?;
 
         let mut edge_active: plan_dag_edges::ActiveModel = edge.into();
 
@@ -967,12 +1013,17 @@ impl Mutation {
 
         // Update metadata if provided
         if let Some(metadata) = updates.metadata {
-            let metadata_json = serde_json::to_string(&metadata)?;
+            let metadata_json = serde_json::to_string(&metadata).map_err(|e| {
+                StructuredError::bad_request(format!("Invalid edge metadata: {}", e))
+            })?;
             edge_active.metadata_json = Set(metadata_json);
         }
 
         edge_active.updated_at = Set(Utc::now());
-        let updated_edge = edge_active.update(&context.db).await?;
+        let updated_edge = edge_active
+            .update(&context.db)
+            .await
+            .map_err(|e| StructuredError::database("plan_dag_edges::Entity::update", e))?;
 
         Ok(Some(PlanDagEdge::from(updated_edge)))
     }
@@ -1546,7 +1597,9 @@ impl Mutation {
         use base64::Engine;
         let file_content = base64::engine::general_purpose::STANDARD
             .decode(&input.file_content)
-            .map_err(|e| Error::new(format!("Failed to decode base64 file content: {}", e)))?;
+            .map_err(|e| {
+                StructuredError::bad_request(format!("Failed to decode base64 file content: {}", e))
+            })?;
 
         // Convert GraphQL enums to database enums
         let file_format = input.file_format.into();
@@ -1563,7 +1616,7 @@ impl Mutation {
                 file_content,
             )
             .await
-            .map_err(|e| Error::new(format!("Failed to create DataSource: {}", e)))?;
+            .map_err(|e| StructuredError::service("DataSourceService::create_from_file", e))?;
 
         // Automatically add a DataSourceNode to the Plan DAG
         let timestamp = chrono::Utc::now().timestamp_millis();
@@ -1573,7 +1626,8 @@ impl Mutation {
         let plan = match plans::Entity::find()
             .filter(plans::Column::ProjectId.eq(input.project_id))
             .one(&context.db)
-            .await?
+            .await
+            .map_err(|e| StructuredError::database("plans::Entity::find (ProjectId)", e))?
         {
             Some(plan) => plan,
             None => {
@@ -1590,13 +1644,17 @@ impl Mutation {
                     created_at: Set(now),
                     updated_at: Set(now),
                 };
-                new_plan.insert(&context.db).await?
+                new_plan
+                    .insert(&context.db)
+                    .await
+                    .map_err(|e| StructuredError::database("plans::Entity::insert", e))?
             }
         };
 
         // Fetch current state to determine node index and position
-        let (current_nodes, _) =
-            plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
+        let (current_nodes, _) = plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id)
+            .await
+            .map_err(|e| StructuredError::service("plan_dag_delta::fetch_current_plan_dag", e))?;
         let node_index = current_nodes.len();
 
         // Calculate position: stack vertically with some spacing
@@ -1604,15 +1662,15 @@ impl Mutation {
         let position_y = 100.0 + (node_index as f64 * 120.0);
 
         // Create the DAG node metadata and config
-        let metadata_json = serde_json::to_string(&serde_json::json!({
-            "label": input.name
-        }))?;
+        let metadata_json = serde_json::to_string(&serde_json::json!({ "label": input.name }))
+            .map_err(|e| StructuredError::bad_request(format!("Invalid node metadata: {}", e)))?;
 
         let config_json = serde_json::to_string(&serde_json::json!({
             "dataSourceId": data_source.id,
             "filename": input.filename,
             "dataType": data_source.data_type.to_lowercase()
-        }))?;
+        }))
+        .map_err(|e| StructuredError::bad_request(format!("Invalid node config: {}", e)))?;
 
         let dag_node = plan_dag_nodes::ActiveModel {
             id: Set(node_id.clone()),
@@ -1628,14 +1686,19 @@ impl Mutation {
             updated_at: Set(Utc::now()),
         };
 
-        let inserted_node = dag_node.insert(&context.db).await?;
+        let inserted_node = dag_node
+            .insert(&context.db)
+            .await
+            .map_err(|e| StructuredError::database("plan_dag_nodes::Entity::insert", e))?;
         let result_node = PlanDagNode::from(inserted_node);
 
         // Generate JSON Patch delta for node addition
         let patch_op = plan_dag_delta::generate_node_add_patch(&result_node, node_index);
 
         // Increment plan version
-        let new_version = plan_dag_delta::increment_plan_version(&context.db, plan.id).await?;
+        let new_version = plan_dag_delta::increment_plan_version(&context.db, plan.id)
+            .await
+            .map_err(|e| StructuredError::service("plan_dag_delta::increment_plan_version", e))?;
 
         // Broadcast delta event
         let user_id = "demo_user".to_string(); // TODO: Get from auth context
@@ -1671,7 +1734,7 @@ impl Mutation {
                 data_type,
             )
             .await
-            .map_err(|e| Error::new(format!("Failed to create empty DataSource: {}", e)))?;
+            .map_err(|e| StructuredError::service("DataSourceService::create_empty", e))?;
 
         // Automatically add a DataSourceNode to the Plan DAG
         let timestamp = chrono::Utc::now().timestamp_millis();
@@ -1681,7 +1744,8 @@ impl Mutation {
         let plan = match plans::Entity::find()
             .filter(plans::Column::ProjectId.eq(input.project_id))
             .one(&context.db)
-            .await?
+            .await
+            .map_err(|e| StructuredError::database("plans::Entity::find (ProjectId)", e))?
         {
             Some(plan) => plan,
             None => {
@@ -1698,13 +1762,17 @@ impl Mutation {
                     created_at: Set(now),
                     updated_at: Set(now),
                 };
-                new_plan.insert(&context.db).await?
+                new_plan
+                    .insert(&context.db)
+                    .await
+                    .map_err(|e| StructuredError::database("plans::Entity::insert", e))?
             }
         };
 
         // Fetch current state to determine node index and position
-        let (current_nodes, _) =
-            plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
+        let (current_nodes, _) = plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id)
+            .await
+            .map_err(|e| StructuredError::service("plan_dag_delta::fetch_current_plan_dag", e))?;
         let node_index = current_nodes.len();
 
         // Calculate position: stack vertically with some spacing
@@ -1712,15 +1780,15 @@ impl Mutation {
         let position_y = 100.0 + (node_index as f64 * 120.0);
 
         // Create the DAG node metadata and config
-        let metadata_json = serde_json::to_string(&serde_json::json!({
-            "label": input.name
-        }))?;
+        let metadata_json = serde_json::to_string(&serde_json::json!({ "label": input.name }))
+            .map_err(|e| StructuredError::bad_request(format!("Invalid node metadata: {}", e)))?;
 
         let config_json = serde_json::to_string(&serde_json::json!({
             "dataSourceId": data_source.id,
             "filename": data_source.filename,
             "dataType": data_source.data_type.to_lowercase()
-        }))?;
+        }))
+        .map_err(|e| StructuredError::bad_request(format!("Invalid node config: {}", e)))?;
 
         let dag_node = plan_dag_nodes::ActiveModel {
             id: Set(node_id.clone()),
@@ -1736,14 +1804,19 @@ impl Mutation {
             updated_at: Set(Utc::now()),
         };
 
-        let inserted_node = dag_node.insert(&context.db).await?;
+        let inserted_node = dag_node
+            .insert(&context.db)
+            .await
+            .map_err(|e| StructuredError::database("plan_dag_nodes::Entity::insert", e))?;
         let result_node = PlanDagNode::from(inserted_node);
 
         // Generate JSON Patch delta for node addition
         let patch_op = plan_dag_delta::generate_node_add_patch(&result_node, node_index);
 
         // Increment plan version
-        let new_version = plan_dag_delta::increment_plan_version(&context.db, plan.id).await?;
+        let new_version = plan_dag_delta::increment_plan_version(&context.db, plan.id)
+            .await
+            .map_err(|e| StructuredError::service("plan_dag_delta::increment_plan_version", e))?;
 
         // Broadcast delta event
         let user_id = "demo_user".to_string(); // TODO: Get from auth context
@@ -1777,7 +1850,7 @@ impl Mutation {
             let file_content = base64::engine::general_purpose::STANDARD
                 .decode(&file_input.file_content)
                 .map_err(|e| {
-                    Error::new(format!(
+                    StructuredError::bad_request(format!(
                         "Failed to decode base64 file content for {}: {}",
                         file_input.filename, e
                     ))
@@ -1794,10 +1867,10 @@ impl Mutation {
                 )
                 .await
                 .map_err(|e| {
-                    Error::new(format!(
-                        "Failed to create DataSource for {}: {}",
-                        file_input.filename, e
-                    ))
+                    StructuredError::service(
+                        "DataSourceService::create_with_auto_detect",
+                        format!("{} (file: {})", e, file_input.filename),
+                    )
                 })?;
 
             // Automatically add a DataSourceNode to the Plan DAG
@@ -1808,7 +1881,8 @@ impl Mutation {
             let plan = match plans::Entity::find()
                 .filter(plans::Column::ProjectId.eq(project_id))
                 .one(&context.db)
-                .await?
+                .await
+                .map_err(|e| StructuredError::database("plans::Entity::find (ProjectId)", e))?
             {
                 Some(plan) => plan,
                 None => {
@@ -1825,13 +1899,19 @@ impl Mutation {
                         created_at: Set(now),
                         updated_at: Set(now),
                     };
-                    new_plan.insert(&context.db).await?
+                    new_plan
+                        .insert(&context.db)
+                        .await
+                        .map_err(|e| StructuredError::database("plans::Entity::insert", e))?
                 }
             };
 
             // Fetch current state to determine node index and position
-            let (current_nodes, _) =
-                plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
+            let (current_nodes, _) = plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id)
+                .await
+                .map_err(|e| {
+                    StructuredError::service("plan_dag_delta::fetch_current_plan_dag", e)
+                })?;
             let node_index = current_nodes.len();
 
             // Calculate position: stack vertically with some spacing
@@ -1841,13 +1921,15 @@ impl Mutation {
             // Create the DAG node metadata and config
             let metadata_json = serde_json::to_string(&serde_json::json!({
                 "label": file_input.name
-            }))?;
+            }))
+            .map_err(|e| StructuredError::bad_request(format!("Invalid node metadata: {}", e)))?;
 
             let config_json = serde_json::to_string(&serde_json::json!({
                 "dataSourceId": data_source.id,
                 "filename": file_input.filename,
                 "dataType": data_source.data_type.to_lowercase()
-            }))?;
+            }))
+            .map_err(|e| StructuredError::bad_request(format!("Invalid node config: {}", e)))?;
 
             let dag_node = plan_dag_nodes::ActiveModel {
                 id: Set(node_id.clone()),
@@ -1863,14 +1945,21 @@ impl Mutation {
                 updated_at: Set(Utc::now()),
             };
 
-            let inserted_node = dag_node.insert(&context.db).await?;
+            let inserted_node = dag_node
+                .insert(&context.db)
+                .await
+                .map_err(|e| StructuredError::database("plan_dag_nodes::Entity::insert", e))?;
             let result_node = PlanDagNode::from(inserted_node);
 
             // Generate JSON Patch delta for node addition
             let patch_op = plan_dag_delta::generate_node_add_patch(&result_node, node_index);
 
             // Increment plan version
-            let new_version = plan_dag_delta::increment_plan_version(&context.db, plan.id).await?;
+            let new_version = plan_dag_delta::increment_plan_version(&context.db, plan.id)
+                .await
+                .map_err(|e| {
+                    StructuredError::service("plan_dag_delta::increment_plan_version", e)
+                })?;
 
             // Broadcast delta event
             let user_id = "demo_user".to_string(); // TODO: Get from auth context
@@ -1904,20 +1993,25 @@ impl Mutation {
             use base64::Engine;
             let file_content = base64::engine::general_purpose::STANDARD
                 .decode(&file_content_b64)
-                .map_err(|e| Error::new(format!("Failed to decode base64 file content: {}", e)))?;
+                .map_err(|e| {
+                    StructuredError::bad_request(format!(
+                        "Failed to decode base64 file content: {}",
+                        e
+                    ))
+                })?;
 
             let filename = input.filename.unwrap_or_else(|| "updated_file".to_string());
 
             data_source_service
                 .update_file(id, filename, file_content)
                 .await
-                .map_err(|e| Error::new(format!("Failed to update DataSource file: {}", e)))?
+                .map_err(|e| StructuredError::service("DataSourceService::update_file", e))?
         } else {
             // Update metadata only
             data_source_service
                 .update(id, input.name, input.description)
                 .await
-                .map_err(|e| Error::new(format!("Failed to update DataSource: {}", e)))?
+                .map_err(|e| StructuredError::service("DataSourceService::update", e))?
         };
 
         Ok(DataSource::from(data_source))
@@ -1931,7 +2025,7 @@ impl Mutation {
         data_source_service
             .delete(id)
             .await
-            .map_err(|e| Error::new(format!("Failed to delete DataSource: {}", e)))?;
+            .map_err(|e| StructuredError::service("DataSourceService::delete", e))?;
 
         Ok(true)
     }
@@ -1944,7 +2038,7 @@ impl Mutation {
         let data_source = data_source_service
             .reprocess(id)
             .await
-            .map_err(|e| Error::new(format!("Failed to reprocess DataSource: {}", e)))?;
+            .map_err(|e| StructuredError::service("DataSourceService::reprocess", e))?;
 
         Ok(DataSource::from(data_source))
     }
@@ -1962,7 +2056,7 @@ impl Mutation {
         let data_source = data_source_service
             .update_graph_data(id, graph_json)
             .await
-            .map_err(|e| Error::new(format!("Failed to update DataSource graph data: {}", e)))?;
+            .map_err(|e| StructuredError::service("DataSourceService::update_graph_data", e))?;
 
         Ok(DataSource::from(data_source))
     }
