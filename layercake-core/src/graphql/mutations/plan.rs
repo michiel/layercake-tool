@@ -6,6 +6,7 @@ use crate::database::entities::{plan_dag_edges, plan_dag_nodes, plans, projects,
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::plan::{CreatePlanInput, Plan, UpdatePlanInput};
 use crate::graphql::types::PlanDagNode;
+use crate::graphql::errors::StructuredError;
 
 #[derive(SimpleObject)]
 pub struct PlanExecutionResult {
@@ -25,7 +26,8 @@ impl PlanMutations {
         let dependencies_json = input
             .dependencies
             .map(|deps| serde_json::to_string(&deps))
-            .transpose()?;
+            .transpose()
+            .map_err(|e| StructuredError::bad_request(format!("Invalid plan dependencies JSON: {}", e)))?;
 
         let plan = plans::ActiveModel {
             project_id: Set(input.project_id),
@@ -36,7 +38,10 @@ impl PlanMutations {
             ..Default::default()
         };
 
-        let plan = plan.insert(&context.db).await?;
+        let plan = plan
+            .insert(&context.db)
+            .await
+            .map_err(|e| StructuredError::database("plans::Entity::insert", e))?;
         Ok(Plan::from(plan))
     }
 
@@ -51,20 +56,25 @@ impl PlanMutations {
 
         let plan = plans::Entity::find_by_id(id)
             .one(&context.db)
-            .await?
-            .ok_or_else(|| Error::new("Plan not found"))?;
+            .await
+            .map_err(|e| StructuredError::database("plans::Entity::find_by_id", e))?
+            .ok_or_else(|| StructuredError::not_found("Plan", id))?;
 
         let dependencies_json = input
             .dependencies
             .map(|deps| serde_json::to_string(&deps))
-            .transpose()?;
+            .transpose()
+            .map_err(|e| StructuredError::bad_request(format!("Invalid plan dependencies JSON: {}", e)))?;
 
         let mut plan: plans::ActiveModel = plan.into();
         plan.name = Set(input.name);
         plan.yaml_content = Set(input.yaml_content);
         plan.dependencies = Set(dependencies_json);
 
-        let plan = plan.update(&context.db).await?;
+        let plan = plan
+            .update(&context.db)
+            .await
+            .map_err(|e| StructuredError::database("plans::Entity::update", e))?;
         Ok(Plan::from(plan))
     }
 
@@ -74,12 +84,14 @@ impl PlanMutations {
 
         let plan = plans::Entity::find_by_id(id)
             .one(&context.db)
-            .await?
-            .ok_or_else(|| Error::new("Plan not found"))?;
+            .await
+            .map_err(|e| StructuredError::database("plans::Entity::find_by_id", e))?
+            .ok_or_else(|| StructuredError::not_found("Plan", id))?;
 
         plans::Entity::delete_by_id(plan.id)
             .exec(&context.db)
-            .await?;
+            .await
+            .map_err(|e| StructuredError::database("plans::Entity::delete_by_id", e))?;
 
         Ok(true)
     }
@@ -92,14 +104,16 @@ impl PlanMutations {
         let plan = plans::Entity::find()
             .filter(plans::Column::ProjectId.eq(id))
             .one(&context.db)
-            .await?
-            .ok_or_else(|| Error::new("Plan not found for project"))?;
+            .await
+            .map_err(|e| StructuredError::database("plans::Entity::find (ProjectId)", e))?
+            .ok_or_else(|| StructuredError::not_found("Plan for project", id))?;
 
         // Get all nodes in the plan
         let nodes = plan_dag_nodes::Entity::find()
             .filter(plan_dag_nodes::Column::PlanId.eq(plan.id))
             .all(&context.db)
-            .await?;
+            .await
+            .map_err(|e| StructuredError::database("plan_dag_nodes::Entity::find", e))?;
 
         if nodes.is_empty() {
             return Ok(PlanExecutionResult {
@@ -113,7 +127,8 @@ impl PlanMutations {
         let edges_models = plan_dag_edges::Entity::find()
             .filter(plan_dag_edges::Column::PlanId.eq(plan.id))
             .all(&context.db)
-            .await?;
+            .await
+            .map_err(|e| StructuredError::database("plan_dag_edges::Entity::find", e))?;
 
         // Convert edges to (source, target) tuples
         let edges: Vec<(String, String)> = edges_models
@@ -127,7 +142,7 @@ impl PlanMutations {
         executor
             .execute_dag(id, plan.id, &nodes, &edges)
             .await
-            .map_err(|e| Error::new(format!("Failed to execute plan: {}", e)))?;
+            .map_err(|e| StructuredError::service("DagExecutor::execute_dag", e))?;
 
         Ok(PlanExecutionResult {
             success: true,
