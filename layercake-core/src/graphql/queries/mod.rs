@@ -6,6 +6,7 @@ use crate::database::entities::{
     plan_dag_nodes, plans, project_collaborators, projects, user_sessions, users,
 };
 use crate::graphql::context::GraphQLContext;
+use crate::graphql::errors::StructuredError;
 use crate::graphql::types::graph::Graph;
 use crate::graphql::types::plan::Plan;
 use crate::graphql::types::plan_dag::DataSourceReference;
@@ -86,8 +87,9 @@ impl Query {
         tracing::debug!("Querying project by id...");
         let project = projects::Entity::find_by_id(project_id)
             .one(&context.db)
-            .await?
-            .ok_or_else(|| Error::new("Project not found"))?;
+            .await
+            .map_err(|e| StructuredError::database("projects::Entity::find_by_id", e))?
+            .ok_or_else(|| StructuredError::not_found("Project", project_id))?;
         tracing::debug!("Project found: {}", project.name);
 
         // Find or create a plan for this project
@@ -596,8 +598,9 @@ impl Query {
         let context = ctx.data::<GraphQLContext>()?;
         let _data_source = data_sources::Entity::find_by_id(id)
             .one(&context.db)
-            .await?
-            .ok_or_else(|| Error::new("DataSource not found"))?;
+            .await
+            .map_err(|e| StructuredError::database("data_sources::Entity::find_by_id", e))?
+            .ok_or_else(|| StructuredError::not_found("DataSource", id))?;
 
         // Generate a temporary download URL (in a real implementation, this would be a signed URL)
         let download_url = format!("/api/data-sources/{}/download/raw", id);
@@ -609,8 +612,9 @@ impl Query {
         let context = ctx.data::<GraphQLContext>()?;
         let _data_source = data_sources::Entity::find_by_id(id)
             .one(&context.db)
-            .await?
-            .ok_or_else(|| Error::new("DataSource not found"))?;
+            .await
+            .map_err(|e| StructuredError::database("data_sources::Entity::find_by_id", e))?
+            .ok_or_else(|| StructuredError::not_found("DataSource", id))?;
 
         // Generate a temporary download URL (in a real implementation, this would be a signed URL)
         let download_url = format!("/api/data-sources/{}/download/json", id);
@@ -634,34 +638,43 @@ impl Query {
         let plan = plans::Entity::find()
             .filter(plans::Column::ProjectId.eq(project_id))
             .one(&context.db)
-            .await?
-            .ok_or_else(|| Error::new("Plan not found for project"))?;
+            .await
+            .map_err(|e| StructuredError::database("plans::Entity::find (ProjectId)", e))?
+            .ok_or_else(|| StructuredError::not_found("Plan for project", project_id))?;
 
         let dag_node = plan_dag_nodes::Entity::find_by_id(&node_id)
             .filter(plan_dag_nodes::Column::PlanId.eq(plan.id))
             .one(&context.db)
-            .await?
-            .ok_or_else(|| Error::new("Node not found"))?;
+            .await
+            .map_err(|e| StructuredError::database("plan_dag_nodes::Entity::find_by_id", e))?
+            .ok_or_else(|| StructuredError::not_found("Plan DAG node", &node_id))?;
 
         // Parse config to get dataSourceId
-        let config: serde_json::Value = serde_json::from_str(&dag_node.config_json)
-            .map_err(|e| Error::new(format!("Failed to parse node config: {}", e)))?;
+        let config: serde_json::Value =
+            serde_json::from_str(&dag_node.config_json).map_err(|e| {
+                StructuredError::bad_request(format!("Failed to parse node config: {}", e))
+            })?;
 
         let data_source_id = config
             .get("dataSourceId")
             .and_then(|v| v.as_i64())
             .map(|v| v as i32)
-            .ok_or_else(|| Error::new("Node config does not have dataSourceId"))?;
+            .ok_or_else(|| {
+                StructuredError::bad_request("Node config does not have dataSourceId".to_string())
+            })?;
 
         // Query the data_sources table
         let data_source = data_sources::Entity::find_by_id(data_source_id)
             .one(&context.db)
-            .await?
-            .ok_or_else(|| Error::new("DataSource not found"))?;
+            .await
+            .map_err(|e| StructuredError::database("data_sources::Entity::find_by_id", e))?
+            .ok_or_else(|| StructuredError::not_found("DataSource", data_source_id))?;
 
         // Parse the graph_json field
-        let graph_data: serde_json::Value = serde_json::from_str(&data_source.graph_json)
-            .map_err(|e| Error::new(format!("Failed to parse graph JSON: {}", e)))?;
+        let graph_data: serde_json::Value =
+            serde_json::from_str(&data_source.graph_json).map_err(|e| {
+                StructuredError::bad_request(format!("Failed to parse graph JSON: {}", e))
+            })?;
 
         // Determine what to extract based on data_type
         let (columns, rows, total_rows) = match data_source.data_type.as_str() {
@@ -669,7 +682,11 @@ impl Query {
                 let nodes_array = graph_data
                     .get("nodes")
                     .and_then(|v| v.as_array())
-                    .ok_or_else(|| Error::new("Graph JSON does not contain nodes array"))?;
+                    .ok_or_else(|| {
+                        StructuredError::bad_request(
+                            "Graph JSON does not contain nodes array".to_string(),
+                        )
+                    })?;
 
                 // Build columns from first node's keys
                 let columns =
@@ -708,7 +725,11 @@ impl Query {
                 let edges_array = graph_data
                     .get("edges")
                     .and_then(|v| v.as_array())
-                    .ok_or_else(|| Error::new("Graph JSON does not contain edges array"))?;
+                    .ok_or_else(|| {
+                        StructuredError::bad_request(
+                            "Graph JSON does not contain edges array".to_string(),
+                        )
+                    })?;
 
                 // Build columns from first edge's keys
                 let columns =
@@ -744,7 +765,7 @@ impl Query {
                 (columns, rows, edges_array.len() as i32)
             }
             _ => {
-                return Err(Error::new(format!(
+                return Err(StructuredError::bad_request(format!(
                     "Unsupported data type: {}",
                     data_source.data_type
                 )));
@@ -850,7 +871,7 @@ impl Query {
         let edits = service
             .get_edits_for_graph(graph_id, unapplied_only.unwrap_or(false))
             .await
-            .map_err(|e| Error::new(format!("Failed to get graph edits: {}", e)))?;
+            .map_err(|e| StructuredError::service("GraphEditService::get_edits_for_graph", e))?;
 
         Ok(edits.into_iter().map(GraphEdit::from).collect())
     }
@@ -868,7 +889,7 @@ impl Query {
         let count = service
             .get_edit_count(graph_id, unapplied_only.unwrap_or(false))
             .await
-            .map_err(|e| Error::new(format!("Failed to get edit count: {}", e)))?;
+            .map_err(|e| StructuredError::service("GraphEditService::get_edit_count", e))?;
 
         Ok(count as i32)
     }

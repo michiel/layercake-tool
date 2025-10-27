@@ -3,6 +3,7 @@ use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
 use crate::database::entities::{graph_edges, graph_layers, graph_nodes};
 use crate::graphql::context::GraphQLContext;
+use crate::graphql::errors::StructuredError;
 use crate::graphql::types::graph_edge::GraphEdge;
 use crate::graphql::types::graph_node::GraphNode;
 use crate::graphql::types::{Layer, Project};
@@ -33,7 +34,7 @@ impl Graph {
     async fn project(&self, ctx: &Context<'_>) -> Result<Project> {
         let graphql_ctx = ctx
             .data::<GraphQLContext>()
-            .map_err(|_| Error::new("GraphQL context not found"))?;
+            .map_err(|_| StructuredError::internal("GraphQL context not found"))?;
 
         use crate::database::entities::projects;
         use sea_orm::EntityTrait;
@@ -41,8 +42,8 @@ impl Graph {
         let project = projects::Entity::find_by_id(self.project_id)
             .one(&graphql_ctx.db)
             .await
-            .map_err(|e| Error::new(format!("Database error: {}", e)))?
-            .ok_or_else(|| Error::new("Project not found"))?;
+            .map_err(|e| StructuredError::database("projects::Entity::find_by_id", e))?
+            .ok_or_else(|| StructuredError::not_found("Project", self.project_id))?;
 
         Ok(Project::from(project))
     }
