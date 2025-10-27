@@ -80,7 +80,9 @@ export const LibrarySourcesPage: React.FC = () => {
     REPROCESS_LIBRARY_SOURCE
   )
   const [updateLibrarySource, { loading: updateLoading }] = useMutation(UPDATE_LIBRARY_SOURCE)
-  const [seedLibrarySourcesMutation, { loading: seedLoading }] = useMutation(SEED_LIBRARY_SOURCES)
+  const [seedLibrarySourcesMutation, { loading: seedLoading }] = useMutation<{
+    seedLibrarySources: SeedLibrarySourcesResult
+  }>(SEED_LIBRARY_SOURCES)
 
   const librarySources: LibrarySource[] = (data as any)?.librarySources || []
 
