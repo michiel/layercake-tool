@@ -339,13 +339,13 @@ impl Subscription {
 
 // Global storage for plan broadcasters using generic EventBroadcaster
 lazy_static::lazy_static! {
-    static ref COLLABORATION_EVENTS: crate::utils::EventBroadcaster<String, CollaborationEvent> =
+    pub static ref COLLABORATION_EVENTS: crate::utils::EventBroadcaster<String, CollaborationEvent> =
         crate::utils::EventBroadcaster::new(1000);
 
-    static ref DELTA_EVENTS: crate::utils::EventBroadcaster<i32, PlanDagDeltaEvent> =
+    pub static ref DELTA_EVENTS: crate::utils::EventBroadcaster<i32, PlanDagDeltaEvent> =
         crate::utils::EventBroadcaster::new(1000);
 
-    static ref EXECUTION_STATUS_EVENTS: crate::utils::EventBroadcaster<i32, NodeExecutionStatusEvent> =
+    pub static ref EXECUTION_STATUS_EVENTS: crate::utils::EventBroadcaster<i32, NodeExecutionStatusEvent> =
         crate::utils::EventBroadcaster::new(1000);
 }
 

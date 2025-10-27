@@ -50,6 +50,43 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
         // Initialize actor-based collaboration coordinator
         let coordinator_handle = CollaborationCoordinator::spawn();
 
+        // Spawn background task to cleanup idle broadcast channels
+        tokio::spawn(async move {
+            use crate::graphql::subscriptions::{COLLABORATION_EVENTS, DELTA_EVENTS, EXECUTION_STATUS_EVENTS};
+            use std::time::Duration;
+
+            let mut interval = tokio::time::interval(Duration::from_secs(60));
+            interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
+            loop {
+                interval.tick().await;
+
+                let cleaned_collab = COLLABORATION_EVENTS.cleanup_idle().await;
+                let cleaned_delta = DELTA_EVENTS.cleanup_idle().await;
+                let cleaned_exec = EXECUTION_STATUS_EVENTS.cleanup_idle().await;
+                let total_cleaned = cleaned_collab + cleaned_delta + cleaned_exec;
+
+                if total_cleaned > 0 {
+                    tracing::info!(
+                        "Cleaned {} idle broadcast channels (collaboration: {}, delta: {}, execution: {})",
+                        total_cleaned, cleaned_collab, cleaned_delta, cleaned_exec
+                    );
+                }
+
+                // Log channel statistics for monitoring
+                let collab_count = COLLABORATION_EVENTS.channel_count().await;
+                let delta_count = DELTA_EVENTS.channel_count().await;
+                let exec_count = EXECUTION_STATUS_EVENTS.channel_count().await;
+
+                if collab_count + delta_count + exec_count > 0 {
+                    tracing::debug!(
+                        "Active broadcast channels - collaboration: {}, delta: {}, execution: {}",
+                        collab_count, delta_count, exec_count
+                    );
+                }
+            }
+        });
+
         let graphql_context = GraphQLContext::new(
             db.clone(),
             import_service,

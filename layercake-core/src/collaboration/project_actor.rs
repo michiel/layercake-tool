@@ -182,6 +182,55 @@ struct DocumentUserData {
 }
 
 impl ProjectState {
+    /// Broadcast message to all connections and clean up dead ones
+    ///
+    /// Returns list of user IDs for dead connections that were removed
+    async fn broadcast_with_cleanup(
+        &mut self,
+        message: ServerMessage,
+        exclude_user: Option<&str>,
+    ) -> Vec<String> {
+        let mut dead_connections = Vec::new();
+
+        // Collect connections to send to (avoid holding iterator during async operations)
+        let targets: Vec<(String, mpsc::Sender<ServerMessage>)> = self
+            .connections
+            .iter()
+            .filter(|(user_id, _)| {
+                exclude_user.is_none() || exclude_user.is_some_and(|u| u != *user_id)
+            })
+            .map(|(user_id, sender)| (user_id.clone(), sender.clone()))
+            .collect();
+
+        // Send to all targets
+        for (user_id, sender) in targets {
+            if let Err(_) = sender.send(message.clone()).await {
+                tracing::warn!(
+                    "Dead connection detected for user {} in project {}, scheduling removal",
+                    user_id, self.project_id
+                );
+                dead_connections.push(user_id);
+            }
+        }
+
+        // Clean up dead connections
+        for user_id in &dead_connections {
+            tracing::info!(
+                "Removing dead connection for user {} from project {}",
+                user_id, self.project_id
+            );
+            self.connections.remove(user_id);
+            self.users.remove(user_id);
+
+            // Remove from all documents
+            for doc_data in self.documents.values_mut() {
+                doc_data.active_users.remove(user_id);
+            }
+        }
+
+        dead_connections
+    }
+
     async fn run(mut self, mut command_rx: mpsc::Receiver<ProjectCommand>) {
         debug!(
             "ProjectState event loop started for project {}",
@@ -384,7 +433,7 @@ impl ProjectState {
             .collect()
     }
 
-    async fn broadcast_user_presence(&self, user_id: &str) {
+    async fn broadcast_user_presence(&mut self, user_id: &str) {
         let user_data = match self.users.get(user_id) {
             Some(u) => u,
             None => return,
@@ -418,20 +467,11 @@ impl ProjectState {
             data: presence_data,
         };
 
-        // Broadcast to all other users
-        for (target_user_id, connection) in &self.connections {
-            if target_user_id != user_id {
-                if let Err(_) = connection.send(message.clone()).await {
-                    warn!(
-                        "Dead connection detected for user {} in project {}",
-                        target_user_id, self.project_id
-                    );
-                }
-            }
-        }
+        // Broadcast to all other users with automatic cleanup
+        self.broadcast_with_cleanup(message, Some(user_id)).await;
     }
 
-    async fn broadcast_user_left(&self, user_id: &str) {
+    async fn broadcast_user_left(&mut self, user_id: &str) {
         let presence_data = UserPresenceData {
             user_id: user_id.to_string(),
             user_name: String::new(),
@@ -445,13 +485,12 @@ impl ProjectState {
             data: presence_data,
         };
 
-        for connection in self.connections.values() {
-            let _ = connection.send(message.clone()).await;
-        }
+        // Broadcast to all users with automatic cleanup
+        self.broadcast_with_cleanup(message, None).await;
     }
 
     async fn broadcast_cursor_update(
-        &self,
+        &mut self,
         user_id: &str,
         document_id: &str,
         position: CursorPosition,
@@ -481,17 +520,43 @@ impl ProjectState {
             },
         };
 
-        // Broadcast to users in same document
-        for target_user_id in doc_data.active_users.keys() {
-            if target_user_id != user_id {
-                if let Some(connection) = self.connections.get(target_user_id) {
-                    let _ = connection.send(message.clone()).await;
+        // Collect users in same document (excluding sender)
+        let document_users: Vec<String> = doc_data
+            .active_users
+            .keys()
+            .filter(|&id| id != user_id)
+            .cloned()
+            .collect();
+
+        // Send to users in document, cleaning up dead connections
+        let mut dead_connections = Vec::new();
+        for target_user_id in document_users {
+            if let Some(connection) = self.connections.get(&target_user_id) {
+                if let Err(_) = connection.send(message.clone()).await {
+                    tracing::warn!(
+                        "Dead connection detected for user {} in project {}, scheduling removal",
+                        target_user_id, self.project_id
+                    );
+                    dead_connections.push(target_user_id);
                 }
+            }
+        }
+
+        // Clean up dead connections
+        for user_id in dead_connections {
+            tracing::info!(
+                "Removing dead connection for user {} from project {}",
+                user_id, self.project_id
+            );
+            self.connections.remove(&user_id);
+            self.users.remove(&user_id);
+            for doc_data in self.documents.values_mut() {
+                doc_data.active_users.remove(&user_id);
             }
         }
     }
 
-    async fn broadcast_document_activity(&self, document_id: &str) {
+    async fn broadcast_document_activity(&mut self, document_id: &str) {
         let doc_data = match self.documents.get(document_id) {
             Some(d) => d,
             None => return,
@@ -517,10 +582,33 @@ impl ProjectState {
             },
         };
 
-        // Broadcast to all users in document
-        for target_user_id in doc_data.active_users.keys() {
-            if let Some(connection) = self.connections.get(target_user_id) {
-                let _ = connection.send(message.clone()).await;
+        // Collect users in document
+        let document_users: Vec<String> = doc_data.active_users.keys().cloned().collect();
+
+        // Send to users in document, cleaning up dead connections
+        let mut dead_connections = Vec::new();
+        for target_user_id in document_users {
+            if let Some(connection) = self.connections.get(&target_user_id) {
+                if let Err(_) = connection.send(message.clone()).await {
+                    tracing::warn!(
+                        "Dead connection detected for user {} in project {}, scheduling removal",
+                        target_user_id, self.project_id
+                    );
+                    dead_connections.push(target_user_id);
+                }
+            }
+        }
+
+        // Clean up dead connections
+        for user_id in dead_connections {
+            tracing::info!(
+                "Removing dead connection for user {} from project {}",
+                user_id, self.project_id
+            );
+            self.connections.remove(&user_id);
+            self.users.remove(&user_id);
+            for doc_data in self.documents.values_mut() {
+                doc_data.active_users.remove(&user_id);
             }
         }
     }
