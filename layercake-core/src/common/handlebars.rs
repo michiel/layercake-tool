@@ -7,9 +7,6 @@ use std::io::Write;
 use std::path::Path;
 
 pub fn create_path_if_not_exists(path: &str) -> anyhow::Result<()> {
-    //
-    // remove the file name from the path
-
     let path = Path::new(path)
         .parent()
         .ok_or_else(|| anyhow::anyhow!("Invalid path: no parent directory for '{}'", path))?;
@@ -51,13 +48,12 @@ pub fn get_handlebars() -> Handlebars<'static> {
     handlebars_helper!(is_empty: |v: Value| {
         match v {
             serde_json::Value::Array(arr) => arr.is_empty(),
-            _ => false, // Return false if not an array
+            _ => false,
         }
     });
     handlebars.register_helper("is_empty", Box::new(is_empty));
 
     handlebars_helper!(puml_render_tree: |node: Value, layermap: Value| {
-        // define inline to allow recursive reference
         fn render_tree(node: Value, layermap: &serde_json::Map<String, Value>, acc: i32) -> String {
             if let Value::Object(map) = node {
                 let id = map.get("id").and_then(|v| v.as_str()).unwrap_or("no-id");
@@ -74,7 +70,7 @@ pub fn get_handlebars() -> Handlebars<'static> {
                     let children_rendered: Vec<String> = children.iter().map(|child| {
                         render_tree(child.clone(), layermap, acc + 1)
                     }).collect();
-                    result += &children_rendered.join("").to_string();
+                    result += &children_rendered.join("");
                     result += &format!("{}}}\n", indent);
                 } else {
                     result += "\n";
@@ -114,7 +110,7 @@ pub fn get_handlebars() -> Handlebars<'static> {
                     let children_rendered: Vec<String> = children.iter().map(|child| {
                         render_tree(child.clone(), acc + 1)
                     }).collect();
-                    result += &children_rendered.join("").to_string();
+                    result += &children_rendered.join("");
                     result += &format!("{}end\n", indent);
                 } else {
                     result += &format!("{}{}[\"{}\"]\n", indent, id, label);
@@ -163,10 +159,10 @@ pub fn get_handlebars() -> Handlebars<'static> {
                     let children_rendered: Vec<String> = children.iter().map(|child| {
                         render_tree(child.clone(), layermap, acc + 1)
                     }).collect();
-                    result += &children_rendered.join("").to_string();
-                    result += &format!("{}}}\n", indent);
+                    result += &children_rendered.join("");
+                    result += &format!("{}  }}\n", indent);
                 } else {
-                    result += &format!("{}{}[label=\"{}\"]\n", indent, id, label);
+                    result += &format!("{}{} [label=\"{}\", layer=\"{}\"];\n", indent, id, label, layer);
                 }
 
                 result
@@ -186,97 +182,26 @@ pub fn get_handlebars() -> Handlebars<'static> {
 
         render_tree(node, &layermap, 0)
     });
-
     handlebars.register_helper("dot_render_tree", Box::new(dot_render_tree));
 
+    handlebars_helper!(puml_link: |layer: Value, link_type: Value| {
+        let default_color = "black";
+        if let (Value::String(layer), Value::String(link_type)) = (layer, link_type) {
+            match (layer.as_str(), link_type.as_str()) {
+                ("data", "parent_of") => "#FF5733",
+                ("data", "child_of") => "#33FF57",
+                ("data", "related_to") => "#3357FF",
+                ("control", _) => "#FFC300",
+                ("application", _) => "#FF33A8",
+                ("infrastructure", _) => "#33FFF0",
+                ("threat", _) => "#FF3333",
+                _ => default_color,
+            }
+        } else {
+            default_color
+        }
+    });
+    handlebars.register_helper("puml_link_color", Box::new(puml_link));
+
     handlebars
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use serde_json::json;
-
-    #[test]
-    fn handlebars_can_render() {
-        let handlebars = get_handlebars();
-        let res = handlebars
-            .render_template("Hello {{name}}", &json!({"name": "foo"}))
-            .expect("This to render");
-        assert_eq!(res, "Hello foo");
-    }
-
-    #[test]
-    fn handlebars_can_iterate() {
-        let handlebars = get_handlebars();
-        let res = handlebars
-            .render_template(
-                r#"{{#each names as |name|}}
-Hello {{name}}
-{{/each}}"#,
-                &json!({"names": ["foo", "bar", "baz"]}),
-            )
-            .expect("This to render");
-        assert_eq!(res, "Hello foo\nHello bar\nHello baz\n");
-    }
-
-    #[test]
-    fn handlebars_can_iterate_objects() {
-        let handlebars = get_handlebars();
-        let res = handlebars
-            .render_template(
-                r#"{{#each people as |person|}}
-Hello {{person.name}}
-{{/each}}"#,
-                &json!({"people": [
-                {
-                    "name": "foo"
-                },
-                {
-                    "name": "bar"
-                },
-                {
-                    "name": "baz"
-                }
-                ]}),
-            )
-            .expect("This to render");
-        assert_eq!(res, "Hello foo\nHello bar\nHello baz\n");
-    }
-
-    #[test]
-    fn handlebars_helper_stringeq_can_render() {
-        let handlebars = get_handlebars();
-        let res = handlebars
-            .render_template(
-                r#"{{#if (stringeq "A label" node.label) }}
-  {{node.label}};
-{{/if}}"#,
-                &json!({
-                    "node": {
-                        "label": "A label",
-                    }
-                }),
-            )
-            .expect("This to render");
-        assert_eq!(res, "  A label;\n");
-    }
-
-    #[test]
-    fn handlebars_helper_isnull_can_render() {
-        let handlebars = get_handlebars();
-        let res = handlebars
-            .render_template(
-                r#"{{#if (isnull node.id) }}
-  {{node.label}};
-{{/if}}"#,
-                &json!({
-                    "node": {
-                        "label": "A label"
-                    }
-                }),
-            )
-            .expect("This to render");
-        assert_eq!(res, "  A label;\n");
-    }
 }

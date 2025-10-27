@@ -23,6 +23,9 @@
 
 use sea_orm::DbErr;
 
+#[cfg(test)]
+use sea_orm::RuntimeErr;
+
 /// Categories of database errors
 ///
 /// This enum categorizes database errors into common types that can be
@@ -83,10 +86,16 @@ impl DbErrorKind {
     pub fn from_db_err(err: &DbErr) -> Self {
         match err {
             DbErr::RecordNotFound(_) => Self::NotFound,
-            DbErr::Conn(msg) if msg.to_lowercase().contains("timeout") => Self::Timeout,
-            DbErr::Conn(_) => Self::ConnectionError,
+            DbErr::Conn(msg) => {
+                let msg_lower = msg.to_string().to_lowercase();
+                if msg_lower.contains("timeout") {
+                    Self::Timeout
+                } else {
+                    Self::ConnectionError
+                }
+            }
             DbErr::Exec(msg) | DbErr::Query(msg) => {
-                let msg_lower = msg.to_lowercase();
+                let msg_lower = msg.to_string().to_lowercase();
                 if msg_lower.contains("unique") || msg_lower.contains("duplicate") {
                     Self::UniqueViolation
                 } else if msg_lower.contains("foreign key") || msg_lower.contains("fk_") {
@@ -118,13 +127,13 @@ impl DbErrorKind {
     /// ```
     pub fn http_status_code(&self) -> u16 {
         match self {
-            Self::NotFound => 404,                  // Not Found
-            Self::UniqueViolation => 409,           // Conflict
-            Self::ForeignKeyViolation => 400,       // Bad Request
-            Self::ConnectionError => 503,           // Service Unavailable
-            Self::Timeout => 504,                   // Gateway Timeout
-            Self::Deadlock => 503,                  // Service Unavailable (retry)
-            Self::Unknown => 500,                   // Internal Server Error
+            Self::NotFound => 404,            // Not Found
+            Self::UniqueViolation => 409,     // Conflict
+            Self::ForeignKeyViolation => 400, // Bad Request
+            Self::ConnectionError => 503,     // Service Unavailable
+            Self::Timeout => 504,             // Gateway Timeout
+            Self::Deadlock => 503,            // Service Unavailable (retry)
+            Self::Unknown => 500,             // Internal Server Error
         }
     }
 
@@ -144,10 +153,7 @@ impl DbErrorKind {
     /// assert!(!DbErrorKind::NotFound.is_retryable());
     /// ```
     pub fn is_retryable(&self) -> bool {
-        matches!(
-            self,
-            Self::ConnectionError | Self::Timeout | Self::Deadlock
-        )
+        matches!(self, Self::ConnectionError | Self::Timeout | Self::Deadlock)
     }
 
     /// Check if this is a client error (4xx)
@@ -277,6 +283,10 @@ pub fn format_db_error_detailed(operation: &str, err: &DbErr) -> (DbErrorKind, S
 mod tests {
     use super::*;
 
+    fn runtime_err(msg: &str) -> RuntimeErr {
+        RuntimeErr::Internal(msg.to_string())
+    }
+
     #[test]
     fn test_categorize_record_not_found() {
         let err = DbErr::RecordNotFound("User not found".to_string());
@@ -288,7 +298,7 @@ mod tests {
 
     #[test]
     fn test_categorize_connection_error() {
-        let err = DbErr::Conn("Connection refused".to_string());
+        let err = DbErr::Conn(runtime_err("Connection refused"));
         let kind = DbErrorKind::from_db_err(&err);
         assert_eq!(kind, DbErrorKind::ConnectionError);
         assert_eq!(kind.http_status_code(), 503);
@@ -297,7 +307,7 @@ mod tests {
 
     #[test]
     fn test_categorize_timeout() {
-        let err = DbErr::Conn("connection timeout after 30s".to_string());
+        let err = DbErr::Conn(runtime_err("connection timeout after 30s"));
         let kind = DbErrorKind::from_db_err(&err);
         assert_eq!(kind, DbErrorKind::Timeout);
         assert_eq!(kind.http_status_code(), 504);
@@ -306,7 +316,7 @@ mod tests {
 
     #[test]
     fn test_categorize_unique_violation() {
-        let err = DbErr::Query("UNIQUE constraint failed: users.email".to_string());
+        let err = DbErr::Query(runtime_err("UNIQUE constraint failed: users.email"));
         let kind = DbErrorKind::from_db_err(&err);
         assert_eq!(kind, DbErrorKind::UniqueViolation);
         assert_eq!(kind.http_status_code(), 409);
@@ -315,7 +325,7 @@ mod tests {
 
     #[test]
     fn test_categorize_foreign_key_violation() {
-        let err = DbErr::Exec("FOREIGN KEY constraint failed".to_string());
+        let err = DbErr::Exec(runtime_err("FOREIGN KEY constraint failed"));
         let kind = DbErrorKind::from_db_err(&err);
         assert_eq!(kind, DbErrorKind::ForeignKeyViolation);
         assert_eq!(kind.http_status_code(), 400);
@@ -324,7 +334,7 @@ mod tests {
 
     #[test]
     fn test_categorize_deadlock() {
-        let err = DbErr::Query("Deadlock detected".to_string());
+        let err = DbErr::Query(runtime_err("Deadlock detected"));
         let kind = DbErrorKind::from_db_err(&err);
         assert_eq!(kind, DbErrorKind::Deadlock);
         assert_eq!(kind.http_status_code(), 503);
@@ -342,7 +352,7 @@ mod tests {
 
     #[test]
     fn test_format_db_error_unique_violation() {
-        let err = DbErr::Query("UNIQUE constraint failed".to_string());
+        let err = DbErr::Query(runtime_err("UNIQUE constraint failed"));
         let (kind, message) = format_db_error("create user", &err);
 
         assert_eq!(kind, DbErrorKind::UniqueViolation);
@@ -369,7 +379,7 @@ mod tests {
 
     #[test]
     fn test_format_db_error_detailed() {
-        let err = DbErr::Conn("connection timeout after 30s".to_string());
+        let err = DbErr::Conn(runtime_err("connection timeout after 30s"));
         let (kind, message) = format_db_error_detailed("connect", &err);
 
         assert_eq!(kind, DbErrorKind::Timeout);

@@ -5,6 +5,7 @@
 
 pub mod db_errors;
 pub mod error_helpers;
+pub mod handlebars;
 
 // Re-export commonly used items for convenience
 pub use db_errors::{format_db_error, format_db_error_detailed, DbErrorKind};
@@ -12,3 +13,4 @@ pub use error_helpers::{
     auth, context_error, db_error_msg, not_found_msg, not_found_simple, service_error_msg,
     validation,
 };
+pub use handlebars::{create_path_if_not_exists, get_handlebars, write_string_to_file};

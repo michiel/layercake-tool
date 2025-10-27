@@ -189,7 +189,10 @@ pub mod validation {
     /// assert_eq!(msg, "Invalid value for 'role'. Expected one of: admin, editor, viewer");
     /// ```
     pub fn invalid_value(field: &str, expected: &str) -> String {
-        format!("Invalid value for '{}'. Expected one of: {}", field, expected)
+        format!(
+            "Invalid value for '{}'. Expected one of: {}",
+            field, expected
+        )
     }
 }
 
@@ -347,7 +350,10 @@ mod tests {
     #[test]
     fn test_validation_invalid_value() {
         let msg = validation::invalid_value("role", "admin, editor");
-        assert_eq!(msg, "Invalid value for 'role'. Expected one of: admin, editor");
+        assert_eq!(
+            msg,
+            "Invalid value for 'role'. Expected one of: admin, editor"
+        );
     }
 
     #[test]
