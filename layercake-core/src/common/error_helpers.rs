@@ -7,6 +7,11 @@
 //!
 //! ```rust
 //! use layercake::common::error_helpers::*;
+//! use sea_orm::DbErr;
+//! use anyhow::anyhow;
+//!
+//! let db_err = DbErr::RecordNotFound("Project not found".to_string());
+//! let err = anyhow!("Boom");
 //!
 //! // Database errors
 //! let msg = db_error_msg("create project", &db_err);

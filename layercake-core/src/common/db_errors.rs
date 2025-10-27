@@ -9,6 +9,8 @@
 //! use layercake::common::db_errors::*;
 //! use sea_orm::DbErr;
 //!
+//! let db_err = DbErr::RecordNotFound("User not found".to_string());
+//!
 //! // Categorize a database error
 //! let kind = DbErrorKind::from_db_err(&db_err);
 //!
@@ -249,9 +251,9 @@ pub fn format_db_error(operation: &str, err: &DbErr) -> (DbErrorKind, String) {
 ///
 /// ```
 /// use layercake::common::db_errors::*;
-/// use sea_orm::DbErr;
+/// use sea_orm::{DbErr, RuntimeErr};
 ///
-/// let err = DbErr::Conn("connection timeout after 30s".to_string());
+/// let err = DbErr::Conn(RuntimeErr::Internal("connection timeout after 30s".to_string()));
 /// let (kind, message) = format_db_error_detailed("connect to database", &err);
 ///
 /// assert_eq!(kind, DbErrorKind::Timeout);

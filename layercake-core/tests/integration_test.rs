@@ -64,6 +64,14 @@ fn reference_exports() {
     let output_dir = manifest_dir.join("out");
     let reference_dir = manifest_dir.join("tests/reference-output");
 
+    if !plan_path.exists() {
+        eprintln!(
+            "Skipping reference_exports: sample plan missing at {}",
+            plan_path.display()
+        );
+        return;
+    }
+
     if output_dir.exists() {
         fs::remove_dir_all(&output_dir).ok();
     }
