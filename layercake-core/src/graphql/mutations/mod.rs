@@ -1099,34 +1099,41 @@ impl Mutation {
 
         // Validate input
         AuthService::validate_email(&input.email)
-            .map_err(|e| Error::new(format!("Email validation failed: {}", e)))?;
-        AuthService::validate_username(&input.username)
-            .map_err(|e| Error::new(format!("Username validation failed: {}", e)))?;
-        AuthService::validate_display_name(&input.display_name)
-            .map_err(|e| Error::new(format!("Display name validation failed: {}", e)))?;
+            .map_err(|e| StructuredError::bad_request(format!("Email validation failed: {}", e)))?;
+        AuthService::validate_username(&input.username).map_err(|e| {
+            StructuredError::bad_request(format!("Username validation failed: {}", e))
+        })?;
+        AuthService::validate_display_name(&input.display_name).map_err(|e| {
+            StructuredError::bad_request(format!("Display name validation failed: {}", e))
+        })?;
 
         // Check if user already exists
         let existing_user = users::Entity::find()
             .filter(users::Column::Email.eq(&input.email))
             .one(&context.db)
-            .await?;
+            .await
+            .map_err(|e| StructuredError::database("users::Entity::find (email)", e))?;
 
         if existing_user.is_some() {
-            return Err(Error::new("User with this email already exists"));
+            return Err(StructuredError::conflict(
+                "User",
+                "User with this email already exists",
+            ));
         }
 
         let existing_username = users::Entity::find()
             .filter(users::Column::Username.eq(&input.username))
             .one(&context.db)
-            .await?;
+            .await
+            .map_err(|e| StructuredError::database("users::Entity::find (username)", e))?;
 
         if existing_username.is_some() {
-            return Err(Error::new("Username already taken"));
+            return Err(StructuredError::conflict("User", "Username already taken"));
         }
 
         // Hash password using bcrypt
         let password_hash = AuthService::hash_password(&input.password)
-            .map_err(|e| Error::new(format!("Password hashing failed: {}", e)))?;
+            .map_err(|e| StructuredError::service("AuthService::hash_password", e))?;
 
         // Create user
         let mut user = users::ActiveModel::new();
@@ -1136,11 +1143,17 @@ impl Mutation {
         user.password_hash = Set(password_hash);
         user.avatar_color = Set(AuthService::generate_avatar_color());
 
-        let user = user.insert(&context.db).await?;
+        let user = user
+            .insert(&context.db)
+            .await
+            .map_err(|e| StructuredError::database("users::Entity::insert", e))?;
 
         // Create session for the new user
         let session = user_sessions::ActiveModel::new(user.id, user.username.clone(), 1); // Assuming project ID 1 for now
-        let session = session.insert(&context.db).await?;
+        let session = session
+            .insert(&context.db)
+            .await
+            .map_err(|e| StructuredError::database("user_sessions::Entity::insert", e))?;
 
         Ok(RegisterResponse {
             user: User::from(user),
@@ -1157,30 +1170,37 @@ impl Mutation {
         let user = users::Entity::find()
             .filter(users::Column::Email.eq(&input.email))
             .one(&context.db)
-            .await?
-            .ok_or_else(|| Error::new("Invalid email or password"))?;
+            .await
+            .map_err(|e| StructuredError::database("users::Entity::find (login email)", e))?
+            .ok_or_else(|| StructuredError::unauthorized("Invalid email or password"))?;
 
         // Verify password using bcrypt
         let is_valid = AuthService::verify_password(&input.password, &user.password_hash)
-            .map_err(|e| Error::new(format!("Password verification failed: {}", e)))?;
+            .map_err(|e| StructuredError::service("AuthService::verify_password", e))?;
 
         if !is_valid {
-            return Err(Error::new("Invalid email or password"));
+            return Err(StructuredError::unauthorized("Invalid email or password"));
         }
 
         // Check if user is active
         if !user.is_active {
-            return Err(Error::new("Account is deactivated"));
+            return Err(StructuredError::forbidden("Account is deactivated"));
         }
 
         // Create new session
         let session = user_sessions::ActiveModel::new(user.id, user.username.clone(), 1); // Assuming project ID 1 for now
-        let session = session.insert(&context.db).await?;
+        let session = session
+            .insert(&context.db)
+            .await
+            .map_err(|e| StructuredError::database("user_sessions::Entity::insert", e))?;
 
         // Update last login
         let mut user_active: users::ActiveModel = user.clone().into();
         user_active.last_login_at = Set(Some(Utc::now()));
-        user_active.update(&context.db).await?;
+        user_active
+            .update(&context.db)
+            .await
+            .map_err(|e| StructuredError::database("users::Entity::update (last_login)", e))?;
 
         Ok(LoginResponse {
             user: User::from(user),
@@ -1197,12 +1217,18 @@ impl Mutation {
         let session = user_sessions::Entity::find()
             .filter(user_sessions::Column::SessionId.eq(&session_id))
             .one(&context.db)
-            .await?;
+            .await
+            .map_err(|e| {
+                StructuredError::database("user_sessions::Entity::find (session_id)", e)
+            })?;
 
         if let Some(session) = session {
             let mut session_active: user_sessions::ActiveModel = session.into();
             session_active = session_active.deactivate();
-            session_active.update(&context.db).await?;
+            session_active
+                .update(&context.db)
+                .await
+                .map_err(|e| StructuredError::database("user_sessions::Entity::update", e))?;
 
             Ok(true)
         } else {
@@ -1221,8 +1247,9 @@ impl Mutation {
 
         let user = users::Entity::find_by_id(user_id)
             .one(&context.db)
-            .await?
-            .ok_or_else(|| Error::new("User not found"))?;
+            .await
+            .map_err(|e| StructuredError::database("users::Entity::find_by_id", e))?
+            .ok_or_else(|| StructuredError::not_found("User", user_id))?;
 
         let mut user_active: users::ActiveModel = user.into();
 
@@ -1236,10 +1263,11 @@ impl Mutation {
                 .filter(users::Column::Email.eq(&email))
                 .filter(users::Column::Id.ne(user_id))
                 .one(&context.db)
-                .await?;
+                .await
+                .map_err(|e| StructuredError::database("users::Entity::find (email check)", e))?;
 
             if existing.is_some() {
-                return Err(Error::new("Email already taken"));
+                return Err(StructuredError::conflict("User", "Email already taken"));
             }
 
             user_active.email = Set(email);
@@ -1265,8 +1293,9 @@ impl Mutation {
         let user = users::Entity::find()
             .filter(users::Column::Email.eq(&input.email))
             .one(&context.db)
-            .await?
-            .ok_or_else(|| Error::new("User not found with this email"))?;
+            .await
+            .map_err(|e| StructuredError::database("users::Entity::find (invite email)", e))?
+            .ok_or_else(|| StructuredError::not_found("User", &input.email))?;
 
         // Check if user is already a collaborator
         let existing = project_collaborators::Entity::find()
@@ -1274,16 +1303,22 @@ impl Mutation {
             .filter(project_collaborators::Column::UserId.eq(user.id))
             .filter(project_collaborators::Column::IsActive.eq(true))
             .one(&context.db)
-            .await?;
+            .await
+            .map_err(|e| {
+                StructuredError::database("project_collaborators::Entity::find (existing)", e)
+            })?;
 
         if existing.is_some() {
-            return Err(Error::new("User is already a collaborator on this project"));
+            return Err(StructuredError::conflict(
+                "ProjectCollaborator",
+                "User is already a collaborator on this project",
+            ));
         }
 
         // Parse role
         let role =
             crate::database::entities::project_collaborators::ProjectRole::from_str(&input.role)
-                .map_err(|_| Error::new("Invalid role"))?;
+                .map_err(|_| StructuredError::validation("role", "Invalid role"))?;
 
         // Create collaboration
         // Note: In a real app, you'd get invited_by from the authentication context
@@ -1294,7 +1329,10 @@ impl Mutation {
             Some(1), // TODO: Get from auth context
         );
 
-        let collaboration = collaboration.insert(&context.db).await?;
+        let collaboration = collaboration
+            .insert(&context.db)
+            .await
+            .map_err(|e| StructuredError::database("project_collaborators::Entity::insert", e))?;
 
         Ok(ProjectCollaborator::from(collaboration))
     }
@@ -1309,12 +1347,16 @@ impl Mutation {
 
         let collaboration = project_collaborators::Entity::find_by_id(collaboration_id)
             .one(&context.db)
-            .await?
-            .ok_or_else(|| Error::new("Collaboration not found"))?;
+            .await
+            .map_err(|e| StructuredError::database("project_collaborators::Entity::find_by_id", e))?
+            .ok_or_else(|| StructuredError::not_found("Collaboration", collaboration_id))?;
 
         let mut collaboration_active: project_collaborators::ActiveModel = collaboration.into();
         collaboration_active = collaboration_active.accept_invitation();
-        let updated = collaboration_active.update(&context.db).await?;
+        let updated = collaboration_active
+            .update(&context.db)
+            .await
+            .map_err(|e| StructuredError::database("project_collaborators::Entity::update", e))?;
 
         Ok(ProjectCollaborator::from(updated))
     }
@@ -1329,12 +1371,16 @@ impl Mutation {
 
         let collaboration = project_collaborators::Entity::find_by_id(collaboration_id)
             .one(&context.db)
-            .await?
-            .ok_or_else(|| Error::new("Collaboration not found"))?;
+            .await
+            .map_err(|e| StructuredError::database("project_collaborators::Entity::find_by_id", e))?
+            .ok_or_else(|| StructuredError::not_found("Collaboration", collaboration_id))?;
 
         let mut collaboration_active: project_collaborators::ActiveModel = collaboration.into();
         collaboration_active = collaboration_active.decline_invitation();
-        let updated = collaboration_active.update(&context.db).await?;
+        let updated = collaboration_active
+            .update(&context.db)
+            .await
+            .map_err(|e| StructuredError::database("project_collaborators::Entity::update", e))?;
 
         Ok(ProjectCollaborator::from(updated))
     }
@@ -1349,17 +1395,21 @@ impl Mutation {
 
         let collaboration = project_collaborators::Entity::find_by_id(input.collaborator_id)
             .one(&context.db)
-            .await?
-            .ok_or_else(|| Error::new("Collaboration not found"))?;
+            .await
+            .map_err(|e| StructuredError::database("project_collaborators::Entity::find_by_id", e))?
+            .ok_or_else(|| StructuredError::not_found("Collaboration", input.collaborator_id))?;
 
         // Parse new role
         let role =
             crate::database::entities::project_collaborators::ProjectRole::from_str(&input.role)
-                .map_err(|_| Error::new("Invalid role"))?;
+                .map_err(|_| StructuredError::validation("role", "Invalid role"))?;
 
         let mut collaboration_active: project_collaborators::ActiveModel = collaboration.into();
         collaboration_active = collaboration_active.update_role(role);
-        let updated = collaboration_active.update(&context.db).await?;
+        let updated = collaboration_active
+            .update(&context.db)
+            .await
+            .map_err(|e| StructuredError::database("project_collaborators::Entity::update", e))?;
 
         Ok(ProjectCollaborator::from(updated))
     }
@@ -1370,12 +1420,16 @@ impl Mutation {
 
         let collaboration = project_collaborators::Entity::find_by_id(collaboration_id)
             .one(&context.db)
-            .await?
-            .ok_or_else(|| Error::new("Collaboration not found"))?;
+            .await
+            .map_err(|e| StructuredError::database("project_collaborators::Entity::find_by_id", e))?
+            .ok_or_else(|| StructuredError::not_found("Collaboration", collaboration_id))?;
 
         let mut collaboration_active: project_collaborators::ActiveModel = collaboration.into();
         collaboration_active = collaboration_active.deactivate();
-        collaboration_active.update(&context.db).await?;
+        collaboration_active
+            .update(&context.db)
+            .await
+            .map_err(|e| StructuredError::database("project_collaborators::Entity::update", e))?;
 
         Ok(true)
     }
