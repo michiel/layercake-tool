@@ -2337,7 +2337,7 @@ impl Mutation {
         let graph = graph_service
             .create_graph(input.project_id, input.name, None)
             .await
-            .map_err(|e| Error::new(format!("Failed to create Graph: {}", e)))?;
+            .map_err(|e| StructuredError::service("GraphService::create_graph", e))?;
 
         Ok(Graph::from(graph))
     }
@@ -2355,7 +2355,7 @@ impl Mutation {
         let graph = graph_service
             .update_graph(id, input.name)
             .await
-            .map_err(|e| Error::new(format!("Failed to update Graph: {}", e)))?;
+            .map_err(|e| StructuredError::service("GraphService::update_graph", e))?;
 
         Ok(Graph::from(graph))
     }
@@ -2368,7 +2368,7 @@ impl Mutation {
         graph_service
             .delete_graph(id)
             .await
-            .map_err(|e| Error::new(format!("Failed to delete Graph: {}", e)))?;
+            .map_err(|e| StructuredError::service("GraphService::delete_graph", e))?;
 
         Ok(true)
     }
@@ -2399,7 +2399,7 @@ impl Mutation {
         let inserted_layer = layer
             .insert(&context.db)
             .await
-            .map_err(|e| Error::new(format!("Failed to create layer: {}", e)))?;
+            .map_err(|e| StructuredError::database("graph_layers::Entity::insert", e))?;
 
         Ok(crate::graphql::types::Layer::from(inserted_layer))
     }
@@ -2446,7 +2446,7 @@ impl Mutation {
                 belongs_to_param.clone(),
             )
             .await
-            .map_err(|e| Error::new(format!("Failed to update graph node: {}", e)))?;
+            .map_err(|e| StructuredError::service("GraphService::update_graph_node", e))?;
 
         // Create graph edits for each changed field
         if let Some(old_node) = old_node {
@@ -2546,13 +2546,16 @@ impl Mutation {
         // Fetch current layer to get old values
         use crate::database::entities::graph_layers::Entity as Layers;
 
-        let old_layer = Layers::find_by_id(id).one(&context.db).await?;
+        let old_layer = Layers::find_by_id(id)
+            .one(&context.db)
+            .await
+            .map_err(|e| StructuredError::database("graph_layers::Entity::find_by_id", e))?;
 
         // Update the layer
         let layer = graph_service
             .update_layer_properties(id, name.clone(), properties.clone())
             .await
-            .map_err(|e| Error::new(format!("Failed to update layer properties: {}", e)))?;
+            .map_err(|e| StructuredError::service("GraphService::update_layer_properties", e))?;
 
         // Create graph edits for changed fields
         if let Some(old_layer) = old_layer {
@@ -2641,7 +2644,7 @@ impl Mutation {
                 attrs.clone(),
             )
             .await
-            .map_err(|e| Error::new(format!("Failed to add graph node: {}", e)))?;
+            .map_err(|e| StructuredError::service("GraphService::add_graph_node", e))?;
 
         // Create edit record for the new node
         let node_data = serde_json::json!({
@@ -2711,7 +2714,7 @@ impl Mutation {
         GraphEdges::insert(edge_model)
             .exec_without_returning(&context.db)
             .await
-            .map_err(|e| Error::new(format!("Failed to insert graph edge: {}", e)))?;
+            .map_err(|e| StructuredError::database("graph_edges::Entity::insert", e))?;
 
         // Create edit record for the new edge
         let edge_data = serde_json::json!({
@@ -2746,8 +2749,9 @@ impl Mutation {
             .filter(EdgeColumn::GraphId.eq(graph_id))
             .filter(EdgeColumn::Id.eq(&id))
             .one(&context.db)
-            .await?
-            .ok_or_else(|| Error::new("Failed to fetch inserted edge"))?;
+            .await
+            .map_err(|e| StructuredError::database("graph_edges::Entity::find", e))?
+            .ok_or_else(|| StructuredError::not_found("Graph edge", &id))?;
 
         Ok(crate::graphql::types::graph_edge::GraphEdge::from(edge))
     }
@@ -2770,7 +2774,8 @@ impl Mutation {
             .filter(EdgeColumn::GraphId.eq(graph_id))
             .filter(EdgeColumn::Id.eq(&edge_id))
             .one(&context.db)
-            .await?;
+            .await
+            .map_err(|e| StructuredError::database("graph_edges::Entity::find", e))?;
 
         if let Some(old_edge) = old_edge {
             // Create edit record for the deletion
@@ -2804,7 +2809,7 @@ impl Mutation {
                 .filter(EdgeColumn::Id.eq(&edge_id))
                 .exec(&context.db)
                 .await
-                .map_err(|e| Error::new(format!("Failed to delete graph edge: {}", e)))?;
+                .map_err(|e| StructuredError::database("graph_edges::Entity::delete_many", e))?;
 
             Ok(true)
         } else {
@@ -2827,7 +2832,7 @@ impl Mutation {
         let old_node = graph_service
             .delete_graph_node(graph_id, node_id.clone())
             .await
-            .map_err(|e| Error::new(format!("Failed to delete graph node: {}", e)))?;
+            .map_err(|e| StructuredError::service("GraphService::delete_graph_node", e))?;
 
         // Create edit record for the deletion
         let node_data = serde_json::json!({
@@ -2881,7 +2886,10 @@ impl Mutation {
                     .filter(NodeColumn::GraphId.eq(graph_id))
                     .filter(NodeColumn::Id.eq(&node_update.node_id))
                     .one(&context.db)
-                    .await?;
+                    .await
+                    .map_err(|e| {
+                        StructuredError::database("graph_nodes::Entity::find (bulk update)", e)
+                    })?;
 
                 // Update the node
                 let _ = graph_service
@@ -2894,7 +2902,7 @@ impl Mutation {
                         None, // belongs_to not supported in bulk update
                     )
                     .await
-                    .map_err(|e| Error::new(format!("Failed to update graph node: {}", e)))?;
+                    .map_err(|e| StructuredError::service("GraphService::update_graph_node", e))?;
 
                 // Create graph edits for each changed field
                 if let Some(old_node) = old_node {
@@ -2964,7 +2972,12 @@ impl Mutation {
         if let Some(layer_updates) = layers {
             for layer_update in layer_updates {
                 // Fetch current layer to get old values
-                let old_layer = Layers::find_by_id(layer_update.id).one(&context.db).await?;
+                let old_layer = Layers::find_by_id(layer_update.id)
+                    .one(&context.db)
+                    .await
+                    .map_err(|e| {
+                        StructuredError::database("graph_layers::Entity::find_by_id", e)
+                    })?;
 
                 // Update the layer
                 let _ = graph_service
@@ -2974,7 +2987,9 @@ impl Mutation {
                         layer_update.properties.clone(),
                     )
                     .await
-                    .map_err(|e| Error::new(format!("Failed to update layer properties: {}", e)))?;
+                    .map_err(|e| {
+                        StructuredError::service("GraphService::update_layer_properties", e)
+                    })?;
 
                 // Create graph edits for changed fields
                 if let Some(old_layer) = old_layer {
@@ -3037,20 +3052,23 @@ impl Mutation {
         let plan = plans::Entity::find()
             .filter(plans::Column::ProjectId.eq(project_id))
             .one(&context.db)
-            .await?
-            .ok_or_else(|| Error::new("Plan not found for project"))?;
+            .await
+            .map_err(|e| StructuredError::database("plans::Entity::find (ProjectId)", e))?
+            .ok_or_else(|| StructuredError::not_found("Plan for project", project_id))?;
 
         // Get all nodes in the plan
         let nodes = plan_dag_nodes::Entity::find()
             .filter(plan_dag_nodes::Column::PlanId.eq(plan.id))
             .all(&context.db)
-            .await?;
+            .await
+            .map_err(|e| StructuredError::database("plan_dag_nodes::Entity::find", e))?;
 
         // Get all edges in the plan
         let edges_models = plan_dag_edges::Entity::find()
             .filter(plan_dag_edges::Column::PlanId.eq(plan.id))
             .all(&context.db)
-            .await?;
+            .await
+            .map_err(|e| StructuredError::database("plan_dag_edges::Entity::find", e))?;
 
         // Convert edges to (source, target) tuples
         let edges: Vec<(String, String)> = edges_models
@@ -3064,12 +3082,12 @@ impl Mutation {
         executor
             .execute_with_dependencies(project_id, plan.id, &node_id, &nodes, &edges)
             .await
-            .map_err(|e| Error::new(format!("Failed to execute node: {}", e)))?;
+            .map_err(|e| StructuredError::service("DagExecutor::execute_with_dependencies", e))?;
 
         executor
             .execute_affected_nodes(project_id, plan.id, &node_id, &nodes, &edges)
             .await
-            .map_err(|e| Error::new(format!("Failed to execute downstream nodes: {}", e)))?;
+            .map_err(|e| StructuredError::service("DagExecutor::execute_affected_nodes", e))?;
 
         Ok(NodeExecutionResult {
             success: true,
@@ -3094,8 +3112,9 @@ impl Mutation {
         let plan = plans::Entity::find()
             .filter(plans::Column::ProjectId.eq(project_id))
             .one(&context.db)
-            .await?
-            .ok_or_else(|| Error::new("Plan not found for project"))?;
+            .await
+            .map_err(|e| StructuredError::database("plans::Entity::find (ProjectId)", e))?
+            .ok_or_else(|| StructuredError::not_found("Plan for project", project_id))?;
 
         // Get the output node
         let output_node = plan_dag_nodes::Entity::find()
@@ -3105,12 +3124,17 @@ impl Mutation {
                     .and(plan_dag_nodes::Column::Id.eq(&node_id)),
             )
             .one(&context.db)
-            .await?
-            .ok_or_else(|| Error::new("Output node not found"))?;
+            .await
+            .map_err(|e| {
+                StructuredError::database("plan_dag_nodes::Entity::find (output node)", e)
+            })?
+            .ok_or_else(|| StructuredError::not_found("Output node", &node_id))?;
 
         // Parse node config to get renderTarget and outputPath
-        let config: serde_json::Value = serde_json::from_str(&output_node.config_json)
-            .map_err(|e| Error::new(format!("Failed to parse node config: {}", e)))?;
+        let config: serde_json::Value =
+            serde_json::from_str(&output_node.config_json).map_err(|e| {
+                StructuredError::bad_request(format!("Failed to parse node config: {}", e))
+            })?;
 
         let render_target = config
             .get("renderTarget")
@@ -3122,8 +3146,9 @@ impl Mutation {
         // Get project name for default filename
         let project = projects::Entity::find_by_id(project_id)
             .one(&context.db)
-            .await?
-            .ok_or_else(|| Error::new("Project not found"))?;
+            .await
+            .map_err(|e| StructuredError::database("projects::Entity::find_by_id", e))?
+            .ok_or_else(|| StructuredError::not_found("Project", project_id))?;
 
         // Generate filename
         let extension = get_extension_for_format(render_target);
@@ -3135,19 +3160,21 @@ impl Mutation {
         let edges = plan_dag_edges::Entity::find()
             .filter(plan_dag_edges::Column::PlanId.eq(plan.id))
             .all(&context.db)
-            .await?;
+            .await
+            .map_err(|e| StructuredError::database("plan_dag_edges::Entity::find", e))?;
 
         let upstream_node_id = edges
             .iter()
             .find(|e| e.target_node_id == node_id)
             .map(|e| e.source_node_id.clone())
-            .ok_or_else(|| Error::new("No upstream graph connected to output node"))?;
+            .ok_or_else(|| StructuredError::not_found("Upstream graph", "output node"))?;
 
         // Get all nodes and edges for DAG execution
         let all_nodes = plan_dag_nodes::Entity::find()
             .filter(plan_dag_nodes::Column::PlanId.eq(plan.id))
             .all(&context.db)
-            .await?;
+            .await
+            .map_err(|e| StructuredError::database("plan_dag_nodes::Entity::find", e))?;
 
         let edge_tuples: Vec<(String, String)> = edges
             .iter()
@@ -3165,7 +3192,7 @@ impl Mutation {
                 &edge_tuples,
             )
             .await
-            .map_err(|e| Error::new(format!("Failed to execute graph: {}", e)))?;
+            .map_err(|e| StructuredError::service("DagExecutor::execute_with_dependencies", e))?;
 
         // Get the built graph from the graphs table using the GraphNode's ID
         use crate::database::entities::graphs;
@@ -3173,8 +3200,11 @@ impl Mutation {
             .filter(graphs::Column::ProjectId.eq(project_id))
             .filter(graphs::Column::NodeId.eq(&upstream_node_id))
             .one(&context.db)
-            .await?
-            .ok_or_else(|| Error::new(format!("Graph not found for node {}", upstream_node_id)))?;
+            .await
+            .map_err(|e| StructuredError::database("graphs::Entity::find (node export)", e))?
+            .ok_or_else(|| {
+                StructuredError::not_found("Graph for node", upstream_node_id.clone())
+            })?;
 
         // Build Graph object from the DAG-built graph
         use crate::services::GraphService;
@@ -3182,13 +3212,13 @@ impl Mutation {
         let graph = graph_service
             .build_graph_from_dag_graph(graph_model.id)
             .await
-            .map_err(|e| Error::new(format!("Failed to build graph: {}", e)))?;
+            .map_err(|e| StructuredError::service("GraphService::build_graph_from_dag_graph", e))?;
 
         // Export the graph
         let export_service = ExportService::new(context.db.clone());
         let content = export_service
             .export_to_string(&graph, &parse_export_format(render_target)?)
-            .map_err(|e| Error::new(format!("Export failed: {}", e)))?;
+            .map_err(|e| StructuredError::service("ExportService::export_to_string", e))?;
 
         // Encode as base64
         use base64::Engine;
@@ -3228,7 +3258,7 @@ impl Mutation {
                 false, // External edit - not yet applied, will be replayed
             )
             .await
-            .map_err(|e| Error::new(format!("Failed to create graph edit: {}", e)))?;
+            .map_err(|e| StructuredError::service("GraphEditService::create_edit", e))?;
 
         Ok(GraphEdit::from(edit))
     }
@@ -3241,7 +3271,7 @@ impl Mutation {
         let summary = service
             .replay_graph_edits(graph_id)
             .await
-            .map_err(|e| Error::new(format!("Failed to replay graph edits: {}", e)))?;
+            .map_err(|e| StructuredError::service("GraphEditService::replay_graph_edits", e))?;
 
         Ok(ReplaySummary {
             total: summary.total as i32,
@@ -3271,7 +3301,7 @@ impl Mutation {
         service
             .clear_graph_edits(graph_id)
             .await
-            .map_err(|e| Error::new(format!("Failed to clear graph edits: {}", e)))?;
+            .map_err(|e| StructuredError::service("GraphEditService::clear_graph_edits", e))?;
 
         Ok(true)
     }
@@ -3287,15 +3317,17 @@ impl Mutation {
         // Verify project exists
         let _project = projects::Entity::find_by_id(project_id)
             .one(&context.db)
-            .await?
-            .ok_or_else(|| Error::new("Project not found"))?;
+            .await
+            .map_err(|e| StructuredError::database("projects::Entity::find_by_id", e))?
+            .ok_or_else(|| StructuredError::not_found("Project", project_id))?;
 
         // Delete all graphs generated by this project's plan nodes
         // This will cascade delete graph_nodes, graph_edges, and graph_layers
         let delete_result = graphs::Entity::delete_many()
             .filter(graphs::Column::ProjectId.eq(project_id))
             .exec(&context.db)
-            .await?;
+            .await
+            .map_err(|e| StructuredError::database("graphs::Entity::delete_many", e))?;
 
         let graphs_deleted = delete_result.rows_affected;
 
@@ -3303,7 +3335,8 @@ impl Mutation {
         let datasources_result = datasources::Entity::delete_many()
             .filter(datasources::Column::ProjectId.eq(project_id))
             .exec(&context.db)
-            .await?;
+            .await
+            .map_err(|e| StructuredError::database("datasources::Entity::delete_many", e))?;
 
         let datasources_deleted = datasources_result.rows_affected;
 
@@ -3327,8 +3360,9 @@ impl Mutation {
         // Verify project exists
         let _project = projects::Entity::find_by_id(project_id)
             .one(&context.db)
-            .await?
-            .ok_or_else(|| Error::new("Project not found"))?;
+            .await
+            .map_err(|e| StructuredError::database("projects::Entity::find_by_id", e))?
+            .ok_or_else(|| StructuredError::not_found("Project", project_id))?;
 
         // Find all graphs in processing or pending state for this project
         let processing_graphs = graphs::Entity::find()
@@ -3339,7 +3373,8 @@ impl Mutation {
                     .or(graphs::Column::ExecutionState.eq(ExecutionState::Pending.as_str())),
             )
             .all(&context.db)
-            .await?;
+            .await
+            .map_err(|e| StructuredError::database("graphs::Entity::find (stop execution)", e))?;
 
         let mut stopped_count = 0;
 
@@ -3348,7 +3383,10 @@ impl Mutation {
             let mut active: graphs::ActiveModel = graph.into();
             active = active.set_state(ExecutionState::NotStarted);
             active.error_message = Set(Some("Execution stopped by user".to_string()));
-            active.update(&context.db).await?;
+            active
+                .update(&context.db)
+                .await
+                .map_err(|e| StructuredError::database("graphs::Entity::update", e))?;
             stopped_count += 1;
         }
 
@@ -3361,14 +3399,18 @@ impl Mutation {
                     .or(datasources::Column::ExecutionState.eq(ExecutionState::Pending.as_str())),
             )
             .all(&context.db)
-            .await?;
+            .await
+            .map_err(|e| StructuredError::database("datasources::Entity::find", e))?;
 
         // Update each datasource to not_started state
         for datasource in processing_datasources {
             let mut active: datasources::ActiveModel = datasource.into();
             active.execution_state = Set(ExecutionState::NotStarted.as_str().to_string());
             active.error_message = Set(Some("Execution stopped by user".to_string()));
-            active.update(&context.db).await?;
+            active
+                .update(&context.db)
+                .await
+                .map_err(|e| StructuredError::database("datasources::Entity::update", e))?;
             stopped_count += 1;
         }
 
@@ -3426,7 +3468,10 @@ fn parse_export_format(format: &str) -> Result<crate::plan::ExportFileType> {
         "CSVNodes" => Ok(ExportFileType::CSVNodes),
         "CSVEdges" => Ok(ExportFileType::CSVEdges),
         "CSV" => Ok(ExportFileType::CSVNodes), // Default CSV to nodes
-        _ => Err(Error::new(format!("Unsupported export format: {}", format))),
+        _ => Err(StructuredError::bad_request(format!(
+            "Unsupported export format: {}",
+            format
+        ))),
     }
 }
 

@@ -21,6 +21,7 @@ high-traffic data-source import/export mutations.
 | Iteration 3 verification | Re-run fmt/tests after the plan slice migrates and capture results here. | Completed | `cargo fmt` + `cargo test -p layercake-core` both succeed (integration test now points at `resources/sample-v1/ref/plan.yaml`). |
 | Auth & collaboration migration | Converted authentication (register/login/logout/update profile) and collaboration invite/role mutations to `StructuredError`, covering validation, conflicts, and database/service failures. | Completed | Remaining GraphQL `Error::new` count is down to **89**. |
 | Graph/DataSource migration | Converted Plan DAG node/edge operations and DataSource creation/update/delete flows to `StructuredError`, wrapping base64 decoding, plan lookups, inserts, and version bumps. Remaining GraphQL `Error::new` count: **86**. | Completed |  |
-| Graph mutation migration | Next up: convert graph CRUD / node-edge mutations (remaining call sites around lines 2250–3300) to `StructuredError`. | Pending |  |
+| Graph mutation migration | Converted graph CRUD, layer updates, node/edge adds/deletes, exports, execution flows, and graph edit mutations to `StructuredError`. Remaining GraphQL `Error::new` count: **39** (now primarily in GraphQL queries/subscriptions). | Completed |  |
+| Final GraphQL cleanup | Plan to finish the remaining 39 `Error::new` usages (mainly GraphQL queries/subscriptions) next. | Pending |  |
 
 We will update this table as each task progresses and commit once the slice is complete.
