@@ -81,9 +81,14 @@ impl ChatManager {
                     .await
                 {
                     tracing::error!("Chat session error: {}", err);
-                    let _ = event_tx.send(ChatEvent::AssistantMessage {
+                    let error_event = ChatEvent::AssistantMessage {
                         text: format!("Chat error: {}", err),
-                    });
+                    };
+                    tracing::info!("Broadcasting error event");
+                    match event_tx.send(error_event) {
+                        Ok(count) => tracing::info!("Error event sent to {} subscribers", count),
+                        Err(e) => tracing::error!("Failed to send error event: {:?}", e),
+                    }
                 }
             }
 

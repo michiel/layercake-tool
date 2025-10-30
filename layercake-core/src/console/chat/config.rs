@@ -61,7 +61,7 @@ impl ChatConfig {
             ChatProvider::Gemini,
             ProviderConfig {
                 model: std::env::var("LAYERCAKE_GEMINI_MODEL")
-                    .unwrap_or_else(|_| "gemini-1.5-flash".to_string()),
+                    .unwrap_or_else(|_| "gemini-2.0-flash-exp".to_string()),
                 base_url: None,
             },
         );
