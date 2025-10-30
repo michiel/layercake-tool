@@ -5,6 +5,7 @@ use async_graphql::{Enum, SimpleObject};
 use crate::console::chat::{ChatEvent, ChatProvider};
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq, Debug)]
+#[graphql(rename_items = "PascalCase")]
 pub enum ChatProviderOption {
     Ollama,
     OpenAi,
