@@ -118,10 +118,13 @@ function createApolloClient(): ApolloClient {
   const { wsUrl: currentWsUrl } = getGraphQLEndpoints()
   console.log('[GraphQL WebSocket] Creating client with URL:', currentWsUrl)
 
+  console.log('[GraphQL WebSocket] Creating WebSocket client for:', currentWsUrl)
+
   const wsClient = createClient({
     url: currentWsUrl,
     connectionParams: () => {
       const { secret } = getGraphQLEndpoints()
+      console.log('[GraphQL WebSocket] Getting connection params, secret:', secret ? 'present' : 'none')
       // Include secret in WebSocket connection params if available (Tauri mode)
       if (secret) {
         return { 'x-tauri-secret': secret }
@@ -130,23 +133,27 @@ function createApolloClient(): ApolloClient {
     },
     shouldRetry: () => {
       // Retry connection on network errors
+      console.log('[GraphQL WebSocket] Retrying connection')
       return true
     },
     retryAttempts: 10, // Retry up to 10 times
     retryWait: async (retries) => {
       // Exponential backoff with max 10 seconds
       const delay = Math.min(1000 * Math.pow(2, retries), 10000)
+      console.log(`[GraphQL WebSocket] Waiting ${delay}ms before retry ${retries}`)
       await new Promise(resolve => setTimeout(resolve, delay))
     },
     lazy: false, // Force connection immediately instead of waiting for first subscription
     keepAlive: 10000, // Send ping every 10 seconds to keep connection alive
     on: {
-      connected: () => console.log('[GraphQL WebSocket] Connected to', currentWsUrl),
-      connecting: () => console.log('[GraphQL WebSocket] Connecting to', currentWsUrl),
-      closed: (event) => console.log('[GraphQL WebSocket] Closed', event),
-      error: (error) => console.error('[GraphQL WebSocket] Error', error),
+      connected: () => console.log('[GraphQL WebSocket] ✅ Connected to', currentWsUrl),
+      connecting: () => console.log('[GraphQL WebSocket] 🔄 Connecting to', currentWsUrl),
+      closed: (event) => console.log('[GraphQL WebSocket] ❌ Closed', event),
+      error: (error) => console.error('[GraphQL WebSocket] ⚠️ Error', error),
     },
   })
+
+  console.log('[GraphQL WebSocket] WebSocket client created')
 
   const wsLink = new GraphQLWsLink(wsClient)
 
