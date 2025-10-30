@@ -73,9 +73,9 @@ impl ChatManager {
                 tracing::info!("Received message in session {}: {}", session_key, message);
                 let mut sink = |event: ChatEvent| {
                     tracing::debug!("Broadcasting event: {:?}", event);
-                    let result = event_tx.send(event);
-                    if let Err(e) = result {
-                        tracing::error!("Failed to broadcast event: {:?}", e);
+                    match event_tx.send(event) {
+                        Ok(count) => tracing::info!("Event sent to {} subscribers", count),
+                        Err(e) => tracing::error!("Failed to broadcast event: {:?}", e),
                     }
                 };
 

@@ -114,13 +114,24 @@ export function useChatSession({ projectId, provider }: UseChatSessionArgs): Use
     {
       variables: { sessionId: session?.sessionId ?? '' },
       skip: !session?.sessionId,
+      onData: ({ data }) => {
+        console.log('[Chat] Subscription data received:', data)
+      },
+      onError: (error) => {
+        console.error('[Chat] Subscription error:', error)
+      },
+      onComplete: () => {
+        console.log('[Chat] Subscription complete')
+      },
     },
   )
 
   useEffect(() => {
     const payload = subscriptionData?.chatEvents
+    console.log('[Chat] useEffect triggered, payload:', payload)
     if (!payload) return
 
+    console.log('[Chat] Adding message to state:', payload)
     setMessages(prev => [
       ...prev,
       {
