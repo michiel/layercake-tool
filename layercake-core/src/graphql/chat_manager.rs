@@ -17,6 +17,8 @@ pub struct StartedChatSession {
 struct ChatSessionRuntime {
     input_tx: mpsc::Sender<String>,
     event_tx: broadcast::Sender<ChatEvent>,
+    // Keep an initial receiver alive to prevent message loss when no subscribers
+    _keeper: broadcast::Receiver<ChatEvent>,
 }
 
 #[derive(Default)]
@@ -45,7 +47,7 @@ impl ChatManager {
     ) -> Result<StartedChatSession> {
         let session_id = Uuid::new_v4().to_string();
         let (input_tx, mut input_rx) = mpsc::channel::<String>(16);
-        let (event_tx, _) = broadcast::channel::<ChatEvent>(64);
+        let (event_tx, keeper_rx) = broadcast::channel::<ChatEvent>(64);
 
         let mut chat_session = ChatSession::new(db.clone(), project_id, provider, &config).await?;
         let model_name = chat_session.model_name().to_string();
@@ -57,6 +59,7 @@ impl ChatManager {
                 ChatSessionRuntime {
                     input_tx: input_tx.clone(),
                     event_tx: event_tx.clone(),
+                    _keeper: keeper_rx,
                 },
             );
         }
