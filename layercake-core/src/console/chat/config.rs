@@ -69,8 +69,11 @@ impl ChatConfig {
             ChatProvider::Ollama,
             ProviderConfig {
                 model: std::env::var("LAYERCAKE_OLLAMA_MODEL")
-                    .unwrap_or_else(|_| "llama3.1".to_string()),
-                base_url: std::env::var("OLLAMA_BASE_URL").ok(),
+                    .unwrap_or_else(|_| "llama3:8b".to_string()),
+                base_url: Some(
+                    std::env::var("OLLAMA_BASE_URL")
+                        .unwrap_or_else(|_| "http://127.0.0.1:11434".to_string()),
+                ),
             },
         );
 

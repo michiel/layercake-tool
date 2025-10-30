@@ -12,6 +12,7 @@ use llm::{
 use sea_orm::DatabaseConnection;
 use serde_json::{json, Value};
 use tokio::io::{self, AsyncBufReadExt, BufReader};
+use tracing;
 
 use super::{
     config::{ChatConfig, ChatCredentialStore},
@@ -137,6 +138,14 @@ impl ChatSession {
         F: FnMut(ChatEvent),
     {
         for _ in 0..MAX_TOOL_ITERATIONS {
+            let mut messages_log = String::new();
+            for message in &self.messages {
+                let role = &message.role;
+                let content = &message.content;
+                messages_log.push_str(&format!("Role: {:?}, Content: {}\n", role, content));
+            }
+            tracing::info!("Sending messages to LLM: \n{}", messages_log);
+
             let response = self
                 .llm
                 .chat_with_tools(&self.messages, Some(&self.llm_tools))
