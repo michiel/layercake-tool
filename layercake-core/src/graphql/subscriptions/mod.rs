@@ -3,8 +3,9 @@ use futures_util::Stream;
 use std::pin::Pin;
 
 use crate::graphql::context::GraphQLContext;
+use crate::graphql::errors::StructuredError;
 use crate::graphql::types::{
-    NodeExecutionStatusEvent, PlanDagDeltaEvent, PlanDagEdge, PlanDagNode,
+    ChatEventPayload, NodeExecutionStatusEvent, PlanDagDeltaEvent, PlanDagEdge, PlanDagNode,
 };
 // REMOVED: CursorPosition import - user presence now handled via WebSocket only
 
@@ -329,6 +330,34 @@ impl Subscription {
                         tracing::info!("Execution status channel closed for project {}", project_id);
                         break;
                     }
+                }
+            }
+        };
+
+        Ok(Box::pin(stream))
+    }
+
+    /// Subscribe to chat events emitted by an active console session.
+    async fn chat_events(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(name = "sessionId")] session_id: String,
+    ) -> Result<Pin<Box<dyn Stream<Item = ChatEventPayload> + Send>>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let mut receiver = context
+            .chat_manager
+            .subscribe(&session_id)
+            .await
+            .map_err(|e| StructuredError::service("ChatManager::subscribe", e))?;
+
+        let stream = async_stream::stream! {
+            loop {
+                use tokio::sync::broadcast::error::RecvError;
+
+                match receiver.recv().await {
+                    Ok(event) => yield ChatEventPayload::from(event),
+                    Err(RecvError::Lagged(_)) => continue,
+                    Err(RecvError::Closed) => break,
                 }
             }
         };

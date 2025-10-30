@@ -8,10 +8,15 @@ mod plan;
 mod plan_execution;
 mod update;
 
+#[cfg(feature = "console")]
+mod chat_credentials_cli;
 mod database;
 mod server;
 mod services;
 mod utils;
+
+#[cfg(feature = "console")]
+mod console;
 
 #[cfg(feature = "graphql")]
 mod graphql;
@@ -64,6 +69,14 @@ enum Commands {
     Db {
         #[clap(subcommand)]
         command: DbCommands,
+    },
+    #[cfg(feature = "console")]
+    ChatCredentials(#[clap(flatten)] chat_credentials_cli::ChatCredentialOptions),
+    #[cfg(feature = "console")]
+    Console {
+        /// Optional database path; defaults to layercake.db
+        #[clap(long)]
+        database: Option<String>,
     },
     Update {
         /// Check for updates without installing
@@ -155,6 +168,14 @@ async fn main() -> Result<()> {
                 server::migrate_database(&database, direction).await?;
             }
         },
+        #[cfg(feature = "console")]
+        Commands::Console { database } => {
+            console::run_console(console::ConsoleOptions { database }).await?;
+        }
+        #[cfg(feature = "console")]
+        Commands::ChatCredentials(options) => {
+            chat_credentials_cli::run(options).await?;
+        }
         Commands::Update {
             check,
             force,

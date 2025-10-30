@@ -1,6 +1,10 @@
 #![allow(dead_code)]
 
-use crate::services::{ExportService, GraphService, ImportService, PlanDagService};
+use crate::{
+    console::chat::ChatConfig,
+    graphql::chat_manager::ChatManager,
+    services::{ExportService, GraphService, ImportService, PlanDagService},
+};
 use sea_orm::DatabaseConnection;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicI32, Ordering};
@@ -15,6 +19,8 @@ pub struct GraphQLContext {
     pub graph_service: Arc<GraphService>,
     pub plan_dag_service: Arc<PlanDagService>,
     pub session_manager: Arc<SessionManager>,
+    pub chat_config: Arc<ChatConfig>,
+    pub chat_manager: Arc<ChatManager>,
 }
 
 /// Simple session manager to track browser sessions and assign user IDs
@@ -106,6 +112,8 @@ impl GraphQLContext {
         export_service: Arc<ExportService>,
         graph_service: Arc<GraphService>,
         plan_dag_service: Arc<PlanDagService>,
+        chat_config: Arc<ChatConfig>,
+        chat_manager: Arc<ChatManager>,
     ) -> Self {
         Self {
             db,
@@ -114,6 +122,8 @@ impl GraphQLContext {
             graph_service,
             plan_dag_service,
             session_manager: Arc::new(SessionManager::new()),
+            chat_config,
+            chat_manager,
         }
     }
 

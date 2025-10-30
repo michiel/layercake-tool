@@ -21,3 +21,6 @@ pub mod graphql;
 
 #[cfg(feature = "mcp")]
 pub mod mcp;
+
+#[cfg(feature = "console")]
+pub mod console;

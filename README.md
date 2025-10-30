@@ -94,6 +94,37 @@ from the output files, you can use a file watcher.
 cargo run -- -p sample/kvm_control_flow_plan.yaml
 ```
 
+### Console and Chat
+
+```
+cargo run -- console
+```
+
+The interactive console lets you:
+
+- `list-projects` to enumerate available datasets
+- `use-project <id>` to change the active context
+- `list-graphs` / `show-graph <id>` for quick metadata checks
+- `chat [--provider <ollama|openai|gemini|claude>]` to launch an LLM session with full MCP tool access
+
+Provider credentials may be stored in the new `chat_credentials` table or supplied through environment variables such as `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, or `OLLAMA_BASE_URL`.
+
+```
+cargo run -- chat-credentials list
+cargo run -- chat-credentials set openai --api-key sk-... --base-url https://api.openai.com
+cargo run -- chat-credentials clear gemini
+```
+
+The database migrations seed empty records for every built-in provider, so the CLI helper simply updates the stored secrets without requiring manual inserts.
+
+GraphQL exposes matching chat operations when the server is running with the `graphql` feature enabled:
+
+- `startChatSession(projectId, provider, message?)`
+- `sendChatMessage(sessionId, message)`
+- `subscription { chatEvents(sessionId) { kind message toolName } }`
+
+Responses stream tool invocations and assistant replies, making it easy to drive the console workflow from the web UI.
+
 ## Rendered examples
 
 _This tool only outputs text files, the following images are rendered using other tools._
@@ -127,6 +158,4 @@ _Reference model with a partition width of 5_
 
 ![Reference model](images/ref-model-hierarchy-width-2.svg)
 _Reference model with a partition width of 2_
-
-
 

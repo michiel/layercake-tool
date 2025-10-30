@@ -20,6 +20,8 @@ use crate::server::websocket::websocket_handler;
 #[cfg(feature = "graphql")]
 use crate::services::{ExportService, GraphService, ImportService, PlanDagService};
 #[cfg(feature = "graphql")]
+use crate::{console::chat::ChatConfig, graphql::chat_manager::ChatManager};
+#[cfg(feature = "graphql")]
 use async_graphql::{
     parser::types::{DocumentOperations, OperationType, Selection},
     Request, Response as GraphQLResponse, Schema,
@@ -91,12 +93,17 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
             }
         });
 
+        let chat_config: Arc<ChatConfig> = Arc::new(ChatConfig::load(&db).await?);
+        let chat_manager = Arc::new(ChatManager::new());
+
         let graphql_context = GraphQLContext::new(
             db.clone(),
             import_service,
             export_service,
             graph_service,
             plan_dag_service,
+            chat_config.clone(),
+            chat_manager.clone(),
         );
 
         let schema = Schema::build(Query, Mutation, Subscription)

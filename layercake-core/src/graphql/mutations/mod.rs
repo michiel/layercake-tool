@@ -22,6 +22,8 @@ use crate::services::graph_service::GraphService;
 use crate::services::library_source_service::LibrarySourceService;
 use crate::services::sample_project_service::SampleProjectService;
 
+use crate::console::chat::ChatProvider;
+use crate::graphql::types::chat::{ChatProviderOption, ChatSendResult, ChatSessionPayload};
 use crate::graphql::types::graph::{CreateGraphInput, CreateLayerInput, Graph, UpdateGraphInput};
 use crate::graphql::types::graph_edit::{
     CreateGraphEditInput, EditResult, GraphEdit, ReplaySummary,
@@ -181,6 +183,62 @@ impl Mutation {
             .map_err(|e| StructuredError::database("projects::Entity::delete_by_id", e))?;
 
         Ok(true)
+    }
+
+    /// Start a conversational chat session bound to a project.
+    async fn start_chat_session(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(name = "projectId")] project_id: i32,
+        #[graphql(name = "provider")] provider: Option<ChatProviderOption>,
+        message: Option<String>,
+    ) -> Result<ChatSessionPayload> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let provider = provider
+            .map(ChatProvider::from)
+            .unwrap_or(context.chat_config.default_provider);
+
+        let started = context
+            .chat_manager
+            .start_session(
+                context.db.clone(),
+                project_id,
+                provider,
+                context.chat_config.clone(),
+            )
+            .await
+            .map_err(|e| StructuredError::service("ChatManager::start_session", e))?;
+
+        if let Some(message) = message {
+            context
+                .chat_manager
+                .enqueue_message(&started.session_id, message)
+                .await
+                .map_err(|e| StructuredError::service("ChatManager::enqueue_message", e))?;
+        }
+
+        Ok(ChatSessionPayload {
+            session_id: started.session_id,
+            provider: ChatProviderOption::from(provider),
+            model: started.model_name,
+        })
+    }
+
+    /// Queue a new user message for an active chat session.
+    async fn send_chat_message(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(name = "sessionId")] session_id: String,
+        message: String,
+    ) -> Result<ChatSendResult> {
+        let context = ctx.data::<GraphQLContext>()?;
+        context
+            .chat_manager
+            .enqueue_message(&session_id, message)
+            .await
+            .map_err(|e| StructuredError::service("ChatManager::enqueue_message", e))?;
+
+        Ok(ChatSendResult { accepted: true })
     }
 
     /// Create a new plan

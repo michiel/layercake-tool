@@ -1,3 +1,4 @@
+pub mod chat_credentials;
 pub mod data_sources;
 pub mod library_sources;
 pub mod plan_dag_edges;
