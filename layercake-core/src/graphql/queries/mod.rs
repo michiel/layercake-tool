@@ -2,18 +2,15 @@ use async_graphql::*;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
 use crate::database::entities::{
-    data_sources, graph_edges, graph_layers, graph_nodes, graphs, library_sources, plan_dag_edges,
-    plan_dag_nodes, plans, project_collaborators, projects, user_sessions, users,
+    data_sources, graph_edges, graph_layers, graph_nodes, graphs, library_sources, plan_dag_nodes,
+    plans, project_collaborators, user_sessions, users,
 };
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
 use crate::graphql::types::graph::Graph;
 use crate::graphql::types::plan::Plan;
 use crate::graphql::types::plan_dag::DataSourceReference;
-use crate::graphql::types::plan_dag::{
-    DataSourceExecutionMetadata, GraphExecutionMetadata, PlanDag, PlanDagEdge, PlanDagInput,
-    PlanDagMetadata, PlanDagNode, PlanDagNodeType, ValidationResult,
-};
+use crate::graphql::types::plan_dag::{PlanDag, PlanDagInput, ValidationResult};
 use crate::graphql::types::project::Project;
 use crate::graphql::types::sample_project::SampleProject;
 use crate::graphql::types::{
@@ -40,7 +37,11 @@ impl Query {
     /// Get all projects
     async fn projects(&self, ctx: &Context<'_>) -> Result<Vec<Project>> {
         let context = ctx.data::<GraphQLContext>()?;
-        let projects = projects::Entity::find().all(&context.db).await?;
+        let projects = context
+            .app
+            .list_projects()
+            .await
+            .map_err(|e| StructuredError::service("AppContext::list_projects", e))?;
 
         Ok(projects.into_iter().map(Project::from).collect())
     }
@@ -48,7 +49,11 @@ impl Query {
     /// Get a specific project by ID
     async fn project(&self, ctx: &Context<'_>, id: i32) -> Result<Option<Project>> {
         let context = ctx.data::<GraphQLContext>()?;
-        let project = projects::Entity::find_by_id(id).one(&context.db).await?;
+        let project = context
+            .app
+            .get_project(id)
+            .await
+            .map_err(|e| StructuredError::service("AppContext::get_project", e))?;
 
         Ok(project.map(Project::from))
     }
@@ -78,160 +83,15 @@ impl Query {
 
     /// Get Plan DAG for a project
     async fn get_plan_dag(&self, ctx: &Context<'_>, project_id: i32) -> Result<Option<PlanDag>> {
-        tracing::info!("getPlanDag called for project_id: {}", project_id);
-
         let context = ctx.data::<GraphQLContext>()?;
-        tracing::debug!("Got GraphQL context");
-
-        // Verify project exists
-        tracing::debug!("Querying project by id...");
-        let project = projects::Entity::find_by_id(project_id)
-            .one(&context.db)
+        let snapshot = context
+            .app
+            .load_plan_dag(project_id)
             .await
-            .map_err(|e| StructuredError::database("projects::Entity::find_by_id", e))?
+            .map_err(|e| StructuredError::service("AppContext::load_plan_dag", e))?
             .ok_or_else(|| StructuredError::not_found("Project", project_id))?;
-        tracing::debug!("Project found: {}", project.name);
 
-        // Find or create a plan for this project
-        let plan = match plans::Entity::find()
-            .filter(plans::Column::ProjectId.eq(project_id))
-            .one(&context.db)
-            .await?
-        {
-            Some(plan) => plan,
-            None => {
-                // No plan exists yet - return empty Plan DAG
-                tracing::debug!("No plan found for project, returning empty Plan DAG");
-                let metadata = PlanDagMetadata {
-                    version: "1.0".to_string(),
-                    name: Some(format!("{} Plan DAG", project.name)),
-                    description: project.description.clone(),
-                    created: Some(project.created_at.to_rfc3339()),
-                    last_modified: Some(project.updated_at.to_rfc3339()),
-                    author: None,
-                };
-                return Ok(Some(PlanDag {
-                    version: metadata.version.clone(),
-                    nodes: vec![],
-                    edges: vec![],
-                    metadata,
-                }));
-            }
-        };
-
-        // Get Plan DAG nodes (not graph nodes!)
-        tracing::debug!("Querying Plan DAG nodes for plan_id: {}...", plan.id);
-        let dag_nodes = plan_dag_nodes::Entity::find()
-            .filter(plan_dag_nodes::Column::PlanId.eq(plan.id))
-            .all(&context.db)
-            .await?;
-        tracing::debug!("Found {} Plan DAG nodes", dag_nodes.len());
-
-        // Get Plan DAG edges (not graph edges!)
-        tracing::debug!("Querying Plan DAG edges for plan_id: {}...", plan.id);
-        let dag_edges = plan_dag_edges::Entity::find()
-            .filter(plan_dag_edges::Column::PlanId.eq(plan.id))
-            .all(&context.db)
-            .await?;
-        tracing::debug!("Found {} Plan DAG edges", dag_edges.len());
-
-        // Convert database models to GraphQL types and populate execution metadata
-        tracing::debug!("Converting {} nodes to GraphQL format...", dag_nodes.len());
-        let mut nodes: Vec<PlanDagNode> = Vec::new();
-
-        for dag_node in dag_nodes {
-            let mut node = PlanDagNode::from(dag_node.clone());
-
-            // Populate execution metadata based on node type
-            match node.node_type {
-                PlanDagNodeType::DataSource => {
-                    // Try to extract dataSourceId from config
-                    if let Ok(config) =
-                        serde_json::from_str::<serde_json::Value>(&dag_node.config_json)
-                    {
-                        if let Some(data_source_id) = config
-                            .get("dataSourceId")
-                            .and_then(|v| v.as_i64())
-                            .map(|v| v as i32)
-                        {
-                            // Query the data_source
-                            if let Ok(Some(ds)) = data_sources::Entity::find_by_id(data_source_id)
-                                .one(&context.db)
-                                .await
-                            {
-                                // Map status to execution_state
-                                let execution_state = match ds.status.as_str() {
-                                    "active" => "completed",
-                                    "processing" => "processing",
-                                    "error" => "error",
-                                    _ => "not_started",
-                                }
-                                .to_string();
-
-                                node.datasource_execution = Some(DataSourceExecutionMetadata {
-                                    data_source_id: ds.id,
-                                    filename: ds.filename.clone(),
-                                    status: ds.status.clone(),
-                                    processed_at: ds.processed_at.map(|d| d.to_rfc3339()),
-                                    execution_state,
-                                    error_message: ds.error_message.clone(),
-                                });
-                            }
-                        }
-                    }
-                }
-                PlanDagNodeType::Graph => {
-                    // Query the graph by node_id
-                    if let Ok(Some(graph)) = graphs::Entity::find()
-                        .filter(graphs::Column::ProjectId.eq(project_id))
-                        .filter(graphs::Column::NodeId.eq(&dag_node.id))
-                        .one(&context.db)
-                        .await
-                    {
-                        node.graph_execution = Some(GraphExecutionMetadata {
-                            graph_id: graph.id,
-                            node_count: graph.node_count,
-                            edge_count: graph.edge_count,
-                            execution_state: graph.execution_state.clone(),
-                            computed_date: graph.computed_date.map(|d| d.to_rfc3339()),
-                            error_message: graph.error_message.clone(),
-                        });
-                    }
-                }
-                _ => {
-                    // Other node types don't have execution metadata yet
-                }
-            }
-
-            nodes.push(node);
-        }
-        tracing::debug!("Converted {} nodes with execution metadata", nodes.len());
-
-        tracing::debug!("Converting {} edges to GraphQL format...", dag_edges.len());
-        let edges: Vec<PlanDagEdge> = dag_edges.into_iter().map(PlanDagEdge::from).collect();
-        tracing::debug!("Converted {} edges", edges.len());
-
-        // Create metadata
-        tracing::debug!("Creating metadata...");
-        let metadata = PlanDagMetadata {
-            version: plan.version.to_string(),
-            name: Some(plan.name.clone()),
-            description: None,
-            created: Some(plan.created_at.to_rfc3339()),
-            last_modified: Some(plan.updated_at.to_rfc3339()),
-            author: None,
-        };
-
-        tracing::info!(
-            "getPlanDag completed successfully for project_id: {}",
-            project_id
-        );
-        Ok(Some(PlanDag {
-            version: metadata.version.clone(),
-            nodes,
-            edges,
-            metadata,
-        }))
+        Ok(Some(PlanDag::from(snapshot)))
     }
 
     /// Validate a Plan DAG structure

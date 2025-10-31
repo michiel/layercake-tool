@@ -45,7 +45,7 @@ impl GraphBuilder {
     pub async fn build_graph(
         &self,
         project_id: i32,
-        plan_id: i32,
+        _plan_id: i32,
         node_id: String,
         name: String,
         upstream_node_ids: Vec<String>,
@@ -349,22 +349,6 @@ impl GraphBuilder {
             created_at: graph.created_at,
             updated_at: graph.updated_at,
         })
-    }
-
-    /// Get upstream data_source by reading plan_dag_node config
-    async fn get_upstream_data_source(
-        &self,
-        plan_id: i32,
-        node_id: &str,
-    ) -> Result<data_sources::Model> {
-        // Find the plan_dag_node to get the config
-        // Note: Node IDs are globally unique, no need to filter by plan_id
-        let dag_node = plan_dag_nodes::Entity::find_by_id(node_id)
-            .one(&self.db)
-            .await?
-            .ok_or_else(|| anyhow!("Plan DAG node not found: {}", node_id))?;
-
-        self.get_data_source_from_node(&dag_node).await
     }
 
     /// Compute hash of upstream data_sources for change detection

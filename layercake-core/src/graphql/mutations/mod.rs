@@ -4,6 +4,7 @@ use async_graphql::*;
 use chrono::Utc;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 
+use crate::app_context::ProjectUpdate;
 use crate::database::entities::{
     data_sources, datasources, graphs, plan_dag_edges, plan_dag_nodes, plans,
     project_collaborators, projects, user_sessions, users, ExecutionState,
@@ -113,12 +114,12 @@ impl Mutation {
         input: CreateProjectInput,
     ) -> Result<Project> {
         let context = ctx.data::<GraphQLContext>()?;
+        let project = context
+            .app
+            .create_project(input.name, input.description)
+            .await
+            .map_err(|e| StructuredError::service("AppContext::create_project", e))?;
 
-        let mut project = projects::ActiveModel::new();
-        project.name = Set(input.name);
-        project.description = Set(input.description);
-
-        let project = project.insert(&context.db).await?;
         Ok(Project::from(project))
     }
 
@@ -149,38 +150,24 @@ impl Mutation {
         input: UpdateProjectInput,
     ) -> Result<Project> {
         let context = ctx.data::<GraphQLContext>()?;
-
-        let project = projects::Entity::find_by_id(id)
-            .one(&context.db)
+        let update = ProjectUpdate::new(Some(input.name), input.description, true);
+        let project = context
+            .app
+            .update_project(id, update)
             .await
-            .map_err(|e| StructuredError::database("projects::Entity::find_by_id", e))?
-            .ok_or_else(|| StructuredError::not_found("Project", id))?;
+            .map_err(|e| StructuredError::service("AppContext::update_project", e))?;
 
-        let mut project: projects::ActiveModel = project.into();
-        project.name = Set(input.name);
-        project.description = Set(input.description);
-
-        let project = project
-            .update(&context.db)
-            .await
-            .map_err(|e| StructuredError::database("projects::Entity::update", e))?;
         Ok(Project::from(project))
     }
 
     /// Delete a project
     async fn delete_project(&self, ctx: &Context<'_>, id: i32) -> Result<bool> {
         let context = ctx.data::<GraphQLContext>()?;
-
-        let project = projects::Entity::find_by_id(id)
-            .one(&context.db)
+        context
+            .app
+            .delete_project(id)
             .await
-            .map_err(|e| StructuredError::database("projects::Entity::find_by_id", e))?
-            .ok_or_else(|| StructuredError::not_found("Project", id))?;
-
-        projects::Entity::delete_by_id(project.id)
-            .exec(&context.db)
-            .await
-            .map_err(|e| StructuredError::database("projects::Entity::delete_by_id", e))?;
+            .map_err(|e| StructuredError::service("AppContext::delete_project", e))?;
 
         Ok(true)
     }

@@ -175,8 +175,8 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
         let mcp_state = LayercakeServerState {
             db: db.clone(),
             app: app_context.clone(),
-            tools: LayercakeToolRegistry::new(db.clone()),
-            resources: crate::mcp::resources::LayercakeResourceRegistry::new(db.clone()),
+            tools: LayercakeToolRegistry::new(app_context.clone()),
+            resources: crate::mcp::resources::LayercakeResourceRegistry::new(app_context.clone()),
             prompts: crate::mcp::prompts::LayercakePromptRegistry::new(),
             auth: LayercakeAuth::new(),
         };

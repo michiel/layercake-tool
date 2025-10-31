@@ -2,6 +2,7 @@ use async_graphql::*;
 use chrono::{DateTime, Utc};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
+use crate::app_context::ProjectSummary;
 use crate::database::entities::{plans, projects};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::Plan;
@@ -26,6 +27,18 @@ impl From<projects::Model> for Project {
             description: model.description,
             created_at: model.created_at,
             updated_at: model.updated_at,
+        }
+    }
+}
+
+impl From<ProjectSummary> for Project {
+    fn from(summary: ProjectSummary) -> Self {
+        Self {
+            id: summary.id,
+            name: summary.name,
+            description: summary.description,
+            created_at: summary.created_at,
+            updated_at: summary.updated_at,
         }
     }
 }

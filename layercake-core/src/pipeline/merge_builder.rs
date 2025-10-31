@@ -41,7 +41,7 @@ impl MergeBuilder {
     pub async fn merge_sources(
         &self,
         project_id: i32,
-        plan_id: i32,
+        _plan_id: i32,
         node_id: String,
         name: String,
         upstream_node_ids: Vec<String>,
@@ -193,24 +193,6 @@ impl MergeBuilder {
             .one(&self.db)
             .await?
             .ok_or_else(|| anyhow!("DataSource not found with id {}", data_source_id))
-    }
-
-    /// Get upstream data_source by reading plan_dag_node config
-    async fn get_upstream_data_source(
-        &self,
-        plan_id: i32,
-        node_id: &str,
-    ) -> Result<data_sources::Model> {
-        use sea_orm::{ColumnTrait, QueryFilter};
-
-        // Find the plan_dag_node to get the config
-        let dag_node = plan_dag_nodes::Entity::find_by_id(node_id)
-            .filter(plan_dag_nodes::Column::PlanId.eq(plan_id))
-            .one(&self.db)
-            .await?
-            .ok_or_else(|| anyhow!("Plan DAG node not found: {}", node_id))?;
-
-        self.get_data_source_from_node(&dag_node).await
     }
 
     /// Get upstream graph (from Graph or Merge node)

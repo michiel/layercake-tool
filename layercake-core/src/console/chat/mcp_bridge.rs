@@ -24,8 +24,8 @@ pub struct McpBridge {
 impl McpBridge {
     pub fn new(db: DatabaseConnection) -> Self {
         let app = Arc::new(AppContext::new(db.clone()));
-        let tools = LayercakeToolRegistry::new(db.clone());
-        let resources = LayercakeResourceRegistry::new(db.clone());
+        let tools = LayercakeToolRegistry::new(app.clone());
+        let resources = LayercakeResourceRegistry::new(app.clone());
         let prompts = LayercakePromptRegistry::new();
         let auth = LayercakeAuth::new();
 

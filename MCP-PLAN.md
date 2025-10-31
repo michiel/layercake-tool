@@ -126,9 +126,9 @@
   - [ ] Rework MCP plan tools to delegate to the shared helpers.  
   - [ ] Ensure plan resources emit real JSON snapshots identical to GraphQL outputs.
 
-- [ ] **Plan DAG read path**  
-  - [ ] Add an `AppContext::load_plan_dag` helper returning nodes/edges.  
-  - [ ] Wire GraphQL `getPlanDag` and a new MCP `get_plan_dag` tool to the helper; confirm serialized shapes match.
+- [x] **Plan DAG read path**  
+  - [x] Add an `AppContext::load_plan_dag` helper returning nodes/edges.  
+  - [x] Wire GraphQL `getPlanDag` and a new MCP `get_plan_dag` tool to the helper; confirm serialized shapes match.
 
 - [ ] **Plan DAG mutations**  
   - [ ] Wrap node/edge create/update/delete/move logic in shared functions (leveraging `PlanDagService`).  

@@ -182,12 +182,12 @@ impl McpServerState for LayercakeServerState {
 /// Custom tool registry for Layercake tools
 #[derive(Clone)]
 pub struct LayercakeToolRegistry {
-    pub db: DatabaseConnection,
+    pub app: Arc<AppContext>,
 }
 
 impl LayercakeToolRegistry {
-    pub fn new(db: DatabaseConnection) -> Self {
-        Self { db }
+    pub fn new(app: Arc<AppContext>) -> Self {
+        Self { app }
     }
 }
 
@@ -232,6 +232,22 @@ impl ToolRegistry for LayercakeToolRegistry {
                         "description": {"type": "string", "description": "Optional description of the project"}
                     },
                     "required": ["name"],
+                    "additionalProperties": false
+                }),
+                "projects"
+            ).public()),
+
+            "update_project" => Some(McpTool::new(
+                "update_project",
+                "Update an existing graph project",
+                json!({
+                    "type": "object",
+                    "properties": {
+                        "project_id": {"type": "integer", "description": "ID of the project to update"},
+                        "name": {"type": "string", "description": "Updated project name"},
+                        "description": {"type": "string", "description": "Updated project description"}
+                    },
+                    "required": ["project_id"],
                     "additionalProperties": false
                 }),
                 "projects"
@@ -310,6 +326,19 @@ impl ToolRegistry for LayercakeToolRegistry {
                         "plan_id": {"type": "integer", "description": "ID of the plan to check"}
                     },
                     "required": ["plan_id"],
+                    "additionalProperties": false
+                }),
+                "plans"
+            ).public()),
+            "get_plan_dag" => Some(McpTool::new(
+                "get_plan_dag",
+                "Retrieve the plan DAG definition for a project",
+                json!({
+                    "type": "object",
+                    "properties": {
+                        "project_id": {"type": "integer", "description": "ID of the project to inspect"}
+                    },
+                    "required": ["project_id"],
                     "additionalProperties": false
                 }),
                 "plans"
@@ -413,37 +442,42 @@ impl ToolRegistry for LayercakeToolRegistry {
         context: ToolExecutionContext,
     ) -> McpResult<ToolsCallResult> {
         match name {
-            // Project tools
-            "list_projects" => super::tools::projects::list_projects(&self.db).await,
+            "list_projects" => super::tools::projects::list_projects(&self.app).await,
             "create_project" => {
-                super::tools::projects::create_project(context.arguments, &self.db).await
+                super::tools::projects::create_project(context.arguments, &self.app).await
             }
-            "get_project" => super::tools::projects::get_project(context.arguments, &self.db).await,
+            "update_project" => {
+                super::tools::projects::update_project(context.arguments, &self.app).await
+            }
+            "get_project" => super::tools::projects::get_project(context.arguments, &self.app).await,
             "delete_project" => {
-                super::tools::projects::delete_project(context.arguments, &self.db).await
+                super::tools::projects::delete_project(context.arguments, &self.app).await
             }
 
             // Plan tools
-            "create_plan" => super::tools::plans::create_plan(context.arguments, &self.db).await,
-            "execute_plan" => super::tools::plans::execute_plan(context.arguments, &self.db).await,
+            "create_plan" => super::tools::plans::create_plan(context.arguments, self.app.db()).await,
+            "execute_plan" => super::tools::plans::execute_plan(context.arguments, self.app.db()).await,
             "get_plan_status" => {
-                super::tools::plans::get_plan_status(context.arguments, &self.db).await
+                super::tools::plans::get_plan_status(context.arguments, self.app.db()).await
+            }
+            "get_plan_dag" => {
+                super::tools::plans::get_plan_dag(context.arguments, &self.app).await
             }
 
             // Graph data tools
-            "import_csv" => super::tools::graph_data::import_csv(context.arguments, &self.db).await,
+            "import_csv" => super::tools::graph_data::import_csv(context.arguments, self.app.db()).await,
             "export_graph" => {
-                super::tools::graph_data::export_graph(context.arguments, &self.db).await
+                super::tools::graph_data::export_graph(context.arguments, self.app.db()).await
             }
             "get_graph_data" => {
-                super::tools::graph_data::get_graph_data(context.arguments, &self.db).await
+                super::tools::graph_data::get_graph_data(context.arguments, self.app.db()).await
             }
 
             // Analysis tools
             "analyze_connectivity" => {
-                super::tools::analysis::analyze_connectivity(context.arguments, &self.db).await
+                super::tools::analysis::analyze_connectivity(context.arguments, self.app.db()).await
             }
-            "find_paths" => super::tools::analysis::find_paths(context.arguments, &self.db).await,
+            "find_paths" => super::tools::analysis::find_paths(context.arguments, self.app.db()).await,
 
             _ => Err(McpError::ToolNotFound {
                 name: name.to_string(),
@@ -457,11 +491,13 @@ impl ToolRegistry for LayercakeToolRegistry {
             name,
             "list_projects"
                 | "create_project"
+                | "update_project"
                 | "get_project"
                 | "delete_project"
                 | "create_plan"
                 | "execute_plan"
                 | "get_plan_status"
+                | "get_plan_dag"
                 | "import_csv"
                 | "export_graph"
                 | "get_graph_data"

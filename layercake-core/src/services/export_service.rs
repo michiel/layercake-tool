@@ -4,8 +4,6 @@ use sea_orm::DatabaseConnection;
 use crate::export::{to_csv_edges, to_csv_nodes, to_dot, to_gml, to_json, to_mermaid, to_plantuml};
 use crate::graph::Graph;
 use crate::plan::{ExportFileType, Plan, RenderConfig, RenderConfigOrientation};
-use crate::services::GraphService;
-
 pub struct ExportService {
     db: DatabaseConnection,
 }
@@ -46,11 +44,10 @@ impl ExportService {
     #[allow(dead_code)] // Reserved for future plan export execution
     pub async fn execute_plan_exports(
         &self,
-        project_id: i32,
+        _project_id: i32,
         plan_yaml: &str,
     ) -> Result<Vec<String>> {
         let plan: Plan = serde_yaml::from_str(plan_yaml)?;
-        let graph_service = GraphService::new(self.db.clone());
         // let mut graph = graph_service.build_graph_from_project(project_id).await?;
         let mut graph = Graph::default(); // Placeholder
 
