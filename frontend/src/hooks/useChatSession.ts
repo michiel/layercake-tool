@@ -89,6 +89,7 @@ export function useChatSession({ projectId, provider }: UseChatSessionArgs): Use
         })
         if (cancelled) return
         if (data?.startChatSession) {
+          console.log('[Chat] Session started:', data.startChatSession)
           setSession(data.startChatSession)
         } else {
           setError('Failed to establish chat session.')
@@ -109,6 +110,8 @@ export function useChatSession({ projectId, provider }: UseChatSessionArgs): Use
     }
   }, [projectId, provider, restartKey, startSession])
 
+  console.log('[Chat] Creating subscription, sessionId:', session?.sessionId, 'skip:', !session?.sessionId)
+
   const { data: subscriptionData, error: subscriptionError } = useSubscription<{ chatEvents: ChatEventPayload }>(
     CHAT_EVENTS_SUBSCRIPTION,
     {
@@ -125,6 +128,8 @@ export function useChatSession({ projectId, provider }: UseChatSessionArgs): Use
       },
     },
   )
+
+  console.log('[Chat] Subscription state - data:', subscriptionData, 'error:', subscriptionError)
 
   useEffect(() => {
     const payload = subscriptionData?.chatEvents

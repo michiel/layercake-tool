@@ -319,21 +319,27 @@ async fn handle_graphql_ws(
 ) {
     use futures_util::{SinkExt, StreamExt};
 
+    tracing::info!("GraphQL WebSocket connection established");
     let (mut sink, mut stream) = socket.split();
 
     while let Some(Ok(msg)) = stream.next().await {
+        tracing::debug!("WebSocket message received: {:?}", msg);
         if let axum::extract::ws::Message::Text(text) = msg {
+            tracing::debug!("WebSocket text: {}", text);
             if let Ok(payload) = serde_json::from_str::<serde_json::Value>(&text) {
                 let msg_type = payload.get("type").and_then(|t| t.as_str()).unwrap_or("");
+                tracing::info!("GraphQL WS message type: {}", msg_type);
 
                 match msg_type {
                     "connection_init" => {
+                        tracing::info!("GraphQL WS connection_init");
                         let ack = serde_json::json!({"type": "connection_ack"});
                         let _ = sink
                             .send(axum::extract::ws::Message::Text(ack.to_string().into()))
                             .await;
                     }
                     "subscribe" => {
+                        tracing::info!("GraphQL WS subscribe: {:?}", payload);
                         if let Some(id) = payload.get("id").and_then(|i| i.as_str()) {
                             if let Some(query_payload) = payload.get("payload") {
                                 if let Ok(request) = serde_json::from_value::<async_graphql::Request>(
