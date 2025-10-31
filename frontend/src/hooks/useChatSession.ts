@@ -119,7 +119,7 @@ export function useChatSession({ projectId, provider }: UseChatSessionArgs): Use
     CHAT_EVENTS_SUBSCRIPTION,
     {
       variables: { sessionId: session?.sessionId ?? '' },
-      skip: !session?.sessionId,
+      skip: !session?.sessionId || loading, // Don't subscribe while loading or if no session
       fetchPolicy: 'no-cache', // Don't cache subscription data
       onData: ({ data }) => {
         console.log('[Chat] Subscription data received:', data)
