@@ -338,6 +338,14 @@ async fn handle_graphql_ws(
                             .send(axum::extract::ws::Message::Text(ack.to_string().into()))
                             .await;
                     }
+                    "ping" => {
+                        // graphql-transport-ws keepalive
+                        tracing::debug!("GraphQL WS ping, sending pong");
+                        let pong = serde_json::json!({"type": "pong"});
+                        let _ = sink
+                            .send(axum::extract::ws::Message::Text(pong.to_string().into()))
+                            .await;
+                    }
                     "subscribe" => {
                         tracing::info!("GraphQL WS subscribe: {:?}", payload);
                         if let Some(id) = payload.get("id").and_then(|i| i.as_str()) {
@@ -383,7 +391,9 @@ async fn handle_graphql_ws(
                             }
                         }
                     }
-                    _ => {}
+                    other => {
+                        tracing::warn!("Unknown GraphQL WS message type: {}, payload: {:?}", other, payload);
+                    }
                 }
             }
         }

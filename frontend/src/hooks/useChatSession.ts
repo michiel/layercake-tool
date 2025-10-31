@@ -117,6 +117,7 @@ export function useChatSession({ projectId, provider }: UseChatSessionArgs): Use
     {
       variables: { sessionId: session?.sessionId ?? '' },
       skip: !session?.sessionId,
+      shouldResubscribe: true, // Force resubscribe when variables change
       onData: ({ data }) => {
         console.log('[Chat] Subscription data received:', data)
       },
