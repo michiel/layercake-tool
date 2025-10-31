@@ -10,6 +10,13 @@
   - Tool registry lists only CRUD-lite operations; authentication helpers exist but aren’t registered, and resources/prompts return placeholder data (`layercake-core/src/mcp/server.rs`, `layercake-core/src/mcp/resources.rs`).  
   - Analysis utilities and resources for graphs are unimplemented; no coverage for plan DAG nodes/edges, data sources, library sources, or collaboration flows.
 
+## Guiding Principles
+
+- **Primary audience**: MCP endpoints target external/agent integrations. Prioritise plan execution and graph manipulation features agents require; defer UI-centric collaboration/chat features to Phase 7.  
+- **Security**: Enforce API-key authentication for MCP (see `layercake-core/src/mcp/server.rs`) and document the expected headers; session reuse is out of scope.  
+- **Realtime scope**: Subscription-style updates are not a near-term requirement. Prefer polling/batch responses for execution status until priorities shift.  
+- **Serialization**: Treat GraphQL schemas as the canonical contract. MCP tool responses should match GraphQL field names (PascalCase types, camelCase fields) by reusing shared serializers wherever possible.
+
 ## Gaps & Discrepancies
 
 1. **Project Lifecycle** – GraphQL supports update, collaboration, samples, and metadata; MCP only lists/create/get/delete and the resource endpoint returns mock data.  
@@ -59,7 +66,46 @@
 
 ## Open Questions / Dependencies
 
-- Confirm desired security posture for MCP (API keys vs. session reuse) before exposing collaborator tools.  
-- Determine if MCP clients need subscription-style updates; axum-mcp batch/streaming support may be required.  
-- Align serialization formats (camelCase vs snake_case) between GraphQL responses and MCP tool outputs for predictable consumer experience.  
-- Identify priority order with stakeholders—if MCP is mainly for agent integrations, focus first on plan/graph tooling before collaboration features.
+- Confirm final API-key distribution/rotation process for third-party agents.  
+- Clarify whether agents require export artifacts pushed to remote storage (vs returned inline) for large graphs.  
+- Track axum-mcp batch API maturity to reassess streaming support when needed.
+
+## Technical Implementation Details
+
+### Phase 1 – Shared Services & Resource Parity
+- Introduce a `SharedGraphqlBridge` module that exposes reusable helpers from `layercake-core/src/graphql/context.rs` (project, plan, graph services).  
+- Refactor MCP tool implementations to accept a lightweight context (DB + services) instead of reimplementing queries.  
+- Replace placeholder resource payloads in `layercake-core/src/mcp/resources.rs` with real data fetched via `ProjectService`, `PlanDagService`, and `GraphService::build_graph_from_dag_graph`. Ensure responses serialise to camelCase by leveraging GraphQL DTO structs (`layercake-core/src/graphql/types`).  
+- Harden API-key enforcement by documenting required headers (`Authorization: Bearer ...`) and ensuring every tool invocation passes through `LayercakeAuth::authenticate`.
+
+### Phase 2 – Project & Plan Enhancements
+- Map GraphQL mutation inputs (e.g., `UpdateProjectInput`, `PlanDagNodeInput`) into serde structs shared with MCP. Consider a new crate module `shared::dto` consumed by both resolvers and tools.  
+- Implement MCP handlers for project updates/archival by reusing `ProjectService` operations. Return responses using the same GraphQL shapes (`Project` type conversions).  
+- Build plan DAG MCP endpoints that call `PlanDagService` methods (`add_node`, `update_node`, `add_edge`, etc.) and mirror validation logic found in `graphql/mutations/mod.rs`.  
+- Expose plan cancellation/monitoring by calling `plan_execution::stop_plan_execution` and reading execution state tables.
+
+### Phase 3 – Graph Editing & Analysis
+- Wrap GraphQL graph mutations (`update_graph_node`, `bulk_update_graph_data`, `replay_graph_edits`) into service functions that MCP tools can invoke. Ensure audit trails remain intact.  
+- Finalise analysis routines: move TODO logic from `mcp/tools/analysis.rs` into reusable functions that consume `GraphService::build_graph_from_dag_graph` outputs; add path-finding utilities under `services`.  
+- Provide export preview endpoints that reuse `ExportService::export_to_string`, controlling response sizes for agents (e.g., optional pagination for node/edge datasets).
+
+### Phase 4 – Data Source & Library Integration
+- Extract shared upload/reprocess logic from `graphql/mutations/mod.rs` into `services::data_source_service`/`library_source_service` helpers that accept raw content so MCP tools can call them directly.  
+- Implement resource URIs for data source downloads pointing to `layercake://datasources/{id}/raw|json`, mirroring GraphQL download queries.  
+- Document expected MIME types and size limits for agent uploads to avoid blocking the MCP runtime.
+
+### Phase 5 – Telemetry & Execution Visibility
+- Leverage `execution_state` tables to expose plan progress via tools/resources; reuse GraphQL `planExecutionStatus` resolver logic.  
+- Add MCP report commands that aggregate graph edit counts using `GraphEditService::count_unapplied_edits`.  
+- Provide optional polling scripts in docs demonstrating how agents can query status periodically instead of relying on subscriptions.
+
+### Phase 6 – Validation & Documentation
+- Build integration tests that spin up the MCP server against a SQLite test DB, invoke each tool via HTTP, and compare payloads to GraphQL query outputs.  
+- Add contract tests ensuring serialisation matches GraphQL JSON (e.g., using snapshot tests referencing `frontend/src/graphql` expectations).  
+- Update developer docs with example MCP requests, API-key configuration, and troubleshooting notes for tool execution errors.
+
+### Phase 7 – Optional Features (Auth/Collaboration/Chat)
+- When prioritised, expose auth tools by wrapping `AuthService` flows and persisting sessions for MCP clients.  
+- Mirror collaboration GraphQL mutations using `CollaborationService`, ensuring role validation matches existing resolver checks.  
+- Add chat orchestration tools that delegate to `ChatManager`, including commands to list providers and send/receive messages for agent-driven conversations.  
+- Align prompt registry definitions with the frontend by loading shared templates from `resources/prompts`.
