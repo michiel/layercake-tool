@@ -60,6 +60,7 @@ export function useChatSession({ projectId, provider }: UseChatSessionArgs): Use
   const [error, setError] = useState<string | null>(null)
   const [isAwaitingAssistant, setAwaitingAssistant] = useState(false)
   const [restartKey, setRestartKey] = useState(0)
+  const [subscriptionActive, setSubscriptionActive] = useState(false)
 
   const [startSession] = useMutation<{ startChatSession: StartChatSessionPayload }>(START_CHAT_SESSION)
   const [sendChat] = useMutation(SEND_CHAT_MESSAGE)
@@ -69,6 +70,7 @@ export function useChatSession({ projectId, provider }: UseChatSessionArgs): Use
     setMessages([])
     setAwaitingAssistant(false)
     setError(null)
+    setSubscriptionActive(false)
     setRestartKey(prev => prev + 1)
   }, [])
 
@@ -81,6 +83,7 @@ export function useChatSession({ projectId, provider }: UseChatSessionArgs): Use
     setMessages([])
     setSession(undefined)
     setAwaitingAssistant(false)
+    setSubscriptionActive(false) // Ensure subscription is inactive during session creation
 
     ;(async () => {
       try {
@@ -110,16 +113,34 @@ export function useChatSession({ projectId, provider }: UseChatSessionArgs): Use
     }
   }, [projectId, provider, restartKey, startSession])
 
+  // Activate subscription after session is created
+  // This ensures Apollo Client treats each session change as a completely new subscription
+  useEffect(() => {
+    if (session?.sessionId && !loading) {
+      console.log('[Chat] Activating subscription for session:', session.sessionId)
+      // First deactivate to force Apollo to close any existing subscription
+      setSubscriptionActive(false)
+      // Then reactivate on next tick to create fresh subscription
+      const timer = setTimeout(() => {
+        console.log('[Chat] Subscription activated for session:', session.sessionId)
+        setSubscriptionActive(true)
+      }, 50)
+      return () => clearTimeout(timer)
+    } else {
+      setSubscriptionActive(false)
+    }
+  }, [session?.sessionId, loading])
+
   // IMPORTANT: Include sessionId in the key to force subscription restart when session changes
   // Without this, Apollo reuses the old subscription even when sessionId changes
   const subscriptionKey = `chat-${session?.sessionId ?? 'none'}`
-  console.log('[Chat] Subscription key:', subscriptionKey, 'skip:', !session?.sessionId)
+  console.log('[Chat] Subscription key:', subscriptionKey, 'skip:', !subscriptionActive, 'sessionId:', session?.sessionId)
 
   const { data: subscriptionData, error: subscriptionError } = useSubscription<{ chatEvents: ChatEventPayload }>(
     CHAT_EVENTS_SUBSCRIPTION,
     {
       variables: { sessionId: session?.sessionId ?? '' },
-      skip: !session?.sessionId || loading, // Don't subscribe while loading or if no session
+      skip: !subscriptionActive || !session?.sessionId, // Only subscribe when explicitly activated
       fetchPolicy: 'no-cache', // Don't cache subscription data
       onData: ({ data }) => {
         console.log('[Chat] Subscription data received:', data)
