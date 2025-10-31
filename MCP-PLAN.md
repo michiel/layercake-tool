@@ -26,11 +26,10 @@
 
 ### Phase 1 – Foundation & Parity Audit
 - Refactor shared service wrappers so MCP tools reuse the same business logic invoked by GraphQL resolvers (projects, plans, graph services).  
-- Register existing auth helpers (`register_user`, `login_user`, `logout_user`) in the tool registry and expose secure API-key gating.  
 - Replace placeholder resource responses with real DB queries via `ProjectService`, `PlanService`, and `GraphService`; implement missing formats for `get_graph_resource`.
 
 ### Phase 2 – Project & Plan Feature Parity
-- Implement MCP tools for `update_project`, `list_collaborators`, `invite_collaborator`, etc., mirroring GraphQL mutations.  
+- Implement MCP tools for `update_project`, metadata edits, and project archiving to mirror GraphQL mutations.  
 - Add plan DAG tooling: list DAG, add/update/delete nodes & edges, move/batch move, validate DAG, aligning payload shapes with GraphQL types.  
 - Provide plan deletion/cancellation and execution monitoring commands that call into `PlanDagService` and `PlanExecution`.
 
@@ -43,15 +42,20 @@
 - Mirror GraphQL mutations for data sources (create from file, update metadata, reprocess, delete, bulk import/export) and library sources (seed, update, reprocess).  
 - Support raw/JSON download via MCP resources to keep parity with `download_data_source_*` queries.
 
-### Phase 5 – Collaboration, Chat, & Prompts
-- Surface collaboration tools (invites, accept/decline, role updates) and session listings to MCP clients.  
-- Provide MCP tasks to start chat sessions, relay messages, and list available providers/models; reuse GraphQL chat manager for consistency.  
-- Synchronize prompt registry with common frontend flows (plan creation templates, graph diagnostics) and document usage.
+### Phase 5 – Telemetry & Execution Visibility
+- Surface execution status, graph edit counters, and plan progress through MCP resources or batch operations.  
+- Evaluate streaming or incremental responses for long-running tasks once axum-mcp batch APIs mature.
 
 ### Phase 6 – Validation, UX, & Documentation
 - Build integration tests that exercise MCP tools against a seeded database, comparing results with GraphQL resolver outputs.  
-+- Update developer docs to describe MCP endpoints, authentication, and example payloads.  
+- Update developer docs to describe MCP endpoints and example payloads.  
 - Ensure UI + MCP share schemas (e.g., reuse async-graphql input objects via serde to avoid drift).
+
+### Phase 7 – Optional: Authentication, Collaboration, & Chat Parity
+- Register authentication tools (`register_user`, `login_user`, `logout_user`) and align API-key/session policies between GraphQL and MCP.  
+- Expose collaboration management (invites, role updates, session listings) for agents that need shared project workflows.  
+- Provide MCP tasks to start chat sessions, relay messages, and enumerate providers/models using the existing chat manager.  
+- Synchronize prompt registry entries with frontend templates (plan creation, graph diagnostics) and document when/why to use them.
 
 ## Open Questions / Dependencies
 
