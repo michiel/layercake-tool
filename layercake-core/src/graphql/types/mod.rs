@@ -2,6 +2,7 @@ pub mod plan;
 pub mod plan_dag;
 pub mod project;
 // REMOVED: node, edge - dead code, GraphQL types not used
+pub mod chat;
 pub mod data_source;
 pub mod graph;
 pub mod graph_edge;
@@ -15,6 +16,7 @@ pub mod sample_project;
 pub mod scalars;
 pub mod user;
 
+pub use chat::*;
 pub use data_source::*;
 pub use graph::*;
 pub use graph_edge::*;

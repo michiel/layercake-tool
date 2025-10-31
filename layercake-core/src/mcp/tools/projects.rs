@@ -1,18 +1,16 @@
-//! Project management tools for MCP
+//! Project management tools for MCP backed by shared AppContext helpers.
 
-use crate::database::entities::projects;
+use crate::app_context::{AppContext, ProjectUpdate};
 use crate::mcp::tools::{create_success_response, get_optional_param, get_required_param};
 use axum_mcp::prelude::*;
-use sea_orm::*;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 
-/// Get project management tools
 pub fn get_project_tools() -> Vec<Tool> {
     vec![
         Tool {
             name: "list_projects".to_string(),
-            description: "List all available graph projects".to_string(),
+            description: "List all available projects".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {},
@@ -22,18 +20,12 @@ pub fn get_project_tools() -> Vec<Tool> {
         },
         Tool {
             name: "create_project".to_string(),
-            description: "Create a new graph project".to_string(),
+            description: "Create a new project".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
-                    "name": {
-                        "type": "string",
-                        "description": "Name of the project"
-                    },
-                    "description": {
-                        "type": "string",
-                        "description": "Optional description of the project"
-                    }
+                    "name": {"type": "string"},
+                    "description": {"type": "string"}
                 },
                 "required": ["name"],
                 "additionalProperties": false
@@ -41,15 +33,27 @@ pub fn get_project_tools() -> Vec<Tool> {
             metadata: HashMap::new(),
         },
         Tool {
-            name: "get_project".to_string(),
-            description: "Get details of a specific project".to_string(),
+            name: "update_project".to_string(),
+            description: "Update an existing project".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
-                    "project_id": {
-                        "type": "integer",
-                        "description": "ID of the project to retrieve"
-                    }
+                    "project_id": {"type": "integer"},
+                    "name": {"type": "string"},
+                    "description": {"type": "string"}
+                },
+                "required": ["project_id"],
+                "additionalProperties": false
+            }),
+            metadata: HashMap::new(),
+        },
+        Tool {
+            name: "get_project".to_string(),
+            description: "Fetch details of a project".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "project_id": {"type": "integer"}
                 },
                 "required": ["project_id"],
                 "additionalProperties": false
@@ -58,14 +62,11 @@ pub fn get_project_tools() -> Vec<Tool> {
         },
         Tool {
             name: "delete_project".to_string(),
-            description: "Delete a project and all its data".to_string(),
+            description: "Delete a project and its data".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
-                    "project_id": {
-                        "type": "integer",
-                        "description": "ID of the project to delete"
-                    }
+                    "project_id": {"type": "integer"}
                 },
                 "required": ["project_id"],
                 "additionalProperties": false
@@ -75,40 +76,23 @@ pub fn get_project_tools() -> Vec<Tool> {
     ]
 }
 
-/// List all projects
-pub async fn list_projects(db: &DatabaseConnection) -> McpResult<ToolsCallResult> {
-    let projects = projects::Entity::find()
-        .all(db)
+pub async fn list_projects(app: &AppContext) -> McpResult<ToolsCallResult> {
+    let projects = app
+        .list_projects()
         .await
         .map_err(|e| McpError::Internal {
-            message: format!("Database error: {}", e),
+            message: format!("Failed to list projects: {}", e),
         })?;
 
-    let project_list: Vec<Value> = projects
-        .into_iter()
-        .map(|p| {
-            json!({
-                "id": p.id,
-                "name": p.name,
-                "description": p.description,
-                "created_at": p.created_at,
-                "updated_at": p.updated_at
-            })
-        })
-        .collect();
-
-    let result = json!({
-        "projects": project_list,
-        "count": project_list.len()
-    });
-
-    create_success_response(&result)
+    create_success_response(&json!({
+        "projects": projects,
+        "count": projects.len()
+    }))
 }
 
-/// Create a new project
 pub async fn create_project(
     arguments: Option<Value>,
-    db: &DatabaseConnection,
+    app: &AppContext,
 ) -> McpResult<ToolsCallResult> {
     let name = get_required_param(&arguments, "name")?
         .as_str()
@@ -116,41 +100,26 @@ pub async fn create_project(
             message: "Project name must be a string".to_string(),
         })?
         .to_string();
-
     let description = get_optional_param(&arguments, "description")
-        .and_then(|v| v.as_str().map(|s| s.to_string()));
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
 
-    let new_project = projects::ActiveModel {
-        name: Set(name),
-        description: Set(description),
-        created_at: Set(chrono::Utc::now()),
-        updated_at: Set(chrono::Utc::now()),
-        ..Default::default()
-    };
-
-    let project = projects::Entity::insert(new_project)
-        .exec_with_returning(db)
+    let project = app
+        .create_project(name, description)
         .await
         .map_err(|e| McpError::Internal {
             message: format!("Failed to create project: {}", e),
         })?;
 
-    let result = json!({
-        "id": project.id,
-        "name": project.name,
-        "description": project.description,
-        "created_at": project.created_at,
-        "updated_at": project.updated_at,
+    create_success_response(&json!({
+        "project": project,
         "message": "Project created successfully"
-    });
-
-    create_success_response(&result)
+    }))
 }
 
-/// Get project details
-pub async fn get_project(
+pub async fn update_project(
     arguments: Option<Value>,
-    db: &DatabaseConnection,
+    app: &AppContext,
 ) -> McpResult<ToolsCallResult> {
     let project_id = get_required_param(&arguments, "project_id")?
         .as_i64()
@@ -158,32 +127,62 @@ pub async fn get_project(
             message: "Project ID must be a number".to_string(),
         })? as i32;
 
-    let project = projects::Entity::find_by_id(project_id)
-        .one(db)
+    let name = get_optional_param(&arguments, "name")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    let description_value = get_optional_param(&arguments, "description");
+    let description = description_value
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    let description_is_set = description_value.is_some();
+
+    if name.is_none() && !description_is_set {
+        return Err(McpError::Validation {
+            message: "Provide at least one field to update".to_string(),
+        });
+    }
+
+    let update = ProjectUpdate::new(name, description, description_is_set);
+    let project = app
+        .update_project(project_id, update)
         .await
         .map_err(|e| McpError::Internal {
-            message: format!("Database error: {}", e),
+            message: format!("Failed to update project: {}", e),
+        })?;
+
+    create_success_response(&json!({
+        "project": project,
+        "message": "Project updated successfully"
+    }))
+}
+
+pub async fn get_project(
+    arguments: Option<Value>,
+    app: &AppContext,
+) -> McpResult<ToolsCallResult> {
+    let project_id = get_required_param(&arguments, "project_id")?
+        .as_i64()
+        .ok_or_else(|| McpError::Validation {
+            message: "Project ID must be a number".to_string(),
+        })? as i32;
+
+    let project = app
+        .get_project(project_id)
+        .await
+        .map_err(|e| McpError::Internal {
+            message: format!("Failed to load project: {}", e),
         })?
         .ok_or_else(|| McpError::ToolExecution {
             tool: "get_project".to_string(),
             message: format!("Project with ID {} not found", project_id),
         })?;
 
-    let result = json!({
-        "id": project.id,
-        "name": project.name,
-        "description": project.description,
-        "created_at": project.created_at,
-        "updated_at": project.updated_at
-    });
-
-    create_success_response(&result)
+    create_success_response(&json!({ "project": project }))
 }
 
-/// Delete a project
 pub async fn delete_project(
     arguments: Option<Value>,
-    db: &DatabaseConnection,
+    app: &AppContext,
 ) -> McpResult<ToolsCallResult> {
     let project_id = get_required_param(&arguments, "project_id")?
         .as_i64()
@@ -191,31 +190,12 @@ pub async fn delete_project(
             message: "Project ID must be a number".to_string(),
         })? as i32;
 
-    // Check if project exists
-    let project = projects::Entity::find_by_id(project_id)
-        .one(db)
-        .await
-        .map_err(|e| McpError::Internal {
-            message: format!("Database error: {}", e),
-        })?
-        .ok_or_else(|| McpError::ToolExecution {
-            tool: "delete_project".to_string(),
-            message: format!("Project with ID {} not found", project_id),
-        })?;
+    app.delete_project(project_id).await.map_err(|e| McpError::Internal {
+        message: format!("Failed to delete project: {}", e),
+    })?;
 
-    // Delete the project (cascade will handle related data)
-    projects::Entity::delete_by_id(project_id)
-        .exec(db)
-        .await
-        .map_err(|e| McpError::Internal {
-            message: format!("Failed to delete project: {}", e),
-        })?;
-
-    let result = json!({
-        "project_id": project_id,
-        "project_name": project.name,
+    create_success_response(&json!({
+        "projectId": project_id,
         "message": "Project deleted successfully"
-    });
-
-    create_success_response(&result)
+    }))
 }

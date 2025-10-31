@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Routes, Route, useNavigate, useParams, useLocation } from 'react-router-dom'
 import { AppShell, Group, Title, Stack, Button, Text, Card, Badge, Alert, Modal, Select, ActionIcon, Tooltip } from '@mantine/core'
-import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconDownload, IconChevronLeft, IconChevronRight, IconFolderPlus, IconNetwork, IconBooks } from '@tabler/icons-react'
+import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconDownload, IconChevronLeft, IconChevronRight, IconFolderPlus, IconNetwork, IconBooks, IconMessageDots } from '@tabler/icons-react'
 import { useQuery, useMutation } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import { Breadcrumbs } from './components/common/Breadcrumbs'
@@ -14,6 +14,7 @@ import { CreateProjectModal } from './components/project/CreateProjectModal'
 import { TopBar } from './components/layout/TopBar'
 import { useCollaborationV2 } from './hooks/useCollaborationV2'
 import { useConnectionStatus } from './hooks/useConnectionStatus'
+import { ProjectChatPage } from './pages/ProjectChatPage'
 
 // Collaboration Context for providing project-level collaboration to all pages
 const CollaborationContext = React.createContext<any>(null)
@@ -268,6 +269,18 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                     style={navCollapsed ? { justifyContent: 'center' } : undefined}
                   >
                     {navCollapsed ? <IconDatabase size={16} /> : 'Graphs'}
+                  </Button>
+                </Tooltip>
+                <Tooltip label="Chat" position="right" disabled={!navCollapsed}>
+                  <Button
+                    variant={isActiveRoute(`/projects/${projectId}/chat`) ? 'filled' : 'light'}
+                    fullWidth={!navCollapsed}
+                    leftSection={navCollapsed ? undefined : <IconMessageDots size={16} />}
+                    onClick={() => navigate(`/projects/${projectId}/chat`)}
+                    px={navCollapsed ? 'xs' : undefined}
+                    style={navCollapsed ? { justifyContent: 'center' } : undefined}
+                  >
+                    {navCollapsed ? <IconMessageDots size={16} /> : 'Chat'}
                   </Button>
                 </Tooltip>
               </>
@@ -1261,6 +1274,11 @@ function App() {
           <Route path="/projects/:projectId/graphs" element={
             <ErrorBoundary>
               <GraphsPage />
+            </ErrorBoundary>
+          } />
+          <Route path="/projects/:projectId/chat" element={
+            <ErrorBoundary>
+              <ProjectChatPage />
             </ErrorBoundary>
           } />
           <Route path="/projects/:projectId/plan-nodes/:graphId/edit" element={

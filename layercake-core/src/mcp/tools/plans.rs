@@ -1,5 +1,6 @@
 //! Plan management tools for MCP
 
+use crate::app_context::AppContext;
 use crate::database::entities::plans;
 use crate::mcp::tools::{create_success_response, get_optional_param, get_required_param};
 use axum_mcp::prelude::*;
@@ -69,6 +70,22 @@ pub fn get_plan_tools() -> Vec<Tool> {
                     }
                 },
                 "required": ["plan_id"],
+                "additionalProperties": false
+            }),
+            metadata: HashMap::new(),
+        },
+        Tool {
+            name: "get_plan_dag".to_string(),
+            description: "Load the plan DAG definition for a project".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "project_id": {
+                        "type": "integer",
+                        "description": "ID of the project whose Plan DAG should be returned"
+                    }
+                },
+                "required": ["project_id"],
                 "additionalProperties": false
             }),
             metadata: HashMap::new(),
@@ -302,4 +319,32 @@ pub async fn get_plan_status(
     });
 
     create_success_response(&result)
+}
+
+/// Get the Plan DAG for a project
+pub async fn get_plan_dag(
+    arguments: Option<Value>,
+    app: &AppContext,
+) -> McpResult<ToolsCallResult> {
+    let project_id = get_required_param(&arguments, "project_id")?
+        .as_i64()
+        .ok_or_else(|| McpError::Validation {
+            message: "Project ID must be a number".to_string(),
+        })? as i32;
+
+    let snapshot = app
+        .load_plan_dag(project_id)
+        .await
+        .map_err(|e| McpError::Internal {
+            message: format!("Failed to load Plan DAG: {}", e),
+        })?
+        .ok_or_else(|| McpError::ToolExecution {
+            tool: "get_plan_dag".to_string(),
+            message: format!("Project with ID {} not found", project_id),
+        })?;
+
+    create_success_response(&json!({
+        "projectId": project_id,
+        "planDag": snapshot
+    }))
 }

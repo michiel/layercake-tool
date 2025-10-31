@@ -83,6 +83,22 @@ pub fn generate_edge_add_patch(edge: &PlanDagEdge, index: usize) -> PatchOperati
     }
 }
 
+/// Helper function to generate JSON Patch for edge update (metadata)
+pub fn generate_edge_update_patch(
+    edge_id: &str,
+    value: serde_json::Value,
+    edges: &[PlanDagEdge],
+) -> Option<PatchOperation> {
+    let index = edges.iter().position(|e| e.id == edge_id)?;
+
+    Some(PatchOperation {
+        op: PatchOp::Replace,
+        path: format!("/edges/{}/metadata", index),
+        value: Some(value),
+        from: None,
+    })
+}
+
 /// Helper function to generate JSON Patch for edge deletion
 pub fn generate_edge_delete_patch(edge_id: &str, edges: &[PlanDagEdge]) -> Option<PatchOperation> {
     let index = edges.iter().position(|e| e.id == edge_id)?;

@@ -12,6 +12,7 @@ use sea_orm::{
 };
 use serde_json::{json, Map, Value};
 
+use crate::app_context::AppContext;
 use crate::database::entities::execution_state::ExecutionState;
 use crate::database::entities::{
     graph_edges::{self, Column as GraphEdgeColumn, Entity as GraphEdges},
@@ -22,7 +23,7 @@ use crate::database::entities::{
 };
 use crate::mcp::tools::{create_success_response, get_optional_param, get_required_param};
 use crate::plan::ExportFileType;
-use crate::services::{ExportService, GraphService, ImportService, PlanDagService};
+use crate::services::{GraphService, ImportService, PlanDagService};
 use uuid::Uuid;
 
 /// Declare the MCP tools made available by this module.
@@ -171,7 +172,7 @@ pub async fn import_csv(
 /// Export the active graph for a project in a supported format.
 pub async fn export_graph(
     arguments: Option<Value>,
-    db: &DatabaseConnection,
+    app: &AppContext,
 ) -> McpResult<ToolsCallResult> {
     let project_id = parse_project_id(&arguments)?;
     let format_value = get_required_param(&arguments, "format")?;
@@ -179,9 +180,12 @@ pub async fn export_graph(
         message: "Format must be a string".to_string(),
     })?;
 
-    let export_format =
-        parse_export_format(format_str).map_err(|message| McpError::Validation { message })?;
+    let preview_limit = get_optional_param(&arguments, "preview_limit")
+        .and_then(Value::as_i64)
+        .filter(|value| *value > 0)
+        .map(|value| value as usize);
 
+    let db = app.db();
     let graph = find_graph(project_id, db)
         .await
         .map_err(|e| internal_error("Failed to locate graph", e))?
@@ -191,8 +195,6 @@ pub async fn export_graph(
         })?;
 
     let graph_service = GraphService::new(db.clone());
-    let export_service = ExportService::new(db.clone());
-
     let graph_data = graph_service
         .build_graph_from_dag_graph(graph.id)
         .await
@@ -208,8 +210,10 @@ pub async fn export_graph(
         serde_json::to_string_pretty(&summary)
             .map_err(|e| internal_error("Failed to serialize graph data", e))?
     } else {
-        export_service
-            .export_to_string(&graph_data, &export_format)
+        let export_format =
+            parse_export_format(format_str).map_err(|message| McpError::Validation { message })?;
+        app.preview_graph_export(graph.id, export_format, preview_limit)
+            .await
             .map_err(|e| internal_error("Failed to render graph content", e))?
     };
 

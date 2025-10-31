@@ -4,12 +4,17 @@ use axum_mcp::prelude::*;
 use axum_mcp::server::{PromptRegistry, ResourceRegistry};
 use sea_orm::DatabaseConnection;
 use std::collections::HashMap;
+use std::sync::Arc;
+
+use crate::app_context::AppContext;
 
 /// Layercake-specific server state implementing axum-mcp traits
 #[derive(Clone)]
 pub struct LayercakeServerState {
     #[allow(dead_code)] // Available for MCP tools that need direct database access
     pub db: DatabaseConnection,
+    #[allow(dead_code)]
+    pub app: Arc<AppContext>,
     pub tools: LayercakeToolRegistry,
     pub resources: super::resources::LayercakeResourceRegistry,
     pub prompts: super::prompts::LayercakePromptRegistry,
@@ -177,12 +182,12 @@ impl McpServerState for LayercakeServerState {
 /// Custom tool registry for Layercake tools
 #[derive(Clone)]
 pub struct LayercakeToolRegistry {
-    pub db: DatabaseConnection,
+    pub app: Arc<AppContext>,
 }
 
 impl LayercakeToolRegistry {
-    pub fn new(db: DatabaseConnection) -> Self {
-        Self { db }
+    pub fn new(app: Arc<AppContext>) -> Self {
+        Self { app }
     }
 }
 
@@ -197,8 +202,14 @@ impl ToolRegistry for LayercakeToolRegistry {
         // Plan management tools
         tools.extend(super::tools::plans::get_plan_tools());
 
+        // Plan DAG tools
+        tools.extend(super::tools::plan_dag::get_plan_dag_tools());
+
         // Graph data tools
         tools.extend(super::tools::graph_data::get_graph_data_tools());
+
+        // Graph editing tools
+        tools.extend(super::tools::graph_edit::get_graph_edit_tools());
 
         // Analysis tools
         tools.extend(super::tools::analysis::get_analysis_tools());
@@ -227,6 +238,22 @@ impl ToolRegistry for LayercakeToolRegistry {
                         "description": {"type": "string", "description": "Optional description of the project"}
                     },
                     "required": ["name"],
+                    "additionalProperties": false
+                }),
+                "projects"
+            ).public()),
+
+            "update_project" => Some(McpTool::new(
+                "update_project",
+                "Update an existing graph project",
+                json!({
+                    "type": "object",
+                    "properties": {
+                        "project_id": {"type": "integer", "description": "ID of the project to update"},
+                        "name": {"type": "string", "description": "Updated project name"},
+                        "description": {"type": "string", "description": "Updated project description"}
+                    },
+                    "required": ["project_id"],
                     "additionalProperties": false
                 }),
                 "projects"
@@ -309,6 +336,254 @@ impl ToolRegistry for LayercakeToolRegistry {
                 }),
                 "plans"
             ).public()),
+            "get_plan_dag" => Some(McpTool::new(
+                "get_plan_dag",
+                "Retrieve the plan DAG definition for a project",
+                json!({
+                    "type": "object",
+                    "properties": {
+                        "project_id": {"type": "integer", "description": "ID of the project to inspect"}
+                    },
+                    "required": ["project_id"],
+                    "additionalProperties": false
+                }),
+                "plans"
+            ).public()),
+
+            "add_plan_dag_node" => Some(McpTool::new(
+                "add_plan_dag_node",
+                "Create a new Plan DAG node",
+                json!({
+                    "type": "object",
+                    "properties": {
+                        "project_id": {"type": "integer", "description": "Project identifier"},
+                        "node_type": {"type": "string", "description": "Node type (e.g. DataSourceNode)"},
+                        "position": {
+                            "type": "object",
+                            "properties": {"x": {"type": "number"}, "y": {"type": "number"}},
+                            "required": ["x", "y"],
+                            "additionalProperties": false
+                        },
+                        "metadata": {"type": "object"},
+                        "config": {"type": "object"}
+                    },
+                    "required": ["project_id", "node_type", "position"],
+                    "additionalProperties": false
+                }),
+                "plans"
+            ).public()),
+
+            "update_plan_dag_node" => Some(McpTool::new(
+                "update_plan_dag_node",
+                "Update an existing Plan DAG node",
+                json!({
+                    "type": "object",
+                    "properties": {
+                        "project_id": {"type": "integer", "description": "Project identifier"},
+                        "node_id": {"type": "string", "description": "Node identifier"},
+                        "position": {
+                            "type": "object",
+                            "properties": {"x": {"type": "number"}, "y": {"type": "number"}}
+                        },
+                        "metadata": {"type": "object"},
+                        "config": {"type": "object"}
+                    },
+                    "required": ["project_id", "node_id"],
+                    "additionalProperties": false
+                }),
+                "plans"
+            ).public()),
+
+            "delete_plan_dag_node" => Some(McpTool::new(
+                "delete_plan_dag_node",
+                "Delete a Plan DAG node and its edges",
+                json!({
+                    "type": "object",
+                    "properties": {
+                        "project_id": {"type": "integer", "description": "Project identifier"},
+                        "node_id": {"type": "string", "description": "Node identifier"}
+                    },
+                    "required": ["project_id", "node_id"],
+                    "additionalProperties": false
+                }),
+                "plans"
+            ).public()),
+
+            "move_plan_dag_node" => Some(McpTool::new(
+                "move_plan_dag_node",
+                "Move a Plan DAG node to a new position",
+                json!({
+                    "type": "object",
+                    "properties": {
+                        "project_id": {"type": "integer", "description": "Project identifier"},
+                        "node_id": {"type": "string"},
+                        "position": {
+                            "type": "object",
+                            "properties": {"x": {"type": "number"}, "y": {"type": "number"}},
+                            "required": ["x", "y"],
+                            "additionalProperties": false
+                        }
+                    },
+                    "required": ["project_id", "node_id", "position"],
+                    "additionalProperties": false
+                }),
+                "plans"
+            ).public()),
+
+            "batch_move_plan_dag_nodes" => Some(McpTool::new(
+                "batch_move_plan_dag_nodes",
+                "Move multiple Plan DAG nodes",
+                json!({
+                    "type": "object",
+                    "properties": {
+                        "project_id": {"type": "integer"},
+                        "nodes": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "node_id": {"type": "string"},
+                                    "position": {
+                                        "type": "object",
+                                        "properties": {"x": {"type": "number"}, "y": {"type": "number"}},
+                                        "required": ["x", "y"],
+                                        "additionalProperties": false
+                                    },
+                                    "source_position": {"type": "string"},
+                                    "target_position": {"type": "string"}
+                                },
+                                "required": ["node_id", "position"],
+                                "additionalProperties": false
+                            }
+                        }
+                    },
+                    "required": ["project_id", "nodes"],
+                    "additionalProperties": false
+                }),
+                "plans"
+            ).public()),
+
+            "add_plan_dag_edge" => Some(McpTool::new(
+                "add_plan_dag_edge",
+                "Create a Plan DAG edge between nodes",
+                json!({
+                    "type": "object",
+                    "properties": {
+                        "project_id": {"type": "integer"},
+                        "source": {"type": "string"},
+                        "target": {"type": "string"},
+                        "metadata": {"type": "object"}
+                    },
+                    "required": ["project_id", "source", "target"],
+                    "additionalProperties": false
+                }),
+                "plans"
+            ).public()),
+
+            "update_plan_dag_edge" => Some(McpTool::new(
+                "update_plan_dag_edge",
+                "Update Plan DAG edge metadata",
+                json!({
+                    "type": "object",
+                    "properties": {
+                        "project_id": {"type": "integer"},
+                        "edge_id": {"type": "string"},
+                        "metadata": {"type": "object"}
+                    },
+                    "required": ["project_id", "edge_id"],
+                    "additionalProperties": false
+                }),
+                "plans"
+            ).public()),
+
+            "delete_plan_dag_edge" => Some(McpTool::new(
+                "delete_plan_dag_edge",
+                "Delete a Plan DAG edge",
+                json!({
+                    "type": "object",
+                    "properties": {
+                        "project_id": {"type": "integer"},
+                        "edge_id": {"type": "string"}
+                    },
+                    "required": ["project_id", "edge_id"],
+                    "additionalProperties": false
+                }),
+                "plans"
+            ).public()),
+
+            "update_graph_node" => Some(McpTool::new(
+                "update_graph_node",
+                "Update a graph node's metadata",
+                json!({
+                    "type": "object",
+                    "properties": {
+                        "graph_id": {"type": "integer", "description": "Graph identifier"},
+                        "node_id": {"type": "string", "description": "Graph node identifier"},
+                        "label": {"type": "string"},
+                        "layer": {"type": "string"},
+                        "attrs": {"type": "object"},
+                        "belongs_to": {"type": "string"}
+                    },
+                    "required": ["graph_id", "node_id"],
+                    "additionalProperties": false
+                }),
+                "graphs"
+            ).public()),
+
+            "bulk_update_graph_data" => Some(McpTool::new(
+                "bulk_update_graph_data",
+                "Bulk update graph nodes and layers",
+                json!({
+                    "type": "object",
+                    "properties": {
+                        "graph_id": {"type": "integer", "description": "Graph identifier"},
+                        "nodes": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "node_id": {"type": "string"},
+                                    "label": {"type": "string"},
+                                    "layer": {"type": "string"},
+                                    "attrs": {"type": "object"}
+                                },
+                                "required": ["node_id"],
+                                "additionalProperties": false
+                            }
+                        },
+                        "layers": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "id": {"type": "integer"},
+                                    "name": {"type": "string"},
+                                    "properties": {"type": "object"}
+                                },
+                                "required": ["id"],
+                                "additionalProperties": false
+                            }
+                        }
+                    },
+                    "required": ["graph_id"],
+                    "additionalProperties": false
+                }),
+                "graphs"
+            ).public()),
+
+            "replay_graph_edits" => Some(McpTool::new(
+                "replay_graph_edits",
+                "Replay pending graph edits for a graph",
+                json!({
+                    "type": "object",
+                    "properties": {
+                        "graph_id": {"type": "integer", "description": "Graph identifier"}
+                    },
+                    "required": ["graph_id"],
+                    "additionalProperties": false
+                }),
+                "graphs"
+            ).public()),
 
             // Graph data tools
             "import_csv" => Some(McpTool::new(
@@ -339,7 +614,8 @@ impl ToolRegistry for LayercakeToolRegistry {
                             "type": "string",
                             "enum": ["json", "csv", "dot", "gml", "plantuml", "mermaid"],
                             "description": "Export format"
-                        }
+                        },
+                        "preview_limit": {"type": "integer", "description": "Optional maximum number of rows to include in CSV previews"}
                     },
                     "required": ["project_id", "format"],
                     "additionalProperties": false
@@ -371,9 +647,9 @@ impl ToolRegistry for LayercakeToolRegistry {
                 json!({
                     "type": "object",
                     "properties": {
-                        "project_id": {"type": "integer", "description": "ID of the project to analyze"}
+                        "graph_id": {"type": "integer", "description": "Graph identifier to analyze"}
                     },
-                    "required": ["project_id"],
+                    "required": ["graph_id"],
                     "additionalProperties": false
                 }),
                 "analysis"
@@ -385,12 +661,12 @@ impl ToolRegistry for LayercakeToolRegistry {
                 json!({
                     "type": "object",
                     "properties": {
-                        "project_id": {"type": "integer", "description": "ID of the project"},
+                        "graph_id": {"type": "integer", "description": "Graph identifier"},
                         "source_node": {"type": "string", "description": "ID of the source node"},
                         "target_node": {"type": "string", "description": "ID of the target node"},
                         "max_paths": {"type": "integer", "description": "Maximum number of paths to find (default: 10)"}
                     },
-                    "required": ["project_id", "source_node", "target_node"],
+                    "required": ["graph_id", "source_node", "target_node"],
                     "additionalProperties": false
                 }),
                 "analysis"
@@ -408,37 +684,77 @@ impl ToolRegistry for LayercakeToolRegistry {
         context: ToolExecutionContext,
     ) -> McpResult<ToolsCallResult> {
         match name {
-            // Project tools
-            "list_projects" => super::tools::projects::list_projects(&self.db).await,
+            "list_projects" => super::tools::projects::list_projects(&self.app).await,
             "create_project" => {
-                super::tools::projects::create_project(context.arguments, &self.db).await
+                super::tools::projects::create_project(context.arguments, &self.app).await
             }
-            "get_project" => super::tools::projects::get_project(context.arguments, &self.db).await,
+            "update_project" => {
+                super::tools::projects::update_project(context.arguments, &self.app).await
+            }
+            "get_project" => super::tools::projects::get_project(context.arguments, &self.app).await,
             "delete_project" => {
-                super::tools::projects::delete_project(context.arguments, &self.db).await
+                super::tools::projects::delete_project(context.arguments, &self.app).await
             }
 
             // Plan tools
-            "create_plan" => super::tools::plans::create_plan(context.arguments, &self.db).await,
-            "execute_plan" => super::tools::plans::execute_plan(context.arguments, &self.db).await,
+            "create_plan" => super::tools::plans::create_plan(context.arguments, self.app.db()).await,
+            "execute_plan" => super::tools::plans::execute_plan(context.arguments, self.app.db()).await,
             "get_plan_status" => {
-                super::tools::plans::get_plan_status(context.arguments, &self.db).await
+                super::tools::plans::get_plan_status(context.arguments, self.app.db()).await
+            }
+            "get_plan_dag" => {
+                super::tools::plans::get_plan_dag(context.arguments, &self.app).await
+            }
+            "add_plan_dag_node" => {
+                super::tools::plan_dag::add_plan_dag_node(context.arguments, &self.app).await
+            }
+            "update_plan_dag_node" => {
+                super::tools::plan_dag::update_plan_dag_node(context.arguments, &self.app).await
+            }
+            "delete_plan_dag_node" => {
+                super::tools::plan_dag::delete_plan_dag_node(context.arguments, &self.app).await
+            }
+            "move_plan_dag_node" => {
+                super::tools::plan_dag::move_plan_dag_node(context.arguments, &self.app).await
+            }
+            "batch_move_plan_dag_nodes" => {
+                super::tools::plan_dag::batch_move_plan_dag_nodes(context.arguments, &self.app).await
+            }
+            "add_plan_dag_edge" => {
+                super::tools::plan_dag::add_plan_dag_edge(context.arguments, &self.app).await
+            }
+            "update_plan_dag_edge" => {
+                super::tools::plan_dag::update_plan_dag_edge(context.arguments, &self.app).await
+            }
+            "delete_plan_dag_edge" => {
+                super::tools::plan_dag::delete_plan_dag_edge(context.arguments, &self.app).await
+            }
+
+            // Graph editing tools
+            "update_graph_node" => {
+                super::tools::graph_edit::update_graph_node(context.arguments, &self.app).await
+            }
+            "bulk_update_graph_data" => {
+                super::tools::graph_edit::bulk_update_graph_data(context.arguments, &self.app).await
+            }
+            "replay_graph_edits" => {
+                super::tools::graph_edit::replay_graph_edits(context.arguments, &self.app).await
             }
 
             // Graph data tools
-            "import_csv" => super::tools::graph_data::import_csv(context.arguments, &self.db).await,
+            "import_csv" => super::tools::graph_data::import_csv(context.arguments, self.app.db()).await,
             "export_graph" => {
-                super::tools::graph_data::export_graph(context.arguments, &self.db).await
+                super::tools::graph_data::export_graph(context.arguments, &self.app).await
             }
             "get_graph_data" => {
-                super::tools::graph_data::get_graph_data(context.arguments, &self.db).await
+                super::tools::graph_data::get_graph_data(context.arguments, self.app.db()).await
             }
 
             // Analysis tools
             "analyze_connectivity" => {
-                super::tools::analysis::analyze_connectivity(context.arguments, &self.db).await
+                super::tools::analysis::analyze_connectivity(context.arguments, &self.app).await
             }
-            "find_paths" => super::tools::analysis::find_paths(context.arguments, &self.db).await,
+            "find_paths" => super::tools::analysis::find_paths(context.arguments, &self.app).await,
 
             _ => Err(McpError::ToolNotFound {
                 name: name.to_string(),
@@ -452,11 +768,24 @@ impl ToolRegistry for LayercakeToolRegistry {
             name,
             "list_projects"
                 | "create_project"
+                | "update_project"
                 | "get_project"
                 | "delete_project"
                 | "create_plan"
                 | "execute_plan"
                 | "get_plan_status"
+                | "get_plan_dag"
+                | "add_plan_dag_node"
+                | "update_plan_dag_node"
+                | "delete_plan_dag_node"
+                | "move_plan_dag_node"
+                | "batch_move_plan_dag_nodes"
+                | "add_plan_dag_edge"
+                | "update_plan_dag_edge"
+                | "delete_plan_dag_edge"
+                | "update_graph_node"
+                | "bulk_update_graph_data"
+                | "replay_graph_edits"
                 | "import_csv"
                 | "export_graph"
                 | "get_graph_data"

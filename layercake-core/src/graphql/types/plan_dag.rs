@@ -10,6 +10,7 @@ use serde_json::json;
 use std::collections::HashSet;
 use tracing::warn;
 
+use crate::app_context::PlanDagSnapshot;
 use crate::database::entities::{data_sources, plan_dag_edges, plan_dag_nodes};
 use crate::graph::Graph;
 use crate::graphql::types::scalars::JSON;
@@ -869,8 +870,6 @@ mod query_filter_executor {
     #[derive(Debug, Clone, Deserialize)]
     #[serde(rename_all = "camelCase")]
     struct QueryRuleGroup {
-        #[serde(default)]
-        id: Option<String>,
         combinator: QueryRuleCombinator,
         #[serde(default)]
         not: bool,
@@ -1810,6 +1809,17 @@ impl From<plan_dag_edges::Model> for PlanDagEdge {
             metadata,
             created_at: model.created_at,
             updated_at: model.updated_at,
+        }
+    }
+}
+
+impl From<PlanDagSnapshot> for PlanDag {
+    fn from(snapshot: PlanDagSnapshot) -> Self {
+        Self {
+            version: snapshot.version,
+            nodes: snapshot.nodes,
+            edges: snapshot.edges,
+            metadata: snapshot.metadata,
         }
     }
 }
