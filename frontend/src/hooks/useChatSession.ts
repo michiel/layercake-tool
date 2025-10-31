@@ -155,9 +155,6 @@ export function useChatSession({ projectId, provider }: UseChatSessionArgs): Use
       onComplete: () => {
         console.log('[Chat] Subscription complete')
       },
-      onSubscriptionData: (options) => {
-        console.log('[Chat] onSubscriptionData callback:', options)
-      },
     },
   )
 
