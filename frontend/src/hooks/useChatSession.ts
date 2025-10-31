@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useMutation, useSubscription } from '@apollo/client/react'
+import { gql } from '@apollo/client'
 import {
   START_CHAT_SESSION,
   SEND_CHAT_MESSAGE,
-  CHAT_EVENTS_SUBSCRIPTION,
   ChatProviderOption,
   ChatEventPayload,
   StartChatSessionPayload,
@@ -134,31 +134,45 @@ export function useChatSession({ projectId, provider }: UseChatSessionArgs): Use
     }
   }, [session?.sessionId, loading])
 
-  // IMPORTANT: Include sessionId in the key to force subscription restart when session changes
-  // Without this, Apollo reuses the old subscription even when sessionId changes
-  const subscriptionKey = `chat-${session?.sessionId ?? 'none'}`
-  console.log('[Chat] Subscription key:', subscriptionKey, 'skip:', !subscriptionActive, 'sessionId:', session?.sessionId)
+  // Create a unique subscription query for each session to force Apollo to treat it as new
+  // This is a workaround for Apollo Client not properly restarting subscriptions
+  const subscriptionQuery = useMemo(() => {
+    if (!session?.sessionId) {
+      return gql`subscription DummySubscription { __typename }`
+    }
+    // Include sessionId in a comment to make each query unique
+    return gql`
+      subscription ChatEvents_${session.sessionId.replace(/-/g, '_')} {
+        chatEvents(sessionId: "${session.sessionId}") {
+          kind
+          message
+          toolName
+        }
+      }
+    `
+  }, [session?.sessionId])
+
+  const shouldSubscribe = subscriptionActive && !!session?.sessionId
+  console.log('[Chat] Should subscribe:', shouldSubscribe, 'sessionId:', session?.sessionId, 'active:', subscriptionActive)
 
   const subscriptionResult = useSubscription<{ chatEvents: ChatEventPayload }>(
-    CHAT_EVENTS_SUBSCRIPTION,
+    subscriptionQuery,
     {
-      variables: { sessionId: session?.sessionId ?? '' },
-      skip: !subscriptionActive || !session?.sessionId, // Only subscribe when explicitly activated
+      skip: !shouldSubscribe, // Only subscribe when both session exists and explicitly activated
       fetchPolicy: 'no-cache', // Don't cache subscription data
-      shouldResubscribe: true, // Force resubscribe on variable changes
       onData: ({ data }) => {
-        console.log('[Chat] Subscription data received:', data)
+        console.log('[Chat] ✅ Subscription data received:', data)
       },
       onError: (error) => {
-        console.error('[Chat] Subscription error:', error)
+        console.error('[Chat] ❌ Subscription error:', error)
       },
       onComplete: () => {
-        console.log('[Chat] Subscription complete')
+        console.log('[Chat] 🔚 Subscription complete')
       },
     },
   )
 
-  console.log('[Chat] Subscription state - data:', subscriptionResult.data, 'error:', subscriptionResult.error, 'loading:', subscriptionResult.loading)
+  console.log('[Chat] Subscription state - loading:', subscriptionResult.loading, 'data:', subscriptionResult.data, 'error:', subscriptionResult.error)
 
   const subscriptionData = subscriptionResult.data
   const subscriptionError = subscriptionResult.error
