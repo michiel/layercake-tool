@@ -253,11 +253,12 @@ impl ChatSession {
                 Ok(response) => Ok(response),
                 Err(err) if self.should_disable_tools(&err) => {
                     self.tool_use_enabled = false;
-                    let notice =
-                        "Ollama server rejected tool calls; continuing without tool integration.";
+                    let notice = "Ollama server rejected function/tool calls. Continuing without tool access; responses now rely on model knowledge only.";
                     observer(ChatEvent::AssistantMessage {
                         text: notice.to_string(),
                     });
+                    self.messages
+                        .push(ChatMessage::assistant().content(notice).build());
                     tracing::warn!("Disabling tool usage for session: {}", err);
                     self.llm
                         .chat(&self.messages)

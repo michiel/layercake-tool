@@ -177,6 +177,30 @@ Simply set the `--base-url` to point to your endpoint and provide the appropriat
 
 The database migrations seed empty records for every built-in provider, so the CLI helper simply updates the stored secrets without requiring manual inserts.
 
+##### Ollama Tool Support & Verification
+
+Layercake relies on MCP tool calls (`get_project`, `list_projects`, etc.) to return real data. Ollama only accepts those tool payloads when both the server and model support function calling. Use the checklist below to ensure MCP integration works end-to-end:
+
+- **Check your Ollama build** – `ollama --version` should be ≥ `0.3.12`. Upgrade if needed (`brew upgrade ollama`, `curl https://ollama.com/install.sh | sh`, etc.) and restart `ollama serve`.
+- **Pull a tool-capable model** – defaults like `llama3:8b` reject tools. Favour variants such as `llama3.2`, `llama3.1:70b-tool`, `phi3:medium-128k-instruct-q4`, `qwen2.5:14b-instruct`, or other models tagged with tool/function support:\
+  `ollama pull llama3.2`
+- **Configure Layercake** – point the chat layer at the model via env or credentials:\
+  `export LAYERCAKE_OLLAMA_MODEL=llama3.2`
+- **Sanity test the API** – issue a raw request that includes a dummy tool. A `200` confirms the server accepts tooling; a `400` means the selected model/build cannot handle function calls yet:
+
+  ```bash
+  curl http://127.0.0.1:11434/api/chat \
+    -d '{
+      "model": "llama3.2",
+      "messages": [{"role":"user","content":"hi"}],
+      "tools": [{"type":"function","function":{"name":"noop","parameters":{"type":"object"}}}]
+    }'
+  ```
+
+- **Restart Layercake** – recycle the backend/web app so it picks up the new model. Once the chat UI reconnects, tool executions will resume and responses pull live project data.
+
+If the Ollama API continues to reject tools, Layercake automatically disables MCP integration for that session and emits a notice (“Continuing without tool access…”). In that degraded mode responses come from the model’s own knowledge and may hallucinate project details—switch back to a tool-capable model to restore full functionality.
+
 #### GraphQL Chat Operations
 
 GraphQL exposes chat operations when the server is running with the `graphql` feature enabled:
@@ -220,4 +244,3 @@ _Reference model with a partition width of 5_
 
 ![Reference model](images/ref-model-hierarchy-width-2.svg)
 _Reference model with a partition width of 2_
-

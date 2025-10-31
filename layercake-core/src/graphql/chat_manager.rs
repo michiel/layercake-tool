@@ -152,15 +152,13 @@ impl ChatManager {
         let rx = {
             let sessions = self.inner.sessions.lock().await;
             tracing::debug!("Active sessions for subscription: {}", sessions.len());
-            sessions
-                .get(session_id)
-                .map(|session| {
-                    let history = {
-                        let guard = session.history.lock().unwrap();
-                        guard.iter().cloned().collect::<Vec<_>>()
-                    };
-                    (history, session.event_tx.subscribe())
-                })
+            sessions.get(session_id).map(|session| {
+                let history = {
+                    let guard = session.history.lock().unwrap();
+                    guard.iter().cloned().collect::<Vec<_>>()
+                };
+                (history, session.event_tx.subscribe())
+            })
         };
 
         match &rx {
