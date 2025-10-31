@@ -118,14 +118,17 @@ export function useChatSession({ projectId, provider }: UseChatSessionArgs): Use
   useEffect(() => {
     if (session?.sessionId && !loading) {
       console.log('[Chat] Activating subscription for session:', session.sessionId)
-      // First deactivate to force Apollo to close any existing subscription
-      setSubscriptionActive(false)
-      // Then reactivate on next tick to create fresh subscription
+      // Use a longer delay to ensure Apollo Client fully processes the deactivation
+      // and any React reconciliation has completed
       const timer = setTimeout(() => {
         console.log('[Chat] Subscription activated for session:', session.sessionId)
         setSubscriptionActive(true)
-      }, 50)
-      return () => clearTimeout(timer)
+      }, 100)
+      return () => {
+        clearTimeout(timer)
+        // Ensure subscription is deactivated on cleanup
+        setSubscriptionActive(false)
+      }
     } else {
       setSubscriptionActive(false)
     }
@@ -136,12 +139,13 @@ export function useChatSession({ projectId, provider }: UseChatSessionArgs): Use
   const subscriptionKey = `chat-${session?.sessionId ?? 'none'}`
   console.log('[Chat] Subscription key:', subscriptionKey, 'skip:', !subscriptionActive, 'sessionId:', session?.sessionId)
 
-  const { data: subscriptionData, error: subscriptionError } = useSubscription<{ chatEvents: ChatEventPayload }>(
+  const subscriptionResult = useSubscription<{ chatEvents: ChatEventPayload }>(
     CHAT_EVENTS_SUBSCRIPTION,
     {
       variables: { sessionId: session?.sessionId ?? '' },
       skip: !subscriptionActive || !session?.sessionId, // Only subscribe when explicitly activated
       fetchPolicy: 'no-cache', // Don't cache subscription data
+      shouldResubscribe: true, // Force resubscribe on variable changes
       onData: ({ data }) => {
         console.log('[Chat] Subscription data received:', data)
       },
@@ -151,10 +155,16 @@ export function useChatSession({ projectId, provider }: UseChatSessionArgs): Use
       onComplete: () => {
         console.log('[Chat] Subscription complete')
       },
+      onSubscriptionData: (options) => {
+        console.log('[Chat] onSubscriptionData callback:', options)
+      },
     },
   )
 
-  console.log('[Chat] Subscription state - data:', subscriptionData, 'error:', subscriptionError)
+  console.log('[Chat] Subscription state - data:', subscriptionResult.data, 'error:', subscriptionResult.error, 'loading:', subscriptionResult.loading)
+
+  const subscriptionData = subscriptionResult.data
+  const subscriptionError = subscriptionResult.error
 
   useEffect(() => {
     const payload = subscriptionData?.chatEvents

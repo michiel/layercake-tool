@@ -143,7 +143,7 @@ function createApolloClient(): ApolloClient {
       console.log(`[GraphQL WebSocket] Waiting ${delay}ms before retry ${retries}`)
       await new Promise(resolve => setTimeout(resolve, delay))
     },
-    lazy: false, // Force connection immediately instead of waiting for first subscription
+    lazy: true, // Connect lazily when first subscription is created (allows proper reconnection)
     keepAlive: 10000, // Send ping every 10 seconds to keep connection alive
     on: {
       connected: () => console.log('[GraphQL WebSocket] ✅ Connected to', currentWsUrl),
