@@ -7,6 +7,8 @@ pub mod pipeline;
 pub mod plan;
 pub mod plan_execution;
 
+pub mod app_context;
+pub use app_context::AppContext;
 pub mod collaboration;
 pub mod database;
 pub mod server;

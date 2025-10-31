@@ -4,12 +4,17 @@ use axum_mcp::prelude::*;
 use axum_mcp::server::{PromptRegistry, ResourceRegistry};
 use sea_orm::DatabaseConnection;
 use std::collections::HashMap;
+use std::sync::Arc;
+
+use crate::app_context::AppContext;
 
 /// Layercake-specific server state implementing axum-mcp traits
 #[derive(Clone)]
 pub struct LayercakeServerState {
     #[allow(dead_code)] // Available for MCP tools that need direct database access
     pub db: DatabaseConnection,
+    #[allow(dead_code)]
+    pub app: Arc<AppContext>,
     pub tools: LayercakeToolRegistry,
     pub resources: super::resources::LayercakeResourceRegistry,
     pub prompts: super::prompts::LayercakePromptRegistry,

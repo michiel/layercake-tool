@@ -106,6 +106,38 @@
 - Add contract tests ensuring serialisation matches GraphQL JSON (e.g., using snapshot tests referencing `frontend/src/graphql` expectations) and asserting MCP/console outputs match the same snapshots.  
 - Update developer docs with example MCP/GraphQL/console requests, API-key configuration (for HTTP), and troubleshooting notes for shared service errors.
 
+## Incremental Delivery Checklist
+
+- [ ] **Baseline sanity**  
+  - [x] Confirm the current repo builds (`cargo test -p layercake-core`, `npm run build`) and document the versions used; this becomes the starting point for subsequent diffs.  
+  - [ ] Tag or branch the baseline so regressions can be bisected quickly during the refactor.  
+
+- [ ] **Bootstrap shared foundation**  
+  - [x] Create a lightweight `AppContext` (DB + core services) and wire it into the GraphQL server, MCP server, and console bridge without changing existing behaviour.  
+  - [x] Add regression checks (manual or automated) proving project list/create still work via GraphQL after the refactor.  
+
+- [ ] **Project parity**  
+  - [ ] Refactor GraphQL project CRUD mutations to call `AppContext`; update MCP project tools to reuse the same helpers.  
+  - [ ] Update `layercake://projects/...` resource responses to return live data through the shared DTOs.  
+  - [ ] Verify parity across GraphQL + MCP project operations.
+
+- [ ] **Plan summary parity**  
+  - [ ] Introduce shared helpers for plan create/update/get/delete and migrate GraphQL mutations.  
+  - [ ] Rework MCP plan tools to delegate to the shared helpers.  
+  - [ ] Ensure plan resources emit real JSON snapshots identical to GraphQL outputs.
+
+- [ ] **Plan DAG read path**  
+  - [ ] Add an `AppContext::load_plan_dag` helper returning nodes/edges.  
+  - [ ] Wire GraphQL `getPlanDag` and a new MCP `get_plan_dag` tool to the helper; confirm serialized shapes match.
+
+- [ ] **Plan DAG mutations**  
+  - [ ] Wrap node/edge create/update/delete/move logic in shared functions (leveraging `PlanDagService`).  
+  - [ ] Migrate GraphQL DAG mutations and expose matching MCP tools; smoke-test both surfaces.
+
+- [ ] **Prepare for Phase 3+**  
+  - [ ] Document remaining gaps (graph editing, data sources, telemetry).  
+  - [ ] Update test/CI strategy to exercise GraphQL and MCP endpoints in parallel before advancing to later phases.
+
 ### Phase 7 – Optional Features (Auth/Collaboration/Chat)
 - When prioritised, expose auth tools by wrapping `AuthService` flows and persisting sessions for MCP clients.  
 - Mirror collaboration GraphQL mutations using `CollaborationService`, ensuring role validation matches existing resolver checks.  

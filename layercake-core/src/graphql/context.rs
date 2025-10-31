@@ -1,11 +1,11 @@
 #![allow(dead_code)]
 
 use crate::{
+    app_context::AppContext,
     console::chat::ChatConfig,
     graphql::chat_manager::ChatManager,
     services::{ExportService, GraphService, ImportService, PlanDagService},
 };
-use sea_orm::DatabaseConnection;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::Arc;
@@ -13,7 +13,8 @@ use tokio::sync::RwLock;
 
 #[derive(Clone)]
 pub struct GraphQLContext {
-    pub db: DatabaseConnection,
+    pub app: Arc<AppContext>,
+    pub db: sea_orm::DatabaseConnection,
     pub import_service: Arc<ImportService>,
     pub export_service: Arc<ExportService>,
     pub graph_service: Arc<GraphService>,
@@ -107,15 +108,18 @@ impl SessionManager {
 
 impl GraphQLContext {
     pub fn new(
-        db: DatabaseConnection,
-        import_service: Arc<ImportService>,
-        export_service: Arc<ExportService>,
-        graph_service: Arc<GraphService>,
-        plan_dag_service: Arc<PlanDagService>,
+        app: Arc<AppContext>,
         chat_config: Arc<ChatConfig>,
         chat_manager: Arc<ChatManager>,
     ) -> Self {
+        let db = app.db().clone();
+        let import_service = app.import_service();
+        let export_service = app.export_service();
+        let graph_service = app.graph_service();
+        let plan_dag_service = app.plan_dag_service();
+
         Self {
+            app,
             db,
             import_service,
             export_service,
@@ -138,5 +142,25 @@ impl GraphQLContext {
                 chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
             )
         })
+    }
+
+    pub fn db(&self) -> &sea_orm::DatabaseConnection {
+        &self.db
+    }
+
+    pub fn import_service(&self) -> Arc<ImportService> {
+        self.import_service.clone()
+    }
+
+    pub fn export_service(&self) -> Arc<ExportService> {
+        self.export_service.clone()
+    }
+
+    pub fn graph_service(&self) -> Arc<GraphService> {
+        self.graph_service.clone()
+    }
+
+    pub fn plan_dag_service(&self) -> Arc<PlanDagService> {
+        self.plan_dag_service.clone()
     }
 }

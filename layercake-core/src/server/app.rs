@@ -6,9 +6,11 @@ use axum::{
     Router,
 };
 use sea_orm::DatabaseConnection;
+use std::sync::Arc;
 use tower::ServiceBuilder;
 use tower_http::cors::{Any, CorsLayer};
 
+use crate::app_context::AppContext;
 #[cfg(feature = "graphql")]
 use crate::collaboration::{CollaborationCoordinator, CoordinatorHandle};
 #[cfg(feature = "graphql")]
@@ -18,16 +20,12 @@ use crate::graphql::{
 #[cfg(feature = "graphql")]
 use crate::server::websocket::websocket_handler;
 #[cfg(feature = "graphql")]
-use crate::services::{ExportService, GraphService, ImportService, PlanDagService};
-#[cfg(feature = "graphql")]
 use crate::{console::chat::ChatConfig, graphql::chat_manager::ChatManager};
 #[cfg(feature = "graphql")]
 use async_graphql::{
     parser::types::{DocumentOperations, OperationType, Selection},
     Request, Response as GraphQLResponse, Schema,
 };
-#[cfg(feature = "graphql")]
-use std::sync::Arc;
 
 use super::handlers::health;
 
@@ -42,13 +40,10 @@ pub struct AppState {
 }
 
 pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Result<Router> {
+    let app_context = Arc::new(AppContext::new(db.clone()));
+
     #[cfg(feature = "graphql")]
     let (graphql_schema, coordinator_handle) = {
-        let import_service = Arc::new(ImportService::new(db.clone()));
-        let export_service = Arc::new(ExportService::new(db.clone()));
-        let graph_service = Arc::new(GraphService::new(db.clone()));
-        let plan_dag_service = Arc::new(PlanDagService::new(db.clone()));
-
         // Initialize actor-based collaboration coordinator
         let coordinator_handle = CollaborationCoordinator::spawn();
 
@@ -97,11 +92,7 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
         let chat_manager = Arc::new(ChatManager::new());
 
         let graphql_context = GraphQLContext::new(
-            db.clone(),
-            import_service,
-            export_service,
-            graph_service,
-            plan_dag_service,
+            app_context.clone(),
             chat_config.clone(),
             chat_manager.clone(),
         );
@@ -183,6 +174,7 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
 
         let mcp_state = LayercakeServerState {
             db: db.clone(),
+            app: app_context.clone(),
             tools: LayercakeToolRegistry::new(db.clone()),
             resources: crate::mcp::resources::LayercakeResourceRegistry::new(db.clone()),
             prompts: crate::mcp::prompts::LayercakePromptRegistry::new(),

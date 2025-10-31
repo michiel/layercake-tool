@@ -7,7 +7,9 @@ use axum_mcp::server::registry::ToolExecutionContext;
 use llm::chat::{FunctionTool, Tool as LlmTool};
 use sea_orm::DatabaseConnection;
 use serde_json::json;
+use std::sync::Arc;
 
+use crate::app_context::AppContext;
 use crate::mcp::{
     prompts::LayercakePromptRegistry,
     resources::LayercakeResourceRegistry,
@@ -21,6 +23,7 @@ pub struct McpBridge {
 
 impl McpBridge {
     pub fn new(db: DatabaseConnection) -> Self {
+        let app = Arc::new(AppContext::new(db.clone()));
         let tools = LayercakeToolRegistry::new(db.clone());
         let resources = LayercakeResourceRegistry::new(db.clone());
         let prompts = LayercakePromptRegistry::new();
@@ -28,6 +31,7 @@ impl McpBridge {
 
         let state = LayercakeServerState {
             db,
+            app,
             tools,
             resources,
             prompts,

@@ -6,6 +6,7 @@ mod graph;
 mod pipeline;
 mod plan;
 mod plan_execution;
+mod app_context;
 mod update;
 
 #[cfg(feature = "console")]
