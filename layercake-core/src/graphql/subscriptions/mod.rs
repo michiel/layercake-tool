@@ -344,13 +344,17 @@ impl Subscription {
         #[graphql(name = "sessionId")] session_id: String,
     ) -> Result<Pin<Box<dyn Stream<Item = ChatEventPayload> + Send>>> {
         let context = ctx.data::<GraphQLContext>()?;
-        let mut receiver = context
+        let (history, mut receiver) = context
             .chat_manager
             .subscribe(&session_id)
             .await
             .map_err(|e| StructuredError::service("ChatManager::subscribe", e))?;
 
         let stream = async_stream::stream! {
+            for event in history {
+                yield ChatEventPayload::from(event);
+            }
+
             loop {
                 use tokio::sync::broadcast::error::RecvError;
 
