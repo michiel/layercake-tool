@@ -13,6 +13,7 @@
 - **Simplified subscription handling**: The frontend hook now performs a single `client.subscribe` call keyed by the session id, removes the delayed activation logic, and always tears down stale observers. This reduces state churn and ensures the subscription starts immediately after a session is created.
 - **Safety improvements**: Both ToolInvocation and AssistantMessage events are captured in the history buffer so downstream consumers always remain in sync, even across UI remounts or slow WebSocket negotiations.
 - **Build cleanup**: Removed redundant `NODE_ENV` overrides in `.env` files so `npm run build` stops emitting errors about unsupported production settings.
+- **Ollama compatibility**: Detect Ollama servers that reject tool/function calls (typically older versions) and automatically retry without tool integration so the chat still succeeds while surfacing an assistant notice about the downgrade.
 
 ## Remaining Follow-ups
 - The history buffer is capped at 64 events and is per-session; we should adjust the size if longer conversations are introduced or persist transcripts server-side if we need auditability.

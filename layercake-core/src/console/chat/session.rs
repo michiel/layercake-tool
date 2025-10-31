@@ -7,6 +7,7 @@ use axum_mcp::prelude::SecurityContext;
 use llm::{
     builder::LLMBuilder,
     chat::{ChatMessage, Tool as LlmTool},
+    error::LLMError,
     FunctionCall, LLMProvider, ToolCall,
 };
 use sea_orm::DatabaseConnection;
@@ -36,6 +37,7 @@ pub struct ChatSession {
     bridge: McpBridge,
     security: SecurityContext,
     llm_tools: Vec<LlmTool>,
+    tool_use_enabled: bool,
 }
 
 impl ChatSession {
@@ -72,6 +74,7 @@ impl ChatSession {
             bridge,
             security,
             llm_tools,
+            tool_use_enabled: true,
         })
     }
 
@@ -146,11 +149,7 @@ impl ChatSession {
             }
             tracing::info!("Sending messages to LLM: \n{}", messages_log);
 
-            let response = self
-                .llm
-                .chat_with_tools(&self.messages, Some(&self.llm_tools))
-                .await
-                .map_err(|err| anyhow!("llm call failed: {}", err))?;
+            let response = self.request_llm_response(observer).await?;
 
             let maybe_tool_calls = response.tool_calls();
             let response_text = response.text();
@@ -235,6 +234,52 @@ impl ChatSession {
                 .build(),
         );
         Ok(())
+    }
+
+    async fn request_llm_response<F>(
+        &mut self,
+        observer: &mut F,
+    ) -> Result<Box<dyn llm::chat::ChatResponse>, anyhow::Error>
+    where
+        F: FnMut(ChatEvent),
+    {
+        let use_tools = self.tool_use_enabled && !self.llm_tools.is_empty();
+        if use_tools {
+            match self
+                .llm
+                .chat_with_tools(&self.messages, Some(&self.llm_tools))
+                .await
+            {
+                Ok(response) => Ok(response),
+                Err(err) if self.should_disable_tools(&err) => {
+                    self.tool_use_enabled = false;
+                    let notice =
+                        "Ollama server rejected tool calls; continuing without tool integration.";
+                    observer(ChatEvent::AssistantMessage {
+                        text: notice.to_string(),
+                    });
+                    tracing::warn!("Disabling tool usage for session: {}", err);
+                    self.llm
+                        .chat(&self.messages)
+                        .await
+                        .map_err(|fallback_err| anyhow!("llm call failed: {}", fallback_err))
+                }
+                Err(err) => Err(anyhow!("llm call failed: {}", err)),
+            }
+        } else {
+            self.llm
+                .chat(&self.messages)
+                .await
+                .map_err(|err| anyhow!("llm call failed: {}", err))
+        }
+    }
+
+    fn should_disable_tools(&self, err: &LLMError) -> bool {
+        if self.provider != ChatProvider::Ollama || self.tool_use_enabled == false {
+            return false;
+        }
+
+        matches!(err, LLMError::HttpError(message) if message.contains("/api/chat") && message.contains("400"))
     }
 }
 
