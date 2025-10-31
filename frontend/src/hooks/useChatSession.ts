@@ -117,19 +117,22 @@ export function useChatSession({ projectId, provider }: UseChatSessionArgs): Use
   // This ensures Apollo Client treats each session change as a completely new subscription
   useEffect(() => {
     if (session?.sessionId && !loading) {
-      console.log('[Chat] Activating subscription for session:', session.sessionId)
+      console.log('[Chat] 🔄 Will activate subscription for session:', session.sessionId, 'after delay')
+      // Deactivate first to ensure clean state
+      setSubscriptionActive(false)
       // Use a longer delay to ensure Apollo Client fully processes the deactivation
       // and any React reconciliation has completed
       const timer = setTimeout(() => {
-        console.log('[Chat] Subscription activated for session:', session.sessionId)
+        console.log('[Chat] ✅ Activating subscription NOW for session:', session.sessionId)
         setSubscriptionActive(true)
-      }, 100)
+      }, 150) // Increased delay to ensure React has settled
       return () => {
+        console.log('[Chat] 🧹 Cleanup: deactivating subscription for session:', session?.sessionId)
         clearTimeout(timer)
-        // Ensure subscription is deactivated on cleanup
         setSubscriptionActive(false)
       }
     } else {
+      console.log('[Chat] ⏸️ Not activating subscription - session:', session?.sessionId, 'loading:', loading)
       setSubscriptionActive(false)
     }
   }, [session?.sessionId, loading])
@@ -138,10 +141,12 @@ export function useChatSession({ projectId, provider }: UseChatSessionArgs): Use
   // This is a workaround for Apollo Client not properly restarting subscriptions
   const subscriptionQuery = useMemo(() => {
     if (!session?.sessionId) {
+      console.log('[Chat] Creating dummy subscription query (no session)')
       return gql`subscription DummySubscription { __typename }`
     }
+    console.log('[Chat] Creating subscription query for session:', session.sessionId)
     // Include sessionId in a comment to make each query unique
-    return gql`
+    const query = gql`
       subscription ChatEvents_${session.sessionId.replace(/-/g, '_')} {
         chatEvents(sessionId: "${session.sessionId}") {
           kind
@@ -150,6 +155,8 @@ export function useChatSession({ projectId, provider }: UseChatSessionArgs): Use
         }
       }
     `
+    console.log('[Chat] Subscription query created:', query.loc?.source.body)
+    return query
   }, [session?.sessionId])
 
   const shouldSubscribe = subscriptionActive && !!session?.sessionId

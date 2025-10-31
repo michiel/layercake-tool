@@ -318,11 +318,18 @@ async fn handle_graphql_ws(
     schema: crate::graphql::GraphQLSchema,
 ) {
     use futures_util::{SinkExt, StreamExt};
+    use tokio::sync::mpsc;
 
     tracing::info!("GraphQL WebSocket connection established");
     let (mut sink, mut stream) = socket.split();
 
-    while let Some(Ok(msg)) = stream.next().await {
+    // Create channel for subscription tasks to send messages back to main handler
+    let (msg_tx, mut msg_rx) = mpsc::unbounded_channel::<axum::extract::ws::Message>();
+
+    loop {
+        tokio::select! {
+            // Handle incoming WebSocket messages
+            Some(Ok(msg)) = stream.next() => {
         tracing::debug!("WebSocket message received: {:?}", msg);
         if let axum::extract::ws::Message::Text(text) = msg {
             tracing::debug!("WebSocket text: {}", text);
@@ -354,39 +361,49 @@ async fn handle_graphql_ws(
                                     query_payload.clone(),
                                 ) {
                                     tracing::info!("Executing GraphQL subscription for id: {}", id);
-                                    let mut response_stream = schema.execute_stream(request);
 
-                                    // Send subscription responses as they arrive
-                                    while let Some(response) = response_stream.next().await {
-                                        tracing::info!("Subscription {} received event: {:?}", id, response);
-                                        let next_msg = serde_json::json!({
-                                            "id": id,
-                                            "type": "next",
-                                            "payload": response
-                                        });
-                                        tracing::debug!("Sending next message: {:?}", next_msg);
-                                        if sink
-                                            .send(axum::extract::ws::Message::Text(
-                                                next_msg.to_string().into(),
-                                            ))
-                                            .await
-                                            .is_err()
-                                        {
-                                            tracing::error!("Failed to send subscription response for id: {}", id);
-                                            return;
+                                    // Clone schema and other data for the spawned task
+                                    let schema_clone = schema.clone();
+                                    let msg_tx_clone = msg_tx.clone();
+                                    let id_owned = id.to_string();
+                                    let request_owned = request;
+
+                                    // Spawn subscription handling in separate task to allow
+                                    // WebSocket handler to continue processing new messages
+                                    tokio::spawn(async move {
+                                        let mut response_stream = schema_clone.execute_stream(request_owned);
+                                        // Send subscription responses as they arrive
+                                        while let Some(response) = response_stream.next().await {
+                                            tracing::info!("Subscription {} received event: {:?}", id_owned, response);
+                                            let next_msg = serde_json::json!({
+                                                "id": id_owned,
+                                                "type": "next",
+                                                "payload": response
+                                            });
+                                            tracing::debug!("Sending next message: {:?}", next_msg);
+                                            if msg_tx_clone
+                                                .send(axum::extract::ws::Message::Text(
+                                                    next_msg.to_string().into(),
+                                                ))
+                                                .is_err()
+                                            {
+                                                tracing::error!("Failed to send subscription response for id: {}", id_owned);
+                                                return;
+                                            }
+                                            tracing::info!("Successfully sent subscription event for id: {}", id_owned);
                                         }
-                                        tracing::info!("Successfully sent subscription event for id: {}", id);
-                                    }
-                                    tracing::info!("Subscription stream ended for id: {}", id);
+                                        tracing::info!("Subscription stream ended for id: {}", id_owned);
 
-                                    // Send complete when subscription ends
-                                    let complete_msg =
-                                        serde_json::json!({"id": id, "type": "complete"});
-                                    let _ = sink
-                                        .send(axum::extract::ws::Message::Text(
-                                            complete_msg.to_string().into(),
-                                        ))
-                                        .await;
+                                        // Send complete when subscription ends
+                                        let complete_msg =
+                                            serde_json::json!({"id": id_owned, "type": "complete"});
+                                        let _ = msg_tx_clone
+                                            .send(axum::extract::ws::Message::Text(
+                                                complete_msg.to_string().into(),
+                                            ));
+                                    });
+
+                                    tracing::info!("Subscription task spawned for id: {}", id);
                                 }
                             }
                         }
@@ -395,6 +412,20 @@ async fn handle_graphql_ws(
                         tracing::warn!("Unknown GraphQL WS message type: {}, payload: {:?}", other, payload);
                     }
                 }
+            }
+        }
+            }
+            // Handle messages from subscription tasks
+            Some(msg) = msg_rx.recv() => {
+                if sink.send(msg).await.is_err() {
+                    tracing::error!("Failed to send message to WebSocket, connection closed");
+                    break;
+                }
+            }
+            // Handle end of stream
+            else => {
+                tracing::info!("WebSocket connection closed");
+                break;
             }
         }
     }
