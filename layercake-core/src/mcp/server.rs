@@ -208,6 +208,9 @@ impl ToolRegistry for LayercakeToolRegistry {
         // Graph data tools
         tools.extend(super::tools::graph_data::get_graph_data_tools());
 
+        // Graph editing tools
+        tools.extend(super::tools::graph_edit::get_graph_edit_tools());
+
         // Analysis tools
         tools.extend(super::tools::analysis::get_analysis_tools());
 
@@ -508,6 +511,80 @@ impl ToolRegistry for LayercakeToolRegistry {
                 "plans"
             ).public()),
 
+            "update_graph_node" => Some(McpTool::new(
+                "update_graph_node",
+                "Update a graph node's metadata",
+                json!({
+                    "type": "object",
+                    "properties": {
+                        "graph_id": {"type": "integer", "description": "Graph identifier"},
+                        "node_id": {"type": "string", "description": "Graph node identifier"},
+                        "label": {"type": "string"},
+                        "layer": {"type": "string"},
+                        "attrs": {"type": "object"},
+                        "belongs_to": {"type": "string"}
+                    },
+                    "required": ["graph_id", "node_id"],
+                    "additionalProperties": false
+                }),
+                "graphs"
+            ).public()),
+
+            "bulk_update_graph_data" => Some(McpTool::new(
+                "bulk_update_graph_data",
+                "Bulk update graph nodes and layers",
+                json!({
+                    "type": "object",
+                    "properties": {
+                        "graph_id": {"type": "integer", "description": "Graph identifier"},
+                        "nodes": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "node_id": {"type": "string"},
+                                    "label": {"type": "string"},
+                                    "layer": {"type": "string"},
+                                    "attrs": {"type": "object"}
+                                },
+                                "required": ["node_id"],
+                                "additionalProperties": false
+                            }
+                        },
+                        "layers": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "id": {"type": "integer"},
+                                    "name": {"type": "string"},
+                                    "properties": {"type": "object"}
+                                },
+                                "required": ["id"],
+                                "additionalProperties": false
+                            }
+                        }
+                    },
+                    "required": ["graph_id"],
+                    "additionalProperties": false
+                }),
+                "graphs"
+            ).public()),
+
+            "replay_graph_edits" => Some(McpTool::new(
+                "replay_graph_edits",
+                "Replay pending graph edits for a graph",
+                json!({
+                    "type": "object",
+                    "properties": {
+                        "graph_id": {"type": "integer", "description": "Graph identifier"}
+                    },
+                    "required": ["graph_id"],
+                    "additionalProperties": false
+                }),
+                "graphs"
+            ).public()),
+
             // Graph data tools
             "import_csv" => Some(McpTool::new(
                 "import_csv",
@@ -537,7 +614,8 @@ impl ToolRegistry for LayercakeToolRegistry {
                             "type": "string",
                             "enum": ["json", "csv", "dot", "gml", "plantuml", "mermaid"],
                             "description": "Export format"
-                        }
+                        },
+                        "preview_limit": {"type": "integer", "description": "Optional maximum number of rows to include in CSV previews"}
                     },
                     "required": ["project_id", "format"],
                     "additionalProperties": false
@@ -569,9 +647,9 @@ impl ToolRegistry for LayercakeToolRegistry {
                 json!({
                     "type": "object",
                     "properties": {
-                        "project_id": {"type": "integer", "description": "ID of the project to analyze"}
+                        "graph_id": {"type": "integer", "description": "Graph identifier to analyze"}
                     },
-                    "required": ["project_id"],
+                    "required": ["graph_id"],
                     "additionalProperties": false
                 }),
                 "analysis"
@@ -583,12 +661,12 @@ impl ToolRegistry for LayercakeToolRegistry {
                 json!({
                     "type": "object",
                     "properties": {
-                        "project_id": {"type": "integer", "description": "ID of the project"},
+                        "graph_id": {"type": "integer", "description": "Graph identifier"},
                         "source_node": {"type": "string", "description": "ID of the source node"},
                         "target_node": {"type": "string", "description": "ID of the target node"},
                         "max_paths": {"type": "integer", "description": "Maximum number of paths to find (default: 10)"}
                     },
-                    "required": ["project_id", "source_node", "target_node"],
+                    "required": ["graph_id", "source_node", "target_node"],
                     "additionalProperties": false
                 }),
                 "analysis"
@@ -652,10 +730,21 @@ impl ToolRegistry for LayercakeToolRegistry {
                 super::tools::plan_dag::delete_plan_dag_edge(context.arguments, &self.app).await
             }
 
+            // Graph editing tools
+            "update_graph_node" => {
+                super::tools::graph_edit::update_graph_node(context.arguments, &self.app).await
+            }
+            "bulk_update_graph_data" => {
+                super::tools::graph_edit::bulk_update_graph_data(context.arguments, &self.app).await
+            }
+            "replay_graph_edits" => {
+                super::tools::graph_edit::replay_graph_edits(context.arguments, &self.app).await
+            }
+
             // Graph data tools
             "import_csv" => super::tools::graph_data::import_csv(context.arguments, self.app.db()).await,
             "export_graph" => {
-                super::tools::graph_data::export_graph(context.arguments, self.app.db()).await
+                super::tools::graph_data::export_graph(context.arguments, &self.app).await
             }
             "get_graph_data" => {
                 super::tools::graph_data::get_graph_data(context.arguments, self.app.db()).await
@@ -663,9 +752,9 @@ impl ToolRegistry for LayercakeToolRegistry {
 
             // Analysis tools
             "analyze_connectivity" => {
-                super::tools::analysis::analyze_connectivity(context.arguments, self.app.db()).await
+                super::tools::analysis::analyze_connectivity(context.arguments, &self.app).await
             }
-            "find_paths" => super::tools::analysis::find_paths(context.arguments, self.app.db()).await,
+            "find_paths" => super::tools::analysis::find_paths(context.arguments, &self.app).await,
 
             _ => Err(McpError::ToolNotFound {
                 name: name.to_string(),
@@ -694,6 +783,9 @@ impl ToolRegistry for LayercakeToolRegistry {
                 | "add_plan_dag_edge"
                 | "update_plan_dag_edge"
                 | "delete_plan_dag_edge"
+                | "update_graph_node"
+                | "bulk_update_graph_data"
+                | "replay_graph_edits"
                 | "import_csv"
                 | "export_graph"
                 | "get_graph_data"

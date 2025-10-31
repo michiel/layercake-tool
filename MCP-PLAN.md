@@ -87,9 +87,9 @@
 - Expose plan cancellation/monitoring by calling `plan_execution::stop_plan_execution` and reading execution state tables via the shared layer.
 
 ### Phase 3 – Graph Editing & Analysis
-- Wrap GraphQL graph mutations (`update_graph_node`, `bulk_update_graph_data`, `replay_graph_edits`) into shared service functions invoked by MCP tools and console commands, keeping audit trails intact.  
-- Finalise analysis routines: move TODO logic from `mcp/tools/analysis.rs` into reusable functions that consume `GraphService::build_graph_from_dag_graph` outputs; add path-finding utilities under `services` for all front-ends.  
-- Provide export preview helpers that reuse `ExportService::export_to_string`, with optional pagination limits configurable per consumer (GraphQL, MCP, console).
+- [x] Wrap GraphQL graph mutations (`update_graph_node`, `bulk_update_graph_data`, `replay_graph_edits`) into shared service functions invoked by MCP tools and console commands, keeping audit trails intact.  
+- [x] Finalise analysis routines: move TODO logic from `mcp/tools/analysis.rs` into reusable functions that consume `GraphService::build_graph_from_dag_graph` outputs; add path-finding utilities under `services` for all front-ends.  
+- [x] Provide export preview helpers that reuse `ExportService::export_to_string`, with optional pagination limits configurable per consumer (GraphQL, MCP, console).
 
 ### Phase 4 – Data Source & Library Integration
 - Extract shared upload/reprocess logic from `graphql/mutations/mod.rs` into `services::data_source_service`/`library_source_service` helpers that accept raw content so MCP tools and console scripts can call them directly.  

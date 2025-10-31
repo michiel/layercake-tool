@@ -7,13 +7,20 @@ use sea_orm::{
 };
 use regex::Regex;
 use serde::Serialize;
-use serde_json::Value;
+use serde_json::{json, Value};
 use uuid::Uuid;
 
 use crate::database::entities::{data_sources, graphs, plans, projects};
+use crate::graphql::types::graph_node::GraphNode as GraphNodeDto;
+use crate::graphql::types::layer::Layer as LayerDto;
 use crate::graphql::types::plan_dag::{
     DataSourceExecutionMetadata, GraphExecutionMetadata, PlanDagEdge, PlanDagMetadata,
     PlanDagNode, PlanDagNodeType, Position,
+};
+use crate::plan::ExportFileType;
+use crate::services::graph_analysis_service::{GraphAnalysisService, GraphConnectivityReport};
+use crate::services::graph_edit_service::{
+    GraphEditService, ReplaySummary as GraphEditReplaySummary,
 };
 use crate::services::{ExportService, GraphService, ImportService, PlanDagService};
 use crate::services::plan_dag_service::PlanDagNodePositionUpdate;
@@ -26,6 +33,8 @@ pub struct AppContext {
     export_service: Arc<ExportService>,
     graph_service: Arc<GraphService>,
     plan_dag_service: Arc<PlanDagService>,
+    graph_edit_service: Arc<GraphEditService>,
+    graph_analysis_service: Arc<GraphAnalysisService>,
 }
 
 impl AppContext {
@@ -34,6 +43,8 @@ impl AppContext {
         let export_service = Arc::new(ExportService::new(db.clone()));
         let graph_service = Arc::new(GraphService::new(db.clone()));
         let plan_dag_service = Arc::new(PlanDagService::new(db.clone()));
+        let graph_edit_service = Arc::new(GraphEditService::new(db.clone()));
+        let graph_analysis_service = Arc::new(GraphAnalysisService::new(db.clone()));
 
         Self {
             db,
@@ -41,6 +52,8 @@ impl AppContext {
             export_service,
             graph_service,
             plan_dag_service,
+            graph_edit_service,
+            graph_analysis_service,
         }
     }
 
@@ -62,6 +75,14 @@ impl AppContext {
 
     pub fn plan_dag_service(&self) -> Arc<PlanDagService> {
         self.plan_dag_service.clone()
+    }
+
+    pub fn graph_edit_service(&self) -> Arc<GraphEditService> {
+        self.graph_edit_service.clone()
+    }
+
+    pub fn graph_analysis_service(&self) -> Arc<GraphAnalysisService> {
+        self.graph_analysis_service.clone()
     }
 
     // ----- Project helpers -------------------------------------------------
@@ -451,6 +472,282 @@ impl AppContext {
             .delete_edge(project_id, edge_id)
             .await
     }
+
+    // ----- Graph editing helpers ------------------------------------------
+
+    pub async fn update_graph_node(
+        &self,
+        graph_id: i32,
+        node_id: String,
+        label: Option<String>,
+        layer: Option<String>,
+        attrs: Option<Value>,
+        belongs_to: Option<String>,
+    ) -> Result<GraphNodeDto> {
+        use crate::database::entities::graph_nodes::{Column as NodeColumn, Entity as GraphNodes};
+        use sea_orm::{ColumnTrait, QueryFilter};
+
+        let old_node = GraphNodes::find()
+            .filter(NodeColumn::GraphId.eq(graph_id))
+            .filter(NodeColumn::Id.eq(&node_id))
+            .one(&self.db)
+            .await
+            .map_err(|e| anyhow!("Failed to load graph node {}: {}", node_id, e))?;
+
+        let belongs_to_param = belongs_to
+            .as_ref()
+            .map(|value| if value.is_empty() { None } else { Some(value.clone()) });
+
+        let updated_node = self
+            .graph_service
+            .update_graph_node(
+                graph_id,
+                node_id.clone(),
+                label.clone(),
+                layer.clone(),
+                attrs.clone(),
+                belongs_to_param.clone(),
+            )
+            .await
+            .map_err(|e| anyhow!("Failed to update graph node {}: {}", node_id, e))?;
+
+        if let Some(old_node) = old_node {
+            if let Some(new_label) = &label {
+                if old_node.label.as_ref() != Some(new_label) {
+                    let _ = self
+                        .graph_edit_service
+                        .create_edit(
+                            graph_id,
+                            "node".to_string(),
+                            node_id.clone(),
+                            "update".to_string(),
+                            Some("label".to_string()),
+                            old_node.label.as_ref().map(|l| json!(l)),
+                            Some(json!(new_label)),
+                            None,
+                            true,
+                        )
+                        .await;
+                }
+            }
+
+            if let Some(new_layer) = &layer {
+                let old_layer_value = old_node.layer.clone().unwrap_or_default();
+                if &old_layer_value != new_layer {
+                    let _ = self
+                        .graph_edit_service
+                        .create_edit(
+                            graph_id,
+                            "node".to_string(),
+                            node_id.clone(),
+                            "update".to_string(),
+                            Some("layer".to_string()),
+                            if old_layer_value.is_empty() {
+                                None
+                            } else {
+                                Some(json!(old_layer_value))
+                            },
+                            Some(json!(new_layer)),
+                            None,
+                            true,
+                        )
+                        .await;
+                }
+            }
+
+            if let Some(new_attrs) = &attrs {
+                if old_node.attrs.as_ref() != Some(new_attrs) {
+                    let _ = self
+                        .graph_edit_service
+                        .create_edit(
+                            graph_id,
+                            "node".to_string(),
+                            node_id.clone(),
+                            "update".to_string(),
+                            Some("attrs".to_string()),
+                            old_node.attrs.clone(),
+                            Some(new_attrs.clone()),
+                            None,
+                            true,
+                        )
+                        .await;
+                }
+            }
+
+            if let Some(new_belongs_to) = belongs_to_param.clone() {
+                if old_node.belongs_to != new_belongs_to {
+                    let _ = self
+                        .graph_edit_service
+                        .create_edit(
+                            graph_id,
+                            "node".to_string(),
+                            node_id.clone(),
+                            "update".to_string(),
+                            Some("belongsTo".to_string()),
+                            old_node
+                                .belongs_to
+                                .as_ref()
+                                .map(|b| json!(b)),
+                            new_belongs_to.as_ref().map(|b| json!(b)),
+                            None,
+                            true,
+                        )
+                        .await;
+                }
+            }
+        }
+
+        Ok(GraphNodeDto::from(updated_node))
+    }
+
+    pub async fn update_layer_properties(
+        &self,
+        layer_id: i32,
+        name: Option<String>,
+        properties: Option<Value>,
+    ) -> Result<LayerDto> {
+        use crate::database::entities::graph_layers::Entity as Layers;
+
+        let old_layer = Layers::find_by_id(layer_id)
+            .one(&self.db)
+            .await
+            .map_err(|e| anyhow!("Failed to load layer {}: {}", layer_id, e))?;
+
+        let updated_layer = self
+            .graph_service
+            .update_layer_properties(layer_id, name.clone(), properties.clone())
+            .await
+            .map_err(|e| anyhow!("Failed to update layer {}: {}", layer_id, e))?;
+
+        if let Some(old_layer) = old_layer {
+            if let Some(new_name) = &name {
+                if &old_layer.name != new_name {
+                    let _ = self
+                        .graph_edit_service
+                        .create_edit(
+                            old_layer.graph_id,
+                            "layer".to_string(),
+                            old_layer.layer_id.clone(),
+                            "update".to_string(),
+                            Some("name".to_string()),
+                            Some(json!(old_layer.name)),
+                            Some(json!(new_name)),
+                            None,
+                            true,
+                        )
+                        .await;
+                }
+            }
+
+            if let Some(new_properties) = &properties {
+                let old_props = old_layer
+                    .properties
+                    .and_then(|p| serde_json::from_str::<Value>(&p).ok());
+
+                if old_props.as_ref() != Some(new_properties) {
+                    let _ = self
+                        .graph_edit_service
+                        .create_edit(
+                            old_layer.graph_id,
+                            "layer".to_string(),
+                            old_layer.layer_id.clone(),
+                            "update".to_string(),
+                            Some("properties".to_string()),
+                            old_props,
+                            Some(new_properties.clone()),
+                            None,
+                            true,
+                        )
+                        .await;
+                }
+            }
+        }
+
+        Ok(LayerDto::from(updated_layer))
+    }
+
+    pub async fn bulk_update_graph_data(
+        &self,
+        graph_id: i32,
+        node_updates: Vec<GraphNodeUpdateRequest>,
+        layer_updates: Vec<GraphLayerUpdateRequest>,
+    ) -> Result<()> {
+        for node_update in node_updates {
+            self.update_graph_node(
+                graph_id,
+                node_update.node_id,
+                node_update.label,
+                node_update.layer,
+                node_update.attrs,
+                node_update.belongs_to,
+            )
+            .await?;
+        }
+
+        for layer_update in layer_updates {
+            self.update_layer_properties(
+                layer_update.id,
+                layer_update.name,
+                layer_update.properties,
+            )
+            .await?;
+        }
+
+        Ok(())
+    }
+
+    pub async fn replay_graph_edits(
+        &self,
+        graph_id: i32,
+    ) -> Result<GraphEditReplaySummary> {
+        self.graph_edit_service
+            .replay_graph_edits(graph_id)
+            .await
+            .map_err(|e| anyhow!("Failed to replay graph edits: {}", e))
+    }
+
+    pub async fn analyze_graph_connectivity(
+        &self,
+        graph_id: i32,
+    ) -> Result<GraphConnectivityReport> {
+        self.graph_analysis_service
+            .analyze_connectivity(graph_id)
+            .await
+            .map_err(|e| anyhow!("Failed to analyze graph connectivity: {}", e))
+    }
+
+    pub async fn find_graph_paths(
+        &self,
+        graph_id: i32,
+        source_node: String,
+        target_node: String,
+        max_paths: usize,
+    ) -> Result<Vec<Vec<String>>> {
+        self.graph_analysis_service
+            .find_paths(graph_id, &source_node, &target_node, max_paths)
+            .await
+            .map_err(|e| anyhow!("Failed to find graph paths: {}", e))
+    }
+    pub async fn preview_graph_export(
+        &self,
+        graph_id: i32,
+        format: ExportFileType,
+        max_rows: Option<usize>,
+    ) -> Result<String> {
+        let graph = self
+            .graph_service
+            .build_graph_from_dag_graph(graph_id)
+            .await
+            .map_err(|e| anyhow!("Failed to load graph {}: {}", graph_id, e))?;
+
+        let content = self
+            .export_service
+            .export_to_string(&graph, &format)
+            .map_err(|e| anyhow!("Failed to render graph export: {}", e))?;
+
+        Ok(apply_preview_limit(content, format, max_rows))
+    }
+
 }
 
 #[derive(Clone, Serialize)]
@@ -536,6 +833,22 @@ pub struct PlanDagEdgeUpdateRequest {
     pub metadata: Option<Value>,
 }
 
+#[derive(Clone)]
+pub struct GraphNodeUpdateRequest {
+    pub node_id: String,
+    pub label: Option<String>,
+    pub layer: Option<String>,
+    pub attrs: Option<Value>,
+    pub belongs_to: Option<String>,
+}
+
+#[derive(Clone)]
+pub struct GraphLayerUpdateRequest {
+    pub id: i32,
+    pub name: Option<String>,
+    pub properties: Option<Value>,
+}
+
 fn node_type_prefix(node_type: &PlanDagNodeType) -> &'static str {
     match node_type {
         PlanDagNodeType::DataSource => "datasource",
@@ -589,4 +902,23 @@ fn generate_edge_id(source: &str, target: &str) -> String {
         target,
         Uuid::new_v4().simple()
     )
+}
+
+fn apply_preview_limit(content: String, format: ExportFileType, max_rows: Option<usize>) -> String {
+    match (format, max_rows) {
+        (ExportFileType::CSVNodes | ExportFileType::CSVEdges | ExportFileType::CSVMatrix, Some(limit)) => {
+            let mut limited_lines = Vec::new();
+
+            for (index, line) in content.lines().enumerate() {
+                if index == 0 || index <= limit {
+                    limited_lines.push(line.to_string());
+                } else {
+                    break;
+                }
+            }
+
+            limited_lines.join("\n")
+        }
+        _ => content,
+    }
 }

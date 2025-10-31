@@ -1,6 +1,8 @@
 //! Layercake resource registry for MCP backed by the shared application context.
 
 use crate::app_context::AppContext;
+use crate::database::entities::graphs;
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 use axum_mcp::prelude::*;
 use axum_mcp::protocol::ToolContent;
 use axum_mcp::server::resource::{
@@ -72,12 +74,21 @@ impl LayercakeResourceRegistry {
     ) -> McpResult<Resource> {
         match analysis_type {
             "connectivity" => {
-                let arguments = Some(json!({ "project_id": project_id }));
-                let result = crate::mcp::tools::analysis::analyze_connectivity(
-                    arguments,
-                    self.app.db(),
-                )
-                .await?;
+                let graph = graphs::Entity::find()
+                    .filter(graphs::Column::ProjectId.eq(project_id))
+                    .order_by_asc(graphs::Column::Id)
+                    .one(self.app.db())
+                    .await
+                    .map_err(|e| McpError::Internal {
+                        message: format!("Failed to load graphs for project {}: {}", project_id, e),
+                    })?
+                    .ok_or_else(|| McpError::ResourceNotFound {
+                        uri: format!("layercake://analysis/{}/connectivity", project_id),
+                    })?;
+
+                let arguments = Some(json!({ "graph_id": graph.id }));
+                let result =
+                    crate::mcp::tools::analysis::analyze_connectivity(arguments, &self.app).await?;
 
                 let content = if let Some(ToolContent::Text { text }) = result.content.first() {
                     text.clone()
@@ -86,14 +97,15 @@ impl LayercakeResourceRegistry {
                 };
 
                 Ok(Resource {
-                    uri: format!("layercake://analysis/{}/connectivity", project_id),
-                    name: format!("Connectivity Analysis - Project {}", project_id),
+                    uri: format!("layercake://analysis/{}/connectivity", graph.id),
+                    name: format!("Connectivity Analysis - Graph {}", graph.id),
                     description: Some("Graph connectivity analysis".to_string()),
                     mime_type: Some("application/json".to_string()),
                     content: ResourceContent::Text { text: content },
                     metadata: {
                         let mut meta = HashMap::new();
                         meta.insert("project_id".to_string(), json!(project_id));
+                        meta.insert("graph_id".to_string(), json!(graph.id));
                         meta.insert("analysis_type".to_string(), json!("connectivity"));
                         meta.insert("resource_type".to_string(), json!("analysis"));
                         meta

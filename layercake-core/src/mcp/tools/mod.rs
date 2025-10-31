@@ -3,6 +3,7 @@
 pub mod analysis;
 pub mod auth;
 pub mod graph_data;
+pub mod graph_edit;
 pub mod plan_dag;
 pub mod plans;
 pub mod projects;
