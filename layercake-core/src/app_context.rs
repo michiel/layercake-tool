@@ -5,14 +5,18 @@ use chrono::{DateTime, Utc};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, Set,
 };
+use regex::Regex;
 use serde::Serialize;
+use serde_json::Value;
+use uuid::Uuid;
 
 use crate::database::entities::{data_sources, graphs, plans, projects};
 use crate::graphql::types::plan_dag::{
     DataSourceExecutionMetadata, GraphExecutionMetadata, PlanDagEdge, PlanDagMetadata,
-    PlanDagNode, PlanDagNodeType,
+    PlanDagNode, PlanDagNodeType, Position,
 };
 use crate::services::{ExportService, GraphService, ImportService, PlanDagService};
+use crate::services::plan_dag_service::PlanDagNodePositionUpdate;
 
 /// Shared application context exposing core services for GraphQL, MCP, and console layers.
 #[derive(Clone)]
@@ -283,6 +287,170 @@ impl AppContext {
             }))
         }
     }
+
+    // ----- Plan DAG mutations ----------------------------------------------
+
+    pub async fn create_plan_dag_node(
+        &self,
+        project_id: i32,
+        request: PlanDagNodeRequest,
+    ) -> Result<PlanDagNode> {
+        // Ensure plan exists before inspecting existing nodes
+        self.plan_dag_service
+            .get_or_create_plan(project_id)
+            .await
+            .map_err(|e| anyhow!("Failed to prepare plan for project {}: {}", project_id, e))?;
+
+        let existing_nodes = self
+            .plan_dag_service
+            .get_nodes(project_id)
+            .await
+            .unwrap_or_default();
+
+        let node_id = generate_node_id(&request.node_type, &existing_nodes)?;
+        let node_type = node_type_storage_name(&request.node_type).to_string();
+        let metadata_json = serde_json::to_string(&request.metadata)
+            .map_err(|e| anyhow!("Invalid node metadata: {}", e))?;
+        let config_json = serde_json::to_string(&request.config)
+            .map_err(|e| anyhow!("Invalid node config: {}", e))?;
+
+        self.plan_dag_service
+            .create_node(
+                project_id,
+                node_id,
+                node_type,
+                request.position,
+                metadata_json,
+                config_json,
+            )
+            .await
+    }
+
+    pub async fn update_plan_dag_node(
+        &self,
+        project_id: i32,
+        node_id: String,
+        updates: PlanDagNodeUpdateRequest,
+    ) -> Result<PlanDagNode> {
+        let metadata_json = if let Some(metadata) = updates.metadata {
+            Some(
+                serde_json::to_string(&metadata)
+                    .map_err(|e| anyhow!("Invalid node metadata: {}", e))?,
+            )
+        } else {
+            None
+        };
+
+        let config_json = if let Some(config) = updates.config {
+            Some(
+                serde_json::to_string(&config)
+                    .map_err(|e| anyhow!("Invalid node config: {}", e))?,
+            )
+        } else {
+            None
+        };
+
+        self.plan_dag_service
+            .update_node(project_id, node_id, updates.position, metadata_json, config_json)
+            .await
+    }
+
+    pub async fn delete_plan_dag_node(
+        &self,
+        project_id: i32,
+        node_id: String,
+    ) -> Result<PlanDagNode> {
+        self.plan_dag_service
+            .delete_node(project_id, node_id)
+            .await
+    }
+
+    pub async fn move_plan_dag_node(
+        &self,
+        project_id: i32,
+        node_id: String,
+        position: Position,
+    ) -> Result<PlanDagNode> {
+        self.plan_dag_service
+            .move_node(project_id, node_id, position)
+            .await
+    }
+
+    pub async fn batch_move_plan_dag_nodes(
+        &self,
+        project_id: i32,
+        positions: Vec<PlanDagNodePositionRequest>,
+    ) -> Result<Vec<PlanDagNode>> {
+        let updates = positions
+            .into_iter()
+            .map(|p| PlanDagNodePositionUpdate {
+                node_id: p.node_id,
+                position: p.position,
+                source_position: p.source_position,
+                target_position: p.target_position,
+            })
+            .collect();
+
+        self.plan_dag_service
+            .batch_move_nodes(project_id, updates)
+            .await
+    }
+
+    pub async fn create_plan_dag_edge(
+        &self,
+        project_id: i32,
+        request: PlanDagEdgeRequest,
+    ) -> Result<PlanDagEdge> {
+        // Ensure plan exists before creating edge
+        self.plan_dag_service
+            .get_or_create_plan(project_id)
+            .await
+            .map_err(|e| anyhow!("Failed to prepare plan for project {}: {}", project_id, e))?;
+
+        let edge_id = generate_edge_id(&request.source, &request.target);
+        let metadata_json = serde_json::to_string(&request.metadata)
+            .map_err(|e| anyhow!("Invalid edge metadata: {}", e))?;
+
+        self.plan_dag_service
+            .create_edge(
+                project_id,
+                edge_id,
+                request.source,
+                request.target,
+                metadata_json,
+            )
+            .await
+    }
+
+    pub async fn update_plan_dag_edge(
+        &self,
+        project_id: i32,
+        edge_id: String,
+        updates: PlanDagEdgeUpdateRequest,
+    ) -> Result<PlanDagEdge> {
+        let metadata_json = if let Some(metadata) = updates.metadata {
+            Some(
+                serde_json::to_string(&metadata)
+                    .map_err(|e| anyhow!("Invalid edge metadata: {}", e))?,
+            )
+        } else {
+            None
+        };
+
+        self.plan_dag_service
+            .update_edge(project_id, edge_id, metadata_json)
+            .await
+    }
+
+    pub async fn delete_plan_dag_edge(
+        &self,
+        project_id: i32,
+        edge_id: String,
+    ) -> Result<PlanDagEdge> {
+        self.plan_dag_service
+            .delete_edge(project_id, edge_id)
+            .await
+    }
 }
 
 #[derive(Clone, Serialize)]
@@ -331,4 +499,94 @@ pub struct PlanDagSnapshot {
     pub nodes: Vec<PlanDagNode>,
     pub edges: Vec<PlanDagEdge>,
     pub metadata: PlanDagMetadata,
+}
+
+#[derive(Clone)]
+pub struct PlanDagNodeRequest {
+    pub node_type: PlanDagNodeType,
+    pub position: Position,
+    pub metadata: Value,
+    pub config: Value,
+}
+
+#[derive(Clone)]
+pub struct PlanDagNodeUpdateRequest {
+    pub position: Option<Position>,
+    pub metadata: Option<Value>,
+    pub config: Option<Value>,
+}
+
+#[derive(Clone)]
+pub struct PlanDagNodePositionRequest {
+    pub node_id: String,
+    pub position: Position,
+    pub source_position: Option<String>,
+    pub target_position: Option<String>,
+}
+
+#[derive(Clone)]
+pub struct PlanDagEdgeRequest {
+    pub source: String,
+    pub target: String,
+    pub metadata: Value,
+}
+
+#[derive(Clone)]
+pub struct PlanDagEdgeUpdateRequest {
+    pub metadata: Option<Value>,
+}
+
+fn node_type_prefix(node_type: &PlanDagNodeType) -> &'static str {
+    match node_type {
+        PlanDagNodeType::DataSource => "datasource",
+        PlanDagNodeType::Graph => "graph",
+        PlanDagNodeType::Transform => "transform",
+        PlanDagNodeType::Filter => "filter",
+        PlanDagNodeType::Merge => "merge",
+        PlanDagNodeType::Copy => "copy",
+        PlanDagNodeType::Output => "output",
+    }
+}
+
+fn node_type_storage_name(node_type: &PlanDagNodeType) -> &'static str {
+    match node_type {
+        PlanDagNodeType::DataSource => "DataSourceNode",
+        PlanDagNodeType::Graph => "GraphNode",
+        PlanDagNodeType::Transform => "TransformNode",
+        PlanDagNodeType::Filter => "FilterNode",
+        PlanDagNodeType::Merge => "MergeNode",
+        PlanDagNodeType::Copy => "CopyNode",
+        PlanDagNodeType::Output => "OutputNode",
+    }
+}
+
+fn generate_node_id(
+    node_type: &PlanDagNodeType,
+    existing_nodes: &[PlanDagNode],
+) -> Result<String> {
+    let prefix = node_type_prefix(node_type);
+    let regex = Regex::new(r"_(\d+)$").map_err(|e| anyhow!("Invalid regex: {}", e))?;
+
+    let max_number = existing_nodes
+        .iter()
+        .filter(|node| node.id.starts_with(prefix))
+        .filter_map(|node| {
+            regex
+                .captures(&node.id)
+                .and_then(|caps| caps.get(1))
+                .and_then(|m| m.as_str().parse::<i32>().ok())
+        })
+        .max()
+        .unwrap_or(0);
+
+    Ok(format!("{}_{}", prefix, format!("{:03}", max_number + 1)))
+}
+
+fn generate_edge_id(source: &str, target: &str) -> String {
+    format!(
+        "edge-{}-{}-{}",
+        source,
+        target,
+        Uuid::new_v4().simple()
+    )
 }

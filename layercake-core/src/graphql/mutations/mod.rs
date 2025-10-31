@@ -4,15 +4,19 @@ use async_graphql::*;
 use chrono::Utc;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 
-use crate::app_context::ProjectUpdate;
+use crate::app_context::{
+    PlanDagEdgeRequest, PlanDagEdgeUpdateRequest, PlanDagNodePositionRequest, PlanDagNodeRequest,
+    PlanDagNodeUpdateRequest, ProjectUpdate,
+};
 use crate::database::entities::{
-    data_sources, datasources, graphs, plan_dag_edges, plan_dag_nodes, plans,
-    project_collaborators, projects, user_sessions, users, ExecutionState,
+    datasources, graphs, plan_dag_edges, plan_dag_nodes, plans, project_collaborators, projects,
+    user_sessions, users, ExecutionState,
 };
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
 use crate::services::auth_service::AuthService;
-use serde_json::{Map, Value};
+use serde_json::Value;
+use uuid::Uuid;
 
 use crate::pipeline::DagExecutor;
 use crate::services::data_source_service::DataSourceService;
@@ -44,31 +48,13 @@ use crate::graphql::types::{
     UpdateDataSourceInput, UpdateLibrarySourceInput, UpdateUserInput, User,
 };
 
-pub struct Mutation;
-
-/// Generate a unique node ID based on node type and existing nodes
-fn generate_node_id(
-    node_type: &crate::graphql::types::PlanDagNodeType,
-    existing_nodes: &[PlanDagNode],
-) -> String {
-    generate_node_id_from_ids(
-        node_type,
-        &existing_nodes
-            .iter()
-            .map(|n| n.id.as_str())
-            .collect::<Vec<_>>(),
-    )
-}
-
-/// Generate a unique node ID based on node type and existing node IDs
 fn generate_node_id_from_ids(
     node_type: &crate::graphql::types::PlanDagNodeType,
     existing_node_ids: &[&str],
 ) -> String {
     use crate::graphql::types::PlanDagNodeType;
 
-    // Get type prefix
-    let type_prefix = match node_type {
+    let prefix = match node_type {
         PlanDagNodeType::DataSource => "datasource",
         PlanDagNodeType::Graph => "graph",
         PlanDagNodeType::Transform => "transform",
@@ -78,32 +64,29 @@ fn generate_node_id_from_ids(
         PlanDagNodeType::Output => "output",
     };
 
-    // Extract all numeric suffixes from existing node IDs
-    let number_pattern = regex::Regex::new(r"_(\d+)$").unwrap();
-    let existing_numbers: Vec<i32> = existing_node_ids
+    let max_number = existing_node_ids
         .iter()
         .filter_map(|id| {
-            number_pattern
-                .captures(id)
-                .and_then(|cap| cap.get(1))
-                .and_then(|m| m.as_str().parse::<i32>().ok())
+            id.strip_prefix(prefix)
+                .and_then(|rest| rest.strip_prefix('_'))
+                .and_then(|raw| raw.parse::<i32>().ok())
         })
-        .collect();
+        .max()
+        .unwrap_or(0);
 
-    // Find the max number and increment
-    let max_number = existing_numbers.iter().max().copied().unwrap_or(0);
-    let next_number = max_number + 1;
-
-    // Format with leading zeros (3 digits)
-    format!("{}_{:03}", type_prefix, next_number)
+    format!("{}_{}", prefix, format!("{:03}", max_number + 1))
 }
 
-/// Generate a unique edge ID based on source and target
 fn generate_edge_id(source: &str, target: &str) -> String {
-    use uuid::Uuid;
-    // Use a UUID suffix to ensure uniqueness even if same source/target combination
-    format!("edge-{}-{}-{}", source, target, Uuid::new_v4().simple())
+    format!(
+        "edge-{}-{}-{}",
+        source,
+        target,
+        Uuid::new_v4().simple()
+    )
 }
+
+pub struct Mutation;
 
 #[Object]
 impl Mutation {
@@ -494,105 +477,34 @@ impl Mutation {
     ) -> Result<Option<PlanDagNode>> {
         let context = ctx.data::<GraphQLContext>()?;
 
-        // Verify project exists
-        let _project = projects::Entity::find_by_id(project_id)
-            .one(&context.db)
-            .await
-            .map_err(|e| StructuredError::database("projects::Entity::find_by_id", e))?
-            .ok_or_else(|| StructuredError::not_found("Project", project_id))?;
+        let PlanDagNodeInput {
+            node_type,
+            position,
+            metadata,
+            config,
+            ..
+        } = node;
 
-        // Find or create a plan for this project
-        let plan = match plans::Entity::find()
-            .filter(plans::Column::ProjectId.eq(project_id))
-            .one(&context.db)
-            .await
-            .map_err(|e| StructuredError::database("plans::Entity::find (ProjectId)", e))?
-        {
-            Some(plan) => plan,
-            None => {
-                // Auto-create a plan if one doesn't exist
-                let now = chrono::Utc::now();
-                let new_plan = plans::ActiveModel {
-                    id: sea_orm::ActiveValue::NotSet,
-                    project_id: Set(project_id),
-                    name: Set(format!("Plan for Project {}", project_id)),
-                    yaml_content: Set("".to_string()),
-                    dependencies: Set(None),
-                    status: Set("draft".to_string()),
-                    version: Set(1),
-                    created_at: Set(now),
-                    updated_at: Set(now),
-                };
-                new_plan
-                    .insert(&context.db)
-                    .await
-                    .map_err(|e| StructuredError::database("plans::Entity::insert", e))?
-            }
-        };
-
-        // Fetch current state to determine node index and generate unique ID
-        let (current_nodes, _) = plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id)
-            .await
-            .map_err(|e| StructuredError::service("plan_dag_delta::fetch_current_plan_dag", e))?;
-        let node_index = current_nodes.len();
-
-        // Generate unique ID on backend - ignore frontend-provided ID
-        let generated_id = generate_node_id(&node.node_type, &current_nodes);
-
-        let node_type_str = match node.node_type {
-            crate::graphql::types::PlanDagNodeType::DataSource => "DataSourceNode",
-            crate::graphql::types::PlanDagNodeType::Graph => "GraphNode",
-            crate::graphql::types::PlanDagNodeType::Transform => "TransformNode",
-            crate::graphql::types::PlanDagNodeType::Filter => "FilterNode",
-            crate::graphql::types::PlanDagNodeType::Merge => "MergeNode",
-            crate::graphql::types::PlanDagNodeType::Copy => "CopyNode",
-            crate::graphql::types::PlanDagNodeType::Output => "OutputNode",
-        };
-
-        let metadata_json = serde_json::to_string(&node.metadata)
+        let metadata_value = serde_json::to_value(metadata)
             .map_err(|e| StructuredError::bad_request(format!("Invalid node metadata: {}", e)))?;
+        let config_value = serde_json::from_str::<Value>(&config).map_err(|e| {
+            StructuredError::bad_request(format!("Invalid node configuration JSON: {}", e))
+        })?;
 
-        let dag_node = plan_dag_nodes::ActiveModel {
-            id: Set(generated_id),
-            plan_id: Set(plan.id), // Use the actual plan ID instead of project ID
-            node_type: Set(node_type_str.to_string()),
-            position_x: Set(node.position.x),
-            position_y: Set(node.position.y),
-            source_position: Set(None),
-            target_position: Set(None),
-            metadata_json: Set(metadata_json),
-            config_json: Set(node.config.clone()),
-            created_at: Set(Utc::now()),
-            updated_at: Set(Utc::now()),
+        let request = PlanDagNodeRequest {
+            node_type,
+            position,
+            metadata: metadata_value,
+            config: config_value,
         };
 
-        let inserted_node = dag_node
-            .insert(&context.db)
+        let created = context
+            .app
+            .create_plan_dag_node(project_id, request)
             .await
-            .map_err(|e| StructuredError::database("plan_dag_nodes::Entity::insert", e))?;
-        let result_node = PlanDagNode::from(inserted_node.clone());
+            .map_err(|e| StructuredError::service("AppContext::create_plan_dag_node", e))?;
 
-        // Generate JSON Patch delta for node addition
-        let patch_op = plan_dag_delta::generate_node_add_patch(&result_node, node_index);
-
-        // Increment plan version
-        let new_version = plan_dag_delta::increment_plan_version(&context.db, plan.id)
-            .await
-            .map_err(|e| StructuredError::service("plan_dag_delta::increment_plan_version", e))?;
-
-        // Broadcast delta event
-        let user_id = "demo_user".to_string(); // TODO: Get from auth context
-        plan_dag_delta::publish_plan_dag_delta(project_id, new_version, user_id, vec![patch_op])
-            .await
-            .ok(); // Non-fatal if broadcast fails
-
-        // TODO: Trigger pipeline execution if node is configured
-        // Will be implemented after Phase 2 completion
-        // if should_execute_node(&inserted_node) {
-        //     trigger_async_execution(context.db.clone(), project_id, result_node.id.clone());
-        // }
-
-        Ok(Some(result_node))
+        Ok(Some(created))
     }
 
     /// Update a Plan DAG node
@@ -605,186 +517,42 @@ impl Mutation {
     ) -> Result<Option<PlanDagNode>> {
         let context = ctx.data::<GraphQLContext>()?;
 
-        // Find or create a plan for this project
-        let plan = match plans::Entity::find()
-            .filter(plans::Column::ProjectId.eq(project_id))
-            .one(&context.db)
-            .await
-            .map_err(|e| StructuredError::database("plans::Entity::find (ProjectId)", e))?
-        {
-            Some(plan) => plan,
-            None => {
-                // Auto-create a plan if one doesn't exist
-                let now = chrono::Utc::now();
-                let new_plan = plans::ActiveModel {
-                    id: sea_orm::ActiveValue::NotSet,
-                    project_id: Set(project_id),
-                    name: Set(format!("Plan for Project {}", project_id)),
-                    yaml_content: Set("".to_string()),
-                    dependencies: Set(None),
-                    status: Set("draft".to_string()),
-                    version: Set(1),
-                    created_at: Set(now),
-                    updated_at: Set(now),
-                };
-                new_plan
-                    .insert(&context.db)
-                    .await
-                    .map_err(|e| StructuredError::database("plans::Entity::insert", e))?
-            }
+        let PlanDagNodeUpdateInput {
+            position,
+            metadata,
+            config,
+        } = updates;
+
+        let metadata_value = if let Some(metadata) = metadata {
+            Some(
+                serde_json::to_value(metadata)
+                    .map_err(|e| StructuredError::bad_request(format!("Invalid node metadata: {}", e)))?,
+            )
+        } else {
+            None
         };
 
-        // Fetch current state for delta generation
-        let (current_nodes, _) = plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id)
+        let config_value = if let Some(config) = config {
+            Some(serde_json::from_str::<Value>(&config).map_err(|e| {
+                StructuredError::bad_request(format!("Invalid node configuration JSON: {}", e))
+            })?)
+        } else {
+            None
+        };
+
+        let request = PlanDagNodeUpdateRequest {
+            position,
+            metadata: metadata_value,
+            config: config_value,
+        };
+
+        let updated = context
+            .app
+            .update_plan_dag_node(project_id, node_id, request)
             .await
-            .map_err(|e| StructuredError::service("plan_dag_delta::fetch_current_plan_dag", e))?;
+            .map_err(|e| StructuredError::service("AppContext::update_plan_dag_node", e))?;
 
-        // Find the node
-        let node = plan_dag_nodes::Entity::find()
-            .filter(
-                plan_dag_nodes::Column::PlanId
-                    .eq(plan.id)
-                    .and(plan_dag_nodes::Column::Id.eq(&node_id)),
-            )
-            .one(&context.db)
-            .await
-            .map_err(|e| StructuredError::database("plan_dag_nodes::Entity::find", e))?
-            .ok_or_else(|| StructuredError::not_found("Plan DAG node", &node_id))?;
-
-        let node_type = node.node_type.clone();
-        let mut metadata_json_current = node.metadata_json.clone();
-
-        let mut node_active: plan_dag_nodes::ActiveModel = node.into();
-        let mut patch_ops = Vec::new();
-        let _config_updated = false;
-
-        // Update position if provided
-        if let Some(position) = updates.position {
-            node_active.position_x = Set(position.x);
-            node_active.position_y = Set(position.y);
-
-            // Generate position delta
-            patch_ops.extend(plan_dag_delta::generate_node_position_patch(
-                &node_id,
-                position.x,
-                position.y,
-                &current_nodes,
-            ));
-        }
-
-        // Update metadata if provided
-        if let Some(metadata) = updates.metadata {
-            let metadata_json_str = serde_json::to_string(&metadata).map_err(|e| {
-                StructuredError::bad_request(format!("Invalid node metadata: {}", e))
-            })?;
-            node_active.metadata_json = Set(metadata_json_str.clone());
-            metadata_json_current = metadata_json_str.clone();
-
-            // Generate metadata delta
-            if let Some(patch) = plan_dag_delta::generate_node_update_patch(
-                &node_id,
-                "metadata",
-                serde_json::from_str(&metadata_json_str).unwrap_or(serde_json::Value::Null),
-                &current_nodes,
-            ) {
-                patch_ops.push(patch);
-            }
-        }
-
-        // Update config if provided
-        if let Some(config) = updates.config {
-            // config_updated = true;
-            node_active.config_json = Set(config.clone());
-
-            // Generate config delta
-            if let Some(patch) = plan_dag_delta::generate_node_update_patch(
-                &node_id,
-                "config",
-                serde_json::from_str(&config).unwrap_or(serde_json::Value::Null),
-                &current_nodes,
-            ) {
-                patch_ops.push(patch);
-            }
-
-            if node_type == "DataSourceNode" {
-                if let Ok(config_value) = serde_json::from_str::<Value>(&config) {
-                    if let Some(data_source_id) =
-                        config_value.get("dataSourceId").and_then(|v| v.as_i64())
-                    {
-                        if let Some(data_source) =
-                            data_sources::Entity::find_by_id(data_source_id as i32)
-                                .one(&context.db)
-                                .await
-                                .map_err(|e| {
-                                    StructuredError::database("data_sources::Entity::find_by_id", e)
-                                })?
-                        {
-                            let mut metadata_obj =
-                                serde_json::from_str::<Value>(&metadata_json_current)
-                                    .ok()
-                                    .and_then(|value| value.as_object().cloned())
-                                    .unwrap_or_else(|| Map::new());
-
-                            let needs_update = match metadata_obj.get("label") {
-                                Some(Value::String(current_label))
-                                    if current_label == &data_source.name =>
-                                {
-                                    false
-                                }
-                                _ => true,
-                            };
-
-                            if needs_update {
-                                metadata_obj.insert(
-                                    "label".to_string(),
-                                    Value::String(data_source.name.clone()),
-                                );
-                                let metadata_value = Value::Object(metadata_obj);
-                                metadata_json_current = metadata_value.to_string();
-                                node_active.metadata_json = Set(metadata_json_current.clone());
-
-                                if let Some(patch) = plan_dag_delta::generate_node_update_patch(
-                                    &node_id,
-                                    "metadata",
-                                    serde_json::from_str(&metadata_json_current)
-                                        .unwrap_or(Value::Null),
-                                    &current_nodes,
-                                ) {
-                                    patch_ops.push(patch);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        node_active.updated_at = Set(Utc::now());
-        let updated_node = node_active
-            .update(&context.db)
-            .await
-            .map_err(|e| StructuredError::database("plan_dag_nodes::Entity::update", e))?;
-        let result_node = PlanDagNode::from(updated_node.clone());
-
-        // Increment plan version and broadcast delta
-        if !patch_ops.is_empty() {
-            let new_version = plan_dag_delta::increment_plan_version(&context.db, plan.id)
-                .await
-                .map_err(|e| {
-                    StructuredError::service("plan_dag_delta::increment_plan_version", e)
-                })?;
-            let user_id = "demo_user".to_string(); // TODO: Get from auth context
-            plan_dag_delta::publish_plan_dag_delta(project_id, new_version, user_id, patch_ops)
-                .await
-                .ok(); // Non-fatal if broadcast fails
-        }
-
-        // TODO: Trigger pipeline re-execution if config was updated
-        // if config_updated && should_execute_node(&updated_node) {
-        //     trigger_async_execution(context.db.clone(), project_id, result_node.id.clone());
-        // }
-
-        Ok(Some(result_node))
+        Ok(Some(updated))
     }
 
     /// Delete a Plan DAG node
@@ -796,80 +564,13 @@ impl Mutation {
     ) -> Result<Option<PlanDagNode>> {
         let context = ctx.data::<GraphQLContext>()?;
 
-        // Find the plan for this project
-        let plan = plans::Entity::find()
-            .filter(plans::Column::ProjectId.eq(project_id))
-            .one(&context.db)
+        let deleted = context
+            .app
+            .delete_plan_dag_node(project_id, node_id)
             .await
-            .map_err(|e| StructuredError::database("plans::Entity::find (ProjectId)", e))?
-            .ok_or_else(|| StructuredError::not_found("Plan for project", project_id))?;
+            .map_err(|e| StructuredError::service("AppContext::delete_plan_dag_node", e))?;
 
-        // Fetch current state for delta generation
-        let (current_nodes, current_edges) =
-            plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
-
-        // Generate delta for node deletion
-        let mut patch_ops = Vec::new();
-        if let Some(patch) = plan_dag_delta::generate_node_delete_patch(&node_id, &current_nodes) {
-            patch_ops.push(patch);
-        }
-
-        // Find and delete connected edges, generating deltas for each
-        let connected_edges: Vec<&PlanDagEdge> = current_edges
-            .iter()
-            .filter(|e| e.source == node_id || e.target == node_id)
-            .collect();
-
-        for edge in &connected_edges {
-            if let Some(patch) =
-                plan_dag_delta::generate_edge_delete_patch(&edge.id, &current_edges)
-            {
-                patch_ops.push(patch);
-            }
-        }
-
-        // Delete edges connected to this node first
-        plan_dag_edges::Entity::delete_many()
-            .filter(
-                plan_dag_edges::Column::PlanId.eq(plan.id).and(
-                    plan_dag_edges::Column::SourceNodeId
-                        .eq(&node_id)
-                        .or(plan_dag_edges::Column::TargetNodeId.eq(&node_id)),
-                ),
-            )
-            .exec(&context.db)
-            .await
-            .map_err(|e| StructuredError::database("plan_dag_edges::Entity::delete_many", e))?;
-
-        // Delete the node
-        let result = plan_dag_nodes::Entity::delete_many()
-            .filter(
-                plan_dag_nodes::Column::PlanId
-                    .eq(plan.id)
-                    .and(plan_dag_nodes::Column::Id.eq(&node_id)),
-            )
-            .exec(&context.db)
-            .await
-            .map_err(|e| StructuredError::database("plan_dag_nodes::Entity::delete_many", e))?;
-
-        if result.rows_affected > 0 {
-            // Increment plan version and broadcast delta
-            if !patch_ops.is_empty() {
-                let new_version = plan_dag_delta::increment_plan_version(&context.db, plan.id)
-                    .await
-                    .map_err(|e| {
-                        StructuredError::service("plan_dag_delta::increment_plan_version", e)
-                    })?;
-                let user_id = "demo_user".to_string(); // TODO: Get from auth context
-                plan_dag_delta::publish_plan_dag_delta(project_id, new_version, user_id, patch_ops)
-                    .await
-                    .ok(); // Non-fatal if broadcast fails
-            }
-
-            Ok(None)
-        } else {
-            Err(StructuredError::not_found("Plan DAG node", node_id))
-        }
+        Ok(Some(deleted))
     }
 
     /// Add a Plan DAG edge
@@ -881,77 +582,29 @@ impl Mutation {
     ) -> Result<Option<PlanDagEdge>> {
         let context = ctx.data::<GraphQLContext>()?;
 
-        // Find or create a plan for this project
-        let plan = match plans::Entity::find()
-            .filter(plans::Column::ProjectId.eq(project_id))
-            .one(&context.db)
-            .await?
-        {
-            Some(plan) => plan,
-            None => {
-                // Auto-create a plan if one doesn't exist
-                let now = chrono::Utc::now();
-                let new_plan = plans::ActiveModel {
-                    id: sea_orm::ActiveValue::NotSet,
-                    project_id: Set(project_id),
-                    name: Set(format!("Plan for Project {}", project_id)),
-                    yaml_content: Set("".to_string()),
-                    dependencies: Set(None),
-                    status: Set("draft".to_string()),
-                    version: Set(1),
-                    created_at: Set(now),
-                    updated_at: Set(now),
-                };
-                new_plan.insert(&context.db).await?
-            }
-        };
+        let PlanDagEdgeInput {
+            source,
+            target,
+            metadata,
+            ..
+        } = edge;
 
-        // Fetch current state to determine edge index
-        let (_, current_edges) = plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id)
-            .await
-            .map_err(|e| StructuredError::service("plan_dag_delta::fetch_current_plan_dag", e))?;
-        let edge_index = current_edges.len();
-
-        // Generate unique ID on backend - ignore frontend-provided ID
-        let generated_id = generate_edge_id(&edge.source, &edge.target);
-
-        let metadata_json = serde_json::to_string(&edge.metadata)
+        let metadata_value = serde_json::to_value(metadata)
             .map_err(|e| StructuredError::bad_request(format!("Invalid edge metadata: {}", e)))?;
 
-        let dag_edge = plan_dag_edges::ActiveModel {
-            id: Set(generated_id),
-            plan_id: Set(plan.id),
-            source_node_id: Set(edge.source.clone()),
-            target_node_id: Set(edge.target.clone()),
-            // Removed source_handle and target_handle for floating edges
-            metadata_json: Set(metadata_json),
-            created_at: Set(Utc::now()),
-            updated_at: Set(Utc::now()),
+        let request = PlanDagEdgeRequest {
+            source,
+            target,
+            metadata: metadata_value,
         };
 
-        let inserted_edge = dag_edge
-            .insert(&context.db)
+        let created = context
+            .app
+            .create_plan_dag_edge(project_id, request)
             .await
-            .map_err(|e| StructuredError::database("plan_dag_edges::Entity::insert", e))?;
-        let result_edge = PlanDagEdge::from(inserted_edge);
+            .map_err(|e| StructuredError::service("AppContext::create_plan_dag_edge", e))?;
 
-        // Generate JSON Patch delta for edge addition
-        let patch_op = plan_dag_delta::generate_edge_add_patch(&result_edge, edge_index);
-
-        // Increment plan version
-        let new_version = plan_dag_delta::increment_plan_version(&context.db, plan.id).await?;
-
-        // Broadcast delta event
-        let user_id = "demo_user".to_string(); // TODO: Get from auth context
-        plan_dag_delta::publish_plan_dag_delta(project_id, new_version, user_id, vec![patch_op])
-            .await
-            .ok(); // Non-fatal if broadcast fails
-
-        // TODO: Trigger pipeline execution for affected nodes (target and downstream)
-        // The target node needs to be recomputed because it has a new upstream dependency
-        // trigger_async_affected_execution(context.db.clone(), project_id, result_edge.target.clone());
-
-        Ok(Some(result_edge))
+        Ok(Some(created))
     }
 
     /// Delete a Plan DAG edge
@@ -963,63 +616,13 @@ impl Mutation {
     ) -> Result<Option<PlanDagEdge>> {
         let context = ctx.data::<GraphQLContext>()?;
 
-        // Find the plan for this project
-        let plan = plans::Entity::find()
-            .filter(plans::Column::ProjectId.eq(project_id))
-            .one(&context.db)
+        let deleted = context
+            .app
+            .delete_plan_dag_edge(project_id, edge_id)
             .await
-            .map_err(|e| StructuredError::database("plans::Entity::find (ProjectId)", e))?
-            .ok_or_else(|| StructuredError::not_found("Plan for project", project_id))?;
+            .map_err(|e| StructuredError::service("AppContext::delete_plan_dag_edge", e))?;
 
-        // Fetch current state for delta generation
-        let (_, current_edges) = plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id)
-            .await
-            .map_err(|e| StructuredError::service("plan_dag_delta::fetch_current_plan_dag", e))?;
-
-        // Find the edge to get its target node before deletion
-        let _deleted_edge_target = current_edges
-            .iter()
-            .find(|e| e.id == edge_id)
-            .map(|e| e.target.clone());
-
-        // Generate delta for edge deletion
-        let mut patch_ops = Vec::new();
-        if let Some(patch) = plan_dag_delta::generate_edge_delete_patch(&edge_id, &current_edges) {
-            patch_ops.push(patch);
-        }
-
-        // Delete the edge
-        let result = plan_dag_edges::Entity::delete_many()
-            .filter(
-                plan_dag_edges::Column::PlanId
-                    .eq(plan.id)
-                    .and(plan_dag_edges::Column::Id.eq(&edge_id)),
-            )
-            .exec(&context.db)
-            .await
-            .map_err(|e| StructuredError::database("plan_dag_edges::Entity::delete_many", e))?;
-
-        if result.rows_affected > 0 {
-            // Increment plan version and broadcast delta
-            if !patch_ops.is_empty() {
-                let new_version =
-                    plan_dag_delta::increment_plan_version(&context.db, plan.id).await?;
-                let user_id = "demo_user".to_string(); // TODO: Get from auth context
-                plan_dag_delta::publish_plan_dag_delta(project_id, new_version, user_id, patch_ops)
-                    .await
-                    .ok(); // Non-fatal if broadcast fails
-            }
-
-            // TODO: Trigger pipeline re-execution for affected nodes (target and downstream)
-            // The target node needs to be recomputed because it lost an upstream dependency
-            // if let Some(target_node_id) = deleted_edge_target {
-            //     trigger_async_affected_execution(context.db.clone(), project_id, target_node_id);
-            // }
-
-            Ok(None)
-        } else {
-            Err(StructuredError::not_found("Plan DAG edge", edge_id))
-        }
+        Ok(Some(deleted))
     }
 
     /// Update a Plan DAG edge
@@ -1032,45 +635,26 @@ impl Mutation {
     ) -> Result<Option<PlanDagEdge>> {
         let context = ctx.data::<GraphQLContext>()?;
 
-        // Find the plan for this project
-        let plan = plans::Entity::find()
-            .filter(plans::Column::ProjectId.eq(project_id))
-            .one(&context.db)
-            .await
-            .map_err(|e| StructuredError::database("plans::Entity::find (ProjectId)", e))?
-            .ok_or_else(|| StructuredError::not_found("Plan for project", project_id))?;
-
-        // Find the edge
-        let edge = plan_dag_edges::Entity::find()
-            .filter(
-                plan_dag_edges::Column::PlanId
-                    .eq(plan.id)
-                    .and(plan_dag_edges::Column::Id.eq(&edge_id)),
+        let metadata_value = if let Some(metadata) = updates.metadata {
+            Some(
+                serde_json::to_value(metadata)
+                    .map_err(|e| StructuredError::bad_request(format!("Invalid edge metadata: {}", e)))?,
             )
-            .one(&context.db)
+        } else {
+            None
+        };
+
+        let request = PlanDagEdgeUpdateRequest {
+            metadata: metadata_value,
+        };
+
+        let updated = context
+            .app
+            .update_plan_dag_edge(project_id, edge_id, request)
             .await
-            .map_err(|e| StructuredError::database("plan_dag_edges::Entity::find", e))?
-            .ok_or_else(|| StructuredError::not_found("Plan DAG edge", &edge_id))?;
+            .map_err(|e| StructuredError::service("AppContext::update_plan_dag_edge", e))?;
 
-        let mut edge_active: plan_dag_edges::ActiveModel = edge.into();
-
-        // Removed source_handle and target_handle updates for floating edges
-
-        // Update metadata if provided
-        if let Some(metadata) = updates.metadata {
-            let metadata_json = serde_json::to_string(&metadata).map_err(|e| {
-                StructuredError::bad_request(format!("Invalid edge metadata: {}", e))
-            })?;
-            edge_active.metadata_json = Set(metadata_json);
-        }
-
-        edge_active.updated_at = Set(Utc::now());
-        let updated_edge = edge_active
-            .update(&context.db)
-            .await
-            .map_err(|e| StructuredError::database("plan_dag_edges::Entity::update", e))?;
-
-        Ok(Some(PlanDagEdge::from(updated_edge)))
+        Ok(Some(updated))
     }
 
     /// Move a Plan DAG node (update position)
@@ -1081,14 +665,15 @@ impl Mutation {
         node_id: String,
         position: Position,
     ) -> Result<Option<PlanDagNode>> {
-        let updates = PlanDagNodeUpdateInput {
-            position: Some(position),
-            metadata: None,
-            config: None,
-        };
+        let context = ctx.data::<GraphQLContext>()?;
 
-        self.update_plan_dag_node(ctx, project_id, node_id, updates)
+        let moved = context
+            .app
+            .move_plan_dag_node(project_id, node_id, position)
             .await
+            .map_err(|e| StructuredError::service("AppContext::move_plan_dag_node", e))?;
+
+        Ok(Some(moved))
     }
 
     /// Batch move multiple nodes at once (optimized for layout operations)
@@ -1100,87 +685,23 @@ impl Mutation {
     ) -> Result<Vec<PlanDagNode>> {
         let context = ctx.data::<GraphQLContext>()?;
 
-        // Find or create a plan for this project
-        let plan = match plans::Entity::find()
-            .filter(plans::Column::ProjectId.eq(project_id))
-            .one(&context.db)
-            .await?
-        {
-            Some(plan) => plan,
-            None => {
-                let now = chrono::Utc::now();
-                let new_plan = plans::ActiveModel {
-                    id: sea_orm::ActiveValue::NotSet,
-                    project_id: Set(project_id),
-                    name: Set(format!("Plan for Project {}", project_id)),
-                    yaml_content: Set("".to_string()),
-                    dependencies: Set(None),
-                    status: Set("draft".to_string()),
-                    version: Set(1),
-                    created_at: Set(now),
-                    updated_at: Set(now),
-                };
-                new_plan.insert(&context.db).await?
-            }
-        };
+        let requests = node_positions
+            .into_iter()
+            .map(|node_pos| PlanDagNodePositionRequest {
+                node_id: node_pos.node_id,
+                position: node_pos.position,
+                source_position: node_pos.source_position,
+                target_position: node_pos.target_position,
+            })
+            .collect();
 
-        // Fetch current state once for all nodes
-        let (current_nodes, _) =
-            plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id).await?;
+        let moved = context
+            .app
+            .batch_move_plan_dag_nodes(project_id, requests)
+            .await
+            .map_err(|e| StructuredError::service("AppContext::batch_move_plan_dag_nodes", e))?;
 
-        let mut updated_nodes = Vec::new();
-        let mut all_patch_ops = Vec::new();
-
-        // Update all nodes
-        for node_pos in node_positions {
-            // Find the node
-            let node = plan_dag_nodes::Entity::find()
-                .filter(
-                    plan_dag_nodes::Column::PlanId
-                        .eq(plan.id)
-                        .and(plan_dag_nodes::Column::Id.eq(&node_pos.node_id)),
-                )
-                .one(&context.db)
-                .await?;
-
-            if let Some(node) = node {
-                let mut node_active: plan_dag_nodes::ActiveModel = node.clone().into();
-
-                // Update position
-                node_active.position_x = Set(node_pos.position.x);
-                node_active.position_y = Set(node_pos.position.y);
-                if let Some(source_pos) = node_pos.source_position.clone() {
-                    node_active.source_position = Set(Some(source_pos));
-                }
-                if let Some(target_pos) = node_pos.target_position.clone() {
-                    node_active.target_position = Set(Some(target_pos));
-                }
-                node_active.updated_at = Set(Utc::now());
-
-                // Save to database
-                let updated_node = node_active.update(&context.db).await?;
-
-                // Generate position delta
-                all_patch_ops.extend(plan_dag_delta::generate_node_position_patch(
-                    &node_pos.node_id,
-                    node_pos.position.x,
-                    node_pos.position.y,
-                    &current_nodes,
-                ));
-
-                updated_nodes.push(PlanDagNode::from(updated_node));
-            }
-        }
-
-        // Publish all deltas in a single batch
-        if !all_patch_ops.is_empty() {
-            let new_version = plan_dag_delta::increment_plan_version(&context.db, plan.id).await?;
-            let user_id = "demo_user".to_string(); // TODO: Get from auth context
-            plan_dag_delta::publish_plan_dag_delta(project_id, new_version, user_id, all_patch_ops)
-                .await?;
-        }
-
-        Ok(updated_nodes)
+        Ok(moved)
     }
 
     // Authentication Mutations

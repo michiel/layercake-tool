@@ -130,9 +130,9 @@
   - [x] Add an `AppContext::load_plan_dag` helper returning nodes/edges.  
   - [x] Wire GraphQL `getPlanDag` and a new MCP `get_plan_dag` tool to the helper; confirm serialized shapes match.
 
-- [ ] **Plan DAG mutations**  
-  - [ ] Wrap node/edge create/update/delete/move logic in shared functions (leveraging `PlanDagService`).  
-  - [ ] Migrate GraphQL DAG mutations and expose matching MCP tools; smoke-test both surfaces.
+- [x] **Plan DAG mutations**  
+  - [x] Wrap node/edge create/update/delete/move logic in shared functions (leveraging `PlanDagService`).  
+  - [x] Migrate GraphQL DAG mutations and expose matching MCP tools; smoke-test both surfaces.
 
 - [ ] **Prepare for Phase 3+**  
   - [ ] Document remaining gaps (graph editing, data sources, telemetry).  

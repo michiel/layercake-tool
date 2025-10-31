@@ -4,16 +4,25 @@ use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, Set,
 };
 
-use crate::database::entities::{plan_dag_edges, plan_dag_nodes, plans};
+use crate::database::entities::{data_sources, plan_dag_edges, plan_dag_nodes, plans};
 use crate::graphql::mutations::plan_dag_delta;
 use crate::graphql::types::{PlanDagEdge, PlanDagNode, Position};
 use crate::services::ValidationService;
+use serde_json::{Map, Value};
 
 /// Service layer for Plan DAG operations
 /// Separates business logic from GraphQL mutation layer
 #[derive(Clone)]
 pub struct PlanDagService {
     db: DatabaseConnection,
+}
+
+#[derive(Clone)]
+pub struct PlanDagNodePositionUpdate {
+    pub node_id: String,
+    pub position: Position,
+    pub source_position: Option<String>,
+    pub target_position: Option<String>,
 }
 
 impl PlanDagService {
@@ -148,6 +157,9 @@ impl PlanDagService {
             .map_err(|e| anyhow!("Database error: {}", e))?
             .ok_or_else(|| anyhow!("Node not found"))?;
 
+        let node_type = node.node_type.clone();
+        let mut metadata_json_current = node.metadata_json.clone();
+
         let mut node_active: plan_dag_nodes::ActiveModel = node.into();
         let mut patch_ops = Vec::new();
 
@@ -167,6 +179,7 @@ impl PlanDagService {
         // Update metadata if provided
         if let Some(metadata) = &metadata_json {
             node_active.metadata_json = Set(metadata.clone());
+            metadata_json_current = metadata.clone();
 
             if let Some(patch) = plan_dag_delta::generate_node_update_patch(
                 &node_id,
@@ -189,6 +202,59 @@ impl PlanDagService {
                 &current_nodes,
             ) {
                 patch_ops.push(patch);
+            }
+
+            if node_type == "DataSourceNode" {
+                if let Ok(config_value) = serde_json::from_str::<Value>(config) {
+                    if let Some(data_source_id) =
+                        config_value.get("dataSourceId").and_then(|v| v.as_i64())
+                    {
+                        if let Some(data_source) = data_sources::Entity::find_by_id(
+                            data_source_id as i32,
+                        )
+                        .one(&self.db)
+                        .await
+                        .map_err(|e| anyhow!("Failed to load data source {}: {}", data_source_id, e))?
+                        {
+                            let mut metadata_obj = serde_json::from_str::<Value>(
+                                &metadata_json_current,
+                            )
+                            .ok()
+                            .and_then(|value| value.as_object().cloned())
+                            .unwrap_or_else(Map::new);
+
+                            let needs_update = match metadata_obj.get("label") {
+                                Some(Value::String(current_label))
+                                    if current_label == &data_source.name =>
+                                {
+                                    false
+                                }
+                                _ => true,
+                            };
+
+                            if needs_update {
+                                metadata_obj.insert(
+                                    "label".to_string(),
+                                    Value::String(data_source.name.clone()),
+                                );
+                                let metadata_value = Value::Object(metadata_obj);
+                                let metadata_json = metadata_value.to_string();
+                                node_active.metadata_json = Set(metadata_json.clone());
+
+                                if let Some(patch) =
+                                    plan_dag_delta::generate_node_update_patch(
+                                        &node_id,
+                                        "metadata",
+                                        metadata_value,
+                                        &current_nodes,
+                                    )
+                                {
+                                    patch_ops.push(patch);
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -475,6 +541,134 @@ impl PlanDagService {
             .map_err(|e| anyhow!("Database error: {}", e))?;
 
         Ok(edges.into_iter().map(PlanDagEdge::from).collect())
+    }
+
+    /// Update metadata for a Plan DAG edge
+    pub async fn update_edge(
+        &self,
+        project_id: i32,
+        edge_id: String,
+        metadata_json: Option<String>,
+    ) -> Result<PlanDagEdge> {
+        let plan = self.get_or_create_plan(project_id).await?;
+
+        let (_, current_edges) = plan_dag_delta::fetch_current_plan_dag(&self.db, plan.id)
+            .await
+            .map_err(|e| anyhow!("Failed to fetch current state: {}", e))?;
+
+        let edge = plan_dag_edges::Entity::find()
+            .filter(
+                plan_dag_edges::Column::PlanId
+                    .eq(plan.id)
+                    .and(plan_dag_edges::Column::Id.eq(&edge_id)),
+            )
+            .one(&self.db)
+            .await
+            .map_err(|e| anyhow!("Database error: {}", e))?
+            .ok_or_else(|| anyhow!("Edge not found"))?;
+
+        let mut edge_active: plan_dag_edges::ActiveModel = edge.into();
+        let mut patch_ops = Vec::new();
+
+        if let Some(metadata) = metadata_json {
+            edge_active.metadata_json = Set(metadata.clone());
+
+            if let Some(patch) = plan_dag_delta::generate_edge_update_patch(
+                &edge_id,
+                serde_json::from_str(&metadata).unwrap_or(serde_json::Value::Null),
+                &current_edges,
+            ) {
+                patch_ops.push(patch);
+            }
+        }
+
+        edge_active.updated_at = Set(Utc::now());
+        let updated_edge = edge_active
+            .update(&self.db)
+            .await
+            .map_err(|e| anyhow!("Failed to update edge: {}", e))?;
+
+        let result_edge = PlanDagEdge::from(updated_edge);
+
+        if !patch_ops.is_empty() {
+            let new_version = plan_dag_delta::increment_plan_version(&self.db, plan.id)
+                .await
+                .map_err(|e| anyhow!("Failed to increment version: {}", e))?;
+
+            let user_id = "demo_user".to_string(); // TODO: Get from auth context
+            plan_dag_delta::publish_plan_dag_delta(project_id, new_version, user_id, patch_ops)
+                .await
+                .ok();
+        }
+
+        Ok(result_edge)
+    }
+
+    /// Batch move nodes with delta publication
+    pub async fn batch_move_nodes(
+        &self,
+        project_id: i32,
+        node_positions: Vec<PlanDagNodePositionUpdate>,
+    ) -> Result<Vec<PlanDagNode>> {
+        if node_positions.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let plan = self.get_or_create_plan(project_id).await?;
+
+        let (current_nodes, _) = plan_dag_delta::fetch_current_plan_dag(&self.db, plan.id)
+            .await
+            .map_err(|e| anyhow!("Failed to fetch current state: {}", e))?;
+
+        let mut updated_nodes = Vec::new();
+        let mut all_patch_ops = Vec::new();
+
+        for node_pos in node_positions {
+            let node = plan_dag_nodes::Entity::find()
+                .filter(
+                    plan_dag_nodes::Column::PlanId
+                        .eq(plan.id)
+                        .and(plan_dag_nodes::Column::Id.eq(&node_pos.node_id)),
+                )
+                .one(&self.db)
+                .await
+                .map_err(|e| anyhow!("Database error: {}", e))?;
+
+            if let Some(node) = node {
+                let mut node_active: plan_dag_nodes::ActiveModel = node.into();
+                node_active.position_x = Set(node_pos.position.x);
+                node_active.position_y = Set(node_pos.position.y);
+                node_active.source_position = Set(node_pos.source_position.clone());
+                node_active.target_position = Set(node_pos.target_position.clone());
+                node_active.updated_at = Set(Utc::now());
+
+                let updated_node = node_active
+                    .update(&self.db)
+                    .await
+                    .map_err(|e| anyhow!("Failed to update node: {}", e))?;
+
+                all_patch_ops.extend(plan_dag_delta::generate_node_position_patch(
+                    &node_pos.node_id,
+                    node_pos.position.x,
+                    node_pos.position.y,
+                    &current_nodes,
+                ));
+
+                updated_nodes.push(PlanDagNode::from(updated_node));
+            }
+        }
+
+        if !all_patch_ops.is_empty() {
+            let new_version = plan_dag_delta::increment_plan_version(&self.db, plan.id)
+                .await
+                .map_err(|e| anyhow!("Failed to increment version: {}", e))?;
+            let user_id = "demo_user".to_string(); // TODO: Get from auth context
+            plan_dag_delta::publish_plan_dag_delta(project_id, new_version, user_id, all_patch_ops)
+                .await
+                .ok();
+        }
+
+        Ok(updated_nodes)
     }
 }
 
