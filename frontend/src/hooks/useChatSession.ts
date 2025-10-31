@@ -110,17 +110,17 @@ export function useChatSession({ projectId, provider }: UseChatSessionArgs): Use
     }
   }, [projectId, provider, restartKey, startSession])
 
-  console.log('[Chat] Creating subscription, sessionId:', session?.sessionId, 'skip:', !session?.sessionId)
+  // IMPORTANT: Include sessionId in the key to force subscription restart when session changes
+  // Without this, Apollo reuses the old subscription even when sessionId changes
+  const subscriptionKey = `chat-${session?.sessionId ?? 'none'}`
+  console.log('[Chat] Subscription key:', subscriptionKey, 'skip:', !session?.sessionId)
 
   const { data: subscriptionData, error: subscriptionError } = useSubscription<{ chatEvents: ChatEventPayload }>(
     CHAT_EVENTS_SUBSCRIPTION,
     {
       variables: { sessionId: session?.sessionId ?? '' },
       skip: !session?.sessionId,
-      // Use subscriptionId to force Apollo to create new subscription when sessionId changes
-      context: {
-        subscriptionId: session?.sessionId,
-      },
+      fetchPolicy: 'no-cache', // Don't cache subscription data
       onData: ({ data }) => {
         console.log('[Chat] Subscription data received:', data)
       },

@@ -17,20 +17,22 @@ const GET_PROJECT = gql`
   }
 `
 
-export const ProjectChatPage = () => {
-  const { projectId } = useParams<{ projectId: string }>()
-  const numericProjectId = projectId ? parseInt(projectId, 10) : NaN
-
-  const [provider, setProvider] = useState<ChatProviderOption>('Ollama')
+// Inner component that uses the chat session
+// The key prop on this component forces it to remount when sessionId changes,
+// which recreates the subscription hook with the new sessionId
+const ChatInterface = ({
+  projectId,
+  provider,
+  project,
+  onProviderChange,
+}: {
+  projectId: number | undefined
+  provider: ChatProviderOption
+  project: any
+  onProviderChange: (provider: ChatProviderOption) => void
+}) => {
   const [input, setInput] = useState('')
-
-  const { data: projectData } = useQuery(GET_PROJECT, {
-    variables: { id: numericProjectId },
-    skip: !Number.isFinite(numericProjectId),
-  })
-  const project = useMemo(() => (projectData as any)?.project ?? null, [projectData])
-
-  const chat = useChatSession({ projectId: Number.isFinite(numericProjectId) ? numericProjectId : undefined, provider })
+  const chat = useChatSession({ projectId, provider })
 
   // auto-scroll on new messages
   const viewportRef = useRef<HTMLDivElement | null>(null)
@@ -72,7 +74,7 @@ export const ProjectChatPage = () => {
         <div>
           <Title order={2}>Project Chat</Title>
           <Text c="dimmed" size="sm">
-            {project ? `Discuss project “${project.name}” with tool-assisted insights.` : 'Start a conversation powered by Layercake tools.'}
+            {project ? `Discuss project "${project.name}" with tool-assisted insights.` : 'Start a conversation powered by Layercake tools.'}
           </Text>
         </div>
         <Group gap="sm">
@@ -82,7 +84,7 @@ export const ProjectChatPage = () => {
             value={provider}
             onChange={(value) => {
               if (value) {
-                setProvider(value as ChatProviderOption)
+                onProviderChange(value as ChatProviderOption)
               }
             }}
             styles={{ root: { minWidth: 200 } }}
@@ -174,5 +176,38 @@ export const ProjectChatPage = () => {
         </Group>
       </Stack>
     </Stack>
+  )
+}
+
+// Outer component that manages provider state
+export const ProjectChatPage = () => {
+  const { projectId } = useParams<{ projectId: string }>()
+  const numericProjectId = projectId ? parseInt(projectId, 10) : NaN
+
+  const [provider, setProvider] = useState<ChatProviderOption>('Gemini')
+
+  const { data: projectData } = useQuery(GET_PROJECT, {
+    variables: { id: numericProjectId },
+    skip: !Number.isFinite(numericProjectId),
+  })
+  const project = useMemo(() => (projectData as any)?.project ?? null, [projectData])
+
+  // Use a combination of provider and timestamp as key to force remount on provider change
+  // This ensures the ChatInterface (and its useChat session hook) completely remounts,
+  // creating a fresh subscription with the new sessionId
+  const [mountKey, setMountKey] = useState(0)
+  const handleProviderChange = (newProvider: ChatProviderOption) => {
+    setProvider(newProvider)
+    setMountKey(prev => prev + 1) // Force remount
+  }
+
+  return (
+    <ChatInterface
+      key={`${provider}-${mountKey}`}
+      projectId={Number.isFinite(numericProjectId) ? numericProjectId : undefined}
+      provider={provider}
+      project={project}
+      onProviderChange={handleProviderChange}
+    />
   )
 }
