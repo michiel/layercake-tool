@@ -345,15 +345,18 @@ async fn handle_graphql_ws(
                                 if let Ok(request) = serde_json::from_value::<async_graphql::Request>(
                                     query_payload.clone(),
                                 ) {
+                                    tracing::info!("Executing GraphQL subscription for id: {}", id);
                                     let mut response_stream = schema.execute_stream(request);
 
                                     // Send subscription responses as they arrive
                                     while let Some(response) = response_stream.next().await {
+                                        tracing::info!("Subscription {} received event: {:?}", id, response);
                                         let next_msg = serde_json::json!({
                                             "id": id,
                                             "type": "next",
                                             "payload": response
                                         });
+                                        tracing::debug!("Sending next message: {:?}", next_msg);
                                         if sink
                                             .send(axum::extract::ws::Message::Text(
                                                 next_msg.to_string().into(),
@@ -361,9 +364,12 @@ async fn handle_graphql_ws(
                                             .await
                                             .is_err()
                                         {
+                                            tracing::error!("Failed to send subscription response for id: {}", id);
                                             return;
                                         }
+                                        tracing::info!("Successfully sent subscription event for id: {}", id);
                                     }
+                                    tracing::info!("Subscription stream ended for id: {}", id);
 
                                     // Send complete when subscription ends
                                     let complete_msg =
