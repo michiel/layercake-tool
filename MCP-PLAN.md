@@ -13,7 +13,7 @@
 ## Guiding Principles
 
 - **Primary audience**: MCP endpoints target external/agent integrations. Prioritise plan execution and graph manipulation features agents require; defer UI-centric collaboration/chat features to Phase 7.  
-- **Security**: Enforce API-key authentication for MCP (see `layercake-core/src/mcp/server.rs`) and document the expected headers; session reuse is out of scope.  
+- **Security**: MCP tooling is available both inside the built-in chat UI and over HTTP. Require API-key authentication for HTTP exposure only (see `layercake-core/src/mcp/server.rs`), while allowing trusted, in-process chat usage without keys. Document `Authorization: Bearer …` expectations for external clients.  
 - **Realtime scope**: Subscription-style updates are not a near-term requirement. Prefer polling/batch responses for execution status until priorities shift.  
 - **Serialization**: Treat GraphQL schemas as the canonical contract. MCP tool responses should match GraphQL field names (PascalCase types, camelCase fields) by reusing shared serializers wherever possible.
 
@@ -76,7 +76,7 @@
 - Introduce a `SharedGraphqlBridge` module that exposes reusable helpers from `layercake-core/src/graphql/context.rs` (project, plan, graph services).  
 - Refactor MCP tool implementations to accept a lightweight context (DB + services) instead of reimplementing queries.  
 - Replace placeholder resource payloads in `layercake-core/src/mcp/resources.rs` with real data fetched via `ProjectService`, `PlanDagService`, and `GraphService::build_graph_from_dag_graph`. Ensure responses serialise to camelCase by leveraging GraphQL DTO structs (`layercake-core/src/graphql/types`).  
-- Harden API-key enforcement by documenting required headers (`Authorization: Bearer ...`) and ensuring every tool invocation passes through `LayercakeAuth::authenticate`.
+- Harden API-key enforcement on HTTP entry points by documenting required headers (`Authorization: Bearer ...`) and ensuring external requests pass through `LayercakeAuth::authenticate`, while privileged chat invocations reuse the trusted security context.
 
 ### Phase 2 – Project & Plan Enhancements
 - Map GraphQL mutation inputs (e.g., `UpdateProjectInput`, `PlanDagNodeInput`) into serde structs shared with MCP. Consider a new crate module `shared::dto` consumed by both resolvers and tools.  
