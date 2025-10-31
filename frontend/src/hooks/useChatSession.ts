@@ -117,7 +117,10 @@ export function useChatSession({ projectId, provider }: UseChatSessionArgs): Use
     {
       variables: { sessionId: session?.sessionId ?? '' },
       skip: !session?.sessionId,
-      shouldResubscribe: true, // Force resubscribe when variables change
+      // Use subscriptionId to force Apollo to create new subscription when sessionId changes
+      context: {
+        subscriptionId: session?.sessionId,
+      },
       onData: ({ data }) => {
         console.log('[Chat] Subscription data received:', data)
       },
