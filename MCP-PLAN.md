@@ -92,9 +92,10 @@
 - [x] Provide export preview helpers that reuse `ExportService::export_to_string`, with optional pagination limits configurable per consumer (GraphQL, MCP, console).
 
 ### Phase 4 – Data Source & Library Integration
-- Extract shared upload/reprocess logic from `graphql/mutations/mod.rs` into `services::data_source_service`/`library_source_service` helpers that accept raw content so MCP tools and console scripts can call them directly.  
-- Implement resource URIs for data source downloads pointing to `layercake://datasources/{id}/raw|json`, reusing the same serializer as GraphQL download queries.  
-- Document expected MIME types and size limits for agent uploads to avoid blocking the MCP runtime, and reference the same guidance in console docs.
+- [x] Extract shared upload/reprocess logic into `AppContext` so GraphQL and MCP reuse the same helpers for create/update/reprocess flows.
+- [x] Add MCP data source tools and `layercake://datasources/...` resources that return the same JSON payloads as GraphQL.
+  - Covered by the extended parity smoke test in `layercake-core/tests/parity_smoke_test.rs`.
+- [ ] Document expected MIME types and size limits for agent uploads in the MCP and console docs.
 
 ### Phase 5 – Telemetry & Execution Visibility
 - Leverage shared helpers over the `execution_state` tables so plan progress is exposed via GraphQL queries, MCP resources, and console reports alike.  
@@ -112,8 +113,7 @@
   - Shared helpers cover updates/bulk edits/replay only; creation and deletion flows still instantiate `GraphService` directly inside mutations. Plan follow-up to expose `AppContext::add_graph_node`, `add_graph_edge`, and delete helpers so MCP parity can extend to structural changes.
   - No event streaming yet for graph edit playback. Telemetry work (Phase 5) should introduce a shared publisher so MCP/console can subscribe or poll for edit progress.
 - **Data Sources**
-  - Upload/reprocess/download paths are still GraphQL-only. Phase 4 must move `DataSourceService`/`LibrarySourceService` entry points into `AppContext` and surface MCP tools/resources.
-  - `layercake://datasources/...` URIs still return placeholder content; update once shared DTOs are available.
+  - Document remaining upload limits + MIME guidance for agents (Phase 4 follow-up).
 - **Telemetry**
   - Execution status remains tied to GraphQL subscriptions. Need shared polling helpers plus MCP resource endpoints (Phase 5) to surface execution state snapshots.
   - CI lacks cross-surface smoke tests verifying shared helpers; roll into the remaining “Prepare for Phase 3+” checklist item.

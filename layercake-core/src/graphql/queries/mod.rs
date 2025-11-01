@@ -61,7 +61,11 @@ impl Query {
     /// Get a specific plan by ID
     async fn plan(&self, ctx: &Context<'_>, id: i32) -> Result<Option<Plan>> {
         let context = ctx.data::<GraphQLContext>()?;
-        let plan = plans::Entity::find_by_id(id).one(&context.db).await?;
+        let plan = context
+            .app
+            .get_plan(id)
+            .await
+            .map_err(|e| StructuredError::service("AppContext::get_plan", e))?;
 
         Ok(plan.map(Plan::from))
     }
@@ -377,28 +381,29 @@ impl Query {
     /// Get DataSource by ID
     async fn data_source(&self, ctx: &Context<'_>, id: i32) -> Result<Option<DataSource>> {
         let context = ctx.data::<GraphQLContext>()?;
-        let data_source = data_sources::Entity::find_by_id(id)
-            .one(&context.db)
-            .await?;
+        let summary = context
+            .app
+            .get_data_source(id)
+            .await
+            .map_err(|e| StructuredError::service("AppContext::get_data_source", e))?;
 
-        Ok(data_source.map(DataSource::from))
+        Ok(summary.map(DataSource::from))
     }
 
     /// Get all DataSources for a project
     async fn data_sources(&self, ctx: &Context<'_>, project_id: i32) -> Result<Vec<DataSource>> {
         let context = ctx.data::<GraphQLContext>()?;
-        let data_sources_list = data_sources::Entity::find()
-            .filter(data_sources::Column::ProjectId.eq(project_id))
-            .all(&context.db)
-            .await?;
+        let summaries = context
+            .app
+            .list_data_sources(project_id)
+            .await
+            .map_err(|e| StructuredError::service("AppContext::list_data_sources", e))?;
 
-        Ok(data_sources_list
-            .into_iter()
-            .map(DataSource::from)
-            .collect())
+        Ok(summaries.into_iter().map(DataSource::from).collect())
     }
 
     /// Get all library sources
+
     async fn library_sources(&self, ctx: &Context<'_>) -> Result<Vec<LibrarySource>> {
         let context = ctx.data::<GraphQLContext>()?;
         let sources = library_sources::Entity::find().all(&context.db).await?;
@@ -442,18 +447,20 @@ impl Query {
         project_id: i32,
     ) -> Result<Vec<DataSourceReference>> {
         let context = ctx.data::<GraphQLContext>()?;
-        let data_sources_list = data_sources::Entity::find()
-            .filter(data_sources::Column::ProjectId.eq(project_id))
-            .all(&context.db)
-            .await?;
+        let summaries = context
+            .app
+            .available_data_sources(project_id)
+            .await
+            .map_err(|e| StructuredError::service("AppContext::available_data_sources", e))?;
 
-        Ok(data_sources_list
+        Ok(summaries
             .into_iter()
             .map(DataSourceReference::from)
             .collect())
     }
 
     /// Generate download URL for raw DataSource file
+
     async fn download_data_source_raw(&self, ctx: &Context<'_>, id: i32) -> Result<String> {
         let context = ctx.data::<GraphQLContext>()?;
         let _data_source = data_sources::Entity::find_by_id(id)

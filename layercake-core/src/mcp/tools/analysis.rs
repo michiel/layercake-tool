@@ -81,10 +81,7 @@ pub async fn analyze_connectivity(
     }))
 }
 
-pub async fn find_paths(
-    arguments: Option<Value>,
-    app: &AppContext,
-) -> McpResult<ToolsCallResult> {
+pub async fn find_paths(arguments: Option<Value>, app: &AppContext) -> McpResult<ToolsCallResult> {
     let graph_id = get_required_param(&arguments, "graph_id")?
         .as_i64()
         .ok_or_else(|| McpError::Validation {
@@ -111,7 +108,12 @@ pub async fn find_paths(
         .max(1) as usize;
 
     let paths = app
-        .find_graph_paths(graph_id, source_node.clone(), target_node.clone(), max_paths)
+        .find_graph_paths(
+            graph_id,
+            source_node.clone(),
+            target_node.clone(),
+            max_paths,
+        )
         .await
         .map_err(|e| McpError::Internal {
             message: format!("Failed to find graph paths: {}", e),

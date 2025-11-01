@@ -1,10 +1,10 @@
 //! Plan DAG manipulation tools for MCP clients.
 
+use crate::app_context::AppContext;
 use crate::app_context::{
     PlanDagEdgeRequest, PlanDagEdgeUpdateRequest, PlanDagNodePositionRequest, PlanDagNodeRequest,
     PlanDagNodeUpdateRequest,
 };
-use crate::app_context::AppContext;
 use crate::graphql::types::plan_dag::{PlanDagNodeType, Position};
 use crate::mcp::tools::{create_success_response, get_optional_param, get_required_param};
 use axum_mcp::prelude::*;
@@ -40,7 +40,8 @@ pub fn get_plan_dag_tools() -> Vec<Tool> {
         },
         Tool {
             name: "update_plan_dag_node".to_string(),
-            description: "Update position, metadata, or config for an existing Plan DAG node".to_string(),
+            description: "Update position, metadata, or config for an existing Plan DAG node"
+                .to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -485,16 +486,18 @@ fn parse_node_type(value: &str) -> McpResult<PlanDagNodeType> {
 }
 
 fn parse_position(value: &Value) -> McpResult<Position> {
-    let x = value.get("x").and_then(Value::as_f64).ok_or_else(|| {
-        McpError::Validation {
+    let x = value
+        .get("x")
+        .and_then(Value::as_f64)
+        .ok_or_else(|| McpError::Validation {
             message: "position.x must be a number".to_string(),
-        }
-    })?;
-    let y = value.get("y").and_then(Value::as_f64).ok_or_else(|| {
-        McpError::Validation {
+        })?;
+    let y = value
+        .get("y")
+        .and_then(Value::as_f64)
+        .ok_or_else(|| McpError::Validation {
             message: "position.y must be a number".to_string(),
-        }
-    })?;
+        })?;
 
     Ok(Position { x, y })
 }

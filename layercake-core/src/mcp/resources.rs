@@ -2,13 +2,13 @@
 
 use crate::app_context::AppContext;
 use crate::database::entities::graphs;
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 use axum_mcp::prelude::*;
 use axum_mcp::protocol::ToolContent;
 use axum_mcp::server::resource::{
     Resource, ResourceContent, ResourceRegistry, ResourceSubscription, ResourceTemplate,
     UriSchemeConfig,
 };
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 use serde_json::json;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -31,6 +31,7 @@ impl LayercakeResourceRegistry {
             "graph".to_string(),
             "export".to_string(),
             "analysis".to_string(),
+            "datasource".to_string(),
         ]);
 
         Self { scheme_config, app }
@@ -62,6 +63,135 @@ impl LayercakeResourceRegistry {
                 let mut meta = HashMap::new();
                 meta.insert("project_id".to_string(), json!(project_id));
                 meta.insert("resource_type".to_string(), json!("project"));
+                meta
+            },
+        })
+    }
+    async fn get_data_source_resource(&self, data_source_id: i32) -> McpResult<Resource> {
+        let data_source = self
+            .app
+            .get_data_source(data_source_id)
+            .await
+            .map_err(|e| McpError::Internal {
+                message: format!("Failed to load data source: {}", e),
+            })?
+            .ok_or_else(|| McpError::ResourceNotFound {
+                uri: format!("layercake://datasources/{}", data_source_id),
+            })?;
+
+        let content =
+            serde_json::to_string_pretty(&data_source).map_err(|e| McpError::Internal {
+                message: format!("Failed to serialize data source: {}", e),
+            })?;
+
+        Ok(Resource {
+            uri: format!("layercake://datasources/{}", data_source_id),
+            name: format!("Data Source {}", data_source_id),
+            description: Some("Layercake data source metadata".to_string()),
+            mime_type: Some("application/json".to_string()),
+            content: ResourceContent::Text { text: content },
+            metadata: {
+                let mut meta = HashMap::new();
+                meta.insert("data_source_id".to_string(), json!(data_source_id));
+                meta.insert("project_id".to_string(), json!(data_source.project_id));
+                meta.insert("resource_type".to_string(), json!("datasource"));
+                meta
+            },
+        })
+    }
+
+    async fn get_project_data_sources_resource(&self, project_id: i32) -> McpResult<Resource> {
+        let data_sources =
+            self.app
+                .list_data_sources(project_id)
+                .await
+                .map_err(|e| McpError::Internal {
+                    message: format!("Failed to list data sources: {}", e),
+                })?;
+
+        let content = serde_json::to_string_pretty(&json!({
+            "projectId": project_id,
+            "count": data_sources.len(),
+            "dataSources": data_sources,
+        }))
+        .map_err(|e| McpError::Internal {
+            message: format!("Failed to serialize data source list: {}", e),
+        })?;
+
+        Ok(Resource {
+            uri: format!("layercake://projects/{}/datasources", project_id),
+            name: format!("Project {} Data Sources", project_id),
+            description: Some("List of data sources for the project".to_string()),
+            mime_type: Some("application/json".to_string()),
+            content: ResourceContent::Text { text: content },
+            metadata: {
+                let mut meta = HashMap::new();
+                meta.insert("project_id".to_string(), json!(project_id));
+                meta.insert("resource_type".to_string(), json!("datasource"));
+                meta
+            },
+        })
+    }
+
+    async fn get_plan_resource(&self, plan_id: i32) -> McpResult<Resource> {
+        let plan = self
+            .app
+            .get_plan(plan_id)
+            .await
+            .map_err(|e| McpError::Internal {
+                message: format!("Failed to load plan: {}", e),
+            })?
+            .ok_or_else(|| McpError::ResourceNotFound {
+                uri: format!("layercake://plans/{}", plan_id),
+            })?;
+
+        let content = serde_json::to_string_pretty(&plan).map_err(|e| McpError::Internal {
+            message: format!("Failed to serialize plan: {}", e),
+        })?;
+
+        Ok(Resource {
+            uri: format!("layercake://plans/{}", plan_id),
+            name: format!("Plan {}", plan.name),
+            description: Some("Layercake plan summary and configuration".to_string()),
+            mime_type: Some("application/json".to_string()),
+            content: ResourceContent::Text { text: content },
+            metadata: {
+                let mut meta = HashMap::new();
+                meta.insert("plan_id".to_string(), json!(plan.id));
+                meta.insert("project_id".to_string(), json!(plan.project_id));
+                meta.insert("resource_type".to_string(), json!("plan"));
+                meta
+            },
+        })
+    }
+
+    async fn get_project_plan_resource(&self, project_id: i32) -> McpResult<Resource> {
+        let plan = self
+            .app
+            .get_plan_for_project(project_id)
+            .await
+            .map_err(|e| McpError::Internal {
+                message: format!("Failed to load plan for project {}: {}", project_id, e),
+            })?
+            .ok_or_else(|| McpError::ResourceNotFound {
+                uri: format!("layercake://projects/{}/plan", project_id),
+            })?;
+
+        let content = serde_json::to_string_pretty(&plan).map_err(|e| McpError::Internal {
+            message: format!("Failed to serialize plan: {}", e),
+        })?;
+
+        Ok(Resource {
+            uri: format!("layercake://projects/{}/plan", project_id),
+            name: format!("Project {} Plan", project_id),
+            description: Some("Layercake plan summary associated with the project".to_string()),
+            mime_type: Some("application/json".to_string()),
+            content: ResourceContent::Text { text: content },
+            metadata: {
+                let mut meta = HashMap::new();
+                meta.insert("plan_id".to_string(), json!(plan.id));
+                meta.insert("project_id".to_string(), json!(plan.project_id));
+                meta.insert("resource_type".to_string(), json!("plan"));
                 meta
             },
         })
@@ -129,17 +259,65 @@ impl ResourceRegistry for LayercakeResourceRegistry {
         &self,
         _context: &SecurityContext,
     ) -> McpResult<Vec<ResourceTemplate>> {
-        Ok(vec![ResourceTemplate {
-            uri_template: "layercake://projects/{project_id}".to_string(),
-            name: "Project Configuration".to_string(),
-            description: Some("Layercake project configuration and metadata".to_string()),
-            mime_type: Some("application/json".to_string()),
-            metadata: {
-                let mut meta = HashMap::new();
-                meta.insert("category".to_string(), json!("projects"));
-                meta
+        Ok(vec![
+            ResourceTemplate {
+                uri_template: "layercake://projects/{project_id}".to_string(),
+                name: "Project Configuration".to_string(),
+                description: Some("Layercake project configuration and metadata".to_string()),
+                mime_type: Some("application/json".to_string()),
+                metadata: {
+                    let mut meta = HashMap::new();
+                    meta.insert("category".to_string(), json!("projects"));
+                    meta
+                },
             },
-        }])
+            ResourceTemplate {
+                uri_template: "layercake://plans/{plan_id}".to_string(),
+                name: "Plan Summary".to_string(),
+                description: Some("Layercake plan summary including YAML content".to_string()),
+                mime_type: Some("application/json".to_string()),
+                metadata: {
+                    let mut meta = HashMap::new();
+                    meta.insert("category".to_string(), json!("plans"));
+                    meta
+                },
+            },
+            ResourceTemplate {
+                uri_template: "layercake://projects/{project_id}/plan".to_string(),
+                name: "Project Plan Summary".to_string(),
+                description: Some("Plan summary associated with a specific project".to_string()),
+                mime_type: Some("application/json".to_string()),
+                metadata: {
+                    let mut meta = HashMap::new();
+                    meta.insert("category".to_string(), json!("plans"));
+                    meta.insert("relationship".to_string(), json!("project"));
+                    meta
+                },
+            },
+            ResourceTemplate {
+                uri_template: "layercake://datasources/{data_source_id}".to_string(),
+                name: "Data Source Summary".to_string(),
+                description: Some("Layercake data source metadata".to_string()),
+                mime_type: Some("application/json".to_string()),
+                metadata: {
+                    let mut meta = HashMap::new();
+                    meta.insert("category".to_string(), json!("datasources"));
+                    meta
+                },
+            },
+            ResourceTemplate {
+                uri_template: "layercake://projects/{project_id}/datasources".to_string(),
+                name: "Project Data Sources".to_string(),
+                description: Some("List of data sources for a specific project".to_string()),
+                mime_type: Some("application/json".to_string()),
+                metadata: {
+                    let mut meta = HashMap::new();
+                    meta.insert("category".to_string(), json!("datasources"));
+                    meta.insert("relationship".to_string(), json!("project"));
+                    meta
+                },
+            },
+        ])
     }
 
     async fn get_resource(&self, uri: &str, _context: &SecurityContext) -> McpResult<Resource> {
@@ -159,6 +337,30 @@ impl ResourceRegistry for LayercakeResourceRegistry {
                 })?;
                 self.get_project_resource(project_id).await
             }
+            ["projects", id, "plan"] => {
+                let project_id = id.parse::<i32>().map_err(|_| McpError::Validation {
+                    message: "Invalid project ID".to_string(),
+                })?;
+                self.get_project_plan_resource(project_id).await
+            }
+            ["plans", id] => {
+                let plan_id = id.parse::<i32>().map_err(|_| McpError::Validation {
+                    message: "Invalid plan ID".to_string(),
+                })?;
+                self.get_plan_resource(plan_id).await
+            }
+            ["datasources", id] => {
+                let data_source_id = id.parse::<i32>().map_err(|_| McpError::Validation {
+                    message: "Invalid data source ID".to_string(),
+                })?;
+                self.get_data_source_resource(data_source_id).await
+            }
+            ["projects", id, "datasources"] => {
+                let project_id = id.parse::<i32>().map_err(|_| McpError::Validation {
+                    message: "Invalid project ID".to_string(),
+                })?;
+                self.get_project_data_sources_resource(project_id).await
+            }
             ["analysis", id, analysis_type] => {
                 let project_id = id.parse::<i32>().map_err(|_| McpError::Validation {
                     message: "Invalid project ID".to_string(),
@@ -171,11 +373,7 @@ impl ResourceRegistry for LayercakeResourceRegistry {
         }
     }
 
-    async fn resource_exists(
-        &self,
-        uri: &str,
-        context: &SecurityContext,
-    ) -> McpResult<bool> {
+    async fn resource_exists(&self, uri: &str, context: &SecurityContext) -> McpResult<bool> {
         match self.get_resource(uri, context).await {
             Ok(_) => Ok(true),
             Err(McpError::ResourceNotFound { .. }) => Ok(false),

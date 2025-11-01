@@ -1,10 +1,10 @@
 use async_graphql::*;
 use chrono::{DateTime, Utc};
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
 use crate::app_context::ProjectSummary;
-use crate::database::entities::{plans, projects};
+use crate::database::entities::projects;
 use crate::graphql::context::GraphQLContext;
+use crate::graphql::errors::StructuredError;
 use crate::graphql::types::Plan;
 
 #[derive(SimpleObject)]
@@ -47,10 +47,11 @@ impl From<ProjectSummary> for Project {
 impl Project {
     async fn plan(&self, ctx: &Context<'_>) -> Result<Option<Plan>> {
         let context = ctx.data::<GraphQLContext>()?;
-        let plan = plans::Entity::find()
-            .filter(plans::Column::ProjectId.eq(self.id))
-            .one(&context.db)
-            .await?;
+        let plan = context
+            .app
+            .get_plan_for_project(self.id)
+            .await
+            .map_err(|e| StructuredError::service("AppContext::get_plan_for_project", e))?;
 
         Ok(plan.map(Plan::from))
     }

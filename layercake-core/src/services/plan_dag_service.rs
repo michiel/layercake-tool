@@ -209,19 +209,19 @@ impl PlanDagService {
                     if let Some(data_source_id) =
                         config_value.get("dataSourceId").and_then(|v| v.as_i64())
                     {
-                        if let Some(data_source) = data_sources::Entity::find_by_id(
-                            data_source_id as i32,
-                        )
-                        .one(&self.db)
-                        .await
-                        .map_err(|e| anyhow!("Failed to load data source {}: {}", data_source_id, e))?
+                        if let Some(data_source) =
+                            data_sources::Entity::find_by_id(data_source_id as i32)
+                                .one(&self.db)
+                                .await
+                                .map_err(|e| {
+                                    anyhow!("Failed to load data source {}: {}", data_source_id, e)
+                                })?
                         {
-                            let mut metadata_obj = serde_json::from_str::<Value>(
-                                &metadata_json_current,
-                            )
-                            .ok()
-                            .and_then(|value| value.as_object().cloned())
-                            .unwrap_or_else(Map::new);
+                            let mut metadata_obj =
+                                serde_json::from_str::<Value>(&metadata_json_current)
+                                    .ok()
+                                    .and_then(|value| value.as_object().cloned())
+                                    .unwrap_or_else(Map::new);
 
                             let needs_update = match metadata_obj.get("label") {
                                 Some(Value::String(current_label))
@@ -241,14 +241,12 @@ impl PlanDagService {
                                 let metadata_json = metadata_value.to_string();
                                 node_active.metadata_json = Set(metadata_json.clone());
 
-                                if let Some(patch) =
-                                    plan_dag_delta::generate_node_update_patch(
-                                        &node_id,
-                                        "metadata",
-                                        metadata_value,
-                                        &current_nodes,
-                                    )
-                                {
+                                if let Some(patch) = plan_dag_delta::generate_node_update_patch(
+                                    &node_id,
+                                    "metadata",
+                                    metadata_value,
+                                    &current_nodes,
+                                ) {
                                     patch_ops.push(patch);
                                 }
                             }

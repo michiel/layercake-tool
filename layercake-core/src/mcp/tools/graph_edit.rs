@@ -1,8 +1,6 @@
 //! Graph editing tools for MCP clients backed by shared AppContext helpers.
 
-use crate::app_context::{
-    AppContext, GraphLayerUpdateRequest, GraphNodeUpdateRequest,
-};
+use crate::app_context::{AppContext, GraphLayerUpdateRequest, GraphNodeUpdateRequest};
 use crate::graphql::types::graph_node::GraphNode as GraphNodeDto;
 use crate::mcp::tools::{create_success_response, get_optional_param, get_required_param};
 use axum_mcp::prelude::*;
@@ -13,7 +11,8 @@ pub fn get_graph_edit_tools() -> Vec<Tool> {
     vec![
         Tool {
             name: "update_graph_node".to_string(),
-            description: "Update a graph node's metadata (label, layer, attrs, belongsTo)".to_string(),
+            description: "Update a graph node's metadata (label, layer, attrs, belongsTo)"
+                .to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -207,8 +206,14 @@ fn parse_node_updates(arguments: &Option<Value>) -> McpResult<Vec<GraphNodeUpdat
             })?
             .to_string();
 
-        let label = node.get("label").and_then(Value::as_str).map(|s| s.to_string());
-        let layer = node.get("layer").and_then(Value::as_str).map(|s| s.to_string());
+        let label = node
+            .get("label")
+            .and_then(Value::as_str)
+            .map(|s| s.to_string());
+        let layer = node
+            .get("layer")
+            .and_then(Value::as_str)
+            .map(|s| s.to_string());
         let attrs = node.get("attrs").cloned();
 
         requests.push(GraphNodeUpdateRequest {
@@ -238,7 +243,10 @@ fn parse_layer_updates(arguments: &Option<Value>) -> McpResult<Vec<GraphLayerUpd
                 message: "Each layer entry must include id".to_string(),
             })? as i32;
 
-        let name = layer.get("name").and_then(Value::as_str).map(|s| s.to_string());
+        let name = layer
+            .get("name")
+            .and_then(Value::as_str)
+            .map(|s| s.to_string());
         let properties = layer.get("properties").cloned();
 
         requests.push(GraphLayerUpdateRequest {

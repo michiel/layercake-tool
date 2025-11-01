@@ -1,6 +1,7 @@
 use async_graphql::*;
 use serde::{Deserialize, Serialize};
 
+use crate::app_context::DataSourceSummary;
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
 use crate::graphql::types::Project;
@@ -101,6 +102,27 @@ impl From<crate::database::entities::data_sources::Model> for DataSource {
             processed_at: model.processed_at,
             created_at: model.created_at,
             updated_at: model.updated_at,
+        }
+    }
+}
+
+impl From<DataSourceSummary> for DataSource {
+    fn from(summary: DataSourceSummary) -> Self {
+        Self {
+            id: summary.id,
+            project_id: summary.project_id,
+            name: summary.name,
+            description: summary.description,
+            file_format: summary.file_format,
+            data_type: summary.data_type,
+            filename: summary.filename,
+            graph_json: summary.graph_json,
+            status: summary.status,
+            error_message: summary.error_message,
+            file_size: summary.file_size,
+            processed_at: summary.processed_at,
+            created_at: summary.created_at,
+            updated_at: summary.updated_at,
         }
     }
 }

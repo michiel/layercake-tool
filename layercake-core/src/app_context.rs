@@ -2,28 +2,35 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
+use regex::Regex;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, Set,
 };
-use regex::Regex;
 use serde::Serialize;
 use serde_json::{json, Value};
 use uuid::Uuid;
 
-use crate::database::entities::{data_sources, graphs, plans, projects};
+use crate::database::entities::{
+    data_sources,
+    data_sources::{DataType as DataSourceDataType, FileFormat as DataSourceFileFormat},
+    graphs, plans, projects,
+};
 use crate::graphql::types::graph_node::GraphNode as GraphNodeDto;
 use crate::graphql::types::layer::Layer as LayerDto;
 use crate::graphql::types::plan_dag::{
-    DataSourceExecutionMetadata, GraphExecutionMetadata, PlanDagEdge, PlanDagMetadata,
-    PlanDagNode, PlanDagNodeType, Position,
+    DataSourceExecutionMetadata, GraphExecutionMetadata, PlanDagEdge, PlanDagMetadata, PlanDagNode,
+    PlanDagNodeType, Position,
 };
 use crate::plan::ExportFileType;
 use crate::services::graph_analysis_service::{GraphAnalysisService, GraphConnectivityReport};
 use crate::services::graph_edit_service::{
     GraphEditService, ReplaySummary as GraphEditReplaySummary,
 };
-use crate::services::{ExportService, GraphService, ImportService, PlanDagService};
 use crate::services::plan_dag_service::PlanDagNodePositionUpdate;
+use crate::services::{
+    data_source_service::DataSourceService, datasource_bulk_service::DataSourceBulkService,
+    ExportService, GraphService, ImportService, PlanDagService,
+};
 
 /// Shared application context exposing core services for GraphQL, MCP, and console layers.
 #[derive(Clone)]
@@ -32,6 +39,8 @@ pub struct AppContext {
     import_service: Arc<ImportService>,
     export_service: Arc<ExportService>,
     graph_service: Arc<GraphService>,
+    data_source_service: Arc<DataSourceService>,
+    data_source_bulk_service: Arc<DataSourceBulkService>,
     plan_dag_service: Arc<PlanDagService>,
     graph_edit_service: Arc<GraphEditService>,
     graph_analysis_service: Arc<GraphAnalysisService>,
@@ -45,12 +54,16 @@ impl AppContext {
         let plan_dag_service = Arc::new(PlanDagService::new(db.clone()));
         let graph_edit_service = Arc::new(GraphEditService::new(db.clone()));
         let graph_analysis_service = Arc::new(GraphAnalysisService::new(db.clone()));
+        let data_source_service = Arc::new(DataSourceService::new(db.clone()));
+        let data_source_bulk_service = Arc::new(DataSourceBulkService::new(db.clone()));
 
         Self {
             db,
             import_service,
             export_service,
             graph_service,
+            data_source_service,
+            data_source_bulk_service,
             plan_dag_service,
             graph_edit_service,
             graph_analysis_service,
@@ -71,6 +84,14 @@ impl AppContext {
 
     pub fn graph_service(&self) -> Arc<GraphService> {
         self.graph_service.clone()
+    }
+
+    pub fn data_source_service(&self) -> Arc<DataSourceService> {
+        self.data_source_service.clone()
+    }
+
+    pub fn data_source_bulk_service(&self) -> Arc<DataSourceBulkService> {
+        self.data_source_bulk_service.clone()
     }
 
     pub fn plan_dag_service(&self) -> Arc<PlanDagService> {
@@ -127,11 +148,7 @@ impl AppContext {
         Ok(ProjectSummary::from(project))
     }
 
-    pub async fn update_project(
-        &self,
-        id: i32,
-        update: ProjectUpdate,
-    ) -> Result<ProjectSummary> {
+    pub async fn update_project(&self, id: i32, update: ProjectUpdate) -> Result<ProjectSummary> {
         let project = projects::Entity::find_by_id(id)
             .one(&self.db)
             .await
@@ -164,6 +181,458 @@ impl AppContext {
         if result.rows_affected == 0 {
             return Err(anyhow!("Project {} not found", id));
         }
+
+        Ok(())
+    }
+
+    // ----- Plan summary helpers -------------------------------------------
+
+    pub async fn list_plans(&self, project_id: Option<i32>) -> Result<Vec<PlanSummary>> {
+        let mut query = plans::Entity::find().order_by_desc(plans::Column::UpdatedAt);
+
+        if let Some(project_id) = project_id {
+            query = query.filter(plans::Column::ProjectId.eq(project_id));
+        }
+
+        let plans = query
+            .all(&self.db)
+            .await
+            .map_err(|e| anyhow!("Failed to list plans: {}", e))?;
+
+        Ok(plans.into_iter().map(PlanSummary::from).collect())
+    }
+
+    pub async fn get_plan(&self, id: i32) -> Result<Option<PlanSummary>> {
+        let plan = plans::Entity::find_by_id(id)
+            .one(&self.db)
+            .await
+            .map_err(|e| anyhow!("Failed to load plan {}: {}", id, e))?;
+
+        Ok(plan.map(PlanSummary::from))
+    }
+
+    pub async fn get_plan_for_project(&self, project_id: i32) -> Result<Option<PlanSummary>> {
+        let plan = plans::Entity::find()
+            .filter(plans::Column::ProjectId.eq(project_id))
+            .order_by_desc(plans::Column::UpdatedAt)
+            .one(&self.db)
+            .await
+            .map_err(|e| anyhow!("Failed to load plan for project {}: {}", project_id, e))?;
+
+        Ok(plan.map(PlanSummary::from))
+    }
+
+    pub async fn create_plan(&self, request: PlanCreateRequest) -> Result<PlanSummary> {
+        let PlanCreateRequest {
+            project_id,
+            name,
+            yaml_content,
+            dependencies,
+            status,
+        } = request;
+
+        let dependencies_json = match dependencies {
+            Some(values) => Some(
+                serde_json::to_string(&values)
+                    .map_err(|e| anyhow!("Invalid plan dependencies: {}", e))?,
+            ),
+            None => None,
+        };
+
+        let now = Utc::now();
+        let plan = plans::ActiveModel {
+            project_id: Set(project_id),
+            name: Set(name),
+            yaml_content: Set(yaml_content),
+            dependencies: Set(dependencies_json),
+            status: Set(status.unwrap_or_else(|| "pending".to_string())),
+            version: Set(1),
+            created_at: Set(now),
+            updated_at: Set(now),
+            ..Default::default()
+        };
+
+        let plan = plan
+            .insert(&self.db)
+            .await
+            .map_err(|e| anyhow!("Failed to create plan: {}", e))?;
+
+        Ok(PlanSummary::from(plan))
+    }
+
+    pub async fn update_plan(&self, id: i32, update: PlanUpdateRequest) -> Result<PlanSummary> {
+        let plan = plans::Entity::find_by_id(id)
+            .one(&self.db)
+            .await
+            .map_err(|e| anyhow!("Failed to load plan {}: {}", id, e))?
+            .ok_or_else(|| anyhow!("Plan {} not found", id))?;
+
+        let PlanUpdateRequest {
+            name,
+            yaml_content,
+            dependencies,
+            dependencies_is_set,
+            status,
+        } = update;
+
+        let mut active: plans::ActiveModel = plan.into();
+
+        if let Some(name) = name {
+            active.name = Set(name);
+        }
+
+        if let Some(content) = yaml_content {
+            active.yaml_content = Set(content);
+        }
+
+        if dependencies_is_set {
+            let dependencies_json = match dependencies {
+                Some(values) => Some(
+                    serde_json::to_string(&values)
+                        .map_err(|e| anyhow!("Invalid plan dependencies: {}", e))?,
+                ),
+                None => None,
+            };
+            active.dependencies = Set(dependencies_json);
+        }
+
+        if let Some(status) = status {
+            active.status = Set(status);
+        }
+
+        active.updated_at = Set(Utc::now());
+
+        let plan = active
+            .update(&self.db)
+            .await
+            .map_err(|e| anyhow!("Failed to update plan {}: {}", id, e))?;
+
+        Ok(PlanSummary::from(plan))
+    }
+
+    pub async fn delete_plan(&self, id: i32) -> Result<()> {
+        let result = plans::Entity::delete_by_id(id)
+            .exec(&self.db)
+            .await
+            .map_err(|e| anyhow!("Failed to delete plan {}: {}", id, e))?;
+
+        if result.rows_affected == 0 {
+            return Err(anyhow!("Plan {} not found", id));
+        }
+
+        Ok(())
+    }
+
+    // ----- Data source helpers ---------------------------------------------
+
+    pub async fn list_data_sources(&self, project_id: i32) -> Result<Vec<DataSourceSummary>> {
+        let data_sources = data_sources::Entity::find()
+            .filter(data_sources::Column::ProjectId.eq(project_id))
+            .order_by_asc(data_sources::Column::Name)
+            .all(&self.db)
+            .await
+            .map_err(|e| {
+                anyhow!(
+                    "Failed to list data sources for project {}: {}",
+                    project_id,
+                    e
+                )
+            })?;
+
+        Ok(data_sources
+            .into_iter()
+            .map(DataSourceSummary::from)
+            .collect())
+    }
+
+    pub async fn available_data_sources(&self, project_id: i32) -> Result<Vec<DataSourceSummary>> {
+        self.list_data_sources(project_id).await
+    }
+
+    pub async fn get_data_source(&self, id: i32) -> Result<Option<DataSourceSummary>> {
+        let data_source = data_sources::Entity::find_by_id(id)
+            .one(&self.db)
+            .await
+            .map_err(|e| anyhow!("Failed to load data source {}: {}", id, e))?;
+
+        Ok(data_source.map(DataSourceSummary::from))
+    }
+
+    pub async fn create_data_source_from_file(
+        &self,
+        request: DataSourceFileCreateRequest,
+    ) -> Result<DataSourceSummary> {
+        let DataSourceFileCreateRequest {
+            project_id,
+            name,
+            description,
+            filename,
+            file_format,
+            data_type,
+            file_bytes,
+        } = request;
+
+        let created = self
+            .data_source_service
+            .create_from_file(
+                project_id,
+                name,
+                description,
+                filename,
+                file_format,
+                data_type,
+                file_bytes,
+            )
+            .await
+            .map_err(|e| anyhow!("Failed to create data source from file: {}", e))?;
+
+        self.attach_data_source_to_plan(project_id, &created)
+            .await?;
+
+        Ok(DataSourceSummary::from(created))
+    }
+
+    pub async fn create_empty_data_source(
+        &self,
+        request: DataSourceEmptyCreateRequest,
+    ) -> Result<DataSourceSummary> {
+        let DataSourceEmptyCreateRequest {
+            project_id,
+            name,
+            description,
+            data_type,
+        } = request;
+
+        let created = self
+            .data_source_service
+            .create_empty(project_id, name, description, data_type)
+            .await
+            .map_err(|e| anyhow!("Failed to create empty data source: {}", e))?;
+
+        self.attach_data_source_to_plan(project_id, &created)
+            .await?;
+
+        Ok(DataSourceSummary::from(created))
+    }
+
+    pub async fn bulk_upload_data_sources(
+        &self,
+        project_id: i32,
+        uploads: Vec<BulkDataSourceUpload>,
+    ) -> Result<Vec<DataSourceSummary>> {
+        let mut results = Vec::new();
+
+        for upload in uploads {
+            let created = self
+                .data_source_service
+                .create_with_auto_detect(
+                    project_id,
+                    upload.name.clone(),
+                    upload.description.clone(),
+                    upload.filename.clone(),
+                    upload.file_bytes.clone(),
+                )
+                .await
+                .map_err(|e| anyhow!("Failed to import data source {}: {}", upload.filename, e))?;
+
+            self.attach_data_source_to_plan(project_id, &created)
+                .await?;
+            results.push(DataSourceSummary::from(created));
+        }
+
+        Ok(results)
+    }
+
+    pub async fn update_data_source(
+        &self,
+        request: DataSourceUpdateRequest,
+    ) -> Result<DataSourceSummary> {
+        let DataSourceUpdateRequest {
+            id,
+            name,
+            description,
+            new_file,
+        } = request;
+
+        let (mut model, had_new_file) = if let Some(file) = new_file {
+            let updated = self
+                .data_source_service
+                .update_file(id, file.filename, file.file_bytes)
+                .await
+                .map_err(|e| anyhow!("Failed to update data source file {}: {}", id, e))?;
+            (updated, true)
+        } else {
+            let updated = self
+                .data_source_service
+                .update(id, name.clone(), description.clone())
+                .await
+                .map_err(|e| anyhow!("Failed to update data source {}: {}", id, e))?;
+            (updated, false)
+        };
+
+        if had_new_file && (name.is_some() || description.is_some()) {
+            model = self
+                .data_source_service
+                .update(id, name, description)
+                .await
+                .map_err(|e| anyhow!("Failed to update metadata for data source {}: {}", id, e))?;
+        }
+
+        Ok(DataSourceSummary::from(model))
+    }
+
+    pub async fn update_data_source_graph_json(
+        &self,
+        id: i32,
+        graph_json: String,
+    ) -> Result<DataSourceSummary> {
+        let model = self
+            .data_source_service
+            .update_graph_data(id, graph_json)
+            .await
+            .map_err(|e| anyhow!("Failed to update graph data for data source {}: {}", id, e))?;
+
+        Ok(DataSourceSummary::from(model))
+    }
+
+    pub async fn reprocess_data_source(&self, id: i32) -> Result<DataSourceSummary> {
+        let model = self
+            .data_source_service
+            .reprocess(id)
+            .await
+            .map_err(|e| anyhow!("Failed to reprocess data source {}: {}", id, e))?;
+
+        Ok(DataSourceSummary::from(model))
+    }
+
+    pub async fn delete_data_source(&self, id: i32) -> Result<()> {
+        self.data_source_service
+            .delete(id)
+            .await
+            .map_err(|e| anyhow!("Failed to delete data source {}: {}", id, e))
+    }
+
+    pub async fn export_data_sources(
+        &self,
+        request: DataSourceExportRequest,
+    ) -> Result<DataSourceExportResult> {
+        let bytes = match request.format {
+            DataSourceExportFormat::Xlsx => self
+                .data_source_bulk_service
+                .export_to_xlsx(&request.data_source_ids)
+                .await
+                .map_err(|e| anyhow!("Failed to export datasources to XLSX: {}", e))?,
+            DataSourceExportFormat::Ods => self
+                .data_source_bulk_service
+                .export_to_ods(&request.data_source_ids)
+                .await
+                .map_err(|e| anyhow!("Failed to export datasources to ODS: {}", e))?,
+        };
+
+        let filename = format!(
+            "datasources_export_{}.{}",
+            chrono::Utc::now().timestamp(),
+            request.format.extension()
+        );
+
+        Ok(DataSourceExportResult {
+            data: bytes,
+            filename,
+            format: request.format,
+        })
+    }
+
+    pub async fn import_data_sources(
+        &self,
+        request: DataSourceImportRequest,
+    ) -> Result<DataSourceImportOutcome> {
+        let result = match request.format {
+            DataSourceImportFormat::Xlsx => self
+                .data_source_bulk_service
+                .import_from_xlsx(request.project_id, &request.file_bytes)
+                .await
+                .map_err(|e| anyhow!("Failed to import datasources from XLSX: {}", e))?,
+            DataSourceImportFormat::Ods => self
+                .data_source_bulk_service
+                .import_from_ods(request.project_id, &request.file_bytes)
+                .await
+                .map_err(|e| anyhow!("Failed to import datasources from ODS: {}", e))?,
+        };
+
+        if result.imported_ids.is_empty() {
+            return Ok(DataSourceImportOutcome {
+                data_sources: Vec::new(),
+                created_count: result.created_count,
+                updated_count: result.updated_count,
+            });
+        }
+
+        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+        let models = data_sources::Entity::find()
+            .filter(data_sources::Column::Id.is_in(result.imported_ids.clone()))
+            .all(&self.db)
+            .await
+            .map_err(|e| anyhow!("Failed to load imported datasources: {}", e))?;
+
+        for model in &models {
+            self.attach_data_source_to_plan(model.project_id, model)
+                .await
+                .ok();
+        }
+
+        Ok(DataSourceImportOutcome {
+            data_sources: models.into_iter().map(DataSourceSummary::from).collect(),
+            created_count: result.created_count,
+            updated_count: result.updated_count,
+        })
+    }
+
+    async fn attach_data_source_to_plan(
+        &self,
+        project_id: i32,
+        data_source: &data_sources::Model,
+    ) -> Result<()> {
+        let nodes = self
+            .plan_dag_service
+            .get_nodes(project_id)
+            .await
+            .unwrap_or_default();
+
+        let already_attached = nodes.iter().any(|node| {
+            serde_json::from_str::<Value>(&node.config)
+                .ok()
+                .and_then(|config| config.get("dataSourceId").and_then(|id| id.as_i64()))
+                .map(|id| id as i32 == data_source.id)
+                .unwrap_or(false)
+        });
+
+        if already_attached {
+            return Ok(());
+        }
+
+        let position = Position {
+            x: 100.0,
+            y: 100.0 + (nodes.len() as f64 * 120.0),
+        };
+
+        let metadata = json!({ "label": data_source.name });
+        let config = json!({
+            "dataSourceId": data_source.id,
+            "filename": data_source.filename,
+            "dataType": data_source.data_type.to_lowercase(),
+        });
+
+        let _ = self
+            .create_plan_dag_node(
+                project_id,
+                PlanDagNodeRequest {
+                    node_type: PlanDagNodeType::DataSource,
+                    position,
+                    metadata,
+                    config,
+                },
+            )
+            .await?;
 
         Ok(())
     }
@@ -211,18 +680,17 @@ impl AppContext {
                                 .and_then(|v| v.as_i64())
                                 .map(|v| v as i32)
                             {
-                                if let Some(data_source) = data_sources::Entity::find_by_id(
-                                    data_source_id,
-                                )
-                                .one(&self.db)
-                                .await
-                                .map_err(|e| {
-                                    anyhow!(
-                                        "Failed to load data source {}: {}",
-                                        data_source_id,
-                                        e
-                                    )
-                                })?
+                                if let Some(data_source) =
+                                    data_sources::Entity::find_by_id(data_source_id)
+                                        .one(&self.db)
+                                        .await
+                                        .map_err(|e| {
+                                            anyhow!(
+                                                "Failed to load data source {}: {}",
+                                                data_source_id,
+                                                e
+                                            )
+                                        })?
                                 {
                                     let execution_state = match data_source.status.as_str() {
                                         "active" => "completed",
@@ -372,7 +840,13 @@ impl AppContext {
         };
 
         self.plan_dag_service
-            .update_node(project_id, node_id, updates.position, metadata_json, config_json)
+            .update_node(
+                project_id,
+                node_id,
+                updates.position,
+                metadata_json,
+                config_json,
+            )
             .await
     }
 
@@ -381,9 +855,7 @@ impl AppContext {
         project_id: i32,
         node_id: String,
     ) -> Result<PlanDagNode> {
-        self.plan_dag_service
-            .delete_node(project_id, node_id)
-            .await
+        self.plan_dag_service.delete_node(project_id, node_id).await
     }
 
     pub async fn move_plan_dag_node(
@@ -468,9 +940,7 @@ impl AppContext {
         project_id: i32,
         edge_id: String,
     ) -> Result<PlanDagEdge> {
-        self.plan_dag_service
-            .delete_edge(project_id, edge_id)
-            .await
+        self.plan_dag_service.delete_edge(project_id, edge_id).await
     }
 
     // ----- Graph editing helpers ------------------------------------------
@@ -494,9 +964,13 @@ impl AppContext {
             .await
             .map_err(|e| anyhow!("Failed to load graph node {}: {}", node_id, e))?;
 
-        let belongs_to_param = belongs_to
-            .as_ref()
-            .map(|value| if value.is_empty() { None } else { Some(value.clone()) });
+        let belongs_to_param = belongs_to.as_ref().map(|value| {
+            if value.is_empty() {
+                None
+            } else {
+                Some(value.clone())
+            }
+        });
 
         let updated_node = self
             .graph_service
@@ -584,10 +1058,7 @@ impl AppContext {
                             node_id.clone(),
                             "update".to_string(),
                             Some("belongsTo".to_string()),
-                            old_node
-                                .belongs_to
-                                .as_ref()
-                                .map(|b| json!(b)),
+                            old_node.belongs_to.as_ref().map(|b| json!(b)),
                             new_belongs_to.as_ref().map(|b| json!(b)),
                             None,
                             true,
@@ -696,10 +1167,7 @@ impl AppContext {
         Ok(())
     }
 
-    pub async fn replay_graph_edits(
-        &self,
-        graph_id: i32,
-    ) -> Result<GraphEditReplaySummary> {
+    pub async fn replay_graph_edits(&self, graph_id: i32) -> Result<GraphEditReplaySummary> {
         self.graph_edit_service
             .replay_graph_edits(graph_id)
             .await
@@ -747,7 +1215,6 @@ impl AppContext {
 
         Ok(apply_preview_limit(content, format, max_rows))
     }
-
 }
 
 #[derive(Clone, Serialize)]
@@ -780,13 +1247,213 @@ pub struct ProjectUpdate {
 }
 
 impl ProjectUpdate {
-    pub fn new(name: Option<String>, description: Option<String>, description_is_set: bool) -> Self {
+    pub fn new(
+        name: Option<String>,
+        description: Option<String>,
+        description_is_set: bool,
+    ) -> Self {
         Self {
             name,
             description,
             description_is_set,
         }
     }
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlanSummary {
+    pub id: i32,
+    pub project_id: i32,
+    pub name: String,
+    pub yaml_content: String,
+    pub dependencies: Option<Vec<i32>>,
+    pub status: String,
+    pub version: i32,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+impl From<plans::Model> for PlanSummary {
+    fn from(model: plans::Model) -> Self {
+        let dependencies = model
+            .dependencies
+            .and_then(|value| serde_json::from_str::<Vec<i32>>(&value).ok());
+
+        Self {
+            id: model.id,
+            project_id: model.project_id,
+            name: model.name,
+            yaml_content: model.yaml_content,
+            dependencies,
+            status: model.status,
+            version: model.version,
+            created_at: model.created_at,
+            updated_at: model.updated_at,
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct PlanCreateRequest {
+    pub project_id: i32,
+    pub name: String,
+    pub yaml_content: String,
+    pub dependencies: Option<Vec<i32>>,
+    pub status: Option<String>,
+}
+
+#[derive(Clone)]
+pub struct PlanUpdateRequest {
+    pub name: Option<String>,
+    pub yaml_content: Option<String>,
+    pub dependencies: Option<Vec<i32>>,
+    pub dependencies_is_set: bool,
+    pub status: Option<String>,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DataSourceSummary {
+    pub id: i32,
+    pub project_id: i32,
+    pub name: String,
+    pub description: Option<String>,
+    pub file_format: String,
+    pub data_type: String,
+    pub filename: String,
+    pub graph_json: String,
+    pub status: String,
+    pub error_message: Option<String>,
+    pub file_size: i64,
+    pub processed_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+impl From<data_sources::Model> for DataSourceSummary {
+    fn from(model: data_sources::Model) -> Self {
+        Self {
+            id: model.id,
+            project_id: model.project_id,
+            name: model.name,
+            description: model.description,
+            file_format: model.file_format,
+            data_type: model.data_type,
+            filename: model.filename,
+            graph_json: model.graph_json,
+            status: model.status,
+            error_message: model.error_message,
+            file_size: model.file_size,
+            processed_at: model.processed_at,
+            created_at: model.created_at,
+            updated_at: model.updated_at,
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct DataSourceFileCreateRequest {
+    pub project_id: i32,
+    pub name: String,
+    pub description: Option<String>,
+    pub filename: String,
+    pub file_format: DataSourceFileFormat,
+    pub data_type: DataSourceDataType,
+    pub file_bytes: Vec<u8>,
+}
+
+#[derive(Clone)]
+pub struct DataSourceEmptyCreateRequest {
+    pub project_id: i32,
+    pub name: String,
+    pub description: Option<String>,
+    pub data_type: DataSourceDataType,
+}
+
+#[derive(Clone)]
+pub struct BulkDataSourceUpload {
+    pub name: String,
+    pub description: Option<String>,
+    pub filename: String,
+    pub file_bytes: Vec<u8>,
+}
+
+#[derive(Clone)]
+pub struct DataSourceUpdateRequest {
+    pub id: i32,
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub new_file: Option<DataSourceFileReplacement>,
+}
+
+#[derive(Clone)]
+pub struct DataSourceFileReplacement {
+    pub filename: String,
+    pub file_bytes: Vec<u8>,
+}
+
+#[derive(Clone, Copy)]
+pub enum DataSourceExportFormat {
+    Xlsx,
+    Ods,
+}
+
+impl DataSourceExportFormat {
+    pub fn extension(&self) -> &'static str {
+        match self {
+            DataSourceExportFormat::Xlsx => "xlsx",
+            DataSourceExportFormat::Ods => "ods",
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct DataSourceExportRequest {
+    pub project_id: i32,
+    pub data_source_ids: Vec<i32>,
+    pub format: DataSourceExportFormat,
+}
+
+#[derive(Clone)]
+pub struct DataSourceExportResult {
+    pub data: Vec<u8>,
+    pub filename: String,
+    pub format: DataSourceExportFormat,
+}
+
+#[derive(Clone, Copy)]
+pub enum DataSourceImportFormat {
+    Xlsx,
+    Ods,
+}
+
+impl DataSourceImportFormat {
+    pub fn from_filename(filename: &str) -> Option<Self> {
+        let lower = filename.to_lowercase();
+        if lower.ends_with(".xlsx") {
+            Some(DataSourceImportFormat::Xlsx)
+        } else if lower.ends_with(".ods") {
+            Some(DataSourceImportFormat::Ods)
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct DataSourceImportRequest {
+    pub project_id: i32,
+    pub format: DataSourceImportFormat,
+    pub file_bytes: Vec<u8>,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DataSourceImportOutcome {
+    pub data_sources: Vec<DataSourceSummary>,
+    pub created_count: i32,
+    pub updated_count: i32,
 }
 
 #[derive(Clone, Serialize)]
@@ -873,10 +1540,7 @@ fn node_type_storage_name(node_type: &PlanDagNodeType) -> &'static str {
     }
 }
 
-fn generate_node_id(
-    node_type: &PlanDagNodeType,
-    existing_nodes: &[PlanDagNode],
-) -> Result<String> {
+fn generate_node_id(node_type: &PlanDagNodeType, existing_nodes: &[PlanDagNode]) -> Result<String> {
     let prefix = node_type_prefix(node_type);
     let regex = Regex::new(r"_(\d+)$").map_err(|e| anyhow!("Invalid regex: {}", e))?;
 
@@ -896,17 +1560,15 @@ fn generate_node_id(
 }
 
 fn generate_edge_id(source: &str, target: &str) -> String {
-    format!(
-        "edge-{}-{}-{}",
-        source,
-        target,
-        Uuid::new_v4().simple()
-    )
+    format!("edge-{}-{}-{}", source, target, Uuid::new_v4().simple())
 }
 
 fn apply_preview_limit(content: String, format: ExportFileType, max_rows: Option<usize>) -> String {
     match (format, max_rows) {
-        (ExportFileType::CSVNodes | ExportFileType::CSVEdges | ExportFileType::CSVMatrix, Some(limit)) => {
+        (
+            ExportFileType::CSVNodes | ExportFileType::CSVEdges | ExportFileType::CSVMatrix,
+            Some(limit),
+        ) => {
             let mut limited_lines = Vec::new();
 
             for (index, line) in content.lines().enumerate() {

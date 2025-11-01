@@ -202,6 +202,9 @@ impl ToolRegistry for LayercakeToolRegistry {
         // Plan management tools
         tools.extend(super::tools::plans::get_plan_tools());
 
+        // Data source tools
+        tools.extend(super::tools::data_sources::get_data_source_tools());
+
         // Plan DAG tools
         tools.extend(super::tools::plan_dag::get_plan_dag_tools());
 
@@ -691,20 +694,59 @@ impl ToolRegistry for LayercakeToolRegistry {
             "update_project" => {
                 super::tools::projects::update_project(context.arguments, &self.app).await
             }
-            "get_project" => super::tools::projects::get_project(context.arguments, &self.app).await,
+            "get_project" => {
+                super::tools::projects::get_project(context.arguments, &self.app).await
+            }
             "delete_project" => {
                 super::tools::projects::delete_project(context.arguments, &self.app).await
             }
 
             // Plan tools
-            "create_plan" => super::tools::plans::create_plan(context.arguments, self.app.db()).await,
-            "execute_plan" => super::tools::plans::execute_plan(context.arguments, self.app.db()).await,
+
+            // Data source tools
+            "list_data_sources" => {
+                super::tools::data_sources::list_data_sources(context.arguments, &self.app).await
+            }
+            "get_data_source" => {
+                super::tools::data_sources::get_data_source(context.arguments, &self.app).await
+            }
+            "create_data_source_from_file" => {
+                super::tools::data_sources::create_data_source_from_file(
+                    context.arguments,
+                    &self.app,
+                )
+                .await
+            }
+            "create_empty_data_source" => {
+                super::tools::data_sources::create_empty_data_source(context.arguments, &self.app)
+                    .await
+            }
+            "update_data_source" => {
+                super::tools::data_sources::update_data_source(context.arguments, &self.app).await
+            }
+            "delete_data_source" => {
+                super::tools::data_sources::delete_data_source(context.arguments, &self.app).await
+            }
+            "reprocess_data_source" => {
+                super::tools::data_sources::reprocess_data_source(context.arguments, &self.app)
+                    .await
+            }
+            "export_data_sources" => {
+                super::tools::data_sources::export_data_sources(context.arguments, &self.app).await
+            }
+            "import_data_sources" => {
+                super::tools::data_sources::import_data_sources(context.arguments, &self.app).await
+            }
+
+            "create_plan" => super::tools::plans::create_plan(context.arguments, &self.app).await,
+            "update_plan" => super::tools::plans::update_plan(context.arguments, &self.app).await,
+            "get_plan" => super::tools::plans::get_plan(context.arguments, &self.app).await,
+            "delete_plan" => super::tools::plans::delete_plan(context.arguments, &self.app).await,
+            "execute_plan" => super::tools::plans::execute_plan(context.arguments, &self.app).await,
             "get_plan_status" => {
-                super::tools::plans::get_plan_status(context.arguments, self.app.db()).await
+                super::tools::plans::get_plan_status(context.arguments, &self.app).await
             }
-            "get_plan_dag" => {
-                super::tools::plans::get_plan_dag(context.arguments, &self.app).await
-            }
+            "get_plan_dag" => super::tools::plans::get_plan_dag(context.arguments, &self.app).await,
             "add_plan_dag_node" => {
                 super::tools::plan_dag::add_plan_dag_node(context.arguments, &self.app).await
             }
@@ -718,7 +760,8 @@ impl ToolRegistry for LayercakeToolRegistry {
                 super::tools::plan_dag::move_plan_dag_node(context.arguments, &self.app).await
             }
             "batch_move_plan_dag_nodes" => {
-                super::tools::plan_dag::batch_move_plan_dag_nodes(context.arguments, &self.app).await
+                super::tools::plan_dag::batch_move_plan_dag_nodes(context.arguments, &self.app)
+                    .await
             }
             "add_plan_dag_edge" => {
                 super::tools::plan_dag::add_plan_dag_edge(context.arguments, &self.app).await
@@ -742,7 +785,9 @@ impl ToolRegistry for LayercakeToolRegistry {
             }
 
             // Graph data tools
-            "import_csv" => super::tools::graph_data::import_csv(context.arguments, self.app.db()).await,
+            "import_csv" => {
+                super::tools::graph_data::import_csv(context.arguments, self.app.db()).await
+            }
             "export_graph" => {
                 super::tools::graph_data::export_graph(context.arguments, &self.app).await
             }
@@ -774,6 +819,15 @@ impl ToolRegistry for LayercakeToolRegistry {
                 | "create_plan"
                 | "execute_plan"
                 | "get_plan_status"
+                | "list_data_sources"
+                | "get_data_source"
+                | "create_data_source_from_file"
+                | "create_empty_data_source"
+                | "update_data_source"
+                | "delete_data_source"
+                | "reprocess_data_source"
+                | "export_data_sources"
+                | "import_data_sources"
                 | "get_plan_dag"
                 | "add_plan_dag_node"
                 | "update_plan_dag_node"

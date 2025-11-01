@@ -2,6 +2,7 @@
 
 pub mod analysis;
 pub mod auth;
+pub mod data_sources;
 pub mod graph_data;
 pub mod graph_edit;
 pub mod plan_dag;

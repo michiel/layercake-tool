@@ -9,7 +9,7 @@ use layercake_core::graphql::{
     chat_manager::ChatManager, context::GraphQLContext, mutations::Mutation, queries::Query,
     subscriptions::Subscription,
 };
-use layercake_core::mcp::tools::{plans as mcp_plans, projects as mcp_projects};
+use layercake_core::mcp::tools::{data_sources, plans as mcp_plans, projects as mcp_projects};
 use sea_orm::{Database, DatabaseConnection};
 use sea_orm_migration::MigratorTrait;
 use serde_json::{json, Value};
@@ -280,6 +280,161 @@ async fn graphql_mcp_parity_smoke_test() -> anyhow::Result<()> {
             "mcp plan updatedAt after update"
         )
     );
+
+    // --- Data source parity -------------------------------------------------
+    let create_empty_data_source_mutation = r#"
+        mutation CreateEmptyDataSource($input: CreateEmptyDataSourceInput!) {
+            createEmptyDataSource(input: $input) {
+                id
+                projectId
+                name
+                dataType
+                status
+                createdAt
+                updatedAt
+            }
+        }
+    "#;
+
+    let data_source_variables = Variables::from_json(json!({
+        "input": {
+            "projectId": project_id,
+            "name": "GraphQL Empty Source",
+            "description": "Created via GraphQL",
+            "dataType": "NODES"
+        }
+    }));
+
+    let data_source_response = schema
+        .execute(Request::new(create_empty_data_source_mutation).variables(data_source_variables))
+        .await;
+    assert!(
+        data_source_response.errors.is_empty(),
+        "GraphQL createEmptyDataSource mutation errored: {:?}",
+        data_source_response.errors
+    );
+
+    let data_source_json = serde_json::to_value(&data_source_response)?;
+    let gql_data_source = data_source_json["data"]["createEmptyDataSource"].clone();
+    assert!(
+        !gql_data_source.is_null(),
+        "createEmptyDataSource response payload missing"
+    );
+    let data_source_id = gql_data_source["id"]
+        .as_i64()
+        .expect("data source id should be an integer") as i32;
+
+    let mcp_data_source = tool_result_json(
+        data_sources::get_data_source(Some(json!({ "data_source_id": data_source_id })), &app)
+            .await?,
+    )["dataSource"]
+        .clone();
+    assert!(
+        !mcp_data_source.is_null(),
+        "MCP get_data_source payload missing 'dataSource'"
+    );
+
+    assert_eq!(gql_data_source["id"], mcp_data_source["id"]);
+    assert_eq!(gql_data_source["projectId"], mcp_data_source["projectId"]);
+    assert_eq!(gql_data_source["dataType"], mcp_data_source["dataType"]);
+    assert_eq!(gql_data_source["status"], mcp_data_source["status"]);
+    assert_eq!(
+        parse_timestamp(
+            &gql_data_source["createdAt"],
+            "graphql data source createdAt"
+        ),
+        parse_timestamp(&mcp_data_source["createdAt"], "mcp data source createdAt")
+    );
+
+    let updated_data_source = tool_result_json(
+        data_sources::update_data_source(
+            Some(json!({
+                "data_source_id": data_source_id,
+                "name": "Updated MCP Source",
+                "description": "Name updated via MCP"
+            })),
+            &app,
+        )
+        .await?,
+    )["dataSource"]
+        .clone();
+    assert!(
+        !updated_data_source.is_null(),
+        "MCP update_data_source payload missing 'dataSource'"
+    );
+    assert_eq!(updated_data_source["name"], json!("Updated MCP Source"));
+    assert_eq!(
+        updated_data_source["description"],
+        json!("Name updated via MCP")
+    );
+
+    let get_data_source_query = r#"
+        query GetDataSource($id: Int!) {
+            dataSource(id: $id) {
+                id
+                projectId
+                name
+                description
+                dataType
+                status
+                createdAt
+                updatedAt
+            }
+        }
+    "#;
+    let gql_ds_after = schema
+        .execute(
+            Request::new(get_data_source_query).variables(Variables::from_json(json!({
+                "id": data_source_id
+            }))),
+        )
+        .await;
+    assert!(
+        gql_ds_after.errors.is_empty(),
+        "GraphQL dataSource query errored: {:?}",
+        gql_ds_after.errors
+    );
+    let gql_ds_after_json = serde_json::to_value(&gql_ds_after)?;
+    let gql_data_source_after = gql_ds_after_json["data"]["dataSource"].clone();
+    assert_eq!(gql_data_source_after["name"], json!("Updated MCP Source"));
+    assert_eq!(
+        gql_data_source_after["description"],
+        json!("Name updated via MCP")
+    );
+
+    let mcp_list = tool_result_json(
+        data_sources::list_data_sources(Some(json!({ "project_id": project_id })), &app).await?,
+    );
+    let mcp_count = mcp_list["count"]
+        .as_u64()
+        .expect("count should be a number");
+
+    let gql_list_query = r#"
+        query ListProjectDataSources($projectId: Int!) {
+            dataSources(projectId: $projectId) {
+                id
+            }
+        }
+    "#;
+    let gql_list = schema
+        .execute(
+            Request::new(gql_list_query).variables(Variables::from_json(json!({
+                "projectId": project_id
+            }))),
+        )
+        .await;
+    assert!(
+        gql_list.errors.is_empty(),
+        "GraphQL dataSources query errored: {:?}",
+        gql_list.errors
+    );
+    let gql_list_json = serde_json::to_value(&gql_list)?;
+    let gql_list_count = gql_list_json["data"]["dataSources"]
+        .as_array()
+        .map(|a| a.len())
+        .unwrap_or(0);
+
+    assert_eq!(mcp_count as usize, gql_list_count);
 
     Ok(())
 }

@@ -2,6 +2,7 @@ use async_graphql::*;
 use chrono::{DateTime, Utc};
 use sea_orm::EntityTrait;
 
+use crate::app_context::PlanSummary;
 use crate::database::entities::{plans, projects};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::Project;
@@ -19,22 +20,24 @@ pub struct Plan {
     pub updated_at: DateTime<Utc>,
 }
 
+impl From<PlanSummary> for Plan {
+    fn from(summary: PlanSummary) -> Self {
+        Self {
+            id: summary.id,
+            project_id: summary.project_id,
+            name: summary.name,
+            yaml_content: summary.yaml_content,
+            dependencies: summary.dependencies,
+            status: summary.status,
+            created_at: summary.created_at,
+            updated_at: summary.updated_at,
+        }
+    }
+}
+
 impl From<plans::Model> for Plan {
     fn from(model: plans::Model) -> Self {
-        let dependencies = model
-            .dependencies
-            .and_then(|d| serde_json::from_str::<Vec<i32>>(&d).ok());
-
-        Self {
-            id: model.id,
-            project_id: model.project_id,
-            name: model.name,
-            yaml_content: model.yaml_content,
-            dependencies,
-            status: model.status,
-            created_at: model.created_at,
-            updated_at: model.updated_at,
-        }
+        PlanSummary::from(model).into()
     }
 }
 

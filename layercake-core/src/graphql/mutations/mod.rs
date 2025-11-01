@@ -5,8 +5,12 @@ use chrono::Utc;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 
 use crate::app_context::{
-    GraphLayerUpdateRequest, GraphNodeUpdateRequest, PlanDagEdgeRequest, PlanDagEdgeUpdateRequest,
-    PlanDagNodePositionRequest, PlanDagNodeRequest, PlanDagNodeUpdateRequest, ProjectUpdate,
+    BulkDataSourceUpload, DataSourceEmptyCreateRequest, DataSourceExportFormat,
+    DataSourceExportRequest, DataSourceFileCreateRequest, DataSourceFileReplacement,
+    DataSourceImportFormat, DataSourceImportRequest, DataSourceUpdateRequest,
+    GraphLayerUpdateRequest, GraphNodeUpdateRequest, PlanCreateRequest, PlanDagEdgeRequest,
+    PlanDagEdgeUpdateRequest, PlanDagNodePositionRequest, PlanDagNodeRequest,
+    PlanDagNodeUpdateRequest, PlanUpdateRequest, ProjectUpdate,
 };
 use crate::database::entities::{
     datasources, graphs, plan_dag_edges, plan_dag_nodes, plans, project_collaborators, projects,
@@ -19,8 +23,6 @@ use serde_json::Value;
 use uuid::Uuid;
 
 use crate::pipeline::DagExecutor;
-use crate::services::data_source_service::DataSourceService;
-use crate::services::datasource_bulk_service::DataSourceBulkService;
 use crate::services::graph_edit_service::GraphEditService;
 use crate::services::graph_service::GraphService;
 use crate::services::library_source_service::LibrarySourceService;
@@ -77,12 +79,7 @@ fn generate_node_id_from_ids(
 }
 
 fn generate_edge_id(source: &str, target: &str) -> String {
-    format!(
-        "edge-{}-{}-{}",
-        source,
-        target,
-        Uuid::new_v4().simple()
-    )
+    format!("edge-{}-{}-{}", source, target, Uuid::new_v4().simple())
 }
 
 pub struct Mutation;
@@ -214,28 +211,20 @@ impl Mutation {
     async fn create_plan(&self, ctx: &Context<'_>, input: CreatePlanInput) -> Result<Plan> {
         let context = ctx.data::<GraphQLContext>()?;
 
-        let dependencies_json = input
-            .dependencies
-            .map(|deps| serde_json::to_string(&deps))
-            .transpose()
-            .map_err(|e| {
-                StructuredError::bad_request(format!("Invalid plan dependencies JSON: {}", e))
-            })?;
-
-        let plan = plans::ActiveModel {
-            project_id: Set(input.project_id),
-            name: Set(input.name),
-            yaml_content: Set(input.yaml_content),
-            dependencies: Set(dependencies_json),
-            status: Set("pending".to_string()),
-            ..Default::default()
+        let request = PlanCreateRequest {
+            project_id: input.project_id,
+            name: input.name,
+            yaml_content: input.yaml_content,
+            dependencies: input.dependencies,
+            status: None,
         };
 
-        let plan = plan
-            .insert(&context.db)
+        let summary = context
+            .app
+            .create_plan(request)
             .await
-            .map_err(|e| StructuredError::database("plans::Entity::insert", e))?;
-        Ok(Plan::from(plan))
+            .map_err(|e| StructuredError::service("AppContext::create_plan", e))?;
+        Ok(Plan::from(summary))
     }
 
     /// Update an existing plan
@@ -247,30 +236,20 @@ impl Mutation {
     ) -> Result<Plan> {
         let context = ctx.data::<GraphQLContext>()?;
 
-        let plan = plans::Entity::find_by_id(id)
-            .one(&context.db)
+        let update = PlanUpdateRequest {
+            name: Some(input.name),
+            yaml_content: Some(input.yaml_content),
+            dependencies: input.dependencies,
+            dependencies_is_set: true,
+            status: None,
+        };
+
+        let summary = context
+            .app
+            .update_plan(id, update)
             .await
-            .map_err(|e| StructuredError::database("plans::Entity::find_by_id", e))?
-            .ok_or_else(|| StructuredError::not_found("Plan", id))?;
-
-        let dependencies_json = input
-            .dependencies
-            .map(|deps| serde_json::to_string(&deps))
-            .transpose()
-            .map_err(|e| {
-                StructuredError::bad_request(format!("Invalid plan dependencies JSON: {}", e))
-            })?;
-
-        let mut plan: plans::ActiveModel = plan.into();
-        plan.name = Set(input.name);
-        plan.yaml_content = Set(input.yaml_content);
-        plan.dependencies = Set(dependencies_json);
-
-        let plan = plan
-            .update(&context.db)
-            .await
-            .map_err(|e| StructuredError::database("plans::Entity::update", e))?;
-        Ok(Plan::from(plan))
+            .map_err(|e| StructuredError::service("AppContext::update_plan", e))?;
+        Ok(Plan::from(summary))
     }
 
     /// Delete a plan
@@ -523,10 +502,9 @@ impl Mutation {
         } = updates;
 
         let metadata_value = if let Some(metadata) = metadata {
-            Some(
-                serde_json::to_value(metadata)
-                    .map_err(|e| StructuredError::bad_request(format!("Invalid node metadata: {}", e)))?,
-            )
+            Some(serde_json::to_value(metadata).map_err(|e| {
+                StructuredError::bad_request(format!("Invalid node metadata: {}", e))
+            })?)
         } else {
             None
         };
@@ -635,10 +613,9 @@ impl Mutation {
         let context = ctx.data::<GraphQLContext>()?;
 
         let metadata_value = if let Some(metadata) = updates.metadata {
-            Some(
-                serde_json::to_value(metadata)
-                    .map_err(|e| StructuredError::bad_request(format!("Invalid edge metadata: {}", e)))?,
-            )
+            Some(serde_json::to_value(metadata).map_err(|e| {
+                StructuredError::bad_request(format!("Invalid edge metadata: {}", e))
+            })?)
         } else {
             None
         };
@@ -1156,127 +1133,29 @@ impl Mutation {
         input: CreateDataSourceInput,
     ) -> Result<DataSource> {
         let context = ctx.data::<GraphQLContext>()?;
-        let data_source_service = DataSourceService::new(context.db.clone());
 
-        // Decode the base64 file content
         use base64::Engine;
-        let file_content = base64::engine::general_purpose::STANDARD
+        let file_bytes = base64::engine::general_purpose::STANDARD
             .decode(&input.file_content)
             .map_err(|e| {
                 StructuredError::bad_request(format!("Failed to decode base64 file content: {}", e))
             })?;
 
-        // Convert GraphQL enums to database enums
-        let file_format = input.file_format.into();
-        let data_type = input.data_type.into();
-
-        let data_source = data_source_service
-            .create_from_file(
-                input.project_id,
-                input.name.clone(),
-                input.description,
-                input.filename.clone(),
-                file_format,
-                data_type,
-                file_content,
-            )
+        let summary = context
+            .app
+            .create_data_source_from_file(DataSourceFileCreateRequest {
+                project_id: input.project_id,
+                name: input.name,
+                description: input.description,
+                filename: input.filename,
+                file_format: input.file_format.into(),
+                data_type: input.data_type.into(),
+                file_bytes,
+            })
             .await
-            .map_err(|e| StructuredError::service("DataSourceService::create_from_file", e))?;
+            .map_err(|e| StructuredError::service("AppContext::create_data_source_from_file", e))?;
 
-        // Automatically add a DataSourceNode to the Plan DAG
-        let timestamp = chrono::Utc::now().timestamp_millis();
-        let node_id = format!("datasourcenode_{}_{:08x}", timestamp, data_source.id);
-
-        // Find or create a plan for this project
-        let plan = match plans::Entity::find()
-            .filter(plans::Column::ProjectId.eq(input.project_id))
-            .one(&context.db)
-            .await
-            .map_err(|e| StructuredError::database("plans::Entity::find (ProjectId)", e))?
-        {
-            Some(plan) => plan,
-            None => {
-                // Auto-create a plan if one doesn't exist
-                let now = chrono::Utc::now();
-                let new_plan = plans::ActiveModel {
-                    id: sea_orm::ActiveValue::NotSet,
-                    project_id: Set(input.project_id),
-                    name: Set(format!("Plan for Project {}", input.project_id)),
-                    yaml_content: Set("".to_string()),
-                    dependencies: Set(None),
-                    status: Set("draft".to_string()),
-                    version: Set(1),
-                    created_at: Set(now),
-                    updated_at: Set(now),
-                };
-                new_plan
-                    .insert(&context.db)
-                    .await
-                    .map_err(|e| StructuredError::database("plans::Entity::insert", e))?
-            }
-        };
-
-        // Fetch current state to determine node index and position
-        let (current_nodes, _) = plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id)
-            .await
-            .map_err(|e| StructuredError::service("plan_dag_delta::fetch_current_plan_dag", e))?;
-        let node_index = current_nodes.len();
-
-        // Calculate position: stack vertically with some spacing
-        let position_x = 100.0;
-        let position_y = 100.0 + (node_index as f64 * 120.0);
-
-        // Create the DAG node metadata and config
-        let metadata_json = serde_json::to_string(&serde_json::json!({ "label": input.name }))
-            .map_err(|e| StructuredError::bad_request(format!("Invalid node metadata: {}", e)))?;
-
-        let config_json = serde_json::to_string(&serde_json::json!({
-            "dataSourceId": data_source.id,
-            "filename": input.filename,
-            "dataType": data_source.data_type.to_lowercase()
-        }))
-        .map_err(|e| StructuredError::bad_request(format!("Invalid node config: {}", e)))?;
-
-        let dag_node = plan_dag_nodes::ActiveModel {
-            id: Set(node_id.clone()),
-            plan_id: Set(plan.id),
-            node_type: Set("DataSourceNode".to_string()),
-            position_x: Set(position_x),
-            position_y: Set(position_y),
-            source_position: Set(None),
-            target_position: Set(None),
-            metadata_json: Set(metadata_json),
-            config_json: Set(config_json),
-            created_at: Set(Utc::now()),
-            updated_at: Set(Utc::now()),
-        };
-
-        let inserted_node = dag_node
-            .insert(&context.db)
-            .await
-            .map_err(|e| StructuredError::database("plan_dag_nodes::Entity::insert", e))?;
-        let result_node = PlanDagNode::from(inserted_node);
-
-        // Generate JSON Patch delta for node addition
-        let patch_op = plan_dag_delta::generate_node_add_patch(&result_node, node_index);
-
-        // Increment plan version
-        let new_version = plan_dag_delta::increment_plan_version(&context.db, plan.id)
-            .await
-            .map_err(|e| StructuredError::service("plan_dag_delta::increment_plan_version", e))?;
-
-        // Broadcast delta event
-        let user_id = "demo_user".to_string(); // TODO: Get from auth context
-        plan_dag_delta::publish_plan_dag_delta(
-            input.project_id,
-            new_version,
-            user_id,
-            vec![patch_op],
-        )
-        .await
-        .ok(); // Non-fatal if broadcast fails
-
-        Ok(DataSource::from(data_source))
+        Ok(DataSource::from(summary))
     }
 
     /// Create a new empty DataSource (without file upload)
@@ -1286,115 +1165,18 @@ impl Mutation {
         input: CreateEmptyDataSourceInput,
     ) -> Result<DataSource> {
         let context = ctx.data::<GraphQLContext>()?;
-        let data_source_service = DataSourceService::new(context.db.clone());
-
-        // Convert GraphQL enum to database enum
-        let data_type = input.data_type.into();
-
-        let data_source = data_source_service
-            .create_empty(
-                input.project_id,
-                input.name.clone(),
-                input.description,
-                data_type,
-            )
+        let summary = context
+            .app
+            .create_empty_data_source(DataSourceEmptyCreateRequest {
+                project_id: input.project_id,
+                name: input.name,
+                description: input.description,
+                data_type: input.data_type.into(),
+            })
             .await
-            .map_err(|e| StructuredError::service("DataSourceService::create_empty", e))?;
+            .map_err(|e| StructuredError::service("AppContext::create_empty_data_source", e))?;
 
-        // Automatically add a DataSourceNode to the Plan DAG
-        let timestamp = chrono::Utc::now().timestamp_millis();
-        let node_id = format!("datasourcenode_{}_{:08x}", timestamp, data_source.id);
-
-        // Find or create a plan for this project
-        let plan = match plans::Entity::find()
-            .filter(plans::Column::ProjectId.eq(input.project_id))
-            .one(&context.db)
-            .await
-            .map_err(|e| StructuredError::database("plans::Entity::find (ProjectId)", e))?
-        {
-            Some(plan) => plan,
-            None => {
-                // Auto-create a plan if one doesn't exist
-                let now = chrono::Utc::now();
-                let new_plan = plans::ActiveModel {
-                    id: sea_orm::ActiveValue::NotSet,
-                    project_id: Set(input.project_id),
-                    name: Set(format!("Plan for Project {}", input.project_id)),
-                    yaml_content: Set("".to_string()),
-                    dependencies: Set(None),
-                    status: Set("draft".to_string()),
-                    version: Set(1),
-                    created_at: Set(now),
-                    updated_at: Set(now),
-                };
-                new_plan
-                    .insert(&context.db)
-                    .await
-                    .map_err(|e| StructuredError::database("plans::Entity::insert", e))?
-            }
-        };
-
-        // Fetch current state to determine node index and position
-        let (current_nodes, _) = plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id)
-            .await
-            .map_err(|e| StructuredError::service("plan_dag_delta::fetch_current_plan_dag", e))?;
-        let node_index = current_nodes.len();
-
-        // Calculate position: stack vertically with some spacing
-        let position_x = 100.0;
-        let position_y = 100.0 + (node_index as f64 * 120.0);
-
-        // Create the DAG node metadata and config
-        let metadata_json = serde_json::to_string(&serde_json::json!({ "label": input.name }))
-            .map_err(|e| StructuredError::bad_request(format!("Invalid node metadata: {}", e)))?;
-
-        let config_json = serde_json::to_string(&serde_json::json!({
-            "dataSourceId": data_source.id,
-            "filename": data_source.filename,
-            "dataType": data_source.data_type.to_lowercase()
-        }))
-        .map_err(|e| StructuredError::bad_request(format!("Invalid node config: {}", e)))?;
-
-        let dag_node = plan_dag_nodes::ActiveModel {
-            id: Set(node_id.clone()),
-            plan_id: Set(plan.id),
-            node_type: Set("DataSourceNode".to_string()),
-            position_x: Set(position_x),
-            position_y: Set(position_y),
-            source_position: Set(None),
-            target_position: Set(None),
-            metadata_json: Set(metadata_json),
-            config_json: Set(config_json),
-            created_at: Set(Utc::now()),
-            updated_at: Set(Utc::now()),
-        };
-
-        let inserted_node = dag_node
-            .insert(&context.db)
-            .await
-            .map_err(|e| StructuredError::database("plan_dag_nodes::Entity::insert", e))?;
-        let result_node = PlanDagNode::from(inserted_node);
-
-        // Generate JSON Patch delta for node addition
-        let patch_op = plan_dag_delta::generate_node_add_patch(&result_node, node_index);
-
-        // Increment plan version
-        let new_version = plan_dag_delta::increment_plan_version(&context.db, plan.id)
-            .await
-            .map_err(|e| StructuredError::service("plan_dag_delta::increment_plan_version", e))?;
-
-        // Broadcast delta event
-        let user_id = "demo_user".to_string(); // TODO: Get from auth context
-        plan_dag_delta::publish_plan_dag_delta(
-            input.project_id,
-            new_version,
-            user_id,
-            vec![patch_op],
-        )
-        .await
-        .ok(); // Non-fatal if broadcast fails
-
-        Ok(DataSource::from(data_source))
+        Ok(DataSource::from(summary))
     }
 
     /// Bulk upload multiple DataSources with automatic file type detection
@@ -1405,14 +1187,11 @@ impl Mutation {
         files: Vec<BulkUploadDataSourceInput>,
     ) -> Result<Vec<DataSource>> {
         let context = ctx.data::<GraphQLContext>()?;
-        let data_source_service = DataSourceService::new(context.db.clone());
 
-        let mut created_data_sources = Vec::new();
-
+        use base64::Engine;
+        let mut uploads = Vec::with_capacity(files.len());
         for file_input in files {
-            // Decode the base64 file content
-            use base64::Engine;
-            let file_content = base64::engine::general_purpose::STANDARD
+            let file_bytes = base64::engine::general_purpose::STANDARD
                 .decode(&file_input.file_content)
                 .map_err(|e| {
                     StructuredError::bad_request(format!(
@@ -1421,126 +1200,21 @@ impl Mutation {
                     ))
                 })?;
 
-            // Use auto-detection to create the data source
-            let data_source = data_source_service
-                .create_with_auto_detect(
-                    project_id,
-                    file_input.name.clone(),
-                    file_input.description,
-                    file_input.filename.clone(),
-                    file_content,
-                )
-                .await
-                .map_err(|e| {
-                    StructuredError::service(
-                        "DataSourceService::create_with_auto_detect",
-                        format!("{} (file: {})", e, file_input.filename),
-                    )
-                })?;
-
-            // Automatically add a DataSourceNode to the Plan DAG
-            let timestamp = chrono::Utc::now().timestamp_millis();
-            let node_id = format!("datasourcenode_{}_{:08x}", timestamp, data_source.id);
-
-            // Find or create a plan for this project
-            let plan = match plans::Entity::find()
-                .filter(plans::Column::ProjectId.eq(project_id))
-                .one(&context.db)
-                .await
-                .map_err(|e| StructuredError::database("plans::Entity::find (ProjectId)", e))?
-            {
-                Some(plan) => plan,
-                None => {
-                    // Auto-create a plan if one doesn't exist
-                    let now = chrono::Utc::now();
-                    let new_plan = plans::ActiveModel {
-                        id: sea_orm::ActiveValue::NotSet,
-                        project_id: Set(project_id),
-                        name: Set(format!("Plan for Project {}", project_id)),
-                        yaml_content: Set("".to_string()),
-                        dependencies: Set(None),
-                        status: Set("draft".to_string()),
-                        version: Set(1),
-                        created_at: Set(now),
-                        updated_at: Set(now),
-                    };
-                    new_plan
-                        .insert(&context.db)
-                        .await
-                        .map_err(|e| StructuredError::database("plans::Entity::insert", e))?
-                }
-            };
-
-            // Fetch current state to determine node index and position
-            let (current_nodes, _) = plan_dag_delta::fetch_current_plan_dag(&context.db, plan.id)
-                .await
-                .map_err(|e| {
-                    StructuredError::service("plan_dag_delta::fetch_current_plan_dag", e)
-                })?;
-            let node_index = current_nodes.len();
-
-            // Calculate position: stack vertically with some spacing
-            let position_x = 100.0;
-            let position_y = 100.0 + (node_index as f64 * 120.0);
-
-            // Create the DAG node metadata and config
-            let metadata_json = serde_json::to_string(&serde_json::json!({
-                "label": file_input.name
-            }))
-            .map_err(|e| StructuredError::bad_request(format!("Invalid node metadata: {}", e)))?;
-
-            let config_json = serde_json::to_string(&serde_json::json!({
-                "dataSourceId": data_source.id,
-                "filename": file_input.filename,
-                "dataType": data_source.data_type.to_lowercase()
-            }))
-            .map_err(|e| StructuredError::bad_request(format!("Invalid node config: {}", e)))?;
-
-            let dag_node = plan_dag_nodes::ActiveModel {
-                id: Set(node_id.clone()),
-                plan_id: Set(plan.id),
-                node_type: Set("DataSourceNode".to_string()),
-                position_x: Set(position_x),
-                position_y: Set(position_y),
-                source_position: Set(None),
-                target_position: Set(None),
-                metadata_json: Set(metadata_json),
-                config_json: Set(config_json),
-                created_at: Set(Utc::now()),
-                updated_at: Set(Utc::now()),
-            };
-
-            let inserted_node = dag_node
-                .insert(&context.db)
-                .await
-                .map_err(|e| StructuredError::database("plan_dag_nodes::Entity::insert", e))?;
-            let result_node = PlanDagNode::from(inserted_node);
-
-            // Generate JSON Patch delta for node addition
-            let patch_op = plan_dag_delta::generate_node_add_patch(&result_node, node_index);
-
-            // Increment plan version
-            let new_version = plan_dag_delta::increment_plan_version(&context.db, plan.id)
-                .await
-                .map_err(|e| {
-                    StructuredError::service("plan_dag_delta::increment_plan_version", e)
-                })?;
-
-            // Broadcast delta event
-            let user_id = "demo_user".to_string(); // TODO: Get from auth context
-            plan_dag_delta::publish_plan_dag_delta(
-                project_id,
-                new_version,
-                user_id,
-                vec![patch_op],
-            )
-            .await
-            .ok(); // Non-fatal if broadcast fails
-
-            created_data_sources.push(DataSource::from(data_source));
+            uploads.push(BulkDataSourceUpload {
+                name: file_input.name,
+                description: file_input.description,
+                filename: file_input.filename,
+                file_bytes,
+            });
         }
 
-        Ok(created_data_sources)
+        let summaries = context
+            .app
+            .bulk_upload_data_sources(project_id, uploads)
+            .await
+            .map_err(|e| StructuredError::service("AppContext::bulk_upload_data_sources", e))?;
+
+        Ok(summaries.into_iter().map(DataSource::from).collect())
     }
 
     /// Update DataSource metadata
@@ -1551,13 +1225,11 @@ impl Mutation {
         input: UpdateDataSourceInput,
     ) -> Result<DataSource> {
         let context = ctx.data::<GraphQLContext>()?;
-        let data_source_service = DataSourceService::new(context.db.clone());
 
-        let data_source = if let Some(file_content_b64) = input.file_content {
-            // Update with new file - decode base64 content
-            use base64::Engine;
-            let file_content = base64::engine::general_purpose::STANDARD
-                .decode(&file_content_b64)
+        use base64::Engine;
+        let new_file = if let Some(file_content_b64) = &input.file_content {
+            let file_bytes = base64::engine::general_purpose::STANDARD
+                .decode(file_content_b64)
                 .map_err(|e| {
                     StructuredError::bad_request(format!(
                         "Failed to decode base64 file content: {}",
@@ -1565,32 +1237,39 @@ impl Mutation {
                     ))
                 })?;
 
-            let filename = input.filename.unwrap_or_else(|| "updated_file".to_string());
-
-            data_source_service
-                .update_file(id, filename, file_content)
-                .await
-                .map_err(|e| StructuredError::service("DataSourceService::update_file", e))?
+            Some(DataSourceFileReplacement {
+                filename: input
+                    .filename
+                    .clone()
+                    .unwrap_or_else(|| "updated_file".to_string()),
+                file_bytes,
+            })
         } else {
-            // Update metadata only
-            data_source_service
-                .update(id, input.name, input.description)
-                .await
-                .map_err(|e| StructuredError::service("DataSourceService::update", e))?
+            None
         };
 
-        Ok(DataSource::from(data_source))
+        let summary = context
+            .app
+            .update_data_source(DataSourceUpdateRequest {
+                id,
+                name: input.name,
+                description: input.description,
+                new_file,
+            })
+            .await
+            .map_err(|e| StructuredError::service("AppContext::update_data_source", e))?;
+
+        Ok(DataSource::from(summary))
     }
 
     /// Delete DataSource
     async fn delete_data_source(&self, ctx: &Context<'_>, id: i32) -> Result<bool> {
         let context = ctx.data::<GraphQLContext>()?;
-        let data_source_service = DataSourceService::new(context.db.clone());
-
-        data_source_service
-            .delete(id)
+        context
+            .app
+            .delete_data_source(id)
             .await
-            .map_err(|e| StructuredError::service("DataSourceService::delete", e))?;
+            .map_err(|e| StructuredError::service("AppContext::delete_data_source", e))?;
 
         Ok(true)
     }
@@ -1598,14 +1277,13 @@ impl Mutation {
     /// Reprocess existing DataSource file
     async fn reprocess_data_source(&self, ctx: &Context<'_>, id: i32) -> Result<DataSource> {
         let context = ctx.data::<GraphQLContext>()?;
-        let data_source_service = DataSourceService::new(context.db.clone());
-
-        let data_source = data_source_service
-            .reprocess(id)
+        let summary = context
+            .app
+            .reprocess_data_source(id)
             .await
-            .map_err(|e| StructuredError::service("DataSourceService::reprocess", e))?;
+            .map_err(|e| StructuredError::service("AppContext::reprocess_data_source", e))?;
 
-        Ok(DataSource::from(data_source))
+        Ok(DataSource::from(summary))
     }
 
     /// Update DataSource graph data directly
@@ -1616,14 +1294,15 @@ impl Mutation {
         graph_json: String,
     ) -> Result<DataSource> {
         let context = ctx.data::<GraphQLContext>()?;
-        let data_source_service = DataSourceService::new(context.db.clone());
-
-        let data_source = data_source_service
-            .update_graph_data(id, graph_json)
+        let summary = context
+            .app
+            .update_data_source_graph_json(id, graph_json)
             .await
-            .map_err(|e| StructuredError::service("DataSourceService::update_graph_data", e))?;
+            .map_err(|e| {
+                StructuredError::service("AppContext::update_data_source_graph_json", e)
+            })?;
 
-        Ok(DataSource::from(data_source))
+        Ok(DataSource::from(summary))
     }
 
     /// Export data sources as spreadsheet (XLSX or ODS)
@@ -1633,39 +1312,29 @@ impl Mutation {
         input: ExportDataSourcesInput,
     ) -> Result<ExportDataSourcesResult> {
         let context = ctx.data::<GraphQLContext>()?;
-        let bulk_service = DataSourceBulkService::new(context.db.clone());
 
-        let format_str = match input.format {
-            crate::graphql::types::SpreadsheetFormat::XLSX => "xlsx",
-            crate::graphql::types::SpreadsheetFormat::ODS => "ods",
+        let format = match input.format {
+            crate::graphql::types::SpreadsheetFormat::XLSX => DataSourceExportFormat::Xlsx,
+            crate::graphql::types::SpreadsheetFormat::ODS => DataSourceExportFormat::Ods,
         };
 
-        // Export to the requested format
-        let file_bytes = match input.format {
-            crate::graphql::types::SpreadsheetFormat::XLSX => bulk_service
-                .export_to_xlsx(&input.data_source_ids)
-                .await
-                .map_err(|e| {
-                    StructuredError::service("DataSourceBulkService::export_to_xlsx", e)
-                })?,
-            crate::graphql::types::SpreadsheetFormat::ODS => bulk_service
-                .export_to_ods(&input.data_source_ids)
-                .await
-                .map_err(|e| StructuredError::service("DataSourceBulkService::export_to_ods", e))?,
-        };
+        let exported = context
+            .app
+            .export_data_sources(DataSourceExportRequest {
+                project_id: input.project_id,
+                data_source_ids: input.data_source_ids,
+                format,
+            })
+            .await
+            .map_err(|e| StructuredError::service("AppContext::export_data_sources", e))?;
 
-        // Encode as base64
         use base64::{engine::general_purpose, Engine as _};
-        let encoded = general_purpose::STANDARD.encode(&file_bytes);
+        let encoded = general_purpose::STANDARD.encode(&exported.data);
 
         Ok(ExportDataSourcesResult {
             file_content: encoded,
-            filename: format!(
-                "datasources_export_{}.{}",
-                chrono::Utc::now().timestamp(),
-                format_str
-            ),
-            format: format_str.to_string(),
+            filename: exported.filename,
+            format: exported.format.extension().to_string(),
         })
     }
 
@@ -1676,64 +1345,39 @@ impl Mutation {
         input: ImportDataSourcesInput,
     ) -> Result<ImportDataSourcesResult> {
         let context = ctx.data::<GraphQLContext>()?;
-        let bulk_service = DataSourceBulkService::new(context.db.clone());
 
-        // Decode base64 file content
         use base64::{engine::general_purpose, Engine as _};
-        tracing::info!(
-            "Importing datasources from file: {} (base64 length: {})",
-            input.filename,
-            input.file_content.len()
-        );
-
         let file_bytes = general_purpose::STANDARD
             .decode(&input.file_content)
             .map_err(|e| StructuredError::bad_request(format!("Invalid base64 content: {}", e)))?;
 
-        tracing::info!("Decoded {} bytes from base64", file_bytes.len());
+        let format = DataSourceImportFormat::from_filename(&input.filename).ok_or_else(|| {
+            StructuredError::bad_request("Only XLSX and ODS formats are supported for import")
+        })?;
 
-        // Import from XLSX or ODS (check file extension)
-        let result = if input.filename.to_lowercase().ends_with(".xlsx") {
-            bulk_service
-                .import_from_xlsx(input.project_id, &file_bytes)
-                .await
-                .map_err(|e| {
-                    StructuredError::service("DataSourceBulkService::import_from_xlsx", e)
-                })?
-        } else if input.filename.to_lowercase().ends_with(".ods") {
-            bulk_service
-                .import_from_ods(input.project_id, &file_bytes)
-                .await
-                .map_err(|e| {
-                    StructuredError::service("DataSourceBulkService::import_from_ods", e)
-                })?
-        } else {
-            return Err(StructuredError::bad_request(
-                "Only XLSX and ODS formats are supported for import",
-            ));
-        };
-
-        // Fetch the imported datasources to return
-        use crate::database::entities::data_sources;
-        use sea_orm::EntityTrait;
-
-        let datasources = data_sources::Entity::find()
-            .all(&context.db)
+        let outcome = context
+            .app
+            .import_data_sources(DataSourceImportRequest {
+                project_id: input.project_id,
+                format,
+                file_bytes,
+            })
             .await
-            .map_err(|e| StructuredError::database("data_sources::Entity::find().all", e))?
-            .into_iter()
-            .filter(|ds| result.imported_ids.contains(&ds.id))
-            .map(DataSource::from)
-            .collect();
+            .map_err(|e| StructuredError::service("AppContext::import_data_sources", e))?;
 
         Ok(ImportDataSourcesResult {
-            data_sources: datasources,
-            created_count: result.created_count,
-            updated_count: result.updated_count,
+            data_sources: outcome
+                .data_sources
+                .into_iter()
+                .map(DataSource::from)
+                .collect(),
+            created_count: outcome.created_count,
+            updated_count: outcome.updated_count,
         })
     }
 
     /// Create a new LibrarySource from uploaded file
+
     async fn create_library_source(
         &self,
         ctx: &Context<'_>,
@@ -2469,8 +2113,13 @@ impl Mutation {
 
         let export_format = parse_export_format(render_target)?;
 
-        let preview_limit = preview_rows
-            .and_then(|value| if value > 0 { Some(value as usize) } else { None });
+        let preview_limit = preview_rows.and_then(|value| {
+            if value > 0 {
+                Some(value as usize)
+            } else {
+                None
+            }
+        });
 
         let content = context
             .app

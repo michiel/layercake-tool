@@ -77,12 +77,9 @@ pub fn get_project_tools() -> Vec<Tool> {
 }
 
 pub async fn list_projects(app: &AppContext) -> McpResult<ToolsCallResult> {
-    let projects = app
-        .list_projects()
-        .await
-        .map_err(|e| McpError::Internal {
-            message: format!("Failed to list projects: {}", e),
-        })?;
+    let projects = app.list_projects().await.map_err(|e| McpError::Internal {
+        message: format!("Failed to list projects: {}", e),
+    })?;
 
     create_success_response(&json!({
         "projects": projects,
@@ -156,10 +153,7 @@ pub async fn update_project(
     }))
 }
 
-pub async fn get_project(
-    arguments: Option<Value>,
-    app: &AppContext,
-) -> McpResult<ToolsCallResult> {
+pub async fn get_project(arguments: Option<Value>, app: &AppContext) -> McpResult<ToolsCallResult> {
     let project_id = get_required_param(&arguments, "project_id")?
         .as_i64()
         .ok_or_else(|| McpError::Validation {
@@ -190,9 +184,11 @@ pub async fn delete_project(
             message: "Project ID must be a number".to_string(),
         })? as i32;
 
-    app.delete_project(project_id).await.map_err(|e| McpError::Internal {
-        message: format!("Failed to delete project: {}", e),
-    })?;
+    app.delete_project(project_id)
+        .await
+        .map_err(|e| McpError::Internal {
+            message: format!("Failed to delete project: {}", e),
+        })?;
 
     create_success_response(&json!({
         "projectId": project_id,

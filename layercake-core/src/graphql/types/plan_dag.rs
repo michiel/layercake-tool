@@ -10,6 +10,7 @@ use serde_json::json;
 use std::collections::HashSet;
 use tracing::warn;
 
+use crate::app_context::DataSourceSummary;
 use crate::app_context::PlanDagSnapshot;
 use crate::database::entities::{data_sources, plan_dag_edges, plan_dag_nodes};
 use crate::graph::Graph;
@@ -124,6 +125,18 @@ impl From<data_sources::Model> for DataSourceReference {
             description: model.description,
             data_type: model.data_type,
             created_at: model.created_at,
+        }
+    }
+}
+
+impl From<DataSourceSummary> for DataSourceReference {
+    fn from(summary: DataSourceSummary) -> Self {
+        Self {
+            id: summary.id,
+            name: summary.name,
+            description: summary.description,
+            data_type: summary.data_type,
+            created_at: summary.created_at,
         }
     }
 }

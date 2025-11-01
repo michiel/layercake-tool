@@ -1,8 +1,8 @@
 use async_graphql::*;
-use chrono::Utc;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
-use crate::database::entities::{plan_dag_edges, plan_dag_nodes, plans, projects, ExecutionState};
+use crate::app_context::{PlanCreateRequest, PlanUpdateRequest};
+use crate::database::entities::{plan_dag_edges, plan_dag_nodes, plans};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::plan::{CreatePlanInput, Plan, UpdatePlanInput};
 use crate::graphql::types::PlanDagNode;
@@ -23,25 +23,26 @@ impl PlanMutations {
     async fn create(&self, ctx: &Context<'_>, input: CreatePlanInput) -> Result<Plan> {
         let context = ctx.data::<GraphQLContext>()?;
 
-        let dependencies_json = input
-            .dependencies
-            .map(|deps| serde_json::to_string(&deps))
-            .transpose()
-            .map_err(|e| StructuredError::bad_request(format!("Invalid plan dependencies JSON: {}", e)))?;
+        let CreatePlanInput {
+            project_id,
+            name,
+            yaml_content,
+            dependencies,
+        } = input;
 
-        let plan = plans::ActiveModel {
-            project_id: Set(input.project_id),
-            name: Set(input.name),
-            yaml_content: Set(input.yaml_content),
-            dependencies: Set(dependencies_json),
-            status: Set("pending".to_string()),
-            ..Default::default()
+        let request = PlanCreateRequest {
+            project_id,
+            name,
+            yaml_content,
+            dependencies,
+            status: None,
         };
 
-        let plan = plan
-            .insert(&context.db)
+        let plan = context
+            .app
+            .create_plan(request)
             .await
-            .map_err(|e| StructuredError::database("plans::Entity::insert", e))?;
+            .map_err(|e| StructuredError::service("AppContext::create_plan", e))?;
         Ok(Plan::from(plan))
     }
 
@@ -54,27 +55,25 @@ impl PlanMutations {
     ) -> Result<Plan> {
         let context = ctx.data::<GraphQLContext>()?;
 
-        let plan = plans::Entity::find_by_id(id)
-            .one(&context.db)
+        let UpdatePlanInput {
+            name,
+            yaml_content,
+            dependencies,
+        } = input;
+
+        let update = PlanUpdateRequest {
+            name: Some(name),
+            yaml_content: Some(yaml_content),
+            dependencies,
+            dependencies_is_set: true,
+            status: None,
+        };
+
+        let plan = context
+            .app
+            .update_plan(id, update)
             .await
-            .map_err(|e| StructuredError::database("plans::Entity::find_by_id", e))?
-            .ok_or_else(|| StructuredError::not_found("Plan", id))?;
-
-        let dependencies_json = input
-            .dependencies
-            .map(|deps| serde_json::to_string(&deps))
-            .transpose()
-            .map_err(|e| StructuredError::bad_request(format!("Invalid plan dependencies JSON: {}", e)))?;
-
-        let mut plan: plans::ActiveModel = plan.into();
-        plan.name = Set(input.name);
-        plan.yaml_content = Set(input.yaml_content);
-        plan.dependencies = Set(dependencies_json);
-
-        let plan = plan
-            .update(&context.db)
-            .await
-            .map_err(|e| StructuredError::database("plans::Entity::update", e))?;
+            .map_err(|e| StructuredError::service("AppContext::update_plan", e))?;
         Ok(Plan::from(plan))
     }
 
@@ -82,16 +81,11 @@ impl PlanMutations {
     async fn delete(&self, ctx: &Context<'_>, id: i32) -> Result<bool> {
         let context = ctx.data::<GraphQLContext>()?;
 
-        let plan = plans::Entity::find_by_id(id)
-            .one(&context.db)
+        context
+            .app
+            .delete_plan(id)
             .await
-            .map_err(|e| StructuredError::database("plans::Entity::find_by_id", e))?
-            .ok_or_else(|| StructuredError::not_found("Plan", id))?;
-
-        plans::Entity::delete_by_id(plan.id)
-            .exec(&context.db)
-            .await
-            .map_err(|e| StructuredError::database("plans::Entity::delete_by_id", e))?;
+            .map_err(|e| StructuredError::service("AppContext::delete_plan", e))?;
 
         Ok(true)
     }

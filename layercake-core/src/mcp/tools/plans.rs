@@ -1,12 +1,49 @@
-//! Plan management tools for MCP
+//! Plan management tools for MCP backed by shared AppContext helpers.
 
-use crate::app_context::AppContext;
-use crate::database::entities::plans;
+use crate::app_context::{AppContext, PlanCreateRequest, PlanUpdateRequest};
 use crate::mcp::tools::{create_success_response, get_optional_param, get_required_param};
 use axum_mcp::prelude::*;
-use sea_orm::*;
 use serde_json::{json, Value};
 use std::collections::HashMap;
+
+fn parse_dependencies(value: Option<&Value>) -> McpResult<Option<Vec<i32>>> {
+    match value {
+        None | Some(Value::Null) => Ok(None),
+        Some(Value::Array(items)) => {
+            let mut deps = Vec::new();
+            for item in items {
+                let id = item.as_i64().ok_or_else(|| McpError::Validation {
+                    message: "Dependencies must be an array of numbers".to_string(),
+                })? as i32;
+                deps.push(id);
+            }
+            Ok(Some(deps))
+        }
+        Some(_) => Err(McpError::Validation {
+            message: "Dependencies must be an array of numbers".to_string(),
+        }),
+    }
+}
+
+fn parse_dependencies_update(value: Option<&Value>) -> McpResult<(Option<Vec<i32>>, bool)> {
+    match value {
+        None => Ok((None, false)),
+        Some(Value::Null) => Ok((None, true)),
+        Some(Value::Array(items)) => {
+            let mut deps = Vec::new();
+            for item in items {
+                let id = item.as_i64().ok_or_else(|| McpError::Validation {
+                    message: "Dependencies must be an array of numbers".to_string(),
+                })? as i32;
+                deps.push(id);
+            }
+            Ok((Some(deps), true))
+        }
+        Some(_) => Err(McpError::Validation {
+            message: "Dependencies must be an array of numbers".to_string(),
+        }),
+    }
+}
 
 /// Get plan management tools
 pub fn get_plan_tools() -> Vec<Tool> {
@@ -38,6 +75,67 @@ pub fn get_plan_tools() -> Vec<Tool> {
                     }
                 },
                 "required": ["project_id", "name", "yaml_content"],
+                "additionalProperties": false
+            }),
+            metadata: HashMap::new(),
+        },
+        Tool {
+            name: "update_plan".to_string(),
+            description: "Update an existing transformation plan".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "plan_id": {
+                        "type": "integer",
+                        "description": "ID of the plan to update"
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Updated name of the plan"
+                    },
+                    "yaml_content": {
+                        "type": "string",
+                        "description": "Updated YAML content for the plan"
+                    },
+                    "dependencies": {
+                        "type": ["array", "null"],
+                        "items": { "type": "integer" },
+                        "description": "Optional list of plan IDs this plan depends on"
+                    }
+                },
+                "required": ["plan_id", "name", "yaml_content"],
+                "additionalProperties": false
+            }),
+            metadata: HashMap::new(),
+        },
+        Tool {
+            name: "get_plan".to_string(),
+            description: "Fetch details of a plan by ID".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "plan_id": {
+                        "type": "integer",
+                        "description": "ID of the plan to retrieve"
+                    }
+                },
+                "required": ["plan_id"],
+                "additionalProperties": false
+            }),
+            metadata: HashMap::new(),
+        },
+        Tool {
+            name: "delete_plan".to_string(),
+            description: "Delete a plan and its associated DAG data".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "plan_id": {
+                        "type": "integer",
+                        "description": "ID of the plan to delete"
+                    }
+                },
+                "required": ["plan_id"],
                 "additionalProperties": false
             }),
             metadata: HashMap::new(),
@@ -94,10 +192,7 @@ pub fn get_plan_tools() -> Vec<Tool> {
 }
 
 /// Create a new plan
-pub async fn create_plan(
-    arguments: Option<Value>,
-    db: &DatabaseConnection,
-) -> McpResult<ToolsCallResult> {
+pub async fn create_plan(arguments: Option<Value>, app: &AppContext) -> McpResult<ToolsCallResult> {
     let project_id = get_required_param(&arguments, "project_id")?
         .as_i64()
         .ok_or_else(|| McpError::Validation {
@@ -118,85 +213,131 @@ pub async fn create_plan(
         })?
         .to_string();
 
-    let dependencies = get_optional_param(&arguments, "dependencies")
-        .and_then(|v| {
-            v.as_array().map(|arr| {
-                arr.iter()
-                    .filter_map(|v| v.as_i64().map(|i| i as i32))
-                    .collect::<Vec<i32>>()
-            })
-        })
-        .unwrap_or_default();
+    let dependencies = parse_dependencies(get_optional_param(&arguments, "dependencies"))?;
 
     // Validate YAML content
     serde_yaml::from_str::<serde_yaml::Value>(&yaml_content).map_err(|e| McpError::Validation {
         message: format!("Invalid YAML content: {}", e),
     })?;
 
-    let dependencies_json =
-        serde_json::to_string(&dependencies).map_err(|e| McpError::Internal {
-            message: format!("Failed to serialize dependencies: {}", e),
-        })?;
-
-    let existing_plan = plans::Entity::find()
-        .filter(plans::Column::ProjectId.eq(project_id))
-        .one(db)
-        .await
-        .map_err(|e| McpError::Internal {
-            message: format!("Database error: {}", e),
-        })?;
-
-    let now = chrono::Utc::now();
-    let (plan, message) = if let Some(plan) = existing_plan {
-        let mut active: plans::ActiveModel = plan.into();
-        active.name = Set(name.clone());
-        active.yaml_content = Set(yaml_content.clone());
-        active.dependencies = Set(Some(dependencies_json.clone()));
-        active.status = Set("pending".to_string());
-        active.updated_at = Set(now);
-        let updated = active.update(db).await.map_err(|e| McpError::Internal {
-            message: format!("Failed to update plan: {}", e),
-        })?;
-        (updated, "Plan updated successfully")
-    } else {
-        let new_plan = plans::ActiveModel {
-            project_id: Set(project_id),
-            name: Set(name.clone()),
-            yaml_content: Set(yaml_content.clone()),
-            dependencies: Set(Some(dependencies_json.clone())),
-            status: Set("pending".to_string()),
-            created_at: Set(now),
-            updated_at: Set(now),
-            ..Default::default()
-        };
-
-        let created = plans::Entity::insert(new_plan)
-            .exec_with_returning(db)
-            .await
-            .map_err(|e| McpError::Internal {
-                message: format!("Failed to create plan: {}", e),
-            })?;
-        (created, "Plan created successfully")
+    let request = PlanCreateRequest {
+        project_id,
+        name,
+        yaml_content,
+        dependencies,
+        status: None,
     };
 
-    let result = json!({
-        "id": plan.id,
-        "project_id": plan.project_id,
-        "name": plan.name,
-        "status": plan.status,
-        "dependencies": dependencies,
-        "created_at": plan.created_at,
-        "updated_at": plan.updated_at,
-        "message": message
-    });
+    let plan = app
+        .create_plan(request)
+        .await
+        .map_err(|e| McpError::Internal {
+            message: format!("Failed to create plan: {}", e),
+        })?;
 
-    create_success_response(&result)
+    create_success_response(&json!({
+        "plan": plan,
+        "message": "Plan created successfully"
+    }))
+}
+
+/// Update an existing plan
+pub async fn update_plan(arguments: Option<Value>, app: &AppContext) -> McpResult<ToolsCallResult> {
+    let plan_id = get_required_param(&arguments, "plan_id")?
+        .as_i64()
+        .ok_or_else(|| McpError::Validation {
+            message: "Plan ID must be a number".to_string(),
+        })? as i32;
+
+    let name = get_required_param(&arguments, "name")?
+        .as_str()
+        .ok_or_else(|| McpError::Validation {
+            message: "Plan name must be a string".to_string(),
+        })?
+        .to_string();
+
+    let yaml_content = get_required_param(&arguments, "yaml_content")?
+        .as_str()
+        .ok_or_else(|| McpError::Validation {
+            message: "YAML content must be a string".to_string(),
+        })?
+        .to_string();
+
+    let (dependencies, dependencies_is_set) =
+        parse_dependencies_update(get_optional_param(&arguments, "dependencies"))?;
+
+    // Validate YAML content
+    serde_yaml::from_str::<serde_yaml::Value>(&yaml_content).map_err(|e| McpError::Validation {
+        message: format!("Invalid YAML content: {}", e),
+    })?;
+
+    let update = PlanUpdateRequest {
+        name: Some(name),
+        yaml_content: Some(yaml_content),
+        dependencies,
+        dependencies_is_set,
+        status: None,
+    };
+
+    let plan = app
+        .update_plan(plan_id, update)
+        .await
+        .map_err(|e| McpError::Internal {
+            message: format!("Failed to update plan: {}", e),
+        })?;
+
+    create_success_response(&json!({
+        "plan": plan,
+        "message": "Plan updated successfully"
+    }))
+}
+
+/// Retrieve a plan by ID
+pub async fn get_plan(arguments: Option<Value>, app: &AppContext) -> McpResult<ToolsCallResult> {
+    let plan_id = get_required_param(&arguments, "plan_id")?
+        .as_i64()
+        .ok_or_else(|| McpError::Validation {
+            message: "Plan ID must be a number".to_string(),
+        })? as i32;
+
+    let plan = app
+        .get_plan(plan_id)
+        .await
+        .map_err(|e| McpError::Internal {
+            message: format!("Failed to load plan: {}", e),
+        })?
+        .ok_or_else(|| McpError::ToolExecution {
+            tool: "get_plan".to_string(),
+            message: format!("Plan with ID {} not found", plan_id),
+        })?;
+
+    create_success_response(&json!({ "plan": plan }))
+}
+
+/// Delete a plan by ID
+pub async fn delete_plan(arguments: Option<Value>, app: &AppContext) -> McpResult<ToolsCallResult> {
+    let plan_id = get_required_param(&arguments, "plan_id")?
+        .as_i64()
+        .ok_or_else(|| McpError::Validation {
+            message: "Plan ID must be a number".to_string(),
+        })? as i32;
+
+    app.delete_plan(plan_id)
+        .await
+        .map_err(|e| McpError::Internal {
+            message: format!("Failed to delete plan: {}", e),
+        })?;
+
+    create_success_response(&json!({
+        "planId": plan_id,
+        "message": "Plan deleted successfully"
+    }))
 }
 
 /// Execute a plan (placeholder implementation)
 pub async fn execute_plan(
     arguments: Option<Value>,
-    db: &DatabaseConnection,
+    app: &AppContext,
 ) -> McpResult<ToolsCallResult> {
     let plan_id = get_required_param(&arguments, "plan_id")?
         .as_i64()
@@ -205,11 +346,11 @@ pub async fn execute_plan(
         })? as i32;
 
     // Find the plan
-    let plan = plans::Entity::find_by_id(plan_id)
-        .one(db)
+    let plan = app
+        .get_plan(plan_id)
         .await
         .map_err(|e| McpError::Internal {
-            message: format!("Database error: {}", e),
+            message: format!("Failed to load plan: {}", e),
         })?
         .ok_or_else(|| McpError::ToolExecution {
             tool: "execute_plan".to_string(),
@@ -234,16 +375,20 @@ pub async fn execute_plan(
     }
 
     // Update status to running
-    let mut plan_active: plans::ActiveModel = plan.clone().into();
-    plan_active.status = Set("running".to_string());
-    plan_active.updated_at = Set(chrono::Utc::now());
-
-    plans::Entity::update(plan_active)
-        .exec(db)
-        .await
-        .map_err(|e| McpError::Internal {
-            message: format!("Failed to update plan status: {}", e),
-        })?;
+    app.update_plan(
+        plan_id,
+        PlanUpdateRequest {
+            name: None,
+            yaml_content: None,
+            dependencies: None,
+            dependencies_is_set: false,
+            status: Some("running".to_string()),
+        },
+    )
+    .await
+    .map_err(|e| McpError::Internal {
+        message: format!("Failed to update plan status: {}", e),
+    })?;
 
     // Execute the plan using the existing plan_execution module
     let execution_result = crate::plan_execution::execute_plan(plan.yaml_content.clone(), false);
@@ -260,16 +405,20 @@ pub async fn execute_plan(
     };
 
     // Update status based on execution result
-    let mut plan_active: plans::ActiveModel = plan.into();
-    plan_active.status = Set(status.clone());
-    plan_active.updated_at = Set(chrono::Utc::now());
-
-    plans::Entity::update(plan_active)
-        .exec(db)
-        .await
-        .map_err(|e| McpError::Internal {
-            message: format!("Failed to update plan status: {}", e),
-        })?;
+    app.update_plan(
+        plan_id,
+        PlanUpdateRequest {
+            name: None,
+            yaml_content: None,
+            dependencies: None,
+            dependencies_is_set: false,
+            status: Some(status.clone()),
+        },
+    )
+    .await
+    .map_err(|e| McpError::Internal {
+        message: format!("Failed to update plan status: {}", e),
+    })?;
 
     let result = json!({
         "plan_id": plan_id,
@@ -283,7 +432,7 @@ pub async fn execute_plan(
 /// Get plan status
 pub async fn get_plan_status(
     arguments: Option<Value>,
-    db: &DatabaseConnection,
+    app: &AppContext,
 ) -> McpResult<ToolsCallResult> {
     let plan_id = get_required_param(&arguments, "plan_id")?
         .as_i64()
@@ -291,29 +440,23 @@ pub async fn get_plan_status(
             message: "Plan ID must be a number".to_string(),
         })? as i32;
 
-    let plan = plans::Entity::find_by_id(plan_id)
-        .one(db)
+    let plan = app
+        .get_plan(plan_id)
         .await
         .map_err(|e| McpError::Internal {
-            message: format!("Database error: {}", e),
+            message: format!("Failed to load plan: {}", e),
         })?
         .ok_or_else(|| McpError::ToolExecution {
             tool: "get_plan_status".to_string(),
             message: format!("Plan with ID {} not found", plan_id),
         })?;
 
-    let dependencies: Vec<i32> = plan
-        .dependencies
-        .as_ref()
-        .and_then(|deps| serde_json::from_str(deps).ok())
-        .unwrap_or_default();
-
     let result = json!({
         "id": plan.id,
         "project_id": plan.project_id,
         "name": plan.name,
         "status": plan.status,
-        "dependencies": dependencies,
+        "dependencies": plan.dependencies.unwrap_or_default(),
         "created_at": plan.created_at,
         "updated_at": plan.updated_at
     });
