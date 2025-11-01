@@ -135,14 +135,15 @@
   - [x] Add regression checks (manual or automated) proving project list/create still work via GraphQL after the refactor.  
 
 - [ ] **Project parity**  
-  - [ ] Refactor GraphQL project CRUD mutations to call `AppContext`; update MCP project tools to reuse the same helpers.  
-  - [ ] Update `layercake://projects/...` resource responses to return live data through the shared DTOs.  
-  - [ ] Verify parity across GraphQL + MCP project operations.
+  - [x] Refactor GraphQL project CRUD mutations to call `AppContext`; update MCP project tools to reuse the same helpers.  
+  - [x] Update `layercake://projects/...` resource responses to return live data through the shared DTOs.  
+  - [x] Verify parity across GraphQL + MCP project operations.
 
-- [ ] **Plan summary parity**  
-  - [ ] Introduce shared helpers for plan create/update/get/delete and migrate GraphQL mutations.  
-  - [ ] Rework MCP plan tools to delegate to the shared helpers.  
-  - [ ] Ensure plan resources emit real JSON snapshots identical to GraphQL outputs.
+- [x] **Plan summary parity**  
+  - [x] Introduce shared helpers for plan create/update/get/delete and migrate GraphQL mutations.  
+  - [x] Rework MCP plan tools to delegate to the shared helpers.  
+  - [x] Ensure plan resources emit real JSON snapshots identical to GraphQL outputs.
+    - Covered by the shared parity smoke test in `layercake-core/tests/parity_smoke_test.rs`.
 
 - [x] **Plan DAG read path**  
   - [x] Add an `AppContext::load_plan_dag` helper returning nodes/edges.  
@@ -154,7 +155,7 @@
 
 - [ ] **Prepare for Phase 3+**  
   - [x] Document remaining gaps (graph editing, data sources, telemetry).  
-  - [ ] Update test/CI strategy to exercise GraphQL and MCP endpoints in parallel before advancing to later phases.
+  - [x] Update test/CI strategy to exercise GraphQL and MCP endpoints in parallel before advancing to later phases.
 
 ### Phase 7 – Optional Features (Auth/Collaboration/Chat)
 - When prioritised, expose auth tools by wrapping `AuthService` flows and persisting sessions for MCP clients.  
