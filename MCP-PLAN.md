@@ -106,6 +106,24 @@
 - Add contract tests ensuring serialisation matches GraphQL JSON (e.g., using snapshot tests referencing `frontend/src/graphql` expectations) and asserting MCP/console outputs match the same snapshots.  
 - Update developer docs with example MCP/GraphQL/console requests, API-key configuration (for HTTP), and troubleshooting notes for shared service errors.
 
+## Remaining Gaps After Phase 3
+
+- **Graph Editing**
+  - Shared helpers cover updates/bulk edits/replay only; creation and deletion flows still instantiate `GraphService` directly inside mutations. Plan follow-up to expose `AppContext::add_graph_node`, `add_graph_edge`, and delete helpers so MCP parity can extend to structural changes.
+  - No event streaming yet for graph edit playback. Telemetry work (Phase 5) should introduce a shared publisher so MCP/console can subscribe or poll for edit progress.
+- **Data Sources**
+  - Upload/reprocess/download paths are still GraphQL-only. Phase 4 must move `DataSourceService`/`LibrarySourceService` entry points into `AppContext` and surface MCP tools/resources.
+  - `layercake://datasources/...` URIs still return placeholder content; update once shared DTOs are available.
+- **Telemetry**
+  - Execution status remains tied to GraphQL subscriptions. Need shared polling helpers plus MCP resource endpoints (Phase 5) to surface execution state snapshots.
+  - CI lacks cross-surface smoke tests verifying shared helpers; roll into the remaining “Prepare for Phase 3+” checklist item.
+
+## Next Session Checklist
+
+1. Define the dual GraphQL/MCP smoke-test strategy and mark the remaining “Prepare for Phase 3+” checkbox.
+2. Begin Phase 4 by extracting shared data source upload/reprocess helpers into `AppContext`, then implement matching MCP tools/resources.
+3. Decide telemetry data model requirements (e.g., plan execution timelines) to unblock Phase 5 subscriptions/polling work.
+
 ## Incremental Delivery Checklist
 
 - [ ] **Baseline sanity**  
@@ -135,7 +153,7 @@
   - [x] Migrate GraphQL DAG mutations and expose matching MCP tools; smoke-test both surfaces.
 
 - [ ] **Prepare for Phase 3+**  
-  - [ ] Document remaining gaps (graph editing, data sources, telemetry).  
+  - [x] Document remaining gaps (graph editing, data sources, telemetry).  
   - [ ] Update test/CI strategy to exercise GraphQL and MCP endpoints in parallel before advancing to later phases.
 
 ### Phase 7 – Optional Features (Auth/Collaboration/Chat)
