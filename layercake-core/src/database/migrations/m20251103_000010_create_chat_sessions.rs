@@ -57,21 +57,9 @@ impl MigrationTrait for Migration {
                             .to(Users::Table, Users::Id)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
-                    .index(
-                        Index::create()
-                            .name("idx_chat_sessions_project")
-                            .col(ChatSessions::ProjectId),
-                    )
-                    .index(
-                        Index::create()
-                            .name("idx_chat_sessions_user")
-                            .col(ChatSessions::UserId),
-                    )
-                    .index(
-                        Index::create()
-                            .name("idx_chat_sessions_activity")
-                            .col(ChatSessions::LastActivityAt),
-                    )
+                    .index(Index::create().name("idx_chat_sessions_project").col(ChatSessions::ProjectId))
+                    .index(Index::create().name("idx_chat_sessions_user").col(ChatSessions::UserId))
+                    .index(Index::create().name("idx_chat_sessions_activity").col(ChatSessions::LastActivityAt))
                     .to_owned(),
             )
             .await

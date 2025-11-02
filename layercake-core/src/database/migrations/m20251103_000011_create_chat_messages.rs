@@ -38,16 +38,8 @@ impl MigrationTrait for Migration {
                             .to(ChatSessions::Table, ChatSessions::Id)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
-                    .index(
-                        Index::create()
-                            .name("idx_chat_messages_session")
-                            .col(ChatMessages::SessionId),
-                    )
-                    .index(
-                        Index::create()
-                            .name("idx_chat_messages_created")
-                            .col(ChatMessages::CreatedAt),
-                    )
+                    .index(Index::create().name("idx_chat_messages_session").col(ChatMessages::SessionId))
+                    .index(Index::create().name("idx_chat_messages_created").col(ChatMessages::CreatedAt))
                     .to_owned(),
             )
             .await

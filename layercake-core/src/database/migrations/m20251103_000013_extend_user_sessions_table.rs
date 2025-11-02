@@ -26,11 +26,7 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(UserSessions::Table)
-                    .add_column(
-                        ColumnDef::new(UserSessions::AuthContext)
-                            .string()
-                            .null()
-                    )
+                    .add_column(ColumnDef::new(UserSessions::AuthContext).string())
                     .to_owned(),
             )
             .await?;
