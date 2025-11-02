@@ -27,7 +27,7 @@ impl McpBridge {
         let tools = LayercakeToolRegistry::new(app.clone());
         let resources = LayercakeResourceRegistry::new(app.clone());
         let prompts = LayercakePromptRegistry::new();
-        let auth = LayercakeAuth::new();
+        let auth = LayercakeAuth::new(db.clone());
 
         let state = LayercakeServerState {
             db,

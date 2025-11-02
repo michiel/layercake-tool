@@ -27,16 +27,11 @@ pub struct LayercakeAuth {
     pub allow_anonymous: bool,
     pub require_api_key: bool,
     pub valid_api_keys: std::collections::HashSet<String>,
-}
-
-impl Default for LayercakeAuth {
-    fn default() -> Self {
-        Self::new()
-    }
+    pub db: DatabaseConnection,
 }
 
 impl LayercakeAuth {
-    pub fn new() -> Self {
+    pub fn new(db: DatabaseConnection) -> Self {
         Self {
             allow_anonymous: std::env::var("LAYERCAKE_ALLOW_ANONYMOUS")
                 .unwrap_or_else(|_| "true".to_string())
@@ -52,6 +47,7 @@ impl LayercakeAuth {
                 .filter(|key| !key.is_empty())
                 .map(|key| key.trim().to_string())
                 .collect(),
+            db,
         }
     }
 
@@ -66,21 +62,31 @@ impl LayercakeAuth {
 #[async_trait]
 impl McpAuth for LayercakeAuth {
     async fn authenticate(&self, client_info: &ClientContext) -> McpResult<SecurityContext> {
-        if self.require_api_key {
-            // Check for API key in client metadata
-            if let Some(auth_header) = client_info.metadata.get("authorization") {
-                if let Some(api_key) = auth_header.strip_prefix("Bearer ") {
-                    if self.validate_api_key(api_key) {
-                        return Ok(SecurityContext::authenticated(
-                            client_info.clone(),
-                            vec!["api_key".to_string(), "authenticated".to_string()],
-                        ));
+        // Try to authenticate as MCP agent first
+        if let Some(auth_header) = client_info.metadata.get("authorization") {
+            if let Some(api_key) = auth_header.strip_prefix("Bearer ") {
+                // Check if this is a Layercake MCP agent API key
+                if api_key.starts_with("lc_mcp_") {
+                    use crate::services::mcp_agent_service::McpAgentService;
+                    let service = McpAgentService::new(self.db.clone());
+
+                    match service.authenticate_agent(api_key).await {
+                        Ok(agent) => {
+                            return Ok(SecurityContext::user(
+                                agent.id,
+                                agent.user_type,
+                                agent.scoped_project_id,
+                            ));
+                        }
+                        Err(_) => {
+                            return Err(McpError::Authentication {
+                                message: "Invalid MCP agent API key".to_string(),
+                            });
+                        }
                     }
                 }
-            }
 
-            // Check for API key in query parameters
-            if let Some(api_key) = client_info.metadata.get("api_key") {
+                // Check if this is a legacy API key
                 if self.validate_api_key(api_key) {
                     return Ok(SecurityContext::authenticated(
                         client_info.clone(),
@@ -88,7 +94,19 @@ impl McpAuth for LayercakeAuth {
                     ));
                 }
             }
+        }
 
+        // Check for API key in query parameters
+        if let Some(api_key) = client_info.metadata.get("api_key") {
+            if self.validate_api_key(api_key) {
+                return Ok(SecurityContext::authenticated(
+                    client_info.clone(),
+                    vec!["api_key".to_string(), "authenticated".to_string()],
+                ));
+            }
+        }
+
+        if self.require_api_key {
             return Err(McpError::Authentication {
                 message: "Valid API key required".to_string(),
             });
@@ -179,6 +197,13 @@ impl McpServerState for LayercakeServerState {
     }
 }
 
+/// Tools that MCP agents should not have access to
+const MCP_AGENT_BLACKLIST: &[&str] = &[
+    "create_project",
+    "delete_project",
+    "list_projects",
+];
+
 /// Custom tool registry for Layercake tools
 #[derive(Clone)]
 pub struct LayercakeToolRegistry {
@@ -189,11 +214,42 @@ impl LayercakeToolRegistry {
     pub fn new(app: Arc<AppContext>) -> Self {
         Self { app }
     }
+
+    /// Inject project_id into arguments for MCP agents to enforce scope
+    fn inject_project_scope(
+        arguments: &mut Option<serde_json::Value>,
+        scoped_project_id: i32,
+    ) -> McpResult<()> {
+        if let Some(args) = arguments {
+            if let Some(obj) = args.as_object_mut() {
+                // If project_id is already present, verify it matches the scoped project
+                if let Some(existing_project_id) = obj.get("project_id") {
+                    if let Some(id) = existing_project_id.as_i64() {
+                        if id as i32 != scoped_project_id {
+                            return Err(McpError::Authorization {
+                                message: format!(
+                                    "MCP agent scoped to project {} cannot access project {}",
+                                    scoped_project_id, id
+                                ),
+                            });
+                        }
+                    }
+                } else {
+                    // Inject the scoped project_id
+                    obj.insert(
+                        "project_id".to_string(),
+                        serde_json::Value::Number(scoped_project_id.into()),
+                    );
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 #[async_trait]
 impl ToolRegistry for LayercakeToolRegistry {
-    async fn list_tools(&self, _context: &SecurityContext) -> McpResult<Vec<Tool>> {
+    async fn list_tools(&self, context: &SecurityContext) -> McpResult<Vec<Tool>> {
         let mut tools = Vec::new();
 
         // Project management tools
@@ -216,6 +272,11 @@ impl ToolRegistry for LayercakeToolRegistry {
 
         // Analysis tools
         tools.extend(super::tools::analysis::get_analysis_tools());
+
+        // Filter blacklisted tools for MCP agents
+        if context.is_mcp_agent() {
+            tools.retain(|tool| !MCP_AGENT_BLACKLIST.contains(&tool.name.as_str()));
+        }
 
         Ok(tools)
     }
@@ -684,8 +745,23 @@ impl ToolRegistry for LayercakeToolRegistry {
     async fn execute_tool(
         &self,
         name: &str,
-        context: ToolExecutionContext,
+        mut context: ToolExecutionContext,
     ) -> McpResult<ToolsCallResult> {
+        // Enforce MCP agent restrictions
+        if context.security.is_mcp_agent() {
+            // Check if tool is blacklisted
+            if MCP_AGENT_BLACKLIST.contains(&name) {
+                return Err(McpError::Authorization {
+                    message: format!("MCP agents cannot access tool: {}", name),
+                });
+            }
+
+            // Inject project scope for MCP agents
+            if let Some(scoped_project_id) = context.security.scoped_project_id() {
+                Self::inject_project_scope(&mut context.arguments, scoped_project_id)?;
+            }
+        }
+
         match name {
             "list_projects" => super::tools::projects::list_projects(&self.app).await,
             "create_project" => {
