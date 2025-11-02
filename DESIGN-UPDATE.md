@@ -985,23 +985,23 @@ impl McpAgentService {
 
 ## Migration Strategy
 
-### Phase 1: Database Schema
+### Phase 1: Database Schema ✅ COMPLETE
 
-- [ ] Create migration for `chat_sessions` table
-- [ ] Create migration for `chat_messages` table
-- [ ] Add `user_type` column to `users` table
-- [ ] Add `scoped_project_id` column to `users` table
-- [ ] Add `api_key_hash` column to `users` table
-- [ ] Add `organisation_id` column to `users` table (nullable, for future)
-- [ ] Add `auth_method` column to `user_sessions` table
-- [ ] Add `auth_context` column to `user_sessions` table
-- [ ] Create entity models for `chat_sessions`
-- [ ] Create entity models for `chat_messages`
-- [ ] Update entity models for `users` with new fields
-- [ ] Update entity models for `user_sessions` with new fields
-- [ ] Test migrations on development database
-- [ ] Verify build passes: `cargo build`
-- [ ] Verify tests pass: `cargo test`
+- [x] Create migration for `chat_sessions` table
+- [x] Create migration for `chat_messages` table
+- [x] Add `user_type` column to `users` table
+- [x] Add `scoped_project_id` column to `users` table
+- [x] Add `api_key_hash` column to `users` table
+- [x] Add `organisation_id` column to `users` table (nullable, for future)
+- [x] Add `auth_method` column to `user_sessions` table
+- [x] Add `auth_context` column to `user_sessions` table
+- [x] Create entity models for `chat_sessions`
+- [x] Create entity models for `chat_messages`
+- [x] Update entity models for `users` with new fields
+- [x] Update entity models for `user_sessions` with new fields
+- [x] Test migrations on development database
+- [x] Verify build passes: `cargo build`
+- [x] Verify tests pass: `cargo test`
 
 ### Phase 2: Service Layer
 
