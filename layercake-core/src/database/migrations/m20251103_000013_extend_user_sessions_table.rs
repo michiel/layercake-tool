@@ -21,12 +21,16 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // Add auth_context column for storing additional auth metadata as JSON
+        // Add auth_context column for storing additional auth metadata as JSON text
         manager
             .alter_table(
                 Table::alter()
                     .table(UserSessions::Table)
-                    .add_column(ColumnDef::new(UserSessions::AuthContext).text())
+                    .add_column(
+                        ColumnDef::new(UserSessions::AuthContext)
+                            .string()
+                            .null()
+                    )
                     .to_owned(),
             )
             .await?;
