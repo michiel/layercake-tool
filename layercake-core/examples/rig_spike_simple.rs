@@ -5,7 +5,7 @@
 use anyhow::Result;
 use rig::client::CompletionClient;
 use rig::completion::Prompt;
-use rig::providers;
+use rig::providers::openai;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -17,26 +17,18 @@ async fn main() -> Result<()> {
         return Ok(());
     }
 
-    // Test 1: Basic completion
-    println!("📝 Test: Basic Completion");
-    let client = providers::openai::Client::from_env();
-    let model = client.completion_model("gpt-4o-mini");
+    // Test 1: Agent (simplest API)
+    println!("🤖 Test: Agent with Prompt");
+    let openai_client = openai::Client::from_env();
+    let gpt4 = openai_client.agent("gpt-4o-mini").build();
 
-    let response = model.prompt("What is 2+2? Answer with just the number.").await?;
+    let response = gpt4
+        .prompt("What is 2+2? Answer with just the number.")
+        .await?;
+
     println!("   Response: {}", response);
     println!("   ✅ Works!\n");
 
-    // Test 2: Agent
-    println!("🤖 Test: Agent");
-    let agent = client
-        .agent("gpt-4o-mini")
-        .preamble("You are a helpful assistant")
-        .build();
-
-    let response = agent.prompt("Say hello").await?;
-    println!("   Response: {}", response);
-    println!("   ✅ Works!\n");
-
-    println!("=== All Tests Passed ===");
+    println!("=== Test Passed ===");
     Ok(())
 }

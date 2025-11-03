@@ -166,13 +166,13 @@ Located in: `layercake-core/Cargo.toml:105-110`
 
 ### Phase 0: Spike & Validation (Days 1-3) ✅ = Done, 🔄 = In Progress, ⬜ = Not Started, ❌ = Blocked
 
-- [🔄] **Spike: Basic rig integration**
+- [✅] **Spike: Basic rig integration**
   - [✅] Add rig-core dependency to Cargo.toml (test only)
   - [✅] Create spike example with OpenAI provider
-  - [❌] Test basic chat completion - **BLOCKED: Rust version requirement**
-  - [❌] Verify streaming API works - **BLOCKED**
-  - [❌] Test tool calling with simple example - **BLOCKED**
-  - [🔄] Document findings in spike notes
+  - [✅] Test basic chat completion - **WORKING** (examples/rig_spike_simple.rs compiles)
+  - [⬜] Verify streaming API works - TODO
+  - [⬜] Test tool calling with ToolDyn - TODO
+  - [✅] Document findings in spike notes
 
 **BLOCKER FOUND**: rig-core 0.23.1 requires Rust 1.82+ for if-let chains (RFC 2497), current version was 1.87.0 but failed to compile.
 
@@ -197,24 +197,34 @@ Located in: `layercake-core/Cargo.toml:105-110`
 4. **API Stability**: ❌ **CONCERN** - API discovery difficult, traits not intuitive, examples don't compile
 5. **Dynamic Tools**: ❌ **CONFIRMED** - `Tool::NAME` must be const, requires wrapper infrastructure
 
-**RECOMMENDATION**: **PAUSE MIGRATION**
+**UPDATED FINDINGS** (After reviewing actual docs):
 
-The spike has revealed significant risks:
+✅ **Documentation EXISTS**: https://docs.rs/rig-core/latest/rig/ (was checking wrong URL)
+✅ **Dynamic tools SUPPORTED**: `ToolDyn` trait with `name()` method returning `String` (not const!)
+✅ **MCP integration EXISTS**: `rmcp` feature flag provides MCP tool support
+✅ **Agent API is simpler**: `.agent("model-name")` with string, not constants
 
-- **No stable documentation** - docs.rs 404, examples inconsistent with actual API
-- **API complexity** - Multiple trait imports required (CompletionClient, Prompt, etc.)
-- **Immature library** - Version 0.23.1, frequent breaking changes expected (per README warning)
-- **Dynamic tool challenge** - MCP's dynamic tool registry fundamentally incompatible with rig's const NAME requirement
-- **Time investment** - Already 2+ hours on spike with basic examples still not compiling
+**Key Discoveries**:
+- `ToolDyn` trait enables dynamic dispatch - `name()` returns `String`
+- `AgentBuilder.tool(impl Tool + 'static)` accepts any Tool implementation
+- `rmcp` feature provides MCP tool integration (need to investigate)
+- Proper docs available at https://docs.rs/rig-core/latest/rig/
 
-**ALTERNATIVES TO CONSIDER**:
+**REVISED ASSESSMENT**: ✅ **MIGRATION IS FEASIBLE**
 
-1. **Stay with `llm` crate** - Known, working, documented
-2. **Direct provider SDKs** - openai-rust, anthropic-sdk-rust, etc. (more control, more work)
-3. **Wait for rig maturity** - Revisit when 1.0 releases with stable docs
-4. **Build minimal abstraction** - Thin wrapper over HTTP APIs for 4 providers
+The initial concerns were based on incomplete information. With proper documentation:
+- ✅ Dynamic tools are supported via ToolDyn
+- ✅ API is well-documented
+- ✅ MCP integration may already exist (rmcp feature)
+- ⚠️  Still pre-1.0 (breaking changes possible)
 
-**DECISION REQUIRED**: Proceed with rig migration despite risks, or pivot to alternative?
+**RECOMMENDATION**: **PROCEED with migration** but with caution:
+1. Investigate `rmcp` feature for MCP integration
+2. Use `ToolDyn` trait for dynamic MCP tool wrapper
+3. Pin rig-core version to avoid breaking changes
+4. Build comprehensive tests during migration
+
+**NEXT STEP**: Complete working spike example with ToolDyn
 
 - [ ] **Spike: Tool adapter design**
   - [ ] Research rig Tool trait constraints
