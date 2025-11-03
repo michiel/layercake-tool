@@ -178,7 +178,7 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
             tools: LayercakeToolRegistry::new(app_context.clone()),
             resources: crate::mcp::resources::LayercakeResourceRegistry::new(app_context.clone()),
             prompts: crate::mcp::prompts::LayercakePromptRegistry::new(),
-            auth: LayercakeAuth::new(),
+            auth: LayercakeAuth::new(db.clone()),
         };
 
         let mcp_server = Arc::new(McpServer::new(mcp_config, mcp_state));
@@ -198,10 +198,20 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
 #[cfg(feature = "graphql")]
 async fn graphql_handler(
     State(state): State<AppState>,
-    Json(req): Json<Request>,
+    headers: axum::http::HeaderMap,
+    Json(mut req): Json<Request>,
 ) -> Json<GraphQLResponse> {
+    use crate::graphql::context::RequestSession;
+
     tracing::debug!("GraphQL request received");
-    let mut req = req;
+
+    if let Some(session_header) = headers
+        .get("x-layercake-session")
+        .and_then(|value| value.to_str().ok())
+    {
+        req = req.data(RequestSession(session_header.to_string()));
+    }
+
     let mutation_log = capture_mutation_log_info(&mut req);
     let response = state.graphql_schema.execute(req).await;
 

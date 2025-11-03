@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useApolloClient, useMutation } from '@apollo/client/react'
+import { useApolloClient, useMutation, useQuery } from '@apollo/client/react'
 import {
   START_CHAT_SESSION,
   SEND_CHAT_MESSAGE,
@@ -7,6 +7,8 @@ import {
   ChatEventPayload,
   StartChatSessionPayload,
   CHAT_EVENTS_SUBSCRIPTION,
+  GET_CHAT_HISTORY,
+  ChatMessage,
 } from '../graphql/chat'
 
 export type ChatMessageRole = 'user' | 'assistant' | 'tool'
@@ -22,6 +24,7 @@ export interface ChatMessageEntry {
 interface UseChatSessionArgs {
   projectId?: number
   provider: ChatProviderOption
+  sessionId?: string | null
 }
 
 interface UseChatSessionResult {
@@ -53,7 +56,7 @@ const getErrorMessage = (error: unknown) => {
   return String(error)
 }
 
-export function useChatSession({ projectId, provider }: UseChatSessionArgs): UseChatSessionResult {
+export function useChatSession({ projectId, provider, sessionId }: UseChatSessionArgs): UseChatSessionResult {
   const [session, setSession] = useState<StartChatSessionPayload | undefined>()
   const [messages, setMessages] = useState<ChatMessageEntry[]>([])
   const [loading, setLoading] = useState(false)
@@ -64,6 +67,13 @@ export function useChatSession({ projectId, provider }: UseChatSessionArgs): Use
   const client = useApolloClient()
   const [startSession] = useMutation<{ startChatSession: StartChatSessionPayload }>(START_CHAT_SESSION)
   const [sendChat] = useMutation(SEND_CHAT_MESSAGE)
+
+  // Load history for existing sessions
+  const { data: historyData } = useQuery<{ chatHistory: ChatMessage[] }>(GET_CHAT_HISTORY, {
+    variables: { sessionId: sessionId || '' },
+    skip: !sessionId,
+    fetchPolicy: 'network-only',
+  })
 
   const subscriptionRef = useRef<{ unsubscribe: () => void } | null>(null)
 
@@ -83,6 +93,8 @@ export function useChatSession({ projectId, provider }: UseChatSessionArgs): Use
     setRestartNonce(prev => prev + 1)
   }, [teardownSubscription])
 
+  // Initialize session - always create a NEW active session for real-time communication
+  // When viewing history, this creates a continuation session
   useEffect(() => {
     if (!projectId) {
       return
@@ -91,15 +103,20 @@ export function useChatSession({ projectId, provider }: UseChatSessionArgs): Use
     let cancelled = false
     setLoading(true)
     setError(null)
-    setMessages([])
-    setSession(undefined)
     setAwaitingAssistant(false)
     teardownSubscription()
 
+    // Clear messages only when starting completely fresh (no history to load)
+    if (!sessionId) {
+      setMessages([])
+      setSession(undefined)
+    }
+
+    // Always start a new active session for real-time communication
     ;(async () => {
       try {
         const { data } = await startSession({
-          variables: { projectId, provider },
+          variables: { projectId, provider, sessionId: sessionId ?? null },
         })
         if (cancelled) return
         if (data?.startChatSession) {
@@ -121,8 +138,29 @@ export function useChatSession({ projectId, provider }: UseChatSessionArgs): Use
     return () => {
       cancelled = true
     }
-  }, [projectId, provider, restartNonce, startSession, teardownSubscription])
+  }, [projectId, provider, sessionId, restartNonce, startSession, teardownSubscription])
 
+  // Load history when viewing an existing session (after active session is created)
+  useEffect(() => {
+    if (sessionId) {
+      setMessages([])
+    }
+  }, [sessionId])
+
+  useEffect(() => {
+    if (sessionId && historyData?.chatHistory) {
+      const loadedMessages: ChatMessageEntry[] = historyData.chatHistory.map((msg) => ({
+        id: msg.message_id,
+        role: msg.role as ChatMessageRole,
+        content: msg.content,
+        toolName: msg.tool_name || undefined,
+        createdAt: msg.created_at,
+      }))
+      setMessages(loadedMessages)
+    }
+  }, [sessionId, historyData])
+
+  // Subscribe to real-time chat events from the active session
   useEffect(() => {
     if (!session?.sessionId) {
       return

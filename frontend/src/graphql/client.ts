@@ -5,6 +5,7 @@ import { onError } from '@apollo/client/link/error'
 import { setContext } from '@apollo/client/link/context'
 import { createClient } from 'graphql-ws'
 import { getServerInfo, isTauriApp, waitForServer } from '../utils/tauri'
+import { getOrCreateSessionId } from '../utils/session'
 
 // Store server configuration
 let serverConfig: { url: string; secret: string; wsUrl: string } | null = null
@@ -76,6 +77,7 @@ function createApolloClient(): ApolloClient {
   // Create authentication link for Tauri secret
   const authLink = setContext((_, { headers }) => {
     const { secret } = getGraphQLEndpoints()
+    const sessionId = getOrCreateSessionId()
 
     // Add secret header if available (Tauri mode)
     if (secret) {
@@ -83,11 +85,17 @@ function createApolloClient(): ApolloClient {
         headers: {
           ...headers,
           'x-tauri-secret': secret,
+          'x-layercake-session': sessionId,
         },
       }
     }
 
-    return { headers }
+    return {
+      headers: {
+        ...headers,
+        'x-layercake-session': sessionId,
+      },
+    }
   })
 
   // HTTP Link for queries and mutations with timeout using AbortController
@@ -124,12 +132,13 @@ function createApolloClient(): ApolloClient {
     url: currentWsUrl,
     connectionParams: () => {
       const { secret } = getGraphQLEndpoints()
+      const sessionId = getOrCreateSessionId()
       console.log('[GraphQL WebSocket] Getting connection params, secret:', secret ? 'present' : 'none')
       // Include secret in WebSocket connection params if available (Tauri mode)
       if (secret) {
-        return { 'x-tauri-secret': secret }
+        return { 'x-tauri-secret': secret, 'x-layercake-session': sessionId }
       }
-      return {}
+      return { 'x-layercake-session': sessionId }
     },
     shouldRetry: () => {
       // Retry connection on network errors

@@ -10,6 +10,10 @@ mod m20251024_000006_add_datasource_id_to_graph_data;
 mod m20251024_000007_normalize_graph_schema;
 mod m20251030_000008_create_chat_credentials;
 mod m20251030_000009_seed_chat_credentials;
+mod m20251103_000010_create_chat_sessions;
+mod m20251103_000011_create_chat_messages;
+mod m20251103_000012_extend_users_table;
+mod m20251103_000013_extend_user_sessions_table;
 
 pub struct Migrator;
 
@@ -27,6 +31,10 @@ impl MigratorTrait for Migrator {
             Box::new(m20251024_000007_normalize_graph_schema::Migration),
             Box::new(m20251030_000008_create_chat_credentials::Migration),
             Box::new(m20251030_000009_seed_chat_credentials::Migration),
+            Box::new(m20251103_000010_create_chat_sessions::Migration),
+            Box::new(m20251103_000011_create_chat_messages::Migration),
+            Box::new(m20251103_000012_extend_users_table::Migration),
+            Box::new(m20251103_000013_extend_user_sessions_table::Migration),
         ]
     }
 }

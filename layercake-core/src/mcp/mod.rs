@@ -8,6 +8,8 @@ pub mod prompts;
 #[cfg(feature = "mcp")]
 pub mod resources;
 #[cfg(feature = "mcp")]
+pub mod security;
+#[cfg(feature = "mcp")]
 pub mod server;
 #[cfg(feature = "mcp")]
 pub mod tools;

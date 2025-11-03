@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { Routes, Route, useNavigate, useParams, useLocation } from 'react-router-dom'
 import { AppShell, Group, Title, Stack, Button, Text, Card, Badge, Alert, Modal, Select, ActionIcon, Tooltip } from '@mantine/core'
 import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconDownload, IconChevronLeft, IconChevronRight, IconFolderPlus, IconNetwork, IconBooks, IconMessageDots } from '@tabler/icons-react'
@@ -15,6 +15,8 @@ import { TopBar } from './components/layout/TopBar'
 import { useCollaborationV2 } from './hooks/useCollaborationV2'
 import { useConnectionStatus } from './hooks/useConnectionStatus'
 import { ProjectChatPage } from './pages/ProjectChatPage'
+import { ChatLogsPage } from './pages/ChatLogsPage'
+import { getOrCreateSessionId } from './utils/session'
 
 // Collaboration Context for providing project-level collaboration to all pages
 const CollaborationContext = React.createContext<any>(null)
@@ -83,29 +85,24 @@ const GET_PLAN_DAG = gql`
   }
 `
 
-// Generate a unique session ID for this browser tab/window
-// This ensures each browser session is tracked separately
-const generateSessionId = () => {
-  // Use crypto.randomUUID if available, otherwise fallback to timestamp + random
-  if (crypto.randomUUID) {
-    return `user-${crypto.randomUUID()}`;
-  }
-  return `user-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-};
-
 // Layout wrapper component
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate()
   const location = useLocation()
 
   // Generate stable session ID (only once per component mount)
-  const [sessionId] = useState(() => generateSessionId());
+  const [sessionId] = useState(() => getOrCreateSessionId());
 
   // Navigation collapse state
   const [navCollapsed, setNavCollapsed] = useState(false);
 
   // Get current route info for navigation highlighting
   const isActiveRoute = (path: string) => {
+    if (path === '/') return location.pathname === '/'
+    return location.pathname === path
+  }
+
+  const isActiveRoutePrefix = (path: string) => {
     if (path === '/') return location.pathname === '/'
     if (!location.pathname.startsWith(path)) {
       return false
@@ -115,8 +112,10 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   }
 
   // Extract project info from current path for navbar
-  const projectIdMatch = location.pathname.match(/\/projects\/(\d+)/)
-  const projectId = projectIdMatch ? parseInt(projectIdMatch[1]) : undefined
+  const projectId = useMemo(() => {
+    const match = location.pathname.match(/\/projects\/(\d+)/)
+    return match ? parseInt(match[1], 10) : undefined
+  }, [location.pathname])
 
   // Initialize collaboration only if we're in a project context
   const collaboration = useCollaborationV2({
@@ -196,7 +195,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
             </Tooltip>
             <Tooltip label="Projects" position="right" disabled={!navCollapsed}>
               <Button
-                variant={isActiveRoute('/projects') ? 'filled' : 'light'}
+                variant={isActiveRoutePrefix('/projects') ? 'filled' : 'light'}
                 fullWidth={!navCollapsed}
                 leftSection={navCollapsed ? undefined : <IconDatabase size={16} />}
                 onClick={() => navigate('/projects')}
@@ -213,7 +212,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                 <div style={{ height: '1px', backgroundColor: '#e9ecef', margin: '8px 0' }} />
                 <Tooltip label="Project" position="right" disabled={!navCollapsed}>
                   <Button
-                    variant={isActiveRoute(`/projects/${projectId}`) && !isActiveRoute(`/projects/${projectId}/datasources`) && !isActiveRoute(`/projects/${projectId}/plan`) && !isActiveRoute(`/projects/${projectId}/plan-nodes`) && !isActiveRoute(`/projects/${projectId}/graphs`) ? 'filled' : 'light'}
+                    variant={isActiveRoute(`/projects/${projectId}`) ? 'filled' : 'light'}
                     fullWidth={!navCollapsed}
                     leftSection={navCollapsed ? undefined : <IconFolderPlus size={16} />}
                     onClick={() => navigate(`/projects/${projectId}`)}
@@ -237,7 +236,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                 </Tooltip>
                 <Tooltip label="Plan" position="right" disabled={!navCollapsed}>
                   <Button
-                    variant={isActiveRoute(`/projects/${projectId}/plan`) ? 'filled' : 'light'}
+                    variant={isActiveRoute(`/projects/${projectId}/plan`) || isActiveRoute(`/projects/${projectId}/plan-nodes`) ? 'filled' : 'light'}
                     fullWidth={!navCollapsed}
                     leftSection={navCollapsed ? undefined : <IconGraph size={16} />}
                     onClick={() => navigate(`/projects/${projectId}/plan`)}
@@ -247,18 +246,21 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                     {navCollapsed ? <IconGraph size={16} /> : 'Plan'}
                   </Button>
                 </Tooltip>
-                <Tooltip label="Plan Nodes" position="right" disabled={!navCollapsed}>
-                  <Button
-                    variant={isActiveRoute(`/projects/${projectId}/plan-nodes`) ? 'filled' : 'light'}
-                    fullWidth={!navCollapsed}
-                    leftSection={navCollapsed ? undefined : <IconNetwork size={16} />}
-                    onClick={() => navigate(`/projects/${projectId}/plan-nodes`)}
-                    px={navCollapsed ? 'xs' : undefined}
-                    style={navCollapsed ? { justifyContent: 'center' } : undefined}
-                  >
-                    {navCollapsed ? <IconNetwork size={16} /> : 'Plan Nodes'}
-                  </Button>
-                </Tooltip>
+                {/* Show Plan Nodes when on Plan or Plan Nodes page */}
+                {(isActiveRoute(`/projects/${projectId}/plan`) || isActiveRoute(`/projects/${projectId}/plan-nodes`)) && (
+                  <Tooltip label="Plan Nodes" position="right" disabled={!navCollapsed}>
+                    <Button
+                      variant={isActiveRoute(`/projects/${projectId}/plan-nodes`) ? 'filled' : 'light'}
+                      fullWidth={!navCollapsed}
+                      leftSection={navCollapsed ? undefined : <IconNetwork size={16} />}
+                      onClick={() => navigate(`/projects/${projectId}/plan-nodes`)}
+                      px={navCollapsed ? 'xs' : undefined}
+                      style={navCollapsed ? { justifyContent: 'center', ...(navCollapsed ? {} : { paddingLeft: '2rem' }) } : undefined}
+                    >
+                      {navCollapsed ? <IconNetwork size={16} /> : 'Plan Nodes'}
+                    </Button>
+                  </Tooltip>
+                )}
                 <Tooltip label="Graphs" position="right" disabled={!navCollapsed}>
                   <Button
                     variant={isActiveRoute(`/projects/${projectId}/graphs`) ? 'filled' : 'light'}
@@ -273,7 +275,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                 </Tooltip>
                 <Tooltip label="Chat" position="right" disabled={!navCollapsed}>
                   <Button
-                    variant={isActiveRoute(`/projects/${projectId}/chat`) ? 'filled' : 'light'}
+                    variant={isActiveRoutePrefix(`/projects/${projectId}/chat`) ? 'filled' : 'light'}
                     fullWidth={!navCollapsed}
                     leftSection={navCollapsed ? undefined : <IconMessageDots size={16} />}
                     onClick={() => navigate(`/projects/${projectId}/chat`)}
@@ -283,6 +285,21 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                     {navCollapsed ? <IconMessageDots size={16} /> : 'Chat'}
                   </Button>
                 </Tooltip>
+                {/* Show Chat logs only when on Chat page */}
+                {isActiveRoutePrefix(`/projects/${projectId}/chat`) && (
+                  <Tooltip label="Chat logs" position="right" disabled={!navCollapsed}>
+                    <Button
+                      variant={isActiveRoute(`/projects/${projectId}/chat/logs`) ? 'filled' : 'light'}
+                      fullWidth={!navCollapsed}
+                      leftSection={navCollapsed ? undefined : <IconMessageDots size={16} />}
+                      onClick={() => navigate(`/projects/${projectId}/chat/logs`)}
+                      px={navCollapsed ? 'xs' : undefined}
+                      style={navCollapsed ? { justifyContent: 'center', ...(navCollapsed ? {} : { paddingLeft: '2rem' }) } : undefined}
+                    >
+                      {navCollapsed ? <IconMessageDots size={16} /> : 'Chat logs'}
+                    </Button>
+                  </Tooltip>
+                )}
               </>
             )}
           </Stack>
@@ -1279,6 +1296,11 @@ function App() {
           <Route path="/projects/:projectId/chat" element={
             <ErrorBoundary>
               <ProjectChatPage />
+            </ErrorBoundary>
+          } />
+          <Route path="/projects/:projectId/chat/logs" element={
+            <ErrorBoundary>
+              <ChatLogsPage />
             </ErrorBoundary>
           } />
           <Route path="/projects/:projectId/plan-nodes/:graphId/edit" element={

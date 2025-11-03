@@ -7,12 +7,48 @@ use sea_orm::{
     ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
 };
 
-use crate::database::entities::{graph_edges, graphs, projects};
+use crate::database::entities::{graph_edges, graphs, projects, users};
 
 use super::{
     chat::{ChatConfig, ChatProvider},
     output::{print_table, TableRow},
 };
+
+/// Get or create a default user for console/development use
+async fn get_or_create_default_user(db: &DatabaseConnection) -> Result<users::Model> {
+    use sea_orm::{ActiveModelTrait, Set};
+
+    // Try to find existing default user
+    if let Some(user) = users::Entity::find()
+        .filter(users::Column::Username.eq("default"))
+        .one(db)
+        .await?
+    {
+        return Ok(user);
+    }
+
+    // Create default user if it doesn't exist
+    let now = chrono::Utc::now();
+    let default_user = users::ActiveModel {
+        email: Set("default@layercake.local".to_string()),
+        username: Set("default".to_string()),
+        display_name: Set("Default User".to_string()),
+        password_hash: Set("".to_string()), // No password for default user
+        avatar_color: Set("#3b82f6".to_string()),
+        is_active: Set(true),
+        user_type: Set("human".to_string()),
+        scoped_project_id: Set(None),
+        api_key_hash: Set(None),
+        organisation_id: Set(None),
+        created_at: Set(now),
+        updated_at: Set(now),
+        last_login_at: Set(None),
+        ..Default::default()
+    };
+
+    let user = default_user.insert(db).await?;
+    Ok(user)
+}
 
 /// Active console runtime state shared across command handlers.
 pub struct ConsoleContext {
@@ -153,10 +189,20 @@ impl ConsoleContext {
 
         let provider = provider_override.unwrap_or(self.chat_config.default_provider);
 
-        let mut session =
-            super::chat::ChatSession::new(self.db.clone(), project.id, provider, &self.chat_config)
-                .await
-                .context("failed to start chat session")?;
+        // Get or create default user for console/development use
+        let user = get_or_create_default_user(&self.db)
+            .await
+            .context("failed to get or create default user")?;
+
+        let mut session = super::chat::ChatSession::new(
+            self.db.clone(),
+            project.id,
+            user,
+            provider,
+            &self.chat_config,
+        )
+        .await
+        .context("failed to start chat session")?;
 
         session.interactive_loop().await
     }

@@ -17,6 +17,8 @@ pub struct Model {
     pub selected_node_id: Option<String>,
     pub last_activity: ChronoDateTimeUtc,
     pub is_active: bool,
+    pub auth_method: String,
+    pub auth_context: Option<String>,
     pub created_at: ChronoDateTimeUtc,
     pub expires_at: ChronoDateTimeUtc,
 }
@@ -67,6 +69,8 @@ impl ActiveModel {
             selected_node_id: ActiveValue::NotSet,
             last_activity: Set(now),
             is_active: Set(true),
+            auth_method: Set("password".to_string()),
+            auth_context: ActiveValue::NotSet,
             created_at: Set(now),
             expires_at: Set(now + chrono::Duration::hours(24)), // 24 hour session
         }
