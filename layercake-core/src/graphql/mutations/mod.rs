@@ -30,6 +30,51 @@ use crate::services::sample_project_service::SampleProjectService;
 
 use crate::console::chat::ChatProvider;
 use crate::graphql::types::chat::{ChatProviderOption, ChatSendResult, ChatSessionPayload};
+
+/// Get or create a default user for development/testing
+/// In production, this should be replaced with proper authentication
+async fn get_or_create_default_user(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<i32, async_graphql::Error> {
+    use sea_orm::{ActiveModelTrait, EntityTrait, Set};
+
+    // Try to find existing default user
+    if let Some(user) = users::Entity::find()
+        .filter(users::Column::Username.eq("default"))
+        .one(db)
+        .await
+        .map_err(|e| {
+            StructuredError::database("users::Entity::find", anyhow::Error::new(e))
+        })?
+    {
+        return Ok(user.id);
+    }
+
+    // Create default user if it doesn't exist
+    let now = chrono::Utc::now();
+    let default_user = users::ActiveModel {
+        email: Set("default@layercake.local".to_string()),
+        username: Set("default".to_string()),
+        display_name: Set("Default User".to_string()),
+        password_hash: Set("".to_string()), // No password for default user
+        avatar_color: Set("#3b82f6".to_string()),
+        is_active: Set(true),
+        user_type: Set("human".to_string()),
+        scoped_project_id: Set(None),
+        api_key_hash: Set(None),
+        organisation_id: Set(None),
+        created_at: Set(now),
+        updated_at: Set(now),
+        last_login_at: Set(None),
+        ..Default::default()
+    };
+
+    let user = default_user.insert(db).await.map_err(|e| {
+        StructuredError::database("users::ActiveModel::insert", anyhow::Error::new(e))
+    })?;
+
+    Ok(user.id)
+}
 use crate::graphql::types::graph::{CreateGraphInput, CreateLayerInput, Graph, UpdateGraphInput};
 use crate::graphql::types::graph_edit::{
     CreateGraphEditInput, EditResult, GraphEdit, ReplaySummary,
@@ -164,8 +209,9 @@ impl Mutation {
             .map(ChatProvider::from)
             .unwrap_or(context.chat_config.default_provider);
 
-        // TODO: Get actual user_id from GraphQL context authentication
-        let user_id = 1; // Placeholder for now
+        // Get or create default user for development/testing
+        // TODO: Replace with proper authentication in production
+        let user_id = get_or_create_default_user(&context.db).await?;
 
         let started = context
             .chat_manager
@@ -2413,8 +2459,9 @@ impl Mutation {
         let context = ctx.data::<GraphQLContext>()?;
         let service = McpAgentService::new(context.db.clone());
 
-        // TODO: Get actual creator_user_id from authentication context
-        let creator_user_id = 1;
+        // Get or create default user for development/testing
+        // TODO: Replace with proper authentication in production
+        let creator_user_id = get_or_create_default_user(&context.db).await?;
 
         let credentials = service
             .create_agent(creator_user_id, project_id, name, None)
