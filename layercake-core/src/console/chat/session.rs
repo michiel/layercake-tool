@@ -450,6 +450,10 @@ impl ChatSession {
         F: FnMut(ChatEvent),
     {
         let use_tools = self.tool_use_enabled && !self.llm_tools.is_empty();
+
+        // Log request details at DEBUG level before making the call
+        self.log_llm_request_debug(use_tools);
+
         if use_tools {
             match self
                 .llm
@@ -490,6 +494,50 @@ impl ChatSession {
         }
     }
 
+    fn log_llm_request_debug(&self, with_tools: bool) {
+        if !tracing::enabled!(tracing::Level::DEBUG) {
+            return;
+        }
+
+        // Build a detailed representation of the request
+        let mut request_debug = String::new();
+        request_debug.push_str(&format!("\n=== LLM Request Details ===\n"));
+        request_debug.push_str(&format!("Provider: {}\n", self.provider.to_string()));
+        request_debug.push_str(&format!("Model: {}\n", self.model_name));
+        request_debug.push_str(&format!("Session ID: {:?}\n", self.session_id));
+        request_debug.push_str(&format!("With Tools: {}\n", with_tools));
+        request_debug.push_str(&format!("Message Count: {}\n", self.messages.len()));
+
+        if with_tools {
+            request_debug.push_str(&format!("Tool Count: {}\n", self.llm_tools.len()));
+            request_debug.push_str("Tools: ");
+            for tool in &self.llm_tools {
+                request_debug.push_str(&format!("{}, ", tool.function.name));
+            }
+            request_debug.push('\n');
+        }
+
+        request_debug.push_str("\n--- Messages ---\n");
+        for (idx, msg) in self.messages.iter().enumerate() {
+            request_debug.push_str(&format!(
+                "\nMessage {}: role={:?}, type={:?}\n",
+                idx,
+                msg.role,
+                msg.message_type
+            ));
+            request_debug.push_str(&format!("Content ({}): {}\n",
+                msg.content.len(),
+                msg.content
+            ));
+        }
+
+        request_debug.push_str("\n--- System Prompt ---\n");
+        request_debug.push_str(&self.system_prompt);
+        request_debug.push_str("\n=========================\n");
+
+        tracing::debug!("{}", request_debug);
+    }
+
     fn log_llm_error_debug(&self, err: &LLMError) {
         // Only log at DEBUG level if it's an HTTP error in 4xx or 5xx range
         if let LLMError::HttpError(msg) = err {
@@ -500,32 +548,11 @@ impl ChatSession {
                 || msg.contains("504");
 
             if is_client_error || is_server_error {
-                // Build a debug representation of the messages
-                let mut messages_debug = String::new();
-                for (idx, msg) in self.messages.iter().enumerate() {
-                    messages_debug.push_str(&format!(
-                        "Message {}: role={:?}, type={:?}, content_length={}\n",
-                        idx,
-                        msg.role,
-                        msg.message_type,
-                        msg.content.len()
-                    ));
-                    // Include content preview (first 200 chars)
-                    let content_preview = if msg.content.len() > 200 {
-                        format!("{}...", &msg.content[..200])
-                    } else {
-                        msg.content.clone()
-                    };
-                    messages_debug.push_str(&format!("  Content: {}\n", content_preview));
-                }
-
                 tracing::debug!(
                     provider = %self.provider.to_string(),
                     model = %self.model_name,
                     session_id = ?self.session_id,
-                    error = %msg,
-                    "LLM HTTP error occurred\n\nRequest payload (messages):\n{}\nError response: {}",
-                    messages_debug,
+                    "\n=== LLM HTTP Error Response ===\n{}\n===============================",
                     msg
                 );
             }
