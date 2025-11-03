@@ -125,5 +125,6 @@ tokio-test = "0.4"
 futures-util = { workspace = true }
 tokio-tungstenite = { workspace = true }
 
-# Spike: rig evaluation
-rig-core = "0.23.1"
+# Spike: rig evaluation (note: crate is rig-core but imports use `rig::`)
+rig = { version = "0.23.1", package = "rig-core" }
+thiserror = { workspace = true }

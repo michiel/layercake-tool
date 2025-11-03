@@ -37,13 +37,14 @@ async fn main() -> Result<()> {
 async fn test_basic_completion() -> Result<()> {
     println!("📝 Test 1: Basic Completion");
 
-    // This will help us understand the actual rig API
-    use rig_core::prelude::*;
+    use rig::client::CompletionClient;
+    use rig::completion::Prompt;
+    use rig::providers;
 
-    let client = rig_core::providers::openai::Client::from_env();
+    let client = providers::openai::Client::from_env();
 
     // Test model initialization
-    let model = client.model("gpt-4o-mini").build();
+    let model = client.completion_model(providers::openai::GPT_4O_MINI);
 
     // Test basic prompt
     let response = model.prompt("What is 2+2? Answer with just the number.").await?;
@@ -57,19 +58,20 @@ async fn test_basic_completion() -> Result<()> {
 async fn test_streaming() -> Result<()> {
     println!("📡 Test 2: Streaming");
 
-    use rig_core::prelude::*;
+    use rig::client::CompletionClient;
+    use rig::completion::Prompt;
+    use rig::providers;
 
-    let client = rig_core::providers::openai::Client::from_env();
-    let model = client.model("gpt-4o-mini").build();
+    let client = providers::openai::Client::from_env();
+    let model = client.completion_model(providers::openai::GPT_4O_MINI);
 
-    // Test streaming - we need to understand the streaming API
+    // Test streaming - rig uses prompt() which returns full response
+    // For actual streaming, we'd use a different method
     println!("   Testing streaming API...");
 
-    // Note: This will likely need adjustment based on actual rig API
-    // We're discovering the API here
     let response = model.prompt("Count from 1 to 3").await?;
-    println!("   Streamed response: {}", response);
-    println!("   ⚠️  Need to investigate actual streaming API\n");
+    println!("   Response: {}", response);
+    println!("   ⚠️  Note: Need to investigate streaming API (may be agent-level)\n");
 
     Ok(())
 }
@@ -77,8 +79,10 @@ async fn test_streaming() -> Result<()> {
 async fn test_tool_calling() -> Result<()> {
     println!("🔧 Test 3: Tool Calling");
 
-    use rig_core::prelude::*;
-    use rig_core::tool::Tool;
+    use rig::client::CompletionClient;
+    use rig::completion::{Prompt, ToolDefinition};
+    use rig::providers;
+    use rig::tool::Tool;
     use serde::{Deserialize, Serialize};
     use serde_json::json;
 
@@ -92,23 +96,26 @@ async fn test_tool_calling() -> Result<()> {
         y: i32,
     }
 
-    #[async_trait::async_trait]
+    #[derive(Debug, thiserror::Error)]
+    #[error("Calculator error")]
+    struct CalcError;
+
     impl Tool for Calculator {
         const NAME: &'static str = "add";
 
-        type Error = anyhow::Error;
+        type Error = CalcError;
         type Args = AddArgs;
         type Output = i32;
 
-        async fn definition(&self, _prompt: String) -> rig_core::completion::ToolDefinition {
-            rig_core::completion::ToolDefinition {
+        async fn definition(&self, _prompt: String) -> ToolDefinition {
+            ToolDefinition {
                 name: "add".to_string(),
                 description: "Add two numbers".to_string(),
                 parameters: json!({
                     "type": "object",
                     "properties": {
-                        "x": {"type": "number"},
-                        "y": {"type": "number"}
+                        "x": {"type": "number", "description": "First number"},
+                        "y": {"type": "number", "description": "Second number"}
                     },
                     "required": ["x", "y"]
                 }),
@@ -121,11 +128,11 @@ async fn test_tool_calling() -> Result<()> {
         }
     }
 
-    let client = rig_core::providers::openai::Client::from_env();
+    let client = providers::openai::Client::from_env();
 
     // Test agent with tools
     let agent = client
-        .agent("gpt-4o-mini")
+        .agent(providers::openai::GPT_4O_MINI)
         .preamble("You are a calculator assistant")
         .tool(Calculator)
         .build();
@@ -140,21 +147,23 @@ async fn test_tool_calling() -> Result<()> {
 async fn test_api_structure() -> Result<()> {
     println!("🔍 Test 4: API Structure Exploration");
 
-    println!("   Checking rig-core module structure...");
+    println!("   Checking rig module structure...");
 
     // Document what we learn about the API
-    println!("   - rig_core::prelude exports main types");
-    println!("   - rig_core::providers::{openai, anthropic, gemini, ollama}");
-    println!("   - rig_core::tool::Tool trait");
-    println!("   - rig_core::completion types");
+    println!("   - rig::prelude exports main types");
+    println!("   - rig::providers::{openai, anthropic, gemini, ollama}");
+    println!("   - rig::tool::Tool trait");
+    println!("   - rig::completion types");
+    println!("   - Import: use `rig::` not `rig_core::`");
 
     // Key questions to answer:
     println!("\n   Key findings needed:");
     println!("   ❓ How does streaming work? (token-by-token or full response?)");
-    println!("   ❓ Can Tool::NAME be dynamic? (likely not - const requirement)");
+    println!("   ❌ Tool::NAME must be const - cannot be dynamic");
     println!("   ❓ How to handle multiple tool calls in one turn?");
     println!("   ❓ What error types does rig return?");
     println!("   ❓ How to customize request timeout?");
+    println!("   ❓ How to access tool call metadata for persistence?");
 
     println!("\n   ✅ API exploration notes recorded\n");
 

@@ -174,17 +174,20 @@ Located in: `layercake-core/Cargo.toml:105-110`
   - [❌] Test tool calling with simple example - **BLOCKED**
   - [🔄] Document findings in spike notes
 
-**BLOCKER FOUND**: rig-core 0.23.1 requires Rust 1.82+ for if-let chains (RFC 2497), current version is 1.87.0 but rig-core still fails to compile. This appears to be a rig-core bug using unstable features.
+**BLOCKER FOUND**: rig-core 0.23.1 requires Rust 1.82+ for if-let chains (RFC 2497), current version was 1.87.0 but failed to compile.
 
-**UPDATE**: rig-core compiles with nightly Rust. Project uses stable Rust (1.87.0).
+**RESOLUTION**: Updated to Rust 1.91.0 (stable) which includes if-let chains support. rig-core now compiles successfully!
 
-**DECISION REQUIRED**:
-1. Switch project to nightly Rust (risky for production)
-2. Wait for rig-core to release stable-compatible version
-3. Consider alternative: continue with `llm` crate
-4. Consider alternative: use direct provider SDKs without abstraction layer
+**SPIKE STATUS**: In progress - working through rig API discovery
 
-**SPIKE STATUS**: Paused pending decision on Rust toolchain requirements.
+**API Findings**:
+- Crate is `rig-core` but imports use `rig::` (need package rename in Cargo.toml)
+- Requires `use rig::client::CompletionClient` trait for `.completion_model()` and `.agent()` methods
+- Requires `use rig::completion::Prompt` trait for `.prompt()` method
+- Model constants: `rig::providers::openai::GPT_4O_MINI`
+- Tool trait requires `const NAME: &'static str` - **confirms dynamic tools need wrapper**
+
+**BLOCKER**: Documentation for rig-core 0.23.1 not available on docs.rs (404), learning API from GitHub examples
 
 - [ ] **Spike: Tool adapter design**
   - [ ] Research rig Tool trait constraints

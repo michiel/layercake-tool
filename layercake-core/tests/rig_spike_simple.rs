@@ -7,8 +7,8 @@ mod rig_spike {
         // We don't actually run anything, just verify compilation
 
         // This will fail to compile if rig isn't properly set up
-        let _: Option<rig_core::providers::openai::Client> = None;
+        let _: Option<rig::providers::openai::Client> = None;
 
-        println!("rig-core types accessible");
+        println!("rig types accessible");
     }
 }
