@@ -15,6 +15,7 @@ import { TopBar } from './components/layout/TopBar'
 import { useCollaborationV2 } from './hooks/useCollaborationV2'
 import { useConnectionStatus } from './hooks/useConnectionStatus'
 import { ProjectChatPage } from './pages/ProjectChatPage'
+import { ChatLogsPage } from './pages/ChatLogsPage'
 
 // Collaboration Context for providing project-level collaboration to all pages
 const CollaborationContext = React.createContext<any>(null)
@@ -107,6 +108,11 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   // Get current route info for navigation highlighting
   const isActiveRoute = (path: string) => {
     if (path === '/') return location.pathname === '/'
+    return location.pathname === path
+  }
+
+  const isActiveRoutePrefix = (path: string) => {
+    if (path === '/') return location.pathname === '/'
     if (!location.pathname.startsWith(path)) {
       return false
     }
@@ -196,7 +202,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
             </Tooltip>
             <Tooltip label="Projects" position="right" disabled={!navCollapsed}>
               <Button
-                variant={isActiveRoute('/projects') ? 'filled' : 'light'}
+                variant={isActiveRoutePrefix('/projects') ? 'filled' : 'light'}
                 fullWidth={!navCollapsed}
                 leftSection={navCollapsed ? undefined : <IconDatabase size={16} />}
                 onClick={() => navigate('/projects')}
@@ -213,7 +219,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                 <div style={{ height: '1px', backgroundColor: '#e9ecef', margin: '8px 0' }} />
                 <Tooltip label="Project" position="right" disabled={!navCollapsed}>
                   <Button
-                    variant={isActiveRoute(`/projects/${projectId}`) && !isActiveRoute(`/projects/${projectId}/datasources`) && !isActiveRoute(`/projects/${projectId}/plan`) && !isActiveRoute(`/projects/${projectId}/plan-nodes`) && !isActiveRoute(`/projects/${projectId}/graphs`) ? 'filled' : 'light'}
+                    variant={isActiveRoute(`/projects/${projectId}`) ? 'filled' : 'light'}
                     fullWidth={!navCollapsed}
                     leftSection={navCollapsed ? undefined : <IconFolderPlus size={16} />}
                     onClick={() => navigate(`/projects/${projectId}`)}
@@ -237,7 +243,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                 </Tooltip>
                 <Tooltip label="Plan" position="right" disabled={!navCollapsed}>
                   <Button
-                    variant={isActiveRoute(`/projects/${projectId}/plan`) ? 'filled' : 'light'}
+                    variant={isActiveRoutePrefix(`/projects/${projectId}/plan`) ? 'filled' : 'light'}
                     fullWidth={!navCollapsed}
                     leftSection={navCollapsed ? undefined : <IconGraph size={16} />}
                     onClick={() => navigate(`/projects/${projectId}/plan`)}
@@ -247,18 +253,21 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                     {navCollapsed ? <IconGraph size={16} /> : 'Plan'}
                   </Button>
                 </Tooltip>
-                <Tooltip label="Plan Nodes" position="right" disabled={!navCollapsed}>
-                  <Button
-                    variant={isActiveRoute(`/projects/${projectId}/plan-nodes`) ? 'filled' : 'light'}
-                    fullWidth={!navCollapsed}
-                    leftSection={navCollapsed ? undefined : <IconNetwork size={16} />}
-                    onClick={() => navigate(`/projects/${projectId}/plan-nodes`)}
-                    px={navCollapsed ? 'xs' : undefined}
-                    style={navCollapsed ? { justifyContent: 'center' } : undefined}
-                  >
-                    {navCollapsed ? <IconNetwork size={16} /> : 'Plan Nodes'}
-                  </Button>
-                </Tooltip>
+                {/* Show Plan Nodes only when on Plan page */}
+                {isActiveRoutePrefix(`/projects/${projectId}/plan`) && (
+                  <Tooltip label="Plan Nodes" position="right" disabled={!navCollapsed}>
+                    <Button
+                      variant={isActiveRoute(`/projects/${projectId}/plan-nodes`) ? 'filled' : 'light'}
+                      fullWidth={!navCollapsed}
+                      leftSection={navCollapsed ? undefined : <IconNetwork size={16} />}
+                      onClick={() => navigate(`/projects/${projectId}/plan-nodes`)}
+                      px={navCollapsed ? 'xs' : undefined}
+                      style={navCollapsed ? { justifyContent: 'center', ...(navCollapsed ? {} : { paddingLeft: '2rem' }) } : undefined}
+                    >
+                      {navCollapsed ? <IconNetwork size={16} /> : 'Plan Nodes'}
+                    </Button>
+                  </Tooltip>
+                )}
                 <Tooltip label="Graphs" position="right" disabled={!navCollapsed}>
                   <Button
                     variant={isActiveRoute(`/projects/${projectId}/graphs`) ? 'filled' : 'light'}
@@ -273,7 +282,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                 </Tooltip>
                 <Tooltip label="Chat" position="right" disabled={!navCollapsed}>
                   <Button
-                    variant={isActiveRoute(`/projects/${projectId}/chat`) ? 'filled' : 'light'}
+                    variant={isActiveRoutePrefix(`/projects/${projectId}/chat`) ? 'filled' : 'light'}
                     fullWidth={!navCollapsed}
                     leftSection={navCollapsed ? undefined : <IconMessageDots size={16} />}
                     onClick={() => navigate(`/projects/${projectId}/chat`)}
@@ -283,6 +292,21 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                     {navCollapsed ? <IconMessageDots size={16} /> : 'Chat'}
                   </Button>
                 </Tooltip>
+                {/* Show Chat logs only when on Chat page */}
+                {isActiveRoutePrefix(`/projects/${projectId}/chat`) && (
+                  <Tooltip label="Chat logs" position="right" disabled={!navCollapsed}>
+                    <Button
+                      variant={isActiveRoute(`/projects/${projectId}/chat/logs`) ? 'filled' : 'light'}
+                      fullWidth={!navCollapsed}
+                      leftSection={navCollapsed ? undefined : <IconMessageDots size={16} />}
+                      onClick={() => navigate(`/projects/${projectId}/chat/logs`)}
+                      px={navCollapsed ? 'xs' : undefined}
+                      style={navCollapsed ? { justifyContent: 'center', ...(navCollapsed ? {} : { paddingLeft: '2rem' }) } : undefined}
+                    >
+                      {navCollapsed ? <IconMessageDots size={16} /> : 'Chat logs'}
+                    </Button>
+                  </Tooltip>
+                )}
               </>
             )}
           </Stack>
@@ -1279,6 +1303,11 @@ function App() {
           <Route path="/projects/:projectId/chat" element={
             <ErrorBoundary>
               <ProjectChatPage />
+            </ErrorBoundary>
+          } />
+          <Route path="/projects/:projectId/chat/logs" element={
+            <ErrorBoundary>
+              <ChatLogsPage />
             </ErrorBoundary>
           } />
           <Route path="/projects/:projectId/plan-nodes/:graphId/edit" element={

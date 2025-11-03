@@ -1,13 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Alert, Badge, Button, Card, Flex, Group, Loader, Paper, ScrollArea, Select, Stack, Text, Textarea } from '@mantine/core'
+import { Alert, Badge, Button, Card, Group, Loader, Paper, ScrollArea, Select, Stack, Text, Textarea, Title } from '@mantine/core'
 import { IconMessageDots, IconRefresh } from '@tabler/icons-react'
 import { gql } from '@apollo/client'
 import { useQuery } from '@apollo/client/react'
 import { CHAT_PROVIDER_OPTIONS, ChatProviderOption } from '../graphql/chat'
 import { useChatSession } from '../hooks/useChatSession'
-import { ChatSessionList } from '../components/chat/ChatSessionList'
-import { ChatSessionHeader } from '../components/chat/ChatSessionHeader'
 
 const GET_PROJECT = gql`
   query GetProjectName($id: Int!) {
@@ -20,33 +18,19 @@ const GET_PROJECT = gql`
 `
 
 // Inner component that uses the chat session
-// The key prop on this component forces it to remount when sessionId changes,
-// which recreates the subscription hook with the new sessionId
 const ChatInterface = ({
   projectId,
   provider,
   project,
   onProviderChange,
-  selectedSessionId,
-  currentSession,
-  onNewSession,
-  onSessionDeleted,
-  onSessionArchived,
-  onTitleUpdated,
 }: {
   projectId: number | undefined
   provider: ChatProviderOption
   project: any
   onProviderChange: (provider: ChatProviderOption) => void
-  selectedSessionId: string | null
-  currentSession: any
-  onNewSession: () => void
-  onSessionDeleted: () => void
-  onSessionArchived: () => void
-  onTitleUpdated: () => void
 }) => {
   const [input, setInput] = useState('')
-  const chat = useChatSession({ projectId, provider, sessionId: selectedSessionId })
+  const chat = useChatSession({ projectId, provider })
 
   // auto-scroll on new messages
   const viewportRef = useRef<HTMLDivElement | null>(null)
@@ -83,17 +67,10 @@ const ChatInterface = ({
       : 'Ready'
 
   return (
-    <Stack h="100%" gap={0}>
-      <ChatSessionHeader
-        session={currentSession}
-        onNewSession={onNewSession}
-        onSessionDeleted={onSessionDeleted}
-        onSessionArchived={onSessionArchived}
-        onTitleUpdated={onTitleUpdated}
-      />
-
-      <Group justify="space-between" align="flex-start" p="md" style={{ borderBottom: '1px solid #e9ecef' }}>
+    <Stack h="100%" gap="md" p="md">
+      <Group justify="space-between" align="flex-start">
         <div>
+          <Title order={2}>Project Chat</Title>
           <Text c="dimmed" size="sm">
             {project ? `Discuss project "${project.name}" with tool-assisted insights.` : 'Start a conversation powered by Layercake tools.'}
           </Text>
@@ -122,7 +99,7 @@ const ChatInterface = ({
         </Alert>
       )}
 
-      <Paper withBorder={false} p="md" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <Paper withBorder p="md" radius="md" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         <Group justify="space-between" mb="sm">
           <Group gap="xs">
             <Badge color="blue" variant="light">{provider}</Badge>
@@ -200,41 +177,18 @@ const ChatInterface = ({
   )
 }
 
-// Outer component that manages provider state and session selection
+// Outer component that manages provider state
 export const ProjectChatPage = () => {
   const { projectId } = useParams<{ projectId: string }>()
   const numericProjectId = projectId ? parseInt(projectId, 10) : NaN
 
   const [provider, setProvider] = useState<ChatProviderOption>('Gemini')
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
-  const [sessionListKey, setSessionListKey] = useState(0)
 
   const { data: projectData } = useQuery(GET_PROJECT, {
     variables: { id: numericProjectId },
     skip: !Number.isFinite(numericProjectId),
   })
   const project = useMemo(() => (projectData as any)?.project ?? null, [projectData])
-
-  // Fetch current session details for header
-  const { data: sessionsData, refetch: refetchSessions } = useQuery(gql`
-    query GetSessions($projectId: Int!) {
-      chatSessions(projectId: $projectId, includeArchived: false) {
-        id
-        session_id
-        title
-        provider
-        model_name
-      }
-    }
-  `, {
-    variables: { id: numericProjectId },
-    skip: !Number.isFinite(numericProjectId),
-  })
-
-  const currentSession = useMemo(() => {
-    if (!selectedSessionId || !sessionsData) return null
-    return (sessionsData as any)?.chatSessions?.find((s: any) => s.session_id === selectedSessionId) || null
-  }, [selectedSessionId, sessionsData])
 
   // Use a combination of provider and timestamp as key to force remount on provider change
   // This ensures the ChatInterface (and its useChat session hook) completely remounts,
@@ -245,76 +199,13 @@ export const ProjectChatPage = () => {
     setMountKey(prev => prev + 1) // Force remount
   }
 
-  const handleNewSession = () => {
-    setSelectedSessionId(null)
-    setMountKey(prev => prev + 1)
-  }
-
-  const handleSessionDeleted = () => {
-    setSelectedSessionId(null)
-    setSessionListKey(prev => prev + 1)
-    refetchSessions()
-  }
-
-  const handleSessionArchived = () => {
-    setSelectedSessionId(null)
-    setSessionListKey(prev => prev + 1)
-    refetchSessions()
-  }
-
-  const handleTitleUpdated = () => {
-    refetchSessions()
-  }
-
-  const handleSelectSession = (sessionId: string | null) => {
-    setSelectedSessionId(sessionId)
-    setMountKey(prev => prev + 1)
-  }
-
-  if (!Number.isFinite(numericProjectId)) {
-    return <Text c="red">Invalid project ID</Text>
-  }
-
   return (
-    <Flex h="100%" gap={0}>
-      {/* Session list sidebar */}
-      <Paper
-        withBorder
-        style={{
-          width: 300,
-          borderTop: 'none',
-          borderBottom: 'none',
-          borderLeft: 'none',
-          borderRadius: 0,
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-        p="md"
-      >
-        <ChatSessionList
-          key={sessionListKey}
-          projectId={numericProjectId}
-          selectedSessionId={selectedSessionId}
-          onSelectSession={handleSelectSession}
-        />
-      </Paper>
-
-      {/* Main chat interface */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        <ChatInterface
-          key={`${provider}-${mountKey}-${selectedSessionId}`}
-          projectId={numericProjectId}
-          provider={provider}
-          project={project}
-          onProviderChange={handleProviderChange}
-          selectedSessionId={selectedSessionId}
-          currentSession={currentSession}
-          onNewSession={handleNewSession}
-          onSessionDeleted={handleSessionDeleted}
-          onSessionArchived={handleSessionArchived}
-          onTitleUpdated={handleTitleUpdated}
-        />
-      </div>
-    </Flex>
+    <ChatInterface
+      key={`${provider}-${mountKey}`}
+      projectId={Number.isFinite(numericProjectId) ? numericProjectId : undefined}
+      provider={provider}
+      project={project}
+      onProviderChange={handleProviderChange}
+    />
   )
 }
