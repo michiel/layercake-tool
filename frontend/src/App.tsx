@@ -243,7 +243,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                 </Tooltip>
                 <Tooltip label="Plan" position="right" disabled={!navCollapsed}>
                   <Button
-                    variant={isActiveRoutePrefix(`/projects/${projectId}/plan`) ? 'filled' : 'light'}
+                    variant={isActiveRoute(`/projects/${projectId}/plan`) || isActiveRoute(`/projects/${projectId}/plan-nodes`) ? 'filled' : 'light'}
                     fullWidth={!navCollapsed}
                     leftSection={navCollapsed ? undefined : <IconGraph size={16} />}
                     onClick={() => navigate(`/projects/${projectId}/plan`)}
@@ -253,8 +253,8 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                     {navCollapsed ? <IconGraph size={16} /> : 'Plan'}
                   </Button>
                 </Tooltip>
-                {/* Show Plan Nodes only when on Plan page */}
-                {isActiveRoutePrefix(`/projects/${projectId}/plan`) && (
+                {/* Show Plan Nodes when on Plan or Plan Nodes page */}
+                {(isActiveRoute(`/projects/${projectId}/plan`) || isActiveRoute(`/projects/${projectId}/plan-nodes`)) && (
                   <Tooltip label="Plan Nodes" position="right" disabled={!navCollapsed}>
                     <Button
                       variant={isActiveRoute(`/projects/${projectId}/plan-nodes`) ? 'filled' : 'light'}
