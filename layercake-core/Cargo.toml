@@ -126,5 +126,5 @@ futures-util = { workspace = true }
 tokio-tungstenite = { workspace = true }
 
 # Spike: rig evaluation (note: crate is rig-core but imports use `rig::`)
-rig = { version = "0.23.1", package = "rig-core" }
+rig = { version = "0.23.1", package = "rig-core", features = ["rmcp"] }
 thiserror = { workspace = true }
