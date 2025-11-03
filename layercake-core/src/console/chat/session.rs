@@ -469,15 +469,66 @@ impl ChatSession {
                     self.llm
                         .chat(&self.messages)
                         .await
-                        .map_err(|fallback_err| anyhow!("llm call failed: {}", fallback_err))
+                        .map_err(|fallback_err| {
+                            self.log_llm_error_debug(&fallback_err);
+                            anyhow!("llm call failed: {}", fallback_err)
+                        })
                 }
-                Err(err) => Err(anyhow!("llm call failed: {}", err)),
+                Err(err) => {
+                    self.log_llm_error_debug(&err);
+                    Err(anyhow!("llm call failed: {}", err))
+                }
             }
         } else {
             self.llm
                 .chat(&self.messages)
                 .await
-                .map_err(|err| anyhow!("llm call failed: {}", err))
+                .map_err(|err| {
+                    self.log_llm_error_debug(&err);
+                    anyhow!("llm call failed: {}", err)
+                })
+        }
+    }
+
+    fn log_llm_error_debug(&self, err: &LLMError) {
+        // Only log at DEBUG level if it's an HTTP error in 4xx or 5xx range
+        if let LLMError::HttpError(msg) = err {
+            // Check if the error message contains status code indicators
+            let is_client_error = msg.contains("400") || msg.contains("401") || msg.contains("403")
+                || msg.contains("404") || msg.contains("422") || msg.contains("429");
+            let is_server_error = msg.contains("500") || msg.contains("502") || msg.contains("503")
+                || msg.contains("504");
+
+            if is_client_error || is_server_error {
+                // Build a debug representation of the messages
+                let mut messages_debug = String::new();
+                for (idx, msg) in self.messages.iter().enumerate() {
+                    messages_debug.push_str(&format!(
+                        "Message {}: role={:?}, type={:?}, content_length={}\n",
+                        idx,
+                        msg.role,
+                        msg.message_type,
+                        msg.content.len()
+                    ));
+                    // Include content preview (first 200 chars)
+                    let content_preview = if msg.content.len() > 200 {
+                        format!("{}...", &msg.content[..200])
+                    } else {
+                        msg.content.clone()
+                    };
+                    messages_debug.push_str(&format!("  Content: {}\n", content_preview));
+                }
+
+                tracing::debug!(
+                    provider = %self.provider.to_string(),
+                    model = %self.model_name,
+                    session_id = ?self.session_id,
+                    error = %msg,
+                    "LLM HTTP error occurred\n\nRequest payload (messages):\n{}\nError response: {}",
+                    messages_debug,
+                    msg
+                );
+            }
         }
     }
 
