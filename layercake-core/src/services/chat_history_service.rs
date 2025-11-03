@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
     QueryOrder, QuerySelect, Set,
 };
 use uuid::Uuid;
@@ -61,8 +61,8 @@ impl ChatHistoryService {
         limit: u64,
         offset: u64,
     ) -> Result<Vec<chat_sessions::Model>> {
-        let mut query = chat_sessions::Entity::find()
-            .filter(chat_sessions::Column::ProjectId.eq(project_id));
+        let mut query =
+            chat_sessions::Entity::find().filter(chat_sessions::Column::ProjectId.eq(project_id));
 
         if let Some(uid) = user_id {
             query = query.filter(chat_sessions::Column::UserId.eq(uid));
@@ -177,13 +177,13 @@ impl ChatHistoryService {
             .await?
             .ok_or_else(|| anyhow!("Chat session not found: {}", session_id))?;
 
-        let messages = chat_messages::Entity::find()
+        let count = chat_messages::Entity::find()
             .filter(chat_messages::Column::SessionId.eq(session.id))
-            .all(&self.db)
+            .count(&self.db)
             .await
             .map_err(|e| anyhow!("Failed to count messages: {}", e))?;
 
-        Ok(messages.len())
+        Ok(count as usize)
     }
 
     /// Update session title
@@ -420,13 +420,24 @@ mod tests_disabled {
         let project = create_test_project(&db).await.unwrap();
 
         let session = service
-            .create_session(project.id, user.id, "openai".to_string(), "gpt-4".to_string(), None, None)
+            .create_session(
+                project.id,
+                user.id,
+                "openai".to_string(),
+                "gpt-4".to_string(),
+                None,
+                None,
+            )
             .await
             .unwrap();
 
         service.archive_session(&session.session_id).await.unwrap();
 
-        let updated = service.get_session(&session.session_id).await.unwrap().unwrap();
+        let updated = service
+            .get_session(&session.session_id)
+            .await
+            .unwrap()
+            .unwrap();
         assert!(updated.is_archived);
 
         // Archived sessions shouldn't appear in default list
@@ -453,13 +464,27 @@ mod tests_disabled {
         let project = create_test_project(&db).await.unwrap();
 
         let session = service
-            .create_session(project.id, user.id, "openai".to_string(), "gpt-4".to_string(), None, None)
+            .create_session(
+                project.id,
+                user.id,
+                "openai".to_string(),
+                "gpt-4".to_string(),
+                None,
+                None,
+            )
             .await
             .unwrap();
 
         // Add some messages
         service
-            .store_message(&session.session_id, "user".to_string(), "test".to_string(), None, None, None)
+            .store_message(
+                &session.session_id,
+                "user".to_string(),
+                "test".to_string(),
+                None,
+                None,
+                None,
+            )
             .await
             .unwrap();
 
@@ -469,9 +494,7 @@ mod tests_disabled {
         assert!(deleted.is_none());
 
         // Messages should be cascade deleted
-        let messages = service
-            .get_history(&session.session_id, 10, 0)
-            .await;
+        let messages = service.get_history(&session.session_id, 10, 0).await;
         assert!(messages.is_err());
     }
 }

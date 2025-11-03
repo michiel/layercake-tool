@@ -284,9 +284,7 @@ mod tests_disabled {
 
         let owner = create_test_user(&db, "owner").await.unwrap();
         let project = create_test_project(&db, "Test Project").await.unwrap();
-        make_project_owner(&db, project.id, owner.id)
-            .await
-            .unwrap();
+        make_project_owner(&db, project.id, owner.id).await.unwrap();
 
         let credentials = service
             .create_agent(owner.id, project.id, "Test Agent".to_string(), None)
@@ -317,9 +315,7 @@ mod tests_disabled {
 
         let owner = create_test_user(&db, "owner").await.unwrap();
         let project = create_test_project(&db, "Test Project").await.unwrap();
-        make_project_owner(&db, project.id, owner.id)
-            .await
-            .unwrap();
+        make_project_owner(&db, project.id, owner.id).await.unwrap();
 
         let credentials = service
             .create_agent(owner.id, project.id, "Test Agent".to_string(), None)
@@ -385,9 +381,7 @@ mod tests_disabled {
 
         let owner = create_test_user(&db, "owner").await.unwrap();
         let project = create_test_project(&db, "Test Project").await.unwrap();
-        make_project_owner(&db, project.id, owner.id)
-            .await
-            .unwrap();
+        make_project_owner(&db, project.id, owner.id).await.unwrap();
 
         let credentials = service
             .create_agent(owner.id, project.id, "Test Agent".to_string(), None)
@@ -424,9 +418,7 @@ mod tests_disabled {
 
         let owner = create_test_user(&db, "owner").await.unwrap();
         let project = create_test_project(&db, "Test Project").await.unwrap();
-        make_project_owner(&db, project.id, owner.id)
-            .await
-            .unwrap();
+        make_project_owner(&db, project.id, owner.id).await.unwrap();
 
         let credentials = service
             .create_agent(owner.id, project.id, "Test Agent".to_string(), None)

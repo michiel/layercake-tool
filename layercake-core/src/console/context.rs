@@ -15,7 +15,7 @@ use super::{
 };
 
 /// Get or create a default user for console/development use
-async fn get_or_create_default_user(db: &DatabaseConnection) -> Result<i32> {
+async fn get_or_create_default_user(db: &DatabaseConnection) -> Result<users::Model> {
     use sea_orm::{ActiveModelTrait, Set};
 
     // Try to find existing default user
@@ -24,7 +24,7 @@ async fn get_or_create_default_user(db: &DatabaseConnection) -> Result<i32> {
         .one(db)
         .await?
     {
-        return Ok(user.id);
+        return Ok(user);
     }
 
     // Create default user if it doesn't exist
@@ -47,7 +47,7 @@ async fn get_or_create_default_user(db: &DatabaseConnection) -> Result<i32> {
     };
 
     let user = default_user.insert(db).await?;
-    Ok(user.id)
+    Ok(user)
 }
 
 /// Active console runtime state shared across command handlers.
@@ -190,14 +190,19 @@ impl ConsoleContext {
         let provider = provider_override.unwrap_or(self.chat_config.default_provider);
 
         // Get or create default user for console/development use
-        let user_id = get_or_create_default_user(&self.db)
+        let user = get_or_create_default_user(&self.db)
             .await
             .context("failed to get or create default user")?;
 
-        let mut session =
-            super::chat::ChatSession::new(self.db.clone(), project.id, user_id, provider, &self.chat_config)
-                .await
-                .context("failed to start chat session")?;
+        let mut session = super::chat::ChatSession::new(
+            self.db.clone(),
+            project.id,
+            user,
+            provider,
+            &self.chat_config,
+        )
+        .await
+        .context("failed to start chat session")?;
 
         session.interactive_loop().await
     }

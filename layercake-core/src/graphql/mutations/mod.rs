@@ -16,9 +16,11 @@ use crate::database::entities::{
     datasources, graphs, plan_dag_edges, plan_dag_nodes, plans, project_collaborators, projects,
     user_sessions, users, ExecutionState,
 };
-use crate::graphql::context::GraphQLContext;
+use crate::graphql::context::{GraphQLContext, RequestSession};
 use crate::graphql::errors::StructuredError;
 use crate::services::auth_service::AuthService;
+use crate::services::authorization::AuthorizationService;
+use crate::services::chat_history_service::ChatHistoryService;
 use serde_json::Value;
 use uuid::Uuid;
 
@@ -27,54 +29,10 @@ use crate::services::graph_edit_service::GraphEditService;
 use crate::services::graph_service::GraphService;
 use crate::services::library_source_service::LibrarySourceService;
 use crate::services::sample_project_service::SampleProjectService;
+use serde_json::json;
 
 use crate::console::chat::ChatProvider;
 use crate::graphql::types::chat::{ChatProviderOption, ChatSendResult, ChatSessionPayload};
-
-/// Get or create a default user for development/testing
-/// In production, this should be replaced with proper authentication
-async fn get_or_create_default_user(
-    db: &sea_orm::DatabaseConnection,
-) -> Result<i32, async_graphql::Error> {
-    use sea_orm::{ActiveModelTrait, EntityTrait, Set};
-
-    // Try to find existing default user
-    if let Some(user) = users::Entity::find()
-        .filter(users::Column::Username.eq("default"))
-        .one(db)
-        .await
-        .map_err(|e| {
-            StructuredError::database("users::Entity::find", anyhow::Error::new(e))
-        })?
-    {
-        return Ok(user.id);
-    }
-
-    // Create default user if it doesn't exist
-    let now = chrono::Utc::now();
-    let default_user = users::ActiveModel {
-        email: Set("default@layercake.local".to_string()),
-        username: Set("default".to_string()),
-        display_name: Set("Default User".to_string()),
-        password_hash: Set("".to_string()), // No password for default user
-        avatar_color: Set("#3b82f6".to_string()),
-        is_active: Set(true),
-        user_type: Set("human".to_string()),
-        scoped_project_id: Set(None),
-        api_key_hash: Set(None),
-        organisation_id: Set(None),
-        created_at: Set(now),
-        updated_at: Set(now),
-        last_login_at: Set(None),
-        ..Default::default()
-    };
-
-    let user = default_user.insert(db).await.map_err(|e| {
-        StructuredError::database("users::ActiveModel::insert", anyhow::Error::new(e))
-    })?;
-
-    Ok(user.id)
-}
 use crate::graphql::types::graph::{CreateGraphInput, CreateLayerInput, Graph, UpdateGraphInput};
 use crate::graphql::types::graph_edit::{
     CreateGraphEditInput, EditResult, GraphEdit, ReplaySummary,
@@ -202,28 +160,85 @@ impl Mutation {
         ctx: &Context<'_>,
         #[graphql(name = "projectId")] project_id: i32,
         #[graphql(name = "provider")] provider: Option<ChatProviderOption>,
+        #[graphql(name = "sessionId")] existing_session_id: Option<String>,
         message: Option<String>,
     ) -> Result<ChatSessionPayload> {
         let context = ctx.data::<GraphQLContext>()?;
-        let provider = provider
+        let session = ctx
+            .data_opt::<RequestSession>()
+            .ok_or_else(|| StructuredError::unauthorized("Active session required"))?;
+
+        let auth_service = AuthorizationService::new(context.db.clone());
+        let user = match auth_service.get_user_from_session(session.as_str()).await {
+            Ok(user) => user,
+            Err(_) => ensure_local_user_session(&context.db, session.as_str(), project_id).await?,
+        };
+
+        auth_service
+            .check_project_read_access(user.id, project_id)
+            .await
+            .map_err(|err| StructuredError::forbidden(err.to_string()))?;
+
+        let mut resolved_provider = provider
             .map(ChatProvider::from)
             .unwrap_or(context.chat_config.default_provider);
 
-        // Get or create default user for development/testing
-        // TODO: Replace with proper authentication in production
-        let user_id = get_or_create_default_user(&context.db).await?;
+        let started = if let Some(existing_id) = existing_session_id {
+            let history_service = ChatHistoryService::new(context.db.clone());
+            let existing = history_service
+                .get_session(&existing_id)
+                .await
+                .map_err(|e| StructuredError::service("ChatHistoryService::get_session", e))?
+                .ok_or_else(|| StructuredError::not_found("ChatSession", existing_id.clone()))?;
 
-        let started = context
-            .chat_manager
-            .start_session(
-                context.db.clone(),
-                project_id,
-                user_id,
-                provider,
-                context.chat_config.clone(),
-            )
-            .await
-            .map_err(|e| StructuredError::service("ChatManager::start_session", e))?;
+            if existing.project_id != project_id {
+                return Err(StructuredError::forbidden(
+                    "Chat session does not belong to this project",
+                ));
+            }
+
+            if existing.user_id != user.id {
+                return Err(StructuredError::forbidden(
+                    "Chat session belongs to another user",
+                ));
+            }
+
+            resolved_provider = match existing.provider.as_str() {
+                "openai" => ChatProvider::OpenAi,
+                "claude" | "anthropic" => ChatProvider::Claude,
+                "ollama" => ChatProvider::Ollama,
+                "gemini" | "google" => ChatProvider::Gemini,
+                other => {
+                    return Err(StructuredError::bad_request(format!(
+                        "Unknown chat provider: {}",
+                        other
+                    )))
+                }
+            };
+
+            context
+                .chat_manager
+                .resume_session(
+                    context.db.clone(),
+                    existing.clone(),
+                    user.clone(),
+                    context.chat_config.clone(),
+                )
+                .await
+                .map_err(|e| StructuredError::service("ChatManager::resume_session", e))?
+        } else {
+            context
+                .chat_manager
+                .start_session(
+                    context.db.clone(),
+                    project_id,
+                    user.clone(),
+                    resolved_provider,
+                    context.chat_config.clone(),
+                )
+                .await
+                .map_err(|e| StructuredError::service("ChatManager::start_session", e))?
+        };
 
         if let Some(message) = message {
             context
@@ -235,7 +250,7 @@ impl Mutation {
 
         Ok(ChatSessionPayload {
             session_id: started.session_id,
-            provider: ChatProviderOption::from(provider),
+            provider: ChatProviderOption::from(resolved_provider),
             model: started.model_name,
         })
     }
@@ -248,6 +263,50 @@ impl Mutation {
         message: String,
     ) -> Result<ChatSendResult> {
         let context = ctx.data::<GraphQLContext>()?;
+        let session = ctx
+            .data_opt::<RequestSession>()
+            .ok_or_else(|| StructuredError::unauthorized("Active session required"))?;
+
+        let history_service = ChatHistoryService::new(context.db.clone());
+        let chat_session = history_service
+            .get_session(&session_id)
+            .await
+            .map_err(|e| StructuredError::service("ChatHistoryService::get_session", e))?
+            .ok_or_else(|| StructuredError::not_found("ChatSession", session_id.clone()))?;
+
+        let auth_service = AuthorizationService::new(context.db.clone());
+        let user = match auth_service.get_user_from_session(session.as_str()).await {
+            Ok(user) => user,
+            Err(_) => {
+                ensure_local_user_session(&context.db, session.as_str(), chat_session.project_id)
+                    .await?
+            }
+        };
+
+        if chat_session.user_id != user.id {
+            return Err(StructuredError::forbidden(
+                "You do not have access to this chat session",
+            ));
+        }
+
+        auth_service
+            .check_project_read_access(user.id, chat_session.project_id)
+            .await
+            .map_err(|err| StructuredError::forbidden(err.to_string()))?;
+
+        if !context.chat_manager.is_session_active(&session_id).await {
+            context
+                .chat_manager
+                .resume_session(
+                    context.db.clone(),
+                    chat_session.clone(),
+                    user.clone(),
+                    context.chat_config.clone(),
+                )
+                .await
+                .map_err(|e| StructuredError::service("ChatManager::resume_session", e))?;
+        }
+
         context
             .chat_manager
             .enqueue_message(&session_id, message)
@@ -2457,31 +2516,46 @@ impl Mutation {
     ) -> Result<crate::graphql::types::McpAgentCredentials> {
         use crate::services::mcp_agent_service::McpAgentService;
         let context = ctx.data::<GraphQLContext>()?;
+        let session = ctx
+            .data_opt::<RequestSession>()
+            .ok_or_else(|| StructuredError::unauthorized("Active session required"))?;
+
+        let auth_service = AuthorizationService::new(context.db.clone());
+        let user = auth_service
+            .get_user_from_session(session.as_str())
+            .await
+            .map_err(|_| StructuredError::unauthorized("Invalid session"))?;
+
         let service = McpAgentService::new(context.db.clone());
 
-        // Get or create default user for development/testing
-        // TODO: Replace with proper authentication in production
-        let creator_user_id = get_or_create_default_user(&context.db).await?;
-
         let credentials = service
-            .create_agent(creator_user_id, project_id, name, None)
+            .create_agent(user.id, project_id, name, None)
             .await
             .map_err(|e| StructuredError::service("McpAgentService::create_agent", e))?;
 
-        Ok(crate::graphql::types::McpAgentCredentials::from(credentials))
+        Ok(crate::graphql::types::McpAgentCredentials::from(
+            credentials,
+        ))
     }
 
     /// Revoke (deactivate) an MCP agent
     async fn revoke_mcp_agent(&self, ctx: &Context<'_>, user_id: i32) -> Result<bool> {
         use crate::services::mcp_agent_service::McpAgentService;
         let context = ctx.data::<GraphQLContext>()?;
+        let session = ctx
+            .data_opt::<RequestSession>()
+            .ok_or_else(|| StructuredError::unauthorized("Active session required"))?;
+
+        let auth_service = AuthorizationService::new(context.db.clone());
+        let user = auth_service
+            .get_user_from_session(session.as_str())
+            .await
+            .map_err(|_| StructuredError::unauthorized("Invalid session"))?;
+
         let service = McpAgentService::new(context.db.clone());
 
-        // TODO: Get actual revoker_id from authentication context
-        let revoker_id = 1;
-
         service
-            .revoke_agent(user_id, revoker_id)
+            .revoke_agent(user_id, user.id)
             .await
             .map_err(|e| StructuredError::service("McpAgentService::revoke_agent", e))?;
 
@@ -2492,18 +2566,157 @@ impl Mutation {
     async fn regenerate_mcp_agent_key(&self, ctx: &Context<'_>, user_id: i32) -> Result<String> {
         use crate::services::mcp_agent_service::McpAgentService;
         let context = ctx.data::<GraphQLContext>()?;
+        let session = ctx
+            .data_opt::<RequestSession>()
+            .ok_or_else(|| StructuredError::unauthorized("Active session required"))?;
+
+        let auth_service = AuthorizationService::new(context.db.clone());
+        let user = auth_service
+            .get_user_from_session(session.as_str())
+            .await
+            .map_err(|_| StructuredError::unauthorized("Invalid session"))?;
+
         let service = McpAgentService::new(context.db.clone());
 
-        // TODO: Get actual requester_id from authentication context
-        let requester_id = 1;
-
         let new_key = service
-            .regenerate_api_key(user_id, requester_id)
+            .regenerate_api_key(user_id, user.id)
             .await
             .map_err(|e| StructuredError::service("McpAgentService::regenerate_api_key", e))?;
 
         Ok(new_key)
     }
+}
+
+async fn ensure_local_user_session(
+    db: &sea_orm::DatabaseConnection,
+    session_id: &str,
+    project_id: i32,
+) -> async_graphql::Result<users::Model> {
+    use crate::database::entities::{user_sessions, users};
+    use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
+
+    if let Some(existing_session) = user_sessions::Entity::find()
+        .filter(user_sessions::Column::SessionId.eq(session_id))
+        .filter(user_sessions::Column::IsActive.eq(true))
+        .one(db)
+        .await
+        .map_err(|e| {
+            StructuredError::database("user_sessions::Entity::find (ensure_local_user_session)", e)
+        })?
+    {
+        if let Some(user) = users::Entity::find_by_id(existing_session.user_id)
+            .one(db)
+            .await
+            .map_err(|e| {
+                StructuredError::database(
+                    "users::Entity::find_by_id (ensure_local_user_session)",
+                    e,
+                )
+            })?
+        {
+            ensure_project_collaborator(db, project_id, user.id).await?;
+            return Ok(user);
+        }
+    }
+
+    let sanitized: String = session_id
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .collect();
+    let identifier = if sanitized.is_empty() {
+        format!("sess{}", chrono::Utc::now().timestamp_micros())
+    } else {
+        sanitized
+    };
+
+    let username = format!("local_{identifier}");
+    let email = format!("{identifier}@local.layercake");
+
+    let mut user_active = users::ActiveModel::new();
+    user_active.email = Set(email);
+    user_active.username = Set(username.clone());
+    user_active.display_name = Set("Local User".to_string());
+    user_active.password_hash = Set(String::new());
+    user_active.avatar_color = Set("#3b82f6".to_string());
+    user_active.is_active = Set(true);
+    user_active.user_type = Set("local".to_string());
+    user_active.scoped_project_id = Set(Some(project_id));
+    user_active.api_key_hash = Set(None);
+    user_active.organisation_id = Set(None);
+    user_active.created_at = Set(chrono::Utc::now());
+    user_active.updated_at = Set(chrono::Utc::now());
+    user_active.last_login_at = Set(None);
+
+    let user = user_active.insert(db).await.map_err(|e| {
+        StructuredError::database("users::ActiveModel::insert (ensure_local_user_session)", e)
+    })?;
+
+    ensure_project_collaborator(db, project_id, user.id).await?;
+
+    let mut session_active = user_sessions::ActiveModel::new(user.id, username, project_id);
+    session_active.session_id = Set(session_id.to_string());
+    session_active.auth_method = Set("local".to_string());
+    session_active.auth_context = Set(Some(json!({ "source": "local" }).to_string()));
+
+    session_active.insert(db).await.map_err(|e| {
+        StructuredError::database(
+            "user_sessions::ActiveModel::insert (ensure_local_user_session)",
+            e,
+        )
+    })?;
+
+    Ok(user)
+}
+
+async fn ensure_project_collaborator(
+    db: &sea_orm::DatabaseConnection,
+    project_id: i32,
+    user_id: i32,
+) -> async_graphql::Result<()> {
+    use crate::database::entities::project_collaborators;
+    use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
+
+    if let Some(collaborator) = project_collaborators::Entity::find()
+        .filter(project_collaborators::Column::ProjectId.eq(project_id))
+        .filter(project_collaborators::Column::UserId.eq(user_id))
+        .filter(project_collaborators::Column::IsActive.eq(true))
+        .one(db)
+        .await
+        .map_err(|e| {
+            StructuredError::database(
+                "project_collaborators::Entity::find (ensure_project_collaborator)",
+                e,
+            )
+        })?
+    {
+        if collaborator.invitation_status != "accepted" {
+            let mut active: project_collaborators::ActiveModel = collaborator.into();
+            active.invitation_status = Set("accepted".to_string());
+            active.joined_at = Set(Some(chrono::Utc::now()));
+            active.updated_at = Set(chrono::Utc::now());
+            active.update(db).await.map_err(|e| {
+                StructuredError::database("project_collaborators::ActiveModel::update", e)
+            })?;
+        }
+        return Ok(());
+    }
+
+    let collaborator = project_collaborators::ActiveModel::new(
+        project_id,
+        user_id,
+        project_collaborators::ProjectRole::Viewer,
+        None,
+    )
+    .accept_invitation();
+
+    collaborator.insert(db).await.map_err(|e| {
+        StructuredError::database(
+            "project_collaborators::ActiveModel::insert (ensure_project_collaborator)",
+            e,
+        )
+    })?;
+
+    Ok(())
 }
 
 // Helper function to get file extension for render target

@@ -7,9 +7,11 @@ use std::{
 
 use anyhow::{anyhow, Result};
 use tokio::sync::{broadcast, mpsc, Mutex};
-use uuid::Uuid;
 
-use crate::console::chat::{ChatConfig, ChatEvent, ChatProvider, ChatSession};
+use crate::{
+    console::chat::{ChatConfig, ChatEvent, ChatProvider, ChatSession},
+    database::entities::{chat_sessions, users},
+};
 use sea_orm::DatabaseConnection;
 
 pub struct StartedChatSession {
@@ -48,16 +50,17 @@ impl ChatManager {
         &self,
         db: DatabaseConnection,
         project_id: i32,
-        user_id: i32,
+        user: users::Model,
         provider: ChatProvider,
         config: Arc<ChatConfig>,
     ) -> Result<StartedChatSession> {
-        let session_id = Uuid::new_v4().to_string();
         let (input_tx, mut input_rx) = mpsc::channel::<String>(16);
         let (event_tx, keeper_rx) = broadcast::channel::<ChatEvent>(64);
         let history = Arc::new(StdMutex::new(VecDeque::new()));
 
-        let mut chat_session = ChatSession::new(db.clone(), project_id, user_id, provider, &config).await?;
+        let mut chat_session =
+            ChatSession::new(db.clone(), project_id, user.clone(), provider, &config).await?;
+        let session_id = chat_session.ensure_persisted().await?;
         let model_name = chat_session.model_name().to_string();
 
         {
@@ -119,6 +122,98 @@ impl ChatManager {
             session_id,
             model_name,
         })
+    }
+
+    pub async fn resume_session(
+        &self,
+        db: DatabaseConnection,
+        session: chat_sessions::Model,
+        user: users::Model,
+        config: Arc<ChatConfig>,
+    ) -> Result<StartedChatSession> {
+        if self.is_session_active(&session.session_id).await {
+            return Ok(StartedChatSession {
+                session_id: session.session_id,
+                model_name: session.model_name,
+            });
+        }
+
+        let (input_tx, mut input_rx) = mpsc::channel::<String>(16);
+        let (event_tx, keeper_rx) = broadcast::channel::<ChatEvent>(64);
+        let history = Arc::new(StdMutex::new(VecDeque::new()));
+
+        let mut chat_session =
+            ChatSession::resume(db.clone(), session.clone(), user.clone(), &config).await?;
+        let session_id = session.session_id.clone();
+        let model_name = chat_session.model_name().to_string();
+
+        {
+            let mut sessions = self.inner.sessions.lock().await;
+            sessions.insert(
+                session_id.clone(),
+                ChatSessionRuntime {
+                    input_tx: input_tx.clone(),
+                    event_tx: event_tx.clone(),
+                    history: history.clone(),
+                    _keeper: keeper_rx,
+                },
+            );
+        }
+
+        let manager = self.inner.clone();
+        let session_key = session_id.clone();
+        let history_for_task = history.clone();
+        let event_tx_for_task = event_tx.clone();
+
+        tokio::spawn(async move {
+            tracing::info!(
+                "Resumed chat session task started for session {}",
+                session_key
+            );
+            while let Some(message) = input_rx.recv().await {
+                tracing::info!("Received message in session {}: {}", session_key, message);
+                let history_for_sink = history_for_task.clone();
+                let event_tx_for_sink = event_tx_for_task.clone();
+                let mut sink = move |event: ChatEvent| {
+                    store_event(&history_for_sink, &event);
+                    tracing::debug!("Broadcasting event: {:?}", event);
+                    match event_tx_for_sink.send(event) {
+                        Ok(count) => tracing::info!("Event sent to {} subscribers", count),
+                        Err(e) => tracing::error!("Failed to broadcast event: {:?}", e),
+                    }
+                };
+
+                if let Err(err) = chat_session
+                    .send_message_with_observer(&message, &mut sink)
+                    .await
+                {
+                    tracing::error!("Chat session error: {}", err);
+                    let error_event = ChatEvent::AssistantMessage {
+                        text: format!("Chat error: {}", err),
+                    };
+                    store_event(&history_for_task, &error_event);
+                    tracing::info!("Broadcasting error event");
+                    match event_tx_for_task.send(error_event) {
+                        Ok(count) => tracing::info!("Error event sent to {} subscribers", count),
+                        Err(e) => tracing::error!("Failed to send error event: {:?}", e),
+                    }
+                }
+            }
+
+            tracing::info!("Chat session task ending for session {}", session_key);
+            let mut sessions = manager.sessions.lock().await;
+            sessions.remove(&session_key);
+        });
+
+        Ok(StartedChatSession {
+            session_id,
+            model_name,
+        })
+    }
+
+    pub async fn is_session_active(&self, session_id: &str) -> bool {
+        let sessions = self.inner.sessions.lock().await;
+        sessions.contains_key(session_id)
     }
 
     pub async fn enqueue_message(&self, session_id: &str, message: String) -> Result<()> {

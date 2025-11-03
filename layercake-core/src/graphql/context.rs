@@ -24,6 +24,15 @@ pub struct GraphQLContext {
     pub chat_manager: Arc<ChatManager>,
 }
 
+#[derive(Clone, Debug)]
+pub struct RequestSession(pub String);
+
+impl RequestSession {
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
 /// Simple session manager to track browser sessions and assign user IDs
 #[derive(Debug)]
 pub struct SessionManager {

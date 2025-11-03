@@ -36,8 +36,16 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .default(false),
                     )
-                    .col(ColumnDef::new(ChatSessions::CreatedAt).timestamp().not_null())
-                    .col(ColumnDef::new(ChatSessions::UpdatedAt).timestamp().not_null())
+                    .col(
+                        ColumnDef::new(ChatSessions::CreatedAt)
+                            .timestamp()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(ChatSessions::UpdatedAt)
+                            .timestamp()
+                            .not_null(),
+                    )
                     .col(
                         ColumnDef::new(ChatSessions::LastActivityAt)
                             .timestamp()

@@ -24,8 +24,8 @@ export interface ChatEventPayload {
 }
 
 export const START_CHAT_SESSION = gql`
-  mutation StartChatSession($projectId: Int!, $provider: ChatProviderOption) {
-    startChatSession(projectId: $projectId, provider: $provider) {
+  mutation StartChatSession($projectId: Int!, $provider: ChatProviderOption, $sessionId: String) {
+    startChatSession(projectId: $projectId, provider: $provider, sessionId: $sessionId) {
       sessionId
       provider
       model
@@ -127,6 +127,12 @@ export const UPDATE_CHAT_SESSION_TITLE = gql`
 export const ARCHIVE_CHAT_SESSION = gql`
   mutation ArchiveChatSession($sessionId: String!) {
     archiveChatSession(sessionId: $sessionId)
+  }
+`
+
+export const UNARCHIVE_CHAT_SESSION = gql`
+  mutation UnarchiveChatSession($sessionId: String!) {
+    unarchiveChatSession(sessionId: $sessionId)
   }
 `
 

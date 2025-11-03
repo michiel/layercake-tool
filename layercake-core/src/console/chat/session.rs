@@ -3,7 +3,7 @@
 use std::fmt::Write;
 
 use anyhow::{anyhow, Context, Result};
-use axum_mcp::prelude::SecurityContext;
+use axum_mcp::prelude::{ClientContext, SecurityContext};
 use llm::{
     builder::LLMBuilder,
     chat::{ChatMessage, Tool as LlmTool},
@@ -14,6 +14,9 @@ use sea_orm::DatabaseConnection;
 use serde_json::{json, Value};
 use tokio::io::{self, AsyncBufReadExt, BufReader};
 use tracing;
+
+use crate::database::entities::{chat_sessions, users};
+use crate::mcp::security::build_user_security_context;
 
 use super::{
     config::{ChatConfig, ChatCredentialStore},
@@ -35,6 +38,7 @@ pub struct ChatSession {
     user_id: i32,
     provider: ChatProvider,
     model_name: String,
+    system_prompt: String,
     messages: Vec<ChatMessage>,
     llm: Box<dyn LLMProvider>,
     bridge: McpBridge,
@@ -48,13 +52,18 @@ impl ChatSession {
     pub async fn new(
         db: DatabaseConnection,
         project_id: i32,
-        user_id: i32,
+        user: users::Model,
         provider: ChatProvider,
         config: &ChatConfig,
     ) -> Result<Self> {
         let credentials = ChatCredentialStore::new(db.clone());
         let bridge = McpBridge::new(db.clone());
-        let security = SecurityContext::system();
+        let security = build_user_security_context(
+            ClientContext::default(),
+            user.id,
+            &user.user_type,
+            Some(project_id),
+        );
         let llm_tools = bridge
             .llm_tools(&security)
             .await
@@ -74,9 +83,10 @@ impl ChatSession {
             db,
             session_id: None,
             project_id,
-            user_id,
+            user_id: user.id,
             provider,
             model_name,
+            system_prompt,
             messages: Vec::new(),
             llm,
             bridge,
@@ -89,21 +99,18 @@ impl ChatSession {
     /// Resume an existing chat session from the database
     pub async fn resume(
         db: DatabaseConnection,
-        session_id: String,
+        session: chat_sessions::Model,
+        user: users::Model,
         config: &ChatConfig,
     ) -> Result<Self> {
         use crate::services::chat_history_service::ChatHistoryService;
 
         let history_service = ChatHistoryService::new(db.clone());
 
-        // Load session metadata
-        let session = history_service
-            .get_session(&session_id)
-            .await?
-            .ok_or_else(|| anyhow!("Session not found: {}", session_id))?;
-
         // Load message history
-        let messages_history = history_service.get_history(&session_id, 1000, 0).await?;
+        let messages_history = history_service
+            .get_history(&session.session_id, 1000, 0)
+            .await?;
 
         // Convert provider string to enum
         let provider = match session.provider.as_str() {
@@ -116,26 +123,30 @@ impl ChatSession {
 
         let credentials = ChatCredentialStore::new(db.clone());
         let bridge = McpBridge::new(db.clone());
-        let security = SecurityContext::system();
+        let security = build_user_security_context(
+            ClientContext::default(),
+            user.id,
+            &user.user_type,
+            Some(session.project_id),
+        );
         let llm_tools = bridge
             .llm_tools(&security)
             .await
             .map_err(|err| anyhow!("failed to load MCP tools: {}", err))?;
 
-        let system_prompt_owned = match session.system_prompt.as_deref() {
-            Some(prompt) => prompt.to_string(),
-            None => compose_system_prompt(
+        let system_prompt = session.system_prompt.clone().unwrap_or_else(|| {
+            compose_system_prompt(
                 config,
                 session.project_id,
                 &llm_tools
                     .iter()
                     .map(|t| t.function.name.clone())
                     .collect::<Vec<_>>(),
-            ),
-        };
+            )
+        });
 
         let (llm, model_name) =
-            build_llm_client(provider, config, &credentials, &system_prompt_owned).await?;
+            build_llm_client(provider, config, &credentials, &system_prompt).await?;
 
         // Convert database messages to LLM messages
         let mut messages = Vec::new();
@@ -151,11 +162,12 @@ impl ChatSession {
 
         Ok(Self {
             db,
-            session_id: Some(session_id),
+            session_id: Some(session.session_id.clone()),
             project_id: session.project_id,
             user_id: session.user_id,
             provider,
             model_name,
+            system_prompt,
             messages,
             llm,
             bridge,
@@ -166,7 +178,7 @@ impl ChatSession {
     }
 
     /// Persist the session to the database if not already persisted
-    async fn ensure_persisted(&mut self) -> Result<String> {
+    pub async fn ensure_persisted(&mut self) -> Result<String> {
         if let Some(ref session_id) = self.session_id {
             return Ok(session_id.clone());
         }
@@ -181,7 +193,7 @@ impl ChatSession {
                 self.provider.to_string(),
                 self.model_name.clone(),
                 None,
-                None,
+                Some(self.system_prompt.clone()),
             )
             .await?;
 
@@ -252,7 +264,14 @@ impl ChatSession {
         use crate::services::chat_history_service::ChatHistoryService;
         let history_service = ChatHistoryService::new(self.db.clone());
         history_service
-            .store_message(&session_id, "user".to_string(), input.to_string(), None, None, None)
+            .store_message(
+                &session_id,
+                "user".to_string(),
+                input.to_string(),
+                None,
+                None,
+                None,
+            )
             .await?;
 
         self.resolve_conversation(observer).await
@@ -294,7 +313,14 @@ impl ChatSession {
                 use crate::services::chat_history_service::ChatHistoryService;
                 let history_service = ChatHistoryService::new(self.db.clone());
                 history_service
-                    .store_message(session_id, "assistant".to_string(), final_text, None, None, None)
+                    .store_message(
+                        session_id,
+                        "assistant".to_string(),
+                        final_text,
+                        None,
+                        None,
+                        None,
+                    )
                     .await?;
             }
 
@@ -345,6 +371,7 @@ impl ChatSession {
         }
 
         let mut tool_results_for_llm = Vec::new();
+        let mut tool_history_entries = Vec::new();
 
         for call in &tool_calls {
             let args = parse_tool_arguments(&call.function.arguments)?;
@@ -363,7 +390,7 @@ impl ChatSession {
                 call_type: call.call_type.clone(),
                 function: FunctionCall {
                     name: call.function.name.clone(),
-                    arguments: payload_string,
+                    arguments: payload_string.clone(),
                 },
             });
 
@@ -375,8 +402,15 @@ impl ChatSession {
             };
             observer(ChatEvent::ToolInvocation {
                 name: call.function.name.clone(),
-                summary,
+                summary: summary.clone(),
             });
+
+            tool_history_entries.push((
+                call.function.name.clone(),
+                call.id.clone(),
+                summary,
+                payload_string,
+            ));
         }
 
         self.messages.push(
@@ -391,15 +425,15 @@ impl ChatSession {
             use crate::services::chat_history_service::ChatHistoryService;
             let history_service = ChatHistoryService::new(self.db.clone());
 
-            for result in &tool_results_for_llm {
+            for (tool_name, call_id, summary, metadata_json) in &tool_history_entries {
                 history_service
                     .store_message(
                         session_id,
                         "tool".to_string(),
-                        result.function.arguments.clone(),
-                        Some(result.function.name.clone()),
-                        Some(result.id.clone()),
-                        None,
+                        summary.clone(),
+                        Some(tool_name.clone()),
+                        Some(call_id.clone()),
+                        Some(metadata_json.clone()),
                     )
                     .await?;
             }

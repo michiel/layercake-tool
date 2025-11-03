@@ -30,7 +30,11 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(ChatMessages::ToolName).string())
                     .col(ColumnDef::new(ChatMessages::ToolCallId).string())
                     .col(ColumnDef::new(ChatMessages::MetadataJson).text())
-                    .col(ColumnDef::new(ChatMessages::CreatedAt).timestamp().not_null())
+                    .col(
+                        ColumnDef::new(ChatMessages::CreatedAt)
+                            .timestamp()
+                            .not_null(),
+                    )
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_chat_messages_session_id")

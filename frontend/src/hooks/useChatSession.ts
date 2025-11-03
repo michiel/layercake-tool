@@ -116,7 +116,7 @@ export function useChatSession({ projectId, provider, sessionId }: UseChatSessio
     ;(async () => {
       try {
         const { data } = await startSession({
-          variables: { projectId, provider },
+          variables: { projectId, provider, sessionId: sessionId ?? null },
         })
         if (cancelled) return
         if (data?.startChatSession) {
@@ -141,6 +141,12 @@ export function useChatSession({ projectId, provider, sessionId }: UseChatSessio
   }, [projectId, provider, sessionId, restartNonce, startSession, teardownSubscription])
 
   // Load history when viewing an existing session (after active session is created)
+  useEffect(() => {
+    if (sessionId) {
+      setMessages([])
+    }
+  }, [sessionId])
+
   useEffect(() => {
     if (sessionId && historyData?.chatHistory) {
       const loadedMessages: ChatMessageEntry[] = historyData.chatHistory.map((msg) => ({

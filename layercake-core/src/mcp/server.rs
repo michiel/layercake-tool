@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::app_context::AppContext;
+use crate::mcp::security::{build_user_security_context, scoped_project_from_context};
 
 /// Layercake-specific server state implementing axum-mcp traits
 #[derive(Clone)]
@@ -72,9 +73,10 @@ impl McpAuth for LayercakeAuth {
 
                     match service.authenticate_agent(api_key).await {
                         Ok(agent) => {
-                            return Ok(SecurityContext::user(
+                            return Ok(build_user_security_context(
+                                client_info.clone(),
                                 agent.id,
-                                agent.user_type,
+                                &agent.user_type,
                                 agent.scoped_project_id,
                             ));
                         }
@@ -198,11 +200,7 @@ impl McpServerState for LayercakeServerState {
 }
 
 /// Tools that MCP agents should not have access to
-const MCP_AGENT_BLACKLIST: &[&str] = &[
-    "create_project",
-    "delete_project",
-    "list_projects",
-];
+const MCP_AGENT_BLACKLIST: &[&str] = &["create_project", "delete_project", "list_projects"];
 
 /// Custom tool registry for Layercake tools
 #[derive(Clone)]
@@ -273,8 +271,7 @@ impl ToolRegistry for LayercakeToolRegistry {
         // Analysis tools
         tools.extend(super::tools::analysis::get_analysis_tools());
 
-        // Filter blacklisted tools for MCP agents
-        if context.is_mcp_agent() {
+        if scoped_project_from_context(context).is_some() {
             tools.retain(|tool| !MCP_AGENT_BLACKLIST.contains(&tool.name.as_str()));
         }
 
@@ -747,19 +744,14 @@ impl ToolRegistry for LayercakeToolRegistry {
         name: &str,
         mut context: ToolExecutionContext,
     ) -> McpResult<ToolsCallResult> {
-        // Enforce MCP agent restrictions
-        if context.security.is_mcp_agent() {
-            // Check if tool is blacklisted
+        if let Some(scoped_project_id) = scoped_project_from_context(&context.security) {
             if MCP_AGENT_BLACKLIST.contains(&name) {
                 return Err(McpError::Authorization {
-                    message: format!("MCP agents cannot access tool: {}", name),
+                    message: format!("Project-scoped chat cannot access tool: {}", name),
                 });
             }
 
-            // Inject project scope for MCP agents
-            if let Some(scoped_project_id) = context.security.scoped_project_id() {
-                Self::inject_project_scope(&mut context.arguments, scoped_project_id)?;
-            }
+            Self::inject_project_scope(&mut context.arguments, scoped_project_id)?;
         }
 
         match name {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { Routes, Route, useNavigate, useParams, useLocation } from 'react-router-dom'
 import { AppShell, Group, Title, Stack, Button, Text, Card, Badge, Alert, Modal, Select, ActionIcon, Tooltip } from '@mantine/core'
 import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconDownload, IconChevronLeft, IconChevronRight, IconFolderPlus, IconNetwork, IconBooks, IconMessageDots } from '@tabler/icons-react'
@@ -16,6 +16,7 @@ import { useCollaborationV2 } from './hooks/useCollaborationV2'
 import { useConnectionStatus } from './hooks/useConnectionStatus'
 import { ProjectChatPage } from './pages/ProjectChatPage'
 import { ChatLogsPage } from './pages/ChatLogsPage'
+import { getOrCreateSessionId } from './utils/session'
 
 // Collaboration Context for providing project-level collaboration to all pages
 const CollaborationContext = React.createContext<any>(null)
@@ -84,23 +85,13 @@ const GET_PLAN_DAG = gql`
   }
 `
 
-// Generate a unique session ID for this browser tab/window
-// This ensures each browser session is tracked separately
-const generateSessionId = () => {
-  // Use crypto.randomUUID if available, otherwise fallback to timestamp + random
-  if (crypto.randomUUID) {
-    return `user-${crypto.randomUUID()}`;
-  }
-  return `user-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-};
-
 // Layout wrapper component
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate()
   const location = useLocation()
 
   // Generate stable session ID (only once per component mount)
-  const [sessionId] = useState(() => generateSessionId());
+  const [sessionId] = useState(() => getOrCreateSessionId());
 
   // Navigation collapse state
   const [navCollapsed, setNavCollapsed] = useState(false);
@@ -121,8 +112,10 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   }
 
   // Extract project info from current path for navbar
-  const projectIdMatch = location.pathname.match(/\/projects\/(\d+)/)
-  const projectId = projectIdMatch ? parseInt(projectIdMatch[1]) : undefined
+  const projectId = useMemo(() => {
+    const match = location.pathname.match(/\/projects\/(\d+)/)
+    return match ? parseInt(match[1], 10) : undefined
+  }, [location.pathname])
 
   // Initialize collaboration only if we're in a project context
   const collaboration = useCollaborationV2({
