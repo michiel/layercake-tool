@@ -189,6 +189,33 @@ Located in: `layercake-core/Cargo.toml:105-110`
 
 **BLOCKER**: Documentation for rig-core 0.23.1 not available on docs.rs (404), learning API from GitHub examples
 
+**Phase 0 Spike Findings Summary**:
+
+1. **Rust Compatibility**: ✅ RESOLVED - Requires Rust 1.82+ (if-let chains), works with 1.91.0
+2. **Compilation**: ✅ rig-core compiles successfully
+3. **Documentation**: ❌ **CRITICAL** - No docs.rs documentation, GitHub examples outdated/incomplete
+4. **API Stability**: ❌ **CONCERN** - API discovery difficult, traits not intuitive, examples don't compile
+5. **Dynamic Tools**: ❌ **CONFIRMED** - `Tool::NAME` must be const, requires wrapper infrastructure
+
+**RECOMMENDATION**: **PAUSE MIGRATION**
+
+The spike has revealed significant risks:
+
+- **No stable documentation** - docs.rs 404, examples inconsistent with actual API
+- **API complexity** - Multiple trait imports required (CompletionClient, Prompt, etc.)
+- **Immature library** - Version 0.23.1, frequent breaking changes expected (per README warning)
+- **Dynamic tool challenge** - MCP's dynamic tool registry fundamentally incompatible with rig's const NAME requirement
+- **Time investment** - Already 2+ hours on spike with basic examples still not compiling
+
+**ALTERNATIVES TO CONSIDER**:
+
+1. **Stay with `llm` crate** - Known, working, documented
+2. **Direct provider SDKs** - openai-rust, anthropic-sdk-rust, etc. (more control, more work)
+3. **Wait for rig maturity** - Revisit when 1.0 releases with stable docs
+4. **Build minimal abstraction** - Thin wrapper over HTTP APIs for 4 providers
+
+**DECISION REQUIRED**: Proceed with rig migration despite risks, or pivot to alternative?
+
 - [ ] **Spike: Tool adapter design**
   - [ ] Research rig Tool trait constraints
   - [ ] Design dynamic tool wrapper approach
