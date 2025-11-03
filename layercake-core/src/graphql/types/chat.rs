@@ -88,6 +88,7 @@ pub enum ChatMessageRole {
 }
 
 #[derive(SimpleObject, Clone, Debug)]
+#[graphql(rename_fields = "snake_case")]
 pub struct ChatSession {
     pub id: i32,
     pub session_id: String,
@@ -123,6 +124,7 @@ impl From<crate::database::entities::chat_sessions::Model> for ChatSession {
 }
 
 #[derive(SimpleObject, Clone, Debug)]
+#[graphql(rename_fields = "snake_case")]
 pub struct ChatMessage {
     pub id: i32,
     pub session_id: i32,
@@ -154,6 +156,7 @@ impl From<crate::database::entities::chat_messages::Model> for ChatMessage {
 // MCP Agent Types
 
 #[derive(SimpleObject, Clone, Debug)]
+#[graphql(rename_fields = "snake_case")]
 pub struct McpAgent {
     pub id: i32,
     pub username: String,
@@ -177,6 +180,7 @@ impl From<crate::database::entities::users::Model> for McpAgent {
 }
 
 #[derive(SimpleObject, Clone, Debug)]
+#[graphql(rename_fields = "snake_case")]
 pub struct McpAgentCredentials {
     pub user_id: i32,
     pub api_key: String,
