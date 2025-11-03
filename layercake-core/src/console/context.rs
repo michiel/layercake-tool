@@ -153,8 +153,11 @@ impl ConsoleContext {
 
         let provider = provider_override.unwrap_or(self.chat_config.default_provider);
 
+        // TODO: Get actual user_id from console authentication
+        let user_id = 1; // Console user placeholder
+
         let mut session =
-            super::chat::ChatSession::new(self.db.clone(), project.id, provider, &self.chat_config)
+            super::chat::ChatSession::new(self.db.clone(), project.id, user_id, provider, &self.chat_config)
                 .await
                 .context("failed to start chat session")?;
 

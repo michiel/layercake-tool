@@ -29,7 +29,10 @@ pub enum ChatEvent {
 }
 
 pub struct ChatSession {
+    db: DatabaseConnection,
+    session_id: Option<String>,
     project_id: i32,
+    user_id: i32,
     provider: ChatProvider,
     model_name: String,
     messages: Vec<ChatMessage>,
@@ -41,14 +44,16 @@ pub struct ChatSession {
 }
 
 impl ChatSession {
+    /// Create a new chat session (not yet persisted)
     pub async fn new(
         db: DatabaseConnection,
         project_id: i32,
+        user_id: i32,
         provider: ChatProvider,
         config: &ChatConfig,
     ) -> Result<Self> {
         let credentials = ChatCredentialStore::new(db.clone());
-        let bridge = McpBridge::new(db);
+        let bridge = McpBridge::new(db.clone());
         let security = SecurityContext::system();
         let llm_tools = bridge
             .llm_tools(&security)
@@ -66,7 +71,10 @@ impl ChatSession {
             build_llm_client(provider, config, &credentials, &system_prompt).await?;
 
         Ok(Self {
+            db,
+            session_id: None,
             project_id,
+            user_id,
             provider,
             model_name,
             messages: Vec::new(),
@@ -76,6 +84,109 @@ impl ChatSession {
             llm_tools,
             tool_use_enabled: true,
         })
+    }
+
+    /// Resume an existing chat session from the database
+    pub async fn resume(
+        db: DatabaseConnection,
+        session_id: String,
+        config: &ChatConfig,
+    ) -> Result<Self> {
+        use crate::services::chat_history_service::ChatHistoryService;
+
+        let history_service = ChatHistoryService::new(db.clone());
+
+        // Load session metadata
+        let session = history_service
+            .get_session(&session_id)
+            .await?
+            .ok_or_else(|| anyhow!("Session not found: {}", session_id))?;
+
+        // Load message history
+        let messages_history = history_service.get_history(&session_id, 1000, 0).await?;
+
+        // Convert provider string to enum
+        let provider = match session.provider.as_str() {
+            "openai" => ChatProvider::OpenAi,
+            "claude" | "anthropic" => ChatProvider::Claude,
+            "ollama" => ChatProvider::Ollama,
+            "gemini" | "google" => ChatProvider::Gemini,
+            _ => return Err(anyhow!("Unknown provider: {}", session.provider)),
+        };
+
+        let credentials = ChatCredentialStore::new(db.clone());
+        let bridge = McpBridge::new(db.clone());
+        let security = SecurityContext::system();
+        let llm_tools = bridge
+            .llm_tools(&security)
+            .await
+            .map_err(|err| anyhow!("failed to load MCP tools: {}", err))?;
+
+        let system_prompt_owned = match session.system_prompt.as_deref() {
+            Some(prompt) => prompt.to_string(),
+            None => compose_system_prompt(
+                config,
+                session.project_id,
+                &llm_tools
+                    .iter()
+                    .map(|t| t.function.name.clone())
+                    .collect::<Vec<_>>(),
+            ),
+        };
+
+        let (llm, model_name) =
+            build_llm_client(provider, config, &credentials, &system_prompt_owned).await?;
+
+        // Convert database messages to LLM messages
+        let mut messages = Vec::new();
+        for msg in messages_history {
+            let chat_msg = match msg.role.as_str() {
+                "user" => ChatMessage::user().content(msg.content).build(),
+                "assistant" => ChatMessage::assistant().content(msg.content).build(),
+                _ => continue, // Skip tool messages for now
+            };
+
+            messages.push(chat_msg);
+        }
+
+        Ok(Self {
+            db,
+            session_id: Some(session_id),
+            project_id: session.project_id,
+            user_id: session.user_id,
+            provider,
+            model_name,
+            messages,
+            llm,
+            bridge,
+            security,
+            llm_tools,
+            tool_use_enabled: true,
+        })
+    }
+
+    /// Persist the session to the database if not already persisted
+    async fn ensure_persisted(&mut self) -> Result<String> {
+        if let Some(ref session_id) = self.session_id {
+            return Ok(session_id.clone());
+        }
+
+        use crate::services::chat_history_service::ChatHistoryService;
+        let history_service = ChatHistoryService::new(self.db.clone());
+
+        let session = history_service
+            .create_session(
+                self.project_id,
+                self.user_id,
+                self.provider.to_string(),
+                self.model_name.clone(),
+                None,
+                None,
+            )
+            .await?;
+
+        self.session_id = Some(session.session_id.clone());
+        Ok(session.session_id)
     }
 
     pub fn model_name(&self) -> &str {
@@ -131,8 +242,19 @@ impl ChatSession {
     where
         F: FnMut(ChatEvent),
     {
+        // Ensure session is persisted before adding messages
+        let session_id = self.ensure_persisted().await?;
+
         self.messages
             .push(ChatMessage::user().content(input).build());
+
+        // Persist user message
+        use crate::services::chat_history_service::ChatHistoryService;
+        let history_service = ChatHistoryService::new(self.db.clone());
+        history_service
+            .store_message(&session_id, "user".to_string(), input.to_string(), None, None, None)
+            .await?;
+
         self.resolve_conversation(observer).await
     }
 
@@ -165,7 +287,17 @@ impl ChatSession {
                 text: final_text.clone(),
             });
             self.messages
-                .push(ChatMessage::assistant().content(final_text).build());
+                .push(ChatMessage::assistant().content(final_text.clone()).build());
+
+            // Persist assistant message
+            if let Some(ref session_id) = self.session_id {
+                use crate::services::chat_history_service::ChatHistoryService;
+                let history_service = ChatHistoryService::new(self.db.clone());
+                history_service
+                    .store_message(session_id, "assistant".to_string(), final_text, None, None, None)
+                    .await?;
+            }
+
             break;
         }
 
@@ -185,12 +317,32 @@ impl ChatSession {
             observer(ChatEvent::AssistantMessage { text: text.clone() });
         }
 
+        let content = response_text.clone().unwrap_or_default();
         self.messages.push(
             ChatMessage::assistant()
                 .tool_use(tool_calls.clone())
-                .content(response_text.unwrap_or_default())
+                .content(content.clone())
                 .build(),
         );
+
+        // Persist assistant message with tool calls
+        if let Some(ref session_id) = self.session_id {
+            use crate::services::chat_history_service::ChatHistoryService;
+            let history_service = ChatHistoryService::new(self.db.clone());
+
+            for call in &tool_calls {
+                history_service
+                    .store_message(
+                        session_id,
+                        "assistant".to_string(),
+                        content.clone(),
+                        Some(call.function.name.clone()),
+                        Some(call.id.clone()),
+                        Some(call.function.arguments.clone()),
+                    )
+                    .await?;
+            }
+        }
 
         let mut tool_results_for_llm = Vec::new();
 
@@ -229,10 +381,30 @@ impl ChatSession {
 
         self.messages.push(
             ChatMessage::user()
-                .tool_result(tool_results_for_llm)
+                .tool_result(tool_results_for_llm.clone())
                 .content("")
                 .build(),
         );
+
+        // Persist tool results
+        if let Some(ref session_id) = self.session_id {
+            use crate::services::chat_history_service::ChatHistoryService;
+            let history_service = ChatHistoryService::new(self.db.clone());
+
+            for result in &tool_results_for_llm {
+                history_service
+                    .store_message(
+                        session_id,
+                        "tool".to_string(),
+                        result.function.arguments.clone(),
+                        Some(result.function.name.clone()),
+                        Some(result.id.clone()),
+                        None,
+                    )
+                    .await?;
+            }
+        }
+
         Ok(())
     }
 
@@ -337,15 +509,34 @@ fn compose_system_prompt(config: &ChatConfig, project_id: i32, tool_names: &[Str
     let mut prompt = format!(
         "You are the Layercake assistant for project {project_id}. \
 Assist with graph analysis and data operations using the available tools. \
-Call tools when you need fresh data before answering.\nAvailable tools: {}.",
+Call tools when you need fresh data before answering.\nAvailable tools: {}.\n\n",
         tool_list
     );
 
+    // Load data model documentation
+    if let Ok(data_model) = load_system_prompt_file("chat-data-model.md") {
+        let _ = write!(prompt, "{}\n\n", data_model);
+    }
+
+    // Load output formatting guidelines
+    if let Ok(formatting) = load_system_prompt_file("chat-output-formatting.md") {
+        let _ = write!(prompt, "{}\n\n", formatting);
+    }
+
     if let Some(extra) = config.system_prompt.as_ref() {
-        let _ = write!(prompt, "\n\n{}", extra);
+        let _ = write!(prompt, "{}", extra);
     }
 
     prompt
+}
+
+fn load_system_prompt_file(filename: &str) -> Result<String> {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("resources")
+        .join(filename);
+
+    std::fs::read_to_string(&path)
+        .with_context(|| format!("Failed to load system prompt file: {}", filename))
 }
 
 fn parse_tool_arguments(raw: &str) -> Result<Value> {

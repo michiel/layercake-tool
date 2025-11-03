@@ -48,6 +48,7 @@ impl ChatManager {
         &self,
         db: DatabaseConnection,
         project_id: i32,
+        user_id: i32,
         provider: ChatProvider,
         config: Arc<ChatConfig>,
     ) -> Result<StartedChatSession> {
@@ -56,7 +57,7 @@ impl ChatManager {
         let (event_tx, keeper_rx) = broadcast::channel::<ChatEvent>(64);
         let history = Arc::new(StdMutex::new(VecDeque::new()));
 
-        let mut chat_session = ChatSession::new(db.clone(), project_id, provider, &config).await?;
+        let mut chat_session = ChatSession::new(db.clone(), project_id, user_id, provider, &config).await?;
         let model_name = chat_session.model_name().to_string();
 
         {

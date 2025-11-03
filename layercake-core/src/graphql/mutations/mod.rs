@@ -164,11 +164,15 @@ impl Mutation {
             .map(ChatProvider::from)
             .unwrap_or(context.chat_config.default_provider);
 
+        // TODO: Get actual user_id from GraphQL context authentication
+        let user_id = 1; // Placeholder for now
+
         let started = context
             .chat_manager
             .start_session(
                 context.db.clone(),
                 project_id,
+                user_id,
                 provider,
                 context.chat_config.clone(),
             )
