@@ -162,9 +162,278 @@ Located in: `layercake-core/Cargo.toml:105-110`
 
 ---
 
+## Implementation Checklist
+
+### Phase 0: Spike & Validation (Days 1-3) ✅ = Done, 🔄 = In Progress, ⬜ = Not Started, ❌ = Blocked
+
+- [🔄] **Spike: Basic rig integration**
+  - [✅] Add rig-core dependency to Cargo.toml (test only)
+  - [✅] Create spike example with OpenAI provider
+  - [❌] Test basic chat completion - **BLOCKED: Rust version requirement**
+  - [❌] Verify streaming API works - **BLOCKED**
+  - [❌] Test tool calling with simple example - **BLOCKED**
+  - [🔄] Document findings in spike notes
+
+**BLOCKER FOUND**: rig-core 0.23.1 requires Rust 1.82+ for if-let chains (RFC 2497), current version is 1.87.0 but rig-core still fails to compile. This appears to be a rig-core bug using unstable features.
+
+**UPDATE**: rig-core compiles with nightly Rust. Project uses stable Rust (1.87.0).
+
+**DECISION REQUIRED**:
+1. Switch project to nightly Rust (risky for production)
+2. Wait for rig-core to release stable-compatible version
+3. Consider alternative: continue with `llm` crate
+4. Consider alternative: use direct provider SDKs without abstraction layer
+
+**SPIKE STATUS**: Paused pending decision on Rust toolchain requirements.
+
+- [ ] **Spike: Tool adapter design**
+  - [ ] Research rig Tool trait constraints
+  - [ ] Design dynamic tool wrapper approach
+  - [ ] Prototype MCP tool adapter
+  - [ ] Test tool execution with metadata preservation
+  - [ ] Validate security context propagation
+
+- [ ] **Spike: Error handling**
+  - [ ] Test error handling patterns
+  - [ ] Verify API key sanitisation approach
+  - [ ] Test Ollama fallback scenarios
+  - [ ] Document error mapping strategy
+
+- [ ] **Decision Point: Proceed or Pivot**
+  - [ ] Review spike findings
+  - [ ] Confirm rig meets requirements
+  - [ ] Update timeline if needed
+  - [ ] Document any blockers found
+
+### Phase 1: Core Infrastructure (Days 4-8)
+
+- [ ] **Dependency management**
+  - [ ] Update layercake-core/Cargo.toml
+  - [ ] Remove llm dependency
+  - [ ] Add rig-core dependency
+  - [ ] Verify workspace builds
+  - [ ] Run cargo check
+
+- [ ] **Provider implementation**
+  - [ ] Create provider client enum wrapper
+  - [ ] Implement OpenAI client builder
+  - [ ] Implement Anthropic client builder
+  - [ ] Implement Gemini client builder
+  - [ ] Implement Ollama client builder
+  - [ ] Update ChatProvider trait methods
+  - [ ] Add credential handling
+  - [ ] Test each provider initialization
+
+- [ ] **Tool adapter infrastructure**
+  - [ ] Create layercake-core/src/console/chat/tools.rs
+  - [ ] Implement McpToolAdapter struct
+  - [ ] Implement McpToolExecutor trait
+  - [ ] Handle dynamic tool naming
+  - [ ] Add tool result serialisation
+  - [ ] Add metadata preservation
+  - [ ] Test tool adapter with sample MCP tool
+
+### Phase 2: Session Management (Days 9-12)
+
+- [ ] **Session rewrite**
+  - [ ] Rewrite ChatSession struct with rig agent
+  - [ ] Implement session initialization
+  - [ ] Implement message persistence
+  - [ ] Add session resumption logic
+  - [ ] Preserve database compatibility
+
+- [ ] **Streaming implementation**
+  - [ ] Wire rig streaming to observer pattern
+  - [ ] Implement token-by-token updates
+  - [ ] Test CLI observer callbacks
+  - [ ] Preserve existing output format
+
+- [ ] **Tool execution loop**
+  - [ ] Implement multi-iteration tool calling
+  - [ ] Add MAX_TOOL_ITERATIONS logic
+  - [ ] Handle tool result feedback
+  - [ ] Persist tool call metadata
+  - [ ] Test tool execution flow
+
+- [ ] **Error handling**
+  - [ ] Implement Ollama HTTP 400 fallback
+  - [ ] Add API key sanitisation
+  - [ ] Map rig errors to existing error types
+  - [ ] Test error scenarios
+
+### Phase 3: MCP Integration (Days 13-15)
+
+- [ ] **MCP bridge updates**
+  - [ ] Add rig_tools() method to McpBridge
+  - [ ] Implement tool registry conversion
+  - [ ] Test security context propagation
+  - [ ] Verify project scoping
+  - [ ] Test tool execution with real MCP tools
+
+- [ ] **Tool persistence**
+  - [ ] Persist tool invocations
+  - [ ] Store tool call IDs
+  - [ ] Store tool arguments
+  - [ ] Store tool results
+  - [ ] Verify ChatHistoryService integration
+
+- [ ] **Module integration**
+  - [ ] Update mod.rs exports
+  - [ ] Remove old llm imports
+  - [ ] Add rig imports
+  - [ ] Fix compilation errors
+  - [ ] Run cargo build
+
+### Phase 4: Testing (Days 16-20)
+
+- [ ] **Unit tests**
+  - [ ] Provider initialization tests
+  - [ ] Tool adapter tests
+  - [ ] Session management tests
+  - [ ] Persistence tests
+  - [ ] Error handling tests
+
+- [ ] **Integration tests**
+  - [ ] OpenAI provider end-to-end
+  - [ ] Anthropic provider end-to-end
+  - [ ] Gemini provider end-to-end
+  - [ ] Ollama provider end-to-end
+  - [ ] MCP tool integration
+  - [ ] Session resumption
+  - [ ] Multi-turn conversations
+
+- [ ] **Edge case testing**
+  - [ ] Ollama tool rejection (HTTP 400)
+  - [ ] API key sanitisation in logs
+  - [ ] Timeout handling
+  - [ ] Error recovery
+  - [ ] Concurrent sessions
+
+- [ ] **Performance validation**
+  - [ ] Response latency benchmarks
+  - [ ] Memory usage checks
+  - [ ] Streaming performance
+  - [ ] Tool execution overhead
+
+### Phase 5: Deployment (Days 21-22)
+
+- [ ] **Pre-deployment**
+  - [ ] All tests passing
+  - [ ] Documentation updated
+  - [ ] Review checklist complete
+  - [ ] Performance acceptable
+
+- [ ] **Deployment**
+  - [ ] Create pull request
+  - [ ] Code review
+  - [ ] Merge to main
+  - [ ] Deploy to staging
+  - [ ] Monitor chat functionality
+  - [ ] Deploy to production
+
+- [ ] **Post-deployment**
+  - [ ] Monitor for issues
+  - [ ] Verify all providers working
+  - [ ] Check error logs
+  - [ ] Performance monitoring
+  - [ ] User acceptance
+
+---
+
 ## Migration Timeline
 
-### Phase 1: Implementation (Days 1-4)
+### Phase 0: Spike & Validation (Days 1-3)
+
+**Status**: ⬜ Not Started
+
+**Objectives:**
+- Validate rig capabilities with prototype
+- Design tool adapter approach
+- Confirm streaming and error handling
+
+**Tasks:**
+1. Create spike branch
+2. Prototype OpenAI integration
+3. Test streaming with observers
+4. Design MCP tool adapter
+5. Document findings and blockers
+
+**Deliverables:**
+- Spike code in separate branch
+- Technical findings document
+- Go/no-go decision
+
+### Phase 1: Core Infrastructure (Days 4-8)
+
+**Status**: ⬜ Not Started
+
+**Objectives:**
+- Replace llm dependency with rig-core
+- Implement provider clients
+- Create tool adapter infrastructure
+
+**Deliverables:**
+- Working provider implementations
+- Tool adapter framework
+- Code compiles
+
+### Phase 2: Session Management (Days 9-12)
+
+**Status**: ⬜ Not Started
+
+**Objectives:**
+- Rewrite session with rig agents
+- Implement streaming and persistence
+- Add tool execution loop
+
+**Deliverables:**
+- Complete session implementation
+- Streaming working with observers
+- Tool execution functional
+
+### Phase 3: MCP Integration (Days 13-15)
+
+**Status**: ⬜ Not Started
+
+**Objectives:**
+- Integrate MCP tools with rig
+- Ensure persistence compatibility
+- Complete module integration
+
+**Deliverables:**
+- MCP bridge updated
+- Tool persistence working
+- Full compilation
+
+### Phase 4: Testing (Days 16-20)
+
+**Status**: ⬜ Not Started
+
+**Objectives:**
+- Comprehensive testing
+- Provider validation
+- Performance checks
+
+**Deliverables:**
+- All tests passing
+- Performance validated
+- Edge cases covered
+
+### Phase 5: Deployment (Days 21-22)
+
+**Status**: ⬜ Not Started
+
+**Objectives:**
+- Deploy to production
+- Monitor functionality
+
+**Deliverables:**
+- Production deployment
+- Monitoring confirmed
+
+---
+
+### Original Phase 1: Implementation (Days 1-4)
 
 **Objectives:**
 - Direct replacement of `llm` crate with `rig`
