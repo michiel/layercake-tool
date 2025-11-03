@@ -2336,6 +2336,127 @@ impl Mutation {
             message,
         })
     }
+
+    // Chat History Mutations
+
+    /// Update chat session title
+    async fn update_chat_session_title(
+        &self,
+        ctx: &Context<'_>,
+        session_id: String,
+        title: String,
+    ) -> Result<bool> {
+        use crate::services::chat_history_service::ChatHistoryService;
+        let context = ctx.data::<GraphQLContext>()?;
+        let service = ChatHistoryService::new(context.db.clone());
+
+        service
+            .update_session_title(&session_id, title)
+            .await
+            .map_err(|e| StructuredError::service("ChatHistoryService::update_session_title", e))?;
+
+        Ok(true)
+    }
+
+    /// Archive a chat session
+    async fn archive_chat_session(&self, ctx: &Context<'_>, session_id: String) -> Result<bool> {
+        use crate::services::chat_history_service::ChatHistoryService;
+        let context = ctx.data::<GraphQLContext>()?;
+        let service = ChatHistoryService::new(context.db.clone());
+
+        service
+            .archive_session(&session_id)
+            .await
+            .map_err(|e| StructuredError::service("ChatHistoryService::archive_session", e))?;
+
+        Ok(true)
+    }
+
+    /// Unarchive a chat session
+    async fn unarchive_chat_session(&self, ctx: &Context<'_>, session_id: String) -> Result<bool> {
+        use crate::services::chat_history_service::ChatHistoryService;
+        let context = ctx.data::<GraphQLContext>()?;
+        let service = ChatHistoryService::new(context.db.clone());
+
+        service
+            .unarchive_session(&session_id)
+            .await
+            .map_err(|e| StructuredError::service("ChatHistoryService::unarchive_session", e))?;
+
+        Ok(true)
+    }
+
+    /// Delete a chat session and all its messages
+    async fn delete_chat_session(&self, ctx: &Context<'_>, session_id: String) -> Result<bool> {
+        use crate::services::chat_history_service::ChatHistoryService;
+        let context = ctx.data::<GraphQLContext>()?;
+        let service = ChatHistoryService::new(context.db.clone());
+
+        service
+            .delete_session(&session_id)
+            .await
+            .map_err(|e| StructuredError::service("ChatHistoryService::delete_session", e))?;
+
+        Ok(true)
+    }
+
+    // MCP Agent Mutations
+
+    /// Create a new MCP agent for a project
+    async fn create_mcp_agent(
+        &self,
+        ctx: &Context<'_>,
+        project_id: i32,
+        name: String,
+    ) -> Result<crate::graphql::types::McpAgentCredentials> {
+        use crate::services::mcp_agent_service::McpAgentService;
+        let context = ctx.data::<GraphQLContext>()?;
+        let service = McpAgentService::new(context.db.clone());
+
+        // TODO: Get actual creator_user_id from authentication context
+        let creator_user_id = 1;
+
+        let credentials = service
+            .create_agent(creator_user_id, project_id, name, None)
+            .await
+            .map_err(|e| StructuredError::service("McpAgentService::create_agent", e))?;
+
+        Ok(crate::graphql::types::McpAgentCredentials::from(credentials))
+    }
+
+    /// Revoke (deactivate) an MCP agent
+    async fn revoke_mcp_agent(&self, ctx: &Context<'_>, user_id: i32) -> Result<bool> {
+        use crate::services::mcp_agent_service::McpAgentService;
+        let context = ctx.data::<GraphQLContext>()?;
+        let service = McpAgentService::new(context.db.clone());
+
+        // TODO: Get actual revoker_id from authentication context
+        let revoker_id = 1;
+
+        service
+            .revoke_agent(user_id, revoker_id)
+            .await
+            .map_err(|e| StructuredError::service("McpAgentService::revoke_agent", e))?;
+
+        Ok(true)
+    }
+
+    /// Regenerate API key for an MCP agent
+    async fn regenerate_mcp_agent_key(&self, ctx: &Context<'_>, user_id: i32) -> Result<String> {
+        use crate::services::mcp_agent_service::McpAgentService;
+        let context = ctx.data::<GraphQLContext>()?;
+        let service = McpAgentService::new(context.db.clone());
+
+        // TODO: Get actual requester_id from authentication context
+        let requester_id = 1;
+
+        let new_key = service
+            .regenerate_api_key(user_id, requester_id)
+            .await
+            .map_err(|e| StructuredError::service("McpAgentService::regenerate_api_key", e))?;
+
+        Ok(new_key)
+    }
 }
 
 // Helper function to get file extension for render target
