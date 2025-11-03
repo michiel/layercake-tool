@@ -101,8 +101,9 @@ impl ChatManager {
                     .await
                 {
                     tracing::error!("Chat session error: {}", err);
+                    let sanitised_error = sanitise_error_message(&format!("Chat error: {}", err));
                     let error_event = ChatEvent::AssistantMessage {
-                        text: format!("Chat error: {}", err),
+                        text: sanitised_error,
                     };
                     store_event(&history_for_task, &error_event);
                     tracing::info!("Broadcasting error event");
@@ -188,8 +189,9 @@ impl ChatManager {
                     .await
                 {
                     tracing::error!("Chat session error: {}", err);
+                    let sanitised_error = sanitise_error_message(&format!("Chat error: {}", err));
                     let error_event = ChatEvent::AssistantMessage {
-                        text: format!("Chat error: {}", err),
+                        text: sanitised_error,
                     };
                     store_event(&history_for_task, &error_event);
                     tracing::info!("Broadcasting error event");
@@ -272,4 +274,18 @@ fn store_event(history: &Arc<StdMutex<VecDeque<ChatEvent>>>, event: &ChatEvent) 
     if guard.len() > MAX_EVENT_HISTORY {
         guard.pop_front();
     }
+}
+
+/// Sanitise API keys and secrets from error messages before sending to clients
+fn sanitise_error_message(msg: &str) -> String {
+    use regex::Regex;
+
+    // Pattern to match API keys in URLs (query parameters)
+    // Matches patterns like: ?key=ACTUAL_KEY or &key=ACTUAL_KEY
+    let re = Regex::new(r"([?&]key=)[A-Za-z0-9_-]+").unwrap();
+    let sanitised = re.replace_all(msg, "${1}[REDACTED]");
+
+    // Also sanitise bearer tokens if present
+    let re_bearer = Regex::new(r"(Bearer\s+)[A-Za-z0-9_.-]+").unwrap();
+    re_bearer.replace_all(&sanitised, "${1}[REDACTED]").to_string()
 }

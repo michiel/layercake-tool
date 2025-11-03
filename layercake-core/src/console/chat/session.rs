@@ -548,15 +548,32 @@ impl ChatSession {
                 || msg.contains("504");
 
             if is_client_error || is_server_error {
+                // Sanitise API keys from error messages
+                let sanitised_msg = Self::sanitise_api_keys(msg);
+
                 tracing::debug!(
                     provider = %self.provider.to_string(),
                     model = %self.model_name,
                     session_id = ?self.session_id,
                     "\n=== LLM HTTP Error Response ===\n{}\n===============================",
-                    msg
+                    sanitised_msg
                 );
             }
         }
+    }
+
+    /// Sanitise API keys from error messages to prevent leaking secrets in logs
+    fn sanitise_api_keys(msg: &str) -> String {
+        use regex::Regex;
+
+        // Pattern to match API keys in URLs (query parameters)
+        // Matches patterns like: ?key=ACTUAL_KEY or &key=ACTUAL_KEY
+        let re = Regex::new(r"([?&]key=)[A-Za-z0-9_-]+").unwrap();
+        let sanitised = re.replace_all(msg, "${1}[REDACTED]");
+
+        // Also sanitise bearer tokens if present
+        let re_bearer = Regex::new(r"(Bearer\s+)[A-Za-z0-9_.-]+").unwrap();
+        re_bearer.replace_all(&sanitised, "${1}[REDACTED]").to_string()
     }
 
     fn should_disable_tools(&self, err: &LLMError) -> bool {
