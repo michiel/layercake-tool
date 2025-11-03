@@ -57,12 +57,45 @@ impl MigrationTrait for Migration {
                             .to(Users::Table, Users::Id)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
-                    .index(Index::create().name("idx_chat_sessions_project").col(ChatSessions::ProjectId))
-                    .index(Index::create().name("idx_chat_sessions_user").col(ChatSessions::UserId))
-                    .index(Index::create().name("idx_chat_sessions_activity").col(ChatSessions::LastActivityAt))
                     .to_owned(),
             )
-            .await
+            .await?;
+
+        // Create indices separately for SQLite compatibility
+        manager
+            .create_index(
+                Index::create()
+                    .if_not_exists()
+                    .name("idx_chat_sessions_project")
+                    .table(ChatSessions::Table)
+                    .col(ChatSessions::ProjectId)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .if_not_exists()
+                    .name("idx_chat_sessions_user")
+                    .table(ChatSessions::Table)
+                    .col(ChatSessions::UserId)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .if_not_exists()
+                    .name("idx_chat_sessions_activity")
+                    .table(ChatSessions::Table)
+                    .col(ChatSessions::LastActivityAt)
+                    .to_owned(),
+            )
+            .await?;
+
+        Ok(())
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
