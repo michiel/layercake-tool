@@ -93,21 +93,8 @@ export function useChatSession({ projectId, provider, sessionId }: UseChatSessio
     setRestartNonce(prev => prev + 1)
   }, [teardownSubscription])
 
-  // Load history when sessionId is provided
-  useEffect(() => {
-    if (sessionId && historyData?.chatHistory) {
-      const loadedMessages: ChatMessageEntry[] = historyData.chatHistory.map((msg) => ({
-        id: msg.message_id,
-        role: msg.role as ChatMessageRole,
-        content: msg.content,
-        toolName: msg.tool_name || undefined,
-        createdAt: msg.created_at,
-      }))
-      setMessages(loadedMessages)
-    }
-  }, [sessionId, historyData])
-
-  // Initialize session (create new or resume existing)
+  // Initialize session - always create a NEW active session for real-time communication
+  // When viewing history, this creates a continuation session
   useEffect(() => {
     if (!projectId) {
       return
@@ -119,23 +106,13 @@ export function useChatSession({ projectId, provider, sessionId }: UseChatSessio
     setAwaitingAssistant(false)
     teardownSubscription()
 
-    // If resuming an existing session
-    if (sessionId) {
-      setSession({
-        sessionId: sessionId,
-        provider: provider,
-        model: '', // Will be populated from session data if needed
-      })
-      setLoading(false)
-      return
-    }
-
-    // If starting a new session
+    // Clear messages only when starting completely fresh (no history to load)
     if (!sessionId) {
       setMessages([])
       setSession(undefined)
     }
 
+    // Always start a new active session for real-time communication
     ;(async () => {
       try {
         const { data } = await startSession({
@@ -163,6 +140,21 @@ export function useChatSession({ projectId, provider, sessionId }: UseChatSessio
     }
   }, [projectId, provider, sessionId, restartNonce, startSession, teardownSubscription])
 
+  // Load history when viewing an existing session (after active session is created)
+  useEffect(() => {
+    if (sessionId && historyData?.chatHistory) {
+      const loadedMessages: ChatMessageEntry[] = historyData.chatHistory.map((msg) => ({
+        id: msg.message_id,
+        role: msg.role as ChatMessageRole,
+        content: msg.content,
+        toolName: msg.tool_name || undefined,
+        createdAt: msg.created_at,
+      }))
+      setMessages(loadedMessages)
+    }
+  }, [sessionId, historyData])
+
+  // Subscribe to real-time chat events from the active session
   useEffect(() => {
     if (!session?.sessionId) {
       return
