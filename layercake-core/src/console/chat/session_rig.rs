@@ -96,6 +96,14 @@ impl ChatMessage {
     }
 }
 
+/// Enum to hold provider-specific rig agents
+enum RigAgent {
+    OpenAI(String), // Just hold model name for now, will create agent on-demand
+    Anthropic(String),
+    Gemini(String),
+    Ollama(String),
+}
+
 pub struct ChatSession {
     db: DatabaseConnection,
     session_id: Option<String>,
@@ -108,7 +116,9 @@ pub struct ChatSession {
     bridge: McpBridge,
     security: SecurityContext,
     tool_use_enabled: bool,
-    // TODO: Add rig agent and rmcp client fields
+    agent: RigAgent,
+    credentials: ChatCredentialStore,
+    config: ChatConfig,
 }
 
 impl ChatSession {
@@ -120,6 +130,7 @@ impl ChatSession {
         provider: ChatProvider,
         config: &ChatConfig,
     ) -> Result<Self> {
+        let credentials = ChatCredentialStore::new(db.clone());
         let bridge = McpBridge::new(db.clone());
         let security = build_user_security_context(
             ClientContext::default(),
@@ -144,7 +155,13 @@ impl ChatSession {
             .clone()
             .unwrap_or_else(|| provider.default_model().to_string());
 
-        // TODO: Initialize rig agent with rmcp tools
+        // Initialize rig agent enum
+        let agent = match provider {
+            ChatProvider::OpenAi => RigAgent::OpenAI(model_name.clone()),
+            ChatProvider::Claude => RigAgent::Anthropic(model_name.clone()),
+            ChatProvider::Gemini => RigAgent::Gemini(model_name.clone()),
+            ChatProvider::Ollama => RigAgent::Ollama(model_name.clone()),
+        };
 
         Ok(Self {
             db,
@@ -158,6 +175,9 @@ impl ChatSession {
             bridge,
             security,
             tool_use_enabled: true,
+            agent,
+            credentials,
+            config: config.clone(),
         })
     }
 
@@ -241,16 +261,141 @@ impl ChatSession {
     where
         F: FnMut(ChatEvent),
     {
-        // TODO: Implement conversation resolution with rig agent
-        // This will include:
-        // - Calling rig agent with messages
-        // - Handling tool calls via rmcp
-        // - Multi-iteration tool loop
-        // - Streaming responses
+        // Build conversation prompt from message history
+        let conversation = self.build_conversation_prompt();
+
+        // For now, make a simple non-streaming call
+        // TODO: Add streaming, tool calling, multi-iteration loop
+        let response_text = self.call_rig_agent(&conversation).await?;
+
+        // Notify observer
         observer(ChatEvent::AssistantMessage {
-            text: "TODO: Implement rig agent conversation".to_string(),
+            text: response_text.clone(),
         });
+
+        // Add assistant response to history
+        self.messages.push(ChatMessage::assistant(&response_text));
+
+        // Persist assistant message
+        if let Some(ref session_id) = self.session_id {
+            use crate::services::chat_history_service::ChatHistoryService;
+            let history_service = ChatHistoryService::new(self.db.clone());
+            history_service
+                .store_message(
+                    session_id,
+                    "assistant".to_string(),
+                    response_text,
+                    None,
+                    None,
+                    None,
+                )
+                .await?;
+        }
+
         Ok(())
+    }
+
+    fn build_conversation_prompt(&self) -> String {
+        let mut prompt = String::new();
+        prompt.push_str(&self.system_prompt);
+        prompt.push_str("\n\n");
+
+        for msg in &self.messages {
+            match msg.role.as_str() {
+                "user" => {
+                    prompt.push_str("User: ");
+                    prompt.push_str(&msg.content);
+                    prompt.push_str("\n\n");
+                }
+                "assistant" => {
+                    prompt.push_str("Assistant: ");
+                    prompt.push_str(&msg.content);
+                    prompt.push_str("\n\n");
+                }
+                _ => {}
+            }
+        }
+
+        prompt.push_str("Assistant: ");
+        prompt
+    }
+
+    async fn call_rig_agent(&self, prompt: &str) -> Result<String> {
+        // Get API key for provider
+        let api_key = if let Some(key) = self.credentials.api_key(self.provider).await? {
+            key
+        } else if let Some(env_var) = self.provider.api_key_env_var() {
+            std::env::var(env_var).with_context(|| {
+                format!(
+                    "Missing API key for {}. Set {} environment variable.",
+                    self.provider.display_name(),
+                    env_var
+                )
+            })?
+        } else {
+            // Ollama doesn't need an API key
+            String::new()
+        };
+
+        // Get base URL if configured
+        let provider_config = self.config.provider(self.provider);
+        let base_url = provider_config.base_url.clone();
+
+        // Call appropriate provider
+        match &self.agent {
+            RigAgent::OpenAI(model) => {
+                let client = if !api_key.is_empty() {
+                    openai::Client::new(&api_key)
+                } else {
+                    return Err(anyhow!("OpenAI requires API key"));
+                };
+
+                let agent = client.agent(model).build();
+                agent
+                    .prompt(prompt)
+                    .await
+                    .context("OpenAI API call failed")
+            }
+
+            RigAgent::Anthropic(model) => {
+                let client = if !api_key.is_empty() {
+                    anthropic::Client::new(&api_key)
+                } else {
+                    return Err(anyhow!("Anthropic requires API key"));
+                };
+
+                let agent = client.agent(model).build();
+                agent
+                    .prompt(prompt)
+                    .await
+                    .context("Anthropic API call failed")
+            }
+
+            RigAgent::Gemini(model) => {
+                let client = if !api_key.is_empty() {
+                    gemini::Client::new(&api_key)
+                } else {
+                    return Err(anyhow!("Gemini requires API key"));
+                };
+
+                let agent = client.agent(model).build();
+                agent.prompt(prompt).await.context("Gemini API call failed")
+            }
+
+            RigAgent::Ollama(model) => {
+                let client = if let Some(url) = base_url {
+                    ollama::Client::from_url(&url)
+                } else {
+                    ollama::Client::from_url("http://localhost:11434")
+                };
+
+                let agent = client.agent(model).build();
+                agent
+                    .prompt(prompt)
+                    .await
+                    .context("Ollama API call failed")
+            }
+        }
     }
 
     async fn ensure_persisted(&mut self) -> Result<String> {
