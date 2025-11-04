@@ -4,9 +4,9 @@
 
 This document outlines the plan to migrate Layercake's chat functionality from the `llm` crate (v1.3.4) to `rig` (v0.23.1). The migration aims to adopt a more actively maintained library with broader provider support, better tooling abstractions, and stronger community backing.
 
-**Migration Timeline**: 1-2 weeks
-**Risk Level**: Medium
-**Recommended Approach**: Direct replacement with comprehensive testing on development branch
+**Migration Timeline**: 5-7 days (1 week)
+**Risk Level**: Low-Medium (reduced via rmcp integration)
+**Recommended Approach**: Direct replacement using rig's native rmcp MCP integration
 
 ---
 
@@ -336,17 +336,17 @@ The initial concerns were based on incomplete information. With proper documenta
 - **Revised estimate: 1 week** (rmcp eliminates ~40% of custom code)
 - Custom MCP adapter no longer needed (Phase 3 simplified)
 
-### Phase 1: Core Infrastructure (Days 4-8)
+### Phase 1: Core Infrastructure (Days 1-2)
 
 - [ ] **Dependency management**
   - [ ] Update layercake-core/Cargo.toml
-  - [ ] Remove llm dependency
-  - [ ] Add rig-core dependency
+  - [ ] Remove llm dependency from console feature
+  - [ ] Add rig-core with rmcp feature to main dependencies
   - [ ] Verify workspace builds
   - [ ] Run cargo check
 
 - [ ] **Provider implementation**
-  - [ ] Create provider client enum wrapper
+  - [ ] Create provider client enum wrapper (rig agents)
   - [ ] Implement OpenAI client builder
   - [ ] Implement Anthropic client builder
   - [ ] Implement Gemini client builder
@@ -355,16 +355,14 @@ The initial concerns were based on incomplete information. With proper documenta
   - [ ] Add credential handling
   - [ ] Test each provider initialization
 
-- [ ] **Tool adapter infrastructure**
-  - [ ] Create layercake-core/src/console/chat/tools.rs
-  - [ ] Implement McpToolAdapter struct
-  - [ ] Implement McpToolExecutor trait
-  - [ ] Handle dynamic tool naming
-  - [ ] Add tool result serialisation
-  - [ ] Add metadata preservation
-  - [ ] Test tool adapter with sample MCP tool
+- [ ] **rmcp MCP integration** (SIMPLIFIED - replaces custom adapter)
+  - [ ] Create rmcp client initialization helper
+  - [ ] Connect to http://localhost:3000/mcp
+  - [ ] Implement tool discovery via rmcp.list_tools()
+  - [ ] Test rmcp connection with running server
+  - [ ] Document rmcp peer configuration
 
-### Phase 2: Session Management (Days 9-12)
+### Phase 2: Session Management (Days 3-4)
 
 - [ ] **Session rewrite**
   - [ ] Rewrite ChatSession struct with rig agent
@@ -392,34 +390,11 @@ The initial concerns were based on incomplete information. With proper documenta
   - [ ] Map rig errors to existing error types
   - [ ] Test error scenarios
 
-### Phase 3: MCP Integration (Days 13-15)
-
-- [ ] **MCP bridge updates**
-  - [ ] Add rig_tools() method to McpBridge
-  - [ ] Implement tool registry conversion
-  - [ ] Test security context propagation
-  - [ ] Verify project scoping
-  - [ ] Test tool execution with real MCP tools
-
-- [ ] **Tool persistence**
-  - [ ] Persist tool invocations
-  - [ ] Store tool call IDs
-  - [ ] Store tool arguments
-  - [ ] Store tool results
-  - [ ] Verify ChatHistoryService integration
-
-- [ ] **Module integration**
-  - [ ] Update mod.rs exports
-  - [ ] Remove old llm imports
-  - [ ] Add rig imports
-  - [ ] Fix compilation errors
-  - [ ] Run cargo build
-
-### Phase 4: Testing (Days 16-20)
+### Phase 3: Testing & Validation (Days 5-7)
 
 - [ ] **Unit tests**
   - [ ] Provider initialization tests
-  - [ ] Tool adapter tests
+  - [ ] rmcp client connection tests
   - [ ] Session management tests
   - [ ] Persistence tests
   - [ ] Error handling tests
@@ -429,9 +404,9 @@ The initial concerns were based on incomplete information. With proper documenta
   - [ ] Anthropic provider end-to-end
   - [ ] Gemini provider end-to-end
   - [ ] Ollama provider end-to-end
-  - [ ] MCP tool integration
+  - [ ] MCP tool integration via rmcp
   - [ ] Session resumption
-  - [ ] Multi-turn conversations
+  - [ ] Multi-turn conversations with tools
 
 - [ ] **Edge case testing**
   - [ ] Ollama tool rejection (HTTP 400)
@@ -439,43 +414,67 @@ The initial concerns were based on incomplete information. With proper documenta
   - [ ] Timeout handling
   - [ ] Error recovery
   - [ ] Concurrent sessions
+  - [ ] MCP server unavailable scenarios
+
+- [ ] **Module integration & cleanup**
+  - [ ] Update mod.rs exports
+  - [ ] Remove old llm imports
+  - [ ] Add rig imports
+  - [ ] Remove unused code
+  - [ ] Run cargo build
+  - [ ] Run cargo clippy
+  - [ ] Run cargo test
 
 - [ ] **Performance validation**
   - [ ] Response latency benchmarks
   - [ ] Memory usage checks
   - [ ] Streaming performance
-  - [ ] Tool execution overhead
-
-### Phase 5: Deployment (Days 21-22)
-
-- [ ] **Pre-deployment**
-  - [ ] All tests passing
-  - [ ] Documentation updated
-  - [ ] Review checklist complete
-  - [ ] Performance acceptable
-
-- [ ] **Deployment**
-  - [ ] Create pull request
-  - [ ] Code review
-  - [ ] Merge to main
-  - [ ] Deploy to staging
-  - [ ] Monitor chat functionality
-  - [ ] Deploy to production
-
-- [ ] **Post-deployment**
-  - [ ] Monitor for issues
-  - [ ] Verify all providers working
-  - [ ] Check error logs
-  - [ ] Performance monitoring
-  - [ ] User acceptance
+  - [ ] Tool execution overhead via rmcp
 
 ---
 
-## Migration Timeline
+## Deployment
 
-### Phase 0: Spike & Validation (Days 1-3)
+### Pre-deployment Checklist
 
-**Status**: ⬜ Not Started
+- [ ] All tests passing
+- [ ] Documentation updated
+- [ ] Review checklist complete
+- [ ] Performance acceptable
+
+### Deployment Steps
+
+- [ ] Create pull request
+- [ ] Code review
+- [ ] Merge to main
+- [ ] Monitor chat functionality
+
+### Post-deployment
+
+- [ ] Monitor for issues
+- [ ] Verify all providers working
+- [ ] Check error logs
+- [ ] Performance monitoring
+
+---
+
+## Implementation Summary
+
+### Timeline: 5-7 Days (1 Week)
+
+- **Phase 0**: Spike & Validation ✅ COMPLETE
+- **Phase 1**: Core Infrastructure (Days 1-2)
+- **Phase 2**: Session Management (Days 3-4)
+- **Phase 3**: Testing & Validation (Days 5-7)
+
+### Key Architecture Decisions
+
+1. **Use rig's native rmcp integration** - No custom MCP adapter needed
+2. **StreamableHttpClientTransport** - Connect to existing Layercake MCP server
+3. **Pin rig-core to 0.23.1** - Avoid breaking changes
+4. **Roll-forward only** - No backward compatibility layer
+
+---
 
 **Objectives:**
 - Validate rig capabilities with prototype
