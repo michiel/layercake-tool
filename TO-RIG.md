@@ -366,20 +366,29 @@ The initial concerns were based on incomplete information. With proper documenta
   - [✅] Update GraphQL integration
   - [✅] Code compiles successfully
 
-### Phase 2: Session Management (Days 3-4)
+### Phase 2: Session Management (Days 3-4) - 🔄 IN PROGRESS (60%)
 
-- [ ] **Session rewrite**
-  - [ ] Rewrite ChatSession struct with rig agent
-  - [ ] Implement session initialization
-  - [ ] Implement message persistence
-  - [ ] Add session resumption logic
-  - [ ] Preserve database compatibility
+- [x] **rmcp client integration**
+  - [x] Add StreamableHttpClientTransport connection to MCP server
+  - [x] Configure MCP server URL via LAYERCAKE_MCP_SERVER_URL env var
+  - [x] Initialize rmcp client in ChatSession::new() and resume()
+  - [x] Load MCP tools on session creation
+  - [x] Graceful fallback if rmcp connection fails
 
-- [ ] **Streaming implementation**
+- [x] **Tool wiring**
+  - [x] Wire rmcp tools to OpenAI agent via `.rmcp_tools()`
+  - [x] Wire rmcp tools to Anthropic agent
+  - [x] Wire rmcp tools to Gemini agent
+  - [x] Wire rmcp tools to Ollama agent
+  - [x] Feature-gate with `#[cfg(feature = "rmcp")]`
+
+- [ ] **Streaming implementation** - ⚠️ BLOCKED
   - [ ] Wire rig streaming to observer pattern
   - [ ] Implement token-by-token updates
   - [ ] Test CLI observer callbacks
   - [ ] Preserve existing output format
+  - **Blocker**: Type complexity with `MultiTurnStreamItem<StreamingCompletionResponse>` across providers
+  - **Note**: Each provider returns different concrete types, requires boxing or dynamic dispatch
 
 - [ ] **Tool execution loop**
   - [ ] Implement multi-iteration tool calling
@@ -390,7 +399,7 @@ The initial concerns were based on incomplete information. With proper documenta
 
 - [ ] **Error handling**
   - [ ] Implement Ollama HTTP 400 fallback
-  - [ ] Add API key sanitisation
+  - [ ] Add API key sanitisation (already exists in chat_manager.rs)
   - [ ] Map rig errors to existing error types
   - [ ] Test error scenarios
 
