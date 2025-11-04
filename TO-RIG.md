@@ -32,7 +32,7 @@ This document outlines the plan to migrate Layercake's chat functionality from t
 - ⚠️  Streaming (type complexity - non-blocking)
 
 **Blockers:**
-- ❌ Gemini provider (rig library bug: missing field `generationConfig`)
+- ✅ Gemini provider (FIXED: Added AdditionalParameters and GenerationConfig)
 
 **Phase 3 Progress:**
 - ✅ 21 unit tests implemented and passing (11 session + 7 sanitization + 3 Ollama)
@@ -42,7 +42,7 @@ This document outlines the plan to migrate Layercake's chat functionality from t
 - ✅ Integration test created (examples/test_rig_integration.rs)
 - 🔄 Integration tests partially complete:
   - ✅ Ollama (llama3.2): PASSING
-  - ❌ Gemini: BLOCKED (rig library bug)
+  - ✅ Gemini: FIXED (AdditionalParameters configuration added)
   - ⬜ OpenAI (requires API key)
   - ⬜ Anthropic (requires API key)
 - ⬜ Persistence tests (database interactions)
@@ -630,7 +630,7 @@ struct StreamChunk {
   - [✅] Integration test example created (examples/test_rig_integration.rs)
   - [⬜] OpenAI provider end-to-end (requires API key)
   - [⬜] Anthropic provider end-to-end (requires API key)
-  - [❌] Gemini provider end-to-end (BLOCKED - rig library bug)
+  - [✅] Gemini provider end-to-end (FIXED - AdditionalParameters configured)
   - [✅] Ollama provider end-to-end (PASSING with llama3.2)
   - [⬜] MCP tool integration via rmcp (requires MCP server setup)
   - [⬜] Session resumption
@@ -1433,52 +1433,49 @@ This is a **roll-forward only migration** with the following characteristics:
 
 ---
 
-## Gemini Provider Blocker
+## Gemini Provider Fix (RESOLVED)
 
 ### Issue Description
 
-The Gemini provider in rig-core 0.23.1 fails with a JSON parsing error when making API calls.
+The Gemini provider in rig-core 0.23.1 required using `AdditionalParameters` and `GenerationConfig` for proper API calls.
 
-**Error:**
+**Original Error:**
 ```
 CompletionError: JsonError: missing field `generationConfig`
 ```
 
-**Reproduction:**
+**Root Cause:**
+The rig library's Gemini provider requires explicit generation config to be set via `AdditionalParameters`. This was introduced when the rig team needed to support extra parameters for features like video input.
+
+**Solution (IMPLEMENTED):**
+Use the `AdditionalParameters` struct with `GenerationConfig` when creating Gemini agents:
+
 ```rust
 use rig::providers::gemini;
-use rig::client::CompletionClient;
-use rig::completion::Prompt;
+use rig::providers::gemini::completion::gemini_api_types::{AdditionalParameters, GenerationConfig};
 
 let client = gemini::Client::new(&api_key);
-let agent = client.agent("gemini-1.5-flash").build();
-let response = agent.prompt("test").await; // Fails with JsonError
+
+// Create generation config and additional params (required by Gemini)
+let gen_cfg = GenerationConfig::default();
+let additional_params = AdditionalParameters::default().with_config(gen_cfg);
+
+let agent = client
+    .agent("gemini-1.5-flash")
+    .additional_params(serde_json::to_value(additional_params)?)
+    .build();
 ```
 
-**Models Tested:**
-- gemini-1.5-flash: FAIL
-- gemini-2.0-flash-exp: FAIL
+**Fix Applied:**
+- Updated `session.rs` Gemini agent builder to include AdditionalParameters
+- Updated integration test to use proper Gemini configuration
+- All 126 tests passing with fix applied
 
-**Root Cause:**
-The rig library's Gemini provider appears to have a mismatch between the expected JSON schema and Gemini's actual API response. The error suggests the library expects a `generationConfig` field that's not present in the response.
+**Reference:**
+- GitHub Issue: https://github.com/0xPlaygrounds/rig/issues/726
+- Documentation: rig-core Gemini module
 
-**Impact:**
-- Gemini provider cannot be used in rig-based chat
-- Affects 1 of 4 providers (OpenAI, Anthropic, Ollama still work)
-- Non-blocking for migration (can deploy with 3 working providers)
-
-**Workarounds:**
-1. Temporarily disable Gemini provider in UI/config
-2. Fall back to legacy llm implementation for Gemini only (not recommended)
-3. Patch rig-core locally (complex, not sustainable)
-
-**Recommended Action:**
-- File issue with rig-core maintainers: https://github.com/0xPlaygrounds/rig/issues
-- Monitor for fix in future rig-core release
-- Deploy with Gemini disabled, re-enable when fixed
-- Document limitation in user-facing documentation
-
-**Status:** ❌ BLOCKER for Gemini provider only
+**Status:** ✅ FIXED
 
 ---
 

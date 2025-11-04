@@ -71,12 +71,20 @@ async fn test_ollama() -> Result<()> {
 
 async fn test_gemini() -> Result<()> {
     use rig::providers::gemini;
+    use rig::providers::gemini::completion::gemini_api_types::{AdditionalParameters, GenerationConfig};
 
     let api_key = std::env::var("GOOGLE_API_KEY")?;
     let client = gemini::Client::new(&api_key);
 
+    // Create generation config and additional params (required by Gemini)
+    let gen_cfg = GenerationConfig::default();
+    let additional_params = AdditionalParameters::default().with_config(gen_cfg);
+
     // Try gemini-1.5-flash which is more stable than 2.0-flash-exp
-    let agent = client.agent("gemini-1.5-flash").build();
+    let agent = client
+        .agent("gemini-1.5-flash")
+        .additional_params(serde_json::to_value(additional_params)?)
+        .build();
 
     println!("Sending prompt: 'What is the capital of France? Answer with just the city name.'");
 

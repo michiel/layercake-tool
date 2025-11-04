@@ -20,6 +20,7 @@ use tracing;
 use rig::client::CompletionClient;
 use rig::completion::Prompt;
 use rig::providers::{anthropic, gemini, ollama, openai};
+use rig::providers::gemini::completion::gemini_api_types::{AdditionalParameters, GenerationConfig};
 
 #[cfg(feature = "rmcp")]
 use rmcp::{
@@ -587,7 +588,13 @@ impl ChatSession {
                     return Err(anyhow!("Gemini requires API key"));
                 };
 
-                let mut builder = client.agent(model);
+                // Create generation config and additional params (required by Gemini)
+                let gen_cfg = GenerationConfig::default();
+                let additional_params = AdditionalParameters::default().with_config(gen_cfg);
+
+                let mut builder = client
+                    .agent(model)
+                    .additional_params(serde_json::to_value(additional_params)?);
 
                 #[cfg(feature = "rmcp")]
                 if let Some(ref rmcp_client) = self.rmcp_client {
