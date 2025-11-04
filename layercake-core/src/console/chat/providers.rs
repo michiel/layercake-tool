@@ -4,7 +4,6 @@ use std::{fmt, str::FromStr};
 
 use anyhow::anyhow;
 use clap::ValueEnum;
-use llm::builder::LLMBackend;
 
 /// Supported chat providers.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, ValueEnum)]
@@ -64,12 +63,23 @@ impl ChatProvider {
         !matches!(self, ChatProvider::Ollama)
     }
 
-    pub fn backend(&self) -> LLMBackend {
+    /// Get the default model for this provider
+    pub fn default_model(&self) -> &'static str {
         match self {
-            ChatProvider::Ollama => LLMBackend::Ollama,
-            ChatProvider::OpenAi => LLMBackend::OpenAI,
-            ChatProvider::Gemini => LLMBackend::Google,
-            ChatProvider::Claude => LLMBackend::Anthropic,
+            ChatProvider::Ollama => "llama3.2",
+            ChatProvider::OpenAi => "gpt-4o-mini",
+            ChatProvider::Gemini => "gemini-1.5-flash",
+            ChatProvider::Claude => "claude-3-5-sonnet-20241022",
+        }
+    }
+
+    /// Get the environment variable name for the API key
+    pub fn api_key_env_var(&self) -> Option<&'static str> {
+        match self {
+            ChatProvider::Ollama => None,
+            ChatProvider::OpenAi => Some("OPENAI_API_KEY"),
+            ChatProvider::Gemini => Some("GOOGLE_API_KEY"),
+            ChatProvider::Claude => Some("ANTHROPIC_API_KEY"),
         }
     }
 }

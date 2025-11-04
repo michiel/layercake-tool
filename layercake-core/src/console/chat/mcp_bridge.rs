@@ -4,7 +4,6 @@ use anyhow::Result;
 use axum_mcp::prelude::*;
 use axum_mcp::protocol::messages::{Tool, ToolContent, ToolsCallResult};
 use axum_mcp::server::registry::ToolExecutionContext;
-use llm::chat::{FunctionTool, Tool as LlmTool};
 use sea_orm::DatabaseConnection;
 use serde_json::json;
 use std::sync::Arc;
@@ -62,21 +61,6 @@ impl McpBridge {
             .tool_registry()
             .execute_tool(name, exec_context)
             .await
-    }
-
-    pub async fn llm_tools(&self, context: &SecurityContext) -> Result<Vec<LlmTool>, McpError> {
-        let tools = self.list_tools(context).await?;
-        Ok(tools
-            .into_iter()
-            .map(|tool| LlmTool {
-                tool_type: "function".to_string(),
-                function: FunctionTool {
-                    name: tool.name,
-                    description: tool.description,
-                    parameters: tool.input_schema,
-                },
-            })
-            .collect())
     }
 
     pub fn summarize_tool_result(result: &ToolsCallResult) -> String {
