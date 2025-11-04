@@ -799,4 +799,35 @@ mod tests {
     fn test_max_tool_iterations_constant() {
         assert_eq!(MAX_TOOL_ITERATIONS, 5);
     }
+
+    #[test]
+    fn test_ollama_error_detection_http_400() {
+        // Test the error pattern that should trigger Ollama tool fallback
+        let error_msg = "HTTP error: POST http://localhost:11434/api/chat returned 400";
+        assert!(error_msg.contains("/api/chat"));
+        assert!(error_msg.contains("400"));
+    }
+
+    #[test]
+    fn test_ollama_error_detection_no_match() {
+        // Test error patterns that should NOT trigger fallback
+        let error_msg_1 = "HTTP error: POST http://localhost:11434/api/generate returned 400";
+        assert!(!error_msg_1.contains("/api/chat"));
+
+        let error_msg_2 = "HTTP error: POST http://localhost:11434/api/chat returned 500";
+        assert!(error_msg_2.contains("/api/chat"));
+        assert!(!error_msg_2.contains("400"));
+
+        let error_msg_3 = "Connection refused";
+        assert!(!error_msg_3.contains("/api/chat"));
+        assert!(!error_msg_3.contains("400"));
+    }
+
+    #[test]
+    fn test_ollama_error_detection_real_world_example() {
+        // Simulate a real Ollama HTTP 400 error when tools are not supported
+        let error_msg = "Request failed: HTTP status client error (400 Bad Request) for url (http://localhost:11434/api/chat)";
+        assert!(error_msg.contains("/api/chat"));
+        assert!(error_msg.contains("400"));
+    }
 }

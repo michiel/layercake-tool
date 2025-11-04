@@ -289,3 +289,69 @@ fn sanitise_error_message(msg: &str) -> String {
     let re_bearer = Regex::new(r"(Bearer\s+)[A-Za-z0-9_.-]+").unwrap();
     re_bearer.replace_all(&sanitised, "${1}[REDACTED]").to_string()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sanitise_error_message_query_param() {
+        let msg = "HTTP error at https://api.example.com/chat?key=sk-1234567890abcdef";
+        let result = sanitise_error_message(msg);
+        assert_eq!(
+            result,
+            "HTTP error at https://api.example.com/chat?key=[REDACTED]"
+        );
+    }
+
+    #[test]
+    fn test_sanitise_error_message_ampersand_param() {
+        let msg = "Request failed: https://api.example.com/v1?model=gpt-4&key=AIzaSyD123456789";
+        let result = sanitise_error_message(msg);
+        assert_eq!(
+            result,
+            "Request failed: https://api.example.com/v1?model=gpt-4&key=[REDACTED]"
+        );
+    }
+
+    #[test]
+    fn test_sanitise_error_message_bearer_token() {
+        let msg = "Authorization failed with Bearer sk-proj-1234567890abcdefghijklmnop";
+        let result = sanitise_error_message(msg);
+        assert_eq!(result, "Authorization failed with Bearer [REDACTED]");
+    }
+
+    #[test]
+    fn test_sanitise_error_message_multiple_keys() {
+        let msg = "Failed: ?key=secret123 and Bearer token-abc-def and &key=another-key";
+        let result = sanitise_error_message(msg);
+        assert_eq!(
+            result,
+            "Failed: ?key=[REDACTED] and Bearer [REDACTED] and &key=[REDACTED]"
+        );
+    }
+
+    #[test]
+    fn test_sanitise_error_message_no_secrets() {
+        let msg = "Simple error message with no secrets";
+        let result = sanitise_error_message(msg);
+        assert_eq!(result, "Simple error message with no secrets");
+    }
+
+    #[test]
+    fn test_sanitise_error_message_anthropic_api_key() {
+        let msg = "Anthropic API error: Bearer sk-ant-api03-1234567890-abcdefghijklmnop";
+        let result = sanitise_error_message(msg);
+        assert_eq!(result, "Anthropic API error: Bearer [REDACTED]");
+    }
+
+    #[test]
+    fn test_sanitise_error_message_gemini_api_key() {
+        let msg = "Gemini request to https://generativelanguage.googleapis.com/v1beta/models?key=AIzaSyABCDEF123456789";
+        let result = sanitise_error_message(msg);
+        assert_eq!(
+            result,
+            "Gemini request to https://generativelanguage.googleapis.com/v1beta/models?key=[REDACTED]"
+        );
+    }
+}
