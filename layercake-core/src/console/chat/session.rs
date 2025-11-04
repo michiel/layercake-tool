@@ -21,6 +21,13 @@ use rig::client::CompletionClient;
 use rig::completion::Prompt;
 use rig::providers::{anthropic, gemini, ollama, openai};
 
+#[cfg(feature = "rmcp")]
+use rmcp::{
+    model::{ClientCapabilities, ClientInfo, Implementation, Tool as RmcpTool},
+    transport::StreamableHttpClientTransport,
+    ServiceExt,
+};
+
 use crate::database::entities::{chat_sessions, users};
 use crate::mcp::security::build_user_security_context;
 
@@ -119,9 +126,51 @@ pub struct ChatSession {
     agent: RigAgent,
     credentials: ChatCredentialStore,
     config: ChatConfig,
+    #[cfg(feature = "rmcp")]
+    rmcp_client: Option<rmcp::Client<rmcp::RoleServer>>,
+    #[cfg(feature = "rmcp")]
+    rmcp_tools: Vec<RmcpTool>,
 }
 
 impl ChatSession {
+    /// Initialize rmcp client connection to MCP server
+    #[cfg(feature = "rmcp")]
+    async fn init_rmcp_client(
+        mcp_server_url: &str,
+    ) -> Result<(rmcp::Client<rmcp::RoleServer>, Vec<RmcpTool>)> {
+        tracing::info!("Connecting to MCP server at {}", mcp_server_url);
+
+        let transport = StreamableHttpClientTransport::from_uri(mcp_server_url);
+
+        let client_info = ClientInfo {
+            protocol_version: Default::default(),
+            capabilities: ClientCapabilities::default(),
+            client_info: Implementation {
+                name: "layercake-chat".to_string(),
+                version: env!("CARGO_PKG_VERSION").to_string(),
+            },
+        };
+
+        let client = client_info
+            .serve(transport)
+            .await
+            .context("Failed to connect to MCP server")?;
+
+        let server_info = client.peer_info();
+        tracing::info!("Connected to MCP server: {:?}", server_info);
+
+        // List available tools
+        let tools = client
+            .list_tools(Default::default())
+            .await
+            .context("Failed to list MCP tools")?
+            .tools;
+
+        tracing::info!("Loaded {} tools from MCP server", tools.len());
+
+        Ok((client, tools))
+    }
+
     /// Create a new chat session (not yet persisted)
     pub async fn new(
         db: DatabaseConnection,
@@ -139,13 +188,27 @@ impl ChatSession {
             Some(project_id),
         );
 
-        // Get available tools from MCP
-        let mcp_tools = bridge
-            .list_tools(&security)
-            .await
-            .map_err(|err| anyhow!("failed to load MCP tools: {}", err))?;
+        // Initialize rmcp client if feature is enabled
+        #[cfg(feature = "rmcp")]
+        let (rmcp_client, rmcp_tools) =
+            Self::init_rmcp_client(&config.mcp_server_url).await.ok().unzip();
 
-        let tool_names: Vec<String> = mcp_tools.iter().map(|t| t.name.clone()).collect();
+        #[cfg(feature = "rmcp")]
+        let tool_names: Vec<String> = rmcp_tools
+            .as_ref()
+            .map(|tools| tools.iter().map(|t| t.name.clone()).collect())
+            .unwrap_or_default();
+
+        // Fallback to bridge tools if rmcp not available
+        #[cfg(not(feature = "rmcp"))]
+        let tool_names: Vec<String> = {
+            let mcp_tools = bridge
+                .list_tools(&security)
+                .await
+                .map_err(|err| anyhow!("failed to load MCP tools: {}", err))?;
+            mcp_tools.iter().map(|t| t.name.clone()).collect()
+        };
+
         let system_prompt = compose_system_prompt(config, project_id, &tool_names);
 
         // Get model name from config
@@ -175,6 +238,10 @@ impl ChatSession {
             agent,
             credentials,
             config: config.clone(),
+            #[cfg(feature = "rmcp")]
+            rmcp_client,
+            #[cfg(feature = "rmcp")]
+            rmcp_tools: rmcp_tools.unwrap_or_default(),
         })
     }
 
@@ -218,6 +285,11 @@ impl ChatSession {
             ChatProvider::Ollama => RigAgent::Ollama(session.model_name.clone()),
         };
 
+        // Initialize rmcp client if feature is enabled
+        #[cfg(feature = "rmcp")]
+        let (rmcp_client, rmcp_tools) =
+            Self::init_rmcp_client(&config.mcp_server_url).await.ok().unzip();
+
         // Load message history (currently empty - could be extended to load from DB)
         let messages = Vec::new();
 
@@ -236,6 +308,10 @@ impl ChatSession {
             agent,
             credentials,
             config: config.clone(),
+            #[cfg(feature = "rmcp")]
+            rmcp_client,
+            #[cfg(feature = "rmcp")]
+            rmcp_tools: rmcp_tools.unwrap_or_default(),
         })
     }
 
@@ -420,7 +496,7 @@ impl ChatSession {
 
         // Get base URL if configured
         let provider_config = self.config.provider(self.provider);
-        let base_url = provider_config.base_url.clone();
+        let _base_url = provider_config.base_url.clone();
 
         // Call appropriate provider
         match &self.agent {
@@ -431,7 +507,16 @@ impl ChatSession {
                     return Err(anyhow!("OpenAI requires API key"));
                 };
 
-                let agent = client.agent(model).build();
+                let mut builder = client.agent(model);
+
+                #[cfg(feature = "rmcp")]
+                if let Some(ref rmcp_client) = self.rmcp_client {
+                    if !self.rmcp_tools.is_empty() {
+                        builder = builder.rmcp_tools(self.rmcp_tools.clone(), rmcp_client.peer().to_owned());
+                    }
+                }
+
+                let agent = builder.build();
                 agent
                     .prompt(prompt)
                     .await
@@ -445,7 +530,16 @@ impl ChatSession {
                     return Err(anyhow!("Anthropic requires API key"));
                 };
 
-                let agent = client.agent(model).build();
+                let mut builder = client.agent(model);
+
+                #[cfg(feature = "rmcp")]
+                if let Some(ref rmcp_client) = self.rmcp_client {
+                    if !self.rmcp_tools.is_empty() {
+                        builder = builder.rmcp_tools(self.rmcp_tools.clone(), rmcp_client.peer().to_owned());
+                    }
+                }
+
+                let agent = builder.build();
                 agent
                     .prompt(prompt)
                     .await
@@ -459,7 +553,16 @@ impl ChatSession {
                     return Err(anyhow!("Gemini requires API key"));
                 };
 
-                let agent = client.agent(model).build();
+                let mut builder = client.agent(model);
+
+                #[cfg(feature = "rmcp")]
+                if let Some(ref rmcp_client) = self.rmcp_client {
+                    if !self.rmcp_tools.is_empty() {
+                        builder = builder.rmcp_tools(self.rmcp_tools.clone(), rmcp_client.peer().to_owned());
+                    }
+                }
+
+                let agent = builder.build();
                 agent.prompt(prompt).await.context("Gemini API call failed")
             }
 
@@ -467,7 +570,16 @@ impl ChatSession {
                 // Ollama client uses environment variable or defaults to localhost
                 let client = ollama::Client::from_env();
 
-                let agent = client.agent(model).build();
+                let mut builder = client.agent(model);
+
+                #[cfg(feature = "rmcp")]
+                if let Some(ref rmcp_client) = self.rmcp_client {
+                    if !self.rmcp_tools.is_empty() {
+                        builder = builder.rmcp_tools(self.rmcp_tools.clone(), rmcp_client.peer().to_owned());
+                    }
+                }
+
+                let agent = builder.build();
                 agent
                     .prompt(prompt)
                     .await

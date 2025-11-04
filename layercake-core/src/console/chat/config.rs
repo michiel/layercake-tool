@@ -21,6 +21,7 @@ pub struct ChatConfig {
     pub request_timeout: Duration,
     pub system_prompt: Option<String>,
     pub providers: HashMap<ChatProvider, ProviderConfig>,
+    pub mcp_server_url: String,
 }
 
 impl ChatConfig {
@@ -77,11 +78,15 @@ impl ChatConfig {
             },
         );
 
+        let mcp_server_url = std::env::var("LAYERCAKE_MCP_SERVER_URL")
+            .unwrap_or_else(|_| "http://localhost:3000/mcp".to_string());
+
         Ok(Self {
             default_provider: provider,
             request_timeout: Duration::from_secs(timeout_secs),
             system_prompt,
             providers,
+            mcp_server_url,
         })
     }
 
