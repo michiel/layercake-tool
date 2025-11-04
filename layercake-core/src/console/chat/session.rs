@@ -421,9 +421,31 @@ impl ChatSession {
         // Build conversation prompt from message history
         let conversation = self.build_conversation_prompt();
 
-        // For now, make a simple non-streaming call
-        // TODO: Add streaming, tool calling, multi-iteration loop
-        let response_text = self.call_rig_agent(&conversation).await?;
+        // Call agent with multi-turn tool support
+        let response_text = match self.call_rig_agent(&conversation).await {
+            Ok(text) => text,
+            Err(err) if self.should_disable_tools(&err) => {
+                // Ollama HTTP 400 when tools not supported - retry without tools
+                self.tool_use_enabled = false;
+
+                #[cfg(feature = "rmcp")]
+                {
+                    self.rmcp_client = None;
+                    self.rmcp_tools.clear();
+                }
+
+                let notice = "Ollama server rejected function/tool calls. Continuing without tool access; responses now rely on model knowledge only.";
+                observer(ChatEvent::AssistantMessage {
+                    text: notice.to_string(),
+                });
+                self.messages.push(ChatMessage::assistant(notice));
+                tracing::warn!("Disabling tool usage for session: {}", err);
+
+                // Retry without tools
+                self.call_rig_agent(&conversation).await?
+            }
+            Err(err) => return Err(err),
+        };
 
         // Notify observer
         observer(ChatEvent::AssistantMessage {
@@ -450,6 +472,16 @@ impl ChatSession {
         }
 
         Ok(())
+    }
+
+    fn should_disable_tools(&self, err: &anyhow::Error) -> bool {
+        if self.provider != ChatProvider::Ollama || !self.tool_use_enabled {
+            return false;
+        }
+
+        // Check if error is HTTP 400 from Ollama /api/chat endpoint
+        let err_str = err.to_string();
+        err_str.contains("/api/chat") && err_str.contains("400")
     }
 
     fn build_conversation_prompt(&self) -> String {
@@ -519,6 +551,7 @@ impl ChatSession {
                 let agent = builder.build();
                 agent
                     .prompt(prompt)
+                    .multi_turn(MAX_TOOL_ITERATIONS)
                     .await
                     .context("OpenAI API call failed")
             }
@@ -542,6 +575,7 @@ impl ChatSession {
                 let agent = builder.build();
                 agent
                     .prompt(prompt)
+                    .multi_turn(MAX_TOOL_ITERATIONS)
                     .await
                     .context("Anthropic API call failed")
             }
@@ -563,7 +597,11 @@ impl ChatSession {
                 }
 
                 let agent = builder.build();
-                agent.prompt(prompt).await.context("Gemini API call failed")
+                agent
+                    .prompt(prompt)
+                    .multi_turn(MAX_TOOL_ITERATIONS)
+                    .await
+                    .context("Gemini API call failed")
             }
 
             RigAgent::Ollama(model) => {
@@ -582,6 +620,7 @@ impl ChatSession {
                 let agent = builder.build();
                 agent
                     .prompt(prompt)
+                    .multi_turn(MAX_TOOL_ITERATIONS)
                     .await
                     .context("Ollama API call failed")
             }
