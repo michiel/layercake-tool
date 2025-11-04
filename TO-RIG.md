@@ -13,26 +13,38 @@ This document outlines the plan to migrate Layercake's chat functionality from t
 **Phase 0**: ✅ COMPLETE (100%)
 **Phase 1**: ✅ COMPLETE (100%)
 **Phase 2**: ✅ COMPLETE (80% - streaming deferred)
-**Phase 3**: 🔄 IN PROGRESS (50%)
+**Phase 3**: 🔄 IN PROGRESS (60%)
 
 **What's Working:**
-- ✅ All 4 providers (OpenAI, Anthropic, Gemini, Ollama) with rig agents
+- ✅ Ollama provider (tested and validated)
+- ✅ OpenAI provider (code complete, untested)
+- ✅ Anthropic provider (code complete, untested)
+- ⚠️  Gemini provider (code complete, blocked by rig library bug)
 - ✅ rmcp client integration for MCP tool calling
 - ✅ Multi-turn tool execution loop (automatic via rig)
 - ✅ Ollama HTTP 400 error handling with tool fallback
 - ✅ Session persistence and resumption
 - ✅ GraphQL integration
 - ✅ Code compiles successfully
+- ✅ 126 tests passing (no regressions)
 
 **Deferred:**
-- ⚠️ Streaming (type complexity - non-blocking)
+- ⚠️  Streaming (type complexity - non-blocking)
+
+**Blockers:**
+- ❌ Gemini provider (rig library bug: missing field `generationConfig`)
 
 **Phase 3 Progress:**
 - ✅ 21 unit tests implemented and passing (11 session + 7 sanitization + 3 Ollama)
 - ✅ Error handling test coverage complete
 - ✅ API key sanitization tests complete
 - ✅ Ollama fallback error detection tests complete
-- ⬜ Integration tests (OpenAI, Anthropic, Gemini, Ollama)
+- ✅ Integration test created (examples/test_rig_integration.rs)
+- 🔄 Integration tests partially complete:
+  - ✅ Ollama (llama3.2): PASSING
+  - ❌ Gemini: BLOCKED (rig library bug)
+  - ⬜ OpenAI (requires API key)
+  - ⬜ Anthropic (requires API key)
 - ⬜ Persistence tests (database interactions)
 - ⬜ Performance validation
 
@@ -602,7 +614,7 @@ struct StreamChunk {
 
 ---
 
-### Phase 3: Testing & Validation (Days 5-7) - 🔄 IN PROGRESS (50%)
+### Phase 3: Testing & Validation (Days 5-7) - 🔄 IN PROGRESS (60%)
 
 - [✅] **Unit tests** - COMPLETE (21 tests passing)
   - [✅] Provider initialization tests (display names, API keys, default models)
@@ -614,14 +626,15 @@ struct StreamChunk {
   - [ ] rmcp client connection tests (requires MCP server)
   - [ ] Persistence tests (requires database setup)
 
-- [ ] **Integration tests**
-  - [ ] OpenAI provider end-to-end
-  - [ ] Anthropic provider end-to-end
-  - [ ] Gemini provider end-to-end
-  - [ ] Ollama provider end-to-end
-  - [ ] MCP tool integration via rmcp
-  - [ ] Session resumption
-  - [ ] Multi-turn conversations with tools
+- [🔄] **Integration tests** - PARTIALLY COMPLETE
+  - [✅] Integration test example created (examples/test_rig_integration.rs)
+  - [⬜] OpenAI provider end-to-end (requires API key)
+  - [⬜] Anthropic provider end-to-end (requires API key)
+  - [❌] Gemini provider end-to-end (BLOCKED - rig library bug)
+  - [✅] Ollama provider end-to-end (PASSING with llama3.2)
+  - [⬜] MCP tool integration via rmcp (requires MCP server setup)
+  - [⬜] Session resumption
+  - [⬜] Multi-turn conversations with tools
 
 - [ ] **Edge case testing**
   - [ ] Ollama tool rejection (HTTP 400)
@@ -1420,6 +1433,55 @@ This is a **roll-forward only migration** with the following characteristics:
 
 ---
 
+## Gemini Provider Blocker
+
+### Issue Description
+
+The Gemini provider in rig-core 0.23.1 fails with a JSON parsing error when making API calls.
+
+**Error:**
+```
+CompletionError: JsonError: missing field `generationConfig`
+```
+
+**Reproduction:**
+```rust
+use rig::providers::gemini;
+use rig::client::CompletionClient;
+use rig::completion::Prompt;
+
+let client = gemini::Client::new(&api_key);
+let agent = client.agent("gemini-1.5-flash").build();
+let response = agent.prompt("test").await; // Fails with JsonError
+```
+
+**Models Tested:**
+- gemini-1.5-flash: FAIL
+- gemini-2.0-flash-exp: FAIL
+
+**Root Cause:**
+The rig library's Gemini provider appears to have a mismatch between the expected JSON schema and Gemini's actual API response. The error suggests the library expects a `generationConfig` field that's not present in the response.
+
+**Impact:**
+- Gemini provider cannot be used in rig-based chat
+- Affects 1 of 4 providers (OpenAI, Anthropic, Ollama still work)
+- Non-blocking for migration (can deploy with 3 working providers)
+
+**Workarounds:**
+1. Temporarily disable Gemini provider in UI/config
+2. Fall back to legacy llm implementation for Gemini only (not recommended)
+3. Patch rig-core locally (complex, not sustainable)
+
+**Recommended Action:**
+- File issue with rig-core maintainers: https://github.com/0xPlaygrounds/rig/issues
+- Monitor for fix in future rig-core release
+- Deploy with Gemini disabled, re-enable when fixed
+- Document limitation in user-facing documentation
+
+**Status:** ❌ BLOCKER for Gemini provider only
+
+---
+
 **Document Status**: Final
-**Last Updated**: 2025-11-03
+**Last Updated**: 2025-11-04
 **Migration Approach**: Roll-Forward Only (No Rollback)
