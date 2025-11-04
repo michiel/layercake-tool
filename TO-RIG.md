@@ -430,6 +430,161 @@ The initial concerns were based on incomplete information. With proper documenta
   - **Blocker**: Type complexity with `MultiTurnStreamItem<StreamingCompletionResponse>` across providers
   - **Note**: Each provider returns different concrete types, requires boxing or dynamic dispatch
   - **Decision**: Non-blocking feature, defer to Phase 3 or post-migration
+  - **See**: [Streaming Type Complexity Analysis](#streaming-type-complexity-analysis) below for technical details
+
+---
+
+## Streaming Type Complexity Analysis
+
+### Problem Statement
+
+Implementing streaming in `ChatSession::stream_rig_agent()` encounters a Rust type system challenge due to each provider returning different concrete types for `StreamingCompletionResponse`.
+
+### Technical Details
+
+**Attempted Implementation:**
+```rust
+async fn stream_rig_agent(
+    &self,
+    prompt: &str,
+) -> Result<impl Stream<Item = Result<MultiTurnStreamItem<...>, anyhow::Error>>> {
+    match &self.agent {
+        RigAgent::OpenAI(model) => {
+            let stream = client.agent(model).build().stream_prompt(prompt).await;
+            Ok(stream.map(|r| r.map_err(|e| anyhow::Error::from(e))))
+        }
+        RigAgent::Anthropic(model) => { /* ... */ }
+        // ...
+    }
+}
+```
+
+**Error:**
+```
+error[E0308]: mismatched types
+expected `StreamingCompletionResponse`, found a different `StreamingCompletionResponse`
+```
+
+**Root Cause:**
+
+Each provider has its own concrete implementation of `StreamingCompletionResponse<R>`:
+- OpenAI: `openai::completion::streaming::StreamingCompletionResponse`
+- Anthropic: `anthropic::streaming::StreamingCompletionResponse`
+- Gemini: `gemini::streaming::StreamingCompletionResponse`
+- Ollama: `ollama::StreamingCompletionResponse`
+
+These are **different types** despite having the same name. The generic `R` parameter also differs per provider.
+
+**Type Signature Challenge:**
+
+```rust
+MultiTurnStreamItem<impl Clone + Unpin>  // Generic bound, but concrete type differs
+```
+
+When returning from a match statement, **all arms must return the same concrete type**. The `impl Trait` syntax doesn't unify different implementations across match arms.
+
+### Attempted Solutions
+
+**1. Generic Bound Approach** ❌
+```rust
+Result<impl Stream<Item = Result<MultiTurnStreamItem<impl Clone + Unpin>, Error>>>
+```
+**Failed**: Each match arm returns different concrete types.
+
+**2. Trait Object (Boxing)** 🤔
+```rust
+Result<Box<dyn Stream<Item = Result<MultiTurnStreamItem<...>, Error>> + Unpin + Send>>
+```
+**Challenges**:
+- Need to box the stream (allocation overhead)
+- `MultiTurnStreamItem<R>` is still generic over `R`
+- `StreamingCompletionResponse` doesn't implement a common trait across providers
+- Potential performance cost per streamed chunk
+
+**3. Enum Wrapper** 🤔
+```rust
+enum StreamingResponse {
+    OpenAI(openai::StreamingCompletionResponse),
+    Anthropic(anthropic::StreamingCompletionResponse),
+    // ...
+}
+```
+**Challenges**:
+- Verbose pattern matching in stream handling
+- Loses ergonomic access to response fields
+- Still need to map each provider's stream
+
+**4. Macro Code Generation** 🤔
+```rust
+macro_rules! impl_streaming {
+    ($provider:ident) => { /* generate streaming method per provider */ }
+}
+```
+**Challenges**:
+- Increased code complexity
+- Harder to maintain
+- Still requires separate methods per provider
+
+### Current Workaround
+
+**Non-Streaming Implementation**:
+```rust
+async fn call_rig_agent(&self, prompt: &str) -> Result<String> {
+    match &self.agent {
+        RigAgent::OpenAI(model) => {
+            agent.prompt(prompt).multi_turn(MAX_TOOL_ITERATIONS).await
+        }
+        // ... returns String (final response)
+    }
+}
+```
+
+**Works because**: All providers return `Result<String>` from `.prompt().await`, which is a unified type.
+
+### Potential Solutions for Future
+
+**Option A: Provider-Specific Stream Methods**
+```rust
+async fn stream_openai_agent(&self, prompt: &str) -> OpenAIStream { /* ... */ }
+async fn stream_anthropic_agent(&self, prompt: &str) -> AnthropicStream { /* ... */ }
+```
+- Simple, type-safe
+- Requires separate code paths for each provider
+- More maintenance overhead
+
+**Option B: Box + Type Erasure**
+```rust
+Box<dyn Stream<Item = Result<StreamChunk, Error>> + Unpin + Send>
+
+struct StreamChunk {
+    text: String,
+    // unified fields
+}
+```
+- Map each provider's stream to common `StreamChunk` type
+- Allocates per stream (one-time cost)
+- Loses provider-specific metadata
+
+**Option C: Defer to rig Improvements**
+- Wait for rig to provide unified streaming trait
+- Community may solve this for multi-provider streaming
+- Check rig GitHub issues/discussions
+
+### Recommendation
+
+**Defer streaming until**:
+1. Non-streaming functionality is fully tested and validated
+2. User feedback indicates streaming is critical (vs nice-to-have)
+3. Performance testing shows non-streaming is acceptable
+4. rig library potentially adds unified streaming abstractions
+
+**Rationale**:
+- Current non-streaming chat is fully functional
+- Multi-turn tool calling works without streaming
+- Streaming adds UI polish but not core functionality
+- Type complexity risk vs reward doesn't justify immediate implementation
+
+---
 
 ### Phase 3: Testing & Validation (Days 5-7)
 
