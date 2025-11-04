@@ -13,7 +13,7 @@ use std::{fmt::Write as FmtWrite, sync::Arc};
 use anyhow::{anyhow, Context, Result};
 use axum_mcp::prelude::{ClientContext, SecurityContext};
 use sea_orm::{DatabaseConnection, EntityTrait};
-use serde_json::{json, Value};
+use serde_json::{json, Number, Value};
 use tokio::io::{self, AsyncBufReadExt, BufReader};
 use tracing;
 
@@ -31,7 +31,7 @@ use rmcp::{
     ServiceExt,
 };
 
-use crate::database::entities::{chat_sessions, users};
+use crate::database::entities::users;
 use crate::mcp::security::build_user_security_context;
 use crate::services::system_settings_service::SystemSettingsService;
 
@@ -95,16 +95,23 @@ impl ChatMessage {
     }
 
     fn tool_result(call_id: impl Into<String>, output: impl Into<String>) -> Self {
+        let output = output.into();
         Self {
             role: "tool".to_string(),
-            content: String::new(),
+            content: output.clone(),
             tool_calls: None,
             tool_results: Some(vec![ToolResultData {
                 call_id: call_id.into(),
-                output: output.into(),
+                output,
             }]),
         }
     }
+}
+
+#[derive(Debug, Clone)]
+struct ParsedToolInvocation {
+    name: String,
+    arguments: Option<serde_json::Value>,
 }
 
 /// Enum to hold provider-specific rig agents
@@ -428,60 +435,39 @@ impl ChatSession {
     where
         F: FnMut(ChatEvent),
     {
-        // Build conversation prompt from message history
-        let conversation = self.build_conversation_prompt();
-
-        // Call agent with multi-turn tool support
-        let response_text = match self.call_rig_agent(&conversation).await {
-            Ok(text) => text,
-            Err(err) if self.should_disable_tools(&err) => {
-                // Ollama HTTP 400 when tools not supported - retry without tools
-                self.tool_use_enabled = false;
-
-                #[cfg(feature = "rmcp")]
-                {
-                    self.rmcp_client = None;
-                    self.rmcp_tools.clear();
-                }
-
-                let notice = "Ollama server rejected function/tool calls. Continuing without tool access; responses now rely on model knowledge only.";
-                observer(ChatEvent::AssistantMessage {
-                    text: notice.to_string(),
-                });
-                self.messages.push(ChatMessage::assistant(notice));
-                tracing::warn!("Disabling tool usage for session: {}", err);
-
-                // Retry without tools
-                self.call_rig_agent(&conversation).await?
+        let mut turn_count = 0usize;
+        loop {
+            if turn_count > MAX_TOOL_ITERATIONS {
+                return Err(anyhow!(
+                    "Exceeded maximum tool interaction depth without producing a response"
+                ));
             }
-            Err(err) => return Err(err),
-        };
+            turn_count += 1;
 
-        // Notify observer
-        observer(ChatEvent::AssistantMessage {
-            text: response_text.clone(),
-        });
-
-        // Add assistant response to history
-        self.messages.push(ChatMessage::assistant(&response_text));
-
-        // Persist assistant message
-        if let Some(ref session_id) = self.session_id {
-            use crate::services::chat_history_service::ChatHistoryService;
-            let history_service = ChatHistoryService::new(self.db.clone());
-            history_service
-                .store_message(
-                    session_id,
-                    "assistant".to_string(),
-                    response_text,
-                    None,
-                    None,
-                    None,
-                )
+            let conversation = self.build_conversation_prompt();
+            let response_text = self
+                .invoke_agent_with_retries(&conversation, observer)
                 .await?;
-        }
 
-        Ok(())
+            if let Some(invocation) = extract_tool_invocation(&response_text) {
+                self.handle_tool_invocation(response_text, invocation, observer)
+                    .await?;
+                continue;
+            }
+
+            observer(ChatEvent::AssistantMessage {
+                text: response_text.clone(),
+            });
+
+            self.messages.push(ChatMessage::assistant(&response_text));
+
+            if let Some(ref session_id) = self.session_id {
+                self.persist_message(session_id, "assistant", &response_text, None, None, None)
+                    .await?;
+            }
+
+            return Ok(());
+        }
     }
 
     fn should_disable_tools(&self, err: &anyhow::Error) -> bool {
@@ -509,6 +495,20 @@ impl ChatSession {
                 "assistant" => {
                     prompt.push_str("Assistant: ");
                     prompt.push_str(&msg.content);
+                    prompt.push_str("\n\n");
+                }
+                "tool" => {
+                    prompt.push_str("Tool: ");
+                    if let Some(results) = &msg.tool_results {
+                        let joined = results
+                            .iter()
+                            .map(|result| result.output.as_str())
+                            .collect::<Vec<_>>()
+                            .join("\n");
+                        prompt.push_str(&joined);
+                    } else {
+                        prompt.push_str(&msg.content);
+                    }
                     prompt.push_str("\n\n");
                 }
                 _ => {}
@@ -646,6 +646,244 @@ impl ChatSession {
             }
         }
     }
+
+    async fn invoke_agent_with_retries<F>(
+        &mut self,
+        prompt: &str,
+        observer: &mut F,
+    ) -> Result<String>
+    where
+        F: FnMut(ChatEvent),
+    {
+        match self.call_rig_agent(prompt).await {
+            Ok(text) => Ok(text),
+            Err(err) if self.should_disable_tools(&err) => {
+                self.tool_use_enabled = false;
+
+                #[cfg(feature = "rmcp")]
+                {
+                    self.rmcp_client = None;
+                    self.rmcp_tools.clear();
+                }
+
+                let notice = "Ollama server rejected function/tool calls. Continuing without tool access; responses now rely on model knowledge only.";
+                observer(ChatEvent::AssistantMessage {
+                    text: notice.to_string(),
+                });
+                self.messages.push(ChatMessage::assistant(notice));
+
+                if let Some(ref session_id) = self.session_id {
+                    self.persist_message(session_id, "assistant", notice, None, None, None)
+                        .await?;
+                }
+
+                tracing::warn!("Disabling tool usage for session: {}", err);
+
+                let updated_prompt = self.build_conversation_prompt();
+                self.call_rig_agent(&updated_prompt).await
+            }
+            Err(err) => Err(err),
+        }
+    }
+
+    async fn handle_tool_invocation<F>(
+        &mut self,
+        raw_response: String,
+        mut invocation: ParsedToolInvocation,
+        observer: &mut F,
+    ) -> Result<()>
+    where
+        F: FnMut(ChatEvent),
+    {
+        let call_id = format!("tool_call_{}", self.messages.len());
+        let arguments_for_record = invocation
+            .arguments
+            .clone()
+            .unwrap_or(Value::Object(serde_json::Map::new()));
+
+        let tool_call = ToolCallData {
+            id: call_id.clone(),
+            name: invocation.name.clone(),
+            arguments: arguments_for_record.clone(),
+        };
+
+        self.messages
+            .push(ChatMessage::assistant(&raw_response).with_tool_calls(vec![tool_call]));
+
+        let execution_args = invocation.arguments.clone();
+        let result = self
+            .bridge
+            .execute_tool(&invocation.name, &self.security, execution_args.clone())
+            .await
+            .with_context(|| format!("failed to execute MCP tool {}", invocation.name))?;
+
+        let summary = McpBridge::summarize_tool_result(&result);
+        let result_metadata = McpBridge::serialize_tool_result(&result);
+
+        self.messages
+            .push(ChatMessage::tool_result(call_id.clone(), &summary));
+
+        if let Some(ref session_id) = self.session_id {
+            let metadata_payload = if let Some(ref args) = execution_args {
+                json!({
+                    "arguments": args,
+                    "result": result_metadata.clone()
+                })
+            } else {
+                result_metadata.clone()
+            };
+
+            self.persist_message(
+                session_id,
+                "tool",
+                &summary,
+                Some(invocation.name.clone()),
+                Some(call_id.clone()),
+                Some(metadata_payload),
+            )
+            .await?;
+        }
+
+        observer(ChatEvent::ToolInvocation {
+            name: invocation.name,
+            summary,
+        });
+
+        Ok(())
+    }
+
+    async fn persist_message(
+        &self,
+        session_id: &str,
+        role: &str,
+        content: &str,
+        tool_name: Option<String>,
+        tool_call_id: Option<String>,
+        metadata: Option<Value>,
+    ) -> Result<()> {
+        use crate::services::chat_history_service::ChatHistoryService;
+        let history_service = ChatHistoryService::new(self.db.clone());
+
+        let metadata_json = metadata
+            .map(|value| serde_json::to_string(&value))
+            .transpose()
+            .context("failed to serialize chat message metadata")?;
+
+        history_service
+            .store_message(
+                session_id,
+                role.to_string(),
+                content.to_string(),
+                tool_name,
+                tool_call_id,
+                metadata_json,
+            )
+            .await?;
+
+        Ok(())
+    }
+}
+
+fn extract_tool_invocation(text: &str) -> Option<ParsedToolInvocation> {
+    const TOOL_CODE_PREFIX: &str = "```tool_code";
+    let start = text.find(TOOL_CODE_PREFIX)?;
+    let after_prefix = &text[start + TOOL_CODE_PREFIX.len()..];
+    let after_prefix = after_prefix.trim_start_matches(|c| c == '\n' || c == '\r' || c == ' ');
+    let end = after_prefix.find("```")?;
+    let block = after_prefix[..end].trim();
+
+    let command_line = block.lines().map(str::trim).find(|line| !line.is_empty())?;
+
+    parse_tool_command(command_line)
+}
+
+fn parse_tool_command(command: &str) -> Option<ParsedToolInvocation> {
+    let open_paren = command.find('(')?;
+    let close_paren = command.rfind(')')?;
+    if close_paren <= open_paren {
+        return None;
+    }
+
+    let name = command[..open_paren].trim();
+    if name.is_empty() {
+        return None;
+    }
+
+    let args_str = command[open_paren + 1..close_paren].trim();
+    let arguments = if args_str.is_empty() {
+        None
+    } else if args_str.starts_with('{') {
+        serde_json::from_str(args_str).ok()
+    } else {
+        parse_key_value_arguments(args_str)
+    };
+
+    Some(ParsedToolInvocation {
+        name: name.to_string(),
+        arguments,
+    })
+}
+
+fn parse_key_value_arguments(args_str: &str) -> Option<serde_json::Value> {
+    let mut map = serde_json::Map::new();
+    for part in args_str.split(',') {
+        let part = part.trim();
+        if part.is_empty() {
+            continue;
+        }
+        let (key, value_raw) = part.split_once('=')?;
+        let key = key.trim();
+        if key.is_empty() {
+            continue;
+        }
+
+        let value = parse_argument_value(value_raw.trim());
+        map.insert(key.to_string(), value);
+    }
+
+    Some(Value::Object(map))
+}
+
+fn parse_argument_value(raw: &str) -> Value {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Value::Null;
+    }
+
+    if trimmed.starts_with('"') && trimmed.ends_with('"') && trimmed.len() >= 2 {
+        return Value::String(trimmed[1..trimmed.len() - 1].to_string());
+    }
+
+    if trimmed.starts_with('\'') && trimmed.ends_with('\'') && trimmed.len() >= 2 {
+        return Value::String(trimmed[1..trimmed.len() - 1].to_string());
+    }
+
+    match trimmed.to_ascii_lowercase().as_str() {
+        "true" => return Value::Bool(true),
+        "false" => return Value::Bool(false),
+        "null" => return Value::Null,
+        _ => {}
+    }
+
+    if (trimmed.starts_with('{') && trimmed.ends_with('}'))
+        || (trimmed.starts_with('[') && trimmed.ends_with(']'))
+    {
+        if let Ok(value) = serde_json::from_str(trimmed) {
+            return value;
+        }
+    }
+
+    if let Ok(int_value) = trimmed.parse::<i64>() {
+        return Value::Number(int_value.into());
+    }
+
+    if let Ok(float_value) = trimmed.parse::<f64>() {
+        if let Some(number) = Number::from_f64(float_value) {
+            return Value::Number(number);
+        }
+    }
+
+    Value::String(trimmed.to_string())
 }
 
 fn compose_system_prompt(config: &ChatConfig, project_id: i32, tool_names: &[String]) -> String {
