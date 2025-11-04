@@ -13,7 +13,7 @@ This document outlines the plan to migrate Layercake's chat functionality from t
 **Phase 0**: ✅ COMPLETE (100%)
 **Phase 1**: ✅ COMPLETE (100%)
 **Phase 2**: ✅ COMPLETE (80% - streaming deferred)
-**Phase 3**: ⬜ NOT STARTED
+**Phase 3**: 🔄 IN PROGRESS (30%)
 
 **What's Working:**
 - ✅ All 4 providers (OpenAI, Anthropic, Gemini, Ollama) with rig agents
@@ -27,11 +27,17 @@ This document outlines the plan to migrate Layercake's chat functionality from t
 **Deferred:**
 - ⚠️ Streaming (type complexity - non-blocking)
 
+**Phase 3 Progress:**
+- ✅ 11 unit tests implemented and passing
+- ⬜ Integration tests (OpenAI, Anthropic, Gemini, Ollama)
+- ⬜ Edge case testing (Ollama fallback, error handling)
+- ⬜ Performance validation
+
 **Next Steps:**
-- Phase 3: Testing & Validation
-- Write unit tests for providers and rmcp integration
-- End-to-end integration tests
-- Performance validation
+- Complete unit test coverage (rmcp, persistence, error handling)
+- Write integration tests for all 4 providers
+- End-to-end validation with MCP server
+- Performance benchmarks
 
 ---
 
@@ -586,12 +592,14 @@ struct StreamChunk {
 
 ---
 
-### Phase 3: Testing & Validation (Days 5-7)
+### Phase 3: Testing & Validation (Days 5-7) - 🔄 IN PROGRESS (30%)
 
-- [ ] **Unit tests**
-  - [ ] Provider initialization tests
+- [🔄] **Unit tests** - IN PROGRESS (11 tests passing)
+  - [✅] Provider initialization tests (display names, API keys, default models)
+  - [✅] Provider string parsing tests (FromStr, ToString)
+  - [✅] Session management tests (system prompt composition, ChatMessage builders)
+  - [✅] MAX_TOOL_ITERATIONS constant validation
   - [ ] rmcp client connection tests
-  - [ ] Session management tests
   - [ ] Persistence tests
   - [ ] Error handling tests
 
