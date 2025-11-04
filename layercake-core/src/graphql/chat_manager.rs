@@ -144,7 +144,7 @@ impl ChatManager {
         let history = Arc::new(StdMutex::new(VecDeque::new()));
 
         let mut chat_session =
-            ChatSession::resume(db.clone(), session.clone(), user.clone(), &config).await?;
+            ChatSession::resume(db.clone(), session.session_id.clone(), &config).await?;
         let session_id = session.session_id.clone();
         let model_name = chat_session.model_name().to_string();
 
