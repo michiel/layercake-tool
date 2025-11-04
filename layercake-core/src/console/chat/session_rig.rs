@@ -1,0 +1,293 @@
+#![cfg(feature = "console")]
+
+//! Chat session implementation using rig with rmcp for MCP integration
+//!
+//! This module replaces the old llm-based chat implementation with rig agents.
+//! Key changes:
+//! - Uses rig agents instead of llm::LLMProvider
+//! - Uses rmcp for direct MCP integration (no conversion layer)
+//! - Maintains same session persistence and observer pattern
+
+use std::fmt::Write as FmtWrite;
+
+use anyhow::{anyhow, Context, Result};
+use axum_mcp::prelude::{ClientContext, SecurityContext};
+use sea_orm::DatabaseConnection;
+use serde_json::{json, Value};
+use tokio::io::{self, AsyncBufReadExt, BufReader};
+use tracing;
+
+use rig::client::CompletionClient;
+use rig::completion::Prompt;
+use rig::providers::{anthropic, gemini, ollama, openai};
+
+use crate::database::entities::{chat_sessions, users};
+use crate::mcp::security::build_user_security_context;
+
+use super::{
+    config::{ChatConfig, ChatCredentialStore},
+    ChatProvider, McpBridge,
+};
+
+const MAX_TOOL_ITERATIONS: usize = 5;
+
+#[derive(Clone, Debug)]
+pub enum ChatEvent {
+    AssistantMessage { text: String },
+    ToolInvocation { name: String, summary: String },
+}
+
+/// Message representation for chat history
+#[derive(Clone, Debug)]
+struct ChatMessage {
+    role: String,
+    content: String,
+    tool_calls: Option<Vec<ToolCallData>>,
+    tool_results: Option<Vec<ToolResultData>>,
+}
+
+#[derive(Clone, Debug)]
+struct ToolCallData {
+    id: String,
+    name: String,
+    arguments: serde_json::Value,
+}
+
+#[derive(Clone, Debug)]
+struct ToolResultData {
+    call_id: String,
+    output: String,
+}
+
+impl ChatMessage {
+    fn user(content: impl Into<String>) -> Self {
+        Self {
+            role: "user".to_string(),
+            content: content.into(),
+            tool_calls: None,
+            tool_results: None,
+        }
+    }
+
+    fn assistant(content: impl Into<String>) -> Self {
+        Self {
+            role: "assistant".to_string(),
+            content: content.into(),
+            tool_calls: None,
+            tool_results: None,
+        }
+    }
+
+    fn with_tool_calls(mut self, calls: Vec<ToolCallData>) -> Self {
+        self.tool_calls = Some(calls);
+        self
+    }
+
+    fn tool_result(call_id: impl Into<String>, output: impl Into<String>) -> Self {
+        Self {
+            role: "tool".to_string(),
+            content: String::new(),
+            tool_calls: None,
+            tool_results: Some(vec![ToolResultData {
+                call_id: call_id.into(),
+                output: output.into(),
+            }]),
+        }
+    }
+}
+
+pub struct ChatSession {
+    db: DatabaseConnection,
+    session_id: Option<String>,
+    project_id: i32,
+    user_id: i32,
+    provider: ChatProvider,
+    model_name: String,
+    system_prompt: String,
+    messages: Vec<ChatMessage>,
+    bridge: McpBridge,
+    security: SecurityContext,
+    tool_use_enabled: bool,
+    // TODO: Add rig agent and rmcp client fields
+}
+
+impl ChatSession {
+    /// Create a new chat session (not yet persisted)
+    pub async fn new(
+        db: DatabaseConnection,
+        project_id: i32,
+        user: users::Model,
+        provider: ChatProvider,
+        config: &ChatConfig,
+    ) -> Result<Self> {
+        let bridge = McpBridge::new(db.clone());
+        let security = build_user_security_context(
+            ClientContext::default(),
+            user.id,
+            &user.user_type,
+            Some(project_id),
+        );
+
+        // Get available tools from MCP
+        let mcp_tools = bridge
+            .list_tools(&security)
+            .await
+            .map_err(|err| anyhow!("failed to load MCP tools: {}", err))?;
+
+        let tool_names: Vec<String> = mcp_tools.iter().map(|t| t.name.clone()).collect();
+        let system_prompt = compose_system_prompt(config, project_id, &tool_names);
+
+        // Get model name from config or use default
+        let provider_config = config.provider(provider);
+        let model_name = provider_config
+            .model
+            .clone()
+            .unwrap_or_else(|| provider.default_model().to_string());
+
+        // TODO: Initialize rig agent with rmcp tools
+
+        Ok(Self {
+            db,
+            session_id: None,
+            project_id,
+            user_id: user.id,
+            provider,
+            model_name,
+            system_prompt,
+            messages: Vec::new(),
+            bridge,
+            security,
+            tool_use_enabled: true,
+        })
+    }
+
+    pub fn model_name(&self) -> &str {
+        &self.model_name
+    }
+
+    pub async fn interactive_loop(&mut self) -> Result<()> {
+        println!(
+            "Starting chat for project {} with {} ({})",
+            self.project_id,
+            self.provider.display_name(),
+            self.model_name
+        );
+
+        let tools = self.bridge.list_tools(&self.security).await?;
+        if !tools.is_empty() {
+            let tool_list = tools
+                .iter()
+                .map(|tool| tool.name.clone())
+                .collect::<Vec<_>>()
+                .join(", ");
+            println!("Tools available: {}", tool_list);
+        } else {
+            println!("No MCP tools are currently available.");
+        }
+        println!("Type your question and press Enter. Submit an empty line to exit.\n");
+
+        let stdin = BufReader::new(io::stdin());
+        let mut lines = stdin.lines();
+
+        while let Some(line) = lines.next_line().await? {
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                println!("Ending chat session.");
+                break;
+            }
+            self.send_message_with_observer(trimmed, &mut |event| match event {
+                ChatEvent::AssistantMessage { text } => println!("assistant> {}", text),
+                ChatEvent::ToolInvocation { name, summary } => {
+                    println!("tool:{} => {}", name, summary.replace('\n', " "))
+                }
+            })
+            .await?;
+        }
+
+        Ok(())
+    }
+
+    pub async fn send_message_with_observer<F>(
+        &mut self,
+        input: &str,
+        observer: &mut F,
+    ) -> Result<()>
+    where
+        F: FnMut(ChatEvent),
+    {
+        // Ensure session is persisted
+        let session_id = self.ensure_persisted().await?;
+
+        self.messages.push(ChatMessage::user(input));
+
+        // Persist user message
+        use crate::services::chat_history_service::ChatHistoryService;
+        let history_service = ChatHistoryService::new(self.db.clone());
+        history_service
+            .store_message(
+                &session_id,
+                "user".to_string(),
+                input.to_string(),
+                None,
+                None,
+                None,
+            )
+            .await?;
+
+        self.resolve_conversation(observer).await
+    }
+
+    async fn resolve_conversation<F>(&mut self, observer: &mut F) -> Result<()>
+    where
+        F: FnMut(ChatEvent),
+    {
+        // TODO: Implement conversation resolution with rig agent
+        // This will include:
+        // - Calling rig agent with messages
+        // - Handling tool calls via rmcp
+        // - Multi-iteration tool loop
+        // - Streaming responses
+        observer(ChatEvent::AssistantMessage {
+            text: "TODO: Implement rig agent conversation".to_string(),
+        });
+        Ok(())
+    }
+
+    async fn ensure_persisted(&mut self) -> Result<String> {
+        if let Some(ref id) = self.session_id {
+            return Ok(id.clone());
+        }
+
+        use crate::services::chat_history_service::ChatHistoryService;
+        let history_service = ChatHistoryService::new(self.db.clone());
+
+        let session = history_service
+            .create_session(
+                self.project_id,
+                self.user_id,
+                &self.system_prompt,
+                &self.provider.to_string(),
+                &self.model_name,
+            )
+            .await?;
+
+        self.session_id = Some(session.session_id.clone());
+        Ok(session.session_id)
+    }
+}
+
+fn compose_system_prompt(config: &ChatConfig, project_id: i32, tool_names: &[String]) -> String {
+    let mut prompt = String::new();
+    prompt.push_str(&config.system_prompt);
+
+    if !tool_names.is_empty() {
+        prompt.push_str("\n\nYou have access to the following tools:\n");
+        for name in tool_names {
+            write!(&mut prompt, "- {}\n", name).unwrap();
+        }
+        prompt.push_str("\nUse these tools when appropriate to help answer questions.");
+    }
+
+    prompt.push_str(&format!("\n\nCurrent project ID: {}", project_id));
+    prompt
+}
