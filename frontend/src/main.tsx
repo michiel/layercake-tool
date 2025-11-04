@@ -6,6 +6,7 @@ import { MantineProvider, Loader, Center, Stack, Text } from '@mantine/core'
 import { Notifications } from '@mantine/notifications'
 import { apolloClient, initializeTauriServer } from './graphql/client'
 import { isTauriApp } from './utils/tauri'
+import { startLogStream } from './services/tauriLogStream'
 import App from './App'
 
 // Mantine CSS
@@ -17,6 +18,8 @@ const root = ReactDOM.createRoot(document.getElementById('root')!)
 
 // Check if running in Tauri and initialize server connection
 if (isTauriApp()) {
+  startLogStream()
+
   // Show loading state while waiting for server
   root.render(
     <React.StrictMode>
