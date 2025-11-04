@@ -336,31 +336,37 @@ The initial concerns were based on incomplete information. With proper documenta
 - **Revised estimate: 1 week** (rmcp eliminates ~40% of custom code)
 - Custom MCP adapter no longer needed (Phase 3 simplified)
 
-### Phase 1: Core Infrastructure (Days 1-2)
+### Phase 1: Core Infrastructure (Days 1-2) - 🔄 IN PROGRESS
 
-- [ ] **Dependency management**
-  - [ ] Update layercake-core/Cargo.toml
-  - [ ] Remove llm dependency from console feature
-  - [ ] Add rig-core with rmcp feature to main dependencies
-  - [ ] Verify workspace builds
-  - [ ] Run cargo check
+- [✅] **Dependency management**
+  - [✅] Update layercake-core/Cargo.toml
+  - [✅] Remove llm dependency from console feature
+  - [✅] Add rig-core with rmcp feature to main dependencies
+  - [⬜] Verify workspace builds (blocked on session.rs completion)
+  - [⬜] Run cargo check (blocked on session.rs completion)
 
-- [ ] **Provider implementation**
-  - [ ] Create provider client enum wrapper (rig agents)
-  - [ ] Implement OpenAI client builder
-  - [ ] Implement Anthropic client builder
-  - [ ] Implement Gemini client builder
-  - [ ] Implement Ollama client builder
-  - [ ] Update ChatProvider trait methods
-  - [ ] Add credential handling
-  - [ ] Test each provider initialization
+- [⬜] **Provider implementation** (IN PROGRESS)
+  - [✅] Update ChatProvider enum (removed llm dependency)
+  - [✅] Add default_model() and api_key_env_var() methods
+  - [⬜] Create rig agent builder for OpenAI
+  - [⬜] Create rig agent builder for Anthropic
+  - [⬜] Create rig agent builder for Gemini
+  - [⬜] Create rig agent builder for Ollama
+  - [⬜] Add credential handling
+  - [⬜] Test each provider initialization
 
-- [ ] **rmcp MCP integration** (SIMPLIFIED - replaces custom adapter)
-  - [ ] Create rmcp client initialization helper
-  - [ ] Connect to http://localhost:3000/mcp
-  - [ ] Implement tool discovery via rmcp.list_tools()
-  - [ ] Test rmcp connection with running server
-  - [ ] Document rmcp peer configuration
+- [⬜] **Session rewrite** (IN PROGRESS - session_rig.rs created)
+  - [✅] Create session_rig.rs skeleton
+  - [✅] Define ChatMessage and ChatEvent types
+  - [✅] Implement basic session lifecycle
+  - [⬜] Initialize rig agent with provider-specific client
+  - [⬜] Implement rmcp client initialization
+  - [⬜] Wire rmcp tools to rig agent via .rmcp_tools()
+  - [⬜] Implement resolve_conversation() with rig
+  - [⬜] Implement streaming with stream_prompt()
+  - [⬜] Port tool invocation handling
+  - [⬜] Port error handling and Ollama fallback
+  - [⬜] Replace old session.rs when complete
 
 ### Phase 2: Session Management (Days 3-4)
 
