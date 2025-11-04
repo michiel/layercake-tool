@@ -319,35 +319,33 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                 {navCollapsed ? <IconSettings size={16} /> : 'Database Settings'}
               </Button>
             </Tooltip>
+            <Tooltip label="System Settings" position="right" disabled={!navCollapsed}>
+              <Button
+                variant={isActiveRoute('/settings/system') ? 'filled' : 'light'}
+                fullWidth={!navCollapsed}
+                leftSection={navCollapsed ? undefined : <IconAdjustments size={16} />}
+                onClick={() => navigate('/settings/system')}
+                px={navCollapsed ? 'xs' : undefined}
+                mt="xs"
+                style={navCollapsed ? { justifyContent: 'center' } : undefined}
+              >
+                {navCollapsed ? <IconAdjustments size={16} /> : 'System Settings'}
+              </Button>
+            </Tooltip>
             {isTauri && (
-              <>
-                <Tooltip label="System Settings" position="right" disabled={!navCollapsed}>
-                  <Button
-                    variant={isActiveRoute('/settings/system') ? 'filled' : 'light'}
-                    fullWidth={!navCollapsed}
-                    leftSection={navCollapsed ? undefined : <IconAdjustments size={16} />}
-                    onClick={() => navigate('/settings/system')}
-                    px={navCollapsed ? 'xs' : undefined}
-                    mt="xs"
-                    style={navCollapsed ? { justifyContent: 'center' } : undefined}
-                  >
-                    {navCollapsed ? <IconAdjustments size={16} /> : 'System Settings'}
-                  </Button>
-                </Tooltip>
-                <Tooltip label="App Logs" position="right" disabled={!navCollapsed}>
-                  <Button
-                    variant={isActiveRoute('/settings/logs') ? 'filled' : 'light'}
-                    fullWidth={!navCollapsed}
-                    leftSection={navCollapsed ? undefined : <IconFileText size={16} />}
-                    onClick={() => navigate('/settings/logs')}
-                    px={navCollapsed ? 'xs' : undefined}
-                    mt="xs"
-                    style={navCollapsed ? { justifyContent: 'center' } : undefined}
-                  >
-                    {navCollapsed ? <IconFileText size={16} /> : 'App Logs'}
-                  </Button>
-                </Tooltip>
-              </>
+              <Tooltip label="App Logs" position="right" disabled={!navCollapsed}>
+                <Button
+                  variant={isActiveRoute('/settings/logs') ? 'filled' : 'light'}
+                  fullWidth={!navCollapsed}
+                  leftSection={navCollapsed ? undefined : <IconFileText size={16} />}
+                  onClick={() => navigate('/settings/logs')}
+                  px={navCollapsed ? 'xs' : undefined}
+                  mt="xs"
+                  style={navCollapsed ? { justifyContent: 'center' } : undefined}
+                >
+                  {navCollapsed ? <IconFileText size={16} /> : 'App Logs'}
+                </Button>
+              </Tooltip>
             )}
           </div>
         </Stack>
