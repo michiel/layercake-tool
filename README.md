@@ -1,246 +1,165 @@
-# Layercake tool
+# Layercake
 
-This tool takes graph definitions in CSV/TSV format and generates various graph formats for rendering.
-Export to,
+Layercake is an interactive platform for designing, executing, and reviewing graph-based plans. It combines a visual DAG builder, rich graph editors, automated exporters, and agentic tooling across three surfaces: a Rust backend and CLI, a React web application, and a Tauri desktop shell that bundles everything into a single install.
 
- - PlantUML
- - Graphviz / dot
- - Mermaid
- - GML (Graph Modeling Language)
+![Layercake plan architecture](images/layercake-project.svg)
 
-Custom renders can be added using [Handlebars](https://handlebarsjs.com/) templates via [handlebars-rust](https://docs.rs/handlebars/latest/handlebars/).
+## Feature Highlights
 
-![Layercake project](images/layercake-project.svg)
+- Visual Workflow Builder – compose plan DAGs with drag-and-drop nodes, data-source wiring, execution states, and automatic dependency tracking.
+- Rich Graph Editing – edit nodes, edges, layers, and metadata in spreadsheet or visual modes with live layout controls, layer toggles, and export-ready previews.
+- Data Source Management – import CSV/TSV assets, persist raw payloads, and replay transformations through the plan pipeline.
+- Desktop & Web Experiences – ship a self-contained Tauri desktop app or run the Vite-powered web UI against the same Rust backend.
+- Real-Time Collaboration – share presence, edit history, and live cursor state through the GraphQL + WebSocket collaboration layer.
+- Agentic Workflows – expose Layercake projects, graphs, and transformations to MCP-compliant assistants (Claude, Ollama, etc.) for chat-driven analysis and tooling.
+- Automation & Exporters – run plans headlessly from the CLI, watch for file changes, and emit PlantUML, Graphviz, Mermaid, GML, or custom Handlebars templates.
+- Persistent Storage & Audit – all projects, DAGs, edits, chat credentials, and plan runs are stored in SQLite via SeaORM migrations.
 
-_Project data flow, defined using this project. The data is available in the `sample` directory._
+## Repository at a Glance
 
-## Installation
+| Path | Purpose |
+|------|---------|
+| `layercake-core/` | Rust workspace crate with the CLI, GraphQL/REST server, plan runtime, exporters, and MCP integration. |
+| `frontend/` | Vite + React + Mantine UI with ReactFlow-based plan and graph editors. |
+| `src-tauri/` | Tauri 2 shell that embeds the backend, manages SQLite files, and ships the desktop app. |
+| `external-modules/` | Optional integrations (e.g. `axum-mcp` transport helpers). |
+| `resources/` | Sample projects, Handlebars templates, reference exports, and shared assets. |
+| `docs/` | Architecture notes, review logs, and migration plans. |
+| `scripts/` | Dev/build helpers (`dev.sh`, platform builds, installers). |
 
-### One-Line Install (Recommended)
+## Application Surfaces
 
-The easiest way to install Layercake is using our install script:
+### Desktop App (Tauri 2)
 
-**Linux/macOS:**
-```bash
-# Install latest release directly from GitHub
-curl -fsSL https://raw.githubusercontent.com/michiel/layercake-tool/master/scripts/install.sh | bash
-```
-
-**Windows (PowerShell):**
-```powershell
-# Install latest release directly from GitHub
-irm https://raw.githubusercontent.com/michiel/layercake-tool/master/scripts/install.ps1 | iex
-```
-
-This script will:
-- ✅ Detect your platform and architecture automatically
-- ✅ Download the latest release from GitHub
-- ✅ Install to `~/.local/bin` (no sudo required)
-- ✅ Check if the install directory is in your PATH
-- ✅ Provide instructions to add it to PATH if needed
-
-### Manual Installation
-
-Download a release from the [releases page](https://github.com/michiel/layercake-tool/releases).
-
-#### MacOS
-
-Remove the quarantine attribute from the binary,
-```
-xattr -d com.apple.quarantine ./layercake
-```
-
-Or from the DMG installation
-
-```
-xattr -d com.apple.quarantine /Applications/Layercake.app
-```
-
-## Concepts
-
-Nodes come in two types, partition and non-partition nodes. Partition nodes are used to group nodes together, and are used to create a hierarchy in the graph.
-
-## Usage
-
-See also [the tips and snippets](README-Tips.md) for file watchers, command line rendering, etc
-
-### Example
-
-Using the sample project,
-
-
-```bash
-# Generate a sample project
-layercake generate sample attack_tree example-project
-
-# Run the sample project with a plan, this will generate the output files
-layercake run -p example-project/plan.yaml 
-
-# Run the sample project with a plan, re-run the plan on input changes
-layercake run -p example-project/plan.yaml -w
-```
-
-Now edit and change the CSV files. A collaborative workflow might include Google Sheets, with separate sheets for nodes and edges, followed by export to CSV. If you make local changes, re-import the changed CSV files back to the source.
-
-If you want to re-run the plan on input changes, you can use the `-w` (**watch**) flag. This will re-run the plan when any of the input files change. If you want to automatically generate images 
-from the output files, you can use a file watcher.
-
-
-## Development
-
-### Sample run
-
-```
-cargo run -- -p sample/kvm_control_flow_plan.yaml
-```
-
-### Console and Chat
-
-```
-cargo run -- console
-```
-
-The interactive console lets you:
-
-- `list-projects` to enumerate available datasets
-- `use-project <id>` to change the active context
-- `list-graphs` / `show-graph <id>` for quick metadata checks
-- `chat [--provider <ollama|openai|gemini|claude>]` to launch an LLM session with full MCP tool access
-
-#### Configuring LLM Providers
-
-Provider credentials may be stored in the `chat_credentials` table or supplied through environment variables.
-
-**Using the CLI:**
-
-```bash
-# List configured providers
-cargo run -- chat-credentials list
-
-# Configure OpenAI (or OpenAI-compatible API)
-cargo run -- chat-credentials set openai --api-key sk-... --base-url https://api.openai.com
-
-# Configure a custom OpenAI-compatible endpoint (e.g., LM Studio, vLLM, Ollama with OpenAI compatibility)
-cargo run -- chat-credentials set openai --api-key custom-key --base-url http://localhost:8000/v1
-
-# Configure Anthropic Claude
-cargo run -- chat-credentials set claude --api-key sk-ant-...
-
-# Configure Google Gemini
-cargo run -- chat-credentials set gemini --api-key AIza...
-
-# Configure Ollama
-cargo run -- chat-credentials set ollama --base-url http://localhost:11434
-
-# Clear credentials for a provider
-cargo run -- chat-credentials clear gemini
-```
-
-**Using environment variables:**
-
-```bash
-# OpenAI
-export OPENAI_API_KEY=sk-...
-export OPENAI_BASE_URL=https://api.openai.com  # Optional, defaults to OpenAI
-
-# OpenAI-compatible endpoints (e.g., LM Studio, vLLM)
-export OPENAI_API_KEY=custom-key
-export OPENAI_BASE_URL=http://localhost:8000/v1
-
-# Anthropic Claude
-export ANTHROPIC_API_KEY=sk-ant-...
-
-# Google Gemini
-export GOOGLE_API_KEY=AIza...
-
-# Ollama
-export OLLAMA_BASE_URL=http://localhost:11434
-
-# Model selection (optional, provider-specific defaults used if not set)
-export LAYERCAKE_OPENAI_MODEL=gpt-4o-mini
-export LAYERCAKE_CLAUDE_MODEL=claude-3-5-sonnet-20241010
-export LAYERCAKE_GEMINI_MODEL=gemini-2.0-flash-exp
-export LAYERCAKE_OLLAMA_MODEL=llama3:8b
-```
-
-**OpenAPI-Compatible Endpoints:**
-
-The `openai` provider supports any OpenAI API-compatible endpoint. This works with:
-- **OpenAI** - Official OpenAI API
-- **LM Studio** - Local model serving (http://localhost:1234/v1)
-- **vLLM** - High-performance inference server
-- **Ollama with OpenAI compatibility** - Use Ollama's OpenAI-compatible endpoint
-- **Text generation web UI** - API mode with OpenAI compatibility
-- **Any service implementing the OpenAI Chat Completions API**
-
-Simply set the `--base-url` to point to your endpoint and provide the appropriate API key (use any string if authentication isn't required).
-
-The database migrations seed empty records for every built-in provider, so the CLI helper simply updates the stored secrets without requiring manual inserts.
-
-##### Ollama Tool Support & Verification
-
-Layercake relies on MCP tool calls (`get_project`, `list_projects`, etc.) to return real data. Ollama only accepts those tool payloads when both the server and model support function calling. Use the checklist below to ensure MCP integration works end-to-end:
-
-- **Check your Ollama build** – `ollama --version` should be ≥ `0.3.12`. Upgrade if needed (`brew upgrade ollama`, `curl https://ollama.com/install.sh | sh`, etc.) and restart `ollama serve`.
-- **Pull a tool-capable model** – defaults like `llama3:8b` reject tools. Favour variants such as `llama3.2`, `llama3.1:70b-tool`, `phi3:medium-128k-instruct-q4`, `qwen2.5:14b-instruct`, or other models tagged with tool/function support:\
-  `ollama pull llama3.2`
-- **Configure Layercake** – point the chat layer at the model via env or credentials:\
-  `export LAYERCAKE_OLLAMA_MODEL=llama3.2`
-- **Sanity test the API** – issue a raw request that includes a dummy tool. A `200` confirms the server accepts tooling; a `400` means the selected model/build cannot handle function calls yet:
-
+- Bundles the backend server and React UI into a single binary, storing data under the OS-specific app data directory.
+- Launch for development with:
   ```bash
-  curl http://127.0.0.1:11434/api/chat \
-    -d '{
-      "model": "llama3.2",
-      "messages": [{"role":"user","content":"hi"}],
-      "tools": [{"type":"function","function":{"name":"noop","parameters":{"type":"object"}}}]
-    }'
+  npm run tauri:dev
+  ```
+- Build signed installers per platform:
+  ```bash
+  npm run tauri:build       # current platform
+  npm run tauri:build:macos # or tauri:build:linux / tauri:build:windows
+  ```
+- The desktop shell starts an embedded server, negotiates a shared secret, and points the UI at it automatically.
+
+### Web Application
+
+1. Start the backend (defaults shown):
+   ```bash
+   cargo run --bin layercake -- serve \
+     --port 3001 \
+     --database layercake.db \
+     --cors-origin http://localhost:1420
+   ```
+2. Point the frontend at that API by creating `frontend/.env.local` (or exporting before the next step):
+   ```bash
+   echo 'VITE_API_BASE_URL=http://localhost:3001' > frontend/.env.local
+   ```
+3. Run the Vite dev server:
+   ```bash
+   npm run frontend:dev
+   ```
+
+Open http://localhost:1420 to access the plan editor, data source manager, graph editors, chat workspace, and system settings.
+
+The repository also ships `./dev.sh` (web) and `./dev.sh --tauri` (desktop) scripts that wire up the services, enforce ports (`3001`/`1422`), initialize the database, and stream logs.
+
+### CLI & Automation
+
+- Execute plans directly:
+  ```bash
+  cargo run --bin layercake -- run \
+    --plan resources/sample-v1/attack_tree/plan.yaml \
+    --watch
+  ```
+- Initialize a new plan YAML:
+  ```bash
+  cargo run --bin layercake -- init --plan my-plan.yaml
+  ```
+- Generate starter projects:
+  ```bash
+  cargo run --bin layercake -- generate sample attack_tree ./output-dir
+  ```
+- Run the backend server for remote clients:
+  ```bash
+  cargo run --bin layercake -- serve --port 8080 --database ./layercake.db
+  ```
+- Manage migrations:
+  ```bash
+  cargo run --bin layercake -- db init
+  cargo run --bin layercake -- db migrate up
+  cargo run --bin layercake -- db migrate fresh
   ```
 
-- **Restart Layercake** – recycle the backend/web app so it picks up the new model. Once the chat UI reconnects, tool executions will resume and responses pull live project data.
+The CLI ships optional features for the interactive console and chat credential manager (enabled in default builds). See `cargo run --bin layercake -- --help` for the complete command tree.
 
-If the Ollama API continues to reject tools, Layercake automatically disables MCP integration for that session and emits a notice (“Continuing without tool access…”). In that degraded mode responses come from the model’s own knowledge and may hallucinate project details—switch back to a tool-capable model to restore full functionality.
+## Getting Started
 
-#### GraphQL Chat Operations
+### Prerequisites
 
-GraphQL exposes chat operations when the server is running with the `graphql` feature enabled:
+- Rust 1.70+ with `cargo`
+- Node.js 18+ and `npm`
+- Git, make, and platform build dependencies listed in [BUILD.md](BUILD.md)
+- (Desktop builds) Tauri prerequisites for your OS (WebKit2GTK on Linux, Xcode CLT on macOS, MSVC + WebView2 on Windows)
 
-- `startChatSession(projectId, provider, message?)` - Create a new chat session
-- `sendChatMessage(sessionId, message)` - Send a message to an active session
-- `subscription { chatEvents(sessionId) { kind message toolName } }` - Stream responses
+### Initial Setup
 
-Responses stream tool invocations and assistant replies in real-time via WebSocket subscriptions, making it easy to drive the console workflow from the web UI.
+```bash
+# Install frontend dependencies
+npm run frontend:install
 
-## Rendered examples
+# Optionally warm the Rust workspace
+cargo build -p layercake-core
+```
 
-_This tool only outputs text files, the following images are rendered using other tools._
+### Quick Development Loop
 
-### GML rendered with Gephi
-Sample control for for virtualized x86 architecture, output to GML and rendered using Gephi.
+- `./dev.sh` – runs the Rust backend on port `3001` and the Vite dev server on `1422`.
+- `./dev.sh --tauri` – launches the desktop shell with hot reload.
+- Logs stream to `backend.log`, `frontend.log`, and `tauri.log` in the repo root.
 
-![Sample](images/sample-gml-gephi.png)
+### Database & Storage
 
-### PlantUML rendered
-Sample control for for virtualized x86 architecture, output rendered using [PlantUML](https://plantuml.com/).
+- The backend uses SQLite via SeaORM, defaulting to `layercake.db` in the repository (dev) or the platform app data dir (desktop).
+- Run `cargo run --bin layercake -- db init` after cloning or deleting the database file to reapply migrations.
+- Use `cargo run --bin layercake -- db migrate fresh` to reset schema state during development.
 
-![Sample](images/kvm-plantuml.svg)
+## Working with Projects, Plans, and Graphs
 
-### Graphviz rendered
-Sample attack tree from [Kelly Shortridge's Security Descision Trees with Graphviz](https://kellyshortridge.com/blog/posts/security-decision-trees-with-graphviz/) output rendered using [Graphviz](https://graphviz.org/)
+- **Projects** group data sources, plan DAGs, graphs, chat logs, and collaboration sessions.
+- **Plan DAGs** (Plan Visual Editor) orchestrate ingestion, transformation, copy, and export nodes. Changes upstream automatically recompute downstream artifacts.
+- **Graphs** can be edited visually or via tabular controls. Edits are stored as replayable `GraphEdits`, so data refreshes reapply your manual changes.
+- **Data Sources** record raw payloads plus parsed node/edge/layer JSON, enabling repeatable imports.
+- **Exports** use built-in renderers (PlantUML, Graphviz, Mermaid, GML) or custom Handlebars templates located under `resources/library`.
+- **Chat & MCP** integrate with Claude, Gemini, OpenAI, Ollama, and other OpenAI-compatible services. Manage credentials via the System Settings UI or the CLI (`cargo run --bin layercake -- chat-credentials ...`).
 
-![Sample](images/attack-tree.svg)
+Sample CSVs, plans, and rendered outputs live in `resources/sample-v1`. Import them through the UI or run the CLI samples to explore the pipeline.
 
-## Graph transformations
+## Testing & Quality
 
-### Partition width
+- Backend: `npm run backend:test` (wraps `cargo test -p layercake-core`)
+- Frontend type/smoke build: `npm run frontend:build`
+- Formatting & linting:
+  ```bash
+  cargo fmt
+  cargo clippy --all-targets --all-features
+  ```
+- Desktop bundles: `npm run tauri:build` (see [BUILD.md](BUILD.md) for signing/notarization guidance)
 
-Aggregate the nodes in a partition of the limit exceeds the set parameter (`partition_width`).
+## Extending Layercake
 
-![Reference model](images/ref-model-hierarchy.svg)
-_Reference model with no transformation_
+- **Export Templates** – add Handlebars templates under `resources/library` and register them in the plan DAG to emit custom text or code artifacts.
+- **MCP Tools** – extend `external-modules/axum-mcp` or the server’s `mcp` module to expose additional functions/resources to agentic clients.
+- **Pipeline Stages** – add Rust modules under `layercake-core/src/pipeline` and wire them into plan execution for custom transformations.
+- **Frontend Components** – React components live under `frontend/src/components`; Plan/Graph editors leverage ReactFlow and Mantine for rapid iteration.
 
-![Reference model](images/ref-model-hierarchy-width-5.svg)
-_Reference model with a partition width of 5_
+## Documentation & References
 
-![Reference model](images/ref-model-hierarchy-width-2.svg)
-_Reference model with a partition width of 2_
+- [BUILD.md](BUILD.md) – platform prerequisites and packaging instructions.
+- [DEV_SCRIPTS.md](DEV_SCRIPTS.md) – details on the `dev.sh` helper.
+- [README-Tips.md](README-Tips.md) – watcher tooling, rendering tips, and automation snippets.
+- [SPECIFICATION.md](SPECIFICATION.md) – end-to-end product vision, data model, and technology stack.
+- `docs/` – collaboration model, mutation refactors, error handling guides, and architecture discussions.
+
+Layercake is evolving rapidly toward distributed collaborative graph editing and agent-driven workflows. Issues, pull requests, and design discussions are welcome!
