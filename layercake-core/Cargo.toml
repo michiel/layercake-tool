@@ -45,7 +45,7 @@ mcp = [
     "dep:url",
 ]
 all-apis = ["server", "graphql", "mcp"]
-console = ["dep:clap-repl", "dep:llm", "dep:nu-ansi-term", "mcp", "dep:chrono"]
+console = ["dep:clap-repl", "dep:rig", "dep:nu-ansi-term", "mcp", "dep:chrono"]
 
 [dependencies]
 # Core dependencies
@@ -102,12 +102,7 @@ url = { workspace = true, optional = true }
 
 # Console dependencies (optional)
 clap-repl = { version = "0.3.2", optional = true }
-llm = { version = "1.3.4", optional = true, default-features = false, features = [
-    "openai",
-    "ollama",
-    "google",
-    "anthropic",
-] }
+rig = { version = "0.23.1", package = "rig-core", features = ["rmcp"], optional = true }
 nu-ansi-term = { version = "0.49.0", optional = true }
 
 # WebSocket collaboration dependencies (optional)
@@ -124,7 +119,4 @@ icu_locid = { workspace = true }
 tokio-test = "0.4"
 futures-util = { workspace = true }
 tokio-tungstenite = { workspace = true }
-
-# Spike: rig evaluation (note: crate is rig-core but imports use `rig::`)
-rig = { version = "0.23.1", package = "rig-core", features = ["rmcp"] }
 thiserror = { workspace = true }
