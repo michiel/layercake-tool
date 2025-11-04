@@ -4,7 +4,7 @@ use crate::{
     app_context::AppContext,
     console::chat::ChatConfig,
     graphql::chat_manager::ChatManager,
-    services::{ExportService, GraphService, ImportService, PlanDagService},
+    services::{ExportService, GraphService, ImportService, PlanDagService, SystemSettingsService},
 };
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicI32, Ordering};
@@ -20,8 +20,8 @@ pub struct GraphQLContext {
     pub graph_service: Arc<GraphService>,
     pub plan_dag_service: Arc<PlanDagService>,
     pub session_manager: Arc<SessionManager>,
-    pub chat_config: Arc<ChatConfig>,
     pub chat_manager: Arc<ChatManager>,
+    pub system_settings: Arc<SystemSettingsService>,
 }
 
 #[derive(Clone, Debug)]
@@ -118,7 +118,7 @@ impl SessionManager {
 impl GraphQLContext {
     pub fn new(
         app: Arc<AppContext>,
-        chat_config: Arc<ChatConfig>,
+        system_settings: Arc<SystemSettingsService>,
         chat_manager: Arc<ChatManager>,
     ) -> Self {
         let db = app.db().clone();
@@ -135,7 +135,7 @@ impl GraphQLContext {
             graph_service,
             plan_dag_service,
             session_manager: Arc::new(SessionManager::new()),
-            chat_config,
+            system_settings,
             chat_manager,
         }
     }
@@ -171,5 +171,9 @@ impl GraphQLContext {
 
     pub fn plan_dag_service(&self) -> Arc<PlanDagService> {
         self.plan_dag_service.clone()
+    }
+
+    pub async fn chat_config(&self) -> Arc<ChatConfig> {
+        self.system_settings.chat_config().await
     }
 }

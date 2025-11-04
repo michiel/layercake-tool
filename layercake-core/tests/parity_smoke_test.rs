@@ -3,13 +3,13 @@ use axum_mcp::protocol::{ToolContent, ToolsCallResult};
 use chrono::{DateTime, Utc};
 use layercake as layercake_core;
 use layercake_core::app_context::AppContext;
-use layercake_core::console::chat::ChatConfig;
 use layercake_core::database::migrations::Migrator;
 use layercake_core::graphql::{
     chat_manager::ChatManager, context::GraphQLContext, mutations::Mutation, queries::Query,
     subscriptions::Subscription,
 };
 use layercake_core::mcp::tools::{data_sources, plans as mcp_plans, projects as mcp_projects};
+use layercake_core::services::system_settings_service::SystemSettingsService;
 use sea_orm::{Database, DatabaseConnection};
 use sea_orm_migration::MigratorTrait;
 use serde_json::{json, Value};
@@ -22,9 +22,9 @@ async fn setup_test_app() -> anyhow::Result<(Arc<AppContext>, GraphQLSchema)> {
     Migrator::up(&db, None).await?;
 
     let app = Arc::new(AppContext::new(db.clone()));
-    let chat_config = Arc::new(ChatConfig::load(&db).await?);
+    let system_settings = Arc::new(SystemSettingsService::new(db.clone()).await?);
     let chat_manager = Arc::new(ChatManager::new());
-    let graphql_context = GraphQLContext::new(app.clone(), chat_config, chat_manager);
+    let graphql_context = GraphQLContext::new(app.clone(), system_settings, chat_manager);
 
     let schema = Schema::build(Query, Mutation, Subscription)
         .data(graphql_context)

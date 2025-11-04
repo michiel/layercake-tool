@@ -14,6 +14,7 @@ pub mod library_source;
 pub mod preview;
 pub mod sample_project;
 pub mod scalars;
+pub mod system_setting;
 pub mod user;
 
 pub use chat::*;
@@ -31,4 +32,5 @@ pub use preview::*;
 pub use project::*;
 pub use sample_project::*;
 pub use scalars::*;
+pub use system_setting::*;
 pub use user::*;

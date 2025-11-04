@@ -1,16 +1,20 @@
 #![cfg(feature = "console")]
 
-use std::fmt;
+use std::{fmt, sync::Arc};
 
 use anyhow::{anyhow, Context as _, Result};
 use sea_orm::{
     ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
 };
 
-use crate::database::entities::{graph_edges, graphs, projects, users};
+use crate::{
+    database::entities::{graph_edges, graphs, projects, users},
+    services::system_settings_service::SystemSettingsService,
+};
 
 use super::{
     chat::{ChatConfig, ChatProvider},
+    commands::SettingsCommand,
     output::{print_table, TableRow},
 };
 
@@ -53,7 +57,7 @@ async fn get_or_create_default_user(db: &DatabaseConnection) -> Result<users::Mo
 /// Active console runtime state shared across command handlers.
 pub struct ConsoleContext {
     pub(crate) db: DatabaseConnection,
-    pub(crate) chat_config: ChatConfig,
+    pub(crate) system_settings: Arc<SystemSettingsService>,
     selected_project: Option<ProjectSelection>,
 }
 
@@ -71,10 +75,10 @@ impl fmt::Display for ProjectSelection {
 
 impl ConsoleContext {
     pub async fn bootstrap(db: DatabaseConnection) -> Result<Self> {
-        let chat_config = ChatConfig::load(&db).await?;
+        let system_settings = Arc::new(SystemSettingsService::new(db.clone()).await?);
         Ok(Self {
             db,
-            chat_config,
+            system_settings,
             selected_project: None,
         })
     }
@@ -187,7 +191,8 @@ impl ConsoleContext {
             .clone()
             .ok_or_else(|| anyhow!("Select a project before starting chat"))?;
 
-        let provider = provider_override.unwrap_or(self.chat_config.default_provider);
+        let chat_config = self.system_settings.chat_config().await;
+        let provider = provider_override.unwrap_or(chat_config.default_provider);
 
         // Get or create default user for console/development use
         let user = get_or_create_default_user(&self.db)
@@ -196,14 +201,91 @@ impl ConsoleContext {
 
         let mut session = super::chat::ChatSession::new(
             self.db.clone(),
+            self.system_settings.clone(),
             project.id,
             user,
             provider,
-            &self.chat_config,
+            &chat_config,
         )
         .await
         .context("failed to start chat session")?;
 
         session.interactive_loop().await
+    }
+
+    pub async fn handle_settings_command(&self, command: SettingsCommand) -> Result<()> {
+        match command {
+            SettingsCommand::List => self.print_settings_overview().await,
+            SettingsCommand::Show { key } => self.show_setting(&key).await,
+            SettingsCommand::Set { key, value } => self.set_setting(&key, &value).await,
+        }
+    }
+
+    async fn print_settings_overview(&self) -> Result<()> {
+        let settings = self
+            .system_settings
+            .list_settings()
+            .await
+            .context("failed to list system settings")?;
+
+        if settings.is_empty() {
+            println!("No runtime settings are registered.");
+            return Ok(());
+        }
+
+        let mut rows = Vec::new();
+        for setting in settings {
+            let display_value = setting.value.unwrap_or_else(|| "<hidden>".to_string());
+            rows.push(TableRow::from(vec![
+                setting.key,
+                display_value,
+                setting.category,
+            ]));
+        }
+
+        print_table(&["key", "value", "category"], &rows);
+        Ok(())
+    }
+
+    async fn show_setting(&self, key: &str) -> Result<()> {
+        let setting = self
+            .system_settings
+            .get_setting(key)
+            .await
+            .with_context(|| format!("failed to load setting {}", key))?;
+
+        println!("{} ({})", setting.label, setting.key);
+        println!("category: {}", setting.category);
+        if let Some(description) = &setting.description {
+            println!("description: {}", description);
+        }
+        if setting.is_secret {
+            println!("value: <hidden>");
+        } else {
+            println!("value: {}", setting.raw_value);
+        }
+        if !setting.allowed_values.is_empty() {
+            println!("allowed values: {}", setting.allowed_values.join(", "));
+        }
+        println!(
+            "updated: {} | read-only: {}",
+            setting.updated_at, setting.is_read_only
+        );
+        Ok(())
+    }
+
+    async fn set_setting(&self, key: &str, value: &str) -> Result<()> {
+        let updated = self
+            .system_settings
+            .update_setting(key, value.to_string())
+            .await
+            .with_context(|| format!("failed to update setting {}", key))?;
+
+        let display_value = updated
+            .value
+            .clone()
+            .unwrap_or_else(|| "<hidden>".to_string());
+        println!("{} set to {}", updated.label, display_value);
+        Ok(())
     }
 }

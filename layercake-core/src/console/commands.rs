@@ -49,7 +49,35 @@ pub enum ConsoleCommand {
         #[arg(long)]
         provider: Option<ChatProvider>,
     },
+    /// Manage runtime system settings.
+    #[command(name = "settings")]
+    Settings {
+        #[command(subcommand)]
+        command: SettingsCommand,
+    },
     /// Print exit instructions.
     #[command(name = "exit")]
     Exit,
+}
+
+/// Nested commands under `settings`.
+#[derive(Subcommand, Debug)]
+pub enum SettingsCommand {
+    /// List all configurable settings
+    #[command(name = "list")]
+    List,
+    /// Show details for a specific setting
+    #[command(name = "show")]
+    Show {
+        /// Setting key (e.g. LAYERCAKE_CHAT_PROVIDER)
+        key: String,
+    },
+    /// Update a setting value
+    #[command(name = "set")]
+    Set {
+        /// Setting key (e.g. LAYERCAKE_CHAT_PROVIDER)
+        key: String,
+        /// New value to persist
+        value: String,
+    },
 }

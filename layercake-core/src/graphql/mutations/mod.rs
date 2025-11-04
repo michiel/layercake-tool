@@ -48,8 +48,9 @@ use crate::graphql::types::{
     CreateLibrarySourceInput, DataSource, ExportDataSourcesInput, ExportDataSourcesResult,
     ImportDataSourcesInput, ImportDataSourcesResult, ImportLibrarySourcesInput,
     InviteCollaboratorInput, LibrarySource, LoginInput, LoginResponse, ProjectCollaborator,
-    RegisterResponse, RegisterUserInput, SeedLibrarySourcesResult, UpdateCollaboratorRoleInput,
-    UpdateDataSourceInput, UpdateLibrarySourceInput, UpdateUserInput, User,
+    RegisterResponse, RegisterUserInput, SeedLibrarySourcesResult, SystemSetting,
+    SystemSettingUpdateInput, UpdateCollaboratorRoleInput, UpdateDataSourceInput,
+    UpdateLibrarySourceInput, UpdateUserInput, User,
 };
 
 fn generate_node_id_from_ids(
@@ -179,9 +180,10 @@ impl Mutation {
             .await
             .map_err(|err| StructuredError::forbidden(err.to_string()))?;
 
+        let chat_config = context.chat_config().await;
         let mut resolved_provider = provider
             .map(ChatProvider::from)
-            .unwrap_or(context.chat_config.default_provider);
+            .unwrap_or(chat_config.default_provider);
 
         let started = if let Some(existing_id) = existing_session_id {
             let history_service = ChatHistoryService::new(context.db.clone());
@@ -222,7 +224,8 @@ impl Mutation {
                     context.db.clone(),
                     existing.clone(),
                     user.clone(),
-                    context.chat_config.clone(),
+                    chat_config.clone(),
+                    context.system_settings.clone(),
                 )
                 .await
                 .map_err(|e| StructuredError::service("ChatManager::resume_session", e))?
@@ -234,7 +237,8 @@ impl Mutation {
                     project_id,
                     user.clone(),
                     resolved_provider,
-                    context.chat_config.clone(),
+                    chat_config.clone(),
+                    context.system_settings.clone(),
                 )
                 .await
                 .map_err(|e| StructuredError::service("ChatManager::start_session", e))?
@@ -301,7 +305,8 @@ impl Mutation {
                     context.db.clone(),
                     chat_session.clone(),
                     user.clone(),
-                    context.chat_config.clone(),
+                    context.chat_config().await,
+                    context.system_settings.clone(),
                 )
                 .await
                 .map_err(|e| StructuredError::service("ChatManager::resume_session", e))?;
@@ -314,6 +319,22 @@ impl Mutation {
             .map_err(|e| StructuredError::service("ChatManager::enqueue_message", e))?;
 
         Ok(ChatSendResult { accepted: true })
+    }
+
+    /// Update a runtime system setting value
+    async fn update_system_setting(
+        &self,
+        ctx: &Context<'_>,
+        input: SystemSettingUpdateInput,
+    ) -> Result<SystemSetting> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let updated = context
+            .system_settings
+            .update_setting(&input.key, input.value)
+            .await
+            .map_err(|e| StructuredError::service("SystemSettingsService::update_setting", e))?;
+
+        Ok(SystemSetting::from(updated))
     }
 
     /// Create a new plan

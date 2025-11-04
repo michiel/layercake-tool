@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { Routes, Route, useNavigate, useParams, useLocation } from 'react-router-dom'
 import { AppShell, Group, Title, Stack, Button, Text, Card, Badge, Alert, Modal, Select, ActionIcon, Tooltip } from '@mantine/core'
-import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconDownload, IconChevronLeft, IconChevronRight, IconFolderPlus, IconNetwork, IconBooks, IconMessageDots } from '@tabler/icons-react'
+import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconDownload, IconChevronLeft, IconChevronRight, IconFolderPlus, IconNetwork, IconBooks, IconMessageDots, IconAdjustments } from '@tabler/icons-react'
 import { useQuery, useMutation } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import { Breadcrumbs } from './components/common/Breadcrumbs'
@@ -316,6 +316,19 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                 style={navCollapsed ? { justifyContent: 'center' } : undefined}
               >
                 {navCollapsed ? <IconSettings size={16} /> : 'Database Settings'}
+              </Button>
+            </Tooltip>
+            <Tooltip label="System Settings" position="right" disabled={!navCollapsed}>
+              <Button
+                variant={isActiveRoute('/settings/system') ? 'filled' : 'light'}
+                fullWidth={!navCollapsed}
+                leftSection={navCollapsed ? undefined : <IconAdjustments size={16} />}
+                onClick={() => navigate('/settings/system')}
+                px={navCollapsed ? 'xs' : undefined}
+                mt="xs"
+                style={navCollapsed ? { justifyContent: 'center' } : undefined}
+              >
+                {navCollapsed ? <IconAdjustments size={16} /> : 'System Settings'}
               </Button>
             </Tooltip>
           </div>
@@ -1250,6 +1263,7 @@ import { PlanNodesPage } from './components/graphs/PlanNodesPage'
 import { GraphsPage } from './components/graphs/GraphsPage'
 import { GraphEditorPage } from './pages/GraphEditorPage'
 import { DatabaseSettings } from './components/settings/DatabaseSettings'
+import { SystemSettingsPage } from './pages/SystemSettingsPage'
 import PageContainer from './components/layout/PageContainer'
 
 // Main App component with routing
@@ -1321,6 +1335,11 @@ function App() {
           <Route path="/settings/database" element={
             <ErrorBoundary>
               <DatabaseSettings />
+            </ErrorBoundary>
+          } />
+          <Route path="/settings/system" element={
+            <ErrorBoundary>
+              <SystemSettingsPage />
             </ErrorBoundary>
           } />
           <Route path="*" element={

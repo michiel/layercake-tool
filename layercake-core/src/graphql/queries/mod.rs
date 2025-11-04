@@ -15,8 +15,8 @@ use crate::graphql::types::project::Project;
 use crate::graphql::types::sample_project::SampleProject;
 use crate::graphql::types::{
     DataSource, DataSourcePreview, GraphEdgePreview, GraphEdit, GraphNodePreview, GraphPreview,
-    Layer, LibrarySource, ProjectCollaborator, TableColumn, TableRow, User, UserFilter,
-    UserSession,
+    Layer, LibrarySource, ProjectCollaborator, SystemSetting, TableColumn, TableRow, User,
+    UserFilter, UserSession,
 };
 use crate::services::{
     graph_edit_service::GraphEditService, sample_project_service::SampleProjectService,
@@ -68,6 +68,28 @@ impl Query {
             .map_err(|e| StructuredError::service("AppContext::get_plan", e))?;
 
         Ok(plan.map(Plan::from))
+    }
+
+    /// List runtime-editable system settings
+    async fn system_settings(&self, ctx: &Context<'_>) -> Result<Vec<SystemSetting>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let settings = context
+            .system_settings
+            .list_settings()
+            .await
+            .map_err(|e| StructuredError::service("SystemSettingsService::list_settings", e))?;
+        Ok(settings.into_iter().map(SystemSetting::from).collect())
+    }
+
+    /// Fetch a single runtime setting by key
+    async fn system_setting(&self, ctx: &Context<'_>, key: String) -> Result<SystemSetting> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let setting = context
+            .system_settings
+            .get_setting(&key)
+            .await
+            .map_err(|e| StructuredError::service("SystemSettingsService::get_setting", e))?;
+        Ok(SystemSetting::from(setting))
     }
 
     // TODO: Fix this function after data model refactoring

@@ -11,6 +11,7 @@ use tokio::sync::{broadcast, mpsc, Mutex};
 use crate::{
     console::chat::{ChatConfig, ChatEvent, ChatProvider, ChatSession},
     database::entities::{chat_sessions, users},
+    services::system_settings_service::SystemSettingsService,
 };
 use sea_orm::DatabaseConnection;
 
@@ -53,13 +54,21 @@ impl ChatManager {
         user: users::Model,
         provider: ChatProvider,
         config: Arc<ChatConfig>,
+        settings: Arc<SystemSettingsService>,
     ) -> Result<StartedChatSession> {
         let (input_tx, mut input_rx) = mpsc::channel::<String>(16);
         let (event_tx, keeper_rx) = broadcast::channel::<ChatEvent>(64);
         let history = Arc::new(StdMutex::new(VecDeque::new()));
 
-        let mut chat_session =
-            ChatSession::new(db.clone(), project_id, user.clone(), provider, &config).await?;
+        let mut chat_session = ChatSession::new(
+            db.clone(),
+            settings.clone(),
+            project_id,
+            user.clone(),
+            provider,
+            &config,
+        )
+        .await?;
         let session_id = chat_session.ensure_persisted().await?;
         let model_name = chat_session.model_name().to_string();
 
@@ -131,6 +140,7 @@ impl ChatManager {
         session: chat_sessions::Model,
         user: users::Model,
         config: Arc<ChatConfig>,
+        settings: Arc<SystemSettingsService>,
     ) -> Result<StartedChatSession> {
         if self.is_session_active(&session.session_id).await {
             return Ok(StartedChatSession {
@@ -143,8 +153,13 @@ impl ChatManager {
         let (event_tx, keeper_rx) = broadcast::channel::<ChatEvent>(64);
         let history = Arc::new(StdMutex::new(VecDeque::new()));
 
-        let mut chat_session =
-            ChatSession::resume(db.clone(), session.session_id.clone(), &config).await?;
+        let mut chat_session = ChatSession::resume(
+            db.clone(),
+            settings.clone(),
+            session.session_id.clone(),
+            &config,
+        )
+        .await?;
         let session_id = session.session_id.clone();
         let model_name = chat_session.model_name().to_string();
 
@@ -287,7 +302,9 @@ fn sanitise_error_message(msg: &str) -> String {
 
     // Also sanitise bearer tokens if present
     let re_bearer = Regex::new(r"(Bearer\s+)[A-Za-z0-9_.-]+").unwrap();
-    re_bearer.replace_all(&sanitised, "${1}[REDACTED]").to_string()
+    re_bearer
+        .replace_all(&sanitised, "${1}[REDACTED]")
+        .to_string()
 }
 
 #[cfg(test)]

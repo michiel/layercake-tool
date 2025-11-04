@@ -14,6 +14,7 @@ mod m20251103_000010_create_chat_sessions;
 mod m20251103_000011_create_chat_messages;
 mod m20251103_000012_extend_users_table;
 mod m20251103_000013_extend_user_sessions_table;
+mod m20251105_000014_create_system_settings;
 
 pub struct Migrator;
 
@@ -35,6 +36,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20251103_000011_create_chat_messages::Migration),
             Box::new(m20251103_000012_extend_users_table::Migration),
             Box::new(m20251103_000013_extend_user_sessions_table::Migration),
+            Box::new(m20251105_000014_create_system_settings::Migration),
         ]
     }
 }

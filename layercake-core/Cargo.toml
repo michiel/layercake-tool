@@ -42,7 +42,6 @@ mcp = [
     "dep:axum-mcp",
     "dep:tokio-tungstenite",
     "dep:futures-util",
-    "dep:url",
 ]
 all-apis = ["server", "graphql", "mcp"]
 console = ["dep:clap-repl", "dep:rig", "dep:nu-ansi-term", "mcp", "dep:chrono"]
@@ -64,6 +63,8 @@ regex = { workspace = true }
 notify = { workspace = true }
 csv = { workspace = true }
 indexmap = { workspace = true }
+url = { workspace = true }
+once_cell = "1.19"
 
 # Update command dependencies
 reqwest = { workspace = true }
@@ -98,7 +99,6 @@ bcrypt = { workspace = true }
 axum-mcp = { workspace = true, optional = true }
 tokio-tungstenite = { workspace = true, optional = true }
 futures-util = { workspace = true, optional = true }
-url = { workspace = true, optional = true }
 
 # Console dependencies (optional)
 clap-repl = { version = "0.3.2", optional = true }

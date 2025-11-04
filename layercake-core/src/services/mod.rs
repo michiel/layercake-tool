@@ -17,6 +17,7 @@ pub mod plan_dag_service;
 pub mod project_service;
 pub mod sample_project_service;
 pub mod source_processing;
+pub mod system_settings_service;
 pub mod validation;
 
 pub use authorization::*;
@@ -32,4 +33,5 @@ pub use library_source_service::*;
 pub use mcp_agent_service::*;
 pub use plan_dag_service::*;
 pub use sample_project_service::*;
+pub use system_settings_service::*;
 pub use validation::*;

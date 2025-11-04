@@ -8,7 +8,7 @@
 //! - Uses rmcp for direct MCP integration (no conversion layer)
 //! - Maintains same session persistence and observer pattern
 
-use std::fmt::Write as FmtWrite;
+use std::{fmt::Write as FmtWrite, sync::Arc};
 
 use anyhow::{anyhow, Context, Result};
 use axum_mcp::prelude::{ClientContext, SecurityContext};
@@ -19,8 +19,10 @@ use tracing;
 
 use rig::client::CompletionClient;
 use rig::completion::Prompt;
+use rig::providers::gemini::completion::gemini_api_types::{
+    AdditionalParameters, GenerationConfig,
+};
 use rig::providers::{anthropic, gemini, ollama, openai};
-use rig::providers::gemini::completion::gemini_api_types::{AdditionalParameters, GenerationConfig};
 
 #[cfg(feature = "rmcp")]
 use rmcp::{
@@ -31,6 +33,7 @@ use rmcp::{
 
 use crate::database::entities::{chat_sessions, users};
 use crate::mcp::security::build_user_security_context;
+use crate::services::system_settings_service::SystemSettingsService;
 
 use super::{
     config::{ChatConfig, ChatCredentialStore},
@@ -175,12 +178,13 @@ impl ChatSession {
     /// Create a new chat session (not yet persisted)
     pub async fn new(
         db: DatabaseConnection,
+        settings: Arc<SystemSettingsService>,
         project_id: i32,
         user: users::Model,
         provider: ChatProvider,
         config: &ChatConfig,
     ) -> Result<Self> {
-        let credentials = ChatCredentialStore::new(db.clone());
+        let credentials = ChatCredentialStore::with_settings(db.clone(), settings);
         let bridge = McpBridge::new(db.clone());
         let security = build_user_security_context(
             ClientContext::default(),
@@ -191,8 +195,10 @@ impl ChatSession {
 
         // Initialize rmcp client if feature is enabled
         #[cfg(feature = "rmcp")]
-        let (rmcp_client, rmcp_tools) =
-            Self::init_rmcp_client(&config.mcp_server_url).await.ok().unzip();
+        let (rmcp_client, rmcp_tools) = Self::init_rmcp_client(&config.mcp_server_url)
+            .await
+            .ok()
+            .unzip();
 
         #[cfg(feature = "rmcp")]
         let tool_names: Vec<String> = rmcp_tools
@@ -249,6 +255,7 @@ impl ChatSession {
     /// Resume an existing chat session from the database
     pub async fn resume(
         db: DatabaseConnection,
+        settings: Arc<SystemSettingsService>,
         session_id: String,
         config: &ChatConfig,
     ) -> Result<Self> {
@@ -262,7 +269,7 @@ impl ChatSession {
             .ok_or_else(|| anyhow!("Session not found: {}", session_id))?;
 
         let provider: ChatProvider = session.provider.parse()?;
-        let credentials = ChatCredentialStore::new(db.clone());
+        let credentials = ChatCredentialStore::with_settings(db.clone(), settings);
         let bridge = McpBridge::new(db.clone());
 
         // For resumed sessions, get security context from session's user
@@ -288,8 +295,10 @@ impl ChatSession {
 
         // Initialize rmcp client if feature is enabled
         #[cfg(feature = "rmcp")]
-        let (rmcp_client, rmcp_tools) =
-            Self::init_rmcp_client(&config.mcp_server_url).await.ok().unzip();
+        let (rmcp_client, rmcp_tools) = Self::init_rmcp_client(&config.mcp_server_url)
+            .await
+            .ok()
+            .unzip();
 
         // Load message history (currently empty - could be extended to load from DB)
         let messages = Vec::new();
@@ -545,7 +554,8 @@ impl ChatSession {
                 #[cfg(feature = "rmcp")]
                 if let Some(ref rmcp_client) = self.rmcp_client {
                     if !self.rmcp_tools.is_empty() {
-                        builder = builder.rmcp_tools(self.rmcp_tools.clone(), rmcp_client.peer().to_owned());
+                        builder = builder
+                            .rmcp_tools(self.rmcp_tools.clone(), rmcp_client.peer().to_owned());
                     }
                 }
 
@@ -569,7 +579,8 @@ impl ChatSession {
                 #[cfg(feature = "rmcp")]
                 if let Some(ref rmcp_client) = self.rmcp_client {
                     if !self.rmcp_tools.is_empty() {
-                        builder = builder.rmcp_tools(self.rmcp_tools.clone(), rmcp_client.peer().to_owned());
+                        builder = builder
+                            .rmcp_tools(self.rmcp_tools.clone(), rmcp_client.peer().to_owned());
                     }
                 }
 
@@ -599,7 +610,8 @@ impl ChatSession {
                 #[cfg(feature = "rmcp")]
                 if let Some(ref rmcp_client) = self.rmcp_client {
                     if !self.rmcp_tools.is_empty() {
-                        builder = builder.rmcp_tools(self.rmcp_tools.clone(), rmcp_client.peer().to_owned());
+                        builder = builder
+                            .rmcp_tools(self.rmcp_tools.clone(), rmcp_client.peer().to_owned());
                     }
                 }
 
@@ -620,7 +632,8 @@ impl ChatSession {
                 #[cfg(feature = "rmcp")]
                 if let Some(ref rmcp_client) = self.rmcp_client {
                     if !self.rmcp_tools.is_empty() {
-                        builder = builder.rmcp_tools(self.rmcp_tools.clone(), rmcp_client.peer().to_owned());
+                        builder = builder
+                            .rmcp_tools(self.rmcp_tools.clone(), rmcp_client.peer().to_owned());
                     }
                 }
 
@@ -757,12 +770,30 @@ mod tests {
 
     #[test]
     fn test_chat_provider_from_str() {
-        assert_eq!("ollama".parse::<ChatProvider>().unwrap(), ChatProvider::Ollama);
-        assert_eq!("openai".parse::<ChatProvider>().unwrap(), ChatProvider::OpenAi);
-        assert_eq!("open-ai".parse::<ChatProvider>().unwrap(), ChatProvider::OpenAi);
-        assert_eq!("gemini".parse::<ChatProvider>().unwrap(), ChatProvider::Gemini);
-        assert_eq!("claude".parse::<ChatProvider>().unwrap(), ChatProvider::Claude);
-        assert_eq!("anthropic".parse::<ChatProvider>().unwrap(), ChatProvider::Claude);
+        assert_eq!(
+            "ollama".parse::<ChatProvider>().unwrap(),
+            ChatProvider::Ollama
+        );
+        assert_eq!(
+            "openai".parse::<ChatProvider>().unwrap(),
+            ChatProvider::OpenAi
+        );
+        assert_eq!(
+            "open-ai".parse::<ChatProvider>().unwrap(),
+            ChatProvider::OpenAi
+        );
+        assert_eq!(
+            "gemini".parse::<ChatProvider>().unwrap(),
+            ChatProvider::Gemini
+        );
+        assert_eq!(
+            "claude".parse::<ChatProvider>().unwrap(),
+            ChatProvider::Claude
+        );
+        assert_eq!(
+            "anthropic".parse::<ChatProvider>().unwrap(),
+            ChatProvider::Claude
+        );
 
         assert!("invalid".parse::<ChatProvider>().is_err());
     }
