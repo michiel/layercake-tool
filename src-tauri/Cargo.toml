@@ -24,7 +24,6 @@ anyhow = { workspace = true }
 tauri-plugin-dialog = { workspace = true }
 tauri-plugin-shell = { workspace = true }
 rand = "0.8"
-tauri-plugin-log = { version = "2", features = ["tracing"] }
 
 # Server dependencies
 axum = { workspace = true }

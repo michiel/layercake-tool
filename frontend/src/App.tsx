@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { Routes, Route, useNavigate, useParams, useLocation } from 'react-router-dom'
 import { AppShell, Group, Title, Stack, Button, Text, Card, Badge, Alert, Modal, Select, ActionIcon, Tooltip } from '@mantine/core'
-import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconDownload, IconChevronLeft, IconChevronRight, IconFolderPlus, IconNetwork, IconBooks, IconMessageDots, IconAdjustments, IconFileText } from '@tabler/icons-react'
+import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconDownload, IconChevronLeft, IconChevronRight, IconFolderPlus, IconNetwork, IconBooks, IconMessageDots, IconAdjustments } from '@tabler/icons-react'
 import { useQuery, useMutation } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import { Breadcrumbs } from './components/common/Breadcrumbs'
@@ -89,7 +89,6 @@ const GET_PLAN_DAG = gql`
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate()
   const location = useLocation()
-  const isTauri = isTauriApp()
 
   // Generate stable session ID (only once per component mount)
   const [sessionId] = useState(() => getOrCreateSessionId());
@@ -332,21 +331,6 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                 {navCollapsed ? <IconAdjustments size={16} /> : 'System Settings'}
               </Button>
             </Tooltip>
-            {isTauri && (
-              <Tooltip label="App Logs" position="right" disabled={!navCollapsed}>
-                <Button
-                  variant={isActiveRoute('/settings/logs') ? 'filled' : 'light'}
-                  fullWidth={!navCollapsed}
-                  leftSection={navCollapsed ? undefined : <IconFileText size={16} />}
-                  onClick={() => navigate('/settings/logs')}
-                  px={navCollapsed ? 'xs' : undefined}
-                  mt="xs"
-                  style={navCollapsed ? { justifyContent: 'center' } : undefined}
-                >
-                  {navCollapsed ? <IconFileText size={16} /> : 'App Logs'}
-                </Button>
-              </Tooltip>
-            )}
           </div>
         </Stack>
       </AppShell.Navbar>
@@ -1280,8 +1264,6 @@ import { GraphsPage } from './components/graphs/GraphsPage'
 import { GraphEditorPage } from './pages/GraphEditorPage'
 import { DatabaseSettings } from './components/settings/DatabaseSettings'
 import { SystemSettingsPage } from './pages/SystemSettingsPage'
-import { AppLogsPage } from './pages/AppLogsPage'
-import { isTauriApp } from './utils/tauri'
 import PageContainer from './components/layout/PageContainer'
 
 // Main App component with routing
@@ -1353,11 +1335,6 @@ function App() {
           <Route path="/settings/database" element={
             <ErrorBoundary>
               <DatabaseSettings />
-            </ErrorBoundary>
-          } />
-          <Route path="/settings/logs" element={
-            <ErrorBoundary>
-              <AppLogsPage />
             </ErrorBoundary>
           } />
           <Route path="/settings/system" element={

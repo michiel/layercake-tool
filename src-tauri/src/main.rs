@@ -7,10 +7,8 @@ mod server;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::Manager;
-use tauri_plugin_log::{Builder as LogPluginBuilder, Target, TargetKind};
 use tokio::sync::RwLock;
 use tracing::{error, info};
-use tracing_subscriber::FmtSubscriber;
 
 use server::ServerHandle;
 
@@ -60,27 +58,15 @@ struct AppState {
 #[tokio::main]
 async fn main() {
     // Initialize tracing for desktop application
-    let env_filter =
-        tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into());
-
-    let subscriber = FmtSubscriber::builder()
-        .with_env_filter(env_filter)
-        .finish();
-
-    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
+        )
+        .init();
 
     info!("Starting Layercake desktop application");
 
     tauri::Builder::default()
-        .plugin(
-            LogPluginBuilder::new()
-                .targets([
-                    Target::new(TargetKind::Stdout),
-                    Target::new(TargetKind::LogDir { file_name: None }),
-                    Target::new(TargetKind::Webview),
-                ])
-                .build(),
-        )
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
