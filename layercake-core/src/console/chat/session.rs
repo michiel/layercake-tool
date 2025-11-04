@@ -645,3 +645,158 @@ fn compose_system_prompt(config: &ChatConfig, project_id: i32, tool_names: &[Str
     prompt.push_str(&format!("\n\nCurrent project ID: {}", project_id));
     prompt
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_compose_system_prompt_no_tools() {
+        let config = ChatConfig {
+            default_provider: ChatProvider::Ollama,
+            request_timeout: std::time::Duration::from_secs(60),
+            system_prompt: Some("You are a helpful assistant.".to_string()),
+            providers: std::collections::HashMap::new(),
+            mcp_server_url: "http://localhost:3000/mcp".to_string(),
+        };
+
+        let prompt = compose_system_prompt(&config, 42, &[]);
+
+        assert!(prompt.contains("You are a helpful assistant."));
+        assert!(prompt.contains("Current project ID: 42"));
+        assert!(!prompt.contains("You have access to the following tools"));
+    }
+
+    #[test]
+    fn test_compose_system_prompt_with_tools() {
+        let config = ChatConfig {
+            default_provider: ChatProvider::Ollama,
+            request_timeout: std::time::Duration::from_secs(60),
+            system_prompt: Some("You are a helpful assistant.".to_string()),
+            providers: std::collections::HashMap::new(),
+            mcp_server_url: "http://localhost:3000/mcp".to_string(),
+        };
+
+        let tools = vec!["search".to_string(), "calculate".to_string()];
+        let prompt = compose_system_prompt(&config, 42, &tools);
+
+        assert!(prompt.contains("You are a helpful assistant."));
+        assert!(prompt.contains("You have access to the following tools:"));
+        assert!(prompt.contains("- search"));
+        assert!(prompt.contains("- calculate"));
+        assert!(prompt.contains("Use these tools when appropriate"));
+        assert!(prompt.contains("Current project ID: 42"));
+    }
+
+    #[test]
+    fn test_compose_system_prompt_no_custom_prompt() {
+        let config = ChatConfig {
+            default_provider: ChatProvider::Ollama,
+            request_timeout: std::time::Duration::from_secs(60),
+            system_prompt: None,
+            providers: std::collections::HashMap::new(),
+            mcp_server_url: "http://localhost:3000/mcp".to_string(),
+        };
+
+        let prompt = compose_system_prompt(&config, 42, &[]);
+
+        assert!(prompt.contains("Current project ID: 42"));
+        assert!(!prompt.contains("You are a helpful assistant"));
+    }
+
+    #[test]
+    fn test_chat_provider_display_names() {
+        assert_eq!(ChatProvider::Ollama.display_name(), "Ollama");
+        assert_eq!(ChatProvider::OpenAi.display_name(), "OpenAI");
+        assert_eq!(ChatProvider::Gemini.display_name(), "Google Gemini");
+        assert_eq!(ChatProvider::Claude.display_name(), "Anthropic Claude");
+    }
+
+    #[test]
+    fn test_chat_provider_requires_api_key() {
+        assert!(!ChatProvider::Ollama.requires_api_key());
+        assert!(ChatProvider::OpenAi.requires_api_key());
+        assert!(ChatProvider::Gemini.requires_api_key());
+        assert!(ChatProvider::Claude.requires_api_key());
+    }
+
+    #[test]
+    fn test_chat_provider_default_models() {
+        assert_eq!(ChatProvider::Ollama.default_model(), "llama3.2");
+        assert_eq!(ChatProvider::OpenAi.default_model(), "gpt-4o-mini");
+        assert_eq!(ChatProvider::Gemini.default_model(), "gemini-1.5-flash");
+        assert_eq!(
+            ChatProvider::Claude.default_model(),
+            "claude-3-5-sonnet-20241022"
+        );
+    }
+
+    #[test]
+    fn test_chat_provider_api_key_env_vars() {
+        assert_eq!(ChatProvider::Ollama.api_key_env_var(), None);
+        assert_eq!(
+            ChatProvider::OpenAi.api_key_env_var(),
+            Some("OPENAI_API_KEY")
+        );
+        assert_eq!(
+            ChatProvider::Gemini.api_key_env_var(),
+            Some("GOOGLE_API_KEY")
+        );
+        assert_eq!(
+            ChatProvider::Claude.api_key_env_var(),
+            Some("ANTHROPIC_API_KEY")
+        );
+    }
+
+    #[test]
+    fn test_chat_provider_from_str() {
+        assert_eq!("ollama".parse::<ChatProvider>().unwrap(), ChatProvider::Ollama);
+        assert_eq!("openai".parse::<ChatProvider>().unwrap(), ChatProvider::OpenAi);
+        assert_eq!("open-ai".parse::<ChatProvider>().unwrap(), ChatProvider::OpenAi);
+        assert_eq!("gemini".parse::<ChatProvider>().unwrap(), ChatProvider::Gemini);
+        assert_eq!("claude".parse::<ChatProvider>().unwrap(), ChatProvider::Claude);
+        assert_eq!("anthropic".parse::<ChatProvider>().unwrap(), ChatProvider::Claude);
+
+        assert!("invalid".parse::<ChatProvider>().is_err());
+    }
+
+    #[test]
+    fn test_chat_provider_to_string() {
+        assert_eq!(ChatProvider::Ollama.to_string(), "ollama");
+        assert_eq!(ChatProvider::OpenAi.to_string(), "openai");
+        assert_eq!(ChatProvider::Gemini.to_string(), "gemini");
+        assert_eq!(ChatProvider::Claude.to_string(), "claude");
+    }
+
+    #[test]
+    fn test_chat_message_builders() {
+        let msg = ChatMessage::user("Hello");
+        assert_eq!(msg.role, "user");
+        assert_eq!(msg.content, "Hello");
+        assert!(msg.tool_calls.is_none());
+        assert!(msg.tool_results.is_none());
+
+        let msg = ChatMessage::assistant("Hi there");
+        assert_eq!(msg.role, "assistant");
+        assert_eq!(msg.content, "Hi there");
+
+        let tool_call = ToolCallData {
+            id: "call_1".to_string(),
+            name: "search".to_string(),
+            arguments: serde_json::json!({"query": "test"}),
+        };
+        let msg = ChatMessage::assistant("Searching...").with_tool_calls(vec![tool_call]);
+        assert_eq!(msg.role, "assistant");
+        assert!(msg.tool_calls.is_some());
+        assert_eq!(msg.tool_calls.as_ref().unwrap().len(), 1);
+
+        let msg = ChatMessage::tool_result("call_1", "Result: Found 5 items");
+        assert_eq!(msg.role, "tool");
+        assert!(msg.tool_results.is_some());
+    }
+
+    #[test]
+    fn test_max_tool_iterations_constant() {
+        assert_eq!(MAX_TOOL_ITERATIONS, 5);
+    }
+}
