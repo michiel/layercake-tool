@@ -1,7 +1,9 @@
 import React from 'react'
-import { Container, ContainerProps } from '@mantine/core'
+import { cn } from '@/lib/utils'
 
-type PageContainerProps = ContainerProps
+interface PageContainerProps extends React.HTMLAttributes<HTMLDivElement> {
+  children?: React.ReactNode
+}
 
 /**
  * Shared page wrapper that stretches content to the full viewport width
@@ -9,22 +11,16 @@ type PageContainerProps = ContainerProps
  */
 export const PageContainer: React.FC<PageContainerProps> = ({
   children,
-  fluid,
-  px,
-  maw,
-  style,
-  ...rest
+  className,
+  ...props
 }) => {
   return (
-    <Container
-      fluid={fluid ?? true}
-      px={px ?? 'xl'}
-      maw={maw ?? '100%'}
-      style={{ width: '100%', ...style }}
-      {...rest}
+    <div
+      className={cn('w-full px-8', className)}
+      {...props}
     >
       {children}
-    </Container>
+    </div>
   )
 }
 

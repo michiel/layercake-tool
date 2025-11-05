@@ -1,8 +1,15 @@
 import React from 'react'
-import { Breadcrumbs as MantineBreadcrumbs, Anchor, Text } from '@mantine/core'
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb'
 import { IconHome, IconDatabase, IconGraph } from '@tabler/icons-react'
 
-interface BreadcrumbItem {
+interface BreadcrumbItemData {
   title: string
   href?: string
   icon?: React.ReactNode
@@ -39,7 +46,7 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({
     }
   }
 
-  const items: BreadcrumbItem[] = [
+  const items: BreadcrumbItemData[] = [
     {
       title: 'Home',
       href: '/',
@@ -75,34 +82,35 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({
     })
   }
 
-  const breadcrumbItems = items.map((item, index) => {
-    const isLast = index === items.length - 1
-
-    if (isLast || !item.href) {
-      return (
-        <Text key={index} size="xs" c="dimmed" style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-          {item.icon}
-          {item.title}
-        </Text>
-      )
-    }
-
-    return (
-      <Anchor
-        key={index}
-        onClick={() => onNavigate?.(item.href!)}
-        size="xs"
-        style={{ display: 'flex', alignItems: 'center', gap: 3, cursor: 'pointer' }}
-      >
-        {item.icon}
-        {item.title}
-      </Anchor>
-    )
-  })
-
   return (
-    <MantineBreadcrumbs separator="/" separatorMargin="xs">
-      {breadcrumbItems}
-    </MantineBreadcrumbs>
+    <Breadcrumb>
+      <BreadcrumbList>
+        {items.map((item, index) => {
+          const isLast = index === items.length - 1
+
+          return (
+            <React.Fragment key={index}>
+              <BreadcrumbItem>
+                {isLast || !item.href ? (
+                  <BreadcrumbPage className="flex items-center gap-1">
+                    {item.icon}
+                    <span>{item.title}</span>
+                  </BreadcrumbPage>
+                ) : (
+                  <BreadcrumbLink
+                    onClick={() => onNavigate?.(item.href!)}
+                    className="flex items-center gap-1 cursor-pointer"
+                  >
+                    {item.icon}
+                    <span>{item.title}</span>
+                  </BreadcrumbLink>
+                )}
+              </BreadcrumbItem>
+              {!isLast && <BreadcrumbSeparator />}
+            </React.Fragment>
+          )
+        })}
+      </BreadcrumbList>
+    </Breadcrumb>
   )
 }

@@ -1,7 +1,9 @@
 import React from 'react';
-import { Group, Text, ActionIcon, useMantineColorScheme } from '@mantine/core';
+import { useMantineColorScheme } from '@mantine/core'; // TODO: Replace with next-themes in Stage 8
 import { IconSun, IconMoon, IconWifi, IconWifiOff, IconGraph, IconLoader, IconRefresh } from '@tabler/icons-react';
 import { useApolloClient } from '@apollo/client/react';
+import { Group } from '@/components/layout-primitives';
+import { Button } from '@/components/ui/button';
 import { UserPresenceIndicator } from '../collaboration/UserPresenceIndicator';
 import { ConnectionState } from '../../types/websocket';
 
@@ -43,12 +45,14 @@ export const TopBar: React.FC<TopBarProps> = ({
   };
 
   return (
-    <Group h={60} px="md" justify="space-between"
-           style={{ borderBottom: '1px solid var(--mantine-color-gray-3)' }}>
+    <Group
+      className="h-[60px] px-4 border-b border-border"
+      justify="between"
+    >
       {/* Left side - Logo and title */}
-      <Group gap="sm" style={{ cursor: 'pointer' }} onClick={onNavigateHome}>
+      <Group gap="sm" className="cursor-pointer" onClick={onNavigateHome}>
         <IconGraph size={28} />
-        <Text size="xl" fw={700}>Layercake</Text>
+        <h1 className="text-2xl font-bold">Layercake</h1>
       </Group>
 
       {/* Right side - Controls */}
@@ -63,31 +67,34 @@ export const TopBar: React.FC<TopBarProps> = ({
         )}
 
         {/* Theme toggle */}
-        <ActionIcon
-          variant="subtle"
-          size="lg"
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={() => toggleColorScheme()}
           title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
         >
-          {isDark ? <IconSun size="1.2rem" /> : <IconMoon size="1.2rem" />}
-        </ActionIcon>
+          {isDark ? <IconSun size={20} /> : <IconMoon size={20} />}
+        </Button>
 
         {/* Clear cache and reload */}
-        <ActionIcon
-          variant="subtle"
-          size="lg"
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={handleClearCache}
           title="Clear cache and reload"
-          color="gray"
         >
-          <IconRefresh size="1.2rem" />
-        </ActionIcon>
+          <IconRefresh size={20} />
+        </Button>
 
         {/* Connection status indicator */}
-        <ActionIcon
-          variant="subtle"
-          size="lg"
-          color={isOnline ? "green" : isConnecting ? "yellow" : "red"}
+        <Button
+          variant="ghost"
+          size="icon"
+          className={
+            isOnline ? "text-green-600" :
+            isConnecting ? "text-yellow-600" :
+            "text-red-600"
+          }
           title={
             isOnline ? "Connected to backend" :
             isConnecting ? "Connecting to backend..." :
@@ -95,23 +102,13 @@ export const TopBar: React.FC<TopBarProps> = ({
           }
         >
           {isOnline ? (
-            <IconWifi size="1.2rem" />
+            <IconWifi size={20} />
           ) : isConnecting ? (
-            <div style={{ animation: 'spin 1s linear infinite' }}>
-              <IconLoader size="1.2rem" />
-              <style>
-                {`
-                  @keyframes spin {
-                    0% { transform: rotate(0deg); }
-                    100% { transform: rotate(360deg); }
-                  }
-                `}
-              </style>
-            </div>
+            <IconLoader size={20} className="animate-spin" />
           ) : (
-            <IconWifiOff size="1.2rem" />
+            <IconWifiOff size={20} />
           )}
-        </ActionIcon>
+        </Button>
       </Group>
     </Group>
   );

@@ -232,11 +232,14 @@ src/components/ui/
   └── spinner.tsx          # Loading spinner with lucide-react (✅ Created)
 ```
 
-#### Files to Update (Priority):
-1. `src/App.tsx` - AppShell, layout structure (⏳ Pending)
-2. `src/main.tsx` - Remove MantineProvider, add Tailwind (⏳ Pending)
-3. `src/components/layout/TopBar.tsx` (⏳ Pending)
-4. `src/components/layout/PageContainer.tsx` (⏳ Pending)
+#### Files Migrated: ✅
+1. `src/components/layout/PageContainer.tsx` ✅ - Converted to Tailwind classes
+2. `src/components/layout/TopBar.tsx` ✅ - Using Group, Button (icon variant)
+3. `src/components/common/Breadcrumbs.tsx` ✅ - Using shadcn Breadcrumb component
+
+#### Files to Update (Remaining):
+1. `src/App.tsx` - AppShell, layout structure (⏳ Pending - Complex, 1385 lines)
+2. `src/main.tsx` - Remove MantineProvider (⏳ Stage 8)
 
 #### Migration Pattern:
 ```tsx
