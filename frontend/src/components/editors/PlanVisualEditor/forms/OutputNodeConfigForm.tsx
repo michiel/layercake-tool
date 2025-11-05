@@ -1,7 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Stack, TextInput, Select, Switch, Alert, Text } from '@mantine/core';
 import { IconInfoCircle } from '@tabler/icons-react';
 import { OutputNodeConfig } from '../../../../types/plan-dag';
+import { Stack } from '@/components/layout-primitives';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 
 interface OutputNodeConfigFormProps {
   config: OutputNodeConfig;
@@ -35,58 +40,80 @@ export const OutputNodeConfigForm: React.FC<OutputNodeConfigFormProps> = ({
 
   return (
     <Stack gap="md">
-      <Alert icon={<IconInfoCircle size="1rem" />} color="blue" title="Output Configuration">
-        <Text size="sm">
+      <Alert>
+        <IconInfoCircle className="h-4 w-4" />
+        <AlertTitle>Output Configuration</AlertTitle>
+        <AlertDescription>
           Configure export format and optional filename. Source graph comes from incoming edge connection.
           If no filename is specified, it will be auto-generated using the project name and file extension.
-        </Text>
+        </AlertDescription>
       </Alert>
 
-      <Select
-        label="Render Target"
-        data={[
-          { value: 'DOT', label: 'DOT (Graphviz)' },
-          { value: 'GML', label: 'GML' },
-          { value: 'JSON', label: 'JSON' },
-          { value: 'PlantUML', label: 'PlantUML' },
-          { value: 'CSVNodes', label: 'CSV Nodes' },
-          { value: 'CSVEdges', label: 'CSV Edges' },
-          { value: 'Mermaid', label: 'Mermaid' },
-          { value: 'Custom', label: 'Custom' },
-        ]}
-        value={localConfig.renderTarget}
-        onChange={(value) => setLocalConfig(prev => ({ ...prev, renderTarget: value as any }))}
-      />
+      <div className="space-y-2">
+        <Label htmlFor="render-target">Render Target</Label>
+        <Select
+          value={localConfig.renderTarget}
+          onValueChange={(value) => setLocalConfig(prev => ({ ...prev, renderTarget: value as any }))}
+        >
+          <SelectTrigger id="render-target">
+            <SelectValue placeholder="Select render target" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="DOT">DOT (Graphviz)</SelectItem>
+            <SelectItem value="GML">GML</SelectItem>
+            <SelectItem value="JSON">JSON</SelectItem>
+            <SelectItem value="PlantUML">PlantUML</SelectItem>
+            <SelectItem value="CSVNodes">CSV Nodes</SelectItem>
+            <SelectItem value="CSVEdges">CSV Edges</SelectItem>
+            <SelectItem value="Mermaid">Mermaid</SelectItem>
+            <SelectItem value="Custom">Custom</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
-      <TextInput
-        label="Filename (optional)"
-        placeholder="e.g., myproject.gml (auto-generated if not specified)"
-        description="If not specified, will use project name and file extension"
-        value={localConfig.outputPath}
-        onChange={(event) => setLocalConfig(prev => ({ ...prev, outputPath: event.currentTarget.value }))}
-      />
+      <div className="space-y-2">
+        <Label htmlFor="filename">Filename (optional)</Label>
+        <Input
+          id="filename"
+          placeholder="e.g., myproject.gml (auto-generated if not specified)"
+          value={localConfig.outputPath}
+          onChange={(event) => setLocalConfig(prev => ({ ...prev, outputPath: event.currentTarget.value }))}
+        />
+        <p className="text-sm text-muted-foreground">
+          If not specified, will use project name and file extension
+        </p>
+      </div>
 
-      <Switch
-        label="Contain Nodes"
-        checked={localConfig.renderConfig?.containNodes || false}
-        onChange={(event) => setLocalConfig(prev => ({
-          ...prev,
-          renderConfig: { ...prev.renderConfig, containNodes: event.currentTarget.checked }
-        }))}
-      />
+      <div className="flex items-center space-x-2">
+        <Switch
+          id="contain-nodes"
+          checked={localConfig.renderConfig?.containNodes || false}
+          onCheckedChange={(checked) => setLocalConfig(prev => ({
+            ...prev,
+            renderConfig: { ...prev.renderConfig, containNodes: checked }
+          }))}
+        />
+        <Label htmlFor="contain-nodes">Contain Nodes</Label>
+      </div>
 
-      <Select
-        label="Orientation"
-        data={[
-          { value: 'LR', label: 'Left to Right' },
-          { value: 'TB', label: 'Top to Bottom' },
-        ]}
-        value={localConfig.renderConfig?.orientation || 'TB'}
-        onChange={(value) => setLocalConfig(prev => ({
-          ...prev,
-          renderConfig: { ...prev.renderConfig, orientation: value as any }
-        }))}
-      />
+      <div className="space-y-2">
+        <Label htmlFor="orientation">Orientation</Label>
+        <Select
+          value={localConfig.renderConfig?.orientation || 'TB'}
+          onValueChange={(value) => setLocalConfig(prev => ({
+            ...prev,
+            renderConfig: { ...prev.renderConfig, orientation: value as any }
+          }))}
+        >
+          <SelectTrigger id="orientation">
+            <SelectValue placeholder="Select orientation" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="LR">Left to Right</SelectItem>
+            <SelectItem value="TB">Top to Bottom</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
     </Stack>
   );
 };
