@@ -1,6 +1,5 @@
 import { memo } from 'react'
 import { NodeProps } from 'reactflow'
-import { Text } from '@mantine/core'
 import { BaseNode } from './BaseNode'
 import { PlanDagNodeType, MergeNodeConfig } from '../../../../types/plan-dag'
 
@@ -15,9 +14,9 @@ export const MergeNode = memo((props: MergeNodeProps) => {
 
   // Footer content with merge strategy
   const footerContent = config.mergeStrategy ? (
-    <Text size="xs" c="dimmed">
+    <p className="text-xs text-muted-foreground">
       {config.mergeStrategy}
-    </Text>
+    </p>
   ) : null
 
   return (
