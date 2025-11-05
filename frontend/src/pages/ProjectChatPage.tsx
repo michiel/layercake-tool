@@ -1,11 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Alert, Badge, Button, Card, Group, Loader, Paper, ScrollArea, Select, Stack, Text, Textarea, Title } from '@mantine/core'
 import { IconMessageDots, IconRefresh } from '@tabler/icons-react'
 import { gql } from '@apollo/client'
 import { useQuery } from '@apollo/client/react'
 import { CHAT_PROVIDER_OPTIONS, ChatProviderOption } from '../graphql/chat'
 import { useChatSession } from '../hooks/useChatSession'
+import { Stack, Group } from '../components/layout-primitives'
+import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert'
+import { Badge } from '../components/ui/badge'
+import { Button } from '../components/ui/button'
+import { Card, CardContent } from '../components/ui/card'
+import { Label } from '../components/ui/label'
+import { ScrollArea } from '../components/ui/scroll-area'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
+import { Spinner } from '../components/ui/spinner'
+import { Textarea } from '../components/ui/textarea'
 
 const GET_PROJECT = gql`
   query GetProjectName($id: Int!) {
@@ -67,124 +76,143 @@ export const ProjectChatPage = () => {
       : 'Ready'
 
   return (
-    <Stack h="100%" p="md" gap="md">
-      <Group justify="space-between" align="flex-start">
+    <Stack gap="md" className="h-full p-4">
+      <Group justify="between" align="start">
         <div>
-          <Title order={2}>Project Chat</Title>
-          <Text c="dimmed" size="sm">
+          <h2 className="text-2xl font-bold">Project Chat</h2>
+          <p className="text-sm text-muted-foreground">
             {project
               ? `Discuss project "${project.name}" with tool-assisted insights.`
               : 'Start a conversation powered by Layercake tools.'}
-          </Text>
+          </p>
         </div>
         <Group gap="sm">
-          <Select
-            label="Provider"
-            data={providerSelectData}
-            value={provider}
-            onChange={(value) => {
-              if (value) {
-                setProvider(value as ChatProviderOption)
-                chat.restart()
-              }
-            }}
-            styles={{ root: { minWidth: 220 } }}
-          />
+          <div className="space-y-2" style={{ minWidth: 220 }}>
+            <Label htmlFor="provider-select">Provider</Label>
+            <Select
+              value={provider}
+              onValueChange={(value) => {
+                if (value) {
+                  setProvider(value as ChatProviderOption)
+                  chat.restart()
+                }
+              }}
+            >
+              <SelectTrigger id="provider-select">
+                <SelectValue placeholder="Select provider" />
+              </SelectTrigger>
+              <SelectContent>
+                {providerSelectData.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    <div>
+                      <div>{option.label}</div>
+                      <div className="text-xs text-muted-foreground">{option.description}</div>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <Button
-            variant="light"
-            leftSection={<IconRefresh size={16} />}
+            variant="secondary"
             onClick={chat.restart}
             disabled={chat.loading}
+            className="mt-8"
           >
+            <IconRefresh className="mr-2 h-4 w-4" />
             Restart Session
           </Button>
         </Group>
       </Group>
 
       {chat.error && (
-        <Alert color="red" title="Chat unavailable" mt="xs">
-          {chat.error}
+        <Alert variant="destructive">
+          <AlertTitle>Chat unavailable</AlertTitle>
+          <AlertDescription>{chat.error}</AlertDescription>
         </Alert>
       )}
 
-      <Paper withBorder p="md" radius="md" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-        <Group justify="space-between" mb="sm">
-          <Group gap="xs">
-            <Badge color="blue" variant="light">
-              {provider}
-            </Badge>
-            {chat.session?.model && (
-              <Badge color="gray" variant="light">
-                Model: {chat.session.model}
+      <Card className="border flex-1 flex flex-col min-h-0">
+        <CardContent className="pt-6 flex flex-col flex-1 min-h-0">
+          <Group justify="between" className="mb-4">
+            <Group gap="xs">
+              <Badge>
+                {provider}
               </Badge>
-            )}
+              {chat.session?.model && (
+                <Badge variant="secondary">
+                  Model: {chat.session.model}
+                </Badge>
+              )}
+            </Group>
+            <Group gap="xs">
+              {chat.loading ? <Spinner className="h-4 w-4" /> : <IconMessageDots size={18} className="text-blue-400" />}
+              <p className="text-sm text-muted-foreground">
+                {statusLabel}
+              </p>
+            </Group>
           </Group>
-          <Group gap="xs">
-            {chat.loading ? <Loader size="sm" /> : <IconMessageDots size={18} style={{ color: '#4dabf7' }} />}
-            <Text size="sm" c="dimmed">
-              {statusLabel}
-            </Text>
-          </Group>
-        </Group>
 
-        <ScrollArea style={{ flex: 1 }} viewportRef={viewportRef} type="auto">
-          <Stack gap="sm" pr="sm">
-            {chat.messages.length === 0 && !chat.loading && (
-              <Card withBorder radius="md" padding="lg">
-                <Text c="dimmed" size="sm">
-                  Ask a question about this project. The assistant can run project-scoped tools for fresh data.
-                </Text>
-              </Card>
-            )}
-
-            {chat.messages.map((message) => (
-              <Group key={message.id} justify={message.role === 'user' ? 'flex-end' : 'flex-start'}>
-                <Card
-                  radius="md"
-                  padding="sm"
-                  withBorder
-                  style={{
-                    maxWidth: '75%',
-                    backgroundColor:
-                      message.role === 'user'
-                        ? '#edf2ff'
-                        : message.role === 'tool'
-                          ? '#fff4e6'
-                          : '#f8f9fa',
-                  }}
-                >
-                  <Stack gap={4}>
-                    <Group gap="xs">
-                      <Badge
-                        size="xs"
-                        color={
-                          message.role === 'user'
-                            ? 'blue'
-                            : message.role === 'tool'
-                              ? 'orange'
-                              : 'gray'
-                        }
-                      >
-                        {message.role === 'user'
-                          ? 'You'
-                          : message.role === 'tool'
-                            ? message.toolName ?? 'Tool'
-                            : 'Assistant'}
-                      </Badge>
-                      <Text size="xs" c="dimmed">
-                        {new Date(message.createdAt).toLocaleTimeString()}
-                      </Text>
-                    </Group>
-                    <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
-                      {message.content}
-                    </Text>
-                  </Stack>
+          <ScrollArea className="flex-1" viewportRef={viewportRef}>
+            <Stack gap="sm" className="pr-2">
+              {chat.messages.length === 0 && !chat.loading && (
+                <Card className="border">
+                  <CardContent className="pt-6">
+                    <p className="text-sm text-muted-foreground">
+                      Ask a question about this project. The assistant can run project-scoped tools for fresh data.
+                    </p>
+                  </CardContent>
                 </Card>
-              </Group>
-            ))}
-          </Stack>
-        </ScrollArea>
-      </Paper>
+              )}
+
+              {chat.messages.map((message) => (
+                <Group key={message.id} justify={message.role === 'user' ? 'end' : 'start'}>
+                  <Card
+                    className="border max-w-[75%]"
+                    style={{
+                      backgroundColor:
+                        message.role === 'user'
+                          ? '#edf2ff'
+                          : message.role === 'tool'
+                            ? '#fff4e6'
+                            : '#f8f9fa',
+                    }}
+                  >
+                    <CardContent className="pt-4 pb-4">
+                      <Stack gap="xs">
+                        <Group gap="xs">
+                          <Badge
+                            variant={
+                              message.role === 'user'
+                                ? 'default'
+                                : message.role === 'tool'
+                                  ? 'secondary'
+                                  : 'outline'
+                            }
+                            className="text-xs"
+                          >
+                            {message.role === 'user'
+                              ? 'You'
+                              : message.role === 'tool'
+                                ? message.toolName ?? 'Tool'
+                                : 'Assistant'}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(message.createdAt).toLocaleTimeString()}
+                          </span>
+                        </Group>
+                        <p className="text-sm whitespace-pre-wrap">
+                          {message.content}
+                        </p>
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                </Group>
+              ))}
+            </Stack>
+          </ScrollArea>
+        </CardContent>
+      </Card>
 
       <ChatInput onSend={handleSend} disabled={chat.loading} />
     </Stack>
@@ -216,15 +244,14 @@ const ChatInput = ({
   return (
     <Stack gap="xs">
       <Textarea
-        minRows={2}
-        autosize
+        rows={2}
         placeholder="Ask a question about this project…"
         value={input}
         onChange={(event) => setInput(event.currentTarget.value)}
         onKeyDown={handleKeyDown}
         disabled={disabled}
       />
-      <Group justify="flex-end">
+      <Group justify="end">
         <Button onClick={() => void handleSend()} disabled={disabled || !input.trim()}>
           Send
         </Button>
