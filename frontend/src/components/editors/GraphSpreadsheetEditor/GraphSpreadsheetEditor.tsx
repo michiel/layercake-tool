@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Tabs, Stack, Button, Group, Text, Table, TextInput, ScrollArea } from '@mantine/core';
-import { IconTable, IconDeviceFloppy, IconClipboard } from '@tabler/icons-react';
+import { IconTable, IconDeviceFloppy, IconClipboard, IconTrash } from '@tabler/icons-react';
 
 export interface GraphNode {
   id: string;
@@ -141,7 +141,21 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
     return rows;
   };
 
+  const confirmDestructiveAction = (subject: string, existingCount: number) => {
+    if (existingCount === 0) {
+      return true;
+    }
+
+    return window.confirm(
+      `This will replace the existing ${existingCount} ${subject}. Continue?`
+    );
+  };
+
   const handlePasteNodes = async () => {
+    if (!confirmDestructiveAction('node records', localNodes.length)) {
+      return;
+    }
+
     try {
       const text = await navigator.clipboard.readText();
       const parsedData = parseCSV(text);
@@ -161,7 +175,7 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
         ...row
       }));
 
-      setLocalNodes(newNodes);
+      setLocalNodes(() => [...newNodes]);
       setHasChanges(true);
     } catch (error) {
       console.error('Failed to paste nodes:', error);
@@ -170,6 +184,10 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
   };
 
   const handlePasteEdges = async () => {
+    if (!confirmDestructiveAction('edge records', localEdges.length)) {
+      return;
+    }
+
     try {
       const text = await navigator.clipboard.readText();
       const parsedData = parseCSV(text);
@@ -189,7 +207,7 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
         ...row
       }));
 
-      setLocalEdges(newEdges);
+      setLocalEdges(() => [...newEdges]);
       setHasChanges(true);
     } catch (error) {
       console.error('Failed to paste edges:', error);
@@ -198,6 +216,10 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
   };
 
   const handlePasteLayers = async () => {
+    if (!confirmDestructiveAction('layer records', localLayers.length)) {
+      return;
+    }
+
     try {
       const text = await navigator.clipboard.readText();
       const parsedData = parseCSV(text);
@@ -217,12 +239,39 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
         ...row
       }));
 
-      setLocalLayers(newLayers);
+      setLocalLayers(() => [...newLayers]);
       setHasChanges(true);
     } catch (error) {
       console.error('Failed to paste layers:', error);
       alert('Failed to read from clipboard. Please ensure you have copied CSV data.');
     }
+  };
+
+  const handleClearNodes = () => {
+    if (!confirmDestructiveAction('node records', localNodes.length)) {
+      return;
+    }
+
+    setLocalNodes([]);
+    setHasChanges(true);
+  };
+
+  const handleClearEdges = () => {
+    if (!confirmDestructiveAction('edge records', localEdges.length)) {
+      return;
+    }
+
+    setLocalEdges([]);
+    setHasChanges(true);
+  };
+
+  const handleClearLayers = () => {
+    if (!confirmDestructiveAction('layer records', localLayers.length)) {
+      return;
+    }
+
+    setLocalLayers([]);
+    setHasChanges(true);
   };
 
   return (
@@ -238,34 +287,67 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
           {!readOnly && (
             <>
               {activeTab === 'nodes' && (
-                <Button
-                  leftSection={<IconClipboard size={16} />}
-                  onClick={handlePasteNodes}
-                  variant="light"
-                  size="sm"
-                >
-                  Paste Nodes
-                </Button>
+                <>
+                  <Button
+                    leftSection={<IconClipboard size={16} />}
+                    onClick={handlePasteNodes}
+                    variant="light"
+                    size="sm"
+                  >
+                    Paste Nodes
+                  </Button>
+                  <Button
+                    leftSection={<IconTrash size={16} />}
+                    onClick={handleClearNodes}
+                    variant="outline"
+                    color="red"
+                    size="sm"
+                  >
+                    Clear Nodes
+                  </Button>
+                </>
               )}
               {activeTab === 'edges' && (
-                <Button
-                  leftSection={<IconClipboard size={16} />}
-                  onClick={handlePasteEdges}
-                  variant="light"
-                  size="sm"
-                >
-                  Paste Edges
-                </Button>
+                <>
+                  <Button
+                    leftSection={<IconClipboard size={16} />}
+                    onClick={handlePasteEdges}
+                    variant="light"
+                    size="sm"
+                  >
+                    Paste Edges
+                  </Button>
+                  <Button
+                    leftSection={<IconTrash size={16} />}
+                    onClick={handleClearEdges}
+                    variant="outline"
+                    color="red"
+                    size="sm"
+                  >
+                    Clear Edges
+                  </Button>
+                </>
               )}
               {activeTab === 'layers' && (
-                <Button
-                  leftSection={<IconClipboard size={16} />}
-                  onClick={handlePasteLayers}
-                  variant="light"
-                  size="sm"
-                >
-                  Paste Layers
-                </Button>
+                <>
+                  <Button
+                    leftSection={<IconClipboard size={16} />}
+                    onClick={handlePasteLayers}
+                    variant="light"
+                    size="sm"
+                  >
+                    Paste Layers
+                  </Button>
+                  <Button
+                    leftSection={<IconTrash size={16} />}
+                    onClick={handleClearLayers}
+                    variant="outline"
+                    color="red"
+                    size="sm"
+                  >
+                    Clear Layers
+                  </Button>
+                </>
               )}
               <Button
                 leftSection={<IconDeviceFloppy size={16} />}
