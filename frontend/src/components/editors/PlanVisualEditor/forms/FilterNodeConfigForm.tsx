@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Stack, Alert, Text } from '@mantine/core';
 import { IconInfoCircle } from '@tabler/icons-react';
 import { FilterNodeConfig, QueryFilterConfig } from '../../../../types/plan-dag';
 import {
   QueryFilterBuilder,
 } from './QueryFilterBuilder';
 import { extractQueryConfigFromRaw } from './filterConfigUtils';
+import { Stack } from '@/components/layout-primitives';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 interface FilterNodeConfigFormProps {
   config: FilterNodeConfig;
@@ -50,11 +51,13 @@ export const FilterNodeConfigForm: React.FC<FilterNodeConfigFormProps> = ({
 
   return (
     <Stack gap="md">
-      <Alert icon={<IconInfoCircle size="1rem" />} color="blue" title="Query Filter">
-        <Text size="sm">
+      <Alert>
+        <IconInfoCircle className="h-4 w-4" />
+        <AlertTitle>Query Filter</AlertTitle>
+        <AlertDescription>
           This Filter node runs a single query builder rule-set against the upstream graph. Adjust the
           targets, match mode, pruning behavior, and rule groups below.
-        </Text>
+        </AlertDescription>
       </Alert>
 
       <QueryFilterBuilder value={localQueryConfig} onChange={setLocalQueryConfig} />
