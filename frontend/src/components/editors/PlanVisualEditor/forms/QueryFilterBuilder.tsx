@@ -1,17 +1,4 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import {
-  Card,
-  Stack,
-  MultiSelect,
-  SegmentedControl,
-  Select,
-  Group,
-  Text,
-  TextInput,
-  Button,
-  Textarea,
-  Divider,
-} from '@mantine/core';
 import { IconPlus } from '@tabler/icons-react';
 import { QueryBuilder, type Field, type RuleGroupType } from 'react-querybuilder';
 import 'react-querybuilder/dist/query-builder.css';
@@ -20,6 +7,16 @@ import {
   QueryFilterTarget,
   QueryLinkPruningMode,
 } from '../../../../types/plan-dag';
+import { Stack, Group } from '@/components/layout-primitives';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
 
 type EntityField = Field & { entity: QueryFilterTarget };
 
@@ -324,97 +321,132 @@ export const QueryFilterBuilder: React.FC<QueryFilterBuilderProps> = ({ value, o
     customFields.some(field => field.name === customFieldInput.trim());
 
   return (
-    <Card withBorder radius="md" padding="md">
-      <Stack gap="sm">
-        <Group align="flex-end">
-          <MultiSelect
-            label="Entity targets"
-            description="Apply this query to one or more entity types"
-            data={TARGET_OPTIONS}
-            value={safeTargets}
-            onChange={next =>
-              handleConfigChange({
-                targets: (next.length ? next : ['nodes']) as QueryFilterTarget[],
-              })
-            }
-            searchable
-            style={{ flex: 1 }}
-          />
-          <Stack gap={4} style={{ minWidth: 220 }}>
-            <Text size="sm" fw={500}>
-              Match mode
-            </Text>
-            <SegmentedControl
-              data={MODE_OPTIONS}
-              value={mergedConfig.mode}
-              onChange={value => handleConfigChange({ mode: value as QueryFilterConfig['mode'] })}
+    <Card className="border">
+      <CardContent className="pt-6">
+        <Stack gap="sm">
+          <Group align="end">
+            <div className="space-y-2 flex-1">
+              <Label>Entity targets</Label>
+              <div className="space-y-2">
+                {TARGET_OPTIONS.map(option => (
+                  <div key={option.value} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`target-${option.value}`}
+                      checked={safeTargets.includes(option.value as QueryFilterTarget)}
+                      onCheckedChange={checked => {
+                        const next = checked
+                          ? [...safeTargets, option.value as QueryFilterTarget]
+                          : safeTargets.filter(t => t !== option.value);
+                        handleConfigChange({
+                          targets: (next.length ? next : ['nodes']) as QueryFilterTarget[],
+                        });
+                      }}
+                    />
+                    <Label htmlFor={`target-${option.value}`} className="font-normal cursor-pointer">
+                      {option.label}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Apply this query to one or more entity types
+              </p>
+            </div>
+            <div className="space-y-2" style={{ minWidth: 220 }}>
+              <Label>Match mode</Label>
+              <Tabs
+                value={mergedConfig.mode}
+                onValueChange={value => handleConfigChange({ mode: value as QueryFilterConfig['mode'] })}
+              >
+                <TabsList className="grid w-full grid-cols-2">
+                  {MODE_OPTIONS.map(option => (
+                    <TabsTrigger key={option.value} value={option.value}>
+                      {option.label}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
+            </div>
+          </Group>
+
+          <div className="space-y-2">
+            <Label htmlFor="link-pruning-mode">Link pruning mode</Label>
+            <Select
+              value={mergedConfig.linkPruningMode}
+              onValueChange={value =>
+                handleConfigChange({
+                  linkPruningMode: (value as QueryLinkPruningMode) ?? mergedConfig.linkPruningMode,
+                })
+              }
+            >
+              <SelectTrigger id="link-pruning-mode">
+                <SelectValue placeholder="Select pruning mode" />
+              </SelectTrigger>
+              <SelectContent>
+                {LINK_PRUNING_OPTIONS.map(option => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-sm text-muted-foreground">
+              {LINK_PRUNING_OPTIONS.find(option => option.value === mergedConfig.linkPruningMode)
+                ?.description}
+            </p>
+          </div>
+
+          <div className="space-y-1">
+            <Label>Query rules</Label>
+            <p className="text-xs text-muted-foreground">
+              Build nested AND/OR groups to match attributes across the selected entities. Use custom
+              fields for JSON attributes such as <code>node.attrs.priority</code>.
+            </p>
+            <QueryBuilder
+              fields={availableFields}
+              query={mergedConfig.ruleGroup}
+              onQueryChange={handleRuleGroupChange}
+              controlClassnames={{ queryBuilder: 'lc-query-builder' }}
             />
-          </Stack>
-        </Group>
+          </div>
 
-        <Select
-          label="Link pruning mode"
-          description={
-            LINK_PRUNING_OPTIONS.find(option => option.value === mergedConfig.linkPruningMode)
-              ?.description
-          }
-          data={LINK_PRUNING_OPTIONS.map(option => ({
-            value: option.value,
-            label: option.label,
-          }))}
-          value={mergedConfig.linkPruningMode}
-          onChange={value =>
-            handleConfigChange({
-              linkPruningMode: (value as QueryLinkPruningMode) ?? mergedConfig.linkPruningMode,
-            })
-          }
-        />
+          <Group align="end">
+            <div className="space-y-2 flex-1">
+              <Label htmlFor="custom-field">Custom field</Label>
+              <Input
+                id="custom-field"
+                placeholder="node.attrs.priority"
+                value={customFieldInput}
+                onChange={event => setCustomFieldInput(event.currentTarget.value)}
+              />
+            </div>
+            <Button
+              variant="secondary"
+              onClick={handleAddCustomField}
+              disabled={!customFieldInput.trim() || customFieldExists}
+            >
+              <IconPlus className="mr-2 h-4 w-4" />
+              Add field
+            </Button>
+          </Group>
 
-        <Stack gap={4}>
-          <Text size="sm" fw={500}>
-            Query rules
-          </Text>
-          <Text size="xs" c="dimmed">
-            Build nested AND/OR groups to match attributes across the selected entities. Use custom
-            fields for JSON attributes such as <code>node.attrs.priority</code>.
-          </Text>
-          <QueryBuilder
-            fields={availableFields}
-            query={mergedConfig.ruleGroup}
-            onQueryChange={handleRuleGroupChange}
-            controlClassnames={{ queryBuilder: 'lc-query-builder' }}
-          />
+          <Separator />
+
+          <div className="space-y-2">
+            <Label htmlFor="notes">Notes</Label>
+            <Textarea
+              id="notes"
+              placeholder="Optional context or TODOs for this query filter"
+              value={mergedConfig.notes ?? ''}
+              onChange={event => handleConfigChange({ notes: event.currentTarget.value })}
+              rows={2}
+            />
+            <p className="text-sm text-muted-foreground">
+              Optional context or TODOs for this query filter.
+            </p>
+          </div>
         </Stack>
-
-        <Group align="flex-end">
-          <TextInput
-            label="Custom field"
-            placeholder="node.attrs.priority"
-            value={customFieldInput}
-            onChange={event => setCustomFieldInput(event.currentTarget.value)}
-            style={{ flex: 1 }}
-          />
-          <Button
-            variant="light"
-            leftSection={<IconPlus size={16} />}
-            onClick={handleAddCustomField}
-            disabled={!customFieldInput.trim() || customFieldExists}
-          >
-            Add field
-          </Button>
-        </Group>
-
-        <Divider />
-
-        <Textarea
-          label="Notes"
-          description="Optional context or TODOs for this query filter."
-          value={mergedConfig.notes ?? ''}
-          onChange={event => handleConfigChange({ notes: event.currentTarget.value })}
-          autosize
-          minRows={2}
-        />
-      </Stack>
+      </CardContent>
     </Card>
   );
 };
