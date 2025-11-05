@@ -1,7 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Container, Title, Alert, LoadingOverlay, Button, Stack, Flex, Group, Badge, ActionIcon, Tooltip, Menu } from '@mantine/core';
-import { IconAlertCircle, IconArrowLeft, IconHistory, IconEdit, IconDownload, IconRoute, IconZoomScan } from '@tabler/icons-react';
+import { IconAlertCircle, IconArrowLeft, IconHistory, IconEdit, IconDownload, IconRoute, IconZoomScan, IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client';
 import { Breadcrumbs } from '../components/common/Breadcrumbs';
@@ -10,7 +9,18 @@ import { PropertiesAndLayersPanel } from '../components/graphs/PropertiesAndLaye
 import EditHistoryModal from '../components/graphs/EditHistoryModal';
 import { ReactFlowProvider, Node as FlowNode, Edge as FlowEdge } from 'reactflow';
 import { Graph, GraphNode, UPDATE_GRAPH_NODE, UPDATE_LAYER_PROPERTIES, GET_GRAPH_EDIT_COUNT, CREATE_LAYER, ADD_GRAPH_NODE, ADD_GRAPH_EDGE, UPDATE_GRAPH_EDGE, DELETE_GRAPH_EDGE, DELETE_GRAPH_NODE } from '../graphql/graphs';
-import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
+import { Stack, Group } from '../components/layout-primitives';
+import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
+import { Badge } from '../components/ui/badge';
+import { Button } from '../components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu';
+import { Spinner } from '../components/ui/spinner';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip';
 
 declare global {
   interface Window {
@@ -866,39 +876,41 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
 
   if (!selectedProject) {
     return (
-      <Container size="xl">
-        <Title order={1}>Project Not Found</Title>
-        <Button onClick={() => navigate('/projects')} mt="md">
+      <div className="container mx-auto max-w-7xl p-4">
+        <h1 className="text-3xl font-bold">Project Not Found</h1>
+        <Button onClick={() => navigate('/projects')} className="mt-4">
           Back to Projects
         </Button>
-      </Container>
+      </div>
     );
   }
 
   if (graphLoading) {
     return (
-      <Container size="xl">
-        <LoadingOverlay visible />
+      <div className="container mx-auto max-w-7xl p-4 relative">
+        <div className="absolute inset-0 flex items-center justify-center bg-background/80">
+          <Spinner className="h-8 w-8" />
+        </div>
         <div style={{ height: '400px' }} />
-      </Container>
+      </div>
     );
   }
 
   if (graphError || !graph) {
     return (
-      <Container size="xl">
-        <Alert
-          icon={<IconAlertCircle size={16} />}
-          title="Error Loading Graph"
-          color="red"
-          mb="md"
-        >
-          {graphError?.message || 'Graph not found'}
+      <div className="container mx-auto max-w-7xl p-4">
+        <Alert variant="destructive" className="mb-4">
+          <IconAlertCircle className="h-4 w-4" />
+          <AlertTitle>Error Loading Graph</AlertTitle>
+          <AlertDescription>
+            {graphError?.message || 'Graph not found'}
+          </AlertDescription>
         </Alert>
-        <Button onClick={handleBack} leftSection={<IconArrowLeft size={16} />}>
+        <Button onClick={handleBack}>
+          <IconArrowLeft className="mr-2 h-4 w-4" />
           Back to Graphs
         </Button>
-      </Container>
+      </div>
     );
   }
 
@@ -906,85 +918,95 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
   const hasEdits = editCount > 0;
 
   return (
-    <Stack gap={0} style={{ height: 'calc(100vh - 60px)', width: '100%', margin: '-16px' }}>
-      <div style={{ padding: '8px 16px', borderBottom: '1px solid #e9ecef' }}>
-        <Flex justify="space-between" align="center">
-          <Breadcrumbs
-            projectName={selectedProject.name}
-            projectId={selectedProject.id}
-            sections={[{ title: 'Graphs', href: `/projects/${projectId}/graphs` }]}
-            currentPage={graph.name}
-            onNavigate={handleNavigate}
-          />
+    <TooltipProvider>
+      <Stack gap="none" style={{ height: 'calc(100vh - 60px)', width: '100%', margin: '-16px' }}>
+        <div style={{ padding: '8px 16px', borderBottom: '1px solid #e9ecef' }}>
+          <div className="flex justify-between items-center">
+            <Breadcrumbs
+              projectName={selectedProject.name}
+              projectId={selectedProject.id}
+              sections={[{ title: 'Graphs', href: `/projects/${projectId}/graphs` }]}
+              currentPage={graph.name}
+              onNavigate={handleNavigate}
+            />
 
-        <Group gap="xs">
-          {hasEdits && (
-            <Badge
-              color="yellow"
-              variant="light"
-              leftSection={<IconEdit size={12} />}
-            >
-              {editCount} pending {editCount === 1 ? 'edit' : 'edits'}
-            </Badge>
-          )}
-          <Tooltip label="Zoom to Fit">
-            <ActionIcon
-              variant="light"
-              color="gray"
-              onClick={requestFitView}
-            >
-              <IconZoomScan size={18} />
-            </ActionIcon>
-          </Tooltip>
-          <Menu withinPortal position="bottom-start">
-            <Menu.Target>
-              <ActionIcon variant="light" color="gray">
-                <IconDownload size={18} />
-              </ActionIcon>
-            </Menu.Target>
-            <Menu.Dropdown>
-              <Menu.Item onClick={() => handleDownload('png')}>
-                Download PNG
-              </Menu.Item>
-              <Menu.Item onClick={() => handleDownload('svg')}>
-                Download SVG
-              </Menu.Item>
-            </Menu.Dropdown>
-          </Menu>
-          {projectId && graph?.nodeId && (
-            <Tooltip label="View in Plan DAG">
-              <ActionIcon
-                variant="light"
-                color="indigo"
-                onClick={() => navigate(`/projects/${projectId}/plan?focusNode=${graph.nodeId}`)}
-              >
-                <IconRoute size={18} />
-              </ActionIcon>
-            </Tooltip>
-          )}
-          <Tooltip label="View edit history">
-            <ActionIcon
-              variant="light"
-              color="blue"
-              onClick={() => setEditHistoryOpen(true)}
-            >
-              <IconHistory size={18} />
-            </ActionIcon>
-            </Tooltip>
-            <Tooltip label={propertiesPanelCollapsed ? "Show properties panel" : "Hide properties panel"}>
-              <ActionIcon
-                variant="light"
-                color="gray"
-                onClick={() => setPropertiesPanelCollapsed(!propertiesPanelCollapsed)}
-              >
-                {propertiesPanelCollapsed ? <IconChevronLeft size={18} /> : <IconChevronRight size={18} />}
-              </ActionIcon>
-            </Tooltip>
-          </Group>
-        </Flex>
-      </div>
+            <Group gap="xs">
+              {hasEdits && (
+                <Badge variant="secondary" className="gap-1">
+                  <IconEdit className="h-3 w-3" />
+                  {editCount} pending {editCount === 1 ? 'edit' : 'edits'}
+                </Badge>
+              )}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={requestFitView}
+                  >
+                    <IconZoomScan className="h-[18px] w-[18px]" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Zoom to Fit</TooltipContent>
+              </Tooltip>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon">
+                    <IconDownload className="h-[18px] w-[18px]" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onClick={() => handleDownload('png')}>
+                    Download PNG
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleDownload('svg')}>
+                    Download SVG
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              {projectId && graph?.nodeId && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => navigate(`/projects/${projectId}/plan?focusNode=${graph.nodeId}`)}
+                    >
+                      <IconRoute className="h-[18px] w-[18px]" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>View in Plan DAG</TooltipContent>
+                </Tooltip>
+              )}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setEditHistoryOpen(true)}
+                  >
+                    <IconHistory className="h-[18px] w-[18px]" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>View edit history</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setPropertiesPanelCollapsed(!propertiesPanelCollapsed)}
+                  >
+                    {propertiesPanelCollapsed ? <IconChevronLeft className="h-[18px] w-[18px]" /> : <IconChevronRight className="h-[18px] w-[18px]" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{propertiesPanelCollapsed ? "Show properties panel" : "Hide properties panel"}</TooltipContent>
+              </Tooltip>
+            </Group>
+          </div>
+        </div>
 
-      <Flex style={{ flex: 1, overflow: 'hidden' }}>
+        <div className="flex flex-1 overflow-hidden">
         <div style={{ flex: 1, position: 'relative' }}>
           <ReactFlowProvider>
             <LayercakeGraphEditor
@@ -1039,18 +1061,19 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
             onMinEdgeLengthChange={handleMinEdgeLengthChange}
           />
         )}
-      </Flex>
+        </div>
 
-      <EditHistoryModal
-        opened={editHistoryOpen}
-        onClose={() => {
-          setEditHistoryOpen(false);
-          refetchEditCount();
-        }}
-        graphId={parseInt(graphId || '0')}
-        graphName={graph.name}
-        onApplyEdits={handleApplyEdits}
-      />
-    </Stack>
+        <EditHistoryModal
+          opened={editHistoryOpen}
+          onClose={() => {
+            setEditHistoryOpen(false);
+            refetchEditCount();
+          }}
+          graphId={parseInt(graphId || '0')}
+          graphName={graph.name}
+          onApplyEdits={handleApplyEdits}
+        />
+      </Stack>
+    </TooltipProvider>
   );
 };
