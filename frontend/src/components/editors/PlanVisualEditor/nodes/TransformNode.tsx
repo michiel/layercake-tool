@@ -1,6 +1,6 @@
 import { memo, useMemo } from 'react'
 import { NodeProps } from 'reactflow'
-import { Stack, Text } from '@mantine/core'
+import { Stack } from '@/components/layout-primitives'
 import { BaseNode } from './BaseNode'
 import { PlanDagNodeType, GraphTransform } from '../../../../types/plan-dag'
 import { usePlanDagCQRSMutations } from '../../../../hooks/usePlanDagCQRSMutations'
@@ -111,10 +111,10 @@ export const TransformNode = memo((props: TransformNodeProps) => {
       hasValidConfig={data.hasValidConfig}
       editableLabel={false}
       children={
-        <Stack gap={4}>
-          <Text size="xs" c="dimmed">
+        <Stack gap="xs">
+          <p className="text-xs text-muted-foreground">
             {transformSummary}
-          </Text>
+          </p>
         </Stack>
       }
     />
