@@ -1,22 +1,4 @@
 import React, { useMemo, useState } from 'react'
-import {
-  Badge,
-  Button,
-  Card,
-  Group,
-  Modal,
-  NumberInput,
-  PasswordInput,
-  Select,
-  Skeleton,
-  Stack,
-  Table,
-  Text,
-  Textarea,
-  TextInput,
-  Title,
-  Alert,
-} from '@mantine/core'
 import { IconAlertCircle, IconSettings } from '@tabler/icons-react'
 import { useMutation, useQuery } from '@apollo/client/react'
 import {
@@ -28,6 +10,18 @@ import {
 } from '../graphql/systemSettings'
 import { showErrorNotification, showSuccessNotification } from '../utils/notifications'
 import PageContainer from '../components/layout/PageContainer'
+import { Stack, Group } from '../components/layout-primitives'
+import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert'
+import { Badge } from '../components/ui/badge'
+import { Button } from '../components/ui/button'
+import { Card, CardContent } from '../components/ui/card'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog'
+import { Input } from '../components/ui/input'
+import { Label } from '../components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
+import { Skeleton } from '../components/ui/skeleton'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table'
+import { Textarea } from '../components/ui/textarea'
 
 export const SystemSettingsPage: React.FC = () => {
   const { data, loading, error, refetch } = useQuery<GetSystemSettingsResponse>(GET_SYSTEM_SETTINGS)
@@ -93,66 +87,96 @@ export const SystemSettingsPage: React.FC = () => {
 
   const renderValueEditor = () => {
     if (!selectedSetting) return null
-    const common = {
-      label: 'Value',
-      description: selectedSetting.description ?? undefined,
-      disabled: selectedSetting.isReadOnly,
-    }
+    const disabled = selectedSetting.isReadOnly
 
     switch (selectedSetting.valueType) {
       case 'Integer':
         return (
-          <NumberInput
-            {...common}
-            placeholder="Enter a number"
-            value={value === '' ? undefined : Number(value)}
-            onChange={(val) => {
-              if (typeof val === 'number') {
-                setValue(String(val))
-              } else if (typeof val === 'string') {
-                setValue(val)
-              } else {
-                setValue('')
-              }
-            }}
-          />
+          <div className="space-y-2">
+            <Label htmlFor="setting-value">Value</Label>
+            <Input
+              id="setting-value"
+              type="number"
+              placeholder="Enter a number"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              disabled={disabled}
+            />
+            {selectedSetting.description && (
+              <p className="text-sm text-muted-foreground">{selectedSetting.description}</p>
+            )}
+          </div>
         )
       case 'Enum':
         return (
-          <Select
-            {...common}
-            data={selectedSetting.allowedValues.map((option) => ({ value: option, label: option }))}
-            value={value || null}
-            onChange={(val) => setValue(val ?? '')}
-            placeholder={selectedSetting.allowedValues.length ? 'Select a value' : 'No options'}
-          />
+          <div className="space-y-2">
+            <Label htmlFor="setting-value">Value</Label>
+            <Select
+              value={value || undefined}
+              onValueChange={(val) => setValue(val ?? '')}
+              disabled={disabled}
+            >
+              <SelectTrigger id="setting-value">
+                <SelectValue placeholder={selectedSetting.allowedValues.length ? 'Select a value' : 'No options'} />
+              </SelectTrigger>
+              <SelectContent>
+                {selectedSetting.allowedValues.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedSetting.description && (
+              <p className="text-sm text-muted-foreground">{selectedSetting.description}</p>
+            )}
+          </div>
         )
       case 'Text':
         return (
-          <Textarea
-            {...common}
-            minRows={4}
-            value={value}
-            onChange={(event) => setValue(event.currentTarget.value)}
-          />
+          <div className="space-y-2">
+            <Label htmlFor="setting-value">Value</Label>
+            <Textarea
+              id="setting-value"
+              rows={4}
+              value={value}
+              onChange={(event) => setValue(event.currentTarget.value)}
+              disabled={disabled}
+            />
+            {selectedSetting.description && (
+              <p className="text-sm text-muted-foreground">{selectedSetting.description}</p>
+            )}
+          </div>
         )
       case 'Secret':
         return (
-          <PasswordInput
-            {...common}
-            placeholder="Enter a new value"
-            value={value}
-            onChange={(event) => setValue(event.currentTarget.value)}
-            description="Leave blank to clear the stored value"
-          />
+          <div className="space-y-2">
+            <Label htmlFor="setting-value">Value</Label>
+            <Input
+              id="setting-value"
+              type="password"
+              placeholder="Enter a new value"
+              value={value}
+              onChange={(event) => setValue(event.currentTarget.value)}
+              disabled={disabled}
+            />
+            <p className="text-sm text-muted-foreground">Leave blank to clear the stored value</p>
+          </div>
         )
       default:
         return (
-          <TextInput
-            {...common}
-            value={value}
-            onChange={(event) => setValue(event.currentTarget.value)}
-          />
+          <div className="space-y-2">
+            <Label htmlFor="setting-value">Value</Label>
+            <Input
+              id="setting-value"
+              value={value}
+              onChange={(event) => setValue(event.currentTarget.value)}
+              disabled={disabled}
+            />
+            {selectedSetting.description && (
+              <p className="text-sm text-muted-foreground">{selectedSetting.description}</p>
+            )}
+          </div>
         )
     }
   }
@@ -160,129 +184,140 @@ export const SystemSettingsPage: React.FC = () => {
   return (
     <PageContainer>
       <Stack gap="lg">
-        <Group justify="space-between" align="flex-start">
+        <Group justify="between" align="start">
           <div>
-            <Title order={2}>System Settings</Title>
-            <Text c="dimmed" size="sm" mt="xs">
+            <h2 className="text-2xl font-bold">System Settings</h2>
+            <p className="text-sm text-muted-foreground mt-1">
               Inspect and update runtime configuration values without restarting the backend.
-            </Text>
+            </p>
           </div>
-          <Button variant="light" leftSection={<IconSettings size={16} />} onClick={() => refetch()} disabled={loading}>
+          <Button variant="secondary" onClick={() => refetch()} disabled={loading}>
+            <IconSettings className="mr-2 h-4 w-4" />
             Refresh
           </Button>
         </Group>
 
         {error && (
-          <Alert icon={<IconAlertCircle size={16} />} color="red" title="Failed to load settings">
-            {error.message}
+          <Alert variant="destructive">
+            <IconAlertCircle className="h-4 w-4" />
+            <AlertTitle>Failed to load settings</AlertTitle>
+            <AlertDescription>{error.message}</AlertDescription>
           </Alert>
         )}
 
-        <Card withBorder padding="lg" radius="md">
-          {loading ? (
-            <Stack gap="sm">
-              {Array.from({ length: 4 }).map((_, index) => (
-                <Skeleton key={index} height={48} radius="sm" />
-              ))}
-            </Stack>
-          ) : (
-            <Table highlightOnHover verticalSpacing="sm">
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>Setting</Table.Th>
-                  <Table.Th>Value</Table.Th>
-                  <Table.Th>Category</Table.Th>
-                  <Table.Th>Actions</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {settings.map((setting) => (
-                <Table.Tr key={setting.key}>
-                    <Table.Td>
-                      <Text fw={600}>{setting.label}</Text>
-                      <Text size="xs" c="dimmed">
-                        {setting.key}
-                      </Text>
-                      {setting.isSecret && (
-                        <Badge color="gray" size="xs" mt={4}>
-                          Secret
-                        </Badge>
-                      )}
-                    </Table.Td>
-                    <Table.Td>
-                      <Text>
-                        {setting.isSecret
-                          ? '••••••'
-                          : setting.value && setting.value.trim() !== ''
-                            ? setting.value
-                            : 'Not set'}
-                      </Text>
-                      <Text size="xs" c="dimmed">
-                        {formatValueType(setting.valueType)}
-                      </Text>
-                    </Table.Td>
-                    <Table.Td>
-                      <Badge color="blue" variant="light">
-                        {setting.category}
-                      </Badge>
-                    </Table.Td>
-                    <Table.Td>
-                      <Group gap="xs">
-                        <Button
-                          size="xs"
-                          variant="light"
-                          onClick={() => openEditor(setting)}
-                          disabled={setting.isReadOnly}
-                        >
-                          Edit
-                        </Button>
-                        {setting.isReadOnly && (
-                          <Badge color="gray" variant="outline" size="xs">
-                            Read-only
+        <Card className="border">
+          <CardContent className="pt-6">
+            {loading ? (
+              <Stack gap="sm">
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <Skeleton key={index} className="h-12 rounded-sm" />
+                ))}
+              </Stack>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Setting</TableHead>
+                    <TableHead>Value</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {settings.map((setting) => (
+                    <TableRow key={setting.key}>
+                      <TableCell>
+                        <div className="font-semibold">{setting.label}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {setting.key}
+                        </div>
+                        {setting.isSecret && (
+                          <Badge variant="secondary" className="mt-1">
+                            Secret
                           </Badge>
                         )}
-                      </Group>
-                    </Table.Td>
-                  </Table.Tr>
-                ))}
-                {settings.length === 0 && (
-                  <Table.Tr>
-                    <Table.Td colSpan={4}>
-                      <Text c="dimmed" style={{ textAlign: 'center' }}>
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          {setting.isSecret
+                            ? '••••••'
+                            : setting.value && setting.value.trim() !== ''
+                              ? setting.value
+                              : 'Not set'}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {formatValueType(setting.valueType)}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge>
+                          {setting.category}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Group gap="xs">
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => openEditor(setting)}
+                            disabled={setting.isReadOnly}
+                          >
+                            Edit
+                          </Button>
+                          {setting.isReadOnly && (
+                            <Badge variant="outline">
+                              Read-only
+                            </Badge>
+                          )}
+                        </Group>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {settings.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center text-muted-foreground">
                         No settings available.
-                      </Text>
-                    </Table.Td>
-                  </Table.Tr>
-                )}
-              </Table.Tbody>
-            </Table>
-          )}
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
         </Card>
       </Stack>
 
-      <Modal opened={Boolean(selectedSetting)} onClose={closeEditor} title={selectedSetting?.label} size="lg">
-        {selectedSetting && (
-          <Stack gap="md">
-            <Text size="sm" c="dimmed">
-              {selectedSetting.description || 'Update the current value for this setting.'}
-            </Text>
-            {renderValueEditor()}
-            {formError && (
-              <Alert icon={<IconAlertCircle size={16} />} color="red">
-                {formError}
-              </Alert>
-            )}
-            <Group justify="flex-end">
-              <Button variant="default" onClick={closeEditor}>
-                Cancel
-              </Button>
-              <Button onClick={handleSubmit} loading={saving}>
-                Save
-              </Button>
-            </Group>
-          </Stack>
-        )}
-      </Modal>
+      <Dialog open={Boolean(selectedSetting)} onOpenChange={(open) => !open && closeEditor()}>
+        <DialogContent className="sm:max-w-[600px]">
+          {selectedSetting && (
+            <>
+              <DialogHeader>
+                <DialogTitle>{selectedSetting.label}</DialogTitle>
+              </DialogHeader>
+              <Stack gap="md">
+                <p className="text-sm text-muted-foreground">
+                  {selectedSetting.description || 'Update the current value for this setting.'}
+                </p>
+                {renderValueEditor()}
+                {formError && (
+                  <Alert variant="destructive">
+                    <IconAlertCircle className="h-4 w-4" />
+                    <AlertDescription>{formError}</AlertDescription>
+                  </Alert>
+                )}
+              </Stack>
+              <DialogFooter>
+                <Button variant="outline" onClick={closeEditor}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSubmit} disabled={saving}>
+                  {saving ? 'Saving...' : 'Save'}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </PageContainer>
   )
 }
