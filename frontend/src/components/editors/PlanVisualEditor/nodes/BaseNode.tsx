@@ -8,11 +8,15 @@ import {
   type TouchEvent as ReactTouchEvent
 } from 'react'
 import { Handle, Position, NodeProps } from 'reactflow'
-import { Paper, Text, Group, ActionIcon, Tooltip, Badge, Box, TextInput } from '@mantine/core'
 import { IconSettings, IconTrash, IconCheck, IconX, IconArrowRight } from '@tabler/icons-react'
 import { PlanDagNodeType, NodeConfig, NodeMetadata } from '../../../../types/plan-dag'
 import { getRequiredInputCount, canHaveMultipleOutputs, isNodeConfigured } from '../../../../utils/planDagValidation'
 import { getNodeColor, getNodeIcon } from '../../../../utils/nodeStyles'
+import { Group } from '@/components/layout-primitives'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 interface BaseNodeProps extends NodeProps {
   nodeType: PlanDagNodeType
@@ -29,6 +33,38 @@ interface BaseNodeProps extends NodeProps {
   labelBadges?: ReactNode
   footerContent?: ReactNode
   editableLabel?: boolean
+}
+
+// Helper function to map Mantine badge colors to shadcn badge classes
+const getBadgeClasses = (color: string, variant: 'filled' | 'light' | 'outline') => {
+  const colorMap: Record<string, { filled: string; light: string; outline: string }> = {
+    orange: {
+      filled: 'bg-orange-600 text-white border-orange-600',
+      light: 'bg-orange-100 text-orange-800 border-orange-200',
+      outline: 'text-orange-600 border-orange-600',
+    },
+    red: {
+      filled: 'bg-red-600 text-white border-red-600',
+      light: 'bg-red-100 text-red-800 border-red-200',
+      outline: 'text-red-600 border-red-600',
+    },
+    blue: {
+      filled: 'bg-blue-600 text-white border-blue-600',
+      light: 'bg-blue-100 text-blue-800 border-blue-200',
+      outline: 'text-blue-600 border-blue-600',
+    },
+    green: {
+      filled: 'bg-green-600 text-white border-green-600',
+      light: 'bg-green-100 text-green-800 border-green-200',
+      outline: 'text-green-600 border-green-600',
+    },
+    gray: {
+      filled: 'bg-gray-600 text-white border-gray-600',
+      light: 'bg-gray-100 text-gray-800 border-gray-200',
+      outline: 'text-gray-600 border-gray-600',
+    },
+  }
+  return colorMap[color]?.[variant] || colorMap.gray[variant]
 }
 
 export const BaseNode = memo(({
@@ -182,64 +218,73 @@ export const BaseNode = memo(({
 
   // Default tool buttons if not provided
   const defaultToolButtons = !readonly && (
-    <>
+    <TooltipProvider>
       {editableLabel && (
-        <Tooltip label="Edit label">
-          <ActionIcon
-            size="sm"
-            variant="subtle"
-            color="blue"
-            data-action-icon="edit-label"
-            onMouseDown={(e) => {
-              e.stopPropagation()
-              e.preventDefault()
-              setIsEditingLabel(true)
-            }}
-          >
-            <IconSettings size="0.8rem" />
-          </ActionIcon>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7 text-blue-600 hover:text-blue-700 hover:bg-blue-100"
+              data-action-icon="edit-label"
+              onMouseDown={(e) => {
+                e.stopPropagation()
+                e.preventDefault()
+                setIsEditingLabel(true)
+              }}
+            >
+              <IconSettings size={13} />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Edit label</TooltipContent>
         </Tooltip>
       )}
       {!editableLabel && (
-        <Tooltip label="Edit node">
-          <ActionIcon
-            size="sm"
-            variant="subtle"
-            color="gray"
-            data-action-icon="edit"
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7 text-gray-600 hover:text-gray-700 hover:bg-gray-100"
+              data-action-icon="edit"
+              onMouseDown={(e) => {
+                e.stopPropagation()
+                e.preventDefault()
+                onEdit?.()
+              }}
+            >
+              <IconSettings size={13} />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Edit node</TooltipContent>
+        </Tooltip>
+      )}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7 text-red-600 hover:text-red-700 hover:bg-red-100"
+            data-action-icon="delete"
             onMouseDown={(e) => {
               e.stopPropagation()
               e.preventDefault()
-              onEdit?.()
+              onDelete?.()
             }}
           >
-            <IconSettings size="0.8rem" />
-          </ActionIcon>
-        </Tooltip>
-      )}
-      <Tooltip label="Delete node">
-        <ActionIcon
-          size="sm"
-          variant="subtle"
-          color="red"
-          data-action-icon="delete"
-          onMouseDown={(e) => {
-            e.stopPropagation()
-            e.preventDefault()
-            onDelete?.()
-          }}
-        >
-          <IconTrash size="0.8rem" />
-        </ActionIcon>
+            <IconTrash size={13} />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Delete node</TooltipContent>
       </Tooltip>
-    </>
+    </TooltipProvider>
   )
 
   // Default label badges if not provided
   const defaultLabelBadges = (
     <>
       {!isConfigured && (
-        <Badge variant="outline" size="xs" color="orange">
+        <Badge variant="outline" className={`text-xs ${getBadgeClasses('orange', 'outline')}`}>
           Not Configured
         </Badge>
       )}
@@ -281,86 +326,88 @@ export const BaseNode = memo(({
       )}
 
       {/* Node Content */}
-      <Paper
-        shadow={selected ? "md" : "sm"}
-        p={0}
+      <div
+        className={`${selected ? 'shadow-md' : 'shadow-sm'} bg-white rounded-lg flex flex-col relative`}
         style={{
           border: `2px solid ${color}`,
-          borderRadius: 8,
           minWidth: 200,
           maxWidth: 280,
-          background: '#fff',
           cursor: 'default',
           pointerEvents: 'all',
-          display: 'flex',
-          flexDirection: 'column',
-          position: 'relative',
         }}
       >
         {requiredInputs > 0 && !readonly && (
-          <Tooltip label="Edge drop target" position="right">
-            <div
-              style={{
-                position: 'absolute',
-                top: '50%',
-                left: -14,
-                width: 32,
-                height: 32,
-                transform: 'translateY(-50%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: '50%',
-                background: edgeDropTargetHovered ? color : '#f8f9fa',
-                color: edgeDropTargetHovered ? '#fff' : color,
-                border: `1px solid ${color}`,
-                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-              }}
-              onMouseEnter={() => setEdgeDropTargetHovered(true)}
-              onMouseLeave={() => setEdgeDropTargetHovered(false)}
-              className="nodrag"
-            >
-              <IconArrowRight size={16} style={{ pointerEvents: 'none' }} />
-            </div>
-          </Tooltip>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: -14,
+                    width: 32,
+                    height: 32,
+                    transform: 'translateY(-50%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '50%',
+                    background: edgeDropTargetHovered ? color : '#f8f9fa',
+                    color: edgeDropTargetHovered ? '#fff' : color,
+                    border: `1px solid ${color}`,
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                  }}
+                  onMouseEnter={() => setEdgeDropTargetHovered(true)}
+                  onMouseLeave={() => setEdgeDropTargetHovered(false)}
+                  className="nodrag"
+                >
+                  <IconArrowRight size={16} style={{ pointerEvents: 'none' }} />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="right">Edge drop target</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         )}
         {canHaveOutputs && !readonly && (
-          <Tooltip label="Create edge" position="left">
-            <div
-              style={{
-                position: 'absolute',
-                top: '50%',
-                right: -14,
-                width: 32,
-                height: 32,
-                transform: 'translateY(-50%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                borderRadius: '50%',
-                background: edgeTriggerHovered ? color : '#f8f9fa',
-                color: edgeTriggerHovered ? '#fff' : color,
-                border: `1px solid ${color}`,
-                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-              }}
-              onMouseEnter={() => setEdgeTriggerHovered(true)}
-              onMouseLeave={() => setEdgeTriggerHovered(false)}
-              onMouseDown={(event) => handleStartConnection(event)}
-              onTouchStart={(event) => handleStartConnection(event)}
-              className="nodrag"
-            >
-              <IconArrowRight size={16} style={{ pointerEvents: 'none' }} />
-            </div>
-          </Tooltip>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '50%',
+                    right: -14,
+                    width: 32,
+                    height: 32,
+                    transform: 'translateY(-50%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    borderRadius: '50%',
+                    background: edgeTriggerHovered ? color : '#f8f9fa',
+                    color: edgeTriggerHovered ? '#fff' : color,
+                    border: `1px solid ${color}`,
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                  }}
+                  onMouseEnter={() => setEdgeTriggerHovered(true)}
+                  onMouseLeave={() => setEdgeTriggerHovered(false)}
+                  onMouseDown={(event) => handleStartConnection(event)}
+                  onTouchStart={(event) => handleStartConnection(event)}
+                  className="nodrag"
+                >
+                  <IconArrowRight size={16} style={{ pointerEvents: 'none' }} />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="left">Create edge</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         )}
         {/* Top Row: Icon and Label */}
         <Group
           gap="sm"
-          p="md"
-          pb="xs"
-          wrap="nowrap"
-          className="node-header"
+          wrap={false}
+          className="node-header p-4 pb-2"
           style={{ cursor: isEditingLabel ? 'default' : 'grab', flex: '0 0 auto' }}
         >
           <div style={{
@@ -372,9 +419,9 @@ export const BaseNode = memo(({
             {getNodeIcon(nodeType, '1.4rem')}
           </div>
           {isEditingLabel ? (
-            <Group gap="xs" style={{ flex: 1, minWidth: 0 }} wrap="nowrap">
-              <TextInput
-                size="sm"
+            <Group gap="xs" style={{ flex: 1, minWidth: 0 }} wrap={false}>
+              <Input
+                className="h-8 text-sm flex-1"
                 value={labelValue}
                 onChange={(e) => setLabelValue(e.currentTarget.value)}
                 onKeyDown={(e) => {
@@ -384,75 +431,68 @@ export const BaseNode = memo(({
                     handleLabelCancel()
                   }
                 }}
-                style={{ flex: 1, minWidth: 0 }}
                 autoFocus
                 onMouseDown={(e) => e.stopPropagation()}
                 onClick={(e) => e.stopPropagation()}
               />
-              <ActionIcon
-                size="sm"
-                color="green"
-                variant="filled"
+              <Button
+                size="icon"
+                className="h-7 w-7 bg-green-600 hover:bg-green-700"
                 onMouseDown={(e) => {
                   e.stopPropagation()
                   e.preventDefault()
                   handleLabelSave()
                 }}
               >
-                <IconCheck size="0.8rem" />
-              </ActionIcon>
-              <ActionIcon
-                size="sm"
-                color="red"
-                variant="filled"
+                <IconCheck size={13} />
+              </Button>
+              <Button
+                size="icon"
+                className="h-7 w-7 bg-red-600 hover:bg-red-700"
                 onMouseDown={(e) => {
                   e.stopPropagation()
                   e.preventDefault()
                   handleLabelCancel()
                 }}
               >
-                <IconX size="0.8rem" />
-              </ActionIcon>
+                <IconX size={13} />
+              </Button>
             </Group>
           ) : (
-            <Text size="sm" fw={600} lineClamp={2} style={{ wordBreak: 'break-word', flex: 1, minWidth: 0 }}>
+            <p className="text-sm font-semibold line-clamp-2" style={{ wordBreak: 'break-word', flex: 1, minWidth: 0 }}>
               {metadata.label}
-            </Text>
+            </p>
           )}
         </Group>
 
         {/* Middle: Node-specific content */}
         {children && (
-          <Box px="md" pb="xs" style={{ flex: '1 1 auto' }}>
+          <div className="px-4 pb-2" style={{ flex: '1 1 auto' }}>
             {children}
-          </Box>
+          </div>
         )}
 
         {/* Bottom Section 1: Labels (narrow horizontal section) */}
         {(labelBadges !== undefined ? labelBadges !== null : !isConfigured) && (
-          <Box
-            px="md"
-            py="xs"
+          <div
+            className="px-4 py-2 border-t border-gray-200"
             style={{
-              borderTop: `1px solid #e9ecef`,
               flex: '0 0 auto',
             }}
           >
-            <Group gap="xs" wrap="wrap">
+            <Group gap="xs" wrap={true}>
               {labelBadges ?? defaultLabelBadges}
             </Group>
-          </Box>
+          </div>
         )}
 
         {/* Bottom Section 2: Tool buttons and footer content (narrow horizontal section) */}
         {(!readonly || footerContent) && (
           <Group
             gap="sm"
-            px="md"
-            py="xs"
-            justify="space-between"
+            justify="between"
+            className="border-t border-gray-200 px-4 py-2"
             style={{
-              borderTop: `1px solid #e9ecef`,
               flex: '0 0 auto',
               pointerEvents: 'auto',
               minHeight: 36,
@@ -461,7 +501,7 @@ export const BaseNode = memo(({
             {footerContent && <div style={{ flex: 1, minWidth: 0 }}>{footerContent}</div>}
             {!readonly && (
               <>
-                <Group gap={4} wrap="nowrap">
+                <Group gap="xs" wrap={false}>
                   {toolButtons || defaultToolButtons}
                 </Group>
                 <div style={{ flex: 1 }} />
@@ -469,7 +509,7 @@ export const BaseNode = memo(({
             )}
           </Group>
         )}
-      </Paper>
+      </div>
 
       {/* Output Handles - Hidden for floating edges but functional */}
       {canHaveOutputs && (
