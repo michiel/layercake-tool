@@ -1,7 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Stack, Select, Switch, Alert, Text } from '@mantine/core';
 import { IconInfoCircle } from '@tabler/icons-react';
 import { CopyNodeConfig } from '../../../../types/plan-dag';
+import { Stack } from '@/components/layout-primitives';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 
 interface CopyNodeConfigFormProps {
   config: CopyNodeConfig;
@@ -33,28 +37,39 @@ export const CopyNodeConfigForm: React.FC<CopyNodeConfigFormProps> = ({
 
   return (
     <Stack gap="md">
-      <Alert icon={<IconInfoCircle size="1rem" />} color="blue" title="Copy Configuration">
-        <Text size="sm">
+      <Alert>
+        <IconInfoCircle className="h-4 w-4" />
+        <AlertTitle>Copy Configuration</AlertTitle>
+        <AlertDescription>
           Configure copy behavior. Source and output are determined by edge connections in the DAG.
-        </Text>
+        </AlertDescription>
       </Alert>
 
-      <Select
-        label="Copy Type"
-        data={[
-          { value: 'DeepCopy', label: 'Deep Copy' },
-          { value: 'ShallowCopy', label: 'Shallow Copy' },
-          { value: 'Reference', label: 'Reference' },
-        ]}
-        value={localConfig.copyType}
-        onChange={(value) => setLocalConfig(prev => ({ ...prev, copyType: value as any }))}
-      />
+      <div className="space-y-2">
+        <Label htmlFor="copy-type">Copy Type</Label>
+        <Select
+          value={localConfig.copyType}
+          onValueChange={(value) => setLocalConfig(prev => ({ ...prev, copyType: value as any }))}
+        >
+          <SelectTrigger id="copy-type">
+            <SelectValue placeholder="Select copy type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="DeepCopy">Deep Copy</SelectItem>
+            <SelectItem value="ShallowCopy">Shallow Copy</SelectItem>
+            <SelectItem value="Reference">Reference</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
-      <Switch
-        label="Preserve Metadata"
-        checked={localConfig.preserveMetadata}
-        onChange={(event) => setLocalConfig(prev => ({ ...prev, preserveMetadata: event.currentTarget.checked }))}
-      />
+      <div className="flex items-center space-x-2">
+        <Switch
+          id="preserve-metadata"
+          checked={localConfig.preserveMetadata}
+          onCheckedChange={(checked) => setLocalConfig(prev => ({ ...prev, preserveMetadata: checked }))}
+        />
+        <Label htmlFor="preserve-metadata">Preserve Metadata</Label>
+      </div>
     </Stack>
   );
 };
