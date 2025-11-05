@@ -1,7 +1,11 @@
 import { memo, useState, useEffect } from 'react'
 import { NodeProps } from 'reactflow'
 import { useQuery } from '@apollo/client/react'
-import { Text, Group, ActionIcon, Tooltip, Badge, Loader } from '@mantine/core'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Spinner } from '@/components/ui/spinner'
+import { Group } from '@/components/layout-primitives'
 import { IconAlertCircle, IconTable } from '@tabler/icons-react'
 import { PlanDagNodeType, DataSourceNodeConfig } from '../../../../types/plan-dag'
 import { isNodeConfigured } from '../../../../utils/planDagValidation'
@@ -45,23 +49,64 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
     }
   }, [dataSourceData])
 
+  // Helper to get badge classes based on Mantine color
+  const getBadgeClasses = (color: string, variant: 'filled' | 'light' | 'outline') => {
+    const colorMap: Record<string, { filled: string; light: string; outline: string }> = {
+      orange: {
+        filled: 'bg-orange-600 text-white border-orange-600',
+        light: 'bg-orange-100 text-orange-800 border-orange-200',
+        outline: 'text-orange-600 border-orange-600',
+      },
+      blue: {
+        filled: 'bg-blue-600 text-white border-blue-600',
+        light: 'bg-blue-100 text-blue-800 border-blue-200',
+        outline: 'text-blue-600 border-blue-600',
+      },
+      green: {
+        filled: 'bg-green-600 text-white border-green-600',
+        light: 'bg-green-100 text-green-800 border-green-200',
+        outline: 'text-green-600 border-green-600',
+      },
+      yellow: {
+        filled: 'bg-yellow-600 text-white border-yellow-600',
+        light: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+        outline: 'text-yellow-600 border-yellow-600',
+      },
+      red: {
+        filled: 'bg-red-600 text-white border-red-600',
+        light: 'bg-red-100 text-red-800 border-red-200',
+        outline: 'text-red-600 border-red-600',
+      },
+      gray: {
+        filled: 'bg-gray-600 text-white border-gray-600',
+        light: 'bg-gray-100 text-gray-800 border-gray-200',
+        outline: 'text-gray-600 border-gray-600',
+      },
+    }
+    return colorMap[color]?.[variant] || colorMap.gray[variant]
+  }
+
   // Custom label badges for data source node
   const hasBadges = !isConfigured || (datasourceExecution && !isExecutionComplete(datasourceExecution.executionState))
   const labelBadges = hasBadges ? (
     <>
       {!isConfigured && (
-        <Badge variant="outline" size="xs" color="orange">
+        <Badge variant="outline" className={`text-xs ${getBadgeClasses('orange', 'outline')}`}>
           Not Configured
         </Badge>
       )}
       {datasourceExecution && !isExecutionComplete(datasourceExecution.executionState) && (
         <Badge
-          variant={isExecutionComplete(datasourceExecution.executionState) ? 'light' : 'filled'}
-          color={getExecutionStateColor(datasourceExecution.executionState)}
-          size="xs"
-          leftSection={isExecutionInProgress(datasourceExecution.executionState) ? <Loader size={10} /> : undefined}
+          variant={isExecutionComplete(datasourceExecution.executionState) ? 'secondary' : 'default'}
+          className={`text-xs ${getBadgeClasses(
+            getExecutionStateColor(datasourceExecution.executionState),
+            isExecutionComplete(datasourceExecution.executionState) ? 'light' : 'filled'
+          )}`}
         >
-          {getExecutionStateLabel(datasourceExecution.executionState)}
+          <span className="flex items-center gap-1">
+            {isExecutionInProgress(datasourceExecution.executionState) && <Spinner size="xs" />}
+            {getExecutionStateLabel(datasourceExecution.executionState)}
+          </span>
         </Badge>
       )}
     </>
@@ -84,40 +129,44 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
         {/* View data button - only show if configured and active */}
         {!readonly && isConfigured && (datasourceExecution?.status === 'active' || dataSourceInfo?.status === 'active') && (
           <Group justify="center">
-            <Tooltip label="View datasource data (nodes, edges, layers)">
-              <ActionIcon
-                size="lg"
-                variant="light"
-                color="teal"
-                radius="xl"
-                data-action-icon="data"
-                onMouseDown={(e) => {
-                  e.stopPropagation()
-                  e.preventDefault()
-                  setShowDataDialog(true)
-                }}
-              >
-                <IconTable size="0.75rem" />
-              </ActionIcon>
-            </Tooltip>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-9 w-9 rounded-full text-teal-600"
+                    data-action-icon="data"
+                    onMouseDown={(e: React.MouseEvent) => {
+                      e.stopPropagation()
+                      e.preventDefault()
+                      setShowDataDialog(true)
+                    }}
+                  >
+                    <IconTable size={12} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>View datasource data (nodes, edges, layers)</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </Group>
         )}
 
         {/* Show error message if there's an error */}
         {datasourceExecution?.status === 'error' && datasourceExecution.errorMessage && (
           <Group gap="xs">
-            <IconAlertCircle size={12} color="red" />
-            <Text size="xs" c="red" lineClamp={1} title={datasourceExecution.errorMessage}>
+            <IconAlertCircle size={12} className="text-red-600" />
+            <p className="text-xs text-red-600 line-clamp-1" title={datasourceExecution.errorMessage}>
               Error processing
-            </Text>
+            </p>
           </Group>
         )}
         {dataSourceInfo?.status === 'error' && dataSourceInfo.errorMessage && (
           <Group gap="xs">
-            <IconAlertCircle size={12} color="red" />
-            <Text size="xs" c="red" lineClamp={1} title={dataSourceInfo.errorMessage}>
+            <IconAlertCircle size={12} className="text-red-600" />
+            <p className="text-xs text-red-600 line-clamp-1" title={dataSourceInfo.errorMessage}>
               Error processing
-            </Text>
+            </p>
           </Group>
         )}
       </BaseNode>
