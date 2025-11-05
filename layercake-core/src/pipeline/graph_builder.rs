@@ -110,10 +110,21 @@ impl GraphBuilder {
         let source_hash = self.compute_data_source_hash(&data_sources_list)?;
 
         // Check if recomputation is needed
-        if let Some(existing_hash) = &graph.source_hash {
-            if existing_hash == &source_hash {
-                // No changes, return existing graph
-                return Ok(graph);
+        if let Some(existing_hash) = graph.source_hash.clone() {
+            if existing_hash == source_hash {
+                // Upstream content unchanged; restore completed state if needed
+                let mut active: graphs::ActiveModel = graph.clone().into();
+                active = active.set_completed(existing_hash, graph.node_count, graph.edge_count);
+                let updated = active.update(&self.db).await?;
+
+                // Publish execution status change so subscribers refresh state
+                #[cfg(feature = "graphql")]
+                crate::graphql::execution_events::publish_graph_status(
+                    &self.db, project_id, &node_id, &updated,
+                )
+                .await;
+
+                return Ok(updated);
             }
         }
 

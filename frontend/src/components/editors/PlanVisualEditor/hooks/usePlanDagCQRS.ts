@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react'
 import { useNodesState, useEdgesState, Node, Edge } from 'reactflow'
 import { useApolloClient } from '@apollo/client/react'
-import { PlanDag } from '../../../../types/plan-dag'
+import { PlanDag, PlanDagNodeType } from '../../../../types/plan-dag'
 import { PlanDagCQRSService } from '../../../../services/PlanDagCQRSService'
 import { ReactFlowAdapter } from '../../../../adapters/ReactFlowAdapter'
 import { useUnifiedUpdateManager } from './useUnifiedUpdateManager'
@@ -174,19 +174,43 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
     const converted = ReactFlowAdapter.planDagToReactFlow(stablePlanDag)
 
     // Add node callbacks and edge list to converted nodes
-    const nodesWithCallbacks = converted.nodes.map(node => ({
-      ...node,
-      data: {
-        ...node.data,
-        projectId, // Add projectId for preview queries
-        onEdit: () => stableOnNodeEdit(node.id),
-        onDelete: () => stableOnNodeDelete(node.id),
-        readonly,
-        edges: converted.edges, // Add edges for node validation/display
-        hasValidConfig: node.data.originalNode?.config &&
-          Object.keys(node.data.originalNode.config).length > 0
+    const nodesWithCallbacks = converted.nodes.map(node => {
+      const nodeType = node.data.nodeType
+      const parsedConfig =
+        node.data.config && typeof node.data.config === 'object'
+          ? node.data.config
+          : {}
+
+      let hasValidConfig = false
+      switch (nodeType) {
+        case PlanDagNodeType.DATA_SOURCE: {
+          const dataSourceId = (parsedConfig as any)?.dataSourceId
+          const numericId =
+            typeof dataSourceId === 'number' ? dataSourceId : Number(dataSourceId)
+          hasValidConfig = Number.isFinite(numericId) && numericId > 0
+          break
+        }
+        case PlanDagNodeType.GRAPH:
+          hasValidConfig = true
+          break
+        default:
+          hasValidConfig = Object.keys(parsedConfig as Record<string, unknown>).length > 0
+          break
       }
-    }))
+
+      return {
+        ...node,
+        data: {
+          ...node.data,
+          projectId, // Add projectId for preview queries
+          onEdit: () => stableOnNodeEdit(node.id),
+          onDelete: () => stableOnNodeDelete(node.id),
+          readonly,
+          edges: converted.edges, // Add edges for node validation/display
+          hasValidConfig
+        }
+      }
+    })
 
     return { nodes: nodesWithCallbacks, edges: converted.edges }
   }, [stablePlanDag, stableOnNodeEdit, stableOnNodeDelete, readonly, projectId])

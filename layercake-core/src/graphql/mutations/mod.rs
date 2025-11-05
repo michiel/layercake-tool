@@ -83,7 +83,35 @@ fn generate_node_id_from_ids(
 }
 
 fn generate_edge_id(source: &str, target: &str) -> String {
-    format!("edge-{}-{}-{}", source, target, Uuid::new_v4().simple())
+    const MAX_ID_LEN: usize = 50;
+    const RANDOM_LEN: usize = 12;
+    let random_segment = {
+        let uuid = Uuid::new_v4().simple().to_string();
+        uuid.chars().take(RANDOM_LEN).collect::<String>()
+    };
+
+    let mut source_segment = source.chars().take(16).collect::<String>();
+    let mut target_segment = target.chars().take(16).collect::<String>();
+
+    let mut candidate = format!(
+        "edge_{}_{}_{}",
+        source_segment, target_segment, random_segment
+    );
+
+    if candidate.len() > MAX_ID_LEN {
+        source_segment = source.chars().take(10).collect();
+        target_segment = target.chars().take(10).collect();
+        candidate = format!(
+            "edge_{}_{}_{}",
+            source_segment, target_segment, random_segment
+        );
+    }
+
+    if candidate.len() > MAX_ID_LEN {
+        format!("edge_{}", random_segment)
+    } else {
+        candidate
+    }
 }
 
 pub struct Mutation;

@@ -39,6 +39,18 @@ const CREATE_PROJECT = gql`
   }
 `
 
+const GET_PROJECTS = gql`
+  query GetProjects {
+    projects {
+      id
+      name
+      description
+      createdAt
+      updatedAt
+    }
+  }
+`
+
 // Zod schema for form validation
 const createProjectSchema = z.object({
   name: z
@@ -71,7 +83,10 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
       createdAt: string
       updatedAt: string
     }
-  }>(CREATE_PROJECT)
+  }>(CREATE_PROJECT, {
+    refetchQueries: [{ query: GET_PROJECTS }],
+    awaitRefetchQueries: true
+  })
 
   const [initializePlanDag] = useMutation<{
     updatePlanDag: {
