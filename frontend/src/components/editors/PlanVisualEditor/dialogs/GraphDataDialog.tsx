@@ -1,5 +1,13 @@
 import React from 'react';
-import { Modal, Stack, Alert, Loader, Text } from '@mantine/core';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Spinner } from '@/components/ui/spinner';
+import { Stack } from '@/components/layout-primitives';
 import { IconAlertCircle } from '@tabler/icons-react';
 import { useQuery, useMutation } from '@apollo/client/react';
 import {
@@ -279,57 +287,51 @@ export const GraphDataDialog: React.FC<GraphDataDialogProps> = ({
   };
 
   return (
-    <Modal
-      opened={opened}
-      onClose={onClose}
-      title={title}
-      size="90%"
-      styles={{
-        body: { padding: 0 },
-        content: { maxHeight: '90vh' }
-      }}
-    >
-      <Stack p="md" gap="md">
-        {loading && (
-          <Stack align="center" py="xl">
-            <Loader />
-            <Text c="dimmed">Loading graph data...</Text>
-          </Stack>
-        )}
+    <Dialog open={opened} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-[90vw] max-h-[90vh] p-0 flex flex-col">
+        <DialogHeader className="px-6 py-4">
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+        <div className="flex-1 overflow-hidden px-6 pb-4">
+          <Stack gap="md">
+            {loading && (
+              <Stack align="center" className="py-12">
+                <Spinner size="lg" />
+                <p className="text-sm text-muted-foreground">Loading graph data...</p>
+              </Stack>
+            )}
 
-        {error && (
-          <Alert
-            icon={<IconAlertCircle size={16} />}
-            title="Error Loading Graph Data"
-            color="red"
-          >
-            {error.message}
-          </Alert>
-        )}
-
-        {data?.graph && (() => {
-          const graphData = getGraphData();
-          if (!graphData) {
-            return (
-              <Alert
-                icon={<IconAlertCircle size={16} />}
-                title="Invalid Graph Data"
-                color="red"
-              >
-                Failed to load graph data
+            {error && (
+              <Alert variant="destructive">
+                <IconAlertCircle className="h-4 w-4" />
+                <AlertTitle>Error Loading Graph Data</AlertTitle>
+                <AlertDescription>{error.message}</AlertDescription>
               </Alert>
-            );
-          }
+            )}
 
-          return (
-            <GraphSpreadsheetEditor
-              graphData={graphData}
-              onSave={handleSave}
-              readOnly={false}
-            />
-          );
-        })()}
-      </Stack>
-    </Modal>
+            {data?.graph && (() => {
+              const graphData = getGraphData();
+              if (!graphData) {
+                return (
+                  <Alert variant="destructive">
+                    <IconAlertCircle className="h-4 w-4" />
+                    <AlertTitle>Invalid Graph Data</AlertTitle>
+                    <AlertDescription>Failed to load graph data</AlertDescription>
+                  </Alert>
+                );
+              }
+
+              return (
+                <GraphSpreadsheetEditor
+                  graphData={graphData}
+                  onSave={handleSave}
+                  readOnly={false}
+                />
+              );
+            })()}
+          </Stack>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 };
