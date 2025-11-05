@@ -1,7 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Stack, Switch, Alert, Text, TextInput } from '@mantine/core';
 import { IconInfoCircle } from '@tabler/icons-react';
 import { GraphNodeConfig, NodeMetadata } from '../../../../types/plan-dag';
+import { Stack } from '@/components/layout-primitives';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 
 interface GraphNodeConfigFormProps {
   config: GraphNodeConfig;
@@ -50,25 +54,34 @@ export const GraphNodeConfigForm: React.FC<GraphNodeConfigFormProps> = ({
 
   return (
     <Stack gap="md">
-      <TextInput
-        label="Node Name"
-        placeholder="Enter a name for this graph node"
-        required
-        value={nodeName}
-        onChange={handleNameChange}
-      />
+      <div className="space-y-2">
+        <Label htmlFor="node-name">
+          Node Name <span className="text-red-600">*</span>
+        </Label>
+        <Input
+          id="node-name"
+          placeholder="Enter a name for this graph node"
+          value={nodeName}
+          onChange={handleNameChange}
+        />
+      </div>
 
-      <Alert icon={<IconInfoCircle size="1rem" />} color="blue" title="Graph Configuration">
-        <Text size="sm">
+      <Alert>
+        <IconInfoCircle className="h-4 w-4" />
+        <AlertTitle>Graph Configuration</AlertTitle>
+        <AlertDescription>
           Configure graph node behavior. Graph source is determined by edge connections in the DAG.
-        </Text>
+        </AlertDescription>
       </Alert>
 
-      <Switch
-        label="Is Reference"
-        checked={localConfig.isReference}
-        onChange={(event) => setLocalConfig(prev => ({ ...prev, isReference: event.currentTarget.checked }))}
-      />
+      <div className="flex items-center space-x-2">
+        <Switch
+          id="is-reference"
+          checked={localConfig.isReference}
+          onCheckedChange={(checked) => setLocalConfig(prev => ({ ...prev, isReference: checked }))}
+        />
+        <Label htmlFor="is-reference">Is Reference</Label>
+      </div>
     </Stack>
   );
 };
