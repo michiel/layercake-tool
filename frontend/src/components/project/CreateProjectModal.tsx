@@ -17,6 +17,18 @@ const CREATE_PROJECT = gql`
   }
 `
 
+const GET_PROJECTS = gql`
+  query GetProjects {
+    projects {
+      id
+      name
+      description
+      createdAt
+      updatedAt
+    }
+  }
+`
+
 interface CreateProjectModalProps {
   opened: boolean
   onClose: () => void
@@ -36,7 +48,10 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
       createdAt: string
       updatedAt: string
     }
-  }>(CREATE_PROJECT)
+  }>(CREATE_PROJECT, {
+    refetchQueries: [{ query: GET_PROJECTS }],
+    awaitRefetchQueries: true
+  })
 
   const [initializePlanDag] = useMutation<{
     updatePlanDag: {
