@@ -1,6 +1,10 @@
 import { memo, useState } from 'react'
 import { NodeProps } from 'reactflow'
-import { Text, Group, ActionIcon, Tooltip, Badge, Loader } from '@mantine/core'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Spinner } from '@/components/ui/spinner'
+import { Group } from '@/components/layout-primitives'
 import { IconSettings, IconTrash, IconPlayerPlayFilled, IconChartDots, IconTable, IconExternalLink } from '@tabler/icons-react'
 import { useMutation } from '@apollo/client/react'
 import { PlanDagNodeType, GraphNodeConfig } from '../../../../types/plan-dag'
@@ -114,6 +118,43 @@ export const GraphNode = memo((props: GraphNodeProps) => {
     })
   }
 
+  // Helper to get badge classes based on Mantine color
+  const getBadgeClasses = (color: string, variant: 'filled' | 'light' | 'outline') => {
+    const colorMap: Record<string, { filled: string; light: string; outline: string }> = {
+      orange: {
+        filled: 'bg-orange-600 text-white border-orange-600',
+        light: 'bg-orange-100 text-orange-800 border-orange-200',
+        outline: 'text-orange-600 border-orange-600',
+      },
+      blue: {
+        filled: 'bg-blue-600 text-white border-blue-600',
+        light: 'bg-blue-100 text-blue-800 border-blue-200',
+        outline: 'text-blue-600 border-blue-600',
+      },
+      green: {
+        filled: 'bg-green-600 text-white border-green-600',
+        light: 'bg-green-100 text-green-800 border-green-200',
+        outline: 'text-green-600 border-green-600',
+      },
+      yellow: {
+        filled: 'bg-yellow-600 text-white border-yellow-600',
+        light: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+        outline: 'text-yellow-600 border-yellow-600',
+      },
+      red: {
+        filled: 'bg-red-600 text-white border-red-600',
+        light: 'bg-red-100 text-red-800 border-red-200',
+        outline: 'text-red-600 border-red-600',
+      },
+      gray: {
+        filled: 'bg-gray-600 text-white border-gray-600',
+        light: 'bg-gray-100 text-gray-800 border-gray-200',
+        outline: 'text-gray-600 border-gray-600',
+      },
+    }
+    return colorMap[color]?.[variant] || colorMap.gray[variant]
+  }
+
   // Transform pipeline graph preview to force-graph format
   const getGraphPreviewData = (): GraphData | null => {
     if (!graphPreview) return null
@@ -153,57 +194,66 @@ export const GraphNode = memo((props: GraphNodeProps) => {
 
   // Custom tool buttons for graph node
   const toolButtons = (
-    <>
+    <TooltipProvider>
       {/* Execute button - only show if configured */}
       {isConfigured && (
-        <Tooltip label="Execute graph (build from upstream data sources)">
-          <ActionIcon
-            size="sm"
-            variant="filled"
-            color="green"
-            data-action-icon="execute"
-            loading={executing}
-            onMouseDown={(e) => {
-              e.stopPropagation()
-              e.preventDefault()
-              handleExecute()
-            }}
-          >
-            <IconPlayerPlayFilled size="0.8rem" />
-          </ActionIcon>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="sm"
+              variant="default"
+              className="h-7 w-7 p-0 bg-green-600 hover:bg-green-700"
+              data-action-icon="execute"
+              disabled={executing}
+              onMouseDown={(e: React.MouseEvent) => {
+                e.stopPropagation()
+                e.preventDefault()
+                handleExecute()
+              }}
+            >
+              <IconPlayerPlayFilled size={13} />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Execute graph (build from upstream data sources)</TooltipContent>
         </Tooltip>
       )}
-      <Tooltip label="Edit graph node">
-        <ActionIcon
-          size="sm"
-          variant="subtle"
-          color="gray"
-          data-action-icon="edit"
-          onMouseDown={(e) => {
-            e.stopPropagation()
-            e.preventDefault()
-            onEdit?.(props.id)
-          }}
-        >
-          <IconSettings size="0.8rem" />
-        </ActionIcon>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 w-7 p-0"
+            data-action-icon="edit"
+            onMouseDown={(e: React.MouseEvent) => {
+              e.stopPropagation()
+              e.preventDefault()
+              onEdit?.(props.id)
+            }}
+          >
+            <IconSettings size={13} />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Edit graph node</TooltipContent>
       </Tooltip>
-      <Tooltip label="Delete node">
-        <ActionIcon
-          size="sm"
-          variant="subtle"
-          color="red"
-          data-action-icon="delete"
-          onMouseDown={(e) => {
-            e.stopPropagation()
-            e.preventDefault()
-            onDelete?.(props.id)
-          }}
-        >
-          <IconTrash size="0.8rem" />
-        </ActionIcon>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+            data-action-icon="delete"
+            onMouseDown={(e: React.MouseEvent) => {
+              e.stopPropagation()
+              e.preventDefault()
+              onDelete?.(props.id)
+            }}
+          >
+            <IconTrash size={13} />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Delete node</TooltipContent>
       </Tooltip>
-    </>
+    </TooltipProvider>
   )
 
   // Custom label badges for graph node
@@ -211,23 +261,27 @@ export const GraphNode = memo((props: GraphNodeProps) => {
   const labelBadges = hasBadges ? (
     <>
       {config.isReference && (
-        <Badge variant="outline" size="xs" color="blue">
+        <Badge variant="outline" className={`text-xs ${getBadgeClasses('blue', 'outline')}`}>
           Reference
         </Badge>
       )}
       {!isConfigured && (
-        <Badge variant="outline" size="xs" color="orange">
+        <Badge variant="outline" className={`text-xs ${getBadgeClasses('orange', 'outline')}`}>
           Not Configured
         </Badge>
       )}
       {(graphExecution || executionPreview) && !isExecutionComplete((graphExecution || executionPreview)!.executionState) && (
         <Badge
-          variant={isExecutionComplete((graphExecution || executionPreview)!.executionState) ? 'light' : 'filled'}
-          color={getExecutionStateColor((graphExecution || executionPreview)!.executionState)}
-          size="xs"
-          leftSection={isExecutionInProgress((graphExecution || executionPreview)!.executionState) ? <Loader size={10} /> : undefined}
+          variant={isExecutionComplete((graphExecution || executionPreview)!.executionState) ? 'secondary' : 'default'}
+          className={`text-xs ${getBadgeClasses(
+            getExecutionStateColor((graphExecution || executionPreview)!.executionState),
+            isExecutionComplete((graphExecution || executionPreview)!.executionState) ? 'light' : 'filled'
+          )}`}
         >
-          {getExecutionStateLabel((graphExecution || executionPreview)!.executionState)}
+          <span className="flex items-center gap-1">
+            {isExecutionInProgress((graphExecution || executionPreview)!.executionState) && <Spinner size="xs" />}
+            {getExecutionStateLabel((graphExecution || executionPreview)!.executionState)}
+          </span>
         </Badge>
       )}
     </>
@@ -235,9 +289,9 @@ export const GraphNode = memo((props: GraphNodeProps) => {
 
   // Footer content with node/edge counts
   const footerContent = (graphExecution?.nodeCount !== undefined || config.metadata?.nodeCount !== undefined) ? (
-    <Text size="xs" c="dimmed">
+    <p className="text-xs text-muted-foreground">
       Nodes: {graphExecution?.nodeCount || config.metadata.nodeCount}, Edges: {graphExecution?.edgeCount || config.metadata.edgeCount || 0}
-    </Text>
+    </p>
   ) : null
 
   return (
@@ -261,56 +315,64 @@ export const GraphNode = memo((props: GraphNodeProps) => {
         {/* Preview buttons */}
         {!readonly && (graphExecution ? isExecutionComplete(graphExecution.executionState) : executionPreview && isExecutionComplete(executionPreview.executionState)) && (
           <Group justify="center" gap="sm">
-            <Tooltip label="Preview graph visualisation">
-              <ActionIcon
-                size="lg"
-                variant="light"
-                color="blue"
-                radius="xl"
-                data-action-icon="preview"
-                onMouseDown={(e) => {
-                  e.stopPropagation()
-                  e.preventDefault()
-                  setShowPreview(true)
-                }}
-              >
-                <IconChartDots size="0.75rem" />
-              </ActionIcon>
-            </Tooltip>
-            <Tooltip label="View graph data (nodes, edges, layers)">
-              <ActionIcon
-                size="lg"
-                variant="light"
-                color="teal"
-                radius="xl"
-                data-action-icon="data"
-                onMouseDown={(e) => {
-                  e.stopPropagation()
-                  e.preventDefault()
-                  setShowDataDialog(true)
-                }}
-              >
-                <IconTable size="0.75rem" />
-              </ActionIcon>
-            </Tooltip>
-            {projectId && resolvedGraphId && (
-              <Tooltip label="Open graph editor">
-                <ActionIcon
-                  size="lg"
-                  variant="light"
-                  color="grape"
-                  radius="xl"
-                  data-action-icon="open-graph"
-                  onMouseDown={(e) => {
-                    e.stopPropagation()
-                    e.preventDefault()
-                    navigate(`/projects/${projectId}/plan-nodes/${resolvedGraphId}/edit`)
-                  }}
-                >
-                  <IconExternalLink size="0.75rem" />
-                </ActionIcon>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-9 w-9 rounded-full text-blue-600"
+                    data-action-icon="preview"
+                    onMouseDown={(e: React.MouseEvent) => {
+                      e.stopPropagation()
+                      e.preventDefault()
+                      setShowPreview(true)
+                    }}
+                  >
+                    <IconChartDots size={12} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Preview graph visualisation</TooltipContent>
               </Tooltip>
-            )}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-9 w-9 rounded-full text-teal-600"
+                    data-action-icon="data"
+                    onMouseDown={(e: React.MouseEvent) => {
+                      e.stopPropagation()
+                      e.preventDefault()
+                      setShowDataDialog(true)
+                    }}
+                  >
+                    <IconTable size={12} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>View graph data (nodes, edges, layers)</TooltipContent>
+              </Tooltip>
+              {projectId && resolvedGraphId && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-9 w-9 rounded-full text-purple-600"
+                      data-action-icon="open-graph"
+                      onMouseDown={(e: React.MouseEvent) => {
+                        e.stopPropagation()
+                        e.preventDefault()
+                        navigate(`/projects/${projectId}/plan-nodes/${resolvedGraphId}/edit`)
+                      }}
+                    >
+                      <IconExternalLink size={12} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Open graph editor</TooltipContent>
+                </Tooltip>
+              )}
+            </TooltipProvider>
           </Group>
         )}
       </BaseNode>
