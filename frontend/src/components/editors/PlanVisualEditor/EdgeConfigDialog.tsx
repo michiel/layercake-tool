@@ -1,7 +1,43 @@
 import { useState, useEffect } from 'react'
-import { Modal, TextInput, Select, Button, Group, Stack, Text } from '@mantine/core'
-import { useForm } from '@mantine/form'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import * as z from 'zod'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form'
+import { Stack } from '@/components/layout-primitives'
 import { ReactFlowEdge } from '../../../types/plan-dag'
+
+// Zod schema for edge form validation
+const edgeConfigSchema = z.object({
+  label: z.string().min(1, 'Label is required').transform((val) => val.trim()),
+  dataType: z.enum(['GRAPH_DATA', 'GRAPH_REFERENCE']),
+})
+
+type EdgeFormData = z.infer<typeof edgeConfigSchema>
 
 interface EdgeConfigDialogProps {
   edge: ReactFlowEdge | null
@@ -9,11 +45,6 @@ interface EdgeConfigDialogProps {
   onClose: () => void
   onSave: (edgeId: string, updates: Partial<ReactFlowEdge>) => void
   readonly?: boolean
-}
-
-interface EdgeFormData {
-  label: string
-  dataType: 'GRAPH_DATA' | 'GRAPH_REFERENCE'
 }
 
 export const EdgeConfigDialog = ({
@@ -26,24 +57,22 @@ export const EdgeConfigDialog = ({
   const [loading, setLoading] = useState(false)
 
   const form = useForm<EdgeFormData>({
-    initialValues: {
+    resolver: zodResolver(edgeConfigSchema),
+    defaultValues: {
       label: '',
-      dataType: 'GRAPH_DATA'
+      dataType: 'GRAPH_DATA',
     },
-    validate: {
-      label: (value) => value.trim().length === 0 ? 'Label is required' : null
-    }
   })
 
   // Update form when edge changes
   useEffect(() => {
     if (edge) {
-      form.setValues({
+      form.reset({
         label: edge.label || '',
-        dataType: edge.metadata?.dataType || 'GRAPH_DATA'
+        dataType: (edge.metadata?.dataType as 'GRAPH_DATA' | 'GRAPH_REFERENCE') || 'GRAPH_DATA'
       })
     }
-  }, [edge])
+  }, [edge, form])
 
   const handleSubmit = async (values: EdgeFormData) => {
     if (!edge) return
@@ -79,64 +108,86 @@ export const EdgeConfigDialog = ({
   }
 
   return (
-    <Modal
-      opened={opened}
-      onClose={handleClose}
-      title="Edge Configuration"
-      size="md"
-    >
-      <form onSubmit={form.onSubmit(handleSubmit)}>
-        <Stack gap="md">
+    <Dialog open={opened} onOpenChange={(open) => !open && handleClose()}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>Edge Configuration</DialogTitle>
           {edge && (
-            <Text size="sm" c="dimmed">
+            <DialogDescription>
               Connection: {edge.source} → {edge.target}
-            </Text>
+            </DialogDescription>
           )}
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleSubmit)}>
+            <Stack gap="lg">
+              <FormField
+                control={form.control}
+                name="label"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Label</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Enter edge label"
+                        {...field}
+                        disabled={readonly || loading}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-          <TextInput
-            label="Label"
-            placeholder="Enter edge label"
-            {...form.getInputProps('label')}
-            disabled={readonly || loading}
-            required
-          />
+              <FormField
+                control={form.control}
+                name="dataType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Data Type</FormLabel>
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      disabled={readonly || loading}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select data type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="GRAPH_DATA">Graph Data</SelectItem>
+                        <SelectItem value="GRAPH_REFERENCE">Graph Reference</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      <strong>Graph Data:</strong> Actual data flow between nodes (grey line)<br/>
+                      <strong>Graph Reference:</strong> Reference to another graph (blue line)
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-          <Select
-            label="Data Type"
-            placeholder="Select data type"
-            data={[
-              { value: 'GRAPH_DATA', label: 'Graph Data' },
-              { value: 'GRAPH_REFERENCE', label: 'Graph Reference' }
-            ]}
-            {...form.getInputProps('dataType')}
-            disabled={readonly || loading}
-            required
-          />
-
-          <Text size="xs" c="dimmed">
-            <strong>Graph Data:</strong> Actual data flow between nodes (gray line)<br/>
-            <strong>Graph Reference:</strong> Reference to another graph (blue line)
-          </Text>
-
-          {!readonly && (
-            <Group justify="flex-end">
-              <Button
-                variant="subtle"
-                onClick={handleClose}
-                disabled={loading}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                loading={loading}
-              >
-                Save Changes
-              </Button>
-            </Group>
-          )}
-        </Stack>
-      </form>
-    </Modal>
+              {!readonly && (
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleClose}
+                    disabled={loading}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={loading}>
+                    {loading ? 'Saving...' : 'Save Changes'}
+                  </Button>
+                </DialogFooter>
+              )}
+            </Stack>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
   )
 }
