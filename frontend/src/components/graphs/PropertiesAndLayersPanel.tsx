@@ -1,9 +1,13 @@
 import React from 'react';
-import { Accordion, Paper, Group, Button, Slider, Stack, Text } from '@mantine/core';
 import { NodePropertiesForm } from './NodePropertiesForm';
 import { LayersAccordionPanel } from './LayersAccordionPanel';
 import { Graph, GraphNode } from '../../graphql/graphs';
 import { GraphViewMode, GraphOrientation, HierarchyViewMode } from './LayercakeGraphEditor';
+import { Stack, Group } from '@/components/layout-primitives';
+import { Paper } from '@/components/layout-primitives';
+import { Button } from '@/components/ui/button';
+import { Slider } from '@/components/ui/slider';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 interface PropertiesAndLayersPanelProps {
   graph: Graph;
@@ -62,8 +66,7 @@ export const PropertiesAndLayersPanel: React.FC<PropertiesAndLayersPanelProps> =
 
   return (
     <Paper
-      shadow="sm"
-      p="md"
+      className="shadow-sm p-4"
       style={{
         width: '320px',
         height: '100%',
@@ -72,16 +75,16 @@ export const PropertiesAndLayersPanel: React.FC<PropertiesAndLayersPanelProps> =
       }}
     >
       <Accordion
-        multiple
-        variant="separated"
+        type="multiple"
         defaultValue={['add-nodes', 'layout-options', 'node-properties', 'layers']}
+        className="space-y-2"
       >
-        <Accordion.Item value="add-nodes">
-          <Accordion.Control>Add Nodes</Accordion.Control>
-          <Accordion.Panel>
+        <AccordionItem value="add-nodes">
+          <AccordionTrigger>Add Nodes</AccordionTrigger>
+          <AccordionContent>
             <Stack gap="xs">
               <Paper
-                p="sm"
+                className="p-3"
                 style={{
                   cursor: 'grab',
                   border: '2px dashed #dee2e6',
@@ -96,12 +99,12 @@ export const PropertiesAndLayersPanel: React.FC<PropertiesAndLayersPanelProps> =
                 }}
                 draggable
               >
-                <Text size="sm" fw={500}>Node</Text>
-                <Text size="xs" c="dimmed">Regular node</Text>
+                <p className="text-sm font-medium">Node</p>
+                <p className="text-xs text-muted-foreground">Regular node</p>
               </Paper>
 
               <Paper
-                p="sm"
+                className="p-3"
                 style={{
                   cursor: 'grab',
                   border: '2px dashed #dee2e6',
@@ -116,29 +119,29 @@ export const PropertiesAndLayersPanel: React.FC<PropertiesAndLayersPanelProps> =
                 }}
                 draggable
               >
-                <Text size="sm" fw={500}>Container</Text>
-                <Text size="xs" c="dimmed">Partition node</Text>
+                <p className="text-sm font-medium">Container</p>
+                <p className="text-xs text-muted-foreground">Partition node</p>
               </Paper>
             </Stack>
-          </Accordion.Panel>
-        </Accordion.Item>
+          </AccordionContent>
+        </AccordionItem>
 
-        <Accordion.Item value="layout-options">
-          <Accordion.Control>Layout Options</Accordion.Control>
-          <Accordion.Panel>
+        <AccordionItem value="layout-options">
+          <AccordionTrigger>Layout Options</AccordionTrigger>
+          <AccordionContent>
             <Stack gap="md">
-              <Group gap="xs">
+              <Group gap="xs" wrap={true}>
                 <Button
-                  size="xs"
-                  variant="light"
+                  size="sm"
+                  variant="secondary"
                   onClick={onToggleViewMode}
                 >
                   {viewMode === 'flow' ? 'Hierarchy' : 'Flow'}
                 </Button>
 
                 <Button
-                  size="xs"
-                  variant="light"
+                  size="sm"
+                  variant="secondary"
                   onClick={onToggleOrientation}
                 >
                   {orientation === 'vertical' ? 'LR' : 'TD'}
@@ -146,8 +149,8 @@ export const PropertiesAndLayersPanel: React.FC<PropertiesAndLayersPanelProps> =
 
                 {viewMode === 'flow' && (
                   <Button
-                    size="xs"
-                    variant="light"
+                    size="sm"
+                    variant="secondary"
                     onClick={onToggleFlowGrouping}
                   >
                     {flowGroupingEnabled ? 'Disable Groupings' : 'Enable Groupings'}
@@ -156,8 +159,8 @@ export const PropertiesAndLayersPanel: React.FC<PropertiesAndLayersPanelProps> =
 
                 {viewMode === 'hierarchy' && (
                   <Button
-                    size="xs"
-                    variant="light"
+                    size="sm"
+                    variant="secondary"
                     onClick={onToggleHierarchyViewMode}
                   >
                     {hierarchyViewMode === 'graph' ? 'As Containers' : 'As Graph'}
@@ -166,56 +169,53 @@ export const PropertiesAndLayersPanel: React.FC<PropertiesAndLayersPanelProps> =
               </Group>
 
               <div>
-                <Group justify="space-between" mb={4}>
-                  <Text size="xs" c="dimmed">Node Spacing</Text>
-                  <Text size="xs" fw={500}>{nodeSpacing}</Text>
+                <Group justify="between" className="mb-1">
+                  <p className="text-xs text-muted-foreground">Node Spacing</p>
+                  <p className="text-xs font-medium">{nodeSpacing}</p>
                 </Group>
                 <Slider
-                  value={nodeSpacing}
-                  onChange={onNodeSpacingChange}
+                  value={[nodeSpacing]}
+                  onValueChange={([value]) => onNodeSpacingChange(value)}
                   min={20}
                   max={200}
                   step={5}
-                  size="sm"
                 />
               </div>
 
               <div>
-                <Group justify="space-between" mb={4}>
-                  <Text size="xs" c="dimmed">Rank Spacing</Text>
-                  <Text size="xs" fw={500}>{rankSpacing}</Text>
+                <Group justify="between" className="mb-1">
+                  <p className="text-xs text-muted-foreground">Rank Spacing</p>
+                  <p className="text-xs font-medium">{rankSpacing}</p>
                 </Group>
                 <Slider
-                  value={rankSpacing}
-                  onChange={onRankSpacingChange}
+                  value={[rankSpacing]}
+                  onValueChange={([value]) => onRankSpacingChange(value)}
                   min={20}
                   max={200}
                   step={5}
-                  size="sm"
                 />
               </div>
 
               <div>
-                <Group justify="space-between" mb={4}>
-                  <Text size="xs" c="dimmed">Min Edge Length</Text>
-                  <Text size="xs" fw={500}>{minEdgeLength}</Text>
+                <Group justify="between" className="mb-1">
+                  <p className="text-xs text-muted-foreground">Min Edge Length</p>
+                  <p className="text-xs font-medium">{minEdgeLength}</p>
                 </Group>
                 <Slider
-                  value={minEdgeLength}
-                  onChange={onMinEdgeLengthChange}
+                  value={[minEdgeLength]}
+                  onValueChange={([value]) => onMinEdgeLengthChange(value)}
                   min={20}
                   max={200}
                   step={5}
-                  size="sm"
                 />
               </div>
             </Stack>
-          </Accordion.Panel>
-        </Accordion.Item>
+          </AccordionContent>
+        </AccordionItem>
 
-        <Accordion.Item value="node-properties">
-          <Accordion.Control>Node Properties</Accordion.Control>
-          <Accordion.Panel>
+        <AccordionItem value="node-properties">
+          <AccordionTrigger>Node Properties</AccordionTrigger>
+          <AccordionContent>
             {selectedNode ? (
               <NodePropertiesForm
                 node={selectedNode}
@@ -223,16 +223,16 @@ export const PropertiesAndLayersPanel: React.FC<PropertiesAndLayersPanelProps> =
                 onUpdate={(updates) => onNodeUpdate(selectedNode.id, updates)}
               />
             ) : (
-              <div style={{ color: '#868e96', fontSize: '14px', textAlign: 'center', padding: '20px 0' }}>
+              <div className="text-muted-foreground text-sm text-center py-5">
                 Select a node to view properties
               </div>
             )}
-          </Accordion.Panel>
-        </Accordion.Item>
+          </AccordionContent>
+        </AccordionItem>
 
-        <Accordion.Item value="layers">
-          <Accordion.Control>Layers</Accordion.Control>
-          <Accordion.Panel>
+        <AccordionItem value="layers">
+          <AccordionTrigger>Layers</AccordionTrigger>
+          <AccordionContent>
             <LayersAccordionPanel
               graph={graph}
               layerVisibility={layerVisibility}
@@ -242,8 +242,8 @@ export const PropertiesAndLayersPanel: React.FC<PropertiesAndLayersPanelProps> =
               onLayerColorChange={onLayerColorChange}
               onAddLayer={onAddLayer}
             />
-          </Accordion.Panel>
-        </Accordion.Item>
+          </AccordionContent>
+        </AccordionItem>
       </Accordion>
     </Paper>
   );
