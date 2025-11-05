@@ -362,8 +362,8 @@ export const isNodeConfigured = (
       return true;
 
     case PlanDagNodeType.DATA_SOURCE:
-      // DataSource nodes MUST have at least one output connected to be configured
-      return outputEdges.length >= 1;
+      // DataSource nodes are configured once they point at a datasource
+      return hasValidConfig;
 
     case PlanDagNodeType.TRANSFORM:
       // TransformNodes MUST have one input and one output to be configured
