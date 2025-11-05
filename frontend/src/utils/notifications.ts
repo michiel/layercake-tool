@@ -1,17 +1,15 @@
 import React from 'react'
-import { notifications } from '@mantine/notifications'
+import { toast } from 'sonner'
 import { IconAlertCircle, IconCheck, IconInfoCircle } from '@tabler/icons-react'
 
 /**
  * Show an error notification toast
  */
 export const showErrorNotification = (title: string, message?: string) => {
-  notifications.show({
-    title,
-    message: message || '',
-    color: 'red',
+  toast.error(title, {
+    description: message || undefined,
     icon: React.createElement(IconAlertCircle, { size: 18 }),
-    autoClose: 5000,
+    duration: 5000,
   })
 }
 
@@ -19,12 +17,10 @@ export const showErrorNotification = (title: string, message?: string) => {
  * Show a success notification toast
  */
 export const showSuccessNotification = (title: string, message?: string) => {
-  notifications.show({
-    title,
-    message: message || '',
-    color: 'green',
+  toast.success(title, {
+    description: message || undefined,
     icon: React.createElement(IconCheck, { size: 18 }),
-    autoClose: 3000,
+    duration: 3000,
   })
 }
 
@@ -32,11 +28,9 @@ export const showSuccessNotification = (title: string, message?: string) => {
  * Show an info notification toast
  */
 export const showInfoNotification = (title: string, message?: string) => {
-  notifications.show({
-    title,
-    message: message || '',
-    color: 'blue',
+  toast.info(title, {
+    description: message || undefined,
     icon: React.createElement(IconInfoCircle, { size: 18 }),
-    autoClose: 4000,
+    duration: 4000,
   })
 }

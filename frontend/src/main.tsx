@@ -7,6 +7,7 @@ import { Notifications } from '@mantine/notifications'
 import { apolloClient, initializeTauriServer } from './graphql/client'
 import { isTauriApp } from './utils/tauri'
 import App from './App'
+import { Toaster } from '@/components/ui/sonner'
 
 // Tailwind CSS
 import './index.css'
@@ -25,6 +26,7 @@ if (isTauriApp()) {
     <React.StrictMode>
       <MantineProvider>
         <Notifications />
+        <Toaster />
         <Center style={{ height: '100vh' }}>
           <Stack align="center" gap="md">
             <Loader size="xl" />
@@ -79,6 +81,7 @@ if (isTauriApp()) {
           <ApolloProvider client={apolloClient}>
             <MantineProvider>
               <Notifications />
+              <Toaster />
               <BrowserRouter>
                 <App />
               </BrowserRouter>
@@ -93,6 +96,7 @@ if (isTauriApp()) {
         <React.StrictMode>
           <MantineProvider>
             <Notifications />
+            <Toaster />
             <Center style={{ height: '100vh' }}>
               <Stack align="center" gap="md" style={{ maxWidth: 500 }}>
                 <Text size="xl" fw={700} c="red">
@@ -117,6 +121,7 @@ if (isTauriApp()) {
       <ApolloProvider client={apolloClient}>
         <MantineProvider>
           <Notifications />
+          <Toaster />
           <BrowserRouter>
             <App />
           </BrowserRouter>
