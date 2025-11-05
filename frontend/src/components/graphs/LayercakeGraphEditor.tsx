@@ -28,6 +28,12 @@ export type GraphViewMode = 'flow' | 'hierarchy';
 export type GraphOrientation = 'vertical' | 'horizontal';
 export type HierarchyViewMode = 'graph' | 'containers';
 
+const GROUP_MIN_WIDTH = 320;
+const GROUP_MIN_HEIGHT = 240;
+const GROUP_PADDING = 48;
+const DEFAULT_NODE_WIDTH = 180;
+const DEFAULT_NODE_HEIGHT = 80;
+
 interface LayercakeGraphEditorProps {
   graph: Graph;
   onNodeSelect?: (nodeId: string | null) => void;
@@ -82,6 +88,31 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
   const manualEdgesRef = useRef<Edge[]>([]);
   const [selectedNodes, setSelectedNodes] = useState<string[]>([]);
   const [selectedEdges, setSelectedEdges] = useState<string[]>([]);
+
+  const getNumericSize = useCallback((value: number | string | null | undefined) => {
+    if (typeof value === 'number') {
+      return value;
+    }
+    if (typeof value === 'string') {
+      const parsed = Number.parseFloat(value);
+      return Number.isFinite(parsed) ? parsed : undefined;
+    }
+    return undefined;
+  }, []);
+
+  const getNodeDimension = useCallback((node: Node, dimension: 'width' | 'height') => {
+    const direct = getNumericSize(node[dimension]);
+    if (direct !== undefined) {
+      return direct;
+    }
+
+    const styleValue = node.style ? getNumericSize(node.style[dimension] as any) : undefined;
+    if (styleValue !== undefined) {
+      return styleValue;
+    }
+
+    return dimension === 'width' ? DEFAULT_NODE_WIDTH : DEFAULT_NODE_HEIGHT;
+  }, [getNumericSize]);
 
   const nodeTypes = useMemo(() => ({
     group: GroupNode,
@@ -448,6 +479,254 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
       }
     }
   }, [mode, hierarchyViewMode, onNodeUpdate, renderGraph, nodes, setNodes]);
+
+  useEffect(() => {
+    if (mode !== 'flow' && !(mode === 'hierarchy' && hierarchyViewMode === 'containers')) {
+      return;
+    }
+
+    setNodes(prevNodes => {
+      const nodeIndexMap = new Map<string, number>();
+      prevNodes.forEach((node, idx) => nodeIndexMap.set(node.id, idx));
+
+      const groups = prevNodes
+        .map((node, idx) => {
+          let depth = 0;
+          let current: Node | undefined = node;
+          while (current?.parentNode) {
+            const parentIdx = nodeIndexMap.get(current.parentNode);
+            if (parentIdx === undefined) break;
+            depth += 1;
+            current = prevNodes[parentIdx];
+          }
+          return { node, idx, depth };
+        })
+        .filter(entry => entry.node.type === 'group')
+        .sort((a, b) => b.depth - a.depth);
+
+      if (groups.length === 0) {
+        return prevNodes;
+      }
+
+      const nextNodes = [...prevNodes];
+      let mutated = false;
+
+      groups.forEach(({ node: groupNode, idx }) => {
+        const childIndices: number[] = [];
+
+        nextNodes.forEach((candidate, candidateIdx) => {
+          if (candidate.parentNode === groupNode.id && !candidate.id.endsWith('-label')) {
+            childIndices.push(candidateIdx);
+          }
+        });
+
+        const labelIndex = nextNodes.findIndex(candidate => candidate.id === `${groupNode.id}-label`);
+
+        if (childIndices.length === 0) {
+          const currentWidth = getNodeDimension(nextNodes[idx], 'width');
+          const currentHeight = getNodeDimension(nextNodes[idx], 'height');
+          const width = Math.max(currentWidth, GROUP_MIN_WIDTH);
+          const height = Math.max(currentHeight, GROUP_MIN_HEIGHT);
+
+          if (width !== currentWidth || height !== currentHeight) {
+            nextNodes[idx] = {
+              ...nextNodes[idx],
+              width,
+              height,
+              style: {
+                ...nextNodes[idx].style,
+                width,
+                height,
+              },
+            };
+            mutated = true;
+          }
+
+          if (labelIndex >= 0) {
+            const labelNode = nextNodes[labelIndex];
+            const desiredLabelPos = { x: GROUP_PADDING - 36, y: 12 };
+            if (labelNode.position.x !== desiredLabelPos.x || labelNode.position.y !== desiredLabelPos.y) {
+              nextNodes[labelIndex] = {
+                ...labelNode,
+                position: desiredLabelPos,
+              };
+              mutated = true;
+            }
+          }
+          return;
+        }
+
+        let minX = Infinity;
+        let minY = Infinity;
+        let maxX = -Infinity;
+        let maxY = -Infinity;
+
+        childIndices.forEach(childIdx => {
+          const child = nextNodes[childIdx];
+          const childWidth = getNodeDimension(child, 'width');
+          const childHeight = getNodeDimension(child, 'height');
+          minX = Math.min(minX, child.position.x);
+          minY = Math.min(minY, child.position.y);
+          maxX = Math.max(maxX, child.position.x + childWidth);
+          maxY = Math.max(maxY, child.position.y + childHeight);
+        });
+
+        if (!Number.isFinite(minX)) {
+          minX = GROUP_PADDING;
+          minY = GROUP_PADDING;
+          maxX = GROUP_MIN_WIDTH - GROUP_PADDING;
+          maxY = GROUP_MIN_HEIGHT - GROUP_PADDING;
+        }
+
+        const shiftX = minX < GROUP_PADDING ? GROUP_PADDING - minX : 0;
+        const shiftY = minY < GROUP_PADDING ? GROUP_PADDING - minY : 0;
+
+        if (shiftX !== 0 || shiftY !== 0) {
+          childIndices.forEach(childIdx => {
+            const child = nextNodes[childIdx];
+            nextNodes[childIdx] = {
+              ...child,
+              position: {
+                x: child.position.x + shiftX,
+                y: child.position.y + shiftY,
+              },
+            };
+          });
+
+          if (labelIndex >= 0) {
+            const labelNode = nextNodes[labelIndex];
+            nextNodes[labelIndex] = {
+              ...labelNode,
+              position: {
+                x: labelNode.position.x + shiftX,
+                y: labelNode.position.y + shiftY,
+              },
+            };
+          }
+
+          mutated = true;
+        }
+
+        const adjustedMaxX = maxX + shiftX;
+        const adjustedMaxY = maxY + shiftY;
+
+        const requiredWidth = Math.max(GROUP_MIN_WIDTH, adjustedMaxX + GROUP_PADDING);
+        const requiredHeight = Math.max(GROUP_MIN_HEIGHT, adjustedMaxY + GROUP_PADDING);
+
+        const currentWidth = getNodeDimension(nextNodes[idx], 'width');
+        const currentHeight = getNodeDimension(nextNodes[idx], 'height');
+
+        if (
+          Math.abs(requiredWidth - currentWidth) > 0.5 ||
+          Math.abs(requiredHeight - currentHeight) > 0.5
+        ) {
+          nextNodes[idx] = {
+            ...nextNodes[idx],
+            width: requiredWidth,
+            height: requiredHeight,
+            style: {
+              ...nextNodes[idx].style,
+              width: requiredWidth,
+              height: requiredHeight,
+            },
+          };
+          mutated = true;
+        }
+
+        if (labelIndex >= 0) {
+          const labelNode = nextNodes[labelIndex];
+          const desiredLabelPos = { x: GROUP_PADDING - 36, y: 12 };
+          if (
+            labelNode.position.x !== desiredLabelPos.x ||
+            labelNode.position.y !== desiredLabelPos.y
+          ) {
+            nextNodes[labelIndex] = {
+              ...labelNode,
+              position: desiredLabelPos,
+            };
+            mutated = true;
+          }
+        }
+      });
+
+      const parentGroupMap = new Map<string, number[]>();
+      nextNodes.forEach((node, idx) => {
+        if (node.type === 'group') {
+          const key = node.parentNode ?? '__root__';
+          if (!parentGroupMap.has(key)) {
+            parentGroupMap.set(key, []);
+          }
+          parentGroupMap.get(key)!.push(idx);
+        }
+      });
+
+      parentGroupMap.forEach(indices => {
+        if (indices.length <= 1) return;
+
+        const horizontalSorted = [...indices].sort(
+          (a, b) => nextNodes[a].position.x - nextNodes[b].position.x
+        );
+
+        let cursorX = Number.NEGATIVE_INFINITY;
+        horizontalSorted.forEach(idx => {
+          const node = nextNodes[idx];
+          const nodeWidth = getNodeDimension(node, 'width');
+          if (!Number.isFinite(cursorX)) {
+            cursorX = node.position.x + nodeWidth;
+            return;
+          }
+
+          const minX = cursorX + GROUP_PADDING;
+          if (node.position.x < minX) {
+            const delta = minX - node.position.x;
+            nextNodes[idx] = {
+              ...node,
+              position: {
+                ...node.position,
+                x: node.position.x + delta,
+              },
+            };
+            mutated = true;
+          }
+
+          const updated = nextNodes[idx];
+          cursorX = updated.position.x + getNodeDimension(updated, 'width');
+        });
+
+        const verticalSorted = [...indices].sort(
+          (a, b) => nextNodes[a].position.y - nextNodes[b].position.y
+        );
+
+        let cursorY = Number.NEGATIVE_INFINITY;
+        verticalSorted.forEach(idx => {
+          const node = nextNodes[idx];
+          const nodeHeight = getNodeDimension(node, 'height');
+          if (!Number.isFinite(cursorY)) {
+            cursorY = node.position.y + nodeHeight;
+            return;
+          }
+
+          const minY = cursorY + GROUP_PADDING;
+          if (node.position.y < minY) {
+            const delta = minY - node.position.y;
+            nextNodes[idx] = {
+              ...node,
+              position: {
+                ...node.position,
+                y: node.position.y + delta,
+              },
+            };
+            mutated = true;
+          }
+
+          const updated = nextNodes[idx];
+          cursorY = updated.position.y + getNodeDimension(updated, 'height');
+        });
+      });
+
+      return mutated ? nextNodes : prevNodes;
+    });
+  }, [mode, hierarchyViewMode, setNodes, getNodeDimension, nodes]);
 
   // Minimap node color customization
   const minimapNodeColor = useCallback((node: Node) => {
