@@ -1,6 +1,11 @@
 import React, { useState } from 'react';
-import { Tabs, Stack, Button, Group, Text, Table, TextInput, ScrollArea } from '@mantine/core';
 import { IconTable, IconDeviceFloppy, IconClipboard, IconTrash } from '@tabler/icons-react';
+import { Stack, Group } from '@/components/layout-primitives';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 export interface GraphNode {
   id: string;
@@ -49,7 +54,7 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
   onSave,
   readOnly = false
 }) => {
-  const [activeTab, setActiveTab] = useState<string | null>('nodes');
+  const [activeTab, setActiveTab] = useState<string>('nodes');
   const [localNodes, setLocalNodes] = useState<GraphNode[]>(graphData.nodes || []);
   const [localEdges, setLocalEdges] = useState<GraphEdge[]>(graphData.edges || []);
   const [localLayers, setLocalLayers] = useState<GraphLayer[]>(graphData.layers || []);
@@ -276,12 +281,12 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
 
   return (
     <Stack gap="md">
-      <Group justify="space-between">
-        <Text size="sm" c="dimmed">
+      <Group justify="between">
+        <p className="text-sm text-muted-foreground">
           {activeTab === 'nodes' && `${localNodes.length} nodes`}
           {activeTab === 'edges' && `${localEdges.length} edges`}
           {activeTab === 'layers' && `${localLayers.length} layers`}
-        </Text>
+        </p>
 
         <Group gap="xs">
           {!readOnly && (
@@ -289,20 +294,19 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
               {activeTab === 'nodes' && (
                 <>
                   <Button
-                    leftSection={<IconClipboard size={16} />}
                     onClick={handlePasteNodes}
-                    variant="light"
+                    variant="secondary"
                     size="sm"
                   >
+                    <IconClipboard className="mr-2 h-4 w-4" />
                     Paste Nodes
                   </Button>
                   <Button
-                    leftSection={<IconTrash size={16} />}
                     onClick={handleClearNodes}
-                    variant="outline"
-                    color="red"
+                    variant="destructive"
                     size="sm"
                   >
+                    <IconTrash className="mr-2 h-4 w-4" />
                     Clear Nodes
                   </Button>
                 </>
@@ -310,20 +314,19 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
               {activeTab === 'edges' && (
                 <>
                   <Button
-                    leftSection={<IconClipboard size={16} />}
                     onClick={handlePasteEdges}
-                    variant="light"
+                    variant="secondary"
                     size="sm"
                   >
+                    <IconClipboard className="mr-2 h-4 w-4" />
                     Paste Edges
                   </Button>
                   <Button
-                    leftSection={<IconTrash size={16} />}
                     onClick={handleClearEdges}
-                    variant="outline"
-                    color="red"
+                    variant="destructive"
                     size="sm"
                   >
+                    <IconTrash className="mr-2 h-4 w-4" />
                     Clear Edges
                   </Button>
                 </>
@@ -331,157 +334,155 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
               {activeTab === 'layers' && (
                 <>
                   <Button
-                    leftSection={<IconClipboard size={16} />}
                     onClick={handlePasteLayers}
-                    variant="light"
+                    variant="secondary"
                     size="sm"
                   >
+                    <IconClipboard className="mr-2 h-4 w-4" />
                     Paste Layers
                   </Button>
                   <Button
-                    leftSection={<IconTrash size={16} />}
                     onClick={handleClearLayers}
-                    variant="outline"
-                    color="red"
+                    variant="destructive"
                     size="sm"
                   >
+                    <IconTrash className="mr-2 h-4 w-4" />
                     Clear Layers
                   </Button>
                 </>
               )}
               <Button
-                leftSection={<IconDeviceFloppy size={16} />}
                 onClick={handleSave}
-                disabled={!hasChanges}
-                loading={saving}
+                disabled={!hasChanges || saving}
               >
-                Save Changes
+                <IconDeviceFloppy className="mr-2 h-4 w-4" />
+                {saving ? 'Saving...' : 'Save Changes'}
               </Button>
             </>
           )}
         </Group>
       </Group>
 
-      <Tabs value={activeTab} onChange={setActiveTab}>
-        <Tabs.List>
-          <Tabs.Tab value="nodes" leftSection={<IconTable size={16} />}>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="nodes">
+            <IconTable className="mr-2 h-4 w-4" />
             Nodes ({localNodes.length})
-          </Tabs.Tab>
-          <Tabs.Tab value="edges" leftSection={<IconTable size={16} />}>
+          </TabsTrigger>
+          <TabsTrigger value="edges">
+            <IconTable className="mr-2 h-4 w-4" />
             Edges ({localEdges.length})
-          </Tabs.Tab>
-          <Tabs.Tab value="layers" leftSection={<IconTable size={16} />}>
+          </TabsTrigger>
+          <TabsTrigger value="layers">
+            <IconTable className="mr-2 h-4 w-4" />
             Layers ({localLayers.length})
-          </Tabs.Tab>
-        </Tabs.List>
+          </TabsTrigger>
+        </TabsList>
 
-        <Tabs.Panel value="nodes" pt="md">
-          <ScrollArea h={600}>
-            <Table striped highlightOnHover withTableBorder withColumnBorders>
-              <Table.Thead>
-                <Table.Tr>
+        <TabsContent value="nodes" className="pt-4">
+          <ScrollArea className="h-[600px]">
+            <Table>
+              <TableHeader>
+                <TableRow>
                   {nodeColumnDefs.map(col => (
-                    <Table.Th key={col} style={{ minWidth: 150 }}>
+                    <TableHead key={col} style={{ minWidth: 150 }}>
                       {col.replace(/_/g, ' ').toUpperCase()}
-                    </Table.Th>
+                    </TableHead>
                   ))}
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {localNodes.map((node, rowIdx) => (
-                  <Table.Tr key={rowIdx}>
+                  <TableRow key={rowIdx}>
                     {nodeColumnDefs.map(col => (
-                      <Table.Td key={col}>
+                      <TableCell key={col}>
                         {readOnly ? (
-                          <Text size="sm">{String(node[col] ?? '')}</Text>
+                          <p className="text-sm">{String(node[col] ?? '')}</p>
                         ) : (
-                          <TextInput
+                          <Input
                             value={String(node[col] ?? '')}
                             onChange={(e) => handleNodeChange(rowIdx, col, e.currentTarget.value)}
-                            size="xs"
-                            styles={{ input: { border: 'none', padding: '4px 8px' } }}
+                            className="h-7 text-xs border-none px-2"
                           />
                         )}
-                      </Table.Td>
+                      </TableCell>
                     ))}
-                  </Table.Tr>
+                  </TableRow>
                 ))}
-              </Table.Tbody>
+              </TableBody>
             </Table>
           </ScrollArea>
-        </Tabs.Panel>
+        </TabsContent>
 
-        <Tabs.Panel value="edges" pt="md">
-          <ScrollArea h={600}>
-            <Table striped highlightOnHover withTableBorder withColumnBorders>
-              <Table.Thead>
-                <Table.Tr>
+        <TabsContent value="edges" className="pt-4">
+          <ScrollArea className="h-[600px]">
+            <Table>
+              <TableHeader>
+                <TableRow>
                   {edgeColumnDefs.map(col => (
-                    <Table.Th key={col} style={{ minWidth: 150 }}>
+                    <TableHead key={col} style={{ minWidth: 150 }}>
                       {col.replace(/_/g, ' ').toUpperCase()}
-                    </Table.Th>
+                    </TableHead>
                   ))}
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {localEdges.map((edge, rowIdx) => (
-                  <Table.Tr key={rowIdx}>
+                  <TableRow key={rowIdx}>
                     {edgeColumnDefs.map(col => (
-                      <Table.Td key={col}>
+                      <TableCell key={col}>
                         {readOnly ? (
-                          <Text size="sm">{String(edge[col] ?? '')}</Text>
+                          <p className="text-sm">{String(edge[col] ?? '')}</p>
                         ) : (
-                          <TextInput
+                          <Input
                             value={String(edge[col] ?? '')}
                             onChange={(e) => handleEdgeChange(rowIdx, col, e.currentTarget.value)}
-                            size="xs"
-                            styles={{ input: { border: 'none', padding: '4px 8px' } }}
+                            className="h-7 text-xs border-none px-2"
                           />
                         )}
-                      </Table.Td>
+                      </TableCell>
                     ))}
-                  </Table.Tr>
+                  </TableRow>
                 ))}
-              </Table.Tbody>
+              </TableBody>
             </Table>
           </ScrollArea>
-        </Tabs.Panel>
+        </TabsContent>
 
-        <Tabs.Panel value="layers" pt="md">
-          <ScrollArea h={600}>
-            <Table striped highlightOnHover withTableBorder withColumnBorders>
-              <Table.Thead>
-                <Table.Tr>
+        <TabsContent value="layers" className="pt-4">
+          <ScrollArea className="h-[600px]">
+            <Table>
+              <TableHeader>
+                <TableRow>
                   {layerColumnDefs.map(col => (
-                    <Table.Th key={col} style={{ minWidth: 150 }}>
+                    <TableHead key={col} style={{ minWidth: 150 }}>
                       {col.replace(/_/g, ' ').toUpperCase()}
-                    </Table.Th>
+                    </TableHead>
                   ))}
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {localLayers.map((layer, rowIdx) => (
-                  <Table.Tr key={rowIdx}>
+                  <TableRow key={rowIdx}>
                     {layerColumnDefs.map(col => (
-                      <Table.Td key={col}>
+                      <TableCell key={col}>
                         {readOnly ? (
-                          <Text size="sm">{String(layer[col] ?? '')}</Text>
+                          <p className="text-sm">{String(layer[col] ?? '')}</p>
                         ) : (
-                          <TextInput
+                          <Input
                             value={String(layer[col] ?? '')}
                             onChange={(e) => handleLayerChange(rowIdx, col, e.currentTarget.value)}
-                            size="xs"
-                            styles={{ input: { border: 'none', padding: '4px 8px' } }}
+                            className="h-7 text-xs border-none px-2"
                           />
                         )}
-                      </Table.Td>
+                      </TableCell>
                     ))}
-                  </Table.Tr>
+                  </TableRow>
                 ))}
-              </Table.Tbody>
+              </TableBody>
             </Table>
           </ScrollArea>
-        </Tabs.Panel>
+        </TabsContent>
       </Tabs>
     </Stack>
   );
