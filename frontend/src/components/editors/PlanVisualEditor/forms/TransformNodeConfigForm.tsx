@@ -1,24 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import {
-  Stack,
-  Select,
-  NumberInput,
-  Switch,
-  Alert,
-  Text,
-  Card,
-  Group,
-  ActionIcon,
-  Button,
-  Tooltip,
-  Divider,
-} from '@mantine/core';
 import { IconInfoCircle, IconTrash, IconPlus, IconArrowUp, IconArrowDown } from '@tabler/icons-react';
 import {
   GraphTransform,
   GraphTransformKind,
   TransformNodeConfig,
 } from '../../../../types/plan-dag';
+import { Stack, Group } from '@/components/layout-primitives';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface TransformNodeConfigFormProps {
   config: TransformNodeConfig;
@@ -239,7 +235,7 @@ export const TransformNodeConfigForm: React.FC<TransformNodeConfigFormProps> = (
     });
   };
 
-  const handleKindChange = (index: number, value: string | null) => {
+  const handleKindChange = (index: number, value: string | undefined) => {
     if (!value) {
       return;
     }
@@ -294,146 +290,187 @@ export const TransformNodeConfigForm: React.FC<TransformNodeConfigFormProps> = (
     switch (transform.kind) {
       case 'PartitionDepthLimit':
         return (
-          <NumberInput
-            label="Max Partition Depth"
-            description="Limit the hierarchy depth explored for partitions"
-            min={1}
-            max={25}
-            value={transform.params.maxPartitionDepth ?? undefined}
-            onChange={value =>
-              updateTransformParam(
-                index,
-                'maxPartitionDepth',
-                typeof value === 'number' ? value : undefined
-              )
-            }
-          />
+          <div className="space-y-2">
+            <Label htmlFor={`max-partition-depth-${index}`}>Max Partition Depth</Label>
+            <Input
+              id={`max-partition-depth-${index}`}
+              type="number"
+              min={1}
+              max={25}
+              value={transform.params.maxPartitionDepth ?? ''}
+              onChange={e => {
+                const value = e.target.value ? parseInt(e.target.value, 10) : undefined;
+                updateTransformParam(index, 'maxPartitionDepth', value);
+              }}
+            />
+            <p className="text-sm text-muted-foreground">
+              Limit the hierarchy depth explored for partitions
+            </p>
+          </div>
         );
       case 'PartitionWidthLimit':
         return (
-          <NumberInput
-            label="Max Partition Width"
-            description="Restrict how many non-partition nodes remain within a partition"
-            min={1}
-            max={200}
-            value={transform.params.maxPartitionWidth ?? undefined}
-            onChange={value =>
-              updateTransformParam(
-                index,
-                'maxPartitionWidth',
-                typeof value === 'number' ? value : undefined
-              )
-            }
-          />
+          <div className="space-y-2">
+            <Label htmlFor={`max-partition-width-${index}`}>Max Partition Width</Label>
+            <Input
+              id={`max-partition-width-${index}`}
+              type="number"
+              min={1}
+              max={200}
+              value={transform.params.maxPartitionWidth ?? ''}
+              onChange={e => {
+                const value = e.target.value ? parseInt(e.target.value, 10) : undefined;
+                updateTransformParam(index, 'maxPartitionWidth', value);
+              }}
+            />
+            <p className="text-sm text-muted-foreground">
+              Restrict how many non-partition nodes remain within a partition
+            </p>
+          </div>
         );
       case 'NodeLabelMaxLength':
         return (
-          <NumberInput
-            label="Max Node Label Length"
-            description="Truncate node labels to a fixed number of characters"
-            min={1}
-            max={200}
-            value={transform.params.nodeLabelMaxLength ?? undefined}
-            onChange={value =>
-              updateTransformParam(
-                index,
-                'nodeLabelMaxLength',
-                typeof value === 'number' ? value : undefined
-              )
-            }
-          />
+          <div className="space-y-2">
+            <Label htmlFor={`node-label-max-length-${index}`}>Max Node Label Length</Label>
+            <Input
+              id={`node-label-max-length-${index}`}
+              type="number"
+              min={1}
+              max={200}
+              value={transform.params.nodeLabelMaxLength ?? ''}
+              onChange={e => {
+                const value = e.target.value ? parseInt(e.target.value, 10) : undefined;
+                updateTransformParam(index, 'nodeLabelMaxLength', value);
+              }}
+            />
+            <p className="text-sm text-muted-foreground">
+              Truncate node labels to a fixed number of characters
+            </p>
+          </div>
         );
       case 'NodeLabelInsertNewlines':
         return (
-          <NumberInput
-            label="Wrap Node Labels At"
-            description="Insert newlines into node labels every N characters"
-            min={1}
-            max={200}
-            value={transform.params.nodeLabelInsertNewlinesAt ?? undefined}
-            onChange={value =>
-              updateTransformParam(
-                index,
-                'nodeLabelInsertNewlinesAt',
-                typeof value === 'number' ? value : undefined
-              )
-            }
-          />
+          <div className="space-y-2">
+            <Label htmlFor={`node-label-insert-newlines-${index}`}>Wrap Node Labels At</Label>
+            <Input
+              id={`node-label-insert-newlines-${index}`}
+              type="number"
+              min={1}
+              max={200}
+              value={transform.params.nodeLabelInsertNewlinesAt ?? ''}
+              onChange={e => {
+                const value = e.target.value ? parseInt(e.target.value, 10) : undefined;
+                updateTransformParam(index, 'nodeLabelInsertNewlinesAt', value);
+              }}
+            />
+            <p className="text-sm text-muted-foreground">
+              Insert newlines into node labels every N characters
+            </p>
+          </div>
         );
       case 'EdgeLabelMaxLength':
         return (
-          <NumberInput
-            label="Max Edge Label Length"
-            description="Truncate edge labels to a fixed number of characters"
-            min={1}
-            max={200}
-            value={transform.params.edgeLabelMaxLength ?? undefined}
-            onChange={value =>
-              updateTransformParam(
-                index,
-                'edgeLabelMaxLength',
-                typeof value === 'number' ? value : undefined
-              )
-            }
-          />
+          <div className="space-y-2">
+            <Label htmlFor={`edge-label-max-length-${index}`}>Max Edge Label Length</Label>
+            <Input
+              id={`edge-label-max-length-${index}`}
+              type="number"
+              min={1}
+              max={200}
+              value={transform.params.edgeLabelMaxLength ?? ''}
+              onChange={e => {
+                const value = e.target.value ? parseInt(e.target.value, 10) : undefined;
+                updateTransformParam(index, 'edgeLabelMaxLength', value);
+              }}
+            />
+            <p className="text-sm text-muted-foreground">
+              Truncate edge labels to a fixed number of characters
+            </p>
+          </div>
         );
       case 'EdgeLabelInsertNewlines':
         return (
-          <NumberInput
-            label="Wrap Edge Labels At"
-            description="Insert newlines into edge labels every N characters"
-            min={1}
-            max={200}
-            value={transform.params.edgeLabelInsertNewlinesAt ?? undefined}
-            onChange={value =>
-              updateTransformParam(
-                index,
-                'edgeLabelInsertNewlinesAt',
-                typeof value === 'number' ? value : undefined
-              )
-            }
-          />
+          <div className="space-y-2">
+            <Label htmlFor={`edge-label-insert-newlines-${index}`}>Wrap Edge Labels At</Label>
+            <Input
+              id={`edge-label-insert-newlines-${index}`}
+              type="number"
+              min={1}
+              max={200}
+              value={transform.params.edgeLabelInsertNewlinesAt ?? ''}
+              onChange={e => {
+                const value = e.target.value ? parseInt(e.target.value, 10) : undefined;
+                updateTransformParam(index, 'edgeLabelInsertNewlinesAt', value);
+              }}
+            />
+            <p className="text-sm text-muted-foreground">
+              Insert newlines into edge labels every N characters
+            </p>
+          </div>
         );
       case 'InvertGraph':
         return (
           <Stack gap="xs">
-            <Switch
-              label="Invert graph connections"
-              description="Flip partitions into edges and edges into intermediates"
-              checked={transform.params.enabled ?? true}
-              onChange={event => updateTransformParam(index, 'enabled', event.currentTarget.checked)}
-            />
-            <Alert icon={<IconInfoCircle size="1rem" />} color="blue">
-              <Text size="sm">
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id={`invert-graph-${index}`}
+                  checked={transform.params.enabled ?? true}
+                  onCheckedChange={checked => updateTransformParam(index, 'enabled', checked)}
+                />
+                <Label htmlFor={`invert-graph-${index}`}>Invert graph connections</Label>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Flip partitions into edges and edges into intermediates
+              </p>
+            </div>
+            <Alert>
+              <IconInfoCircle className="h-4 w-4" />
+              <AlertDescription>
                 Inversion creates a new graph where original edges become nodes, enabling alternative
                 dependency visualisations.
-              </Text>
+              </AlertDescription>
             </Alert>
           </Stack>
         );
       case 'GenerateHierarchy':
         return (
-          <Switch
-            label="Generate hierarchy metadata"
-            description="Annotate graph nodes with computed hierarchy details"
-            checked={transform.params.enabled ?? true}
-            onChange={event => updateTransformParam(index, 'enabled', event.currentTarget.checked)}
-          />
+          <div className="space-y-2">
+            <div className="flex items-center space-x-2">
+              <Switch
+                id={`generate-hierarchy-${index}`}
+                checked={transform.params.enabled ?? true}
+                onCheckedChange={checked => updateTransformParam(index, 'enabled', checked)}
+              />
+              <Label htmlFor={`generate-hierarchy-${index}`}>Generate hierarchy metadata</Label>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Annotate graph nodes with computed hierarchy details
+            </p>
+          </div>
         );
       case 'AggregateEdges':
         return (
           <Stack gap="xs">
-            <Switch
-              label="Aggregate duplicate edges"
-              description="Combine edges that share the same source and target"
-              checked={transform.params.enabled ?? true}
-              onChange={event => updateTransformParam(index, 'enabled', event.currentTarget.checked)}
-            />
-            <Alert icon={<IconInfoCircle size="1rem" />} color="blue">
-              <Text size="sm">
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id={`aggregate-edges-${index}`}
+                  checked={transform.params.enabled ?? true}
+                  onCheckedChange={checked => updateTransformParam(index, 'enabled', checked)}
+                />
+                <Label htmlFor={`aggregate-edges-${index}`}>Aggregate duplicate edges</Label>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Combine edges that share the same source and target
+              </p>
+            </div>
+            <Alert>
+              <IconInfoCircle className="h-4 w-4" />
+              <AlertDescription>
                 Aggregation is applied by default to keep graphs readable. Disable to preserve duplicate
                 edges for analysis.
-              </Text>
+              </AlertDescription>
             </Alert>
           </Stack>
         );
@@ -444,88 +481,110 @@ export const TransformNodeConfigForm: React.FC<TransformNodeConfigFormProps> = (
 
   return (
     <Stack gap="md">
-      <Alert icon={<IconInfoCircle size="1rem" />} color="blue" title="Transform Configuration">
-        <Text size="sm">
+      <Alert>
+        <IconInfoCircle className="h-4 w-4" />
+        <AlertTitle>Transform Configuration</AlertTitle>
+        <AlertDescription>
           Configure the ordered list of transformations applied to this graph. Inputs and outputs are
           determined by the DAG connections.
-        </Text>
+        </AlertDescription>
       </Alert>
 
       <Stack gap="sm">
         {localTransforms.map((transform, index) => {
           const disableRemove = localTransforms.length === 1;
           return (
-            <Card withBorder key={`${index}-${transform.kind}`}>
-              <Stack gap="sm">
-                <Group justify="space-between" align="flex-start">
-                  <Select
-                    label={`Step ${index + 1}`}
-                    placeholder="Select a transformation"
-                    data={TRANSFORM_OPTIONS}
-                    value={transform.kind}
-                    onChange={value => handleKindChange(index, value)}
-                    required
-                  />
-                  <Group gap="xs">
-                    <Tooltip label="Move up" withArrow disabled={index === 0}>
-                      <ActionIcon
-                        variant="subtle"
-                        aria-label="Move transform up"
-                        onClick={() => moveTransform(index, 'up')}
-                        disabled={index === 0}
+            <Card key={`${index}-${transform.kind}`} className="border">
+              <CardContent className="pt-6">
+                <Stack gap="sm">
+                  <Group justify="between" align="start">
+                    <div className="space-y-2 flex-1">
+                      <Label htmlFor={`transform-kind-${index}`}>Step {index + 1}</Label>
+                      <Select
+                        value={transform.kind}
+                        onValueChange={value => handleKindChange(index, value)}
                       >
-                        <IconArrowUp size={16} />
-                      </ActionIcon>
-                    </Tooltip>
-                    <Tooltip
-                      label="Move down"
-                      withArrow
-                      disabled={index === localTransforms.length - 1}
-                    >
-                      <ActionIcon
-                        variant="subtle"
-                        aria-label="Move transform down"
-                        onClick={() => moveTransform(index, 'down')}
-                        disabled={index === localTransforms.length - 1}
-                      >
-                        <IconArrowDown size={16} />
-                      </ActionIcon>
-                    </Tooltip>
-                    <Tooltip
-                      label={
-                        disableRemove
-                          ? 'At least one transform is required'
-                          : 'Remove this transform'
-                      }
-                      withArrow
-                    >
-                      <ActionIcon
-                        color="red"
-                        variant="subtle"
-                        aria-label="Remove transform"
-                        disabled={disableRemove}
-                        onClick={() => removeTransform(index)}
-                      >
-                        <IconTrash size={16} />
-                      </ActionIcon>
-                    </Tooltip>
+                        <SelectTrigger id={`transform-kind-${index}`}>
+                          <SelectValue placeholder="Select a transformation" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {TRANSFORM_OPTIONS.map(option => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <TooltipProvider>
+                      <Group gap="xs" className="pt-8">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              aria-label="Move transform up"
+                              onClick={() => moveTransform(index, 'up')}
+                              disabled={index === 0}
+                            >
+                              <IconArrowUp className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Move up</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              aria-label="Move transform down"
+                              onClick={() => moveTransform(index, 'down')}
+                              disabled={index === localTransforms.length - 1}
+                            >
+                              <IconArrowDown className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Move down</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              aria-label="Remove transform"
+                              disabled={disableRemove}
+                              onClick={() => removeTransform(index)}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <IconTrash className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {disableRemove
+                              ? 'At least one transform is required'
+                              : 'Remove this transform'}
+                          </TooltipContent>
+                        </Tooltip>
+                      </Group>
+                    </TooltipProvider>
                   </Group>
-                </Group>
 
-                <Divider />
-                {renderTransformFields(transform, index)}
-              </Stack>
+                  <Separator />
+                  {renderTransformFields(transform, index)}
+                </Stack>
+              </CardContent>
             </Card>
           );
         })}
       </Stack>
 
       <Button
-        variant="default"
-        leftSection={<IconPlus size={16} />}
+        variant="outline"
         onClick={addTransform}
         disabled={localTransforms.length >= 12}
+        className="w-full"
       >
+        <IconPlus className="mr-2 h-4 w-4" />
         Add transform
       </Button>
     </Stack>
