@@ -46,3 +46,43 @@
 - Accessibility & internationalization maintained.
 - Developer experience: documentation, customization, testability.
 - If all criteria met, produce adoption RFC with timelines and required code changes; otherwise, document blockers and alternatives (enhancing current UI, building custom components).
+
+---
+
+## Evaluation Summary (2025-02-14)
+
+### Current UI Capabilities
+- Frontend state lives in `useChatSession`, backed by `startChatSession` / `sendChatMessage` mutations and `chatEvents` subscription (assistant/tool messages as discrete GraphQL events).
+- Mantine components provide theming, layout, and UX polish (badges, alerts, scroll area, input bar).
+- Chat metadata: provider switcher, model badge, tool invocation summaries, restart/reset flows, and persisted session IDs from the backend.
+
+### assistant-ui Fit Analysis
+- **Runtime options**: `LocalRuntime` can call our GraphQL API through fetch, but we need streaming semantics; `ExternalStoreRuntime` lets us reuse Apollo-managed state and push GraphQL subscription updates directly into assistant-ui.
+- **Tool calls**: Library supports tool-call message parts and custom renderers; we can map our `ToolInvocation` event summary into assistant-ui `ToolCallMessagePart` with the same payload we persist today.
+- **Styling/theming**: Defaults rely on shadcn/tailwind CSS via `@assistant-ui/styles`. Mantine can host assistant-ui components, but we either accept their styling or build wrappers that map Mantine tokens to CSS vars. Expect effort to align typography, spacing, dark mode, and Mantine theme overrides.
+- **Transport expectations**: Most recipes assume REST or OpenAI-compatible streaming. For GraphQL we’ll build a runtime adapter that:
+  - Calls `startChatSession` / `sendChatMessage`.
+  - Subscribes to `chatEvents` and updates assistant-ui message store (either via `useExternalStoreRuntime` or a custom `LocalRuntime` adapter that forwards incremental events).
+  - Translates GraphQL payloads (assistant text, tool summaries) into assistant-ui message/part schema.
+- **Persistence**: assistant-ui is stateless by default; we already persist sessions in Layercake DB. We can keep existing GraphQL endpoints and skip Assistant Cloud.
+- **Dependencies**: Requires React 18+, Zustand, Radix primitives, and CSS bundle; all compatible with our Vite setup. Need to audit bundle size impact once integrated.
+
+### Prototype Scope
+- Build a feature-flagged page using `AssistantRuntimeProvider + Thread`, wired to a lightweight adapter that consumes existing GraphQL hooks.
+- Implement adapter utilities:
+  - Event translator (GraphQL `ChatEvent` → assistant-ui `ThreadMessage` + parts).
+  - Message send handler that mirrors `useChatSession.sendMessage`.
+- Wrap default components with Mantine containers to maintain layout parity.
+- Validate streaming/perf by replaying an existing session via mocked events.
+
+### Risks & Mitigations
+- **Styling drift**: High likelihood default assistant-ui appearance clashes with Mantine. Mitigate by overriding CSS variables and, if necessary, composing primitives with Mantine components.
+- **Feature parity**: Need custom UI for tool summaries and provider switcher. assistant-ui primitives allow custom headers/footers; ensure we can slot provider selector without fighting internal layouts.
+- **Testing**: Introduce React Testing Library snapshots to ensure event translation works; keep integration behind feature flag until stable.
+- **bundle size**: Monitor via `npm run analyze` to ensure acceptable growth; tree-shake unused primitives.
+
+### Recommendation
+assistant-ui can replace the bespoke chat view with manageable engineering effort:
+- Integration complexity: **Medium** (adapter development + styling work).
+- Key blockers: none identified; all required hooks exposed via `LocalRuntime`/`ExternalStoreRuntime`.
+- Next step: implement prototype branch following “Integration Spike Plan”, evaluate styling workload, and run UX review with the product team before deciding on full migration.
