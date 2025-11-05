@@ -1,5 +1,12 @@
 import React, { useCallback } from 'react';
-import { Modal, Button, Group, Text } from '@mantine/core';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import { PlanDagNodeType, NodeMetadata } from '../../../types/plan-dag';
 import { DataSourceNodeConfigForm } from './forms/DataSourceNodeConfigForm';
 import { TransformNodeConfigForm } from './forms/TransformNodeConfigForm';
@@ -104,7 +111,7 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
       case PlanDagNodeType.OUTPUT:
         return <OutputNodeConfigForm {...commonProps} />;
       default:
-        return <Text color="red">Unknown node type: {nodeType}</Text>;
+        return <p className="text-destructive">Unknown node type: {nodeType}</p>;
     }
   };
 
@@ -130,28 +137,32 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
   };
 
   return (
-    <Modal
-      opened={opened}
-      onClose={onClose}
-      title={`Configure ${getNodeTypeName()}`}
-      size="lg"
-      closeOnClickOutside={false}
-      closeOnEscape={false}
+    <Dialog
+      open={opened}
+      onOpenChange={(open) => {
+        // Only allow closing via Cancel button (closeOnClickOutside={false}, closeOnEscape={false})
+        if (!open) return;
+      }}
     >
-      {renderConfigForm()}
-
-      <Group mt="xl" justify="flex-end">
-        <Button variant="subtle" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button
-          onClick={handleSave}
-          disabled={!isValid}
-          variant="filled"
-        >
-          Save Configuration
-        </Button>
-      </Group>
-    </Modal>
+      <DialogContent className="sm:max-w-[600px]">
+        <DialogHeader>
+          <DialogTitle>Configure {getNodeTypeName()}</DialogTitle>
+        </DialogHeader>
+        <div className="py-4">
+          {renderConfigForm()}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSave}
+            disabled={!isValid}
+          >
+            Save Configuration
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
