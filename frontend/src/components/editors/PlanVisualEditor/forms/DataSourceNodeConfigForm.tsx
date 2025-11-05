@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Stack, Select, Loader, Alert, Text } from '@mantine/core';
-import { IconAlertCircle } from '@tabler/icons-react';
+import { IconAlertCircle, IconLoader2 } from '@tabler/icons-react';
 import { useQuery } from '@apollo/client/react';
 import { gql } from '@apollo/client';
 import { DataSourceNodeConfig, NodeMetadata } from '../../../../types/plan-dag';
+import { Stack } from '@/components/layout-primitives';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 // GraphQL query for available data sources
 const GET_AVAILABLE_DATA_SOURCES = gql`
@@ -73,7 +76,7 @@ export const DataSourceNodeConfigForm: React.FC<DataSourceNodeConfigFormProps> =
     setIsValid(isValid);
   }, [localConfig.dataSourceId, setIsValid]);
 
-  const handleDataSourceChange = (value: string | null) => {
+  const handleDataSourceChange = (value: string | undefined) => {
     if (value) {
       const dataSourceId = parseInt(value, 10);
       const newSelection = data?.dataSources?.find(ds => ds.id === dataSourceId);
@@ -101,7 +104,7 @@ export const DataSourceNodeConfigForm: React.FC<DataSourceNodeConfigFormProps> =
     }
   };
 
-  const handleDisplayModeChange = (value: string | null) => {
+  const handleDisplayModeChange = (value: string | undefined) => {
     setLocalConfig(prev => ({
       ...prev,
       displayMode: value as 'summary' | 'detailed' | 'preview' | undefined,
@@ -110,17 +113,21 @@ export const DataSourceNodeConfigForm: React.FC<DataSourceNodeConfigFormProps> =
 
   if (loading) {
     return (
-      <Stack align="center" p="md">
-        <Loader size="sm" />
-        <Text size="sm" c="dimmed">Loading data sources...</Text>
+      <Stack gap="md" className="items-center py-4">
+        <IconLoader2 className="h-4 w-4 animate-spin" />
+        <p className="text-sm text-muted-foreground">Loading data sources...</p>
       </Stack>
     );
   }
 
   if (error) {
     return (
-      <Alert icon={<IconAlertCircle size="1rem" />} color="red" title="Error">
-        Failed to load data sources: {error.message}
+      <Alert variant="destructive">
+        <IconAlertCircle className="h-4 w-4" />
+        <AlertTitle>Error</AlertTitle>
+        <AlertDescription>
+          Failed to load data sources: {error.message}
+        </AlertDescription>
       </Alert>
     );
   }
@@ -137,50 +144,73 @@ export const DataSourceNodeConfigForm: React.FC<DataSourceNodeConfigFormProps> =
 
   return (
     <Stack gap="md">
-      <Select
-        label="Data Source"
-        placeholder="Select a data source"
-        description="Choose an existing data source to reference in this plan"
-        data={dataSourceOptions}
-        value={localConfig.dataSourceId?.toString() || null}
-        onChange={handleDataSourceChange}
-        required
-        searchable
-        clearable
-        maxDropdownHeight={200}
-      />
+      <div className="space-y-2">
+        <Label htmlFor="data-source">
+          Data Source <span className="text-red-600">*</span>
+        </Label>
+        <Select
+          value={localConfig.dataSourceId?.toString() || undefined}
+          onValueChange={handleDataSourceChange}
+        >
+          <SelectTrigger id="data-source">
+            <SelectValue placeholder="Select a data source" />
+          </SelectTrigger>
+          <SelectContent className="max-h-[200px]">
+            {dataSourceOptions.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                <div>
+                  <div>{option.label}</div>
+                  <div className="text-xs text-muted-foreground">{option.description}</div>
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-sm text-muted-foreground">
+          Choose an existing data source to reference in this plan
+        </p>
+      </div>
 
       {selectedDataSource && (
-        <Alert color="blue" radius="md" p="sm">
-          <Stack gap="xs">
-            <Text size="sm" fw={500}>Selected Data Source Details:</Text>
-            <Text size="xs" c="dimmed">
-              <strong>Type:</strong> {selectedDataSource.fileFormat}/{selectedDataSource.dataType}
-            </Text>
-            {selectedDataSource.description && (
-              <Text size="xs" c="dimmed">
-                <strong>Description:</strong> {selectedDataSource.description}
-              </Text>
-            )}
-            <Text size="xs" c="dimmed">
-              <strong>Created:</strong> {new Date(selectedDataSource.createdAt).toLocaleDateString()}
-            </Text>
-          </Stack>
+        <Alert>
+          <AlertTitle>Selected Data Source Details</AlertTitle>
+          <AlertDescription>
+            <div className="space-y-1 text-xs">
+              <div>
+                <strong>Type:</strong> {selectedDataSource.fileFormat}/{selectedDataSource.dataType}
+              </div>
+              {selectedDataSource.description && (
+                <div>
+                  <strong>Description:</strong> {selectedDataSource.description}
+                </div>
+              )}
+              <div>
+                <strong>Created:</strong> {new Date(selectedDataSource.createdAt).toLocaleDateString()}
+              </div>
+            </div>
+          </AlertDescription>
         </Alert>
       )}
 
-      <Select
-        label="Display Mode"
-        placeholder="Choose display mode"
-        description="How this data source should be displayed in the plan view"
-        data={[
-          { value: 'summary', label: 'Summary' },
-          { value: 'detailed', label: 'Detailed' },
-          { value: 'preview', label: 'Preview' },
-        ]}
-        value={localConfig.displayMode || 'summary'}
-        onChange={handleDisplayModeChange}
-      />
+      <div className="space-y-2">
+        <Label htmlFor="display-mode">Display Mode</Label>
+        <Select
+          value={localConfig.displayMode || 'summary'}
+          onValueChange={handleDisplayModeChange}
+        >
+          <SelectTrigger id="display-mode">
+            <SelectValue placeholder="Choose display mode" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="summary">Summary</SelectItem>
+            <SelectItem value="detailed">Detailed</SelectItem>
+            <SelectItem value="preview">Preview</SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-sm text-muted-foreground">
+          How this data source should be displayed in the plan view
+        </p>
+      </div>
     </Stack>
   );
 };
