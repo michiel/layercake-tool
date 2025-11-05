@@ -88,6 +88,7 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
   const manualEdgesRef = useRef<Edge[]>([]);
   const [selectedNodes, setSelectedNodes] = useState<string[]>([]);
   const [selectedEdges, setSelectedEdges] = useState<string[]>([]);
+  const isDraggingRef = useRef(false);
 
   const getNumericSize = useCallback((value: number | string | null | undefined) => {
     if (typeof value === 'number') {
@@ -349,8 +350,13 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
     }
   }, [onNodeSelect]);
 
+  const handleNodeDragStart = useCallback(() => {
+    isDraggingRef.current = true;
+  }, []);
+
   // Handle node/subflow drag stop to detect parent group changes
   const handleNodeDragStop = useCallback((_event: React.MouseEvent, node: Node) => {
+    isDraggingRef.current = false;
     // Only apply drag reparenting in Flow mode or Hierarchy containers mode
     if (mode === 'hierarchy' && hierarchyViewMode !== 'containers') return;
     if (mode !== 'flow' && mode !== 'hierarchy') return;
@@ -481,6 +487,9 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
   }, [mode, hierarchyViewMode, onNodeUpdate, renderGraph, nodes, setNodes]);
 
   useEffect(() => {
+    if (isDraggingRef.current) {
+      return;
+    }
     if (mode !== 'flow' && !(mode === 'hierarchy' && hierarchyViewMode === 'containers')) {
       return;
     }
@@ -971,6 +980,7 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
         onEdgesChange={handleEdgesChange}
         onConnect={handleConnect}
         onSelectionChange={handleSelectionChange}
+        onNodeDragStart={handleNodeDragStart}
         onNodeDragStop={handleNodeDragStop}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
