@@ -10,26 +10,21 @@ import {
 import { ThreadPrimitive, MessagePrimitive, ComposerPrimitive } from '@assistant-ui/react'
 import { useQuery } from '@apollo/client/react'
 import { gql } from '@apollo/client'
-import {
-  Alert,
-  Badge,
-  Button,
-  Card,
-  Group,
-  Loader,
-  Paper,
-  ScrollArea,
-  Select,
-  Stack,
-  Text,
-  Title,
-} from '@mantine/core'
 import { IconMessageDots, IconRefresh } from '@tabler/icons-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 
 import { CHAT_PROVIDER_OPTIONS, type ChatProviderOption } from '../graphql/chat'
 import { useChatSession, type ChatMessageEntry } from '../hooks/useChatSession'
+import { Stack, Group } from '../components/layout-primitives'
+import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert'
+import { Badge } from '../components/ui/badge'
+import { Button } from '../components/ui/button'
+import { Card, CardContent } from '../components/ui/card'
+import { Label } from '../components/ui/label'
+import { ScrollArea } from '../components/ui/scroll-area'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
+import { Spinner } from '../components/ui/spinner'
 
 const GET_PROJECT = gql`
   query GetProjectName($id: Int!) {
@@ -83,38 +78,27 @@ const convertMessages = (entries: readonly ChatMessageEntry[]): ThreadMessageLik
 
 const SimpleThreadMessage = () => {
   const role = useAssistantState(({ message }) => message.role)
-  const align = role === 'user' ? 'flex-end' : 'flex-start'
+  const align = role === 'user' ? 'end' : 'start'
   const background =
-    role === 'user' ? 'var(--mantine-color-blue-1)' : role === 'assistant' ? 'var(--mantine-color-gray-1)' : 'transparent'
+    role === 'user' ? '#edf2ff' : role === 'assistant' ? '#f8f9fa' : 'transparent'
 
   return (
-    <Group justify={align} w="100%" py="xs">
-      <Paper
-        radius="md"
-        p="md"
-        withBorder
-        style={{
-          maxWidth: '70%',
-          background,
-        }}
+    <Group justify={align} className="w-full py-2">
+      <Card
+        className="border max-w-[70%]"
+        style={{ background }}
       >
-        <MessagePrimitive.Parts />
-      </Paper>
+        <CardContent className="pt-4 pb-4">
+          <MessagePrimitive.Parts />
+        </CardContent>
+      </Card>
     </Group>
   )
 }
 
 const SimpleComposer = () => (
   <ComposerPrimitive.Root
-    style={{
-      display: 'flex',
-      alignItems: 'flex-end',
-      gap: 'var(--mantine-spacing-sm)',
-      border: '1px solid var(--mantine-color-gray-3)',
-      borderRadius: 'var(--mantine-radius-md)',
-      padding: 'var(--mantine-spacing-sm)',
-      background: 'var(--mantine-color-body)',
-    }}
+    className="flex items-end gap-2 border rounded-md p-2 bg-background"
   >
     <ComposerPrimitive.Input
       aria-label="Ask the assistant"
@@ -129,10 +113,10 @@ const SimpleComposer = () => (
         padding: '0',
       }}
     />
-    <Group gap="xs" justify="flex-end" wrap="nowrap">
+    <Group gap="xs" justify="end" className="flex-shrink-0">
       <ThreadPrimitive.If running>
         <ComposerPrimitive.Cancel asChild>
-          <Button variant="light" color="red" size="sm">
+          <Button variant="destructive" size="sm">
             Cancel
           </Button>
         </ComposerPrimitive.Cancel>
@@ -151,29 +135,22 @@ const ThreadView = () => {
 
   return (
     <ThreadPrimitive.Root
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--mantine-spacing-md)',
-        minHeight: '100%',
-      }}
+      className="flex flex-col gap-4 min-h-full"
     >
       <ThreadPrimitive.Viewport
         ref={viewportRef}
-        style={{
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-        }}
+        className="flex-1 flex flex-col"
       >
         <ThreadPrimitive.Empty>
-          <Card withBorder radius="md" shadow="sm" p="lg">
-            <Stack gap="xs">
-              <Title order={4}>Start a conversation</Title>
-              <Text c="dimmed" size="sm">
-                Ask the assistant about this project. It can invoke Layercake tools where appropriate.
-              </Text>
-            </Stack>
+          <Card className="border shadow-sm">
+            <CardContent className="pt-6">
+              <Stack gap="xs">
+                <h4 className="text-lg font-semibold">Start a conversation</h4>
+                <p className="text-sm text-muted-foreground">
+                  Ask the assistant about this project. It can invoke Layercake tools where appropriate.
+                </p>
+              </Stack>
+            </CardContent>
           </Card>
         </ThreadPrimitive.Empty>
 
@@ -239,79 +216,92 @@ export const AssistantUiChatPage = () => {
       : 'Ready'
 
   return (
-    <Stack h="100%" p="md" gap="md">
-      <Group justify="space-between" align="flex-start">
+    <Stack gap="md" className="h-full p-4">
+      <Group justify="between" align="start">
         <div>
-          <Title order={2}>Assistant UI Preview</Title>
-          <Text c="dimmed" size="sm">
+          <h2 className="text-2xl font-bold">Assistant UI Preview</h2>
+          <p className="text-sm text-muted-foreground">
             {project
               ? `Exploring project "${project.name}" with the assistant-ui prototype.`
               : 'Prototype chat interface powered by assistant-ui.'}
-          </Text>
+          </p>
         </div>
         <Group gap="sm">
-          <Select
-            label="Provider"
-            data={providerSelectData}
-            value={provider}
-            onChange={(value) => {
-              if (value) {
-                setProvider(value as ChatProviderOption)
-                chat.restart()
-              }
-            }}
-            styles={{ root: { minWidth: 220 } }}
-          />
+          <div className="space-y-2" style={{ minWidth: 220 }}>
+            <Label htmlFor="provider-select">Provider</Label>
+            <Select
+              value={provider}
+              onValueChange={(value) => {
+                if (value) {
+                  setProvider(value as ChatProviderOption)
+                  chat.restart()
+                }
+              }}
+            >
+              <SelectTrigger id="provider-select">
+                <SelectValue placeholder="Select provider" />
+              </SelectTrigger>
+              <SelectContent>
+                {providerSelectData.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    <div>
+                      <div>{option.label}</div>
+                      <div className="text-xs text-muted-foreground">{option.description}</div>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <Button
-            variant="light"
-            leftSection={<IconRefresh size={16} />}
+            variant="secondary"
             onClick={chat.restart}
             disabled={chat.loading}
+            className="mt-8"
           >
+            <IconRefresh className="mr-2 h-4 w-4" />
             Restart Session
           </Button>
         </Group>
       </Group>
 
       {chat.error && (
-        <Alert color="red" title="Chat unavailable" mt="xs">
-          {chat.error}
+        <Alert variant="destructive">
+          <AlertTitle>Chat unavailable</AlertTitle>
+          <AlertDescription>{chat.error}</AlertDescription>
         </Alert>
       )}
 
-      <Paper
-        withBorder
-        p="md"
-        radius="md"
-        style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}
-      >
-        <Group justify="space-between" mb="sm">
-          <Group gap="xs">
-            <Badge color="blue" variant="light">
-              {provider}
-            </Badge>
-            {chat.session?.model && (
-              <Badge color="gray" variant="light">
-                Model: {chat.session.model}
+      <Card className="border flex-1 flex flex-col min-h-0">
+        <CardContent className="pt-6 flex flex-col flex-1 min-h-0">
+          <Group justify="between" className="mb-4">
+            <Group gap="xs">
+              <Badge>
+                {provider}
               </Badge>
-            )}
+              {chat.session?.model && (
+                <Badge variant="secondary">
+                  Model: {chat.session.model}
+                </Badge>
+              )}
+            </Group>
+            <Group gap="xs">
+              {chat.loading ? <Spinner className="h-4 w-4" /> : <IconMessageDots size={18} className="text-blue-400" />}
+              <p className="text-sm text-muted-foreground">
+                {statusLabel}
+              </p>
+            </Group>
           </Group>
-          <Group gap="xs">
-            {chat.loading ? <Loader size="sm" /> : <IconMessageDots size={18} style={{ color: '#4dabf7' }} />}
-            <Text size="sm" c="dimmed">
-              {statusLabel}
-            </Text>
-          </Group>
-        </Group>
 
-        <ScrollArea style={{ flex: 1 }} type="auto">
-          <div style={{ minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
-            <AssistantRuntimeProvider runtime={runtime}>
-              <ThreadView />
-            </AssistantRuntimeProvider>
-          </div>
-        </ScrollArea>
-      </Paper>
+          <ScrollArea className="flex-1">
+            <div className="min-h-full flex flex-col">
+              <AssistantRuntimeProvider runtime={runtime}>
+                <ThreadView />
+              </AssistantRuntimeProvider>
+            </div>
+          </ScrollArea>
+        </CardContent>
+      </Card>
     </Stack>
   )
 }
