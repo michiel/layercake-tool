@@ -193,8 +193,8 @@ export const getLayoutedElements = async (
       const bgColor = layerStyle?.backgroundColor || DEFAULT_GROUP_BG;
 
       // Ensure minimum size for empty containers
-      const minContainerWidth = 250;
-      const minContainerHeight = 150;
+      const minContainerWidth = 320;
+      const minContainerHeight = 240;
       const containerWidth = Math.max(elkNode.width || minContainerWidth, minContainerWidth);
       const containerHeight = Math.max(elkNode.height || minContainerHeight, minContainerHeight);
 

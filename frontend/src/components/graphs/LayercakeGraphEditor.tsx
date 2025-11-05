@@ -618,13 +618,13 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
           belongsTo: parentNode,
         },
         style: {
-          width: isPartition ? 200 : undefined,
-          height: isPartition ? 200 : undefined,
+          width: isPartition ? 320 : undefined,
+          height: isPartition ? 240 : undefined,
         },
         // Set top-level width/height for containers so drag detection works
         ...(isPartition ? {
-          width: 200,
-          height: 200,
+          width: 320,
+          height: 240,
         } : {}),
         ...(parentNode ? {
           parentNode,
