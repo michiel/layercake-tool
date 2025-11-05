@@ -213,25 +213,30 @@ The migration will be performed in stages to minimise disruption and allow for t
 
 ---
 
-### Stage 2: Core Layout Components (Structure)
+### Stage 2: Core Layout Components (Structure) 🚧 IN PROGRESS
 **Goal:** Replace Mantine layout components with custom Tailwind equivalents
 **Duration:** 2-3 days
 
-#### Components to Create:
+#### Components Created: ✅
 ```
-src/components/layout/
-  ├── AppShell.tsx          # Custom layout replacement
-  ├── Container.tsx         # Max-width container
-  ├── Stack.tsx            # Vertical flex layout
-  ├── Group.tsx            # Horizontal flex layout
-  └── Flex.tsx             # Generic flex container
+src/components/layout-primitives/
+  ├── Stack.tsx            # Vertical flex layout (✅ Created)
+  ├── Group.tsx            # Horizontal flex layout (✅ Created)
+  ├── Flex.tsx             # Generic flex container (✅ Created)
+  ├── Container.tsx        # Max-width container (✅ Created)
+  ├── Paper.tsx            # Card-like container (✅ Created)
+  ├── Center.tsx           # Centering container (✅ Created)
+  └── index.ts             # Barrel export (✅ Created)
+
+src/components/ui/
+  └── spinner.tsx          # Loading spinner with lucide-react (✅ Created)
 ```
 
 #### Files to Update (Priority):
-1. `src/App.tsx` - AppShell, layout structure
-2. `src/main.tsx` - Remove MantineProvider, add Tailwind
-3. `src/components/layout/TopBar.tsx`
-4. `src/components/layout/PageContainer.tsx`
+1. `src/App.tsx` - AppShell, layout structure (⏳ Pending)
+2. `src/main.tsx` - Remove MantineProvider, add Tailwind (⏳ Pending)
+3. `src/components/layout/TopBar.tsx` (⏳ Pending)
+4. `src/components/layout/PageContainer.tsx` (⏳ Pending)
 
 #### Migration Pattern:
 ```tsx
