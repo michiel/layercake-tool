@@ -86,3 +86,9 @@ assistant-ui can replace the bespoke chat view with manageable engineering effor
 - Integration complexity: **Medium** (adapter development + styling work).
 - Key blockers: none identified; all required hooks exposed via `LocalRuntime`/`ExternalStoreRuntime`.
 - Next step: implement prototype branch following “Integration Spike Plan”, evaluate styling workload, and run UX review with the product team before deciding on full migration.
+
+## Prototype Implementation (2025-02-14)
+- Added an assistant-ui powered preview screen at `frontend/src/pages/AssistantUiChatPage.tsx`, composed with `useExternalStoreRuntime`, Mantine wrappers, and the existing `useChatSession` backend adapter.
+- Feature-gated the route (`/projects/:projectId/chat/assistant-ui`) and navigation entry behind `VITE_ENABLE_ASSISTANT_UI=true` so the experience can be toggled without impacting current users.
+- Bundled `@assistant-ui/react` and `@assistant-ui/styles` with minimal styling overrides to coexist with Mantine.
+- Reused GraphQL chat mutations/subscriptions; runtime converts existing `ChatMessageEntry` records into assistant-ui `ThreadMessageLike` payloads, including tool-call summaries.

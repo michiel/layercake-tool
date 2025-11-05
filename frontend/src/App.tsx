@@ -15,8 +15,11 @@ import { TopBar } from './components/layout/TopBar'
 import { useCollaborationV2 } from './hooks/useCollaborationV2'
 import { useConnectionStatus } from './hooks/useConnectionStatus'
 import { ProjectChatPage } from './pages/ProjectChatPage'
+import { AssistantUiChatPage } from './pages/AssistantUiChatPage'
 import { ChatLogsPage } from './pages/ChatLogsPage'
 import { getOrCreateSessionId } from './utils/session'
+
+const ENABLE_ASSISTANT_UI = import.meta.env.VITE_ENABLE_ASSISTANT_UI === 'true'
 
 // Collaboration Context for providing project-level collaboration to all pages
 const CollaborationContext = React.createContext<any>(null)
@@ -285,20 +288,36 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                     {navCollapsed ? <IconMessageDots size={16} /> : 'Chat'}
                   </Button>
                 </Tooltip>
-                {/* Show Chat logs only when on Chat page */}
+                {/* Show supplemental chat links when on Chat page */}
                 {isActiveRoutePrefix(`/projects/${projectId}/chat`) && (
-                  <Tooltip label="Chat logs" position="right" disabled={!navCollapsed}>
-                    <Button
-                      variant={isActiveRoute(`/projects/${projectId}/chat/logs`) ? 'filled' : 'light'}
-                      fullWidth={!navCollapsed}
-                      leftSection={navCollapsed ? undefined : <IconMessageDots size={16} />}
-                      onClick={() => navigate(`/projects/${projectId}/chat/logs`)}
-                      px={navCollapsed ? 'xs' : undefined}
-                      style={navCollapsed ? { justifyContent: 'center', ...(navCollapsed ? {} : { paddingLeft: '2rem' }) } : undefined}
-                    >
-                      {navCollapsed ? <IconMessageDots size={16} /> : 'Chat logs'}
-                    </Button>
-                  </Tooltip>
+                  <Stack gap="xs" pl={navCollapsed ? 0 : 'lg'}>
+                    {ENABLE_ASSISTANT_UI && (
+                      <Tooltip label="Assistant UI (preview)" position="right" disabled={!navCollapsed}>
+                        <Button
+                          variant={isActiveRoute(`/projects/${projectId}/chat/assistant-ui`) ? 'filled' : 'light'}
+                          fullWidth={!navCollapsed}
+                          leftSection={navCollapsed ? undefined : <IconMessageDots size={16} />}
+                          onClick={() => navigate(`/projects/${projectId}/chat/assistant-ui`)}
+                          px={navCollapsed ? 'xs' : undefined}
+                          style={navCollapsed ? { justifyContent: 'center' } : undefined}
+                        >
+                          {navCollapsed ? <IconMessageDots size={16} /> : 'Assistant UI (Preview)'}
+                        </Button>
+                      </Tooltip>
+                    )}
+                    <Tooltip label="Chat logs" position="right" disabled={!navCollapsed}>
+                      <Button
+                        variant={isActiveRoute(`/projects/${projectId}/chat/logs`) ? 'filled' : 'light'}
+                        fullWidth={!navCollapsed}
+                        leftSection={navCollapsed ? undefined : <IconMessageDots size={16} />}
+                        onClick={() => navigate(`/projects/${projectId}/chat/logs`)}
+                        px={navCollapsed ? 'xs' : undefined}
+                        style={navCollapsed ? { justifyContent: 'center' } : undefined}
+                      >
+                        {navCollapsed ? <IconMessageDots size={16} /> : 'Chat logs'}
+                      </Button>
+                    </Tooltip>
+                  </Stack>
                 )}
               </>
             )}
@@ -1317,6 +1336,13 @@ function App() {
               <ChatLogsPage />
             </ErrorBoundary>
           } />
+          {ENABLE_ASSISTANT_UI && (
+            <Route path="/projects/:projectId/chat/assistant-ui" element={
+              <ErrorBoundary>
+                <AssistantUiChatPage />
+              </ErrorBoundary>
+            } />
+          )}
           <Route path="/projects/:projectId/plan-nodes/:graphId/edit" element={
             <ErrorBoundary>
               <GraphEditorPage />
