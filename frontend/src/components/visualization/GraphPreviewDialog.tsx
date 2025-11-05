@@ -1,6 +1,16 @@
 import { useMemo, useState, useEffect } from 'react';
-import { Modal, Tabs, Group, Title, ActionIcon, Stack, Loader, Alert, Text } from '@mantine/core';
 import { IconLayout2, IconHierarchy, IconX, IconAlertCircle } from '@tabler/icons-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Spinner } from '@/components/ui/spinner';
+import { Stack } from '@/components/layout-primitives';
 import { GraphPreview, GraphData } from './GraphPreview';
 
 interface GraphPreviewDialogProps {
@@ -69,64 +79,69 @@ export const GraphPreviewDialog = ({ opened, onClose, data, title, loading = fal
   }, [opened]);
 
   return (
-    <Modal
-      opened={opened}
-      onClose={onClose}
-      withCloseButton={false}
-      size="90%"
-      withinPortal
-      padding="md"
-    >
-      <Group justify="space-between" mb="md">
-        <Title order={4}>{title || 'Graph Preview'}</Title>
-        <ActionIcon variant="subtle" onClick={onClose}>
-          <IconX size={18} />
-        </ActionIcon>
-      </Group>
-      {loading ? (
-        <Stack align="center" justify="center" style={{ height: '70vh' }} gap="sm">
-          <Loader />
-          <Text c="dimmed">Loading graph preview…</Text>
-        </Stack>
-      ) : error ? (
-        <Alert icon={<IconAlertCircle size={16} />} color="red">
-          {error}
-        </Alert>
-      ) : data ? (
-        <Tabs value={tab} onChange={setTab}>
-        <Tabs.List>
-          <Tabs.Tab value="flow" leftSection={<IconLayout2 size={16} />}>
-            Flow
-          </Tabs.Tab>
-          <Tabs.Tab value="hierarchy" leftSection={<IconHierarchy size={16} />}>
-            Hierarchy
-          </Tabs.Tab>
-        </Tabs.List>
+    <Dialog open={opened} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-[90vw] h-[90vh] flex flex-col">
+        <DialogHeader className="flex flex-row items-center justify-between pr-10">
+          <DialogTitle>{title || 'Graph Preview'}</DialogTitle>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute right-4 top-4"
+            onClick={onClose}
+          >
+            <IconX size={18} />
+          </Button>
+        </DialogHeader>
+        <div className="flex-1 overflow-hidden">
+          {loading ? (
+            <Stack align="center" justify="center" className="h-full">
+              <Spinner size="lg" />
+              <p className="text-sm text-muted-foreground">Loading graph preview…</p>
+            </Stack>
+          ) : error ? (
+            <Alert variant="destructive">
+              <IconAlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          ) : data ? (
+            <Tabs value={tab || 'flow'} onValueChange={setTab} className="h-full flex flex-col">
+              <TabsList>
+                <TabsTrigger value="flow" className="flex items-center gap-2">
+                  <IconLayout2 size={16} />
+                  Flow
+                </TabsTrigger>
+                <TabsTrigger value="hierarchy" className="flex items-center gap-2">
+                  <IconHierarchy size={16} />
+                  Hierarchy
+                </TabsTrigger>
+              </TabsList>
 
-          <Tabs.Panel value="flow" pt="md" style={{ height: '75vh' }}>
-            {normalizedData.flow ? (
-              <GraphPreview
-                key={`flow-${normalizedData.flow.nodes.length}-${normalizedData.flow.links.length}-${tab}`}
-                data={normalizedData.flow}
-              />
-            ) : (
-              <Text c="dimmed">No flow data available.</Text>
-            )}
-          </Tabs.Panel>
-          <Tabs.Panel value="hierarchy" pt="md" style={{ height: '75vh' }}>
-          {normalizedData.hierarchy ? (
-            <GraphPreview
-              key={`hierarchy-${normalizedData.hierarchy.nodes.length}-${normalizedData.hierarchy.links.length}-${tab}`}
-              data={normalizedData.hierarchy}
-            />
+              <TabsContent value="flow" className="flex-1 mt-4" style={{ height: '75vh' }}>
+                {normalizedData.flow ? (
+                  <GraphPreview
+                    key={`flow-${normalizedData.flow.nodes.length}-${normalizedData.flow.links.length}-${tab}`}
+                    data={normalizedData.flow}
+                  />
+                ) : (
+                  <p className="text-sm text-muted-foreground">No flow data available.</p>
+                )}
+              </TabsContent>
+              <TabsContent value="hierarchy" className="flex-1 mt-4" style={{ height: '75vh' }}>
+                {normalizedData.hierarchy ? (
+                  <GraphPreview
+                    key={`hierarchy-${normalizedData.hierarchy.nodes.length}-${normalizedData.hierarchy.links.length}-${tab}`}
+                    data={normalizedData.hierarchy}
+                  />
+                ) : (
+                  <p className="text-sm text-muted-foreground">No hierarchy data available.</p>
+                )}
+              </TabsContent>
+            </Tabs>
           ) : (
-            <Text c="dimmed">No hierarchy data available.</Text>
+            <p className="text-sm text-muted-foreground">No preview data available.</p>
           )}
-        </Tabs.Panel>
-      </Tabs>
-    ) : (
-      <Text c="dimmed">No preview data available.</Text>
-    )}
-    </Modal>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 };
