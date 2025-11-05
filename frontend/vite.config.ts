@@ -9,6 +9,7 @@ const isTauri =
   Boolean(process.env.TAURI_ENV_PLATFORM)
 
 const alias: Record<string, string> = {
+  '@': path.resolve(__dirname, './src'),
   'web-worker': path.resolve(__dirname, 'src/utils/dummy-web-worker.js'),
 }
 

@@ -8,7 +8,10 @@ import { apolloClient, initializeTauriServer } from './graphql/client'
 import { isTauriApp } from './utils/tauri'
 import App from './App'
 
-// Mantine CSS
+// Tailwind CSS
+import './index.css'
+
+// Mantine CSS (keeping temporarily during migration)
 import '@mantine/core/styles.css'
 import '@mantine/dates/styles.css'
 import '@mantine/notifications/styles.css'
