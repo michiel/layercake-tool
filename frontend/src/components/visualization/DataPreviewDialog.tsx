@@ -1,4 +1,9 @@
-import { Modal } from '@mantine/core';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { DataPreview } from './DataPreview';
 import { DataSourcePreview } from '../../graphql/preview';
 
@@ -20,21 +25,15 @@ export const DataPreviewDialog = ({
   title
 }: DataPreviewDialogProps) => {
   return (
-    <Modal
-      opened={opened}
-      onClose={onClose}
-      title={title || 'Data Preview'}
-      size="100%"
-      fullScreen
-      padding={0}
-      styles={{
-        body: {
-          height: 'calc(100vh - 60px)',
-          padding: 0,
-        },
-      }}
-    >
-      <DataPreview preview={preview} loading={loading} error={error} />
-    </Modal>
+    <Dialog open={opened} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-[100vw] w-full h-screen p-0 gap-0">
+        <DialogHeader className="px-6 py-4 border-b">
+          <DialogTitle>{title || 'Data Preview'}</DialogTitle>
+        </DialogHeader>
+        <div className="flex-1 overflow-hidden" style={{ height: 'calc(100vh - 60px)' }}>
+          <DataPreview preview={preview} loading={loading} error={error} />
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 };
