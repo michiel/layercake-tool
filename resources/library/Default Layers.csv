@@ -1,16 +1,16 @@
 id,label,background_color,text_color,border_color,comment
-main_01,main_01,EBF2FF,003B94,B2CCFF,"'Lightest Blue: Background for the largest/outermost container, or positive/good component.'"
-main_02,main_02,B2CCFF,003B94,598BFF,"'Light Blue: Background for secondary containers (one level nested), or a standard component.'"
-main_03,main_03,598BFF,FFFFFF,003B94,"'Mid Blue: Standard container fill, or a primary component focus.'"
-main_04,main_04,003B94,FFFFFF,002157,"'Darkest Blue: Border/outline for main elements, or background for deep nesting.'"
-alt_01,alt_01,FFF5EB,944C00,FFCCB2,'Lightest Orange: Background for contrasting outer container or secondary positive component.'
-alt_02,alt_02,FFCCB2,944C00,FF8B59,'Light Orange: Background for contrasting secondary container or secondary component.'
-alt_03,alt_03,FF8B59,FFFFFF,944C00,"'Mid Orange: Standard contrast fill (e.g., 'Bad component').'"
-alt_04,alt_04,944C00,FFFFFF,572B00,'Darkest Orange: Border/outline for alternate elements.'
-highlight,highlight,FFD966,333333,FFB800,"'Yellow: To emphasize a specific relationship, flow, or active element.'"
-comment,comment,A9A9A9,333333,808080,"'Gray: For annotations, notes, or deactivated elements.'"
-information,information,8CD9D9,333333,4FC6C6,'Cyan/Teal: For supplemental data or non-critical details.'
-warning,warning,FF6666,FFFFFF,CC0000,"'Red: To signify errors, problems, or elements to be avoided.'"
-callout,callout,66B2FF,FFFFFF,3385FF,'Bright Blue: For pop-up information or external links/references.'
-neutral_border,neutral_border,666666,333333,666666,'General purpose border for a neutral background.'
-neutral_text,neutral_text,FFFFFF,333333,FFFFFF,'Default dark text color for light backgrounds (Background/Border not applicable for text only).'
+main_01,Main 01,EBF2FF,003B94,B2CCFF,"'Lightest Blue: Background for the largest/outermost container, or positive/good component.'"
+main_02,Main 02,B2CCFF,003B94,598BFF,"'Light Blue: Background for secondary containers (one level nested), or a standard component.'"
+main_03,Main 03,598BFF,FFFFFF,003B94,"'Mid Blue: Standard container fill, or a primary component focus.'"
+main_04,Main 04,003B94,FFFFFF,002157,"'Darkest Blue: Border/outline for main elements, or background for deep nesting.'"
+alt_01,Alt 01,FFF5EB,944C00,FFCCB2,'Lightest Orange: Background for contrasting outer container or secondary positive component.'
+alt_02,Alt 02,FFCCB2,944C00,FF8B59,'Light Orange: Background for contrasting secondary container or secondary component.'
+alt_03,Alt 03,FF8B59,FFFFFF,944C00,"'Mid Orange: Standard contrast fill (e.g., 'Bad component').'"
+alt_04,Alt 04,944C00,FFFFFF,572B00,'Darkest Orange: Border/outline for alternate elements.'
+highlight,Highlight,FFD966,333333,FFB800,"'Yellow: To emphasize a specific relationship, flow, or active element.'"
+comment,Comment,A9A9A9,333333,808080,"'Gray: For annotations, notes, or deactivated elements.'"
+information,Information,8CD9D9,333333,4FC6C6,'Cyan/Teal: For supplemental data or non-critical details.'
+warning,Warning,FF6666,FFFFFF,CC0000,"'Red: To signify errors, problems, or elements to be avoided.'"
+callout,Callout,66B2FF,FFFFFF,3385FF,'Bright Blue: For pop-up information or external links/references.'
+neutral_border,Neutral border,666666,333333,666666,'General purpose border for a neutral background.'
+neutral_text,Neutral text,FFFFFF,333333,FFFFFF,'Default dark text color for light backgrounds (Background/Border not applicable for text only).'
