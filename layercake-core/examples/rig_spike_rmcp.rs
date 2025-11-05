@@ -7,7 +7,6 @@
 /// 2. Run this example: OPENAI_API_KEY=... cargo run --example rig_spike_rmcp
 ///
 /// This tests the critical integration point for the migration.
-
 use anyhow::Result;
 use rig::client::CompletionClient;
 use rig::completion::Prompt;

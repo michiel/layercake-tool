@@ -10,7 +10,6 @@
 /// Run with: cargo run --example rig_spike
 ///
 /// Set OPENAI_API_KEY environment variable for testing
-
 use anyhow::Result;
 
 #[tokio::main]
@@ -47,7 +46,9 @@ async fn test_basic_completion() -> Result<()> {
     let model = client.completion_model(providers::openai::GPT_4O_MINI);
 
     // Test basic prompt
-    let response = model.prompt("What is 2+2? Answer with just the number.").await?;
+    let response = model
+        .prompt("What is 2+2? Answer with just the number.")
+        .await?;
 
     println!("   Response: {}", response);
     println!("   ✅ Basic completion works\n");

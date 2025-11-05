@@ -5,10 +5,9 @@
 /// ```
 /// cargo run --example test_rig_integration --features console
 /// ```
-
 use anyhow::Result;
-use rig::completion::Prompt;
 use rig::client::CompletionClient;
+use rig::completion::Prompt;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -71,7 +70,9 @@ async fn test_ollama() -> Result<()> {
 
 async fn test_gemini() -> Result<()> {
     use rig::providers::gemini;
-    use rig::providers::gemini::completion::gemini_api_types::{AdditionalParameters, GenerationConfig};
+    use rig::providers::gemini::completion::gemini_api_types::{
+        AdditionalParameters, GenerationConfig,
+    };
 
     let api_key = std::env::var("GOOGLE_API_KEY")?;
     let client = gemini::Client::new(&api_key);

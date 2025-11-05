@@ -1,7 +1,6 @@
 /// Test rig streaming functionality
 ///
 /// Run with: OPENAI_API_KEY=... cargo run --example rig_spike_streaming
-
 use anyhow::Result;
 use rig::agent::stream_to_stdout;
 use rig::client::CompletionClient;

@@ -536,17 +536,23 @@ impl ChatSession {
             String::new()
         };
 
-        // Get base URL if configured
-        let provider_config = self.config.provider(self.provider);
-        let _base_url = provider_config.base_url.clone();
+        // Get base URL using persisted override -> environment -> provider default
+        let provider_base = self.config.provider(self.provider).base_url.clone();
+        let base_url = self
+            .credentials
+            .base_url_override(self.provider)
+            .await?
+            .or(provider_base);
 
         // Call appropriate provider
         match &self.agent {
             RigAgent::OpenAI(model) => {
-                let client = if !api_key.is_empty() {
-                    openai::Client::new(&api_key)
-                } else {
+                let client = if api_key.is_empty() {
                     return Err(anyhow!("OpenAI requires API key"));
+                } else if let Some(url) = base_url.as_deref() {
+                    openai::Client::builder(&api_key).base_url(url).build()
+                } else {
+                    openai::Client::new(&api_key)
                 };
 
                 let mut builder = client.agent(model);
@@ -624,8 +630,14 @@ impl ChatSession {
             }
 
             RigAgent::Ollama(model) => {
-                // Ollama client uses environment variable or defaults to localhost
-                let client = ollama::Client::from_env();
+                // Prefer persisted overrides, then environment, finally library default
+                let client = if let Some(url) = base_url.as_deref() {
+                    ollama::Client::builder().base_url(url).build()
+                } else if let Ok(env_url) = std::env::var("OLLAMA_API_BASE_URL") {
+                    ollama::Client::builder().base_url(&env_url).build()
+                } else {
+                    ollama::Client::new()
+                };
 
                 let mut builder = client.agent(model);
 

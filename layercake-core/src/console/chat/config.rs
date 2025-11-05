@@ -42,39 +42,32 @@ impl ChatConfig {
     }
 
     pub fn from_map(values: &HashMap<String, String>) -> Self {
-        fn parse_provider(input: Option<&String>) -> ChatProvider {
-            input
-                .and_then(|value| value.parse().ok())
-                .unwrap_or_default()
-        }
-
-        fn read<'a>(values: &'a HashMap<String, String>, key: &str, default: &str) -> String {
+        fn prioritized_value(values: &HashMap<String, String>, key: &str) -> Option<String> {
             values
                 .get(key)
                 .cloned()
                 .filter(|value| !value.is_empty())
-                .unwrap_or_else(|| default.to_string())
+                .or_else(|| std::env::var(key).ok().filter(|value| !value.is_empty()))
         }
 
-        let provider = parse_provider(values.get("LAYERCAKE_CHAT_PROVIDER"));
-        let timeout_secs = values
-            .get("LAYERCAKE_CHAT_TIMEOUT_SECS")
+        fn read(values: &HashMap<String, String>, key: &str, default: &str) -> String {
+            prioritized_value(values, key).unwrap_or_else(|| default.to_string())
+        }
+
+        let provider = prioritized_value(values, "LAYERCAKE_CHAT_PROVIDER")
+            .and_then(|value| value.parse().ok())
+            .unwrap_or_default();
+        let timeout_secs = prioritized_value(values, "LAYERCAKE_CHAT_TIMEOUT_SECS")
             .and_then(|value| value.parse().ok())
             .unwrap_or(90);
-        let system_prompt = values
-            .get("LAYERCAKE_CHAT_SYSTEM_PROMPT")
-            .cloned()
-            .filter(|value| !value.is_empty());
+        let system_prompt = prioritized_value(values, "LAYERCAKE_CHAT_SYSTEM_PROMPT");
 
         let mut providers = HashMap::new();
         providers.insert(
             ChatProvider::OpenAi,
             ProviderConfig {
                 model: read(values, "LAYERCAKE_OPENAI_MODEL", "gpt-4o-mini"),
-                base_url: values
-                    .get("OPENAI_BASE_URL")
-                    .cloned()
-                    .filter(|value| !value.is_empty()),
+                base_url: prioritized_value(values, "OPENAI_BASE_URL"),
             },
         );
         providers.insert(
@@ -168,11 +161,14 @@ impl ChatCredentialStore {
 
     async fn setting_value(&self, key: &str) -> Option<String> {
         if let Some(service) = &self.settings {
-            service.raw_value(key).await
-        } else {
-            std::env::var(key).ok()
+            if let Some(value) = service.raw_value(key).await {
+                if !value.is_empty() {
+                    return Some(value);
+                }
+            }
         }
-        .filter(|value| !value.is_empty())
+
+        std::env::var(key).ok().filter(|value| !value.is_empty())
     }
 
     async fn find_credentials(
