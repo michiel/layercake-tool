@@ -1560,7 +1560,31 @@ fn generate_node_id(node_type: &PlanDagNodeType, existing_nodes: &[PlanDagNode])
 }
 
 fn generate_edge_id(source: &str, target: &str) -> String {
-    format!("edge-{}-{}-{}", source, target, Uuid::new_v4().simple())
+    const MAX_ID_LEN: usize = 50;
+    const RANDOM_LEN: usize = 12;
+    // Keep generated IDs readable while respecting validation rules.
+    let random_segment = {
+        let uuid = Uuid::new_v4().simple().to_string();
+        uuid.chars().take(RANDOM_LEN).collect::<String>()
+    };
+
+    let mut source_segment = source.chars().take(16).collect::<String>();
+    let mut target_segment = target.chars().take(16).collect::<String>();
+
+    let mut candidate =
+        format!("edge_{}_{}_{}", source_segment, target_segment, random_segment);
+
+    if candidate.len() > MAX_ID_LEN {
+        source_segment = source.chars().take(10).collect();
+        target_segment = target.chars().take(10).collect();
+        candidate = format!("edge_{}_{}_{}", source_segment, target_segment, random_segment);
+    }
+
+    if candidate.len() > MAX_ID_LEN {
+        format!("edge_{}", random_segment)
+    } else {
+        candidate
+    }
 }
 
 fn apply_preview_limit(content: String, format: ExportFileType, max_rows: Option<usize>) -> String {
