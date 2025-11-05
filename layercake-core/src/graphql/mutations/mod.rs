@@ -93,13 +93,18 @@ fn generate_edge_id(source: &str, target: &str) -> String {
     let mut source_segment = source.chars().take(16).collect::<String>();
     let mut target_segment = target.chars().take(16).collect::<String>();
 
-    let mut candidate =
-        format!("edge_{}_{}_{}", source_segment, target_segment, random_segment);
+    let mut candidate = format!(
+        "edge_{}_{}_{}",
+        source_segment, target_segment, random_segment
+    );
 
     if candidate.len() > MAX_ID_LEN {
         source_segment = source.chars().take(10).collect();
         target_segment = target.chars().take(10).collect();
-        candidate = format!("edge_{}_{}_{}", source_segment, target_segment, random_segment);
+        candidate = format!(
+            "edge_{}_{}_{}",
+            source_segment, target_segment, random_segment
+        );
     }
 
     if candidate.len() > MAX_ID_LEN {
