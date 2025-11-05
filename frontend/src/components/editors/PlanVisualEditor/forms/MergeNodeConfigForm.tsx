@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Stack, Select, Alert, Text } from '@mantine/core';
 import { IconInfoCircle } from '@tabler/icons-react';
 import { MergeNodeConfig } from '../../../../types/plan-dag';
+import { Stack } from '@/components/layout-primitives';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface MergeNodeConfigFormProps {
   config: MergeNodeConfig;
@@ -33,22 +36,30 @@ export const MergeNodeConfigForm: React.FC<MergeNodeConfigFormProps> = ({
 
   return (
     <Stack gap="md">
-      <Alert icon={<IconInfoCircle size="1rem" />} color="blue" title="Merge Configuration">
-        <Text size="sm">
+      <Alert>
+        <IconInfoCircle className="h-4 w-4" />
+        <AlertTitle>Merge Configuration</AlertTitle>
+        <AlertDescription>
           Configure merge behavior. Inputs and output are determined by edge connections in the DAG.
-        </Text>
+        </AlertDescription>
       </Alert>
 
-      <Select
-        label="Merge Strategy"
-        data={[
-          { value: 'Union', label: 'Union' },
-          { value: 'Intersection', label: 'Intersection' },
-          { value: 'Difference', label: 'Difference' },
-        ]}
-        value={localConfig.mergeStrategy}
-        onChange={(value) => setLocalConfig(prev => ({ ...prev, mergeStrategy: value as any }))}
-      />
+      <div className="space-y-2">
+        <Label htmlFor="merge-strategy">Merge Strategy</Label>
+        <Select
+          value={localConfig.mergeStrategy}
+          onValueChange={(value) => setLocalConfig(prev => ({ ...prev, mergeStrategy: value as any }))}
+        >
+          <SelectTrigger id="merge-strategy">
+            <SelectValue placeholder="Select merge strategy" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="Union">Union</SelectItem>
+            <SelectItem value="Intersection">Intersection</SelectItem>
+            <SelectItem value="Difference">Difference</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
     </Stack>
   );
 };
