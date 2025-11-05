@@ -1,6 +1,8 @@
 import React from 'react'
-import { Badge, Tooltip } from '@mantine/core'
-import { IconWifi, IconWifiOff, IconLoader } from '@tabler/icons-react'
+import { Badge } from '@/components/ui/badge'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Spinner } from '@/components/ui/spinner'
+import { IconWifi, IconWifiOff } from '@tabler/icons-react'
 import { useQuery } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 
@@ -24,8 +26,9 @@ export const ConnectionStatus: React.FC = () => {
   const getStatusConfig = () => {
     if (loading) {
       return {
-        color: 'yellow',
-        icon: <IconLoader size={12} />,
+        variant: 'secondary' as const,
+        className: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+        icon: <Spinner size="xs" />,
         label: 'Connecting...',
         tooltip: 'Connecting to backend server',
       }
@@ -33,7 +36,8 @@ export const ConnectionStatus: React.FC = () => {
 
     if (error) {
       return {
-        color: 'red',
+        variant: 'destructive' as const,
+        className: '',
         icon: <IconWifiOff size={12} />,
         label: 'Offline',
         tooltip: `Backend connection failed: ${error.message}`,
@@ -41,7 +45,8 @@ export const ConnectionStatus: React.FC = () => {
     }
 
     return {
-      color: 'green',
+      variant: 'secondary' as const,
+      className: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
       icon: <IconWifi size={12} />,
       label: 'Online',
       tooltip: 'Connected to backend server',
@@ -51,15 +56,20 @@ export const ConnectionStatus: React.FC = () => {
   const status = getStatusConfig()
 
   return (
-    <Tooltip label={status.tooltip}>
-      <Badge
-        color={status.color}
-        variant="light"
-        leftSection={status.icon}
-        size="sm"
-      >
-        {status.label}
-      </Badge>
-    </Tooltip>
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Badge variant={status.variant} className={status.className}>
+            <span className="flex items-center gap-1.5">
+              {status.icon}
+              <span className="text-xs">{status.label}</span>
+            </span>
+          </Badge>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>{status.tooltip}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   )
 }

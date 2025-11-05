@@ -274,25 +274,28 @@ import { cn } from '@/lib/utils'
 
 ---
 
-### Stage 3: Navigation & Interactive Components
+### Stage 3: Navigation & Interactive Components 🚧 IN PROGRESS
 **Goal:** Replace Mantine navigation and button components
 **Duration:** 2-3 days
 
 #### Components to Migrate:
-- Button → shadcn Button
-- ActionIcon → Button with icon variant
-- Tooltip → shadcn Tooltip
-- Menu → shadcn DropdownMenu
-- Modal → shadcn Dialog
-- Anchor → Custom Link component
+- Button → shadcn Button ✅
+- ActionIcon → Button with icon variant ✅
+- Tooltip → shadcn Tooltip ✅
+- Menu → shadcn DropdownMenu (⏳ Pending)
+- Modal → shadcn Dialog (⏳ Pending)
+- Anchor → Custom Link component (⏳ Pending)
+
+#### Files Migrated: ✅
+1. `src/components/common/ConnectionStatus.tsx` ✅ - Badge + Tooltip
+2. `src/components/common/ErrorBoundary.tsx` ✅ - Alert + Button + Stack
 
 #### Files to Update (Priority):
-1. All navigation buttons in `src/App.tsx` (sidebar)
-2. `src/components/common/Breadcrumbs.tsx`
-3. `src/components/editors/PlanVisualEditor/components/ContextMenu.tsx`
-4. `src/components/editors/PlanVisualEditor/components/AdvancedToolbar.tsx`
-5. `src/components/editors/PlanVisualEditor/components/NodeToolbar.tsx`
-6. All files using Modal (19 files)
+1. All navigation buttons in `src/App.tsx` (sidebar) - Large file, defer
+2. `src/components/editors/PlanVisualEditor/components/ContextMenu.tsx` - Menu
+3. `src/components/editors/PlanVisualEditor/components/AdvancedToolbar.tsx` - Buttons
+4. `src/components/editors/PlanVisualEditor/components/NodeToolbar.tsx` - Buttons
+5. All files using Modal (19 files) - Systematic migration
 
 #### Migration Pattern:
 ```tsx

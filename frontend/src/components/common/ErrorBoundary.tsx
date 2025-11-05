@@ -1,5 +1,7 @@
 import React, { Component, ReactNode } from 'react'
-import { Alert, Stack, Button, Text } from '@mantine/core'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
+import { Stack } from '@/components/layout-primitives'
 import { IconAlertTriangle, IconRefresh } from '@tabler/icons-react'
 
 interface Props {
@@ -39,20 +41,25 @@ export class ErrorBoundary extends Component<Props, State> {
       }
 
       return (
-        <Alert icon={<IconAlertTriangle size="1rem" />} title="Something went wrong" color="red">
-          <Stack gap="md">
-            <Text size="sm">
-              {this.state.error?.message || 'An unexpected error occurred'}
-            </Text>
-            <Button
-              leftSection={<IconRefresh size="1rem" />}
-              variant="light"
-              size="sm"
-              onClick={this.handleReset}
-            >
-              Try Again
-            </Button>
-          </Stack>
+        <Alert variant="destructive">
+          <IconAlertTriangle className="h-4 w-4" />
+          <AlertTitle>Something went wrong</AlertTitle>
+          <AlertDescription>
+            <Stack gap="md">
+              <p className="text-sm">
+                {this.state.error?.message || 'An unexpected error occurred'}
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={this.handleReset}
+                className="w-fit"
+              >
+                <IconRefresh size={16} className="mr-2" />
+                Try Again
+              </Button>
+            </Stack>
+          </AlertDescription>
         </Alert>
       )
     }
