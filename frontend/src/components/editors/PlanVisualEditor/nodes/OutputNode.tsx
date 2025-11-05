@@ -1,7 +1,18 @@
 import { memo, useState, useRef } from 'react'
 import { NodeProps } from 'reactflow'
 import { useMutation } from '@apollo/client/react'
-import { Text, Group, ActionIcon, Tooltip, Badge, Stack, Modal, Textarea, ScrollArea, Button } from '@mantine/core'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Badge } from '@/components/ui/badge'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Stack, Group } from '@/components/layout-primitives'
 import { IconDownload, IconEye, IconCopy, IconSelect } from '@tabler/icons-react'
 import { PlanDagNodeType, OutputNodeConfig } from '../../../../types/plan-dag'
 import { isNodeConfigured } from '../../../../utils/planDagValidation'
@@ -159,7 +170,7 @@ export const OutputNode = memo((props: OutputNodeProps) => {
 
   // Custom label badges for output node
   const labelBadges = !isConfigured ? (
-    <Badge variant="outline" size="xs" color="orange">
+    <Badge variant="outline" className="text-xs text-orange-600 border-orange-600">
       Not Configured
     </Badge>
   ) : null
@@ -187,95 +198,99 @@ export const OutputNode = memo((props: OutputNodeProps) => {
           {/* Download and preview buttons */}
           {!readonly && isConfigured && (
             <Group justify="center" gap="xs">
-              <Tooltip label="Preview export">
-                <ActionIcon
-                  size="lg"
-                  variant="light"
-                  color="gray"
-                  radius="xl"
-                  data-action-icon="preview"
-                  loading={previewLoading}
-                  onMouseDown={(e) => {
-                    e.stopPropagation()
-                    e.preventDefault()
-                    handlePreview()
-                  }}
-                >
-                  <IconEye size="0.75rem" />
-                </ActionIcon>
-              </Tooltip>
-              <Tooltip label="Download export">
-                <ActionIcon
-                  size="lg"
-                  variant="light"
-                  color="blue"
-                  radius="xl"
-                  data-action-icon="download"
-                  loading={downloading}
-                  onMouseDown={(e) => {
-                    e.stopPropagation()
-                    e.preventDefault()
-                    handleDownload()
-                  }}
-                >
-                  <IconDownload size="0.75rem" />
-                </ActionIcon>
-              </Tooltip>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-9 w-9 rounded-full"
+                      data-action-icon="preview"
+                      disabled={previewLoading}
+                      onMouseDown={(e: React.MouseEvent) => {
+                        e.stopPropagation()
+                        e.preventDefault()
+                        handlePreview()
+                      }}
+                    >
+                      <IconEye size={12} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Preview export</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-9 w-9 rounded-full text-blue-600"
+                      data-action-icon="download"
+                      disabled={downloading}
+                      onMouseDown={(e: React.MouseEvent) => {
+                        e.stopPropagation()
+                        e.preventDefault()
+                        handleDownload()
+                      }}
+                    >
+                      <IconDownload size={12} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Download export</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </Group>
           )}
 
           {/* Output metadata */}
           {config.outputPath && (
-            <Text size="xs" c="dimmed" ff="monospace" lineClamp={1}>
+            <p className="text-xs text-muted-foreground font-mono line-clamp-1">
               {config.outputPath}
-            </Text>
+            </p>
           )}
         </Stack>
       </BaseNode>
 
       {/* Preview Dialog - Rendered outside BaseNode to avoid ReactFlow node clipping */}
-      <Modal
-        opened={previewOpen}
-        onClose={() => setPreviewOpen(false)}
-        title={`Export Preview: ${config.renderTarget || 'Output'}`}
-        size="xl"
-      >
-        <Stack gap="md">
-          <Group gap="xs">
-            <Button
-              size="xs"
-              variant="light"
-              leftSection={<IconSelect size={16} />}
-              onClick={handleSelectAll}
-            >
-              Select All
-            </Button>
-            <Button
-              size="xs"
-              variant="light"
-              leftSection={<IconCopy size={16} />}
-              onClick={handleCopyToClipboard}
-            >
-              Copy to Clipboard
-            </Button>
-          </Group>
-          <ScrollArea h={600}>
-            <Textarea
-              ref={textareaRef}
-              value={previewContent}
-              readOnly
-              minRows={30}
-              autosize
-              styles={{
-                input: {
-                  fontFamily: 'monospace',
-                  fontSize: '0.875rem',
-                },
-              }}
-            />
-          </ScrollArea>
-        </Stack>
-      </Modal>
+      <Dialog open={previewOpen} onOpenChange={(open) => !open && setPreviewOpen(false)}>
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Export Preview: {config.renderTarget || 'Output'}</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-hidden">
+            <Stack gap="md">
+              <Group gap="xs">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={handleSelectAll}
+                  className="h-8"
+                >
+                  <IconSelect size={16} className="mr-2" />
+                  Select All
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={handleCopyToClipboard}
+                  className="h-8"
+                >
+                  <IconCopy size={16} className="mr-2" />
+                  Copy to Clipboard
+                </Button>
+              </Group>
+              <ScrollArea className="h-[600px]">
+                <Textarea
+                  ref={textareaRef}
+                  value={previewContent}
+                  readOnly
+                  rows={30}
+                  className="font-mono text-sm resize-none"
+                />
+              </ScrollArea>
+            </Stack>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   )
 })
