@@ -1,8 +1,30 @@
 import React from 'react'
-import { Modal, Stack, TextInput, Textarea, Button, Group } from '@mantine/core'
-import { useForm } from '@mantine/form'
 import { useMutation } from '@apollo/client/react'
 import { gql } from '@apollo/client'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import * as z from 'zod'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form'
+import { Stack } from '@/components/layout-primitives'
+import { showErrorNotification } from '@/utils/notifications'
 import { UPDATE_PLAN_DAG } from '../../graphql/plan-dag'
 
 const CREATE_PROJECT = gql`
@@ -16,6 +38,19 @@ const CREATE_PROJECT = gql`
     }
   }
 `
+
+// Zod schema for form validation
+const createProjectSchema = z.object({
+  name: z
+    .string()
+    .min(1, 'Project name is required')
+    .min(2, 'Project name must be at least 2 characters')
+    .max(100, 'Project name must be less than 100 characters')
+    .transform((val) => val.trim()),
+  description: z.string().transform((val) => val.trim()).optional(),
+})
+
+type CreateProjectFormValues = z.infer<typeof createProjectSchema>
 
 interface CreateProjectModalProps {
   opened: boolean
@@ -46,34 +81,21 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
     }
   }>(UPDATE_PLAN_DAG)
 
-  const form = useForm({
-    initialValues: {
+  const form = useForm<CreateProjectFormValues>({
+    resolver: zodResolver(createProjectSchema),
+    defaultValues: {
       name: '',
-      description: ''
+      description: '',
     },
-    validate: {
-      name: (value) => {
-        if (!value || value.trim().length === 0) {
-          return 'Project name is required'
-        }
-        if (value.trim().length < 2) {
-          return 'Project name must be at least 2 characters'
-        }
-        if (value.trim().length > 100) {
-          return 'Project name must be less than 100 characters'
-        }
-        return null
-      }
-    }
   })
 
-  const handleSubmit = async (values: { name: string; description: string }) => {
+  const handleSubmit = async (values: CreateProjectFormValues) => {
     try {
       const { data } = await createProject({
         variables: {
           input: {
-            name: values.name.trim(),
-            description: values.description.trim() || null
+            name: values.name,
+            description: values.description || null
           }
         }
       })
@@ -111,7 +133,10 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
       }
     } catch (error) {
       console.error('Failed to create project:', error)
-      // TODO: Show error notification
+      showErrorNotification(
+        'Failed to create project',
+        error instanceof Error ? error.message : 'An unexpected error occurred'
+      )
     }
   }
 
@@ -121,45 +146,71 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   }
 
   return (
-    <Modal
-      opened={opened}
-      onClose={handleClose}
-      title="Create New Project"
-      size="md"
-    >
-      <form onSubmit={form.onSubmit(handleSubmit)}>
-        <Stack gap="md">
-          <TextInput
-            label="Project Name"
-            placeholder="Enter project name"
-            required
-            {...form.getInputProps('name')}
-          />
+    <Dialog open={opened} onOpenChange={(open) => !open && handleClose()}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>Create New Project</DialogTitle>
+          <DialogDescription>
+            Create a new project to organize your work
+          </DialogDescription>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleSubmit)}>
+            <Stack gap="lg">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Project Name</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Enter project name"
+                        {...field}
+                        disabled={loading}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-          <Textarea
-            label="Description"
-            placeholder="Optional project description"
-            rows={3}
-            {...form.getInputProps('description')}
-          />
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Optional project description"
+                        rows={3}
+                        {...field}
+                        disabled={loading}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-          <Group justify="flex-end">
-            <Button
-              variant="subtle"
-              onClick={handleClose}
-              disabled={loading}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              loading={loading}
-            >
-              Create Project
-            </Button>
-          </Group>
-        </Stack>
-      </form>
-    </Modal>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleClose}
+                  disabled={loading}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={loading}>
+                  {loading ? 'Creating...' : 'Create Project'}
+                </Button>
+              </DialogFooter>
+            </Stack>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
   )
 }
