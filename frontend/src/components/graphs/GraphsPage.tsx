@@ -32,6 +32,7 @@ import { getExecutionStateLabel, isExecutionInProgress } from '../../graphql/pre
 import { GraphDataDialog } from '../editors/PlanVisualEditor/dialogs/GraphDataDialog'
 import { GraphPreviewDialog } from '../visualization/GraphPreviewDialog'
 import { GraphData } from '../visualization/GraphPreview'
+import { useRegisterChatContext } from '../../hooks/useRegisterChatContext'
 
 const GET_PROJECTS = gql`
   query GetProjects {
@@ -140,6 +141,13 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
     variables: { projectId: parseInt(projectId || '0') },
     fetchPolicy: 'cache-and-network'
   })
+
+  useRegisterChatContext(
+    selectedProject
+      ? `Viewing graphs for project ${selectedProject.name} (#${selectedProject.id})`
+      : 'Viewing project graphs',
+    selectedProject?.id,
+  )
 
   const [createGraph, { loading: createLoading }] = useMutation(CREATE_GRAPH, {
     refetchQueries: [{ query: GET_GRAPHS, variables: { projectId: parseInt(projectId || '0') } }]

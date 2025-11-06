@@ -25,6 +25,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from './components/ui/tooltip'
 import { Separator } from './components/ui/separator'
+import { ChatProvider } from './components/chat/ChatProvider'
+import { useRegisterChatContext } from './hooks/useRegisterChatContext'
 
 // Collaboration Context for providing project-level collaboration to all pages
 const CollaborationContext = React.createContext<any>(null)
@@ -1359,6 +1361,11 @@ const PlanEditorPage = () => {
   const searchParams = new URLSearchParams(location.search)
   const focusNodeId = searchParams.get('focusNode') || undefined
 
+  useRegisterChatContext(
+    `Editing plan for project ${selectedProject.name} (#${selectedProject.id})`,
+    selectedProject.id,
+  )
+
   return (
     <div className="h-full flex flex-col gap-0">
       <div className="px-4 py-2 border-b flex-shrink-0">
@@ -1394,13 +1401,14 @@ import PageContainer from './components/layout/PageContainer'
 // Main App component with routing
 function App() {
   return (
-    <ErrorBoundary>
-      <AppLayout>
-        <Routes>
-          <Route path="/" element={
-            <ErrorBoundary>
-              <HomePage />
-            </ErrorBoundary>
+    <ChatProvider>
+      <ErrorBoundary>
+        <AppLayout>
+          <Routes>
+            <Route path="/" element={
+              <ErrorBoundary>
+                <HomePage />
+              </ErrorBoundary>
           } />
           <Route path="/library" element={
             <ErrorBoundary>
@@ -1479,8 +1487,9 @@ function App() {
             </ErrorBoundary>
           } />
         </Routes>
-      </AppLayout>
-    </ErrorBoundary>
+        </AppLayout>
+      </ErrorBoundary>
+    </ChatProvider>
   )
 }
 

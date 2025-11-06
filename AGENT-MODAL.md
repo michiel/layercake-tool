@@ -7,7 +7,14 @@ Design updates that make the assistant chat persistent, globally accessible, and
 - Chat UI only lives on the chat page; users can’t interact elsewhere in the app.
 - Assistant lacks page-level context (plan editor, graph editor, etc.) when receiving messages.
 
-## Proposed Solutions
+## Implementation Summary
+- Introduced `chatSessionStore` (Zustand + localStorage) to persist sessions per provider and hydrate `useChatSession` across reloads.
+- Rewrote `useChatSession` to reuse stored sessions, gate new `startChatSession` calls, prefix outbound messages with the active page context, and accurately toggle the “Assistant thinking…” indicator.
+- Added `chatContextStore`, `useRegisterChatContext`, and page-level registrations (plan editor, graph editor, graphs, plan nodes, chat) so the assistant receives route-aware descriptions and project IDs.
+- Built a shared `ChatProvider` that centralizes provider selection, chat runtime, and exposes a global floating modal button implemented via `AssistantModalPrimitive`.
+- Migrated the chat page to consume the shared runtime (`AssistantThread`) and removed duplicate assistant-ui wiring; both page and modal now show the same conversation state.
+
+## Approach
 1. **Fix Status Indicator**
    - However caused: `chat.isAwaitingAssistant` never resets or is inferred incorrectly.
    - Update `useChatSession` to flip the flag once an assistant message arrives and ensure it doesn’t default to true on mount.
@@ -57,7 +64,7 @@ Design updates that make the assistant chat persistent, globally accessible, and
 - **Modal UX**: Ensure accessible focus management and keyboard shortcuts (assistant-ui primitives handle much of this).
 
 ## Deliverables
-- Patched `useChatSession` with persistence and correct status handling.
-- New modal chat component + floating trigger.
-- Route-aware context injection into assistant runtime.
-- Updated documentation reflecting persistent, global assistant behavior.
+- ✅ `useChatSession` persistence + status fix (`frontend/src/hooks/useChatSession.ts`, `frontend/src/state/chatSessionStore.ts`).
+- ✅ Global modal button and shared runtime (`frontend/src/components/chat/ChatProvider.tsx`, `frontend/src/components/chat/ChatModal.tsx`, `frontend/src/components/chat/AssistantThread.tsx`).
+- ✅ Route-aware context registration (`frontend/src/hooks/useRegisterChatContext.ts`, page updates).
+- ✅ Documentation kept current with implemented architecture.

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useApolloClient, useMutation, useQuery } from '@apollo/client/react'
+import { useApolloClient, useMutation } from '@apollo/client/react'
 import {
   START_CHAT_SESSION,
   SEND_CHAT_MESSAGE,
@@ -10,21 +10,21 @@ import {
   GET_CHAT_HISTORY,
   ChatMessage,
 } from '../graphql/chat'
-
-export type ChatMessageRole = 'user' | 'assistant' | 'tool'
-
-export interface ChatMessageEntry {
-  id: string
-  role: ChatMessageRole
-  content: string
-  toolName?: string
-  createdAt: string
-}
+import { ChatMessageEntry, ChatMessageRole } from '../types/chat'
+import {
+  appendMessageToProvider,
+  resetProviderSession,
+  setAwaitingForProvider,
+  setMessagesForProvider,
+  setSessionForProvider,
+  useProviderSession,
+} from '../state/chatSessionStore'
 
 interface UseChatSessionArgs {
   projectId?: number
   provider: ChatProviderOption
   sessionId?: string | null
+  context?: string | null
 }
 
 interface UseChatSessionResult {
@@ -56,25 +56,18 @@ const getErrorMessage = (error: unknown) => {
   return String(error)
 }
 
-export function useChatSession({ projectId, provider, sessionId }: UseChatSessionArgs): UseChatSessionResult {
-  const [session, setSession] = useState<StartChatSessionPayload | undefined>()
-  const [messages, setMessages] = useState<ChatMessageEntry[]>([])
+export function useChatSession({
+  projectId,
+  provider,
+  sessionId,
+  context,
+}: UseChatSessionArgs): UseChatSessionResult {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [isAwaitingAssistant, setAwaitingAssistant] = useState(false)
-  const [restartNonce, setRestartNonce] = useState(0)
-
-  const client = useApolloClient()
+  const providerState = useProviderSession(provider)
   const [startSession] = useMutation<{ startChatSession: StartChatSessionPayload }>(START_CHAT_SESSION)
   const [sendChat] = useMutation(SEND_CHAT_MESSAGE)
-
-  // Load history for existing sessions
-  const { data: historyData } = useQuery<{ chatHistory: ChatMessage[] }>(GET_CHAT_HISTORY, {
-    variables: { sessionId: sessionId || '' },
-    skip: !sessionId,
-    fetchPolicy: 'network-only',
-  })
-
+  const client = useApolloClient()
   const subscriptionRef = useRef<{ unsubscribe: () => void } | null>(null)
 
   const teardownSubscription = useCallback(() => {
@@ -84,43 +77,47 @@ export function useChatSession({ projectId, provider, sessionId }: UseChatSessio
     }
   }, [])
 
+  const activeSessionId =
+    providerState.session?.sessionId ?? sessionId ?? undefined
+
   const restart = useCallback(() => {
     teardownSubscription()
-    setSession(undefined)
-    setMessages([])
-    setAwaitingAssistant(false)
+    resetProviderSession(provider)
+    setLoading(false)
     setError(null)
-    setRestartNonce(prev => prev + 1)
-  }, [teardownSubscription])
+  }, [provider, teardownSubscription])
 
-  // Initialize session - always create a NEW active session for real-time communication
-  // When viewing history, this creates a continuation session
+  // Ensure project id is tracked alongside the provider session
+  useEffect(() => {
+    if (providerState.session && projectId !== undefined) {
+      setSessionForProvider(provider, providerState.session, projectId)
+    }
+  }, [provider, providerState.session, projectId])
+
+  // Establish or reuse chat session
   useEffect(() => {
     if (!projectId) {
       return
     }
 
-    let cancelled = false
-    setLoading(true)
-    setError(null)
-    setAwaitingAssistant(false)
-    teardownSubscription()
-
-    // Clear messages only when starting completely fresh (no history to load)
-    if (!sessionId) {
-      setMessages([])
-      setSession(undefined)
+    if (providerState.session?.sessionId) {
+      setLoading(false)
+      setAwaitingForProvider(provider, false)
+      return
     }
 
-    // Always start a new active session for real-time communication
+    let cancelled = false
+    setLoading(true)
+    setAwaitingForProvider(provider, false)
+
     ;(async () => {
       try {
         const { data } = await startSession({
-          variables: { projectId, provider, sessionId: sessionId ?? null },
+          variables: { projectId, provider, sessionId: sessionId ?? providerState.session?.sessionId ?? null },
         })
         if (cancelled) return
         if (data?.startChatSession) {
-          setSession(data.startChatSession)
+          setSessionForProvider(provider, data.startChatSession, projectId)
         } else {
           setError('Failed to establish chat session.')
         }
@@ -138,37 +135,60 @@ export function useChatSession({ projectId, provider, sessionId }: UseChatSessio
     return () => {
       cancelled = true
     }
-  }, [projectId, provider, sessionId, restartNonce, startSession, teardownSubscription])
+  }, [
+    projectId,
+    provider,
+    sessionId,
+    providerState.session?.sessionId,
+    startSession,
+  ])
 
-  // Load history when viewing an existing session (after active session is created)
+  // Load history if needed (e.g., after reload)
   useEffect(() => {
-    if (sessionId) {
-      setMessages([])
+    if (!activeSessionId || providerState.messages.length > 0) {
+      return
     }
-  }, [sessionId])
 
-  useEffect(() => {
-    if (sessionId && historyData?.chatHistory) {
-      const loadedMessages: ChatMessageEntry[] = historyData.chatHistory.map((msg) => ({
-        id: msg.message_id,
-        role: msg.role as ChatMessageRole,
-        content: msg.content,
-        toolName: msg.tool_name || undefined,
-        createdAt: msg.created_at,
-      }))
-      setMessages(loadedMessages)
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { data } = await client.query<{ chatHistory: ChatMessage[] }>({
+          query: GET_CHAT_HISTORY,
+          variables: { sessionId: activeSessionId },
+          fetchPolicy: 'network-only',
+        })
+        if (cancelled) return
+        if (data?.chatHistory) {
+          const loadedMessages: ChatMessageEntry[] = data.chatHistory.map((msg) => ({
+            id: msg.message_id,
+            role: msg.role as ChatMessageRole,
+            content: msg.content,
+            toolName: msg.tool_name || undefined,
+            createdAt: msg.created_at,
+          }))
+          setMessagesForProvider(provider, loadedMessages)
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(getErrorMessage(err))
+        }
+      }
+    })()
+
+    return () => {
+      cancelled = true
     }
-  }, [sessionId, historyData])
+  }, [activeSessionId, provider, providerState.messages.length, client])
 
   // Subscribe to real-time chat events from the active session
   useEffect(() => {
-    if (!session?.sessionId) {
+    if (!providerState.session?.sessionId) {
       return
     }
 
     const observable = client.subscribe<{ chatEvents: ChatEventPayload }>({
       query: CHAT_EVENTS_SUBSCRIPTION,
-      variables: { sessionId: session.sessionId },
+      variables: { sessionId: providerState.session.sessionId },
       fetchPolicy: 'no-cache',
     })
 
@@ -179,44 +199,43 @@ export function useChatSession({ projectId, provider, sessionId }: UseChatSessio
           return
         }
 
-        setMessages(prev => [
-          ...prev,
-          {
-            id: makeId(),
-            role: payload.kind === 'ToolInvocation' ? 'tool' : 'assistant',
-            content: payload.message,
-            toolName: payload.toolName ?? undefined,
-            createdAt: nowIso(),
-          },
-        ])
+        appendMessageToProvider(provider, {
+          id: makeId(),
+          role: payload.kind === 'ToolInvocation' ? 'tool' : 'assistant',
+          content: payload.message,
+          toolName: payload.toolName ?? undefined,
+          createdAt: nowIso(),
+        })
 
         if (payload.kind === 'AssistantMessage') {
-          setAwaitingAssistant(false)
+          setAwaitingForProvider(provider, false)
         }
       },
       error: (subscriptionErr) => {
         setError(getErrorMessage(subscriptionErr))
-        setAwaitingAssistant(false)
+        setAwaitingForProvider(provider, false)
       },
     })
 
     return () => {
       teardownSubscription()
     }
-  }, [client, session?.sessionId, teardownSubscription])
+  }, [client, provider, providerState.session?.sessionId, teardownSubscription])
 
-  useEffect(() => {
-    return () => {
-      teardownSubscription()
-    }
-  }, [teardownSubscription])
+  useEffect(() => () => teardownSubscription(), [teardownSubscription])
 
   const sendMessage = useCallback(
     async (content: string) => {
       const trimmed = content.trim()
-      if (!trimmed || !session?.sessionId) {
+      const sessionIdentifier = providerState.session?.sessionId
+      if (!trimmed || !sessionIdentifier) {
         return
       }
+
+      const enriched =
+        context && context.trim().length > 0
+          ? `Context: ${context.trim()}\n\n${trimmed}`
+          : trimmed
 
       const userMessage: ChatMessageEntry = {
         id: makeId(),
@@ -224,39 +243,36 @@ export function useChatSession({ projectId, provider, sessionId }: UseChatSessio
         content: trimmed,
         createdAt: nowIso(),
       }
-      setMessages(prev => [...prev, userMessage])
-      setAwaitingAssistant(true)
+      appendMessageToProvider(provider, userMessage)
+      setAwaitingForProvider(provider, true)
 
       try {
         await sendChat({
           variables: {
-            sessionId: session.sessionId,
-            message: trimmed,
+            sessionId: sessionIdentifier,
+            message: enriched,
           },
         })
       } catch (err) {
         const errorMessage = getErrorMessage(err)
-        setAwaitingAssistant(false)
-        setMessages(prev => [
-          ...prev,
-          {
-            id: makeId(),
-            role: 'assistant',
-            content: `Error sending message: ${errorMessage}`,
-            createdAt: nowIso(),
-          },
-        ])
+        setAwaitingForProvider(provider, false)
+        appendMessageToProvider(provider, {
+          id: makeId(),
+          role: 'assistant',
+          content: `Error sending message: ${errorMessage}`,
+          createdAt: nowIso(),
+        })
       }
     },
-    [sendChat, session?.sessionId],
+    [context, provider, providerState.session?.sessionId, sendChat],
   )
 
   return {
     loading,
-    session,
-    messages,
+    session: providerState.session,
+    messages: providerState.messages,
     error,
-    isAwaitingAssistant,
+    isAwaitingAssistant: providerState.isAwaitingAssistant,
     sendMessage,
     restart,
   }

@@ -30,6 +30,7 @@ import PageContainer from '../layout/PageContainer'
 import { Graph, GET_GRAPHS, CREATE_GRAPH, UPDATE_GRAPH, DELETE_GRAPH, EXECUTE_NODE } from '../../graphql/graphs'
 import { getExecutionStateLabel, isExecutionInProgress } from '../../graphql/preview'
 import { GET_PLAN_DAG } from '../../graphql/plan-dag'
+import { useRegisterChatContext } from '../../hooks/useRegisterChatContext'
 
 const GET_PROJECTS = gql`
   query GetProjects {
@@ -126,6 +127,13 @@ export const PlanNodesPage: React.FC<PlanNodesPageProps> = () => {
     variables: { projectId: parseInt(projectId || '0') },
     fetchPolicy: 'cache-and-network'
   })
+
+  useRegisterChatContext(
+    selectedProject
+      ? `Viewing plan nodes for project ${selectedProject.name} (#${selectedProject.id})`
+      : 'Viewing plan nodes',
+    selectedProject?.id,
+  )
 
   // Create a map of nodeId to nodeType from plan DAG
   const nodeTypeMap = React.useMemo(() => {

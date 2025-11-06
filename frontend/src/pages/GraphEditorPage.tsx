@@ -21,6 +21,7 @@ import {
 } from '../components/ui/dropdown-menu';
 import { Spinner } from '../components/ui/spinner';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip';
+import { useRegisterChatContext } from '../hooks/useRegisterChatContext';
 
 declare global {
   interface Window {
@@ -171,6 +172,13 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
       });
     }
   });
+
+  useRegisterChatContext(
+    selectedProject && graphData?.graph
+      ? `Editing graph "${graphData.graph.name}" (#${graphData.graph.id}) for project ${selectedProject.name} (#${selectedProject.id})`
+      : 'Editing graph',
+    selectedProject?.id,
+  );
 
   const [updateLayerProperties] = useMutation(UPDATE_LAYER_PROPERTIES, {
     update(cache, { data }: any) {
