@@ -390,7 +390,7 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
         const p = paramsRef.current;
         return p.enableHighlighting && highlightLinks.has(link) ? 4 : 0;
       })
-      .linkDirectionalParticleSpeed(0.005)
+      .linkDirectionalParticleSpeed(0.006)
       .autoPauseRedraw(false)
       .linkCanvasObjectMode(() => 'after')
       .linkCanvasObject((link: any, ctx: CanvasRenderingContext2D) => {
@@ -448,6 +448,11 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
           highlightNodesRef.current.clear();
           highlightLinksRef.current.clear();
           hoverNodeRef.current = null;
+          // Force update of link particles
+          if (graphRef.current) {
+            const currentData = graphRef.current.graphData();
+            graphRef.current.graphData(currentData);
+          }
           return;
         }
 
@@ -465,6 +470,12 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
           }
           hoverNodeRef.current = node;
           hoverTimeoutRef.current = null;
+
+          // Force update of link particles
+          if (graphRef.current) {
+            const currentData = graphRef.current.graphData();
+            graphRef.current.graphData(currentData);
+          }
         }, 150);
       })
       .onLinkHover((link: any) => {
@@ -478,6 +489,11 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
         if (!link) {
           highlightNodesRef.current.clear();
           highlightLinksRef.current.clear();
+          // Force update of link particles
+          if (graphRef.current) {
+            const currentData = graphRef.current.graphData();
+            graphRef.current.graphData(currentData);
+          }
           return;
         }
 
@@ -490,6 +506,12 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
           highlightNodesRef.current.add(link.source);
           highlightNodesRef.current.add(link.target);
           hoverTimeoutRef.current = null;
+
+          // Force update of link particles
+          if (graphRef.current) {
+            const currentData = graphRef.current.graphData();
+            graphRef.current.graphData(currentData);
+          }
         }, 150);
       });
 
