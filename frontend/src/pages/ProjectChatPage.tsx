@@ -163,7 +163,7 @@ export const ProjectChatPage = () => {
                 'List recent tool invocations for this project.',
                 'What are the open tasks for this project?',
               ]}
-              composerDisabled={!session?.sessionId || isAwaitingAssistant}
+              composerDisabled={loading || isAwaitingAssistant}
               showSuggestions={!messages.length}
             />
           </AssistantRuntimeProvider>

@@ -86,17 +86,15 @@ const ThreadComposer = ({ disabled }: { disabled: boolean }) => (
   </ComposerPrimitive.Root>
 )
 
-interface AssistantThreadProps {
-  suggestions?: string[]
-  composerDisabled?: boolean
-  showSuggestions?: boolean
-}
-
 export const AssistantThread = ({
   suggestions = [],
   composerDisabled = false,
   showSuggestions = true,
-}: AssistantThreadProps) => (
+}: {
+  suggestions?: string[]
+  composerDisabled?: boolean
+  showSuggestions?: boolean
+}) => (
   <ThreadPrimitive.Root className="relative flex h-full flex-col items-center pb-6">
     <ThreadPrimitive.Viewport className="flex-1 w-full max-w-3xl space-y-3 overflow-y-auto px-1 pb-20">
       <ThreadPrimitive.Empty>
