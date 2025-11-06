@@ -74,7 +74,7 @@ if (isTauriApp()) {
           <ApolloProvider client={apolloClient}>
             <Toaster />
             <BrowserRouter>
-              <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+              <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
                 <App />
               </ThemeProvider>
             </BrowserRouter>
@@ -110,7 +110,7 @@ if (isTauriApp()) {
       <ApolloProvider client={apolloClient}>
         <Toaster />
         <BrowserRouter>
-          <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
             <App />
           </ThemeProvider>
         </BrowserRouter>
