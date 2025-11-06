@@ -18,6 +18,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Spinner } from '@/components/ui/spinner'
+import { IconTrash } from '@tabler/icons-react'
+import { useChatSessionStore } from '../state/chatSessionStore'
 
 const PAGE_SIZE = 10
 
@@ -54,6 +56,15 @@ export const ChatLogsPage = () => {
   const [archiveSession] = useMutation(ARCHIVE_CHAT_SESSION)
   const [unarchiveSession] = useMutation(UNARCHIVE_CHAT_SESSION)
   const [deleteSession] = useMutation(DELETE_CHAT_SESSION)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  // Get all current active session IDs from the chat store
+  const activeSessions = useChatSessionStore((state) => state.sessions)
+  const currentSessionIds = useMemo(() => {
+    return Object.values(activeSessions)
+      .map(session => session.session?.sessionId)
+      .filter((id): id is string => !!id)
+  }, [activeSessions])
 
   const syncSelection = (sessionId: string | null, dataset?: ChatSession[]) => {
     if (!sessionId) {
@@ -97,18 +108,68 @@ export const ChatLogsPage = () => {
     }
   }
 
+  const handleDeleteAllHistory = async () => {
+    if (!confirm('Delete all historical chat sessions except the current one? This cannot be undone.')) {
+      return
+    }
+
+    setIsDeleting(true)
+    try {
+      // Get all sessions from all pages
+      const allSessionsResponse = await refetch({
+        limit: 1000,
+        offset: 0,
+      })
+      const allSessions = allSessionsResponse.data?.chatSessions ?? []
+
+      // Filter out current sessions
+      const sessionsToDelete = allSessions.filter(
+        session => !currentSessionIds.includes(session.session_id)
+      )
+
+      // Delete all historical sessions
+      await Promise.all(
+        sessionsToDelete.map(session =>
+          deleteSession({ variables: { sessionId: session.session_id } })
+        )
+      )
+
+      // Refresh the list and reset to first page
+      setPage(0)
+      await refetch()
+      setSelectedSession(null)
+    } catch (err) {
+      console.error('Failed to delete chat history', err)
+      alert('Failed to delete some chat sessions. Please try again.')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
   if (!Number.isFinite(numericProjectId)) {
     return <p className="text-red-600">Invalid project ID</p>
   }
 
   return (
     <Stack className="h-full p-4" gap="md">
-      <div>
-        <h2 className="text-2xl font-semibold">Chat History</h2>
-        <p className="text-sm text-muted-foreground">
-          Browse recorded sessions for this project. Select a row to inspect the conversation.
-        </p>
-      </div>
+      <Group justify="between" align="start">
+        <div>
+          <h2 className="text-2xl font-semibold">Chat History</h2>
+          <p className="text-sm text-muted-foreground">
+            Browse recorded sessions for this project. Select a row to inspect the conversation.
+          </p>
+        </div>
+        <Button
+          variant="destructive"
+          size="sm"
+          onClick={() => void handleDeleteAllHistory()}
+          disabled={isDeleting || loading || displaySessions.length === 0}
+          title="Delete all historical chat sessions except the current one"
+        >
+          <IconTrash className="h-4 w-4 mr-2" />
+          {isDeleting ? 'Deleting...' : 'Delete Chat History'}
+        </Button>
+      </Group>
 
       {error && (
         <Alert variant="destructive">
