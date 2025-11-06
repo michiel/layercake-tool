@@ -1,5 +1,4 @@
 import React from 'react';
-import { Group, ActionIcon, Tooltip, Text, Divider } from '@mantine/core';
 import {
   IconDatabase,
   IconNetwork,
@@ -16,6 +15,10 @@ import {
   IconTrash
 } from '@tabler/icons-react';
 import { PlanDagNodeType } from '../../../../types/plan-dag';
+import { Group } from '../../../layout-primitives';
+import { Button } from '../../../ui/button';
+import { Separator } from '../../../ui/separator';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '../../../ui/tooltip';
 
 interface AdvancedToolbarProps {
   readonly?: boolean;
@@ -98,74 +101,100 @@ export const AdvancedToolbar: React.FC<AdvancedToolbarProps> = ({
   };
 
   return (
-    <Group gap="xs" p="md" style={{ borderBottom: '1px solid #e9ecef' }} justify="space-between">
-      {/* Left side - Node Palette, Auto-Layout, Fit View */}
-      <Group gap="xs">
-        {/* Node Palette */}
-        <Group gap={4}>
-          <Text size="xs" fw={500} c="gray.6">Nodes:</Text>
-          {nodeTypes.map((nodeType) => (
-            <Tooltip key={nodeType.type} label={`Drag to add ${nodeType.label}`}>
-              <ActionIcon
-                size="sm"
-                variant="light"
-                style={{ backgroundColor: nodeType.color, color: 'white', cursor: 'grab' }}
-                draggable={!isTauri}
-                onDragStart={(event) => handleNodeDragStart(event, nodeType.type)}
-                onMouseDown={(event) => handleNodePointerDragStart(event, nodeType.type)}
-              >
-                {nodeType.icon}
-              </ActionIcon>
-            </Tooltip>
-          ))}
-        </Group>
-
-        {/* Auto-Layout Operations */}
-        <Divider orientation="vertical" />
-        <Text size="xs" c="dimmed">Auto-layout:</Text>
+    <TooltipProvider>
+      <div className="flex items-center justify-between p-4 border-b gap-2">
+        {/* Left side - Node Palette, Auto-Layout, Fit View */}
         <Group gap="xs">
-          <Tooltip label="Auto-layout Horizontal" position="bottom">
-            <ActionIcon variant="subtle" color="blue" onClick={onAutoLayoutHorizontal}>
-              <IconArrowRight size="1rem" />
-            </ActionIcon>
-          </Tooltip>
+          {/* Node Palette */}
+          <Group gap="xs">
+            <p className="text-xs font-medium text-gray-600">Nodes:</p>
+            {nodeTypes.map((nodeType) => (
+              <Tooltip key={nodeType.type}>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="secondary"
+                    className="h-7 w-7 cursor-grab text-white hover:opacity-80"
+                    style={{ backgroundColor: nodeType.color }}
+                    draggable={!isTauri}
+                    onDragStart={(event) => handleNodeDragStart(event, nodeType.type)}
+                    onMouseDown={(event) => handleNodePointerDragStart(event, nodeType.type)}
+                  >
+                    {nodeType.icon}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  Drag to add {nodeType.label}
+                </TooltipContent>
+              </Tooltip>
+            ))}
+          </Group>
 
-          <Tooltip label="Auto-layout Vertical" position="bottom">
-            <ActionIcon variant="subtle" color="blue" onClick={onAutoLayoutVertical}>
-              <IconArrowDown size="1rem" />
-            </ActionIcon>
+          {/* Auto-Layout Operations */}
+          <Separator orientation="vertical" className="h-6" />
+          <p className="text-xs text-muted-foreground">Auto-layout:</p>
+          <Group gap="xs">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" onClick={onAutoLayoutHorizontal}>
+                  <IconArrowRight className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Auto-layout Horizontal</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" onClick={onAutoLayoutVertical}>
+                  <IconArrowDown className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Auto-layout Vertical</TooltipContent>
+            </Tooltip>
+          </Group>
+
+          {/* Fit View */}
+          <Separator orientation="vertical" className="h-6" />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" onClick={onFitView}>
+                <IconZoomScan className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Fit View (Zoom to see all nodes)</TooltipContent>
           </Tooltip>
         </Group>
 
-        {/* Fit View */}
-        <Divider orientation="vertical" />
-        <Tooltip label="Fit View (Zoom to see all nodes)" position="bottom">
-          <ActionIcon variant="subtle" color="gray" onClick={onFitView}>
-            <IconZoomScan size="1rem" />
-          </ActionIcon>
-        </Tooltip>
-      </Group>
+        {/* Right side - Execution Controls */}
+        <Group gap="xs">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="text-red-600" onClick={onStop}>
+                <IconPlayerStop className="h-5 w-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Stop execution</TooltipContent>
+          </Tooltip>
 
-      {/* Right side - Execution Controls */}
-      <Group gap="xs">
-        <Tooltip label="Stop execution" position="bottom">
-          <ActionIcon variant="subtle" color="red" onClick={onStop}>
-            <IconPlayerStop size="1.2rem" />
-          </ActionIcon>
-        </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="text-orange-600" onClick={onClear}>
+                <IconTrash className="h-5 w-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Clear execution state (reset all nodes)</TooltipContent>
+          </Tooltip>
 
-        <Tooltip label="Clear execution state (reset all nodes)" position="bottom">
-          <ActionIcon variant="subtle" color="orange" onClick={onClear}>
-            <IconTrash size="1.2rem" />
-          </ActionIcon>
-        </Tooltip>
-
-        <Tooltip label="Execute DAG (optimal execution)" position="bottom">
-          <ActionIcon variant="filled" color="green" onClick={onPlay}>
-            <IconPlayerPlay size="1.2rem" />
-          </ActionIcon>
-        </Tooltip>
-      </Group>
-    </Group>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button size="icon" className="bg-green-600 hover:bg-green-700 text-white" onClick={onPlay}>
+                <IconPlayerPlay className="h-5 w-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Execute DAG (optimal execution)</TooltipContent>
+          </Tooltip>
+        </Group>
+      </div>
+    </TooltipProvider>
   );
 };

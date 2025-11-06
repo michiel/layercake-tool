@@ -1,20 +1,14 @@
-import React, { useState } from 'react'
+import React, { useState, useRef } from 'react'
 import { useMutation } from '@apollo/client/react'
-import {
-  Modal,
-  Button,
-  Stack,
-  Text,
-  Group,
-  FileButton,
-  Badge,
-  ActionIcon,
-  Alert,
-  Progress,
-  List
-} from '@mantine/core'
 import { IconUpload, IconX, IconAlertCircle, IconCheck } from '@tabler/icons-react'
 import { BULK_UPLOAD_DATASOURCES, BulkUploadDataSourceInput } from '../../graphql/datasources'
+import { Stack, Group } from '../layout-primitives'
+import { Alert, AlertDescription } from '../ui/alert'
+import { Badge } from '../ui/badge'
+import { Button } from '../ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog'
+import { Progress } from '../ui/progress'
+import { Spinner } from '../ui/spinner'
 
 interface BulkDataSourceUploaderProps {
   projectId: number
@@ -39,6 +33,7 @@ export const BulkDataSourceUploader: React.FC<BulkDataSourceUploaderProps> = ({
 }) => {
   const [files, setFiles] = useState<FileWithData[]>([])
   const [uploadProgress, setUploadProgress] = useState(0)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [bulkUpload, { loading }] = useMutation(BULK_UPLOAD_DATASOURCES)
 
@@ -122,6 +117,17 @@ export const BulkDataSourceUploader: React.FC<BulkDataSourceUploaderProps> = ({
     }
   }
 
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = Array.from(e.target.files || [])
+    if (selectedFiles.length > 0) {
+      handleFilesSelected(selectedFiles)
+    }
+    // Reset input so same files can be selected again
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
   const totalSize = files.reduce((sum, f) => sum + f.file.size, 0)
   const formatSize = (bytes: number): string => {
     if (bytes < 1024) return `${bytes} B`
@@ -131,81 +137,87 @@ export const BulkDataSourceUploader: React.FC<BulkDataSourceUploaderProps> = ({
   }
 
   return (
-    <Modal
-      opened={opened}
-      onClose={handleClose}
-      title="Bulk Upload Data Sources"
-      size="lg"
-    >
-      <Stack gap="md">
-        <Text size="sm" c="dimmed">
-          Upload multiple CSV, TSV, or JSON files. File types will be automatically detected based on content.
-        </Text>
+    <Dialog open={opened} onOpenChange={(open) => !open && handleClose()}>
+      <DialogContent className="sm:max-w-[600px]">
+        <DialogHeader>
+          <DialogTitle>Bulk Upload Data Sources</DialogTitle>
+          <DialogDescription>
+            Upload multiple CSV, TSV, or JSON files. File types will be automatically detected based on content.
+          </DialogDescription>
+        </DialogHeader>
 
-        {loading && (
-          <Progress value={uploadProgress} size="sm" animated />
-        )}
-
-        <FileButton
-          onChange={handleFilesSelected}
-          accept=".csv,.tsv,.json"
-          multiple
-        >
-          {(props) => (
-            <Button
-              {...props}
-              leftSection={<IconUpload size={16} />}
-              variant="light"
-              disabled={loading}
-            >
-              Select Files
-            </Button>
+        <Stack gap="md" className="py-4">
+          {loading && (
+            <Progress value={uploadProgress} className="h-2" />
           )}
-        </FileButton>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,.tsv,.json"
+            multiple
+            onChange={handleFileInputChange}
+            className="hidden"
+          />
+
+          <Button
+            variant="secondary"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={loading}
+          >
+            <IconUpload className="mr-2 h-4 w-4" />
+            Select Files
+          </Button>
 
         {files.length > 0 && (
           <>
-            <Alert icon={<IconCheck size={16} />} color="blue">
-              {files.length} file{files.length > 1 ? 's' : ''} selected ({formatSize(totalSize)})
+            <Alert className="border-blue-200 bg-blue-50 text-blue-900">
+              <IconCheck className="h-4 w-4 text-blue-600" />
+              <AlertDescription>
+                {files.length} file{files.length > 1 ? 's' : ''} selected ({formatSize(totalSize)})
+              </AlertDescription>
             </Alert>
 
-            <List spacing="xs" size="sm">
+            <div className="space-y-2">
               {files.map((fileData, index) => (
-                <List.Item key={index}>
-                  <Group justify="space-between">
-                    <div>
-                      <Text size="sm" fw={500}>{fileData.name}</Text>
-                      <Group gap="xs">
-                        <Text size="xs" c="dimmed">{fileData.file.name}</Text>
-                        <Badge size="xs" variant="light">
-                          {formatSize(fileData.file.size)}
-                        </Badge>
-                      </Group>
-                    </div>
-                    <ActionIcon
-                      color="red"
-                      variant="subtle"
-                      onClick={() => handleRemoveFile(index)}
-                      disabled={loading}
-                    >
-                      <IconX size={16} />
-                    </ActionIcon>
-                  </Group>
-                </List.Item>
+                <div key={index} className="flex items-start justify-between p-2 rounded-md border">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{fileData.name}</p>
+                    <Group gap="xs" className="mt-1">
+                      <p className="text-xs text-muted-foreground">{fileData.file.name}</p>
+                      <Badge variant="secondary" className="text-xs">
+                        {formatSize(fileData.file.size)}
+                      </Badge>
+                    </Group>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleRemoveFile(index)}
+                    disabled={loading}
+                    className="text-red-600 hover:text-red-700"
+                  >
+                    <IconX className="h-4 w-4" />
+                  </Button>
+                </div>
               ))}
-            </List>
+            </div>
           </>
         )}
 
-        {files.length === 0 && !loading && (
-          <Alert icon={<IconAlertCircle size={16} />} color="gray">
-            No files selected. Click "Select Files" to choose files to upload.
-          </Alert>
-        )}
+          {files.length === 0 && !loading && (
+            <Alert className="border-gray-200 bg-gray-50 text-gray-900">
+              <IconAlertCircle className="h-4 w-4 text-gray-600" />
+              <AlertDescription>
+                No files selected. Click "Select Files" to choose files to upload.
+              </AlertDescription>
+            </Alert>
+          )}
+        </Stack>
 
-        <Group justify="flex-end" mt="md">
+        <DialogFooter>
           <Button
-            variant="subtle"
+            variant="secondary"
             onClick={handleClose}
             disabled={loading}
           >
@@ -214,13 +226,13 @@ export const BulkDataSourceUploader: React.FC<BulkDataSourceUploaderProps> = ({
           <Button
             onClick={handleUpload}
             disabled={files.length === 0 || loading}
-            loading={loading}
-            leftSection={<IconUpload size={16} />}
           >
+            {loading && <Spinner className="mr-2 h-4 w-4" />}
+            <IconUpload className="mr-2 h-4 w-4" />
             Upload {files.length > 0 ? `${files.length} File${files.length > 1 ? 's' : ''}` : ''}
           </Button>
-        </Group>
-      </Stack>
-    </Modal>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

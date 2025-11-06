@@ -1,5 +1,4 @@
 import React from 'react';
-import { Menu, ActionIcon, Group, Text, Divider } from '@mantine/core';
 import {
   IconCopy,
   IconClipboard,
@@ -16,6 +15,9 @@ import {
   IconLayoutDistributeHorizontal,
   IconLayoutDistributeVertical,
 } from '@tabler/icons-react';
+import { Group } from '../../../layout-primitives';
+import { Button } from '../../../ui/button';
+import { Separator } from '../../../ui/separator';
 
 interface ContextMenuProps {
   opened: boolean;
@@ -85,182 +87,187 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         pointerEvents: 'auto',
       }}
     >
-      <Menu
-        opened={opened}
-        onClose={onClose}
-        position="bottom-start"
-        withArrow={false}
-        shadow="md"
-        radius="md"
-      >
-        <Menu.Target>
-          <div style={{ width: 1, height: 1 }} />
-        </Menu.Target>
-
-        <Menu.Dropdown>
-          {/* Basic Operations */}
-          {selectedNodeCount > 0 && !readonly && (
-            <>
-              <Menu.Item
-                leftSection={<IconCopyPlus size="1rem" />}
-                onClick={() => handleMenuAction(onDuplicate)}
-                rightSection={<Text size="xs" c="dimmed">Ctrl+D</Text>}
-              >
-                Duplicate {selectedNodeCount} node{selectedNodeCount > 1 ? 's' : ''}
-              </Menu.Item>
-
-              <Menu.Item
-                leftSection={<IconCopy size="1rem" />}
-                onClick={() => handleMenuAction(onCopy)}
-                rightSection={<Text size="xs" c="dimmed">Ctrl+C</Text>}
-              >
-                Copy
-              </Menu.Item>
-
-              <Menu.Item
-                leftSection={<IconScissors size="1rem" />}
-                onClick={() => handleMenuAction(onCut)}
-                rightSection={<Text size="xs" c="dimmed">Ctrl+X</Text>}
-              >
-                Cut
-              </Menu.Item>
-
-              <Menu.Item
-                leftSection={<IconTrash size="1rem" />}
-                onClick={() => handleMenuAction(onDelete)}
-                rightSection={<Text size="xs" c="dimmed">Del</Text>}
-                color="red"
-              >
-                Delete
-              </Menu.Item>
-
-              <Divider />
-            </>
-          )}
-
-          {/* Paste */}
-          {!readonly && (
-            <>
-              <Menu.Item
-                leftSection={<IconClipboard size="1rem" />}
-                onClick={() => handleMenuAction(onPaste)}
-                disabled={!hasClipboardData}
-                rightSection={<Text size="xs" c="dimmed">Ctrl+V</Text>}
-              >
-                Paste
-              </Menu.Item>
-
-              <Divider />
-            </>
-          )}
-
-          {/* Selection Operations */}
-          <Menu.Item
-            leftSection={<IconSelectAll size="1rem" />}
-            onClick={() => handleMenuAction(onSelectAll)}
-            rightSection={<Text size="xs" c="dimmed">Ctrl+A</Text>}
-          >
-            Select All
-          </Menu.Item>
-
-          {selectedNodeCount > 0 && (
-            <Menu.Item
-              leftSection={<IconClick size="1rem" />}
-              onClick={() => handleMenuAction(onDeselectAll)}
-              rightSection={<Text size="xs" c="dimmed">Esc</Text>}
+      <div className="min-w-[200px] rounded-md border bg-popover p-1 text-popover-foreground shadow-md">
+        {/* Basic Operations */}
+        {selectedNodeCount > 0 && !readonly && (
+          <>
+            <button
+              className="relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+              onClick={() => handleMenuAction(onDuplicate)}
             >
-              Deselect All
-            </Menu.Item>
-          )}
+              <IconCopyPlus className="mr-2 h-4 w-4" />
+              <span>Duplicate {selectedNodeCount} node{selectedNodeCount > 1 ? 's' : ''}</span>
+              <span className="ml-auto text-xs text-muted-foreground">Ctrl+D</span>
+            </button>
 
-          {/* Alignment Operations */}
-          {canAlign && !readonly && (
-            <>
-              <Divider />
-              <Menu.Label>Align Nodes</Menu.Label>
+            <button
+              className="relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+              onClick={() => handleMenuAction(onCopy)}
+            >
+              <IconCopy className="mr-2 h-4 w-4" />
+              <span>Copy</span>
+              <span className="ml-auto text-xs text-muted-foreground">Ctrl+C</span>
+            </button>
 
-              <Group gap="xs" p="xs">
-                <ActionIcon
-                  size="sm"
-                  variant="light"
-                  onClick={() => handleMenuAction(onAlignLeft)}
-                  title="Align Left (Ctrl+Shift+←)"
-                >
-                  <IconAlignLeft size="0.8rem" />
-                </ActionIcon>
+            <button
+              className="relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+              onClick={() => handleMenuAction(onCut)}
+            >
+              <IconScissors className="mr-2 h-4 w-4" />
+              <span>Cut</span>
+              <span className="ml-auto text-xs text-muted-foreground">Ctrl+X</span>
+            </button>
 
-                <ActionIcon
-                  size="sm"
-                  variant="light"
-                  onClick={() => handleMenuAction(onAlignCenterVertical)}
-                  title="Align Center Vertically"
-                >
-                  <IconAlignCenter size="0.8rem" style={{ transform: 'rotate(90deg)' }} />
-                </ActionIcon>
+            <button
+              className="relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm text-red-600 outline-none transition-colors hover:bg-accent hover:text-red-600 focus:bg-accent focus:text-red-600"
+              onClick={() => handleMenuAction(onDelete)}
+            >
+              <IconTrash className="mr-2 h-4 w-4" />
+              <span>Delete</span>
+              <span className="ml-auto text-xs text-muted-foreground">Del</span>
+            </button>
 
-                <ActionIcon
-                  size="sm"
-                  variant="light"
-                  onClick={() => handleMenuAction(onAlignRight)}
-                  title="Align Right (Ctrl+Shift+→)"
-                >
-                  <IconAlignRight size="0.8rem" />
-                </ActionIcon>
-              </Group>
+            <Separator className="my-1" />
+          </>
+        )}
 
-              <Group gap="xs" p="xs">
-                <ActionIcon
-                  size="sm"
-                  variant="light"
-                  onClick={() => handleMenuAction(onAlignTop)}
-                  title="Align Top (Ctrl+Shift+↑)"
-                >
-                  <IconBoxAlignTop size="0.8rem" />
-                </ActionIcon>
+        {/* Paste */}
+        {!readonly && (
+          <>
+            <button
+              className={`relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors ${
+                hasClipboardData
+                  ? 'hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground'
+                  : 'cursor-not-allowed opacity-50'
+              }`}
+              onClick={() => hasClipboardData && handleMenuAction(onPaste)}
+              disabled={!hasClipboardData}
+            >
+              <IconClipboard className="mr-2 h-4 w-4" />
+              <span>Paste</span>
+              <span className="ml-auto text-xs text-muted-foreground">Ctrl+V</span>
+            </button>
 
-                <ActionIcon
-                  size="sm"
-                  variant="light"
-                  onClick={() => handleMenuAction(onAlignCenterHorizontal)}
-                  title="Align Center Horizontally"
-                >
-                  <IconAlignCenter size="0.8rem" />
-                </ActionIcon>
+            <Separator className="my-1" />
+          </>
+        )}
 
-                <ActionIcon
-                  size="sm"
-                  variant="light"
-                  onClick={() => handleMenuAction(onAlignBottom)}
-                  title="Align Bottom (Ctrl+Shift+↓)"
-                >
-                  <IconBoxAlignBottom size="0.8rem" />
-                </ActionIcon>
-              </Group>
-            </>
-          )}
+        {/* Selection Operations */}
+        <button
+          className="relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+          onClick={() => handleMenuAction(onSelectAll)}
+        >
+          <IconSelectAll className="mr-2 h-4 w-4" />
+          <span>Select All</span>
+          <span className="ml-auto text-xs text-muted-foreground">Ctrl+A</span>
+        </button>
 
-          {/* Distribution Operations */}
-          {canDistribute && !readonly && (
-            <>
-              <Menu.Label>Distribute Nodes</Menu.Label>
+        {selectedNodeCount > 0 && (
+          <button
+            className="relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+            onClick={() => handleMenuAction(onDeselectAll)}
+          >
+            <IconClick className="mr-2 h-4 w-4" />
+            <span>Deselect All</span>
+            <span className="ml-auto text-xs text-muted-foreground">Esc</span>
+          </button>
+        )}
 
-              <Menu.Item
-                leftSection={<IconLayoutDistributeHorizontal size="1rem" />}
-                onClick={() => handleMenuAction(onDistributeHorizontal)}
+        {/* Alignment Operations */}
+        {canAlign && !readonly && (
+          <>
+            <Separator className="my-1" />
+            <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">Align Nodes</div>
+
+            <Group gap="xs" className="p-2">
+              <Button
+                size="icon"
+                variant="secondary"
+                className="h-8 w-8"
+                onClick={() => handleMenuAction(onAlignLeft)}
+                title="Align Left (Ctrl+Shift+←)"
               >
-                Distribute Horizontally
-              </Menu.Item>
+                <IconAlignLeft className="h-3.5 w-3.5" />
+              </Button>
 
-              <Menu.Item
-                leftSection={<IconLayoutDistributeVertical size="1rem" />}
-                onClick={() => handleMenuAction(onDistributeVertical)}
+              <Button
+                size="icon"
+                variant="secondary"
+                className="h-8 w-8"
+                onClick={() => handleMenuAction(onAlignCenterVertical)}
+                title="Align Center Vertically"
               >
-                Distribute Vertically
-              </Menu.Item>
-            </>
-          )}
-        </Menu.Dropdown>
-      </Menu>
+                <IconAlignCenter className="h-3.5 w-3.5" style={{ transform: 'rotate(90deg)' }} />
+              </Button>
+
+              <Button
+                size="icon"
+                variant="secondary"
+                className="h-8 w-8"
+                onClick={() => handleMenuAction(onAlignRight)}
+                title="Align Right (Ctrl+Shift+→)"
+              >
+                <IconAlignRight className="h-3.5 w-3.5" />
+              </Button>
+            </Group>
+
+            <Group gap="xs" className="p-2">
+              <Button
+                size="icon"
+                variant="secondary"
+                className="h-8 w-8"
+                onClick={() => handleMenuAction(onAlignTop)}
+                title="Align Top (Ctrl+Shift+↑)"
+              >
+                <IconBoxAlignTop className="h-3.5 w-3.5" />
+              </Button>
+
+              <Button
+                size="icon"
+                variant="secondary"
+                className="h-8 w-8"
+                onClick={() => handleMenuAction(onAlignCenterHorizontal)}
+                title="Align Center Horizontally"
+              >
+                <IconAlignCenter className="h-3.5 w-3.5" />
+              </Button>
+
+              <Button
+                size="icon"
+                variant="secondary"
+                className="h-8 w-8"
+                onClick={() => handleMenuAction(onAlignBottom)}
+                title="Align Bottom (Ctrl+Shift+↓)"
+              >
+                <IconBoxAlignBottom className="h-3.5 w-3.5" />
+              </Button>
+            </Group>
+          </>
+        )}
+
+        {/* Distribution Operations */}
+        {canDistribute && !readonly && (
+          <>
+            <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">Distribute Nodes</div>
+
+            <button
+              className="relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+              onClick={() => handleMenuAction(onDistributeHorizontal)}
+            >
+              <IconLayoutDistributeHorizontal className="mr-2 h-4 w-4" />
+              <span>Distribute Horizontally</span>
+            </button>
+
+            <button
+              className="relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+              onClick={() => handleMenuAction(onDistributeVertical)}
+            >
+              <IconLayoutDistributeVertical className="mr-2 h-4 w-4" />
+              <span>Distribute Vertically</span>
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 };

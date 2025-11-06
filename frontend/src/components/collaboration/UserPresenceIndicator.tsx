@@ -1,7 +1,11 @@
 import { memo } from 'react'
-import { Group, Avatar, Badge, Box, Text, HoverCard, ActionIcon, Stack } from '@mantine/core'
 import { IconUser, IconUsers } from '@tabler/icons-react'
 import { UserPresenceData, ConnectionState } from '../../types/websocket'
+import { Group, Stack } from '../layout-primitives'
+import { Avatar, AvatarFallback } from '../ui/avatar'
+import { Badge } from '../ui/badge'
+import { Button } from '../ui/button'
+import { HoverCard, HoverCardTrigger, HoverCardContent } from '../ui/hover-card'
 
 interface UserPresenceIndicatorProps {
   users: UserPresenceData[]
@@ -23,66 +27,59 @@ export const UserPresenceIndicator = memo(({
   }
 
   return (
-    <HoverCard width={300} shadow="md">
-      <HoverCard.Target>
-        <ActionIcon variant="subtle" size="lg" style={{ position: 'relative' }}>
-          <IconUsers size="1.2rem" />
+    <HoverCard>
+      <HoverCardTrigger asChild>
+        <Button variant="ghost" size="icon" className="relative">
+          <IconUsers className="h-5 w-5" />
           {onlineUsers.length > 0 && (
             <Badge
-              size="xs"
-              color="green"
-              variant="filled"
+              className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 text-[10px] leading-tight"
               style={{
-                position: 'absolute',
-                top: -2,
-                right: -2,
-                minWidth: '18px',
-                height: '18px',
-                padding: '0 4px',
-                fontSize: '10px'
+                backgroundColor: '#22c55e',
+                color: 'white',
               }}
             >
               {onlineUsers.length}
             </Badge>
           )}
-        </ActionIcon>
-      </HoverCard.Target>
+        </Button>
+      </HoverCardTrigger>
 
-      <HoverCard.Dropdown>
+      <HoverCardContent className="w-[300px]">
         <Stack gap="xs">
-          <Text fw={500} size="sm">Active Users ({onlineUsers.length})</Text>
+          <p className="text-sm font-medium">Active Users ({onlineUsers.length})</p>
 
           {onlineUsers.length === 0 ? (
-            <Text size="xs" c="dimmed">No other users online</Text>
+            <p className="text-xs text-muted-foreground">No other users online</p>
           ) : (
             onlineUsers.map((user) => (
-              <Group key={user.userId} gap="sm" justify="space-between">
+              <Group key={user.userId} gap="sm" justify="between">
                 <Group gap="xs">
-                  <Avatar
-                    size="sm"
-                    radius="xl"
-                    style={{ backgroundColor: user.avatarColor }}
-                  >
-                    <IconUser size={14} />
+                  <Avatar className="h-8 w-8" style={{ backgroundColor: user.avatarColor }}>
+                    <AvatarFallback style={{ backgroundColor: user.avatarColor }}>
+                      <IconUser className="h-3.5 w-3.5 text-white" />
+                    </AvatarFallback>
                   </Avatar>
-                  <Box>
-                    <Text size="sm" fw={500}>{user.userName}</Text>
-                    <Text size="xs" c="dimmed">
+                  <div>
+                    <p className="text-sm font-medium">{user.userName}</p>
+                    <p className="text-xs text-muted-foreground">
                       Last active: {new Date(user.lastActive).toLocaleTimeString()}
-                    </Text>
+                    </p>
                     {/* Show document activity if available */}
                     {Object.keys(user.documents).length > 0 && (
-                      <Text size="xs" c="dimmed">
+                      <p className="text-xs text-muted-foreground">
                         Active in {Object.keys(user.documents).length} document{Object.keys(user.documents).length > 1 ? 's' : ''}
-                      </Text>
+                      </p>
                     )}
-                  </Box>
+                  </div>
                 </Group>
 
                 <Badge
-                  size="xs"
-                  color="green"
-                  variant="filled"
+                  className="text-xs"
+                  style={{
+                    backgroundColor: '#22c55e',
+                    color: 'white',
+                  }}
                 >
                   Online
                 </Badge>
@@ -90,7 +87,7 @@ export const UserPresenceIndicator = memo(({
             ))
           )}
         </Stack>
-      </HoverCard.Dropdown>
+      </HoverCardContent>
     </HoverCard>
   )
 })

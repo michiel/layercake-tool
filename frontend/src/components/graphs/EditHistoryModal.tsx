@@ -1,22 +1,6 @@
 import React, { useState } from 'react'
 import { useQuery, useMutation, useApolloClient } from '@apollo/client/react'
 import {
-  Modal,
-  Text,
-  Group,
-  Badge,
-  Stack,
-  ScrollArea,
-  Button,
-  Alert,
-  Timeline,
-  Code,
-  ActionIcon,
-  Tooltip,
-  Box,
-  Loader
-} from '@mantine/core'
-import {
   IconHistory,
   IconPlayerPlay,
   IconTrash,
@@ -24,6 +8,14 @@ import {
   IconAlertCircle,
   IconClock
 } from '@tabler/icons-react'
+import { Stack, Group } from '../layout-primitives'
+import { Alert, AlertDescription } from '../ui/alert'
+import { Badge } from '../ui/badge'
+import { Button } from '../ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
+import { ScrollArea } from '../ui/scroll-area'
+import { Spinner } from '../ui/spinner'
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '../ui/tooltip'
 import {
   GET_GRAPH_EDITS,
   REPLAY_GRAPH_EDITS,
@@ -118,15 +110,6 @@ const EditHistoryModal: React.FC<EditHistoryModalProps> = ({
     return String(value)
   }
 
-  const getOperationColor = (operation: string): string => {
-    switch (operation) {
-      case 'create': return 'green'
-      case 'update': return 'blue'
-      case 'delete': return 'red'
-      default: return 'gray'
-    }
-  }
-
   const getTargetTypeIcon = (targetType: string) => {
     switch (targetType) {
       case 'node': return '⬢'
@@ -139,169 +122,194 @@ const EditHistoryModal: React.FC<EditHistoryModalProps> = ({
   const edits = (data as any)?.graphEdits || []
 
   return (
-    <Modal
-      opened={opened}
-      onClose={onClose}
-      title={
-        <Group gap="xs">
-          <IconHistory size={20} />
-          <Text fw={600}>Edit History: {graphName}</Text>
-        </Group>
-      }
-      size="xl"
-    >
-      <Stack gap="md">
-        {/* Controls */}
-        <Group justify="space-between">
-          <Group gap="xs">
-            <Button
-              size="xs"
-              variant={showAppliedEdits ? 'light' : 'filled'}
-              onClick={() => setShowAppliedEdits(!showAppliedEdits)}
-            >
-              {showAppliedEdits ? 'Show Unapplied Only' : 'Show All Edits'}
-            </Button>
-            <Badge color="gray" variant="light">
-              {edits.length} {edits.length === 1 ? 'edit' : 'edits'}
-            </Badge>
-          </Group>
+    <Dialog open={opened} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-[800px]">
+        <DialogHeader>
+          <DialogTitle>
+            <Group gap="xs">
+              <IconHistory className="h-5 w-5" />
+              <span>Edit History: {graphName}</span>
+            </Group>
+          </DialogTitle>
+        </DialogHeader>
 
-          <Group gap="xs">
-            <Tooltip label="Replay unapplied edits">
-              <ActionIcon
-                variant="light"
-                color="blue"
-                onClick={handleReplay}
-                loading={replayLoading}
-                disabled={edits.filter((e: GraphEdit) => !e.applied).length === 0}
-              >
-                <IconPlayerPlay size={16} />
-              </ActionIcon>
-            </Tooltip>
-            <Tooltip label="Clear all edits">
-              <ActionIcon
-                variant="light"
-                color="red"
-                onClick={handleClear}
-                loading={clearLoading}
-                disabled={edits.length === 0}
-              >
-                <IconTrash size={16} />
-              </ActionIcon>
-            </Tooltip>
-          </Group>
-        </Group>
-
-        {/* Loading state */}
-        {loading && (
-          <Group justify="center" py="xl">
-            <Loader size="sm" />
-            <Text size="sm" c="dimmed">Loading edit history...</Text>
-          </Group>
-        )}
-
-        {/* Error state */}
-        {error && (
-          <Alert color="red" icon={<IconX />}>
-            Failed to load edit history: {error.message}
-          </Alert>
-        )}
-
-        {/* Empty state */}
-        {!loading && !error && edits.length === 0 && (
-          <Alert color="blue" icon={<IconAlertCircle />}>
-            {showAppliedEdits
-              ? 'No edit history found for this graph.'
-              : 'No unapplied edits. All changes have been applied.'}
-          </Alert>
-        )}
-
-        {/* Edit timeline */}
-        {!loading && !error && edits.length > 0 && (
-          <ScrollArea h={500}>
-            <Timeline active={-1} bulletSize={24} lineWidth={2}>
-              {edits.map((edit: GraphEdit) => (
-                <Timeline.Item
-                  key={edit.id}
-                  bullet={getTargetTypeIcon(edit.targetType)}
-                  title={
-                    <Group gap="xs">
-                      <Badge color={getOperationColor(edit.operation)} size="sm">
-                        {edit.operation}
-                      </Badge>
-                      <Badge variant="light" color="gray" size="sm">
-                        {edit.targetType}
-                      </Badge>
-                      <Text size="sm" fw={500}>
-                        {edit.targetId}
-                      </Text>
-                      {edit.applied && (
-                        <Badge color="green" size="xs" variant="dot">
-                          Applied
-                        </Badge>
-                      )}
-                    </Group>
-                  }
+        <TooltipProvider>
+          <Stack gap="md" className="py-4">
+            {/* Controls */}
+            <Group justify="between">
+              <Group gap="xs">
+                <Button
+                  size="sm"
+                  variant={showAppliedEdits ? 'secondary' : 'default'}
+                  onClick={() => setShowAppliedEdits(!showAppliedEdits)}
                 >
-                  <Stack gap="xs" mt="xs">
-                    {edit.fieldName && (
-                      <Text size="xs" c="dimmed">
-                        Field: <Code>{edit.fieldName}</Code>
-                      </Text>
-                    )}
+                  {showAppliedEdits ? 'Show Unapplied Only' : 'Show All Edits'}
+                </Button>
+                <Badge variant="secondary">
+                  {edits.length} {edits.length === 1 ? 'edit' : 'edits'}
+                </Badge>
+              </Group>
 
-                    {edit.operation === 'update' && (
-                      <Box>
-                        <Group gap="xs" mb={4}>
-                          <Text size="xs" c="dimmed">Old value:</Text>
+              <Group gap="xs">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      onClick={handleReplay}
+                      disabled={replayLoading || edits.filter((e: GraphEdit) => !e.applied).length === 0}
+                    >
+                      {replayLoading ? <Spinner className="h-4 w-4" /> : <IconPlayerPlay className="h-4 w-4" />}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Replay unapplied edits</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      onClick={handleClear}
+                      disabled={clearLoading || edits.length === 0}
+                      className="text-red-600"
+                    >
+                      {clearLoading ? <Spinner className="h-4 w-4" /> : <IconTrash className="h-4 w-4" />}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Clear all edits</TooltipContent>
+                </Tooltip>
+              </Group>
+            </Group>
+
+            {/* Loading state */}
+            {loading && (
+              <Group justify="center" className="py-12">
+                <Spinner className="h-5 w-5" />
+                <p className="text-sm text-muted-foreground">Loading edit history...</p>
+              </Group>
+            )}
+
+            {/* Error state */}
+            {error && (
+              <Alert variant="destructive">
+                <IconX className="h-4 w-4" />
+                <AlertDescription>
+                  Failed to load edit history: {error.message}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* Empty state */}
+            {!loading && !error && edits.length === 0 && (
+              <Alert>
+                <IconAlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  {showAppliedEdits
+                    ? 'No edit history found for this graph.'
+                    : 'No unapplied edits. All changes have been applied.'}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* Edit timeline */}
+            {!loading && !error && edits.length > 0 && (
+              <ScrollArea className="h-[500px]">
+                <div className="relative space-y-4 before:absolute before:inset-0 before:left-4 before:h-full before:w-0.5 before:bg-border">
+                  {edits.map((edit: GraphEdit) => (
+                    <div key={edit.id} className="relative pl-10">
+                      {/* Timeline bullet */}
+                      <div className="absolute left-0 flex h-8 w-8 items-center justify-center rounded-full border-2 border-border bg-background text-sm">
+                        {getTargetTypeIcon(edit.targetType)}
+                      </div>
+
+                      {/* Timeline content */}
+                      <div className="space-y-2">
+                        <Group gap="xs" className="flex-wrap">
+                          <Badge
+                            variant="secondary"
+                            className={
+                              edit.operation === 'create'
+                                ? 'bg-green-100 text-green-900'
+                                : edit.operation === 'update'
+                                  ? 'bg-blue-100 text-blue-900'
+                                  : edit.operation === 'delete'
+                                    ? 'bg-red-100 text-red-900'
+                                    : ''
+                            }
+                          >
+                            {edit.operation}
+                          </Badge>
+                          <Badge variant="secondary">
+                            {edit.targetType}
+                          </Badge>
+                          <span className="text-sm font-medium">
+                            {edit.targetId}
+                          </span>
+                          {edit.applied && (
+                            <Badge variant="secondary" className="bg-green-100 text-green-900 text-xs">
+                              Applied
+                            </Badge>
+                          )}
                         </Group>
-                        <Code block style={{ fontSize: '11px', maxHeight: '100px', overflow: 'auto' }}>
-                          {formatValue(edit.oldValue)}
-                        </Code>
-                        <Group gap="xs" mt={4} mb={4}>
-                          <Text size="xs" c="dimmed">New value:</Text>
-                        </Group>
-                        <Code block style={{ fontSize: '11px', maxHeight: '100px', overflow: 'auto' }}>
-                          {formatValue(edit.newValue)}
-                        </Code>
-                      </Box>
-                    )}
 
-                    {edit.operation === 'create' && edit.newValue && (
-                      <Box>
-                        <Text size="xs" c="dimmed" mb={4}>Created with:</Text>
-                        <Code block style={{ fontSize: '11px', maxHeight: '150px', overflow: 'auto' }}>
-                          {formatValue(edit.newValue)}
-                        </Code>
-                      </Box>
-                    )}
+                        <Stack gap="xs" className="mt-2">
+                          {edit.fieldName && (
+                            <p className="text-xs text-muted-foreground">
+                              Field: <code className="px-1 py-0.5 rounded bg-muted text-xs">{edit.fieldName}</code>
+                            </p>
+                          )}
 
-                    {edit.operation === 'delete' && edit.oldValue && (
-                      <Box>
-                        <Text size="xs" c="dimmed" mb={4}>Deleted:</Text>
-                        <Code block style={{ fontSize: '11px', maxHeight: '150px', overflow: 'auto' }}>
-                          {formatValue(edit.oldValue)}
-                        </Code>
-                      </Box>
-                    )}
+                          {edit.operation === 'update' && (
+                            <div>
+                              <p className="text-xs text-muted-foreground mb-1">Old value:</p>
+                              <pre className="text-[11px] max-h-[100px] overflow-auto bg-muted p-2 rounded">
+                                <code>{formatValue(edit.oldValue)}</code>
+                              </pre>
+                              <p className="text-xs text-muted-foreground mt-2 mb-1">New value:</p>
+                              <pre className="text-[11px] max-h-[100px] overflow-auto bg-muted p-2 rounded">
+                                <code>{formatValue(edit.newValue)}</code>
+                              </pre>
+                            </div>
+                          )}
 
-                    <Group gap="xs">
-                      <IconClock size={12} />
-                      <Text size="xs" c="dimmed">
-                        {new Date(edit.createdAt).toLocaleString()}
-                      </Text>
-                      <Text size="xs" c="dimmed">
-                        • Sequence #{edit.sequenceNumber}
-                      </Text>
-                    </Group>
-                  </Stack>
-                </Timeline.Item>
-              ))}
-            </Timeline>
-          </ScrollArea>
-        )}
-      </Stack>
-    </Modal>
+                          {edit.operation === 'create' && edit.newValue && (
+                            <div>
+                              <p className="text-xs text-muted-foreground mb-1">Created with:</p>
+                              <pre className="text-[11px] max-h-[150px] overflow-auto bg-muted p-2 rounded">
+                                <code>{formatValue(edit.newValue)}</code>
+                              </pre>
+                            </div>
+                          )}
+
+                          {edit.operation === 'delete' && edit.oldValue && (
+                            <div>
+                              <p className="text-xs text-muted-foreground mb-1">Deleted:</p>
+                              <pre className="text-[11px] max-h-[150px] overflow-auto bg-muted p-2 rounded">
+                                <code>{formatValue(edit.oldValue)}</code>
+                              </pre>
+                            </div>
+                          )}
+
+                          <Group gap="xs">
+                            <IconClock className="h-3 w-3" />
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(edit.createdAt).toLocaleString()}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              • Sequence #{edit.sequenceNumber}
+                            </p>
+                          </Group>
+                        </Stack>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
+          </Stack>
+        </TooltipProvider>
+      </DialogContent>
+    </Dialog>
   )
 }
 

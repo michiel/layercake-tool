@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react'
 import { Routes, Route, useNavigate, useParams, useLocation } from 'react-router-dom'
-import { AppShell, Group, Title, Stack, Button, Text, Card, Badge, Alert, Modal, Select, ActionIcon, Tooltip } from '@mantine/core'
 import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconDownload, IconChevronLeft, IconChevronRight, IconFolderPlus, IconNetwork, IconBooks, IconMessageDots, IconAdjustments } from '@tabler/icons-react'
 import { useQuery, useMutation } from '@apollo/client/react'
 import { gql } from '@apollo/client'
@@ -18,6 +17,15 @@ import { ProjectChatPage } from './pages/ProjectChatPage'
 import { AssistantUiChatPage } from './pages/AssistantUiChatPage'
 import { ChatLogsPage } from './pages/ChatLogsPage'
 import { getOrCreateSessionId } from './utils/session'
+import { Group, Stack } from './components/layout-primitives'
+import { Button } from './components/ui/button'
+import { Card } from './components/ui/card'
+import { Badge } from './components/ui/badge'
+import { Alert, AlertDescription } from './components/ui/alert'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from './components/ui/tooltip'
+import { Separator } from './components/ui/separator'
 
 const ENABLE_ASSISTANT_UI = import.meta.env.VITE_ENABLE_ASSISTANT_UI === 'true'
 
@@ -140,226 +148,336 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   })
 
   return (
-    <AppShell
-      header={{ height: 60 }}
-      navbar={{ width: navCollapsed ? 60 : 250, breakpoint: 'sm' }}
-      padding="md"
-      h="100vh"
-    >
-      <AppShell.Header>
-        <TopBar
-          projectId={projectId}
-          connectionState={connectionStatus.state}
-          users={collaboration.users}
-          currentUserId={sessionId}
-          onNavigateHome={() => navigate('/')}
-        />
-      </AppShell.Header>
-
-      <AppShell.Navbar p={navCollapsed ? 'xs' : 'md'}>
-        <Stack gap="xs" style={{ height: '100%' }}>
-          <Group justify="space-between" mb="xs">
-            {!navCollapsed && <Title order={4}>Navigation</Title>}
-            <Tooltip label={navCollapsed ? "Expand" : "Collapse"} position="right">
-              <ActionIcon
-                variant="subtle"
-                onClick={() => setNavCollapsed(!navCollapsed)}
-                size="sm"
-              >
-                {navCollapsed ? <IconChevronRight size={16} /> : <IconChevronLeft size={16} />}
-              </ActionIcon>
-            </Tooltip>
-          </Group>
-
-          <Stack gap="xs" style={{ flex: 1 }}>
-            <Tooltip label="Home" position="right" disabled={!navCollapsed}>
-              <Button
-                variant={isActiveRoute('/') ? 'filled' : 'light'}
-                fullWidth={!navCollapsed}
-                leftSection={navCollapsed ? undefined : <IconServer size={16} />}
-                onClick={() => navigate('/')}
-                px={navCollapsed ? 'xs' : undefined}
-                style={navCollapsed ? { justifyContent: 'center' } : undefined}
-              >
-                {navCollapsed ? <IconServer size={16} /> : 'Home'}
-              </Button>
-            </Tooltip>
-            <Tooltip label="Library" position="right" disabled={!navCollapsed}>
-              <Button
-                variant={isActiveRoute('/library') ? 'filled' : 'light'}
-                fullWidth={!navCollapsed}
-                leftSection={navCollapsed ? undefined : <IconBooks size={16} />}
-                onClick={() => navigate('/library')}
-                px={navCollapsed ? 'xs' : undefined}
-                style={navCollapsed ? { justifyContent: 'center' } : undefined}
-              >
-                {navCollapsed ? <IconBooks size={16} /> : 'Library'}
-              </Button>
-            </Tooltip>
-            <Tooltip label="Projects" position="right" disabled={!navCollapsed}>
-              <Button
-                variant={isActiveRoutePrefix('/projects') ? 'filled' : 'light'}
-                fullWidth={!navCollapsed}
-                leftSection={navCollapsed ? undefined : <IconDatabase size={16} />}
-                onClick={() => navigate('/projects')}
-                px={navCollapsed ? 'xs' : undefined}
-                style={navCollapsed ? { justifyContent: 'center' } : undefined}
-              >
-                {navCollapsed ? <IconDatabase size={16} /> : 'Projects'}
-              </Button>
-            </Tooltip>
-
-            {/* Project-specific navigation - only show when in a project */}
-            {projectId && (
-              <>
-                <div style={{ height: '1px', backgroundColor: '#e9ecef', margin: '8px 0' }} />
-                <Tooltip label="Project" position="right" disabled={!navCollapsed}>
-                  <Button
-                    variant={isActiveRoute(`/projects/${projectId}`) ? 'filled' : 'light'}
-                    fullWidth={!navCollapsed}
-                    leftSection={navCollapsed ? undefined : <IconFolderPlus size={16} />}
-                    onClick={() => navigate(`/projects/${projectId}`)}
-                    px={navCollapsed ? 'xs' : undefined}
-                    style={navCollapsed ? { justifyContent: 'center' } : undefined}
-                  >
-                    {navCollapsed ? <IconFolderPlus size={16} /> : 'Project'}
-                  </Button>
-                </Tooltip>
-                <Tooltip label="Data Sources" position="right" disabled={!navCollapsed}>
-                  <Button
-                    variant={isActiveRoute(`/projects/${projectId}/datasources`) ? 'filled' : 'light'}
-                    fullWidth={!navCollapsed}
-                    leftSection={navCollapsed ? undefined : <IconFileDatabase size={16} />}
-                    onClick={() => navigate(`/projects/${projectId}/datasources`)}
-                    px={navCollapsed ? 'xs' : undefined}
-                    style={navCollapsed ? { justifyContent: 'center' } : undefined}
-                  >
-                    {navCollapsed ? <IconFileDatabase size={16} /> : 'Data Sources'}
-                  </Button>
-                </Tooltip>
-                <Tooltip label="Plan" position="right" disabled={!navCollapsed}>
-                  <Button
-                    variant={isActiveRoute(`/projects/${projectId}/plan`) || isActiveRoute(`/projects/${projectId}/plan-nodes`) ? 'filled' : 'light'}
-                    fullWidth={!navCollapsed}
-                    leftSection={navCollapsed ? undefined : <IconGraph size={16} />}
-                    onClick={() => navigate(`/projects/${projectId}/plan`)}
-                    px={navCollapsed ? 'xs' : undefined}
-                    style={navCollapsed ? { justifyContent: 'center' } : undefined}
-                  >
-                    {navCollapsed ? <IconGraph size={16} /> : 'Plan'}
-                  </Button>
-                </Tooltip>
-                {/* Show Plan Nodes when on Plan or Plan Nodes page */}
-                {(isActiveRoute(`/projects/${projectId}/plan`) || isActiveRoute(`/projects/${projectId}/plan-nodes`)) && (
-                  <Tooltip label="Plan Nodes" position="right" disabled={!navCollapsed}>
+    <div className="flex h-screen overflow-hidden">
+      {/* Sidebar Navigation */}
+      <aside className={`flex flex-col border-r ${navCollapsed ? 'w-[60px]' : 'w-[250px]'} transition-all duration-200`}>
+        <div className={navCollapsed ? 'p-2' : 'p-4'}>
+          <Stack gap="xs" className="h-full">
+            <TooltipProvider>
+              <Group justify="between" className="mb-2">
+                {!navCollapsed && <h4 className="text-lg font-semibold">Navigation</h4>}
+                <Tooltip>
+                  <TooltipTrigger asChild>
                     <Button
-                      variant={isActiveRoute(`/projects/${projectId}/plan-nodes`) ? 'filled' : 'light'}
-                      fullWidth={!navCollapsed}
-                      leftSection={navCollapsed ? undefined : <IconNetwork size={16} />}
-                      onClick={() => navigate(`/projects/${projectId}/plan-nodes`)}
-                      px={navCollapsed ? 'xs' : undefined}
-                      style={navCollapsed ? { justifyContent: 'center', ...(navCollapsed ? {} : { paddingLeft: '2rem' }) } : undefined}
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setNavCollapsed(!navCollapsed)}
+                      className="h-8 w-8"
                     >
-                      {navCollapsed ? <IconNetwork size={16} /> : 'Plan Nodes'}
+                      {navCollapsed ? <IconChevronRight className="h-4 w-4" /> : <IconChevronLeft className="h-4 w-4" />}
                     </Button>
-                  </Tooltip>
-                )}
-                <Tooltip label="Graphs" position="right" disabled={!navCollapsed}>
-                  <Button
-                    variant={isActiveRoute(`/projects/${projectId}/graphs`) ? 'filled' : 'light'}
-                    fullWidth={!navCollapsed}
-                    leftSection={navCollapsed ? undefined : <IconDatabase size={16} />}
-                    onClick={() => navigate(`/projects/${projectId}/graphs`)}
-                    px={navCollapsed ? 'xs' : undefined}
-                    style={navCollapsed ? { justifyContent: 'center' } : undefined}
-                  >
-                    {navCollapsed ? <IconDatabase size={16} /> : 'Graphs'}
-                  </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    {navCollapsed ? "Expand" : "Collapse"}
+                  </TooltipContent>
                 </Tooltip>
-                <Tooltip label="Chat" position="right" disabled={!navCollapsed}>
-                  <Button
-                    variant={isActiveRoutePrefix(`/projects/${projectId}/chat`) ? 'filled' : 'light'}
-                    fullWidth={!navCollapsed}
-                    leftSection={navCollapsed ? undefined : <IconMessageDots size={16} />}
-                    onClick={() => navigate(`/projects/${projectId}/chat`)}
-                    px={navCollapsed ? 'xs' : undefined}
-                    style={navCollapsed ? { justifyContent: 'center' } : undefined}
-                  >
-                    {navCollapsed ? <IconMessageDots size={16} /> : 'Chat'}
-                  </Button>
+              </Group>
+
+              <Stack gap="xs" className="flex-1">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={isActiveRoute('/') ? 'default' : 'ghost'}
+                      className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start'}
+                      onClick={() => navigate('/')}
+                    >
+                      {navCollapsed ? (
+                        <IconServer className="h-4 w-4" />
+                      ) : (
+                        <>
+                          <IconServer className="h-4 w-4 mr-2" />
+                          Home
+                        </>
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">Home</TooltipContent>
                 </Tooltip>
-                {/* Show supplemental chat links when on Chat page */}
-                {isActiveRoutePrefix(`/projects/${projectId}/chat`) && (
-                  <Stack gap="xs" pl={navCollapsed ? 0 : 'lg'}>
-                    {ENABLE_ASSISTANT_UI && (
-                      <Tooltip label="Assistant UI (preview)" position="right" disabled={!navCollapsed}>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={isActiveRoute('/library') ? 'default' : 'ghost'}
+                      className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start'}
+                      onClick={() => navigate('/library')}
+                    >
+                      {navCollapsed ? (
+                        <IconBooks className="h-4 w-4" />
+                      ) : (
+                        <>
+                          <IconBooks className="h-4 w-4 mr-2" />
+                          Library
+                        </>
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">Library</TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={isActiveRoutePrefix('/projects') ? 'default' : 'ghost'}
+                      className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start'}
+                      onClick={() => navigate('/projects')}
+                    >
+                      {navCollapsed ? (
+                        <IconDatabase className="h-4 w-4" />
+                      ) : (
+                        <>
+                          <IconDatabase className="h-4 w-4 mr-2" />
+                          Projects
+                        </>
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">Projects</TooltipContent>
+                </Tooltip>
+
+                {/* Project-specific navigation - only show when in a project */}
+                {projectId && (
+                  <>
+                    <Separator className="my-2" />
+
+                    <Tooltip>
+                      <TooltipTrigger asChild>
                         <Button
-                          variant={isActiveRoute(`/projects/${projectId}/chat/assistant-ui`) ? 'filled' : 'light'}
-                          fullWidth={!navCollapsed}
-                          leftSection={navCollapsed ? undefined : <IconMessageDots size={16} />}
-                          onClick={() => navigate(`/projects/${projectId}/chat/assistant-ui`)}
-                          px={navCollapsed ? 'xs' : undefined}
-                          style={navCollapsed ? { justifyContent: 'center' } : undefined}
+                          variant={isActiveRoute(`/projects/${projectId}`) ? 'default' : 'ghost'}
+                          className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start'}
+                          onClick={() => navigate(`/projects/${projectId}`)}
                         >
-                          {navCollapsed ? <IconMessageDots size={16} /> : 'Assistant UI (Preview)'}
+                          {navCollapsed ? (
+                            <IconFolderPlus className="h-4 w-4" />
+                          ) : (
+                            <>
+                              <IconFolderPlus className="h-4 w-4 mr-2" />
+                              Project
+                            </>
+                          )}
                         </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">Project</TooltipContent>
+                    </Tooltip>
+
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant={isActiveRoute(`/projects/${projectId}/datasources`) ? 'default' : 'ghost'}
+                          className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start'}
+                          onClick={() => navigate(`/projects/${projectId}/datasources`)}
+                        >
+                          {navCollapsed ? (
+                            <IconFileDatabase className="h-4 w-4" />
+                          ) : (
+                            <>
+                              <IconFileDatabase className="h-4 w-4 mr-2" />
+                              Data Sources
+                            </>
+                          )}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">Data Sources</TooltipContent>
+                    </Tooltip>
+
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant={isActiveRoute(`/projects/${projectId}/plan`) || isActiveRoute(`/projects/${projectId}/plan-nodes`) ? 'default' : 'ghost'}
+                          className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start'}
+                          onClick={() => navigate(`/projects/${projectId}/plan`)}
+                        >
+                          {navCollapsed ? (
+                            <IconGraph className="h-4 w-4" />
+                          ) : (
+                            <>
+                              <IconGraph className="h-4 w-4 mr-2" />
+                              Plan
+                            </>
+                          )}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">Plan</TooltipContent>
+                    </Tooltip>
+
+                    {/* Show Plan Nodes when on Plan or Plan Nodes page */}
+                    {(isActiveRoute(`/projects/${projectId}/plan`) || isActiveRoute(`/projects/${projectId}/plan-nodes`)) && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant={isActiveRoute(`/projects/${projectId}/plan-nodes`) ? 'default' : 'ghost'}
+                            className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start pl-8'}
+                            onClick={() => navigate(`/projects/${projectId}/plan-nodes`)}
+                          >
+                            {navCollapsed ? (
+                              <IconNetwork className="h-4 w-4" />
+                            ) : (
+                              <>
+                                <IconNetwork className="h-4 w-4 mr-2" />
+                                Plan Nodes
+                              </>
+                            )}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="right">Plan Nodes</TooltipContent>
                       </Tooltip>
                     )}
-                    <Tooltip label="Chat logs" position="right" disabled={!navCollapsed}>
-                      <Button
-                        variant={isActiveRoute(`/projects/${projectId}/chat/logs`) ? 'filled' : 'light'}
-                        fullWidth={!navCollapsed}
-                        leftSection={navCollapsed ? undefined : <IconMessageDots size={16} />}
-                        onClick={() => navigate(`/projects/${projectId}/chat/logs`)}
-                        px={navCollapsed ? 'xs' : undefined}
-                        style={navCollapsed ? { justifyContent: 'center' } : undefined}
-                      >
-                        {navCollapsed ? <IconMessageDots size={16} /> : 'Chat logs'}
-                      </Button>
+
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant={isActiveRoute(`/projects/${projectId}/graphs`) ? 'default' : 'ghost'}
+                          className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start'}
+                          onClick={() => navigate(`/projects/${projectId}/graphs`)}
+                        >
+                          {navCollapsed ? (
+                            <IconDatabase className="h-4 w-4" />
+                          ) : (
+                            <>
+                              <IconDatabase className="h-4 w-4 mr-2" />
+                              Graphs
+                            </>
+                          )}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">Graphs</TooltipContent>
                     </Tooltip>
-                  </Stack>
+
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant={isActiveRoutePrefix(`/projects/${projectId}/chat`) ? 'default' : 'ghost'}
+                          className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start'}
+                          onClick={() => navigate(`/projects/${projectId}/chat`)}
+                        >
+                          {navCollapsed ? (
+                            <IconMessageDots className="h-4 w-4" />
+                          ) : (
+                            <>
+                              <IconMessageDots className="h-4 w-4 mr-2" />
+                              Chat
+                            </>
+                          )}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">Chat</TooltipContent>
+                    </Tooltip>
+
+                    {/* Show supplemental chat links when on Chat page */}
+                    {isActiveRoutePrefix(`/projects/${projectId}/chat`) && (
+                      <Stack gap="xs" className={navCollapsed ? '' : 'pl-4'}>
+                        {ENABLE_ASSISTANT_UI && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant={isActiveRoute(`/projects/${projectId}/chat/assistant-ui`) ? 'default' : 'ghost'}
+                                className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start'}
+                                onClick={() => navigate(`/projects/${projectId}/chat/assistant-ui`)}
+                              >
+                                {navCollapsed ? (
+                                  <IconMessageDots className="h-4 w-4" />
+                                ) : (
+                                  <>
+                                    <IconMessageDots className="h-4 w-4 mr-2" />
+                                    Assistant UI (Preview)
+                                  </>
+                                )}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="right">Assistant UI (preview)</TooltipContent>
+                          </Tooltip>
+                        )}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant={isActiveRoute(`/projects/${projectId}/chat/logs`) ? 'default' : 'ghost'}
+                              className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start'}
+                              onClick={() => navigate(`/projects/${projectId}/chat/logs`)}
+                            >
+                              {navCollapsed ? (
+                                <IconMessageDots className="h-4 w-4" />
+                              ) : (
+                                <>
+                                  <IconMessageDots className="h-4 w-4 mr-2" />
+                                  Chat logs
+                                </>
+                              )}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="right">Chat logs</TooltipContent>
+                        </Tooltip>
+                      </Stack>
+                    )}
+                  </>
                 )}
-              </>
-            )}
+              </Stack>
+
+              <div>
+                <Separator className="my-2" />
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={isActiveRoute('/settings/database') ? 'default' : 'ghost'}
+                      className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start'}
+                      onClick={() => navigate('/settings/database')}
+                    >
+                      {navCollapsed ? (
+                        <IconSettings className="h-4 w-4" />
+                      ) : (
+                        <>
+                          <IconSettings className="h-4 w-4 mr-2" />
+                          Database Settings
+                        </>
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">Database Settings</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={isActiveRoute('/settings/system') ? 'default' : 'ghost'}
+                      className={`${navCollapsed ? 'justify-center px-2' : 'w-full justify-start'} mt-2`}
+                      onClick={() => navigate('/settings/system')}
+                    >
+                      {navCollapsed ? (
+                        <IconAdjustments className="h-4 w-4" />
+                      ) : (
+                        <>
+                          <IconAdjustments className="h-4 w-4 mr-2" />
+                          System Settings
+                        </>
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">System Settings</TooltipContent>
+                </Tooltip>
+              </div>
+            </TooltipProvider>
           </Stack>
+        </div>
+      </aside>
 
-          <div>
-            <div style={{ height: '1px', backgroundColor: '#e9ecef', margin: '8px 0' }} />
-            <Tooltip label="Database Settings" position="right" disabled={!navCollapsed}>
-              <Button
-                variant={isActiveRoute('/settings/database') ? 'filled' : 'light'}
-                fullWidth={!navCollapsed}
-                leftSection={navCollapsed ? undefined : <IconSettings size={16} />}
-                onClick={() => navigate('/settings/database')}
-                px={navCollapsed ? 'xs' : undefined}
-                style={navCollapsed ? { justifyContent: 'center' } : undefined}
-              >
-                {navCollapsed ? <IconSettings size={16} /> : 'Database Settings'}
-              </Button>
-            </Tooltip>
-            <Tooltip label="System Settings" position="right" disabled={!navCollapsed}>
-              <Button
-                variant={isActiveRoute('/settings/system') ? 'filled' : 'light'}
-                fullWidth={!navCollapsed}
-                leftSection={navCollapsed ? undefined : <IconAdjustments size={16} />}
-                onClick={() => navigate('/settings/system')}
-                px={navCollapsed ? 'xs' : undefined}
-                mt="xs"
-                style={navCollapsed ? { justifyContent: 'center' } : undefined}
-              >
-                {navCollapsed ? <IconAdjustments size={16} /> : 'System Settings'}
-              </Button>
-            </Tooltip>
-          </div>
-        </Stack>
-      </AppShell.Navbar>
+      {/* Main Content Area */}
+      <div className="flex flex-col flex-1 overflow-hidden">
+        {/* Top Bar */}
+        <header className="h-[60px] border-b">
+          <TopBar
+            projectId={projectId}
+            connectionState={connectionStatus.state}
+            users={collaboration.users}
+            currentUserId={sessionId}
+            onNavigateHome={() => navigate('/')}
+          />
+        </header>
 
-      <AppShell.Main style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-        <CollaborationContext.Provider value={collaboration}>
-          {children}
-        </CollaborationContext.Provider>
-      </AppShell.Main>
-    </AppShell>
+        {/* Main Content */}
+        <main className="flex-1 overflow-auto p-4">
+          <CollaborationContext.Provider value={collaboration}>
+            {children}
+          </CollaborationContext.Provider>
+        </main>
+      </div>
+    </div>
   )
 }
 
@@ -458,128 +576,113 @@ const HomePage = () => {
   const selectedSample = sampleOptions.find(option => option.value === selectedSampleKey)
 
   return (
-    <div style={{ width: '100%', height: '100%' }}>
+    <div className="w-full h-full">
       {/* Action buttons section */}
-      <div style={{ padding: '3rem 2rem', backgroundColor: '#f8f9fa', borderBottom: '1px solid #dee2e6' }}>
+      <div className="py-12 px-8 bg-gray-50 border-b">
         <Group justify="center" gap="xl">
           <Button
-            size="xl"
-            variant="filled"
-            leftSection={<IconDatabase size={24} />}
+            size="lg"
             onClick={() => navigate('/projects')}
-            style={{ minWidth: 240, height: 80, fontSize: '1.1rem' }}
+            className="min-w-[240px] h-20 text-lg"
           >
+            <IconDatabase className="mr-2 h-6 w-6" />
             Browse Projects
           </Button>
           <Button
-            size="xl"
-            variant="filled"
-            color="blue"
-            leftSection={<IconPlus size={24} />}
+            size="lg"
             onClick={handleCreateProject}
-            style={{ minWidth: 240, height: 80, fontSize: '1.1rem' }}
+            className="min-w-[240px] h-20 text-lg"
           >
+            <IconPlus className="mr-2 h-6 w-6" />
             Start New Project
           </Button>
           <Button
-            size="xl"
-            variant="filled"
-            color="teal"
-            leftSection={<IconFolderPlus size={24} />}
+            size="lg"
             onClick={handleOpenSampleModal}
-            style={{ minWidth: 240, height: 80, fontSize: '1.1rem' }}
+            className="min-w-[240px] h-20 text-lg bg-teal-600 hover:bg-teal-700"
           >
+            <IconFolderPlus className="mr-2 h-6 w-6" />
             Import Sample Project
           </Button>
         </Group>
       </div>
 
       {/* Recent projects section */}
-      <div style={{ padding: '2rem' }}>
-        <Title order={2} mb="xl" style={{ textAlign: 'center' }}>
+      <div className="p-8">
+        <h2 className="text-2xl font-bold text-center mb-6">
           Recent Projects
-        </Title>
+        </h2>
 
         {recentProjects.length === 0 ? (
-          <Card withBorder p="xl" radius="md" style={{ maxWidth: 600, margin: '0 auto' }}>
-            <Stack align="center" gap="md">
-              <IconGraph size={48} color="gray" />
-              <Title order={3}>No Projects Yet</Title>
-              <Text ta="center" c="dimmed">
+          <Card className="max-w-[600px] mx-auto border p-6">
+            <div className="flex flex-col items-center gap-4">
+              <IconGraph size={48} className="text-gray-400" />
+              <h3 className="text-xl font-bold">No Projects Yet</h3>
+              <p className="text-center text-muted-foreground">
                 Create your first project to get started with Layercake.
-              </Text>
-            </Stack>
+              </p>
+            </div>
           </Card>
         ) : (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-            gap: '1.5rem',
-            maxWidth: 1600,
-            margin: '0 auto'
-          }}>
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-6 max-w-[1600px] mx-auto">
             {recentProjects.map((project) => (
               <Card
                 key={project.id}
-                withBorder
-                padding="lg"
-                radius="md"
-                shadow="sm"
-                style={{ cursor: 'pointer', height: '100%', display: 'flex', flexDirection: 'column' }}
+                className="cursor-pointer h-full flex flex-col border shadow-sm hover:shadow-md transition-shadow"
                 onClick={() => navigate(`/projects/${project.id}`)}
               >
-                <Card.Section withBorder inheritPadding py="xs" style={{ backgroundColor: '#f8f9fa' }}>
-                  <Group justify="space-between">
+                <div className="border-b bg-gray-50 p-3">
+                  <Group justify="between">
                     <Group gap="xs">
-                      <IconGraph size={20} />
-                      <Text fw={600}>{project.name}</Text>
+                      <IconGraph className="h-5 w-5" />
+                      <p className="font-semibold">{project.name}</p>
                     </Group>
-                    <Badge variant="light" size="sm">
+                    <Badge variant="secondary">
                       ID: {project.id}
                     </Badge>
                   </Group>
-                </Card.Section>
+                </div>
 
-                <Stack gap="sm" mt="md" style={{ flex: 1 }}>
+                <Stack gap="sm" className="flex-1 p-4">
                   {project.description && (
-                    <Text size="sm" c="dimmed" lineClamp={2}>
+                    <p className="text-sm text-muted-foreground line-clamp-2">
                       {project.description}
-                    </Text>
+                    </p>
                   )}
 
-                  <div style={{ marginTop: 'auto' }}>
-                    <Text size="xs" c="dimmed">
+                  <div className="mt-auto">
+                    <p className="text-xs text-muted-foreground">
                       Updated {new Date(project.updatedAt).toLocaleDateString()}
-                    </Text>
+                    </p>
                   </div>
                 </Stack>
 
-                <Card.Section withBorder inheritPadding py="xs" mt="md">
-                  <Group gap="xs" justify="flex-end">
+                <div className="border-t p-3">
+                  <Group gap="xs" justify="end">
                     <Button
-                      size="xs"
-                      variant="light"
-                      leftSection={<IconGraph size={14} />}
+                      size="sm"
+                      variant="ghost"
                       onClick={(e) => {
                         e.stopPropagation()
                         navigate(`/projects/${project.id}/plan`)
                       }}
                     >
+                      <IconGraph className="mr-2 h-3.5 w-3.5" />
                       Plan
                     </Button>
                     <Button
-                      size="xs"
-                      variant="light"
-                      leftSection={<IconFileDatabase size={14} />}
+                      size="sm"
+                      variant="ghost"
                       onClick={(e) => {
                         e.stopPropagation()
                         navigate(`/projects/${project.id}/datasources`)
                       }}
                     >
+                      <IconFileDatabase className="mr-2 h-3.5 w-3.5" />
                       Data
                     </Button>
                   </Group>
-                </Card.Section>
+                </div>
               </Card>
             ))}
           </div>
@@ -592,52 +695,65 @@ const HomePage = () => {
         onSuccess={handleProjectCreated}
       />
 
-      <Modal
-        opened={sampleModalOpened}
-        onClose={handleSampleModalClose}
-        title="Import Sample Project"
-        size="md"
-      >
-        <Stack gap="md">
-          <Text size="sm" c="dimmed">
-            Select one of the bundled samples to create a project preloaded with data sources and a starter DAG.
-          </Text>
+      <Dialog open={sampleModalOpened} onOpenChange={(open) => !open && handleSampleModalClose()}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Import Sample Project</DialogTitle>
+          </DialogHeader>
+          <Stack gap="md" className="py-4">
+            <p className="text-sm text-muted-foreground">
+              Select one of the bundled samples to create a project preloaded with data sources and a starter DAG.
+            </p>
 
-          <Select
-            label="Sample Project"
-            placeholder={sampleProjectsLoading ? 'Loading samples...' : 'Select a sample'}
-            data={sampleOptions}
-            value={selectedSampleKey}
-            onChange={setSelectedSampleKey}
-            disabled={sampleProjectsLoading || sampleOptions.length === 0}
-          />
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Sample Project</label>
+              <Select
+                value={selectedSampleKey || ''}
+                onValueChange={setSelectedSampleKey}
+                disabled={sampleProjectsLoading || sampleOptions.length === 0}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={sampleProjectsLoading ? 'Loading samples...' : 'Select a sample'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {sampleOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          {selectedSample?.description && (
-            <Text size="sm" c="dimmed">
-              {selectedSample.description}
-            </Text>
-          )}
+            {selectedSample?.description && (
+              <p className="text-sm text-muted-foreground">
+                {selectedSample.description}
+              </p>
+            )}
 
-          {sampleError && (
-            <Alert color="red" title="Cannot create sample project">
-              {sampleError}
-            </Alert>
-          )}
-
-          <Group justify="flex-end" gap="xs">
-            <Button variant="subtle" onClick={handleSampleModalClose} disabled={createSampleLoading}>
+            {sampleError && (
+              <Alert variant="destructive">
+                <AlertDescription>
+                  <p className="font-semibold mb-1">Cannot create sample project</p>
+                  <p className="text-sm">{sampleError}</p>
+                </AlertDescription>
+              </Alert>
+            )}
+          </Stack>
+          <DialogFooter>
+            <Button variant="ghost" onClick={handleSampleModalClose} disabled={createSampleLoading}>
               Cancel
             </Button>
             <Button
               onClick={handleCreateSampleProject}
-              loading={createSampleLoading}
-              disabled={!selectedSampleKey || sampleProjectsLoading}
+              disabled={!selectedSampleKey || sampleProjectsLoading || createSampleLoading}
             >
+              {createSampleLoading && <span className="mr-2">...</span>}
               Create Sample Project
             </Button>
-          </Group>
-        </Stack>
-      </Modal>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -759,42 +875,41 @@ const ProjectsPage = () => {
     <PageContainer>
       <Breadcrumbs currentPage="Projects" onNavigate={handleNavigate} />
 
-      <Group justify="space-between" mb="md">
-        <Title order={1}>Projects</Title>
+      <Group justify="between" className="mb-4">
+        <h1 className="text-3xl font-bold">Projects</h1>
         <Group gap="xs">
-          <Button leftSection={<IconPlus size={16} />} onClick={handleCreateProject}>
+          <Button onClick={handleCreateProject}>
+            <IconPlus className="mr-2 h-4 w-4" />
             New Project
           </Button>
-          <Button
-            variant="light"
-            leftSection={<IconFolderPlus size={16} />}
-            onClick={handleOpenSampleModal}
-          >
+          <Button variant="secondary" onClick={handleOpenSampleModal}>
+            <IconFolderPlus className="mr-2 h-4 w-4" />
             Add Sample Project
           </Button>
         </Group>
       </Group>
 
-      {projectsLoading && <Text>Loading projects...</Text>}
+      {projectsLoading && <p>Loading projects...</p>}
 
       {projectsError && (
-        <Text c="red" mb="md">
+        <p className="text-red-600 mb-4">
           Error loading projects: {projectsError.message}
-        </Text>
+        </p>
       )}
 
       {projects.length === 0 && !projectsLoading && !projectsError && (
-        <Card withBorder p="xl" radius="md">
-          <Stack align="center" gap="md">
-            <IconGraph size={48} color="gray" />
-            <Title order={3}>No Projects Yet</Title>
-            <Text ta="center" c="dimmed">
+        <Card className="border p-6">
+          <div className="flex flex-col items-center gap-4">
+            <IconGraph size={48} className="text-gray-400" />
+            <h3 className="text-xl font-bold">No Projects Yet</h3>
+            <p className="text-center text-muted-foreground">
               Create your first project to start building Plan DAGs and transforming graphs.
-            </Text>
-            <Button leftSection={<IconPlus size={16} />} onClick={handleCreateProject}>
+            </p>
+            <Button onClick={handleCreateProject}>
+              <IconPlus className="mr-2 h-4 w-4" />
               Create First Project
             </Button>
-          </Stack>
+          </div>
         </Card>
       )}
 
@@ -803,62 +918,59 @@ const ProjectsPage = () => {
           {projects.map((project: any) => (
             <Card
               key={project.id}
-              withBorder
-              p="md"
-              radius="md"
-              style={{ cursor: 'pointer' }}
+              className="border p-4 cursor-pointer hover:shadow-md transition-shadow"
               onClick={() => handleProjectSelect(project.id)}
             >
-              <Group justify="space-between" align="flex-start">
-                <div style={{ flex: 1 }}>
-                  <Group gap="sm" mb="xs">
-                    <Title order={4}>{project.name}</Title>
-                    <Badge variant="light" size="sm">
+              <Group justify="between" align="start">
+                <div className="flex-1">
+                  <Group gap="sm" className="mb-2">
+                    <h4 className="text-lg font-semibold">{project.name}</h4>
+                    <Badge variant="secondary">
                       ID: {project.id}
                     </Badge>
                   </Group>
                   {project.description && (
-                    <Text size="sm" c="dimmed" mb="sm">
+                    <p className="text-sm text-muted-foreground mb-2">
                       {project.description}
-                    </Text>
+                    </p>
                   )}
-                  <Text size="xs" c="dimmed">
+                  <p className="text-xs text-muted-foreground">
                     Created: {new Date(project.createdAt).toLocaleDateString()}
-                  </Text>
+                  </p>
                 </div>
                 <Group gap="xs">
                   <Button
-                    variant="light"
+                    variant="ghost"
                     size="sm"
-                    leftSection={<IconGraph size={14} />}
                     onClick={(e) => {
                       e.stopPropagation()
                       navigate(`/projects/${project.id}/plan`)
                     }}
                   >
+                    <IconGraph className="mr-2 h-3.5 w-3.5" />
                     Plan
                   </Button>
                   <Button
-                    variant="light"
+                    variant="ghost"
                     size="sm"
-                    color="red"
-                    leftSection={<IconTrash size={14} />}
+                    className="text-red-600 hover:text-red-700"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleDeleteProject(project.id);
                     }}
                   >
+                    <IconTrash className="mr-2 h-3.5 w-3.5" />
                     Delete
                   </Button>
                   <Button
-                    variant="light"
+                    variant="ghost"
                     size="sm"
-                    leftSection={<IconSettings size={14} />}
                     onClick={(e) => {
                       e.stopPropagation()
                       handleProjectSelect(project.id)
                     }}
                   >
+                    <IconSettings className="mr-2 h-3.5 w-3.5" />
                     Settings
                   </Button>
                 </Group>
@@ -874,58 +986,74 @@ const ProjectsPage = () => {
         onSuccess={handleProjectCreated}
       />
 
-      <Modal
-        opened={sampleModalOpened}
-        onClose={handleSampleModalClose}
-        title="Add Sample Project"
-        size="md"
-      >
-        <Stack gap="md">
-          <Text size="sm" c="dimmed">
-            Select one of the bundled samples to create a project preloaded with data sources and a starter DAG.
-          </Text>
+      <Dialog open={sampleModalOpened} onOpenChange={(open) => !open && handleSampleModalClose()}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Add Sample Project</DialogTitle>
+          </DialogHeader>
+          <Stack gap="md" className="py-4">
+            <p className="text-sm text-muted-foreground">
+              Select one of the bundled samples to create a project preloaded with data sources and a starter DAG.
+            </p>
 
-          {sampleProjectsError && (
-            <Alert color="red" title="Unable to load samples">
-              {sampleProjectsError.message}
-            </Alert>
-          )}
+            {sampleProjectsError && (
+              <Alert variant="destructive">
+                <AlertDescription>
+                  <p className="font-semibold mb-1">Unable to load samples</p>
+                  <p className="text-sm">{sampleProjectsError.message}</p>
+                </AlertDescription>
+              </Alert>
+            )}
 
-          <Select
-            label="Sample Project"
-            placeholder={sampleProjectsLoading ? 'Loading samples...' : 'Select a sample'}
-            data={sampleOptions}
-            value={selectedSampleKey}
-            onChange={setSelectedSampleKey}
-            disabled={sampleProjectsLoading || sampleOptions.length === 0}
-          />
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Sample Project</label>
+              <Select
+                value={selectedSampleKey || ''}
+                onValueChange={setSelectedSampleKey}
+                disabled={sampleProjectsLoading || sampleOptions.length === 0}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={sampleProjectsLoading ? 'Loading samples...' : 'Select a sample'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {sampleOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          {selectedSample?.description && (
-            <Text size="sm" c="dimmed">
-              {selectedSample.description}
-            </Text>
-          )}
+            {selectedSample?.description && (
+              <p className="text-sm text-muted-foreground">
+                {selectedSample.description}
+              </p>
+            )}
 
-          {sampleError && (
-            <Alert color="red" title="Cannot create sample project">
-              {sampleError}
-            </Alert>
-          )}
-
-          <Group justify="flex-end" gap="xs">
-            <Button variant="subtle" onClick={handleSampleModalClose} disabled={createSampleLoading}>
+            {sampleError && (
+              <Alert variant="destructive">
+                <AlertDescription>
+                  <p className="font-semibold mb-1">Cannot create sample project</p>
+                  <p className="text-sm">{sampleError}</p>
+                </AlertDescription>
+              </Alert>
+            )}
+          </Stack>
+          <DialogFooter>
+            <Button variant="ghost" onClick={handleSampleModalClose} disabled={createSampleLoading}>
               Cancel
             </Button>
             <Button
               onClick={handleCreateSampleProject}
-              loading={createSampleLoading}
-              disabled={!selectedSampleKey || sampleProjectsLoading}
+              disabled={!selectedSampleKey || sampleProjectsLoading || createSampleLoading}
             >
+              {createSampleLoading && <span className="mr-2">...</span>}
               Create Sample Project
             </Button>
-          </Group>
-        </Stack>
-      </Modal>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
     </PageContainer>
   )
@@ -1066,7 +1194,7 @@ const ProjectDetailPage = () => {
   if (projectsLoading) {
     return (
       <PageContainer>
-        <Text>Loading project...</Text>
+        <p>Loading project...</p>
       </PageContainer>
     )
   }
@@ -1075,8 +1203,8 @@ const ProjectDetailPage = () => {
   if (!selectedProject) {
     return (
       <PageContainer>
-        <Title order={1}>Project Not Found</Title>
-        <Button onClick={() => navigate('/projects')} mt="md">
+        <h1 className="text-3xl font-bold">Project Not Found</h1>
+        <Button onClick={() => navigate('/projects')} className="mt-4">
           Back to Projects
         </Button>
       </PageContainer>
@@ -1127,81 +1255,84 @@ const ProjectDetailPage = () => {
         onNavigate={handleNavigate}
       />
 
-      <Group justify="space-between" mb="xl">
+      <Group justify="between" className="mb-6">
         <div>
-          <Title order={1}>{selectedProject.name}</Title>
-          <Group gap="sm" mt="xs">
-            <Badge variant="light">ID: {selectedProject.id}</Badge>
-            <Badge color="green" variant="light">Active</Badge>
+          <h1 className="text-3xl font-bold">{selectedProject.name}</h1>
+          <Group gap="sm" className="mt-2">
+            <Badge variant="secondary">ID: {selectedProject.id}</Badge>
+            <Badge className="bg-green-100 text-green-900">Active</Badge>
           </Group>
         </div>
       </Group>
 
-      <Title order={2} mb="md">Project Tools</Title>
+      <h2 className="text-2xl font-bold mb-4">Project Tools</h2>
 
-      <Stack gap="md">
-        {projectActions.map((action) => (
-          <Card
-            key={action.title}
-            withBorder
-            p="md"
-            radius="md"
-            style={{
-              cursor: action.disabled ? 'not-allowed' : 'pointer',
-              opacity: action.disabled ? 0.6 : 1,
-            }}
-            onClick={action.disabled ? undefined : action.onClick}
-          >
-            <Group justify="space-between" align="flex-start">
-              <Group align="flex-start" gap="md">
-                {action.icon}
-                <div>
-                  <Title order={4} mb="xs">
-                    {action.title}
-                    {action.disabled && (
-                      <Badge size="xs" color="gray" ml="sm">
-                        Coming Soon
-                      </Badge>
-                    )}
-                  </Title>
-                  <Text size="sm" c="dimmed">
-                    {action.description}
-                  </Text>
-                </div>
-              </Group>
-              {!action.disabled && (
-                <Group gap="xs">
-                  {action.title === 'Plan' && planDag && (
-                    <Tooltip label="Download Plan DAG as YAML">
-                      <ActionIcon
-                        variant="subtle"
-                        size="lg"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleDownloadYAML()
-                        }}
-                      >
-                        <IconDownload size="1.2rem" />
-                      </ActionIcon>
-                    </Tooltip>
-                  )}
-                  <Button
-                    variant={action.primary ? 'filled' : 'light'}
-                    size="sm"
-                    leftSection={action.icon}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      action.onClick()
-                    }}
-                  >
-                    Open
-                  </Button>
+      <TooltipProvider>
+        <Stack gap="md">
+          {projectActions.map((action) => (
+            <Card
+              key={action.title}
+              className={`border p-4 ${
+                action.disabled
+                  ? 'cursor-not-allowed opacity-60'
+                  : 'cursor-pointer hover:shadow-md transition-shadow'
+              }`}
+              onClick={action.disabled ? undefined : action.onClick}
+            >
+              <Group justify="between" align="start">
+                <Group align="start" gap="md">
+                  {action.icon}
+                  <div>
+                    <h4 className="text-lg font-semibold mb-2">
+                      {action.title}
+                      {action.disabled && (
+                        <Badge variant="secondary" className="ml-2 text-xs">
+                          Coming Soon
+                        </Badge>
+                      )}
+                    </h4>
+                    <p className="text-sm text-muted-foreground">
+                      {action.description}
+                    </p>
+                  </div>
                 </Group>
-              )}
-            </Group>
-          </Card>
-        ))}
-      </Stack>
+                {!action.disabled && (
+                  <Group gap="xs">
+                    {action.title === 'Plan' && planDag && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDownloadYAML()
+                            }}
+                          >
+                            <IconDownload className="h-5 w-5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Download Plan DAG as YAML</TooltipContent>
+                      </Tooltip>
+                    )}
+                    <Button
+                      variant={action.primary ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        action.onClick()
+                      }}
+                    >
+                      {action.icon}
+                      <span className="ml-2">Open</span>
+                    </Button>
+                  </Group>
+                )}
+              </Group>
+            </Card>
+          ))}
+        </Stack>
+      </TooltipProvider>
     </PageContainer>
   )
 }
@@ -1233,7 +1364,7 @@ const PlanEditorPage = () => {
   if (projectsLoading) {
     return (
       <PageContainer>
-        <Text>Loading project...</Text>
+        <p>Loading project...</p>
       </PageContainer>
     )
   }
@@ -1242,8 +1373,8 @@ const PlanEditorPage = () => {
   if (!selectedProject) {
     return (
       <PageContainer>
-        <Title order={1}>Project Not Found</Title>
-        <Button onClick={() => navigate('/projects')} mt="md">
+        <h1 className="text-3xl font-bold">Project Not Found</h1>
+        <Button onClick={() => navigate('/projects')} className="mt-4">
           Back to Projects
         </Button>
       </PageContainer>
@@ -1254,8 +1385,8 @@ const PlanEditorPage = () => {
   const focusNodeId = searchParams.get('focusNode') || undefined
 
   return (
-    <Stack gap={0} style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ padding: '8px 16px', borderBottom: '1px solid #e9ecef', flexShrink: 0 }}>
+    <div className="h-full flex flex-col gap-0">
+      <div className="px-4 py-2 border-b flex-shrink-0">
         <Breadcrumbs
           projectName={selectedProject.name}
           projectId={selectedProject.id}
@@ -1263,7 +1394,7 @@ const PlanEditorPage = () => {
           onNavigate={handleNavigate}
         />
       </div>
-      <div style={{ flex: 1, overflow: 'hidden' }}>
+      <div className="flex-1 overflow-hidden">
         <ErrorBoundary>
           <PlanVisualEditor
             projectId={selectedProject.id}
@@ -1274,7 +1405,7 @@ const PlanEditorPage = () => {
           />
         </ErrorBoundary>
       </div>
-    </Stack>
+    </div>
   )
 }
 
@@ -1371,8 +1502,8 @@ function App() {
           <Route path="*" element={
             <ErrorBoundary>
               <PageContainer>
-                <Title order={1}>Page Not Found</Title>
-                <Text mb="md">The page you're looking for doesn't exist.</Text>
+                <h1 className="text-3xl font-bold">Page Not Found</h1>
+                <p className="mb-4">The page you're looking for doesn't exist.</p>
                 <Button onClick={() => window.location.href = '/'}>
                   Go Home
                 </Button>

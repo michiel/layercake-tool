@@ -1,5 +1,4 @@
 import React from 'react';
-import { Group, Paper, Text, ActionIcon, Tooltip } from '@mantine/core';
 import {
   IconDatabase,
   IconNetwork,
@@ -9,6 +8,8 @@ import {
   IconFileExport
 } from '@tabler/icons-react';
 import { PlanDagNodeType } from '../../../../types/plan-dag';
+import { Group } from '../../../layout-primitives';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '../../../ui/tooltip';
 
 const isTauri = !!(window as any).__TAURI__;
 
@@ -31,44 +32,26 @@ const DraggableNode: React.FC<DraggableNodeProps> = ({ type, label, icon, color,
   };
 
   return (
-    <Tooltip label={`Drag to add ${label}`} position="bottom">
-      <Paper
-        p="sm"
-        radius="md"
-        bg={color}
-        style={{
-          cursor: 'grab',
-          minWidth: '60px',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: '4px',
-          ':hover': {
-            opacity: 0.8
-          }
-        }}
-        draggable={!isTauri}
-        onDragStart={handleDragStart}
-        onMouseDown={handleMouseDown}
-      >
-        <ActionIcon
-          variant="transparent"
-          size="lg"
-          color="white"
-          style={{ pointerEvents: 'none' }}
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div
+          className="p-3 rounded-md cursor-grab hover:opacity-80 transition-opacity flex flex-col items-center gap-1 min-w-[60px]"
+          style={{ backgroundColor: color }}
+          draggable={!isTauri}
+          onDragStart={handleDragStart}
+          onMouseDown={handleMouseDown}
         >
-          {icon}
-        </ActionIcon>
-        <Text
-          size="xs"
-          c="white"
-          fw={500}
-          ta="center"
-          style={{ pointerEvents: 'none', lineHeight: 1 }}
-        >
-          {label}
-        </Text>
-      </Paper>
+          <div className="text-white pointer-events-none" style={{ fontSize: '1.2rem' }}>
+            {icon}
+          </div>
+          <p className="text-xs text-white font-medium text-center pointer-events-none leading-none">
+            {label}
+          </p>
+        </div>
+      </TooltipTrigger>
+      <TooltipContent>
+        Drag to add {label}
+      </TooltipContent>
     </Tooltip>
   );
 };
@@ -124,23 +107,25 @@ export const NodeToolbar: React.FC<NodeToolbarProps> = ({ onNodeDragStart, onNod
   ];
 
   return (
-    <Paper p="md" shadow="sm" bg="gray.0" style={{ borderBottom: '1px solid #e9ecef' }}>
-      <Group gap="xs" justify="flex-start">
-        <Text size="sm" fw={500} c="gray.7" mr="md">
-          Drag nodes to canvas:
-        </Text>
-        {nodeTypes.map((nodeType) => (
-          <DraggableNode
-            key={nodeType.type}
-            type={nodeType.type}
-            label={nodeType.label}
-            icon={nodeType.icon}
-            color={nodeType.color}
-            onDragStart={onNodeDragStart}
-            onPointerDragStart={onNodePointerDragStart}
-          />
-        ))}
-      </Group>
-    </Paper>
+    <TooltipProvider>
+      <div className="p-4 shadow-sm bg-gray-50 border-b">
+        <Group gap="xs" justify="start">
+          <p className="text-sm font-medium text-gray-700 mr-4">
+            Drag nodes to canvas:
+          </p>
+          {nodeTypes.map((nodeType) => (
+            <DraggableNode
+              key={nodeType.type}
+              type={nodeType.type}
+              label={nodeType.label}
+              icon={nodeType.icon}
+              color={nodeType.color}
+              onDragStart={onNodeDragStart}
+              onPointerDragStart={onNodePointerDragStart}
+            />
+          ))}
+        </Group>
+      </div>
+    </TooltipProvider>
   );
 };

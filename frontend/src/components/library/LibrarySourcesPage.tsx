@@ -1,25 +1,6 @@
 import React, { useState } from 'react'
 import { useQuery, useMutation } from '@apollo/client/react'
 import {
-  Title,
-  Text,
-  Group,
-  Stack,
-  Button,
-  Card,
-  Table,
-  Badge,
-  Menu,
-  ActionIcon,
-  Alert,
-  Modal,
-  TextInput,
-  Textarea,
-  LoadingOverlay,
-  FileInput,
-  Divider,
-} from '@mantine/core'
-import {
   IconPlus,
   IconDots,
   IconTrash,
@@ -29,9 +10,21 @@ import {
   IconAlertCircle,
   IconDatabaseImport,
 } from '@tabler/icons-react'
-import { useForm } from '@mantine/form'
+import { useForm } from 'react-hook-form'
 import PageContainer from '../layout/PageContainer'
 import { DataSourceUploader } from '../datasources/DataSourceUploader'
+import { Stack, Group } from '../layout-primitives'
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert'
+import { Badge } from '../ui/badge'
+import { Button } from '../ui/button'
+import { Card, CardContent } from '../ui/card'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '../ui/dropdown-menu'
+import { Input } from '../ui/input'
+import { Label } from '../ui/label'
+import { Spinner } from '../ui/spinner'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table'
+import { Textarea } from '../ui/textarea'
 import {
   GET_LIBRARY_SOURCES,
   DELETE_LIBRARY_SOURCE,
@@ -44,7 +37,6 @@ import {
   formatFileSize,
   getDataTypeDisplayName,
   getFileFormatDisplayName,
-  getStatusColor,
   detectFileFormat,
 } from '../../graphql/librarySources'
 import { showErrorNotification, showSuccessNotification } from '../../utils/notifications'
@@ -86,19 +78,16 @@ export const LibrarySourcesPage: React.FC = () => {
 
   const librarySources: LibrarySource[] = (data as any)?.librarySources || []
 
-  const form = useForm({
-    initialValues: {
+  const form = useForm<{name: string; description: string}>({
+    defaultValues: {
       name: '',
       description: ''
-    },
-    validate: {
-      name: (value) => (value.trim().length > 0 ? null : 'Name is required')
     }
   })
 
   const openEditModal = (source: LibrarySource) => {
     setSelectedSource(source)
-    form.setValues({
+    form.reset({
       name: source.name,
       description: source.description || ''
     })
@@ -219,143 +208,155 @@ export const LibrarySourcesPage: React.FC = () => {
   return (
     <PageContainer>
       <Stack gap="lg">
-        <Group justify="space-between" align="flex-start">
+        <Group justify="between" align="start">
           <div>
-            <Title order={2}>Library Sources</Title>
-            <Text size="sm" c="dimmed">
+            <h2 className="text-2xl font-bold">Library Sources</h2>
+            <p className="text-sm text-muted-foreground">
               Manage reusable data sources that can be imported into any project.
-            </Text>
+            </p>
           </div>
           <Group gap="xs">
             <Button
-              variant="light"
-              leftSection={<IconDatabaseImport size={16} />}
-              loading={seedLoading}
+              variant="secondary"
               onClick={handleSeedLibrary}
+              disabled={seedLoading}
             >
+              {seedLoading && <Spinner className="mr-2 h-4 w-4" />}
+              <IconDatabaseImport className="mr-2 h-4 w-4" />
               Seed library
             </Button>
             <Button
-              leftSection={<IconPlus size={16} />}
               onClick={() => setUploaderOpen(true)}
             >
+              <IconPlus className="mr-2 h-4 w-4" />
               Add Library Source
             </Button>
           </Group>
         </Group>
 
-        <Card withBorder>
-          <LoadingOverlay visible={busy} />
-          <Stack gap="md">
-            {(error || deleteError) && (
-              <Alert
-                icon={<IconAlertCircle size={16} />}
-                title="Unable to load library sources"
-                color="red"
-              >
-                {error?.message || deleteError?.message}
-              </Alert>
-            )}
+        <Card className="border relative">
+          {busy && (
+            <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 rounded-lg">
+              <Spinner className="h-8 w-8" />
+            </div>
+          )}
+          <CardContent className="pt-6">
+            <Stack gap="md">
+              {(error || deleteError) && (
+                <Alert variant="destructive">
+                  <IconAlertCircle className="h-4 w-4" />
+                  <AlertTitle>Unable to load library sources</AlertTitle>
+                  <AlertDescription>
+                    {error?.message || deleteError?.message}
+                  </AlertDescription>
+                </Alert>
+              )}
 
-            {librarySources.length === 0 && !loading ? (
-              <Stack align="center" py="xl" gap="xs">
-                <Text fw={500}>No library sources yet</Text>
-                <Text size="sm" c="dimmed" ta="center" style={{ maxWidth: 360 }}>
-                  Add datasources here to share them across projects. They can be imported into any
-                  project without re-uploading.
-                </Text>
-              </Stack>
-            ) : (
-              <Table highlightOnHover verticalSpacing="sm">
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th>Name</Table.Th>
-                    <Table.Th>Format</Table.Th>
-                    <Table.Th>Data Type</Table.Th>
-                    <Table.Th>Status</Table.Th>
-                    <Table.Th>Processed</Table.Th>
-                    <Table.Th>File Size</Table.Th>
-                    <Table.Th></Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
+              {librarySources.length === 0 && !loading ? (
+                <Stack align="center" className="py-12" gap="xs">
+                  <p className="font-medium">No library sources yet</p>
+                  <p className="text-sm text-muted-foreground text-center max-w-sm">
+                    Add datasources here to share them across projects. They can be imported into any
+                    project without re-uploading.
+                  </p>
+                </Stack>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Format</TableHead>
+                      <TableHead>Data Type</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Processed</TableHead>
+                      <TableHead>File Size</TableHead>
+                      <TableHead className="w-[60px]"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                   {librarySources.map((source) => (
-                    <Table.Tr key={source.id}>
-                      <Table.Td>
-                        <Stack gap={2}>
-                          <Text fw={500}>{source.name}</Text>
+                    <TableRow key={source.id}>
+                      <TableCell>
+                        <Stack gap="xs">
+                          <p className="font-medium">{source.name}</p>
                           {source.description && (
-                            <Text size="sm" c="dimmed">
+                            <p className="text-sm text-muted-foreground">
                               {source.description}
-                            </Text>
+                            </p>
                           )}
                         </Stack>
-                      </Table.Td>
-                      <Table.Td>{getFileFormatDisplayName(source.fileFormat)}</Table.Td>
-                      <Table.Td>{getDataTypeDisplayName(source.dataType)}</Table.Td>
-                      <Table.Td>
-                        <Badge color={getStatusColor(source.status)} variant="light">
-                          {source.status === 'processing'
-                            ? 'Processing'
-                            : source.status === 'error'
-                              ? 'Error'
-                              : 'Active'}
-                        </Badge>
-                        {source.status === 'error' && source.errorMessage && (
-                          <Text size="xs" c="red" mt={4}>
-                            {source.errorMessage}
-                          </Text>
-                        )}
-                      </Table.Td>
-                      <Table.Td>
+                      </TableCell>
+                      <TableCell>{getFileFormatDisplayName(source.fileFormat)}</TableCell>
+                      <TableCell>{getDataTypeDisplayName(source.dataType)}</TableCell>
+                      <TableCell>
+                        <div>
+                          <Badge
+                            variant="secondary"
+                            className={
+                              source.status === 'processing'
+                                ? 'bg-blue-100 text-blue-900'
+                                : source.status === 'error'
+                                  ? 'bg-red-100 text-red-900'
+                                  : 'bg-green-100 text-green-900'
+                            }
+                          >
+                            {source.status === 'processing'
+                              ? 'Processing'
+                              : source.status === 'error'
+                                ? 'Error'
+                                : 'Active'}
+                          </Badge>
+                          {source.status === 'error' && source.errorMessage && (
+                            <p className="text-xs text-red-600 mt-1">
+                              {source.errorMessage}
+                            </p>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
                         {source.processedAt
                           ? new Date(source.processedAt).toLocaleString()
                           : '—'}
-                      </Table.Td>
-                      <Table.Td>{formatFileSize(source.fileSize)}</Table.Td>
-                      <Table.Td width={60}>
-                        <Menu withinPortal position="bottom-end" shadow="sm">
-                          <Menu.Target>
-                            <ActionIcon variant="subtle">
-                              <IconDots size={16} />
-                            </ActionIcon>
-                          </Menu.Target>
-                          <Menu.Dropdown>
-                            <Menu.Item
-                              leftSection={<IconEdit size={14} />}
-                              onClick={() => openEditModal(source)}
-                            >
+                      </TableCell>
+                      <TableCell>{formatFileSize(source.fileSize)}</TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <IconDots className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => openEditModal(source)}>
+                              <IconEdit className="mr-2 h-3.5 w-3.5" />
                               Edit details
-                            </Menu.Item>
-                            <Menu.Item
-                              leftSection={<IconRefresh size={14} />}
-                              onClick={() => handleReprocess(source)}
-                            >
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleReprocess(source)}>
+                              <IconRefresh className="mr-2 h-3.5 w-3.5" />
                               Reprocess
-                            </Menu.Item>
-                            <Menu.Item
-                              leftSection={<IconFileDownload size={14} />}
-                              onClick={() => handleDownloadJson(source)}
-                            >
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDownloadJson(source)}>
+                              <IconFileDownload className="mr-2 h-3.5 w-3.5" />
                               Download JSON
-                            </Menu.Item>
-                            <Divider my={4} />
-                            <Menu.Item
-                              color="red"
-                              leftSection={<IconTrash size={14} />}
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
                               onClick={() => openDeleteModal(source)}
+                              className="text-red-600"
                             >
+                              <IconTrash className="mr-2 h-3.5 w-3.5" />
                               Delete
-                            </Menu.Item>
-                          </Menu.Dropdown>
-                        </Menu>
-                      </Table.Td>
-                    </Table.Tr>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </Table.Tbody>
-              </Table>
-            )}
-          </Stack>
+                  </TableBody>
+                </Table>
+              )}
+            </Stack>
+          </CardContent>
         </Card>
       </Stack>
 
@@ -366,73 +367,94 @@ export const LibrarySourcesPage: React.FC = () => {
         onSuccess={() => refetch()}
       />
 
-      <Modal
-        opened={editModalOpen}
-        onClose={() => setEditModalOpen(false)}
-        title="Edit Library Source"
-        size="lg"
-      >
-        <form onSubmit={form.onSubmit(handleEditSubmit)}>
-          <Stack gap="md">
-            <TextInput
-              label="Name"
-              placeholder="Library source name"
-              required
-              {...form.getInputProps('name')}
-            />
-            <Textarea
-              label="Description"
-              placeholder="Optional description"
-              rows={3}
-              {...form.getInputProps('description')}
-            />
-            <FileInput
-              label="Replace file"
-              placeholder="Upload a new file (optional)"
-              description="Upload a CSV, TSV, or JSON file to replace the existing data."
-              value={replacementFile}
-              onChange={setReplacementFile}
-              accept=".csv,.tsv,.json"
-              leftSection={<IconFileDownload size={16} />}
-            />
-            {editError && (
-              <Alert icon={<IconAlertCircle size={16} />} color="red">
-                {editError}
-              </Alert>
-            )}
-            <Group justify="flex-end">
-              <Button variant="light" onClick={() => setEditModalOpen(false)}>
+      <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Edit Library Source</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={form.handleSubmit(handleEditSubmit)}>
+            <Stack gap="md" className="py-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-name">Name *</Label>
+                <Input
+                  id="edit-name"
+                  placeholder="Library source name"
+                  {...form.register('name', { required: true })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-description">Description</Label>
+                <Textarea
+                  id="edit-description"
+                  placeholder="Optional description"
+                  rows={3}
+                  {...form.register('description')}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-file">Replace file</Label>
+                <Input
+                  id="edit-file"
+                  type="file"
+                  accept=".csv,.tsv,.json"
+                  onChange={(e) => setReplacementFile(e.target.files?.[0] || null)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Upload a CSV, TSV, or JSON file to replace the existing data.
+                </p>
+              </div>
+              {editError && (
+                <Alert variant="destructive">
+                  <IconAlertCircle className="h-4 w-4" />
+                  <AlertDescription>{editError}</AlertDescription>
+                </Alert>
+              )}
+            </Stack>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setEditModalOpen(false)}
+              >
                 Cancel
               </Button>
-              <Button type="submit" loading={updateLoading}>
+              <Button type="submit" disabled={updateLoading}>
+                {updateLoading && <Spinner className="mr-2 h-4 w-4" />}
                 Save changes
               </Button>
-            </Group>
-          </Stack>
-        </form>
-      </Modal>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
-      <Modal
-        opened={deleteModalOpen}
-        onClose={() => setDeleteModalOpen(false)}
-        title="Delete Library Source"
-      >
-        <Text mb="md">
-          Are you sure you want to delete{' '}
-          <Text span fw={600}>
-            {selectedSource?.name}
-          </Text>
-          ? This cannot be undone.
-        </Text>
-        <Group justify="flex-end">
-          <Button variant="light" onClick={() => setDeleteModalOpen(false)}>
-            Cancel
-          </Button>
-          <Button color="red" onClick={handleDelete} loading={deleteLoading}>
-            Delete
-          </Button>
-        </Group>
-      </Modal>
+      <Dialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Library Source</DialogTitle>
+          </DialogHeader>
+          <p className="py-4">
+            Are you sure you want to delete{' '}
+            <span className="font-semibold">{selectedSource?.name}</span>
+            ? This cannot be undone.
+          </p>
+          <DialogFooter>
+            <Button
+              variant="secondary"
+              onClick={() => setDeleteModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={deleteLoading}
+            >
+              {deleteLoading && <Spinner className="mr-2 h-4 w-4" />}
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageContainer>
   )
 }

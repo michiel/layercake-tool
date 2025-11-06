@@ -1,22 +1,6 @@
 import React, { useState } from 'react'
 import { useQuery } from '@apollo/client/react'
 import {
-  Modal,
-  Title,
-  Button,
-  Group,
-  Stack,
-  Text,
-  Badge,
-  Card,
-  ScrollArea,
-  TextInput,
-  Alert,
-  LoadingOverlay,
-  Tooltip,
-  ActionIcon
-} from '@mantine/core'
-import {
   IconSearch,
   IconFile,
   IconAlertCircle,
@@ -30,9 +14,18 @@ import {
   DataSource,
   getFileFormatDisplayName,
   getDataTypeDisplayName,
-  formatFileSize,
-  getStatusColor
+  formatFileSize
 } from '../../../../graphql/datasources'
+import { Stack, Group } from '../../../layout-primitives'
+import { Button } from '../../../ui/button'
+import { Badge } from '../../../ui/badge'
+import { Card } from '../../../ui/card'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../../ui/dialog'
+import { Input } from '../../../ui/input'
+import { ScrollArea } from '../../../ui/scroll-area'
+import { Alert, AlertDescription } from '../../../ui/alert'
+import { Spinner } from '../../../ui/spinner'
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '../../../ui/tooltip'
 
 interface DataSourceSelectionDialogProps {
   opened: boolean
@@ -92,174 +85,188 @@ export const DataSourceSelectionDialog: React.FC<DataSourceSelectionDialogProps>
   }
 
   return (
-    <Modal
-      opened={opened}
-      onClose={onClose}
-      title={<Title order={4}>Select Data Source</Title>}
-      size="lg"
-    >
-      <Stack gap="md">
-        <Group>
-          <TextInput
-            placeholder="Search data sources..."
-            leftSection={<IconSearch size={16} />}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.currentTarget.value)}
-            style={{ flex: 1 }}
-          />
-          <Tooltip label="Refresh data sources">
-            <ActionIcon variant="light" onClick={() => refetchDataSources()}>
-              <IconRefresh size={16} />
-            </ActionIcon>
-          </Tooltip>
-        </Group>
+    <Dialog open={opened} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-[600px]">
+        <DialogHeader>
+          <DialogTitle>Select Data Source</DialogTitle>
+        </DialogHeader>
 
-        {dataSourcesError && (
-          <Alert
-            icon={<IconAlertCircle size={16} />}
-            title="Error Loading Data Sources"
-            color="red"
-          >
-            <div>
-              <Text size="sm">{dataSourcesError.message}</Text>
-              <Text size="xs" mt="xs" c="dimmed">
-                Project ID: {projectId}, Query Variables: {JSON.stringify({ projectId })}
-              </Text>
-            </div>
-          </Alert>
-        )}
-
-        {/* Show loading state when projectId is invalid */}
-        {(!projectId || projectId === 0) && !dataSourcesError && (
-          <Alert
-            icon={<IconAlertCircle size={16} />}
-            title="Invalid Project"
-            color="orange"
-          >
-            <Text size="sm">
-              No valid project ID provided. Project ID: {projectId}
-            </Text>
-          </Alert>
-        )}
-
-        <ScrollArea h={400} style={{ position: 'relative' }}>
-          <LoadingOverlay visible={dataSourcesLoading} />
-
-          {filteredDataSources.length === 0 && !dataSourcesLoading ? (
-            <Stack align="center" py="xl" gap="md">
-              <IconFile size={48} color="gray" />
-              <div style={{ textAlign: 'center' }}>
-                <Title order={4}>No Data Sources Found</Title>
-                <Text c="dimmed" size="sm">
-                  {searchQuery
-                    ? 'No data sources match your search criteria.'
-                    : 'Create data sources to use them in your Plan DAG.'
-                  }
-                </Text>
+        <TooltipProvider>
+          <Stack gap="md" className="py-4">
+            <Group>
+              <div className="relative flex-1">
+                <IconSearch className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search data sources..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.currentTarget.value)}
+                  className="pl-9"
+                />
               </div>
-            </Stack>
-          ) : (
-            <Stack gap="sm">
-              {filteredDataSources.map((dataSource) => (
-                <Card
-                  key={dataSource.id}
-                  withBorder
-                  style={{
-                    cursor: dataSource.status === 'active' ? 'pointer' : 'not-allowed',
-                    opacity: dataSource.status === 'active' ? 1 : 0.7,
-                    border: currentDataSourceId === dataSource.id ? '2px solid var(--mantine-color-blue-filled)' : undefined,
-                    backgroundColor: currentDataSourceId === dataSource.id ? 'var(--mantine-color-blue-0)' : undefined
-                  }}
-                  onClick={() => dataSource.status === 'active' && handleSelect(dataSource)}
-                  p="sm"
-                >
-                  <Group justify="space-between" align="flex-start">
-                    <div style={{ flex: 1 }}>
-                      <Group gap="sm" mb="xs">
-                        <Text fw={500}>{dataSource.name}</Text>
-                        {currentDataSourceId === dataSource.id && (
-                          <Badge color="blue" size="sm">
-                            Current
-                          </Badge>
-                        )}
-                      </Group>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="secondary" size="icon" onClick={() => refetchDataSources()}>
+                    <IconRefresh className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Refresh data sources</TooltipContent>
+              </Tooltip>
+            </Group>
 
-                      {dataSource.description && (
-                        <Text size="sm" c="dimmed" mb="xs">
-                          {dataSource.description}
-                        </Text>
-                      )}
+            {dataSourcesError && (
+              <Alert variant="destructive">
+                <IconAlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  <p className="font-semibold mb-1">Error Loading Data Sources</p>
+                  <p className="text-sm">{dataSourcesError.message}</p>
+                  <p className="text-xs mt-1 text-muted-foreground">
+                    Project ID: {projectId}, Query Variables: {JSON.stringify({ projectId })}
+                  </p>
+                </AlertDescription>
+              </Alert>
+            )}
 
-                      <Group gap="xs" mb="xs">
-                        <Badge
-                          variant="light"
-                          color={getStatusColor(dataSource.status)}
-                          leftSection={getStatusIcon(dataSource.status)}
-                          size="sm"
-                        >
-                          {dataSource.status}
-                        </Badge>
-                        <Badge variant="outline" size="sm" color="blue">
-                          {getFileFormatDisplayName(dataSource.fileFormat)}
-                        </Badge>
-                        <Badge variant="outline" size="sm" color="green">
-                          {getDataTypeDisplayName(dataSource.dataType)}
-                        </Badge>
-                      </Group>
+            {/* Show loading state when projectId is invalid */}
+            {(!projectId || projectId === 0) && !dataSourcesError && (
+              <Alert>
+                <IconAlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  <p className="font-semibold mb-1">Invalid Project</p>
+                  <p className="text-sm">
+                    No valid project ID provided. Project ID: {projectId}
+                  </p>
+                </AlertDescription>
+              </Alert>
+            )}
 
-                      <Group gap="sm" align="center">
-                        <Text size="xs" c="dimmed" ff="monospace">
-                          {dataSource.filename}
-                        </Text>
-                        <Text size="xs" c="dimmed">
-                          •
-                        </Text>
-                        <Text size="xs" c="dimmed">
-                          {formatFileSize(dataSource.fileSize)}
-                        </Text>
-                        <Text size="xs" c="dimmed">
-                          •
-                        </Text>
-                        <Text size="xs" c="dimmed">
-                          {new Date(dataSource.updatedAt).toLocaleDateString()}
-                        </Text>
-                      </Group>
+            <div className="relative">
+              <ScrollArea className="h-[400px]">
+                {dataSourcesLoading && (
+                  <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 rounded-lg">
+                    <Spinner className="h-8 w-8" />
+                  </div>
+                )}
 
-                      {dataSource.status === 'error' && dataSource.errorMessage && (
-                        <Group gap="xs" mt="xs">
-                          <IconAlertCircle size={14} color="red" />
-                          <Text size="xs" c="red" lineClamp={1}>
-                            {dataSource.errorMessage}
-                          </Text>
-                        </Group>
-                      )}
+                {filteredDataSources.length === 0 && !dataSourcesLoading ? (
+                  <div className="flex flex-col items-center justify-center py-12 gap-4">
+                    <IconFile size={48} className="text-gray-400" />
+                    <div className="text-center">
+                      <h4 className="font-semibold mb-1">No Data Sources Found</h4>
+                      <p className="text-sm text-muted-foreground">
+                        {searchQuery
+                          ? 'No data sources match your search criteria.'
+                          : 'Create data sources to use them in your Plan DAG.'
+                        }
+                      </p>
                     </div>
-
-                    {dataSource.status === 'active' && (
-                      <Button
-                        size="xs"
-                        variant="light"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleSelect(dataSource)
-                        }}
+                  </div>
+                ) : (
+                  <Stack gap="sm">
+                    {filteredDataSources.map((dataSource) => (
+                      <Card
+                        key={dataSource.id}
+                        className={`border p-4 transition-opacity ${
+                          dataSource.status === 'active'
+                            ? 'cursor-pointer hover:bg-accent'
+                            : 'cursor-not-allowed opacity-70'
+                        } ${
+                          currentDataSourceId === dataSource.id
+                            ? 'border-blue-500 border-2 bg-blue-50'
+                            : ''
+                        }`}
+                        onClick={() => dataSource.status === 'active' && handleSelect(dataSource)}
                       >
-                        Select
-                      </Button>
-                    )}
-                  </Group>
-                </Card>
-              ))}
-            </Stack>
-          )}
-        </ScrollArea>
+                        <Group justify="between" align="start">
+                          <div className="flex-1">
+                            <Group gap="sm" className="mb-2">
+                              <p className="font-medium">{dataSource.name}</p>
+                              {currentDataSourceId === dataSource.id && (
+                                <Badge variant="secondary">
+                                  Current
+                                </Badge>
+                              )}
+                            </Group>
 
-        <Group justify="flex-end">
-          <Button variant="light" onClick={onClose}>
-            Cancel
-          </Button>
-        </Group>
-      </Stack>
-    </Modal>
+                            {dataSource.description && (
+                              <p className="text-sm text-muted-foreground mb-2">
+                                {dataSource.description}
+                              </p>
+                            )}
+
+                            <Group gap="xs" className="mb-2">
+                              <Badge
+                                variant="secondary"
+                                className={`${
+                                  dataSource.status === 'active'
+                                    ? 'bg-green-100 text-green-900'
+                                    : dataSource.status === 'processing'
+                                      ? 'bg-blue-100 text-blue-900'
+                                      : 'bg-red-100 text-red-900'
+                                }`}
+                              >
+                                <span className="mr-1">{getStatusIcon(dataSource.status)}</span>
+                                {dataSource.status}
+                              </Badge>
+                              <Badge variant="outline">
+                                {getFileFormatDisplayName(dataSource.fileFormat)}
+                              </Badge>
+                              <Badge variant="outline">
+                                {getDataTypeDisplayName(dataSource.dataType)}
+                              </Badge>
+                            </Group>
+
+                            <Group gap="sm" className="items-center">
+                              <p className="text-xs text-muted-foreground font-mono">
+                                {dataSource.filename}
+                              </p>
+                              <span className="text-xs text-muted-foreground">•</span>
+                              <p className="text-xs text-muted-foreground">
+                                {formatFileSize(dataSource.fileSize)}
+                              </p>
+                              <span className="text-xs text-muted-foreground">•</span>
+                              <p className="text-xs text-muted-foreground">
+                                {new Date(dataSource.updatedAt).toLocaleDateString()}
+                              </p>
+                            </Group>
+
+                            {dataSource.status === 'error' && dataSource.errorMessage && (
+                              <Group gap="xs" className="mt-2">
+                                <IconAlertCircle size={14} className="text-red-600" />
+                                <p className="text-xs text-red-600 line-clamp-1">
+                                  {dataSource.errorMessage}
+                                </p>
+                              </Group>
+                            )}
+                          </div>
+
+                          {dataSource.status === 'active' && (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleSelect(dataSource)
+                              }}
+                            >
+                              Select
+                            </Button>
+                          )}
+                        </Group>
+                      </Card>
+                    ))}
+                  </Stack>
+                )}
+              </ScrollArea>
+            </div>
+
+            <DialogFooter>
+              <Button variant="secondary" onClick={onClose}>
+                Cancel
+              </Button>
+            </DialogFooter>
+          </Stack>
+        </TooltipProvider>
+      </DialogContent>
+    </Dialog>
   )
 }

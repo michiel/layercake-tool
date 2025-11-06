@@ -2,20 +2,6 @@ import React, { useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation } from '@apollo/client/react'
 import {
-  Title,
-  Group,
-  Button,
-  Stack,
-  Card,
-  Text,
-  Modal,
-  Alert,
-  LoadingOverlay,
-  TextInput,
-  Badge,
-  SimpleGrid
-} from '@mantine/core'
-import {
   IconPlus,
   IconGraph,
   IconEdit,
@@ -28,12 +14,21 @@ import {
   IconChartDots,
   IconTable
 } from '@tabler/icons-react'
+import { Stack, Group } from '../layout-primitives'
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert'
+import { Badge } from '../ui/badge'
+import { Button } from '../ui/button'
+import { Card, CardContent } from '../ui/card'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog'
+import { Input } from '../ui/input'
+import { Label } from '../ui/label'
+import { Spinner } from '../ui/spinner'
 import { gql } from '@apollo/client'
 import { Breadcrumbs } from '../common/Breadcrumbs'
 import { Graph, GET_GRAPHS, CREATE_GRAPH, UPDATE_GRAPH, DELETE_GRAPH, EXECUTE_NODE, GET_GRAPH_DETAILS } from '../../graphql/graphs'
 import { GET_PLAN_DAG, UPDATE_PLAN_DAG_NODE } from '../../graphql/plan-dag'
 import PageContainer from '../layout/PageContainer'
-import { getExecutionStateColor, getExecutionStateLabel, isExecutionInProgress } from '../../graphql/preview'
+import { getExecutionStateLabel, isExecutionInProgress } from '../../graphql/preview'
 import { GraphDataDialog } from '../editors/PlanVisualEditor/dialogs/GraphDataDialog'
 import { GraphPreviewDialog } from '../visualization/GraphPreviewDialog'
 import { GraphData } from '../visualization/GraphPreview'
@@ -259,8 +254,8 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
   if (!selectedProject) {
     return (
       <PageContainer>
-        <Title order={1}>Project Not Found</Title>
-        <Button onClick={() => navigate('/projects')} mt="md">
+        <h1 className="text-3xl font-bold">Project Not Found</h1>
+        <Button onClick={() => navigate('/projects')} className="mt-4">
           Back to Projects
         </Button>
       </PageContainer>
@@ -277,50 +272,59 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
           onNavigate={handleNavigate}
         />
 
-        <Group justify="space-between" mb="md">
+        <Group justify="between" className="mb-4">
           <div>
-            <Title order={1}>Graphs</Title>
-            <Text size="sm" c="dimmed" mt="xs">
+            <h1 className="text-3xl font-bold">Graphs</h1>
+            <p className="text-sm text-muted-foreground mt-1">
               Manage graph entities for this project
-            </Text>
+            </p>
           </div>
           <Group gap="xs">
             <Button
-              leftSection={<IconPlus size={16} />}
               onClick={handleCreate}
-              variant="light"
+              variant="secondary"
             >
+              <IconPlus className="mr-2 h-4 w-4" />
               New Graph Node
             </Button>
           </Group>
         </Group>
 
         {error && (
-          <Alert icon={<IconAlertCircle size={16} />} title="Error" color="red" mb="md">
-            {error.message}
+          <Alert variant="destructive" className="mb-4">
+            <IconAlertCircle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>
+              {error.message}
+            </AlertDescription>
           </Alert>
         )}
 
-        <Card withBorder p="lg" style={{ position: 'relative' }}>
-          <LoadingOverlay visible={loading} />
+        <Card className="border relative">
+          {loading && (
+            <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 rounded-lg">
+              <Spinner className="h-8 w-8" />
+            </div>
+          )}
           {graphNodes.length === 0 && !loading ? (
-            <Stack align="center" py="xl" gap="md">
-              <IconGraph size={48} color="gray" />
-              <div style={{ textAlign: 'center' }}>
-                <Title order={3}>No Graph Nodes</Title>
-                <Text c="dimmed" mb="md">
-                  Create a graph node or run your plan to materialize one.
-                </Text>
-                <Button
-                  leftSection={<IconPlus size={16} />}
-                  onClick={handleCreate}
-                >
-                  Create Graph Node
-                </Button>
-              </div>
-            </Stack>
+            <CardContent className="py-12">
+              <Stack align="center" gap="md">
+                <IconGraph size={48} className="text-muted-foreground" />
+                <div className="text-center">
+                  <h3 className="text-xl font-semibold mb-2">No Graph Nodes</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Create a graph node or run your plan to materialize one.
+                  </p>
+                  <Button onClick={handleCreate}>
+                    <IconPlus className="mr-2 h-4 w-4" />
+                    Create Graph Node
+                  </Button>
+                </div>
+              </Stack>
+            </CardContent>
           ) : (
-            <SimpleGrid cols={{ base: 1, sm: 1, md: 2, xl: 3 }} spacing="lg">
+            <CardContent className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
               {graphNodes.map((graph) => {
                 const executionState = graph.executionState || 'NOT_STARTED'
                 const isRunning =
@@ -330,142 +334,156 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
                 const layerCount = graph.layers?.length ?? 0
 
                 return (
-                  <Card key={graph.id} withBorder shadow="xs" padding="lg" radius="md">
-                    <Stack gap="sm">
-                      <Group justify="space-between" align="flex-start">
-                        <div>
-                          <Text fw={600}>{graph.name}</Text>
-                          <Group gap="xs" mt={4}>
-                            <Badge variant="dot" color="cyan">
-                              {nodeType}
-                            </Badge>
-                          </Group>
-                        </div>
-                        <Badge
-                          variant="light"
-                          color={getExecutionStateColor(executionState)}
-                          leftSection={getExecutionStateIcon(executionState)}
-                        >
-                          {getExecutionStateLabel(executionState)}
-                        </Badge>
-                      </Group>
+                  <Card key={graph.id} className="border shadow-sm">
+                    <CardContent className="p-4">
+                      <Stack gap="sm">
+                        <Group justify="between" align="start">
+                          <div>
+                            <p className="font-semibold">{graph.name}</p>
+                            <Group gap="xs" className="mt-1">
+                              <Badge variant="secondary" className="text-xs">
+                                {nodeType}
+                              </Badge>
+                            </Group>
+                          </div>
+                          <Badge
+                            variant="secondary"
+                            className={
+                              executionState === 'COMPLETED'
+                                ? 'bg-green-100 text-green-900'
+                                : executionState === 'PROCESSING' || executionState === 'PENDING'
+                                  ? 'bg-blue-100 text-blue-900'
+                                  : executionState === 'ERROR'
+                                    ? 'bg-red-100 text-red-900'
+                                    : ''
+                            }
+                          >
+                            {getExecutionStateIcon(executionState)}
+                            <span className="ml-1">{getExecutionStateLabel(executionState)}</span>
+                          </Badge>
+                        </Group>
 
-                      <Group gap="xs" wrap="wrap">
-                        <Badge variant="light" color="blue">
-                          Nodes: {graph.nodeCount}
-                        </Badge>
-                        <Badge variant="light" color="grape">
-                          Edges: {graph.edgeCount}
-                        </Badge>
-                        <Badge variant="light" color="teal">
-                          Layers: {layerCount}
-                        </Badge>
-                      </Group>
-                      <Text size="sm" c="dimmed">
-                        Last updated {lastUpdated}
-                      </Text>
+                        <Group gap="xs" className="flex-wrap">
+                          <Badge variant="secondary">
+                            Nodes: {graph.nodeCount}
+                          </Badge>
+                          <Badge variant="secondary">
+                            Edges: {graph.edgeCount}
+                          </Badge>
+                          <Badge variant="secondary">
+                            Layers: {layerCount}
+                          </Badge>
+                        </Group>
+                        <p className="text-sm text-muted-foreground">
+                          Last updated {lastUpdated}
+                        </p>
 
-                      <Group gap="sm" wrap="wrap">
-                        <Button
-                          size="xs"
-                          variant="light"
-                          leftSection={<IconGraph size={14} />}
-                          onClick={() =>
-                            navigate(`/projects/${projectId}/plan-nodes/${graph.id}/edit`)
-                          }
-                        >
-                          Open Graph Editor
-                        </Button>
-                        <Button
-                          size="xs"
-                          variant="light"
-                          leftSection={<IconChartDots size={14} />}
-                          onClick={() => {
-                            setPreviewGraphId(graph.id)
-                            setPreviewTitle(`Graph Preview: ${graph.name}`)
-                          }}
-                        >
-                          Preview
-                        </Button>
-                        <Button
-                          size="xs"
-                          variant="light"
-                          leftSection={<IconTable size={14} />}
-                          onClick={() => setDataDialogGraphId(graph.id)}
-                        >
-                          View Data
-                        </Button>
-                        <Button
-                          size="xs"
-                          variant="light"
-                          leftSection={<IconEdit size={14} />}
-                          onClick={() => handleEdit(graph)}
-                        >
-                          Edit Properties
-                        </Button>
-                        <Button
-                          size="xs"
-                          variant="light"
-                          leftSection={<IconRefresh size={14} />}
-                          onClick={() => handleReprocess(graph)}
-                          disabled={isRunning}
-                          loading={executingGraphId === graph.id}
-                        >
-                          Reprocess
-                        </Button>
-                        <Button
-                          size="xs"
-                          variant="light"
-                          color="red"
-                          leftSection={<IconTrash size={14} />}
-                          onClick={() => handleDelete(graph)}
-                        >
-                          Delete
-                        </Button>
-                      </Group>
-                    </Stack>
+                        <Group gap="sm" className="flex-wrap">
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() =>
+                              navigate(`/projects/${projectId}/plan-nodes/${graph.id}/edit`)
+                            }
+                          >
+                            <IconGraph className="mr-1.5 h-3.5 w-3.5" />
+                            Open Graph Editor
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => {
+                              setPreviewGraphId(graph.id)
+                              setPreviewTitle(`Graph Preview: ${graph.name}`)
+                            }}
+                          >
+                            <IconChartDots className="mr-1.5 h-3.5 w-3.5" />
+                            Preview
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => setDataDialogGraphId(graph.id)}
+                          >
+                            <IconTable className="mr-1.5 h-3.5 w-3.5" />
+                            View Data
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => handleEdit(graph)}
+                          >
+                            <IconEdit className="mr-1.5 h-3.5 w-3.5" />
+                            Edit Properties
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => handleReprocess(graph)}
+                            disabled={isRunning}
+                          >
+                            {executingGraphId === graph.id && <Spinner className="mr-1.5 h-3.5 w-3.5" />}
+                            {executingGraphId !== graph.id && <IconRefresh className="mr-1.5 h-3.5 w-3.5" />}
+                            Reprocess
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => handleDelete(graph)}
+                            className="text-red-600"
+                          >
+                            <IconTrash className="mr-1.5 h-3.5 w-3.5" />
+                            Delete
+                          </Button>
+                        </Group>
+                      </Stack>
+                    </CardContent>
                   </Card>
                 )
               })}
-            </SimpleGrid>
+              </div>
+            </CardContent>
           )}
         </Card>
       </PageContainer>
 
-      <Modal
-        opened={deleteModalOpen}
-        onClose={() => setDeleteModalOpen(false)}
-        title="Delete Graph Node"
-      >
-        <Text mb="md">
-          Are you sure you want to delete "{selectedGraph?.name}"? This action cannot be undone.
-        </Text>
-        <Group justify="flex-end" gap="sm">
-          <Button variant="light" onClick={() => setDeleteModalOpen(false)}>
-            Cancel
-          </Button>
-          <Button
-            color="red"
-            loading={deleteLoading}
-            onClick={confirmDelete}
-          >
-            Delete
-          </Button>
-        </Group>
-      </Modal>
+      <Dialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Graph Node</DialogTitle>
+          </DialogHeader>
+          <p className="mb-4">
+            Are you sure you want to delete "{selectedGraph?.name}"? This action cannot be undone.
+          </p>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setDeleteModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleteLoading}
+              onClick={confirmDelete}
+            >
+              {deleteLoading && <Spinner className="mr-2 h-4 w-4" />}
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      <Modal
-        opened={editModalOpen}
-        onClose={() => setEditModalOpen(false)}
-        title={selectedGraph ? 'Edit Graph Node' : 'Create Graph Node'}
-      >
-        <EditGraphForm
-          graph={selectedGraph}
-          onSave={handleSave}
-          onCancel={() => setEditModalOpen(false)}
-          loading={createLoading || updateLoading}
-        />
-      </Modal>
+      <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{selectedGraph ? 'Edit Graph Node' : 'Create Graph Node'}</DialogTitle>
+          </DialogHeader>
+          <EditGraphForm
+            graph={selectedGraph}
+            onSave={handleSave}
+            onCancel={() => setEditModalOpen(false)}
+            loading={createLoading || updateLoading}
+          />
+        </DialogContent>
+      </Dialog>
 
       <GraphDataDialog
         opened={dataDialogGraphId !== null}
@@ -506,22 +524,26 @@ const EditGraphForm: React.FC<EditGraphFormProps> = ({ graph, onSave, onCancel, 
 
   return (
     <form onSubmit={handleSubmit}>
-      <Stack>
-        <TextInput
-          label="Name"
-          value={name}
-          onChange={(e) => setName(e.currentTarget.value)}
-          required
-        />
-        <Group justify="flex-end" mt="md">
-          <Button variant="light" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button type="submit" loading={loading}>
-            Save
-          </Button>
-        </Group>
+      <Stack gap="md" className="py-4">
+        <div className="space-y-2">
+          <Label htmlFor="name">Name *</Label>
+          <Input
+            id="name"
+            value={name}
+            onChange={(e) => setName(e.currentTarget.value)}
+            required
+          />
+        </div>
       </Stack>
+      <DialogFooter>
+        <Button variant="secondary" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button type="submit" disabled={loading}>
+          {loading && <Spinner className="mr-2 h-4 w-4" />}
+          Save
+        </Button>
+      </DialogFooter>
     </form>
   )
 }

@@ -2,22 +2,6 @@ import React, { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation } from '@apollo/client/react'
 import {
-  Title,
-  Group,
-  Button,
-  Stack,
-  Card,
-  Text,
-  ActionIcon,
-  Modal,
-  Alert,
-  Table,
-  LoadingOverlay,
-  TextInput,
-  Badge,
-  Menu
-} from '@mantine/core'
-import {
   IconPlus,
   IconGraph,
   IconEdit,
@@ -29,11 +13,22 @@ import {
   IconClock,
   IconX
 } from '@tabler/icons-react'
+import { Stack, Group } from '../layout-primitives'
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert'
+import { Badge } from '../ui/badge'
+import { Button } from '../ui/button'
+import { Card, CardContent } from '../ui/card'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu'
+import { Input } from '../ui/input'
+import { Label } from '../ui/label'
+import { Spinner } from '../ui/spinner'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table'
 import { gql } from '@apollo/client'
 import { Breadcrumbs } from '../common/Breadcrumbs'
 import PageContainer from '../layout/PageContainer'
 import { Graph, GET_GRAPHS, CREATE_GRAPH, UPDATE_GRAPH, DELETE_GRAPH, EXECUTE_NODE } from '../../graphql/graphs'
-import { getExecutionStateColor, getExecutionStateLabel, isExecutionInProgress } from '../../graphql/preview'
+import { getExecutionStateLabel, isExecutionInProgress } from '../../graphql/preview'
 import { GET_PLAN_DAG } from '../../graphql/plan-dag'
 
 const GET_PROJECTS = gql`
@@ -268,8 +263,8 @@ export const PlanNodesPage: React.FC<PlanNodesPageProps> = () => {
   if (!selectedProject) {
     return (
       <PageContainer>
-        <Title order={1}>Project Not Found</Title>
-        <Button onClick={() => navigate('/projects')} mt="md">
+        <h1 className="text-3xl font-bold">Project Not Found</h1>
+        <Button onClick={() => navigate('/projects')} className="mt-4">
           Back to Projects
         </Button>
       </PageContainer>
@@ -286,64 +281,72 @@ export const PlanNodesPage: React.FC<PlanNodesPageProps> = () => {
           onNavigate={handleNavigate}
         />
 
-        <Group justify="space-between" mb="md">
+        <Group justify="between" className="mb-4">
           <div>
-            <Title order={1}>Plan Nodes</Title>
-            <Text size="sm" c="dimmed" mt="xs">
+            <h1 className="text-3xl font-bold">Plan Nodes</h1>
+            <p className="text-sm text-muted-foreground mt-1">
               Review every plan node and track execution progress across datasources and graphs
-            </Text>
+            </p>
           </div>
           <Group gap="xs">
             <Button
-              leftSection={<IconPlus size={16} />}
               onClick={handleCreate}
-              variant="light"
+              variant="secondary"
             >
+              <IconPlus className="mr-2 h-4 w-4" />
               New Graph Node
             </Button>
           </Group>
         </Group>
 
         {error && (
-          <Alert icon={<IconAlertCircle size={16} />} title="Error" color="red" mb="md">
-            {error.message}
+          <Alert variant="destructive" className="mb-4">
+            <IconAlertCircle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>
+              {error.message}
+            </AlertDescription>
           </Alert>
         )}
 
-        <Card withBorder>
-          <LoadingOverlay visible={loading} />
+        <Card className="border relative">
+          {loading && (
+            <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 rounded-lg">
+              <Spinner className="h-8 w-8" />
+            </div>
+          )}
           {planNodes.length === 0 && !loading ? (
-            <Stack align="center" py="xl" gap="md">
-              <IconGraph size={48} color="gray" />
-              <div style={{ textAlign: 'center' }}>
-                <Title order={3}>No Plan Nodes</Title>
-                <Text c="dimmed" mb="md">
-                  Define plan nodes to see data source and graph execution details.
-                </Text>
-                <Button
-                  leftSection={<IconPlus size={16} />}
-                  onClick={handleCreate}
-                >
-                  Create First Graph Node
-                </Button>
-              </div>
-            </Stack>
+            <CardContent className="py-12">
+              <Stack align="center" gap="md">
+                <IconGraph size={48} className="text-muted-foreground" />
+                <div className="text-center">
+                  <h3 className="text-xl font-semibold mb-2">No Plan Nodes</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Define plan nodes to see data source and graph execution details.
+                  </p>
+                  <Button onClick={handleCreate}>
+                    <IconPlus className="mr-2 h-4 w-4" />
+                    Create First Graph Node
+                  </Button>
+                </div>
+              </Stack>
+            </CardContent>
           ) : (
-            <Table.ScrollContainer minWidth={900}>
-              <Table striped highlightOnHover>
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th>Name</Table.Th>
-                    <Table.Th>Node Type</Table.Th>
-                    <Table.Th>Status</Table.Th>
-                    <Table.Th>Nodes</Table.Th>
-                    <Table.Th>Edges</Table.Th>
-                    <Table.Th>Layers</Table.Th>
-                    <Table.Th>Updated</Table.Th>
-                    <Table.Th>Actions</Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Node Type</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Nodes</TableHead>
+                    <TableHead>Edges</TableHead>
+                    <TableHead>Layers</TableHead>
+                    <TableHead>Updated</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {planNodes.map((planNode) => {
                     const { graph, nodeType } = planNode
                     const executionState = planNode.executionState || 'NOT_STARTED'
@@ -367,134 +370,145 @@ export const PlanNodesPage: React.FC<PlanNodesPageProps> = () => {
                       : '—'
 
                     return (
-                      <Table.Tr key={planNode.nodeId}>
-                        <Table.Td>
-                          <Text fw={500}>{planNode.label}</Text>
-                        </Table.Td>
-                        <Table.Td>
-                          <Badge variant="dot" color="cyan">
+                      <TableRow key={planNode.nodeId}>
+                        <TableCell>
+                          <p className="font-medium">{planNode.label}</p>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className="text-xs">
                             {nodeTypeMap.get(planNode.nodeId) || nodeType}
                           </Badge>
-                        </Table.Td>
-                        <Table.Td>
+                        </TableCell>
+                        <TableCell>
                           <Badge
-                            variant="light"
-                            color={getExecutionStateColor(executionState)}
-                            leftSection={getExecutionStateIcon(executionState)}
+                            variant="secondary"
+                            className={
+                              executionState === 'COMPLETED'
+                                ? 'bg-green-100 text-green-900'
+                                : executionState === 'PROCESSING' || executionState === 'PENDING'
+                                  ? 'bg-blue-100 text-blue-900'
+                                  : executionState === 'ERROR'
+                                    ? 'bg-red-100 text-red-900'
+                                    : ''
+                            }
                           >
-                            {getExecutionStateLabel(executionState)}
+                            {getExecutionStateIcon(executionState)}
+                            <span className="ml-1">{getExecutionStateLabel(executionState)}</span>
                           </Badge>
-                        </Table.Td>
-                        <Table.Td>
-                          <Badge variant="light" color="blue">
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">
                             {nodeCount}
                           </Badge>
-                        </Table.Td>
-                        <Table.Td>
-                          <Badge variant="light" color="grape">
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">
                             {edgeCount}
                           </Badge>
-                        </Table.Td>
-                        <Table.Td>
-                          <Badge variant="light" color="teal">
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">
                             {layerCount}
                           </Badge>
-                        </Table.Td>
-                        <Table.Td>
-                          <Text size="sm" c="dimmed">
+                        </TableCell>
+                        <TableCell>
+                          <p className="text-sm text-muted-foreground">
                             {updatedDisplay}
-                          </Text>
-                        </Table.Td>
-                        <Table.Td>
+                          </p>
+                        </TableCell>
+                        <TableCell>
                           {graph ? (
-                            <Menu shadow="md" width={220}>
-                              <Menu.Target>
-                                <ActionIcon variant="subtle">
-                                  <IconDots size={16} />
-                                </ActionIcon>
-                              </Menu.Target>
-                              <Menu.Dropdown>
-                                <Menu.Item
-                                  leftSection={<IconGraph size={14} />}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon">
+                                  <IconDots className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-[220px]">
+                                <DropdownMenuItem
                                   onClick={() =>
                                     navigate(`/projects/${projectId}/plan-nodes/${graph.id}/edit`)
                                   }
                                 >
+                                  <IconGraph className="mr-2 h-3.5 w-3.5" />
                                   Open Graph Editor
-                                </Menu.Item>
-                                <Menu.Item
-                                  leftSection={<IconEdit size={14} />}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
                                   onClick={() => handleEdit(graph)}
                                 >
+                                  <IconEdit className="mr-2 h-3.5 w-3.5" />
                                   Rename
-                                </Menu.Item>
-                                <Menu.Item
-                                  leftSection={<IconRefresh size={14} />}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
                                   onClick={() => handleReprocess(graph)}
                                   disabled={isRunning}
                                 >
+                                  <IconRefresh className="mr-2 h-3.5 w-3.5" />
                                   Reprocess
-                                </Menu.Item>
-                                <Menu.Divider />
-                                <Menu.Item
-                                  leftSection={<IconTrash size={14} />}
-                                  color="red"
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
                                   onClick={() => handleDelete(graph)}
+                                  className="text-red-600"
                                 >
+                                  <IconTrash className="mr-2 h-3.5 w-3.5" />
                                   Delete
-                                </Menu.Item>
-                              </Menu.Dropdown>
-                            </Menu>
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           ) : (
-                            <Text size="sm" c="dimmed">
+                            <p className="text-sm text-muted-foreground">
                               No actions
-                            </Text>
+                            </p>
                           )}
-                        </Table.Td>
-                      </Table.Tr>
+                        </TableCell>
+                      </TableRow>
                     )
                   })}
-                </Table.Tbody>
+                </TableBody>
               </Table>
-            </Table.ScrollContainer>
+            </div>
           )}
         </Card>
       </PageContainer>
 
-      <Modal
-        opened={deleteModalOpen}
-        onClose={() => setDeleteModalOpen(false)}
-        title="Delete Graph Node"
-      >
-        <Text mb="md">
-          Are you sure you want to delete "{selectedGraph?.name}"? This action cannot be undone.
-        </Text>
-        <Group justify="flex-end" gap="sm">
-          <Button variant="light" onClick={() => setDeleteModalOpen(false)}>
-            Cancel
-          </Button>
-          <Button
-            color="red"
-            loading={deleteLoading}
-            onClick={confirmDelete}
-          >
-            Delete
-          </Button>
-        </Group>
-      </Modal>
+      <Dialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Graph Node</DialogTitle>
+          </DialogHeader>
+          <p className="mb-4">
+            Are you sure you want to delete "{selectedGraph?.name}"? This action cannot be undone.
+          </p>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setDeleteModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleteLoading}
+              onClick={confirmDelete}
+            >
+              {deleteLoading && <Spinner className="mr-2 h-4 w-4" />}
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      <Modal
-        opened={editModalOpen}
-        onClose={() => setEditModalOpen(false)}
-        title={selectedGraph ? 'Edit Graph Node' : 'Create Graph Node'}
-      >
-        <EditGraphForm
-          graph={selectedGraph}
-          onSave={handleSave}
-          onCancel={() => setEditModalOpen(false)}
-          loading={createLoading || updateLoading}
-        />
-      </Modal>
+      <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{selectedGraph ? 'Edit Graph Node' : 'Create Graph Node'}</DialogTitle>
+          </DialogHeader>
+          <EditGraphForm
+            graph={selectedGraph}
+            onSave={handleSave}
+            onCancel={() => setEditModalOpen(false)}
+            loading={createLoading || updateLoading}
+          />
+        </DialogContent>
+      </Dialog>
     </>
   )
 }
@@ -516,22 +530,26 @@ const EditGraphForm: React.FC<EditGraphFormProps> = ({ graph, onSave, onCancel, 
 
   return (
     <form onSubmit={handleSubmit}>
-      <Stack>
-        <TextInput
-          label="Name"
-          value={name}
-          onChange={(e) => setName(e.currentTarget.value)}
-          required
-        />
-        <Group justify="flex-end" mt="md">
-          <Button variant="light" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button type="submit" loading={loading}>
-            Save
-          </Button>
-        </Group>
+      <Stack gap="md" className="py-4">
+        <div className="space-y-2">
+          <Label htmlFor="name">Name *</Label>
+          <Input
+            id="name"
+            value={name}
+            onChange={(e) => setName(e.currentTarget.value)}
+            required
+          />
+        </div>
       </Stack>
+      <DialogFooter>
+        <Button variant="secondary" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button type="submit" disabled={loading}>
+          {loading && <Spinner className="mr-2 h-4 w-4" />}
+          Save
+        </Button>
+      </DialogFooter>
     </form>
   )
 }

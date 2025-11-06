@@ -1,4 +1,3 @@
-import { Stack, Text, Group, ActionIcon, Tooltip } from '@mantine/core'
 import {
   IconPlayerPlay,
   IconPlayerPause,
@@ -16,6 +15,9 @@ import {
 } from '@tabler/icons-react'
 import { Panel } from 'reactflow'
 import { PlanDagNodeType } from '../../../../types/plan-dag'
+import { Stack, Group } from '../../../layout-primitives'
+import { Button } from '../../../ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '../../../ui/tooltip'
 
 interface ControlPanelProps {
   // Validation props
@@ -114,96 +116,134 @@ export const ControlPanel = ({
 
   return (
     <Panel position="top-left">
-      <Stack gap="xs" style={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', padding: '12px', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-        {/* Node Creation */}
-        {!readonly && (
+      <TooltipProvider>
+        <Stack gap="xs" className="bg-white/95 p-3 rounded-lg shadow-md">
+          {/* Node Creation */}
+          {!readonly && (
+            <Group gap="md">
+              <p className="text-xs font-medium text-gray-600">Nodes:</p>
+              <Group gap="xs">
+                {nodeTypes.map((nodeType) => (
+                  <Tooltip key={nodeType.type}>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant="secondary"
+                        className="h-6 w-6 cursor-grab text-white hover:opacity-80"
+                        style={{ backgroundColor: nodeType.color }}
+                        draggable={!isTauri}
+                        onDragStart={(event) => handleNodeDragStart(event, nodeType.type)}
+                        onMouseDown={(event) => handleNodePointerDragStart(event, nodeType.type)}
+                      >
+                        {nodeType.icon}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      Drag to add {nodeType.label}
+                    </TooltipContent>
+                  </Tooltip>
+                ))}
+              </Group>
+            </Group>
+          )}
+
           <Group gap="md">
-            <Text size="xs" fw={500} c="gray.6">Nodes:</Text>
-            <Group gap={4}>
-              {nodeTypes.map((nodeType) => (
-                <Tooltip key={nodeType.type} label={`Drag to add ${nodeType.label}`}>
-                  <ActionIcon
-                    size="xs"
-                    variant="light"
-                    style={{ backgroundColor: nodeType.color, color: 'white', cursor: 'grab' }}
-                    draggable={!isTauri}
-                    onDragStart={(event) => handleNodeDragStart(event, nodeType.type)}
-                    onMouseDown={(event) => handleNodePointerDragStart(event, nodeType.type)}
+            <p className="text-xs font-medium text-gray-600">Controls:</p>
+            <Group gap="xs">
+              {/* Update Control Buttons */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="secondary"
+                    className={`h-6 w-6 ${updatesPaused ? 'text-orange-600' : 'text-blue-600'}`}
+                    onClick={updatesPaused ? onResumeUpdates : onPauseUpdates}
                   >
-                    {nodeType.icon}
-                  </ActionIcon>
-                </Tooltip>
-              ))}
+                    {updatesPaused ? <IconPlayerPlay size="0.7rem" /> : <IconPlayerPause size="0.7rem" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {updatesPaused ? `Resume Updates (${pendingUpdates} pending)` : 'Pause Updates'}
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button size="icon" variant="secondary" className="h-6 w-6" onClick={onValidate}>
+                    <IconRotate size="0.7rem" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Trigger Validation</TooltipContent>
+              </Tooltip>
             </Group>
           </Group>
-        )}
 
-        <Group gap="md">
-          <Text size="xs" fw={500} c="gray.6">Controls:</Text>
-          <Group gap={4}>
-            {/* Update Control Buttons */}
-            <Tooltip label={updatesPaused ? `Resume Updates (${pendingUpdates} pending)` : 'Pause Updates'}>
-              <ActionIcon
-                size="xs"
-                variant="light"
-                color={updatesPaused ? "orange" : "blue"}
-                onClick={updatesPaused ? onResumeUpdates : onPauseUpdates}
-              >
-                {updatesPaused ? <IconPlayerPlay size="0.7rem" /> : <IconPlayerPause size="0.7rem" />}
-              </ActionIcon>
-            </Tooltip>
-
-            <Tooltip label="Trigger Validation">
-              <ActionIcon size="xs" variant="light" color="gray" onClick={onValidate}>
-                <IconRotate size="0.7rem" />
-              </ActionIcon>
-            </Tooltip>
-          </Group>
-        </Group>
-
-        <Group gap="md">
-          <Text size="xs" fw={500} c="gray.6">Status:</Text>
-          <Group gap={4}>
-            {/* Collaboration Status */}
-            <Tooltip label={`Collaboration: ${collaborationStatus}${hasError ? ' (Error)' : ''}`}>
-              <ActionIcon size="xs" variant="light" color={hasError ? "red" : isConnected ? "green" : "gray"}>
-                {isConnected ? <IconNetwork size="0.7rem" /> : <IconNetworkOff size="0.7rem" />}
-              </ActionIcon>
-            </Tooltip>
-
-            <Text size="xs" c="dimmed">{onlineUsers.length} online</Text>
-          </Group>
-        </Group>
-
-        <Group gap="md">
-          <Text size="xs" fw={500} c="gray.6">Validation:</Text>
-          <Group gap={4}>
-            {validationLoading && (
-              <Tooltip label="Validating Plan DAG...">
-                <ActionIcon size="xs" variant="light" color="blue">
-                  <IconRefresh size="0.7rem" />
-                </ActionIcon>
+          <Group gap="md">
+            <p className="text-xs font-medium text-gray-600">Status:</p>
+            <Group gap="xs">
+              {/* Collaboration Status */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="secondary"
+                    className={`h-6 w-6 ${hasError ? 'text-red-600' : isConnected ? 'text-green-600' : 'text-gray-600'}`}
+                  >
+                    {isConnected ? <IconNetwork size="0.7rem" /> : <IconNetworkOff size="0.7rem" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  Collaboration: {collaborationStatus}{hasError ? ' (Error)' : ''}
+                </TooltipContent>
               </Tooltip>
-            )}
 
-            {validationErrors.length > 0 && !validationLoading && (
-              <Tooltip label={`${validationErrors.length} validation error${validationErrors.length > 1 ? 's' : ''}`}>
-                <ActionIcon size="xs" variant="light" color="red">
-                  <IconExclamationCircle size="0.7rem" />
-                </ActionIcon>
-              </Tooltip>
-            )}
-
-            {validationErrors.length === 0 && !validationLoading && lastValidation && (
-              <Tooltip label={`Validation passed (${lastValidation.toLocaleTimeString()})`}>
-                <ActionIcon size="xs" variant="light" color="green">
-                  <IconCircleCheck size="0.7rem" />
-                </ActionIcon>
-              </Tooltip>
-            )}
+              <p className="text-xs text-muted-foreground">{onlineUsers.length} online</p>
+            </Group>
           </Group>
-        </Group>
-      </Stack>
+
+          <Group gap="md">
+            <p className="text-xs font-medium text-gray-600">Validation:</p>
+            <Group gap="xs">
+              {validationLoading && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button size="icon" variant="secondary" className="h-6 w-6 text-blue-600">
+                      <IconRefresh size="0.7rem" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Validating Plan DAG...</TooltipContent>
+                </Tooltip>
+              )}
+
+              {validationErrors.length > 0 && !validationLoading && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button size="icon" variant="secondary" className="h-6 w-6 text-red-600">
+                      <IconExclamationCircle size="0.7rem" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {validationErrors.length} validation error{validationErrors.length > 1 ? 's' : ''}
+                  </TooltipContent>
+                </Tooltip>
+              )}
+
+              {validationErrors.length === 0 && !validationLoading && lastValidation && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button size="icon" variant="secondary" className="h-6 w-6 text-green-600">
+                      <IconCircleCheck size="0.7rem" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Validation passed ({lastValidation.toLocaleTimeString()})
+                  </TooltipContent>
+                </Tooltip>
+              )}
+            </Group>
+          </Group>
+        </Stack>
+      </TooltipProvider>
     </Panel>
   )
 }

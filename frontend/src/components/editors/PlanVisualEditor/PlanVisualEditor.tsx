@@ -16,10 +16,12 @@ import ReactFlow, {
   Edge,
   MarkerType
 } from 'reactflow'
-import { Stack, Alert, Loader, Text, Paper } from '@mantine/core'
 import {
   IconAlertCircle
 } from '@tabler/icons-react'
+import { Alert, AlertDescription } from '../../ui/alert'
+import { Spinner } from '../../ui/spinner'
+import { Card } from '../../ui/card'
 
 import { PlanDagNodeType, NodeConfig, NodeMetadata, DataSourceNodeConfig, ReactFlowEdge, PlanDagNode, PlanDag } from '../../../types/plan-dag'
 import { validateConnectionWithCycleDetection, canAcceptMultipleInputs, isNodeConfigured } from '../../../utils/planDagValidation'
@@ -1485,36 +1487,44 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
 
   if (loading) {
     return (
-      <Stack align="center" justify="center" h="100%" gap="md">
-        <Loader size="lg" />
-        <Text>Loading Plan DAG...</Text>
-      </Stack>
+      <div className="flex flex-col items-center justify-center h-full gap-4">
+        <Spinner className="h-8 w-8" />
+        <p>Loading Plan DAG...</p>
+      </div>
     )
   }
 
   if (error) {
     return (
-      <Alert icon={<IconAlertCircle size="1rem" />} title="Error loading Plan DAG" color="red">
-        {error.message}
+      <Alert variant="destructive">
+        <IconAlertCircle className="h-4 w-4" />
+        <AlertDescription>
+          <p className="font-semibold mb-1">Error loading Plan DAG</p>
+          <p className="text-sm">{error.message}</p>
+        </AlertDescription>
       </Alert>
     )
   }
 
   if (!planDag) {
     return (
-      <Stack align="center" justify="center" h="100%" gap="md">
-        <Alert icon={<IconAlertCircle size="1rem" />} title="No Plan DAG found" color="blue" w="100%" maw="500px">
-          This project doesn't have a Plan DAG configured yet. Create one by adding nodes to the canvas using the toolbar.
+      <div className="flex flex-col items-center justify-center h-full gap-4">
+        <Alert className="w-full max-w-[500px]">
+          <IconAlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            <p className="font-semibold mb-1">No Plan DAG found</p>
+            <p className="text-sm">This project doesn't have a Plan DAG configured yet. Create one by adding nodes to the canvas using the toolbar.</p>
+          </AlertDescription>
         </Alert>
-        <Text size="sm" c="dimmed" ta="center">
+        <p className="text-sm text-muted-foreground text-center">
           Plan DAGs define data transformation workflows through connected nodes and edges.
-        </Text>
-      </Stack>
+        </p>
+      </div>
     )
   }
 
   return (
-    <Stack gap={0} style={{ height: '100%' }}>
+    <div className="flex flex-col h-full gap-0">
       <style>{`
         .react-flow__node {
           border: none !important;
@@ -1555,21 +1565,16 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         onClick={handleCanvasClick}
       >
         {draggingNode && (
-          <Paper
-            shadow="sm"
-            p="sm"
-            radius="md"
+          <Card
+            className="absolute z-[1000] pointer-events-none shadow-sm p-3 rounded-md"
             style={{
-              position: 'absolute',
               left: draggingNode.position.x,
               top: draggingNode.position.y,
-              zIndex: 1000,
-              pointerEvents: 'none',
               transform: 'translate(-50%, -50%)',
             }}
           >
-            <Text>{draggingNode.type}</Text>
-          </Paper>
+            <p>{draggingNode.type}</p>
+          </Card>
         )}
         <ReactFlow
           nodes={nodesWithEdges}
@@ -1638,30 +1643,19 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
 
           {/* Empty state overlay when no nodes exist */}
           {nodes.length === 0 && (
-            <div
-              style={{
-                position: 'absolute',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
-                zIndex: 10,
-                pointerEvents: 'none',
-                textAlign: 'center',
-              }}
-            >
-              <Stack align="center" gap="md" p="xl">
-                <Alert
-                  icon={<IconAlertCircle size="1rem" />}
-                  title="Start building your Plan DAG"
-                  color="blue"
-                  style={{ maxWidth: '400px', pointerEvents: 'auto' }}
-                >
-                  Drag nodes from the toolbar above to begin creating your data transformation workflow.
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 pointer-events-none text-center">
+              <div className="flex flex-col items-center gap-4 p-6">
+                <Alert className="max-w-[400px] pointer-events-auto">
+                  <IconAlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    <p className="font-semibold mb-1">Start building your Plan DAG</p>
+                    <p className="text-sm">Drag nodes from the toolbar above to begin creating your data transformation workflow.</p>
+                  </AlertDescription>
                 </Alert>
-                <Text size="sm" c="dimmed" ta="center" style={{ maxWidth: '350px' }}>
+                <p className="text-sm text-muted-foreground text-center max-w-[350px]">
                   Create connections between nodes to define how data flows through your pipeline.
-                </Text>
-              </Stack>
+                </p>
+              </div>
             </div>
           )}
 
@@ -1701,7 +1695,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
       />
 
       {/* Context Menu removed - advanced operations no longer available */}
-    </Stack>
+    </div>
   )
 }
 

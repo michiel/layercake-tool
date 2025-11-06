@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { TextInput, Select, Stack, Text, Loader } from '@mantine/core';
 import { GraphNode, Layer } from '../../graphql/graphs';
 import { IconCheck } from '@tabler/icons-react';
+import { Stack } from '../layout-primitives';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Spinner } from '../ui/spinner';
 
 interface NodePropertiesFormProps {
   node: GraphNode;
@@ -69,44 +73,47 @@ export const NodePropertiesForm: React.FC<NodePropertiesFormProps> = ({
 
   return (
     <Stack gap="md">
-      <TextInput
-        label="Label"
-        value={label}
-        onChange={(e) => setLabel(e.currentTarget.value)}
-        onBlur={handleLabelBlur}
-        placeholder="Enter node label"
-      />
+      <div className="space-y-2">
+        <Label htmlFor="label">Label</Label>
+        <Input
+          id="label"
+          value={label}
+          onChange={(e) => setLabel(e.currentTarget.value)}
+          onBlur={handleLabelBlur}
+          placeholder="Enter node label"
+        />
+      </div>
 
-      <Select
-        label="Layer"
-        value={selectValue}
-        onChange={handleSelectChange}
-        data={layerOptions}
-        placeholder="Select layer"
-        clearable={false}
-      />
+      <div className="space-y-2">
+        <Label htmlFor="layer">Layer</Label>
+        <Select value={selectValue} onValueChange={handleSelectChange}>
+          <SelectTrigger id="layer">
+            <SelectValue placeholder="Select layer" />
+          </SelectTrigger>
+          <SelectContent>
+            {layerOptions.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
       {/* Save indicator */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px',
-        fontSize: '12px',
-        color: '#868e96',
-        minHeight: '20px'
-      }}>
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground min-h-[20px]">
         {isSaving && (
           <>
-            <Loader size="xs" />
-            <Text size="xs">Saving...</Text>
+            <Spinner className="h-3.5 w-3.5" />
+            <span>Saving...</span>
           </>
         )}
         {!isSaving && lastSaved && (
           <>
-            <IconCheck size={14} style={{ color: '#51cf66' }} />
-            <Text size="xs" c="dimmed">
+            <IconCheck className="h-3.5 w-3.5 text-green-500" />
+            <span>
               Saved at {lastSaved.toLocaleTimeString()}
-            </Text>
+            </span>
           </>
         )}
       </div>

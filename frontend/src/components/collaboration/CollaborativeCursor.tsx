@@ -1,5 +1,4 @@
 import { memo } from 'react'
-import { Box, Text } from '@mantine/core'
 import { IconPointer } from '@tabler/icons-react'
 
 interface CollaborativeCursorProps {
@@ -29,7 +28,7 @@ export const CollaborativeCursor = memo(({
   }
 
   return (
-    <Box
+    <div
       style={{
         position: 'absolute',
         left: screenX,
@@ -40,7 +39,7 @@ export const CollaborativeCursor = memo(({
       }}
     >
       {/* Cursor pointer */}
-      <Box
+      <div
         style={{
           position: 'relative',
           display: 'flex',
@@ -58,7 +57,7 @@ export const CollaborativeCursor = memo(({
         />
 
         {/* User name label */}
-        <Box
+        <div
           style={{
             backgroundColor: avatarColor,
             color: 'white',
@@ -74,13 +73,13 @@ export const CollaborativeCursor = memo(({
         >
           {userName}
           {selectedNodeId && (
-            <Text span size="10px" style={{ opacity: 0.8, marginLeft: 4 }}>
+            <span style={{ opacity: 0.8, marginLeft: 4, fontSize: 10 }}>
               ({selectedNodeId})
-            </Text>
+            </span>
           )}
-        </Box>
-      </Box>
-    </Box>
+        </div>
+      </div>
+    </div>
   )
 })
 

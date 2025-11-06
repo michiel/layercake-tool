@@ -2,24 +2,6 @@ import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation } from '@apollo/client/react'
 import {
-  Container,
-  Title,
-  Group,
-  Button,
-  Stack,
-  Card,
-  TextInput,
-  Textarea,
-  Badge,
-  Text,
-  Alert,
-  LoadingOverlay,
-  Tabs,
-  Code,
-  ScrollArea,
-  ActionIcon
-} from '@mantine/core'
-import {
   IconArrowLeft,
   IconDeviceFloppy,
   IconFile,
@@ -32,7 +14,7 @@ import {
   IconX,
   IconTable
 } from '@tabler/icons-react'
-import { useForm } from '@mantine/form'
+import { useForm } from 'react-hook-form'
 import { Breadcrumbs } from '../common/Breadcrumbs'
 import {
   GET_DATASOURCE,
@@ -43,10 +25,20 @@ import {
   UpdateDataSourceInput,
   formatFileSize,
   getDataTypeDisplayName,
-  getFileFormatDisplayName,
-  getStatusColor
+  getFileFormatDisplayName
 } from '../../graphql/datasources'
 import { GraphSpreadsheetEditor, GraphData } from '../editors/GraphSpreadsheetEditor'
+import { Stack, Group } from '../layout-primitives'
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert'
+import { Badge } from '../ui/badge'
+import { Button } from '../ui/button'
+import { Card, CardContent } from '../ui/card'
+import { Input } from '../ui/input'
+import { Label } from '../ui/label'
+import { ScrollArea } from '../ui/scroll-area'
+import { Spinner } from '../ui/spinner'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
+import { Textarea } from '../ui/textarea'
 
 import { gql } from '@apollo/client'
 
@@ -67,7 +59,7 @@ interface DataSourceEditorProps {}
 export const DataSourceEditor: React.FC<DataSourceEditorProps> = () => {
   const navigate = useNavigate()
   const { projectId, dataSourceId } = useParams<{ projectId: string; dataSourceId: string }>()
-  const [activeTab, setActiveTab] = useState<string | null>('details')
+  const [activeTab, setActiveTab] = useState<string>('details')
   const [fileUploadMode, setFileUploadMode] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
 
@@ -103,8 +95,8 @@ export const DataSourceEditor: React.FC<DataSourceEditorProps> = () => {
   const dataSource: DataSource | null = (dataSourceData as any)?.dataSource || null
 
   // Form for editing DataSource metadata
-  const form = useForm({
-    initialValues: {
+  const form = useForm<{name: string; description: string}>({
+    defaultValues: {
       name: '',
       description: ''
     }
@@ -113,12 +105,12 @@ export const DataSourceEditor: React.FC<DataSourceEditorProps> = () => {
   // Update form when dataSource loads
   useEffect(() => {
     if (dataSource) {
-      form.setValues({
+      form.reset({
         name: dataSource.name,
         description: dataSource.description || ''
       })
     }
-  }, [dataSource])
+  }, [dataSource, form])
 
   const handleNavigate = (route: string) => {
     navigate(route)
@@ -259,44 +251,45 @@ export const DataSourceEditor: React.FC<DataSourceEditorProps> = () => {
 
   if (dataSourceLoading) {
     return (
-      <Container size="xl">
-        <LoadingOverlay visible />
-        <div style={{ height: '400px' }} />
-      </Container>
+      <div className="container max-w-7xl py-12">
+        <div className="flex items-center justify-center" style={{ height: '400px' }}>
+          <Spinner className="h-8 w-8" />
+        </div>
+      </div>
     )
   }
 
   if (dataSourceError || !dataSource) {
     return (
-      <Container size="xl">
-        <Alert
-          icon={<IconAlertCircle size={16} />}
-          title="Error Loading Data Source"
-          color="red"
-          mb="md"
-        >
-          {dataSourceError?.message || 'Data Source not found'}
+      <div className="container max-w-7xl py-12">
+        <Alert variant="destructive" className="mb-4">
+          <IconAlertCircle className="h-4 w-4" />
+          <AlertTitle>Error Loading Data Source</AlertTitle>
+          <AlertDescription>
+            {dataSourceError?.message || 'Data Source not found'}
+          </AlertDescription>
         </Alert>
-        <Button onClick={handleBack} leftSection={<IconArrowLeft size={16} />}>
+        <Button onClick={handleBack}>
+          <IconArrowLeft className="mr-2 h-4 w-4" />
           Back to Data Sources
         </Button>
-      </Container>
+      </div>
     )
   }
 
   if (!selectedProject) {
     return (
-      <Container size="xl">
-        <Title order={1}>Project Not Found</Title>
-        <Button onClick={() => navigate('/projects')} mt="md">
+      <div className="container max-w-7xl py-12">
+        <h1 className="text-3xl font-bold">Project Not Found</h1>
+        <Button onClick={() => navigate('/projects')} className="mt-4">
           Back to Projects
         </Button>
-      </Container>
+      </div>
     )
   }
 
   return (
-    <Container size="xl">
+    <div className="container max-w-7xl py-12">
       <Breadcrumbs
         projectName={selectedProject.name}
         projectId={selectedProject.id}
@@ -304,23 +297,29 @@ export const DataSourceEditor: React.FC<DataSourceEditorProps> = () => {
         onNavigate={handleNavigate}
       />
 
-      <Group justify="space-between" mb="md">
-        <Group>
-          <ActionIcon onClick={handleBack} size="lg" variant="subtle">
-            <IconArrowLeft size={18} />
-          </ActionIcon>
+      <Group justify="between" className="mb-4">
+        <Group gap="sm">
+          <Button variant="ghost" size="icon" onClick={handleBack}>
+            <IconArrowLeft className="h-[18px] w-[18px]" />
+          </Button>
           <div>
-            <Title order={1}>{dataSource.name}</Title>
-            <Group gap="xs" mt="xs">
-              <Badge variant="light" size="sm">
+            <h1 className="text-3xl font-bold">{dataSource.name}</h1>
+            <Group gap="xs" className="mt-2">
+              <Badge variant="secondary" className="text-xs">
                 {getFileFormatDisplayName(dataSource.fileFormat)}/{getDataTypeDisplayName(dataSource.dataType)}
               </Badge>
               <Badge
-                variant="light"
-                color={getStatusColor(dataSource.status)}
-                leftSection={getStatusIcon(dataSource.status)}
+                variant="secondary"
+                className={
+                  dataSource.status === 'active'
+                    ? 'bg-green-100 text-green-900'
+                    : dataSource.status === 'processing'
+                      ? 'bg-blue-100 text-blue-900'
+                      : 'bg-red-100 text-red-900'
+                }
               >
-                {dataSource.status}
+                {getStatusIcon(dataSource.status)}
+                <span className="ml-1">{dataSource.status}</span>
               </Badge>
             </Group>
           </div>
@@ -328,24 +327,23 @@ export const DataSourceEditor: React.FC<DataSourceEditorProps> = () => {
 
         <Group gap="sm">
           <Button
-            variant="light"
-            leftSection={<IconRefresh size={16} />}
+            variant="secondary"
             onClick={handleReprocess}
-            loading={reprocessLoading}
-            disabled={dataSource.status === 'processing'}
+            disabled={dataSource.status === 'processing' || reprocessLoading}
           >
+            {reprocessLoading && <Spinner className="mr-2 h-4 w-4" />}
+            <IconRefresh className="mr-2 h-4 w-4" />
             Reprocess
           </Button>
           <Button
-            variant="light"
-            leftSection={<IconDownload size={16} />}
+            variant="secondary"
             onClick={handleDownloadRaw}
           >
+            <IconDownload className="mr-2 h-4 w-4" />
             Download Original
           </Button>
           <Button
-            variant="light"
-            leftSection={<IconDownload size={16} />}
+            variant="secondary"
             onClick={handleDownloadJson}
             disabled={dataSource.status !== 'active'}
           >
@@ -355,174 +353,184 @@ export const DataSourceEditor: React.FC<DataSourceEditorProps> = () => {
       </Group>
 
       {dataSource.status === 'error' && dataSource.errorMessage && (
-        <Alert
-          icon={<IconAlertCircle size={16} />}
-          title="Processing Error"
-          color="red"
-          mb="md"
-        >
-          {dataSource.errorMessage}
+        <Alert variant="destructive" className="mb-4">
+          <IconAlertCircle className="h-4 w-4" />
+          <AlertTitle>Processing Error</AlertTitle>
+          <AlertDescription>{dataSource.errorMessage}</AlertDescription>
         </Alert>
       )}
 
-      <Tabs value={activeTab} onChange={setActiveTab}>
-        <Tabs.List>
-          <Tabs.Tab value="details" leftSection={<IconFile size={16} />}>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="details">
+            <IconFile className="mr-2 h-4 w-4" />
             Details
-          </Tabs.Tab>
-          <Tabs.Tab
+          </TabsTrigger>
+          <TabsTrigger
             value="data"
-            leftSection={<IconCode size={16} />}
             disabled={dataSource.status !== 'active'}
           >
+            <IconCode className="mr-2 h-4 w-4" />
             Graph Data
-          </Tabs.Tab>
-          <Tabs.Tab
+          </TabsTrigger>
+          <TabsTrigger
             value="edit"
-            leftSection={<IconTable size={16} />}
             disabled={dataSource.status !== 'active'}
           >
+            <IconTable className="mr-2 h-4 w-4" />
             Data Edit
-          </Tabs.Tab>
-        </Tabs.List>
+          </TabsTrigger>
+        </TabsList>
 
-        <Tabs.Panel value="details">
-          <Card withBorder mt="md">
-            <form onSubmit={form.onSubmit(handleSave)}>
-              <Stack gap="md">
-                <TextInput
-                  label="Name"
-                  placeholder="Enter data source name"
-                  required
-                  {...form.getInputProps('name')}
-                />
+        <TabsContent value="details">
+          <Card className="border mt-4">
+            <CardContent className="pt-6">
+              <form onSubmit={form.handleSubmit(handleSave)}>
+                <Stack gap="md">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Name *</Label>
+                    <Input
+                      id="name"
+                      placeholder="Enter data source name"
+                      {...form.register('name', { required: true })}
+                    />
+                  </div>
 
-                <Textarea
-                  label="Description"
-                  placeholder="Optional description"
-                  rows={3}
-                  {...form.getInputProps('description')}
-                />
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Description</Label>
+                    <Textarea
+                      id="description"
+                      placeholder="Optional description"
+                      rows={3}
+                      {...form.register('description')}
+                    />
+                  </div>
 
-                <div>
-                  <Text size="sm" fw={500} mb="xs">File Information</Text>
-                  <Group gap="md">
-                    <div>
-                      <Text size="xs" c="dimmed">Filename</Text>
-                      <Text size="sm" ff="monospace">{dataSource.filename}</Text>
-                    </div>
-                    <div>
-                      <Text size="xs" c="dimmed">Size</Text>
-                      <Text size="sm">{formatFileSize(dataSource.fileSize)}</Text>
-                    </div>
-                    <div>
-                      <Text size="xs" c="dimmed">Processed</Text>
-                      <Text size="sm">
-                        {dataSource.processedAt
-                          ? new Date(dataSource.processedAt).toLocaleString()
-                          : 'Not processed'
-                        }
-                      </Text>
-                    </div>
-                  </Group>
-                </div>
+                  <div>
+                    <p className="text-sm font-medium mb-2">File Information</p>
+                    <Group gap="md">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Filename</p>
+                        <p className="text-sm font-mono">{dataSource.filename}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Size</p>
+                        <p className="text-sm">{formatFileSize(dataSource.fileSize)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Processed</p>
+                        <p className="text-sm">
+                          {dataSource.processedAt
+                            ? new Date(dataSource.processedAt).toLocaleString()
+                            : 'Not processed'
+                          }
+                        </p>
+                      </div>
+                    </Group>
+                  </div>
 
-                <div>
-                  <Group justify="space-between" align="center" mb="xs">
-                    <Text size="sm" fw={500}>Replace File</Text>
+                  <div>
+                    <Group justify="between" align="center" className="mb-2">
+                      <p className="text-sm font-medium">Replace File</p>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setFileUploadMode(!fileUploadMode)}
+                      >
+                        {fileUploadMode ? 'Cancel' : 'Upload New File'}
+                      </Button>
+                    </Group>
+
+                    {fileUploadMode && (
+                      <Stack gap="sm">
+                        <Input
+                          type="file"
+                          accept=".csv,.json"
+                          onChange={handleFileChange}
+                        />
+                          {selectedFile && (
+                            <p className="text-sm text-muted-foreground">
+                              Selected: {selectedFile.name} ({formatFileSize(selectedFile.size)})
+                            </p>
+                          )}
+                          <p className="text-xs text-muted-foreground">
+                            Supported formats: CSV (nodes, edges, layers) and JSON (graph format)
+                          </p>
+                        </Stack>
+                      )}
+                  </div>
+
+                  <Group justify="end">
                     <Button
-                      variant="light"
-                      size="xs"
-                      onClick={() => setFileUploadMode(!fileUploadMode)}
+                      type="submit"
+                      disabled={updateLoading}
                     >
-                      {fileUploadMode ? 'Cancel' : 'Upload New File'}
+                      {updateLoading && <Spinner className="mr-2 h-4 w-4" />}
+                      <IconDeviceFloppy className="mr-2 h-4 w-4" />
+                      Save Changes
                     </Button>
                   </Group>
+                </Stack>
+              </form>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-                  {fileUploadMode && (
-                    <Stack gap="sm">
-                      <input
-                        type="file"
-                        accept=".csv,.json"
-                        onChange={handleFileChange}
-                        style={{ width: '100%' }}
-                      />
-                      {selectedFile && (
-                        <Text size="sm" c="dimmed">
-                          Selected: {selectedFile.name} ({formatFileSize(selectedFile.size)})
-                        </Text>
-                      )}
-                      <Text size="xs" c="dimmed">
-                        Supported formats: CSV (nodes, edges, layers) and JSON (graph format)
-                      </Text>
-                    </Stack>
-                  )}
-                </div>
-
-                <Group justify="flex-end">
-                  <Button
-                    type="submit"
-                    loading={updateLoading}
-                    leftSection={<IconDeviceFloppy size={16} />}
-                  >
-                    Save Changes
-                  </Button>
+        <TabsContent value="data">
+          <Card className="border mt-4">
+            <CardContent className="pt-6">
+              <Stack gap="md">
+                <Group justify="between">
+                  <p className="font-medium">Processed Graph Data</p>
+                  <p className="text-sm text-muted-foreground">
+                    {dataSource.graphJson.length} characters
+                  </p>
                 </Group>
+
+                <ScrollArea className="h-[400px]">
+                  <pre className="text-xs bg-muted p-4 rounded-md overflow-x-auto">
+                    <code>{JSON.stringify(JSON.parse(dataSource.graphJson), null, 2)}</code>
+                  </pre>
+                </ScrollArea>
+
+                <p className="text-xs text-muted-foreground">
+                  This is the processed graph data that will be available to Plan DAG nodes.
+                  The format includes nodes, edges, and layers arrays as defined by the graph schema.
+                </p>
               </Stack>
-            </form>
+            </CardContent>
           </Card>
-        </Tabs.Panel>
+        </TabsContent>
 
-        <Tabs.Panel value="data">
-          <Card withBorder mt="md">
-            <Stack gap="md">
-              <Group justify="space-between">
-                <Text fw={500}>Processed Graph Data</Text>
-                <Text size="sm" c="dimmed">
-                  {dataSource.graphJson.length} characters
-                </Text>
-              </Group>
-
-              <ScrollArea h={400}>
-                <Code block>
-                  {JSON.stringify(JSON.parse(dataSource.graphJson), null, 2)}
-                </Code>
-              </ScrollArea>
-
-              <Text size="xs" c="dimmed">
-                This is the processed graph data that will be available to Plan DAG nodes.
-                The format includes nodes, edges, and layers arrays as defined by the graph schema.
-              </Text>
-            </Stack>
+        <TabsContent value="edit">
+          <Card className="border mt-4">
+            <CardContent className="pt-6">
+              {dataSource.status === 'active' && (() => {
+                try {
+                  const graphData: GraphData = JSON.parse(dataSource.graphJson);
+                  return (
+                    <GraphSpreadsheetEditor
+                      graphData={graphData}
+                      onSave={handleSaveGraphData}
+                    />
+                  );
+                } catch (error) {
+                  return (
+                    <Alert variant="destructive">
+                      <IconAlertCircle className="h-4 w-4" />
+                      <AlertTitle>Invalid Graph Data</AlertTitle>
+                      <AlertDescription>
+                        Failed to parse graph JSON data. Please check the data format in the "Graph Data" tab.
+                      </AlertDescription>
+                    </Alert>
+                  );
+                }
+              })()}
+            </CardContent>
           </Card>
-        </Tabs.Panel>
-
-        <Tabs.Panel value="edit">
-          <Card withBorder mt="md">
-            {dataSource.status === 'active' && (() => {
-              try {
-                const graphData: GraphData = JSON.parse(dataSource.graphJson);
-                return (
-                  <GraphSpreadsheetEditor
-                    graphData={graphData}
-                    onSave={handleSaveGraphData}
-                  />
-                );
-              } catch (error) {
-                return (
-                  <Alert
-                    icon={<IconAlertCircle size={16} />}
-                    title="Invalid Graph Data"
-                    color="red"
-                  >
-                    Failed to parse graph JSON data. Please check the data format in the "Graph Data" tab.
-                  </Alert>
-                );
-              }
-            })()}
-          </Card>
-        </Tabs.Panel>
+        </TabsContent>
       </Tabs>
-    </Container>
+    </div>
   )
 }

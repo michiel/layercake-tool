@@ -2,22 +2,6 @@ import React, { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation } from '@apollo/client/react'
 import {
-  Title,
-  Group,
-  Button,
-  Stack,
-  Card,
-  Badge,
-  Text,
-  ActionIcon,
-  Modal,
-  Alert,
-  Table,
-  Menu,
-  LoadingOverlay,
-  Checkbox
-} from '@mantine/core'
-import {
   IconPlus,
   IconFile,
   IconDownload,
@@ -36,6 +20,16 @@ import { useQuery as useProjectsQuery } from '@apollo/client/react'
 import { Breadcrumbs } from '../common/Breadcrumbs'
 import { DataSourceUploader } from './DataSourceUploader'
 import PageContainer from '../layout/PageContainer'
+import { Stack, Group } from '../layout-primitives'
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert'
+import { Badge } from '../ui/badge'
+import { Button } from '../ui/button'
+import { Card, CardContent } from '../ui/card'
+import { Checkbox } from '../ui/checkbox'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '../ui/dropdown-menu'
+import { Spinner } from '../ui/spinner'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table'
 import {
   GET_DATASOURCES,
   DELETE_DATASOURCE,
@@ -44,8 +38,7 @@ import {
   DataSource,
   formatFileSize,
   getFileFormatDisplayName,
-  getDataTypeDisplayName,
-  getStatusColor
+  getDataTypeDisplayName
 } from '../../graphql/datasources'
 
 import {
@@ -348,8 +341,8 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
   if (!selectedProject) {
     return (
       <PageContainer>
-        <Title order={1}>Project Not Found</Title>
-        <Button onClick={() => navigate('/projects')} mt="md">
+        <h1 className="text-3xl font-bold">Project Not Found</h1>
+        <Button onClick={() => navigate('/projects')} className="mt-4">
           Back to Projects
         </Button>
       </PageContainer>
@@ -366,356 +359,380 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
           onNavigate={handleNavigate}
         />
 
-        <Group justify="space-between" mb="md">
+        <Group justify="between" className="mb-4">
           <div>
-            <Title order={1}>Data Sources</Title>
-            <Text size="sm" c="dimmed" mt="xs">
+            <h1 className="text-3xl font-bold">Data Sources</h1>
+            <p className="text-sm text-muted-foreground mt-1">
               Manage CSV, TSV, and JSON files that serve as input data for your Plan DAGs
-            </Text>
+            </p>
           </div>
           <Group gap="xs">
             <Button
-              leftSection={<IconFileExport size={16} />}
               onClick={handleExportClick}
               disabled={selectedRows.size === 0}
-              variant="light"
+              variant="secondary"
             >
+              <IconFileExport className="mr-2 h-4 w-4" />
               Export ({selectedRows.size})
             </Button>
             <Button
-              leftSection={<IconBooks size={16} />}
               onClick={handleOpenLibraryImport}
-              variant="light"
+              variant="secondary"
             >
+              <IconBooks className="mr-2 h-4 w-4" />
               Import from Library
             </Button>
-            <Button
-              leftSection={<IconPlus size={16} />}
-              onClick={handleCreateNew}
-            >
+            <Button onClick={handleCreateNew}>
+              <IconPlus className="mr-2 h-4 w-4" />
               New
             </Button>
           </Group>
         </Group>
 
         {dataSourcesError && (
-          <Alert
-            icon={<IconAlertCircle size={16} />}
-            title="Error Loading Data Sources"
-            color="red"
-            mb="md"
-          >
-            {dataSourcesError.message}
+          <Alert variant="destructive" className="mb-4">
+            <IconAlertCircle className="h-4 w-4" />
+            <AlertTitle>Error Loading Data Sources</AlertTitle>
+            <AlertDescription>
+              {dataSourcesError.message}
+            </AlertDescription>
           </Alert>
         )}
 
-        <Card withBorder>
-          <LoadingOverlay visible={dataSourcesLoading} />
+        <Card className="border relative">
+          {dataSourcesLoading && (
+            <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 rounded-lg">
+              <Spinner className="h-8 w-8" />
+            </div>
+          )}
 
           {dataSources.length === 0 && !dataSourcesLoading ? (
-            <Stack align="center" py="xl" gap="md">
-              <IconFile size={48} color="gray" />
-              <div style={{ textAlign: 'center' }}>
-                <Title order={3}>No Data Sources</Title>
-                <Text c="dimmed" mb="md">
-                  Upload CSV, TSV, or JSON files to create your first data source.
-                </Text>
-                <Button
-                  leftSection={<IconPlus size={16} />}
-                  onClick={handleCreateNew}
-                >
-                  Create First Data Source
-                </Button>
-              </div>
-            </Stack>
+            <CardContent className="py-12">
+              <Stack align="center" gap="md">
+                <IconFile size={48} className="text-muted-foreground" />
+                <div className="text-center">
+                  <h3 className="text-xl font-semibold mb-2">No Data Sources</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Upload CSV, TSV, or JSON files to create your first data source.
+                  </p>
+                  <Button onClick={handleCreateNew}>
+                    <IconPlus className="mr-2 h-4 w-4" />
+                    Create First Data Source
+                  </Button>
+                </div>
+              </Stack>
+            </CardContent>
           ) : (
-            <Table.ScrollContainer minWidth={800}>
-              <Table striped highlightOnHover>
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th style={{ width: 40 }}>
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[40px]">
                       <Checkbox
                         checked={selectedRows.size === dataSources.length && dataSources.length > 0}
-                        indeterminate={selectedRows.size > 0 && selectedRows.size < dataSources.length}
-                        onChange={toggleSelectAll}
+                        onCheckedChange={toggleSelectAll}
                       />
-                    </Table.Th>
-                    <Table.Th>Name</Table.Th>
-                    <Table.Th>Format</Table.Th>
-                    <Table.Th>Data Type</Table.Th>
-                    <Table.Th>Status</Table.Th>
-                    <Table.Th>Size</Table.Th>
-                    <Table.Th>Updated</Table.Th>
-                    <Table.Th>Actions</Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
+                    </TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Format</TableHead>
+                    <TableHead>Data Type</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Size</TableHead>
+                    <TableHead>Updated</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {dataSources.map((dataSource) => (
-                    <Table.Tr key={dataSource.id}>
-                      <Table.Td>
+                    <TableRow key={dataSource.id}>
+                      <TableCell>
                         <Checkbox
                           checked={selectedRows.has(dataSource.id)}
-                          onChange={() => toggleRowSelection(dataSource.id)}
+                          onCheckedChange={() => toggleRowSelection(dataSource.id)}
                         />
-                      </Table.Td>
-                      <Table.Td>
+                      </TableCell>
+                      <TableCell>
                         <div>
-                          <Text fw={500}>{dataSource.name}</Text>
+                          <p className="font-medium">{dataSource.name}</p>
                           {dataSource.description && (
-                            <Text size="xs" c="dimmed" mt={2}>
+                            <p className="text-xs text-muted-foreground mt-0.5">
                               {dataSource.description}
-                            </Text>
+                            </p>
                           )}
                         </div>
-                      </Table.Td>
-                      <Table.Td>
-                        <Badge variant="light" color="blue" size="sm">
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">
                           {getFileFormatDisplayName(dataSource.fileFormat)}
                         </Badge>
-                      </Table.Td>
-                      <Table.Td>
-                        <Badge variant="light" color="green" size="sm">
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">
                           {getDataTypeDisplayName(dataSource.dataType)}
                         </Badge>
-                      </Table.Td>
-                      <Table.Td>
+                      </TableCell>
+                      <TableCell>
                         <Group gap="xs">
                           <Badge
-                            variant="light"
-                            color={getStatusColor(dataSource.status)}
-                            leftSection={getStatusIcon(dataSource.status)}
+                            variant="secondary"
+                            className={
+                              dataSource.status === 'active'
+                                ? 'bg-green-100 text-green-900'
+                                : dataSource.status === 'processing'
+                                  ? 'bg-blue-100 text-blue-900'
+                                  : 'bg-red-100 text-red-900'
+                            }
                           >
-                            {dataSource.status}
+                            {getStatusIcon(dataSource.status)}
+                            <span className="ml-1">{dataSource.status}</span>
                           </Badge>
                           {dataSource.status === 'error' && dataSource.errorMessage && (
-                            <ActionIcon
-                              size="sm"
-                              variant="subtle"
-                              color="red"
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-6 w-6 text-red-600"
                               title={dataSource.errorMessage}
                             >
-                              <IconAlertCircle size={12} />
-                            </ActionIcon>
+                              <IconAlertCircle className="h-3 w-3" />
+                            </Button>
                           )}
                         </Group>
-                      </Table.Td>
-                      <Table.Td>
-                        <Text size="sm">
+                      </TableCell>
+                      <TableCell>
+                        <p className="text-sm">
                           {formatFileSize(dataSource.fileSize)}
-                        </Text>
-                      </Table.Td>
-                      <Table.Td>
-                        <Text size="sm" c="dimmed">
+                        </p>
+                      </TableCell>
+                      <TableCell>
+                        <p className="text-sm text-muted-foreground">
                           {new Date(dataSource.updatedAt).toLocaleString()}
-                        </Text>
-                      </Table.Td>
-                      <Table.Td>
-                        <Group gap="xs">
-                          <Menu shadow="md" width={200}>
-                            <Menu.Target>
-                              <ActionIcon variant="subtle">
-                                <IconDots size={16} />
-                              </ActionIcon>
-                            </Menu.Target>
+                        </p>
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <IconDots className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
 
-                            <Menu.Dropdown>
-                              <Menu.Item
-                                leftSection={<IconEdit size={14} />}
-                                onClick={() => handleEdit(dataSource)}
-                              >
-                                Edit
-                              </Menu.Item>
+                          <DropdownMenuContent align="end" className="w-[200px]">
+                            <DropdownMenuItem onClick={() => handleEdit(dataSource)}>
+                              <IconEdit className="mr-2 h-3.5 w-3.5" />
+                              Edit
+                            </DropdownMenuItem>
 
-                              <Menu.Item
-                                leftSection={<IconRefresh size={14} />}
-                                onClick={() => handleReprocess(dataSource)}
-                                disabled={dataSource.status === 'processing' || reprocessLoading}
-                              >
-                                Reprocess
-                              </Menu.Item>
+                            <DropdownMenuItem
+                              onClick={() => handleReprocess(dataSource)}
+                              disabled={dataSource.status === 'processing' || reprocessLoading}
+                            >
+                              <IconRefresh className="mr-2 h-3.5 w-3.5" />
+                              Reprocess
+                            </DropdownMenuItem>
 
-                              <Menu.Divider />
+                            <DropdownMenuSeparator />
 
-                              <Menu.Item
-                                leftSection={<IconDownload size={14} />}
-                                onClick={() => handleDownloadRaw(dataSource)}
-                              >
-                                Download Original
-                              </Menu.Item>
+                            <DropdownMenuItem onClick={() => handleDownloadRaw(dataSource)}>
+                              <IconDownload className="mr-2 h-3.5 w-3.5" />
+                              Download Original
+                            </DropdownMenuItem>
 
-                              <Menu.Item
-                                leftSection={<IconDownload size={14} />}
-                                onClick={() => handleDownloadJson(dataSource)}
-                                disabled={dataSource.status !== 'active'}
-                              >
-                                Download JSON
-                              </Menu.Item>
+                            <DropdownMenuItem
+                              onClick={() => handleDownloadJson(dataSource)}
+                              disabled={dataSource.status !== 'active'}
+                            >
+                              <IconDownload className="mr-2 h-3.5 w-3.5" />
+                              Download JSON
+                            </DropdownMenuItem>
 
-                              <Menu.Divider />
+                            <DropdownMenuSeparator />
 
-                              <Menu.Item
-                                leftSection={<IconTrash size={14} />}
-                                color="red"
-                                onClick={() => handleDelete(dataSource)}
-                              >
-                                Delete
-                              </Menu.Item>
-                            </Menu.Dropdown>
-                          </Menu>
-                        </Group>
-                      </Table.Td>
-                    </Table.Tr>
+                            <DropdownMenuItem
+                              onClick={() => handleDelete(dataSource)}
+                              className="text-red-600"
+                            >
+                              <IconTrash className="mr-2 h-3.5 w-3.5" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </Table.Tbody>
+                </TableBody>
               </Table>
-            </Table.ScrollContainer>
+            </div>
           )}
         </Card>
       </PageContainer>
 
       {/* Delete Confirmation Modal */}
-      <Modal
-        opened={deleteModalOpen}
-        onClose={() => setDeleteModalOpen(false)}
-        title="Delete Data Source"
-      >
-        <Text mb="md">
-          Are you sure you want to delete "{selectedDataSource?.name}"?
-          This action cannot be undone.
-        </Text>
+      <Dialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Data Source</DialogTitle>
+          </DialogHeader>
+          <p className="mb-4">
+            Are you sure you want to delete "{selectedDataSource?.name}"?
+            This action cannot be undone.
+          </p>
 
-        <Group justify="flex-end" gap="sm">
-          <Button variant="light" onClick={() => setDeleteModalOpen(false)}>
-            Cancel
-          </Button>
-          <Button
-            color="red"
-            loading={deleteLoading}
-            onClick={confirmDelete}
-          >
-            Delete
-          </Button>
-        </Group>
-      </Modal>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setDeleteModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleteLoading}
+              onClick={confirmDelete}
+            >
+              {deleteLoading && <Spinner className="mr-2 h-4 w-4" />}
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Import from Library Modal */}
-      <Modal
-        opened={libraryImportModalOpen}
-        onClose={() => setLibraryImportModalOpen(false)}
-        title="Import from Library"
-        size="xl"
-      >
-        <Stack gap="md">
-          <Text size="sm" c="dimmed">
-            Select one or more library sources to copy into this project. Imported items appear in the project list and can be edited independently.
-          </Text>
+      <Dialog open={libraryImportModalOpen} onOpenChange={setLibraryImportModalOpen}>
+        <DialogContent className="sm:max-w-[800px]">
+          <DialogHeader>
+            <DialogTitle>Import from Library</DialogTitle>
+            <DialogDescription>
+              Select one or more library sources to copy into this project. Imported items appear in the project list and can be edited independently.
+            </DialogDescription>
+          </DialogHeader>
 
-          {librarySourcesError && (
-            <Alert icon={<IconAlertCircle size={16} />} color="red">
-              {librarySourcesError.message}
-            </Alert>
-          )}
+          <Stack gap="md" className="py-4">
+            {librarySourcesError && (
+              <Alert variant="destructive">
+                <IconAlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  {librarySourcesError.message}
+                </AlertDescription>
+              </Alert>
+            )}
 
-          {libraryImportError && (
-            <Alert icon={<IconAlertCircle size={16} />} color="red">
-              {libraryImportError.message}
-            </Alert>
-          )}
+            {libraryImportError && (
+              <Alert variant="destructive">
+                <IconAlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  {libraryImportError.message}
+                </AlertDescription>
+              </Alert>
+            )}
 
-          {librarySelectionError && (
-            <Alert icon={<IconAlertCircle size={16} />} color="orange">
-              {librarySelectionError}
-            </Alert>
-          )}
+            {librarySelectionError && (
+              <Alert className="border-orange-200 bg-orange-50 text-orange-900">
+                <IconAlertCircle className="h-4 w-4 text-orange-600" />
+                <AlertDescription>
+                  {librarySelectionError}
+                </AlertDescription>
+              </Alert>
+            )}
 
-          <div style={{ position: 'relative' }}>
-            <LoadingOverlay visible={librarySourcesLoading || libraryImportLoading} />
+          <div className="relative">
+            {(librarySourcesLoading || libraryImportLoading) && (
+              <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 rounded-lg">
+                <Spinner className="h-8 w-8" />
+              </div>
+            )}
             {librarySources.length === 0 && !librarySourcesLoading ? (
-              <Stack align="center" py="lg" gap="xs">
-                <Text fw={500}>No library sources available</Text>
-                <Text size="sm" c="dimmed" ta="center" style={{ maxWidth: 360 }}>
+              <Stack align="center" className="py-8" gap="xs">
+                <p className="font-medium">No library sources available</p>
+                <p className="text-sm text-muted-foreground text-center max-w-[360px]">
                   Add sources from the Library page before importing them into this project.
-                </Text>
+                </p>
               </Stack>
             ) : (
-              <Table.ScrollContainer minWidth={700}>
-                <Table striped highlightOnHover>
-                  <Table.Thead>
-                    <Table.Tr>
-                      <Table.Th style={{ width: 40 }}>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[40px]">
                         <Checkbox
                           checked={selectedLibraryRows.size === librarySources.length && librarySources.length > 0}
-                          indeterminate={selectedLibraryRows.size > 0 && selectedLibraryRows.size < librarySources.length}
-                          onChange={toggleLibrarySelectAll}
+                          onCheckedChange={toggleLibrarySelectAll}
                         />
-                      </Table.Th>
-                      <Table.Th>Name</Table.Th>
-                      <Table.Th>Format</Table.Th>
-                      <Table.Th>Data Type</Table.Th>
-                      <Table.Th>Status</Table.Th>
-                      <Table.Th>Processed</Table.Th>
-                      <Table.Th>Size</Table.Th>
-                    </Table.Tr>
-                  </Table.Thead>
-                  <Table.Tbody>
+                      </TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Format</TableHead>
+                      <TableHead>Data Type</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Processed</TableHead>
+                      <TableHead>Size</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {librarySources.map((source) => (
-                      <Table.Tr key={source.id}>
-                        <Table.Td>
+                      <TableRow key={source.id}>
+                        <TableCell>
                           <Checkbox
                             checked={selectedLibraryRows.has(source.id)}
-                            onChange={() => toggleLibraryRowSelection(source.id)}
+                            onCheckedChange={() => toggleLibraryRowSelection(source.id)}
                             aria-label={`Select ${source.name}`}
                           />
-                        </Table.Td>
-                        <Table.Td>
-                          <Stack gap={2}>
-                            <Text fw={500}>{source.name}</Text>
+                        </TableCell>
+                        <TableCell>
+                          <Stack gap="xs">
+                            <p className="font-medium">{source.name}</p>
                             {source.description && (
-                              <Text size="sm" c="dimmed">
+                              <p className="text-sm text-muted-foreground">
                                 {source.description}
-                              </Text>
+                              </p>
                             )}
                           </Stack>
-                        </Table.Td>
-                        <Table.Td>{getFileFormatDisplayName(source.fileFormat)}</Table.Td>
-                        <Table.Td>{getDataTypeDisplayName(source.dataType)}</Table.Td>
-                        <Table.Td>
-                          <Badge color={getStatusColor(source.status)} variant="light">
+                        </TableCell>
+                        <TableCell>{getFileFormatDisplayName(source.fileFormat)}</TableCell>
+                        <TableCell>{getDataTypeDisplayName(source.dataType)}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="secondary"
+                            className={
+                              source.status === 'active'
+                                ? 'bg-green-100 text-green-900'
+                                : source.status === 'processing'
+                                  ? 'bg-blue-100 text-blue-900'
+                                  : 'bg-red-100 text-red-900'
+                            }
+                          >
                             {source.status === 'processing'
                               ? 'Processing'
                               : source.status === 'error'
                                 ? 'Error'
                                 : 'Active'}
                           </Badge>
-                        </Table.Td>
-                        <Table.Td>
+                        </TableCell>
+                        <TableCell>
                           {source.processedAt
                             ? new Date(source.processedAt).toLocaleString()
                             : '—'}
-                        </Table.Td>
-                        <Table.Td>{formatFileSize(source.fileSize)}</Table.Td>
-                      </Table.Tr>
+                        </TableCell>
+                        <TableCell>{formatFileSize(source.fileSize)}</TableCell>
+                      </TableRow>
                     ))}
-                  </Table.Tbody>
+                  </TableBody>
                 </Table>
-              </Table.ScrollContainer>
+              </div>
             )}
           </div>
 
-          <Group justify="flex-end">
-            <Button variant="light" onClick={() => setLibraryImportModalOpen(false)}>
+          </Stack>
+
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setLibraryImportModalOpen(false)}>
               Cancel
             </Button>
             <Button
               onClick={handleImportFromLibrary}
-              loading={libraryImportLoading}
-              disabled={librarySources.length === 0}
+              disabled={librarySources.length === 0 || libraryImportLoading}
             >
+              {libraryImportLoading && <Spinner className="mr-2 h-4 w-4" />}
               Import Selected ({selectedLibraryRows.size})
             </Button>
-          </Group>
-        </Stack>
-      </Modal>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* DataSource Uploader Modal */}
       <DataSourceUploader
@@ -729,33 +746,34 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
       />
 
       {/* Export Format Selection Modal */}
-      <Modal
-        opened={exportFormatModalOpen}
-        onClose={() => setExportFormatModalOpen(false)}
-        title="Export Data Sources"
-      >
-        <Text mb="md">
-          Select the format for exporting {selectedRows.size} data source{selectedRows.size !== 1 ? 's' : ''}:
-        </Text>
+      <Dialog open={exportFormatModalOpen} onOpenChange={setExportFormatModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Export Data Sources</DialogTitle>
+            <DialogDescription>
+              Select the format for exporting {selectedRows.size} data source{selectedRows.size !== 1 ? 's' : ''}:
+            </DialogDescription>
+          </DialogHeader>
 
-        <Stack gap="sm">
-          <Button
-            fullWidth
-            leftSection={<IconFileExport size={16} />}
-            onClick={() => handleExport('xlsx')}
-          >
-            Export as XLSX (Excel)
-          </Button>
-          <Button
-            fullWidth
-            leftSection={<IconFileExport size={16} />}
-            onClick={() => handleExport('ods')}
-            variant="light"
-          >
-            Export as ODS (OpenDocument)
-          </Button>
-        </Stack>
-      </Modal>
+          <Stack gap="sm" className="py-4">
+            <Button
+              className="w-full"
+              onClick={() => handleExport('xlsx')}
+            >
+              <IconFileExport className="mr-2 h-4 w-4" />
+              Export as XLSX (Excel)
+            </Button>
+            <Button
+              className="w-full"
+              onClick={() => handleExport('ods')}
+              variant="secondary"
+            >
+              <IconFileExport className="mr-2 h-4 w-4" />
+              Export as ODS (OpenDocument)
+            </Button>
+          </Stack>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

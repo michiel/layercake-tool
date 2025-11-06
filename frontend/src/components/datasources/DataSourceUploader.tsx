@@ -1,25 +1,6 @@
 import React, { useState, useRef } from 'react'
 import { useMutation } from '@apollo/client/react'
 import {
-  Modal,
-  Stack,
-  Group,
-  Button,
-  TextInput,
-  Textarea,
-  Text,
-  Card,
-  Badge,
-  Alert,
-  Progress,
-  ActionIcon,
-  Center,
-  Select,
-  Tabs,
-  FileButton,
-  List
-} from '@mantine/core'
-import {
   IconUpload,
   IconFile,
   IconFileTypeCsv,
@@ -29,7 +10,7 @@ import {
   IconAlertCircle,
   IconCloudUpload
 } from '@tabler/icons-react'
-import { useForm } from '@mantine/form'
+import { useForm } from 'react-hook-form'
 // Note: Using simple file input instead of dropzone for now
 import {
   CREATE_DATASOURCE_FROM_FILE,
@@ -50,6 +31,19 @@ import {
   CREATE_LIBRARY_SOURCE,
   CreateLibrarySourceInput
 } from '../../graphql/librarySources'
+import { Stack, Group } from '../layout-primitives'
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert'
+import { Badge } from '../ui/badge'
+import { Button } from '../ui/button'
+import { Card, CardContent } from '../ui/card'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog'
+import { Input } from '../ui/input'
+import { Label } from '../ui/label'
+import { Progress } from '../ui/progress'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
+import { Spinner } from '../ui/spinner'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
+import { Textarea } from '../ui/textarea'
 
 interface DataSourceUploaderProps {
   projectId?: number
@@ -114,15 +108,11 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
     ? createLibraryError
     : (activeTab === 'empty' ? createEmptyError : activeTab === 'bulk' ? bulkError : activeTab === 'import' ? importError : createError)
 
-  const form = useForm({
-    initialValues: {
+  const form = useForm<{name: string; description: string; dataType: string}>({
+    defaultValues: {
       name: '',
       description: '',
-      dataType: '' as string
-    },
-    validate: {
-      name: (value) => (value.trim().length > 0 ? null : 'Name is required'),
-      dataType: (value) => (value ? null : 'Data type is required')
+      dataType: ''
     }
   })
 
@@ -175,14 +165,14 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
     setPreviewData(preview)
 
     // Auto-populate form name
-    form.setFieldValue('name', fileInfo.name)
+    form.setValue('name', fileInfo.name)
 
     // Auto-select data type if only one option (JSON -> GRAPH)
     const availableTypes = getAvailableDataTypes(format)
     if (availableTypes.length === 1) {
-      form.setFieldValue('dataType', availableTypes[0])
+      form.setValue('dataType', availableTypes[0])
     } else {
-      form.setFieldValue('dataType', '')
+      form.setValue('dataType', '')
     }
   }
 
@@ -416,36 +406,32 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
       return (
         <>
           <Card
-            withBorder
-            style={{
-              minHeight: 220,
-              cursor: 'pointer',
-              borderStyle: 'dashed',
-              borderWidth: '2px'
-            }}
+            className="border border-dashed min-h-[220px] cursor-pointer"
             onClick={handleManualFileSelect}
           >
-            <Group justify="center" gap="xl" style={{ minHeight: 180 }}>
-              <IconCloudUpload size={52} stroke={1.5} />
-              <div>
-                <Text size="xl" inline>
-                  Click to select file
-                </Text>
-                <Text size="sm" c="dimmed" inline mt={7}>
-                  Upload CSV, TSV, or JSON file for your data source
-                </Text>
-              </div>
-            </Group>
+            <CardContent className="pt-6">
+              <Group justify="center" gap="xl" className="min-h-[180px]">
+                <IconCloudUpload size={52} stroke={1.5} className="text-muted-foreground" />
+                <div>
+                  <p className="text-xl">
+                    Click to select file
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Upload CSV, TSV, or JSON file for your data source
+                  </p>
+                </div>
+              </Group>
+            </CardContent>
           </Card>
-          <Center>
-            <Text size="sm" c="dimmed">or</Text>
-          </Center>
+          <div className="flex justify-center">
+            <p className="text-sm text-muted-foreground">or</p>
+          </div>
           <Button
-            variant="light"
-            fullWidth
-            leftSection={<IconFile size={16} />}
+            variant="secondary"
+            className="w-full"
             onClick={handleManualFileSelect}
           >
+            <IconFile className="mr-2 h-4 w-4" />
             Choose File from Computer
           </Button>
         </>
@@ -454,101 +440,105 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
 
     return (
       <>
-        <Card withBorder>
-          <Group justify="space-between" align="flex-start">
-            <Group>
-              {getFileIcon(selectedFile.format)}
-              <div>
-                <Text fw={500}>{selectedFile.file.name}</Text>
-                <Group gap="xs" mt="xs">
-                  <Badge
-                    variant="light"
-                    color={isValidFileFormat ? 'blue' : 'red'}
-                    size="sm"
-                  >
-                    {isValidFileFormat && selectedFile.format
-                      ? getFileFormatDisplayName(selectedFile.format)
-                      : 'Unknown Format'
-                    }
-                  </Badge>
-                  <Text size="sm" c="dimmed">
-                    {formatFileSize(selectedFile.file.size)}
-                  </Text>
-                </Group>
-              </div>
-            </Group>
-            <ActionIcon
-              variant="subtle"
-              color="red"
-              onClick={handleRemoveFile}
-            >
-              <IconX size={16} />
-            </ActionIcon>
-          </Group>
-
-          {!isValidFileFormat && (
-            <Alert
-              icon={<IconAlertCircle size={16} />}
-              title="Unsupported File Format"
-              color="orange"
-              mt="md"
-            >
-              Please upload a CSV (.csv), TSV (.tsv), or JSON (.json) file.
-            </Alert>
-          )}
-
-          {previewData && isValidFileFormat && (
-            <div style={{ marginTop: '12px' }}>
-              <Text size="sm" fw={500} mb="xs">Preview:</Text>
-              <Text
-                size="xs"
-                ff="monospace"
-                style={{
-                  backgroundColor: 'var(--mantine-color-gray-0)',
-                  padding: '8px',
-                  borderRadius: '4px',
-                  whiteSpace: 'pre-wrap',
-                  maxHeight: '120px',
-                  overflow: 'auto'
-                }}
+        <Card className="border">
+          <CardContent className="pt-6">
+            <Group justify="between" align="start">
+              <Group gap="sm">
+                {getFileIcon(selectedFile.format)}
+                <div>
+                  <p className="font-medium">{selectedFile.file.name}</p>
+                  <Group gap="xs" className="mt-2">
+                    <Badge
+                      variant="secondary"
+                      className={isValidFileFormat ? 'bg-blue-100 text-blue-900' : 'bg-red-100 text-red-900'}
+                    >
+                      {isValidFileFormat && selectedFile.format
+                        ? getFileFormatDisplayName(selectedFile.format)
+                        : 'Unknown Format'
+                      }
+                    </Badge>
+                    <p className="text-sm text-muted-foreground">
+                      {formatFileSize(selectedFile.file.size)}
+                    </p>
+                  </Group>
+                </div>
+              </Group>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleRemoveFile}
+                className="text-red-600 hover:text-red-700"
               >
-                {previewData}
-              </Text>
-            </div>
-          )}
+                <IconX className="h-4 w-4" />
+              </Button>
+            </Group>
+          </CardContent>
         </Card>
+
+        {!isValidFileFormat && (
+          <Alert className="border-orange-200 bg-orange-50 text-orange-900">
+            <IconAlertCircle className="h-4 w-4 text-orange-600" />
+            <AlertTitle>Unsupported File Format</AlertTitle>
+            <AlertDescription>
+              Please upload a CSV (.csv), TSV (.tsv), or JSON (.json) file.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {previewData && isValidFileFormat && (
+          <div className="mt-3">
+            <p className="text-sm font-medium mb-2">Preview:</p>
+            <pre className="text-xs font-mono bg-muted p-2 rounded-md whitespace-pre-wrap max-h-[120px] overflow-auto">
+              {previewData}
+            </pre>
+          </div>
+        )}
 
         {isValidFileFormat && (
           <>
-            <Select
-              label="Data Type"
-              placeholder="Select what kind of data this file contains"
-              required
-              data={availableDataTypes.map(type => ({
-                value: type,
-                label: getDataTypeDisplayName(type)
-              }))}
-              {...form.getInputProps('dataType')}
-              description={
-                selectedFile?.format === FileFormat.JSON
+            <div className="space-y-2">
+              <Label htmlFor="data-type">Data Type *</Label>
+              <Select
+                value={form.watch('dataType')}
+                onValueChange={(value) => form.setValue('dataType', value)}
+              >
+                <SelectTrigger id="data-type">
+                  <SelectValue placeholder="Select what kind of data this file contains" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableDataTypes.map(type => (
+                    <SelectItem key={type} value={type}>
+                      {getDataTypeDisplayName(type)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {selectedFile?.format === FileFormat.JSON
                   ? 'JSON files must contain a complete graph structure'
                   : 'Choose whether this file contains nodes, edges, or layers'
-              }
-            />
+                }
+              </p>
+            </div>
 
-            <TextInput
-              label="Name"
-              placeholder="Enter a name for this data source"
-              required
-              {...form.getInputProps('name')}
-            />
+            <div className="space-y-2">
+              <Label htmlFor="name">Name *</Label>
+              <Input
+                id="name"
+                placeholder="Enter a name for this data source"
+                {...form.register('name', { required: true })}
+              />
+            </div>
 
-            <Textarea
-              label="Description"
-              placeholder="Optional description of what this data contains"
-              rows={3}
-              {...form.getInputProps('description')}
-            />
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                placeholder="Optional description of what this data contains"
+                rows={3}
+                {...form.register('description')}
+              />
+            </div>
           </>
         )}
       </>
@@ -558,78 +548,105 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
   const renderEmptyTab = () => {
     return (
       <>
-        <Alert icon={<IconAlertCircle size={16} />} color="blue" mb="md">
-          Create an empty data source that can be filled with data using the graph editor.
+        <Alert className="border-blue-200 bg-blue-50 text-blue-900 mb-4">
+          <IconAlertCircle className="h-4 w-4 text-blue-600" />
+          <AlertDescription>
+            Create an empty data source that can be filled with data using the graph editor.
+          </AlertDescription>
         </Alert>
 
-        <Select
-          label="Data Type"
-          placeholder="Select what kind of data this will contain"
-          required
-          data={availableDataTypes.map(type => ({
-            value: type,
-            label: getDataTypeDisplayName(type)
-          }))}
-          {...form.getInputProps('dataType')}
-          description="Choose what type of data this datasource will contain"
-        />
+        <div className="space-y-2">
+          <Label htmlFor="empty-data-type">Data Type *</Label>
+          <Select
+            value={form.watch('dataType')}
+            onValueChange={(value) => form.setValue('dataType', value)}
+          >
+            <SelectTrigger id="empty-data-type">
+              <SelectValue placeholder="Select what kind of data this will contain" />
+            </SelectTrigger>
+            <SelectContent>
+              {availableDataTypes.map(type => (
+                <SelectItem key={type} value={type}>
+                  {getDataTypeDisplayName(type)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Choose what type of data this datasource will contain
+          </p>
+        </div>
 
-        <TextInput
-          label="Name"
-          placeholder="Enter a name for this data source"
-          required
-          {...form.getInputProps('name')}
-        />
+        <div className="space-y-2">
+          <Label htmlFor="empty-name">Name *</Label>
+          <Input
+            id="empty-name"
+            placeholder="Enter a name for this data source"
+            {...form.register('name', { required: true })}
+          />
+        </div>
 
-        <Textarea
-          label="Description"
-          placeholder="Optional description of what this data will contain"
-          rows={3}
-          {...form.getInputProps('description')}
-        />
+        <div className="space-y-2">
+          <Label htmlFor="empty-description">Description</Label>
+          <Textarea
+            id="empty-description"
+            placeholder="Optional description of what this data will contain"
+            rows={3}
+            {...form.register('description')}
+          />
+        </div>
       </>
     )
   }
 
   const renderImportTab = () => {
+    const importInputRef = useRef<HTMLInputElement>(null)
+
     return (
       <>
-        <Alert icon={<IconAlertCircle size={16} />} color="blue" mb="md">
-          Upload an XLSX or ODS file containing data sources. Each sheet will be imported as a data source.
-          If a sheet name matches an existing data source, it will be updated.
+        <Alert className="border-blue-200 bg-blue-50 text-blue-900 mb-4">
+          <IconAlertCircle className="h-4 w-4 text-blue-600" />
+          <AlertDescription>
+            Upload an XLSX or ODS file containing data sources. Each sheet will be imported as a data source.
+            If a sheet name matches an existing data source, it will be updated.
+          </AlertDescription>
         </Alert>
 
-        <FileButton
-          onChange={setImportFile}
+        <input
+          ref={importInputRef}
+          type="file"
           accept=".xlsx,.ods"
+          onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+          className="hidden"
+        />
+
+        <Button
+          variant="secondary"
+          className="w-full"
+          onClick={() => importInputRef.current?.click()}
         >
-          {(props) => (
-            <Button
-              {...props}
-              leftSection={<IconUpload size={16} />}
-              variant="light"
-              fullWidth
-            >
-              Select Spreadsheet File (.xlsx or .ods)
-            </Button>
-          )}
-        </FileButton>
+          <IconUpload className="mr-2 h-4 w-4" />
+          Select Spreadsheet File (.xlsx or .ods)
+        </Button>
 
         {importFile && (
-          <Card withBorder>
-            <Group justify="space-between">
-              <div>
-                <Text fw={500}>{importFile.name}</Text>
-                <Text size="sm" c="dimmed">{formatFileSize(importFile.size)}</Text>
-              </div>
-              <ActionIcon
-                variant="subtle"
-                color="red"
-                onClick={() => setImportFile(null)}
-              >
-                <IconX size={16} />
-              </ActionIcon>
-            </Group>
+          <Card className="border">
+            <CardContent className="pt-6">
+              <Group justify="between">
+                <div>
+                  <p className="font-medium">{importFile.name}</p>
+                  <p className="text-sm text-muted-foreground">{formatFileSize(importFile.size)}</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setImportFile(null)}
+                  className="text-red-600 hover:text-red-700"
+                >
+                  <IconX className="h-4 w-4" />
+                </Button>
+              </Group>
+            </CardContent>
           </Card>
         )}
       </>
@@ -638,68 +655,81 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
 
   const renderBulkTab = () => {
     const totalSize = bulkFiles.reduce((sum, f) => sum + f.file.size, 0)
+    const bulkInputRef = useRef<HTMLInputElement>(null)
 
     return (
       <>
-        <Alert icon={<IconAlertCircle size={16} />} color="blue" mb="md">
-          Upload multiple CSV, TSV, or JSON files at once. File types will be automatically detected.
+        <Alert className="border-blue-200 bg-blue-50 text-blue-900 mb-4">
+          <IconAlertCircle className="h-4 w-4 text-blue-600" />
+          <AlertDescription>
+            Upload multiple CSV, TSV, or JSON files at once. File types will be automatically detected.
+          </AlertDescription>
         </Alert>
 
-        <FileButton
-          onChange={handleBulkFilesSelected}
+        <input
+          ref={bulkInputRef}
+          type="file"
           accept=".csv,.tsv,.json"
           multiple
+          onChange={(e) => {
+            const files = Array.from(e.target.files || [])
+            handleBulkFilesSelected(files)
+          }}
+          className="hidden"
+        />
+
+        <Button
+          variant="secondary"
+          className="w-full"
+          onClick={() => bulkInputRef.current?.click()}
+          disabled={mutationLoading}
         >
-          {(props) => (
-            <Button
-              {...props}
-              leftSection={<IconUpload size={16} />}
-              variant="light"
-              fullWidth
-              disabled={mutationLoading}
-            >
-              Select Files
-            </Button>
-          )}
-        </FileButton>
+          <IconUpload className="mr-2 h-4 w-4" />
+          Select Files
+        </Button>
 
         {bulkFiles.length > 0 && (
           <>
-            <Alert icon={<IconCheck size={16} />} color="blue">
-              {bulkFiles.length} file{bulkFiles.length > 1 ? 's' : ''} selected ({formatFileSize(totalSize)})
+            <Alert className="border-blue-200 bg-blue-50 text-blue-900">
+              <IconCheck className="h-4 w-4 text-blue-600" />
+              <AlertDescription>
+                {bulkFiles.length} file{bulkFiles.length > 1 ? 's' : ''} selected ({formatFileSize(totalSize)})
+              </AlertDescription>
             </Alert>
 
-            <List spacing="xs" size="sm">
+            <div className="space-y-2">
               {bulkFiles.map((fileData, index) => (
-                <List.Item key={index}>
-                  <Group justify="space-between">
-                    <div>
-                      <Text size="sm" fw={500}>{fileData.name}</Text>
-                      <Group gap="xs">
-                        <Text size="xs" c="dimmed">{fileData.file.name}</Text>
-                        <Badge size="xs" variant="light">
-                          {formatFileSize(fileData.file.size)}
-                        </Badge>
-                      </Group>
-                    </div>
-                    <ActionIcon
-                      color="red"
-                      variant="subtle"
-                      onClick={() => handleRemoveBulkFile(index)}
-                      disabled={mutationLoading}
-                    >
-                      <IconX size={16} />
-                    </ActionIcon>
-                  </Group>
-                </List.Item>
+                <div key={index} className="flex items-start justify-between p-2 rounded-md border">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{fileData.name}</p>
+                    <Group gap="xs" className="mt-1">
+                      <p className="text-xs text-muted-foreground">{fileData.file.name}</p>
+                      <Badge variant="secondary" className="text-xs">
+                        {formatFileSize(fileData.file.size)}
+                      </Badge>
+                    </Group>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleRemoveBulkFile(index)}
+                    disabled={mutationLoading}
+                    className="text-red-600 hover:text-red-700"
+                  >
+                    <IconX className="h-4 w-4" />
+                  </Button>
+                </div>
               ))}
-            </List>
+            </div>
           </>
         )}
 
         {bulkFiles.length === 0 && (
-          <Alert icon={<IconAlertCircle size={16} />} color="gray">
-            No files selected. Click "Select Files" to choose files to upload.
+          <Alert className="border-gray-200 bg-gray-50 text-gray-900">
+            <IconAlertCircle className="h-4 w-4 text-gray-600" />
+            <AlertDescription>
+              No files selected. Click "Select Files" to choose files to upload.
+            </AlertDescription>
           </Alert>
         )}
       </>
@@ -734,87 +764,89 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
 
   return (
     <>
-      <Modal
-        opened={opened}
-        onClose={handleClose}
-        title={modalTitle}
-        size="xl"
-      >
-        <form onSubmit={form.onSubmit(handleSubmit)}>
-          <Stack gap="md">
-            {/* Tabs - only show for project mode */}
-            {!isLibraryMode && (
-              <Tabs value={activeTab} onChange={(value) => {
-                setActiveTab(value || 'upload')
-                setSelectedFile(null)
-                setPreviewData(null)
-                form.setFieldValue('dataType', '')
-              }}>
-                <Tabs.List>
-                  <Tabs.Tab value="upload">Upload File</Tabs.Tab>
-                  <Tabs.Tab value="empty">Create Empty</Tabs.Tab>
-                  <Tabs.Tab value="import">Import Sheet</Tabs.Tab>
-                  <Tabs.Tab value="bulk">Bulk Import</Tabs.Tab>
-                </Tabs.List>
+      <Dialog open={opened} onOpenChange={(open) => !open && handleClose()}>
+        <DialogContent className="sm:max-w-[800px]">
+          <DialogHeader>
+            <DialogTitle>{modalTitle}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={form.handleSubmit(handleSubmit)}>
+            <Stack gap="md" className="py-4">
+              {/* Tabs - only show for project mode */}
+              {!isLibraryMode && (
+                <Tabs value={activeTab} onValueChange={(value) => {
+                  setActiveTab(value || 'upload')
+                  setSelectedFile(null)
+                  setPreviewData(null)
+                  form.setValue('dataType', '')
+                }}>
+                  <TabsList className="grid w-full grid-cols-4">
+                    <TabsTrigger value="upload">Upload File</TabsTrigger>
+                    <TabsTrigger value="empty">Create Empty</TabsTrigger>
+                    <TabsTrigger value="import">Import Sheet</TabsTrigger>
+                    <TabsTrigger value="bulk">Bulk Import</TabsTrigger>
+                  </TabsList>
 
-                {/* Upload Tab */}
-                <Tabs.Panel value="upload" pt="md">
-                  {renderUploadTab()}
-                </Tabs.Panel>
+                  {/* Upload Tab */}
+                  <TabsContent value="upload" className="pt-4">
+                    {renderUploadTab()}
+                  </TabsContent>
 
-                {/* Create Empty Tab */}
-                <Tabs.Panel value="empty" pt="md">
-                  {renderEmptyTab()}
-                </Tabs.Panel>
+                  {/* Create Empty Tab */}
+                  <TabsContent value="empty" className="pt-4">
+                    {renderEmptyTab()}
+                  </TabsContent>
 
-                {/* Import Sheet Tab */}
-                <Tabs.Panel value="import" pt="md">
-                  {renderImportTab()}
-                </Tabs.Panel>
+                  {/* Import Sheet Tab */}
+                  <TabsContent value="import" className="pt-4">
+                    {renderImportTab()}
+                  </TabsContent>
 
-                {/* Bulk Import Tab */}
-                <Tabs.Panel value="bulk" pt="md">
-                  {renderBulkTab()}
-                </Tabs.Panel>
-              </Tabs>
-            )}
+                  {/* Bulk Import Tab */}
+                  <TabsContent value="bulk" className="pt-4">
+                    {renderBulkTab()}
+                  </TabsContent>
+                </Tabs>
+              )}
 
-            {/* Library mode UI (simplified) */}
-            {isLibraryMode && renderUploadTab()}
+              {/* Library mode UI (simplified) */}
+              {isLibraryMode && renderUploadTab()}
 
-            {/* Error Display */}
-            {mutationError && (
-              <Alert
-                icon={<IconAlertCircle size={16} />}
-                title="Upload Failed"
-                color="red"
-              >
-                {mutationError.message}
-              </Alert>
-            )}
+              {/* Error Display */}
+              {mutationError && (
+                <Alert variant="destructive">
+                  <IconAlertCircle className="h-4 w-4" />
+                  <AlertTitle>Upload Failed</AlertTitle>
+                  <AlertDescription>{mutationError.message}</AlertDescription>
+                </Alert>
+              )}
 
-            {/* Progress Bar */}
-            {uploadProgress > 0 && uploadProgress < 100 && (
-              <Progress value={uploadProgress} animated />
-            )}
+              {/* Progress Bar */}
+              {uploadProgress > 0 && uploadProgress < 100 && (
+                <Progress value={uploadProgress} className="h-2" />
+              )}
+            </Stack>
 
             {/* Action Buttons */}
-            <Group justify="flex-end" gap="sm">
-              <Button variant="light" onClick={handleClose} disabled={mutationLoading}>
+            <DialogFooter>
+              <Button variant="secondary" onClick={handleClose} disabled={mutationLoading}>
                 Cancel
               </Button>
               <Button
                 type="submit"
-                loading={mutationLoading}
-                disabled={isSubmitDisabled()}
-                leftSection={uploadProgress === 100 ? <IconCheck size={16} /> : <IconUpload size={16} />}
+                disabled={isSubmitDisabled() || mutationLoading}
               >
+                {mutationLoading && <Spinner className="mr-2 h-4 w-4" />}
+                {uploadProgress === 100 ? (
+                  <IconCheck className="mr-2 h-4 w-4" />
+                ) : (
+                  <IconUpload className="mr-2 h-4 w-4" />
+                )}
                 {getSubmitButtonText()}
               </Button>
-            </Group>
-          </Stack>
-        </form>
-      </Modal>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Hidden file input for manual selection */}
       <input

@@ -1,7 +1,7 @@
 import React from 'react';
-import { useMantineColorScheme } from '@mantine/core'; // TODO: Replace with next-themes in Stage 8
 import { IconSun, IconMoon, IconWifi, IconWifiOff, IconGraph, IconLoader, IconRefresh } from '@tabler/icons-react';
 import { useApolloClient } from '@apollo/client/react';
+import { useTheme } from 'next-themes';
 import { Group } from '@/components/layout-primitives';
 import { Button } from '@/components/ui/button';
 import { UserPresenceIndicator } from '../collaboration/UserPresenceIndicator';
@@ -22,9 +22,9 @@ export const TopBar: React.FC<TopBarProps> = ({
   currentUserId,
   onNavigateHome
 }) => {
-  const { colorScheme, toggleColorScheme } = useMantineColorScheme();
+  const { theme, setTheme } = useTheme();
   const apolloClient = useApolloClient();
-  const isDark = colorScheme === 'dark';
+  const isDark = theme === 'dark';
   const isOnline = connectionState === ConnectionState.CONNECTED;
   const isConnecting = connectionState === ConnectionState.CONNECTING;
 
@@ -70,7 +70,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => toggleColorScheme()}
+          onClick={() => setTheme(isDark ? 'light' : 'dark')}
           title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
         >
           {isDark ? <IconSun size={20} /> : <IconMoon size={20} />}

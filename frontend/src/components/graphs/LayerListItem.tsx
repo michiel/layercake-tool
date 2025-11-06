@@ -1,7 +1,12 @@
 import React, { useState } from 'react';
-import { Group, Stack, Text, Badge, Box, ActionIcon, Popover, ColorPicker } from '@mantine/core';
 import { IconEye, IconEyeOff } from '@tabler/icons-react';
 import { Layer } from '../../graphql/graphs';
+import { Stack, Group } from '../layout-primitives';
+import { Badge } from '../ui/badge';
+import { Button } from '../ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
 
 interface LayerListItemProps {
   layer: Layer;
@@ -43,128 +48,117 @@ export const LayerListItem: React.FC<LayerListItemProps> = ({
   };
 
   return (
-    <Box
-      p="xs"
+    <div
+      className="p-2 rounded border mb-2"
       style={{
-        borderRadius: '4px',
-        border: '1px solid #e9ecef',
-        marginBottom: '8px',
         opacity: isVisible ? 1 : 0.5,
         backgroundColor: isVisible ? 'white' : '#f8f9fa',
       }}
     >
       <Stack gap="xs">
-        <Group justify="space-between" align="center">
+        <Group justify="between" align="center">
           <Group gap="sm">
             {/* Visibility toggle */}
-            <ActionIcon
-              variant="subtle"
-              color="gray"
-              size="sm"
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
               onClick={onVisibilityToggle}
               title={isVisible ? 'Hide layer' : 'Show layer'}
             >
-              {isVisible ? <IconEye size={16} /> : <IconEyeOff size={16} />}
-            </ActionIcon>
+              {isVisible ? <IconEye className="h-4 w-4" /> : <IconEyeOff className="h-4 w-4" />}
+            </Button>
 
             {/* Color swatches with pickers */}
-            <Group gap={4}>
+            <Group gap="xs">
               {/* Background & Border color picker */}
-              <Popover opened={bgPickerOpen} onChange={setBgPickerOpen} position="bottom" withArrow>
-                <Popover.Target>
-                  <Box
-                    onClick={() => setBgPickerOpen(!bgPickerOpen)}
+              <Popover open={bgPickerOpen} onOpenChange={setBgPickerOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    className="w-5 h-5 rounded cursor-pointer"
                     style={{
-                      width: '20px',
-                      height: '20px',
                       backgroundColor: backgroundColor,
                       border: `2px solid ${borderColor}`,
-                      borderRadius: '3px',
-                      cursor: 'pointer',
                     }}
                     title="Click to change background color"
+                    onClick={() => setBgPickerOpen(!bgPickerOpen)}
                   />
-                </Popover.Target>
-                <Popover.Dropdown>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-3">
                   <Stack gap="xs">
-                    <Text size="xs" fw={500}>Background Color</Text>
-                    <ColorPicker
-                      format="hex"
+                    <Label className="text-xs font-medium">Background Color</Label>
+                    <Input
+                      type="color"
                       value={backgroundColor}
-                      onChange={(color) => handleColorChange('background', color)}
+                      onChange={(e) => handleColorChange('background', e.target.value)}
+                      className="h-8 w-24"
                     />
                   </Stack>
-                </Popover.Dropdown>
+                </PopoverContent>
               </Popover>
 
               {/* Border color picker */}
-              <Popover opened={borderPickerOpen} onChange={setBorderPickerOpen} position="bottom" withArrow>
-                <Popover.Target>
-                  <Box
-                    onClick={() => setBorderPickerOpen(!borderPickerOpen)}
+              <Popover open={borderPickerOpen} onOpenChange={setBorderPickerOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    className="w-5 h-5 rounded cursor-pointer border"
                     style={{
-                      width: '20px',
-                      height: '20px',
                       backgroundColor: borderColor,
-                      border: '1px solid #ddd',
-                      borderRadius: '3px',
-                      cursor: 'pointer',
                     }}
                     title="Click to change border color"
+                    onClick={() => setBorderPickerOpen(!borderPickerOpen)}
                   />
-                </Popover.Target>
-                <Popover.Dropdown>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-3">
                   <Stack gap="xs">
-                    <Text size="xs" fw={500}>Border Color</Text>
-                    <ColorPicker
-                      format="hex"
+                    <Label className="text-xs font-medium">Border Color</Label>
+                    <Input
+                      type="color"
                       value={borderColor}
-                      onChange={(color) => handleColorChange('border', color)}
+                      onChange={(e) => handleColorChange('border', e.target.value)}
+                      className="h-8 w-24"
                     />
                   </Stack>
-                </Popover.Dropdown>
+                </PopoverContent>
               </Popover>
 
               {/* Text color picker */}
-              <Popover opened={textPickerOpen} onChange={setTextPickerOpen} position="bottom" withArrow>
-                <Popover.Target>
-                  <Box
-                    onClick={() => setTextPickerOpen(!textPickerOpen)}
+              <Popover open={textPickerOpen} onOpenChange={setTextPickerOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    className="w-5 h-5 rounded cursor-pointer border"
                     style={{
-                      width: '20px',
-                      height: '20px',
                       backgroundColor: textColor,
-                      border: '1px solid #ddd',
-                      borderRadius: '3px',
-                      cursor: 'pointer',
                     }}
                     title="Click to change text color"
+                    onClick={() => setTextPickerOpen(!textPickerOpen)}
                   />
-                </Popover.Target>
-                <Popover.Dropdown>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-3">
                   <Stack gap="xs">
-                    <Text size="xs" fw={500}>Text Color</Text>
-                    <ColorPicker
-                      format="hex"
+                    <Label className="text-xs font-medium">Text Color</Label>
+                    <Input
+                      type="color"
                       value={textColor}
-                      onChange={(color) => handleColorChange('text', color)}
+                      onChange={(e) => handleColorChange('text', e.target.value)}
+                      className="h-8 w-24"
                     />
                   </Stack>
-                </Popover.Dropdown>
+                </PopoverContent>
               </Popover>
             </Group>
 
-            <Text size="sm" fw={500}>
+            <p className="text-sm font-medium">
               {layer.name || layer.layerId}
-            </Text>
+            </p>
           </Group>
 
           {/* Statistics badges */}
-          <Group gap={6}>
-            <Badge size="xs" variant="light" color="blue">
+          <Group gap="xs">
+            <Badge variant="secondary" className="text-xs">
               {nodeCount}N
             </Badge>
-            <Badge size="xs" variant="light" color="grape">
+            <Badge variant="secondary" className="text-xs">
               {edgeCount}E
             </Badge>
           </Group>
@@ -172,11 +166,11 @@ export const LayerListItem: React.FC<LayerListItemProps> = ({
 
         {/* Layer ID if different from name */}
         {layer.name && layer.name !== layer.layerId && (
-          <Text size="xs" c="dimmed" style={{ fontFamily: 'monospace' }}>
+          <p className="text-xs text-muted-foreground font-mono">
             {layer.layerId}
-          </Text>
+          </p>
         )}
       </Stack>
-    </Box>
+    </div>
   );
 };

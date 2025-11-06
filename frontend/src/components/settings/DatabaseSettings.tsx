@@ -1,9 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Title, Card, Text, Group, Button, Stack, Alert, LoadingOverlay, Badge } from '@mantine/core';
-import { IconDatabase, IconRefresh, IconFolder, IconAlertCircle, IconCheck } from '@tabler/icons-react';
+import { IconDatabase, IconRefresh, IconFolder, IconAlertCircle, IconCheck, IconX } from '@tabler/icons-react';
 import { invoke } from "@tauri-apps/api/core";
 import { message } from "@tauri-apps/plugin-dialog";
 import { open } from "@tauri-apps/plugin-shell";
+import { Stack, Group } from '../layout-primitives';
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+import { Badge } from '../ui/badge';
+import { Button } from '../ui/button';
+import { Card, CardContent } from '../ui/card';
+import { Spinner } from '../ui/spinner';
 
 interface DatabaseInfo {
   path: string;
@@ -88,99 +93,135 @@ export const DatabaseSettings: React.FC = () => {
   };
 
   return (
-    <Container size="md" py="xl">
+    <div className="container max-w-3xl py-12">
       <Stack gap="lg">
         <div>
-          <Title order={2}>Database Settings</Title>
-          <Text c="dimmed" size="sm" mt="xs">
+          <h2 className="text-2xl font-bold">Database Settings</h2>
+          <p className="text-sm text-muted-foreground mt-1">
             Manage your local database
-          </Text>
+          </p>
         </div>
 
         {error && (
-          <Alert icon={<IconAlertCircle size={16} />} color="red" title="Error" onClose={() => setError(null)} withCloseButton>
-            {error}
+          <Alert variant="destructive" className="relative pr-10">
+            <IconAlertCircle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute top-2 right-2 h-6 w-6"
+              onClick={() => setError(null)}
+            >
+              <IconX className="h-4 w-4" />
+            </Button>
           </Alert>
         )}
 
         {success && (
-          <Alert icon={<IconCheck size={16} />} color="green" title="Success" onClose={() => setSuccess(null)} withCloseButton>
-            {success}
+          <Alert className="relative pr-10 border-green-200 bg-green-50 text-green-900">
+            <IconCheck className="h-4 w-4 text-green-600" />
+            <AlertTitle>Success</AlertTitle>
+            <AlertDescription>{success}</AlertDescription>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute top-2 right-2 h-6 w-6"
+              onClick={() => setSuccess(null)}
+            >
+              <IconX className="h-4 w-4" />
+            </Button>
           </Alert>
         )}
 
-        <Card shadow="sm" padding="lg" radius="md" withBorder>
-          <LoadingOverlay visible={loading} />
-
-          <Group justify="space-between" mb="md">
-            <Group>
-              <IconDatabase size={24} />
-              <Title order={4}>Database Information</Title>
-            </Group>
-            <Badge color={databaseInfo?.exists ? 'green' : 'red'}>
-              {databaseInfo?.exists ? 'Exists' : 'Not Found'}
-            </Badge>
-          </Group>
-
-          {databaseInfo && (
-            <Stack gap="sm">
-              <div>
-                <Text size="sm" fw={600}>Path:</Text>
-                <Text size="sm" c="dimmed" style={{ wordBreak: 'break-all' }}>
-                  {databaseInfo.path}
-                </Text>
-              </div>
-
-              <div>
-                <Text size="sm" fw={600}>Directory:</Text>
-                <Text size="sm" c="dimmed" style={{ wordBreak: 'break-all' }}>
-                  {databaseInfo.directory}
-                </Text>
-              </div>
-
-              <div>
-                <Text size="sm" fw={600}>Size:</Text>
-                <Text size="sm" c="dimmed">
-                  {databaseInfo.size_mb} MB ({databaseInfo.size_bytes.toLocaleString()} bytes)
-                </Text>
-              </div>
-            </Stack>
+        <Card className="border shadow-sm relative">
+          {loading && (
+            <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 rounded-lg">
+              <Spinner className="h-8 w-8" />
+            </div>
           )}
+
+          <CardContent className="pt-6">
+            <Group justify="between" className="mb-4">
+              <Group gap="sm">
+                <IconDatabase className="h-6 w-6" />
+                <h4 className="text-lg font-semibold">Database Information</h4>
+              </Group>
+              <Badge
+                className={databaseInfo?.exists ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600'}
+              >
+                {databaseInfo?.exists ? 'Exists' : 'Not Found'}
+              </Badge>
+            </Group>
+
+            {databaseInfo && (
+              <Stack gap="sm">
+                <div>
+                  <p className="text-sm font-semibold">Path:</p>
+                  <p className="text-sm text-muted-foreground break-all">
+                    {databaseInfo.path}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-sm font-semibold">Directory:</p>
+                  <p className="text-sm text-muted-foreground break-all">
+                    {databaseInfo.directory}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-sm font-semibold">Size:</p>
+                  <p className="text-sm text-muted-foreground">
+                    {databaseInfo.size_mb} MB ({databaseInfo.size_bytes.toLocaleString()} bytes)
+                  </p>
+                </div>
+              </Stack>
+            )}
+          </CardContent>
         </Card>
 
-        <Card shadow="sm" padding="lg" radius="md" withBorder>
-          <Stack gap="md">
-            <div>
-              <Title order={4} mb="xs">Database Operations</Title>
-              <Text size="sm" c="dimmed">
-                Manage your database with these operations
-              </Text>
-            </div>
+        <Card className="border shadow-sm">
+          <CardContent className="pt-6">
+            <Stack gap="md">
+              <div>
+                <h4 className="text-lg font-semibold mb-1">Database Operations</h4>
+                <p className="text-sm text-muted-foreground">
+                  Manage your database with these operations
+                </p>
+              </div>
 
-            <Button
-              leftSection={<IconFolder size={16} />}
-              variant="light"
-              onClick={handleShowLocation}
-            >
-              Show Database Location
-            </Button>
+              <Button
+                variant="secondary"
+                onClick={handleShowLocation}
+                className="justify-start"
+              >
+                <IconFolder className="mr-2 h-4 w-4" />
+                Show Database Location
+              </Button>
 
-            <Button
-              leftSection={<IconRefresh size={16} />}
-              color="red"
-              onClick={handleReinitialize}
-              disabled={loading}
-            >
-              Reinitialise Database
-            </Button>
+              <Button
+                variant="destructive"
+                onClick={handleReinitialize}
+                disabled={loading}
+                className="justify-start"
+              >
+                <IconRefresh className="mr-2 h-4 w-4" />
+                Reinitialise Database
+              </Button>
 
-            <Alert icon={<IconAlertCircle size={16} />} color="yellow" title="Warning">
-              Reinitialising the database will permanently delete all data. This action cannot be undone.
-              Make sure to export any important data before proceeding.
-            </Alert>
-          </Stack>
+              <Alert className="border-yellow-200 bg-yellow-50 text-yellow-900">
+                <IconAlertCircle className="h-4 w-4 text-yellow-600" />
+                <AlertTitle>Warning</AlertTitle>
+                <AlertDescription>
+                  Reinitialising the database will permanently delete all data. This action cannot be undone.
+                  Make sure to export any important data before proceeding.
+                </AlertDescription>
+              </Alert>
+            </Stack>
+          </CardContent>
         </Card>
       </Stack>
-    </Container>
+    </div>
   );
 };
