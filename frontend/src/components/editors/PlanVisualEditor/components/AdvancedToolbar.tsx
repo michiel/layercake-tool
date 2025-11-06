@@ -5,7 +5,6 @@ import {
   IconTransform,
   IconFilter,
   IconGitMerge,
-  IconCopy,
   IconFileExport,
   IconArrowRight,
   IconArrowDown,
@@ -76,12 +75,6 @@ export const AdvancedToolbar: React.FC<AdvancedToolbarProps> = ({
       type: PlanDagNodeType.MERGE,
       label: 'Merge',
       icon: <IconGitMerge size="0.7rem" />,
-      color: '#8b5cf6' // Violet-500
-    },
-    {
-      type: PlanDagNodeType.COPY,
-      label: 'Copy',
-      icon: <IconCopy size="0.7rem" />,
       color: '#8b5cf6' // Violet-500
     },
     {

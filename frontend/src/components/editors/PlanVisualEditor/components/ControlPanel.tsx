@@ -10,7 +10,6 @@ import {
   IconDatabase,
   IconTransform,
   IconGitMerge,
-  IconCopy,
   IconFileExport
 } from '@tabler/icons-react'
 import { Panel } from 'reactflow'
@@ -87,12 +86,6 @@ export const ControlPanel = ({
       label: 'Merge',
       icon: <IconGitMerge size="0.7rem" />,
       color: '#ffd43b'
-    },
-    {
-      type: PlanDagNodeType.COPY,
-      label: 'Copy',
-      icon: <IconCopy size="0.7rem" />,
-      color: '#74c0fc'
     },
     {
       type: PlanDagNodeType.OUTPUT,

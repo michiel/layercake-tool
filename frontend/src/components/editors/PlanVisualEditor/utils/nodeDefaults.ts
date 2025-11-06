@@ -63,12 +63,6 @@ export const getDefaultNodeConfig = (type: PlanDagNodeType): NodeConfig => {
         conflictResolution: 'PreferFirst'
       };
 
-    case PlanDagNodeType.COPY:
-      return {
-        copyType: 'DeepCopy',
-        preserveMetadata: true
-      };
-
     case PlanDagNodeType.OUTPUT:
       return {
         renderTarget: 'DOT',
@@ -89,7 +83,6 @@ export const getDefaultNodeMetadata = (type: PlanDagNodeType): NodeMetadata => {
     [PlanDagNodeType.TRANSFORM]: 'Transform',
     [PlanDagNodeType.FILTER]: 'Filter',
     [PlanDagNodeType.MERGE]: 'Merge',
-    [PlanDagNodeType.COPY]: 'Copy',
     [PlanDagNodeType.OUTPUT]: 'Output'
   };
 
@@ -105,6 +98,5 @@ export const getNodeColors = () => ({
   [PlanDagNodeType.TRANSFORM]: '#ff8cc8',
   [PlanDagNodeType.FILTER]: '#a78bfa',
   [PlanDagNodeType.MERGE]: '#ffd43b',
-  [PlanDagNodeType.COPY]: '#74c0fc',
   [PlanDagNodeType.OUTPUT]: '#ff6b6b'
 });

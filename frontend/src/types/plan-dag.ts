@@ -31,7 +31,6 @@ export enum PlanDagNodeType {
   TRANSFORM = 'TransformNode',
   FILTER = 'FilterNode',
   MERGE = 'MergeNode',
-  COPY = 'CopyNode',
   OUTPUT = 'OutputNode'
 }
 
@@ -114,14 +113,6 @@ export interface MergeNodeConfig {
   conflictResolution: 'PreferFirst' | 'PreferLast' | 'Manual';
 }
 
-// Copy Node Configuration
-export interface CopyNodeConfig {
-  // Removed: sourceGraphRef - source comes from incoming edge
-  // Removed: outputGraphRef - output goes to outgoing edge
-  copyType: 'DeepCopy' | 'ShallowCopy' | 'Reference';
-  preserveMetadata: boolean;
-}
-
 // Output Node Configuration
 export interface OutputNodeConfig {
   // Removed: sourceGraphRef - source comes from incoming edge connection
@@ -150,7 +141,6 @@ export type NodeConfig =
   | TransformNodeConfig
   | FilterNodeConfig
   | MergeNodeConfig
-  | CopyNodeConfig
   | OutputNodeConfig;
 
 // Execution metadata for DataSource nodes

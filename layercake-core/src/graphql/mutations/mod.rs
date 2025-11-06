@@ -65,7 +65,6 @@ fn generate_node_id_from_ids(
         PlanDagNodeType::Transform => "transform",
         PlanDagNodeType::Filter => "filter",
         PlanDagNodeType::Merge => "merge",
-        PlanDagNodeType::Copy => "copy",
         PlanDagNodeType::Output => "output",
     };
 
@@ -505,7 +504,6 @@ impl Mutation {
                 crate::graphql::types::PlanDagNodeType::Transform => "TransformNode",
                 crate::graphql::types::PlanDagNodeType::Filter => "FilterNode",
                 crate::graphql::types::PlanDagNodeType::Merge => "MergeNode",
-                crate::graphql::types::PlanDagNodeType::Copy => "CopyNode",
                 crate::graphql::types::PlanDagNodeType::Output => "OutputNode",
             };
 

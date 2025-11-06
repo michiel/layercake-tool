@@ -5,7 +5,6 @@ import {
   IconTransform,
   IconFilter,
   IconGitMerge,
-  IconCopy,
   IconFileExport,
 } from '@tabler/icons-react'
 
@@ -15,7 +14,7 @@ import {
 export enum OperationCategory {
   INPUT = 'INPUT',       // Data Source
   GRAPH = 'GRAPH',       // Graph operations
-  OPERATION = 'OPERATION', // Transform, Merge, Copy
+  OPERATION = 'OPERATION', // Transform, Filter, Merge
   OUTPUT = 'OUTPUT',     // Output
 }
 
@@ -41,7 +40,6 @@ export const getOperationCategory = (nodeType: PlanDagNodeType): OperationCatego
     case PlanDagNodeType.TRANSFORM:
     case PlanDagNodeType.FILTER:
     case PlanDagNodeType.MERGE:
-    case PlanDagNodeType.COPY:
       return OperationCategory.OPERATION
     case PlanDagNodeType.OUTPUT:
       return OperationCategory.OUTPUT
@@ -75,8 +73,6 @@ export const getNodeIcon = (nodeType: PlanDagNodeType, size: string | number = '
       return <IconFilter {...iconProps} />
     case PlanDagNodeType.MERGE:
       return <IconGitMerge {...iconProps} />
-    case PlanDagNodeType.COPY:
-      return <IconCopy {...iconProps} />
     case PlanDagNodeType.OUTPUT:
       return <IconFileExport {...iconProps} />
     default:
@@ -99,8 +95,6 @@ export const getNodeTypeLabel = (nodeType: PlanDagNodeType): string => {
       return 'Filter'
     case PlanDagNodeType.MERGE:
       return 'Merge'
-    case PlanDagNodeType.COPY:
-      return 'Copy'
     case PlanDagNodeType.OUTPUT:
       return 'Output'
     default:

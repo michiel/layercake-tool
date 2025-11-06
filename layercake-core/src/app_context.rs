@@ -1522,7 +1522,6 @@ fn node_type_prefix(node_type: &PlanDagNodeType) -> &'static str {
         PlanDagNodeType::Transform => "transform",
         PlanDagNodeType::Filter => "filter",
         PlanDagNodeType::Merge => "merge",
-        PlanDagNodeType::Copy => "copy",
         PlanDagNodeType::Output => "output",
     }
 }
@@ -1534,7 +1533,6 @@ fn node_type_storage_name(node_type: &PlanDagNodeType) -> &'static str {
         PlanDagNodeType::Transform => "TransformNode",
         PlanDagNodeType::Filter => "FilterNode",
         PlanDagNodeType::Merge => "MergeNode",
-        PlanDagNodeType::Copy => "CopyNode",
         PlanDagNodeType::Output => "OutputNode",
     }
 }

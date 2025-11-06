@@ -14,7 +14,6 @@ import { FilterNodeConfigForm } from './forms/FilterNodeConfigForm';
 import { MergeNodeConfigForm } from './forms/MergeNodeConfigForm';
 import { OutputNodeConfigForm } from './forms/OutputNodeConfigForm';
 import { GraphNodeConfigForm } from './forms/GraphNodeConfigForm';
-import { CopyNodeConfigForm } from './forms/CopyNodeConfigForm';
 
 interface NodeConfigDialogProps {
   opened: boolean;
@@ -106,8 +105,6 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
         return <FilterNodeConfigForm {...commonProps} />;
       case PlanDagNodeType.MERGE:
         return <MergeNodeConfigForm {...commonProps} />;
-      case PlanDagNodeType.COPY:
-        return <CopyNodeConfigForm {...commonProps} />;
       case PlanDagNodeType.OUTPUT:
         return <OutputNodeConfigForm {...commonProps} />;
       default:
@@ -127,8 +124,6 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
         return 'Filter';
       case PlanDagNodeType.MERGE:
         return 'Merge';
-      case PlanDagNodeType.COPY:
-        return 'Copy';
       case PlanDagNodeType.OUTPUT:
         return 'Output';
       default:

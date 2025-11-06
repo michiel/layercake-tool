@@ -144,9 +144,6 @@ impl DagExecutor {
                 self.execute_filter_node(project_id, node_id, &node_name, node, nodes, edges)
                     .await?;
             }
-            "CopyNode" => {
-                return Err(anyhow!("Node type {} not yet implemented", node.node_type));
-            }
             _ => {
                 return Err(anyhow!("Unknown node type: {}", node.node_type));
             }

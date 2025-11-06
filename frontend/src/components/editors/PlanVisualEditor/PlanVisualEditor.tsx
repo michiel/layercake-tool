@@ -1389,8 +1389,6 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         return '#ff8cc8'
       case 'MergeNode':
         return '#ffd43b'
-      case 'CopyNode':
-        return '#74c0fc'
       case 'OutputNode':
         return '#ff6b6b'
       default:

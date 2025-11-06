@@ -4,7 +4,6 @@ import {
   IconNetwork,
   IconTransform,
   IconGitMerge,
-  IconCopy,
   IconFileExport
 } from '@tabler/icons-react';
 import { PlanDagNodeType } from '../../../../types/plan-dag';
@@ -91,12 +90,6 @@ export const NodeToolbar: React.FC<NodeToolbarProps> = ({ onNodeDragStart, onNod
       label: 'Merge',
       icon: <IconGitMerge size="1.2rem" />,
       color: '#ffd43b'
-    },
-    {
-      type: PlanDagNodeType.COPY,
-      label: 'Copy',
-      icon: <IconCopy size="1.2rem" />,
-      color: '#74c0fc'
     },
     {
       type: PlanDagNodeType.OUTPUT,

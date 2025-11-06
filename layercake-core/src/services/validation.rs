@@ -284,7 +284,6 @@ impl ValidationService {
             "TransformNode",
             "FilterNode",
             "MergeNode",
-            "CopyNode",
             "OutputNode",
         ];
 
@@ -492,7 +491,6 @@ mod tests {
         assert!(ValidationService::validate_plan_dag_node_type("TransformNode").is_ok());
         assert!(ValidationService::validate_plan_dag_node_type("FilterNode").is_ok());
         assert!(ValidationService::validate_plan_dag_node_type("MergeNode").is_ok());
-        assert!(ValidationService::validate_plan_dag_node_type("CopyNode").is_ok());
         assert!(ValidationService::validate_plan_dag_node_type("OutputNode").is_ok());
 
         // Invalid node types

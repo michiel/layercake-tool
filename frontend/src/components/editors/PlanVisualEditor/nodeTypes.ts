@@ -3,7 +3,6 @@ import { GraphNode } from './nodes/GraphNode'
 import { TransformNode } from './nodes/TransformNode'
 import { FilterNode } from './nodes/FilterNode'
 import { MergeNode } from './nodes/MergeNode'
-import { CopyNode } from './nodes/CopyNode'
 import { OutputNode } from './nodes/OutputNode'
 
 /**
@@ -16,6 +15,5 @@ export const NODE_TYPES = {
   TransformNode: TransformNode,
   FilterNode: FilterNode,
   MergeNode: MergeNode,
-  CopyNode: CopyNode,
   OutputNode: OutputNode,
 } as const

@@ -20,7 +20,7 @@ pub fn get_plan_dag_tools() -> Vec<Tool> {
                 "type": "object",
                 "properties": {
                     "project_id": {"type": "integer"},
-                    "node_type": {"type": "string", "description": "Plan DAG node type (DataSourceNode, GraphNode, TransformNode, FilterNode, MergeNode, CopyNode, OutputNode)"},
+                    "node_type": {"type": "string", "description": "Plan DAG node type (DataSourceNode, GraphNode, TransformNode, FilterNode, MergeNode, OutputNode)"},
                     "position": {
                         "type": "object",
                         "properties": {
@@ -477,7 +477,6 @@ fn parse_node_type(value: &str) -> McpResult<PlanDagNodeType> {
         "TransformNode" | "Transform" => Ok(PlanDagNodeType::Transform),
         "FilterNode" | "Filter" => Ok(PlanDagNodeType::Filter),
         "MergeNode" | "Merge" => Ok(PlanDagNodeType::Merge),
-        "CopyNode" | "Copy" => Ok(PlanDagNodeType::Copy),
         "OutputNode" | "Output" => Ok(PlanDagNodeType::Output),
         _ => Err(McpError::Validation {
             message: format!("Unsupported node_type '{}'", value),

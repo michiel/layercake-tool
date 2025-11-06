@@ -65,8 +65,6 @@ pub enum PlanDagNodeType {
     Filter,
     #[graphql(name = "MergeNode")]
     Merge,
-    #[graphql(name = "CopyNode")]
-    Copy,
     #[graphql(name = "OutputNode")]
     Output,
 }
@@ -1441,23 +1439,6 @@ pub enum ConflictResolution {
     Manual,
 }
 
-// Copy Node Configuration
-#[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
-#[graphql(input_name = "CopyNodeConfigInput")]
-pub struct CopyNodeConfig {
-    // Removed: source_graph_ref - source comes from incoming edge
-    // Removed: output_graph_ref - output goes to outgoing edge
-    pub copy_type: CopyType,
-    pub preserve_metadata: bool,
-}
-
-#[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
-pub enum CopyType {
-    DeepCopy,
-    ShallowCopy,
-    Reference,
-}
-
 // Output Node Configuration
 #[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
 #[graphql(input_name = "OutputNodeConfigInput")]
@@ -1516,7 +1497,6 @@ pub enum NodeConfig {
     Transform(TransformNodeConfig),
     Filter(FilterNodeConfig),
     Merge(MergeNodeConfig),
-    Copy(CopyNodeConfig),
     Output(OutputNodeConfig),
 }
 
@@ -1776,7 +1756,6 @@ impl From<plan_dag_nodes::Model> for PlanDagNode {
             "TransformNode" => PlanDagNodeType::Transform,
             "FilterNode" => PlanDagNodeType::Filter,
             "MergeNode" => PlanDagNodeType::Merge,
-            "CopyNode" => PlanDagNodeType::Copy,
             "OutputNode" => PlanDagNodeType::Output,
             _ => PlanDagNodeType::DataSource, // Default fallback
         };

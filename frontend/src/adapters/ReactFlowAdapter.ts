@@ -222,7 +222,6 @@ export class ReactFlowAdapter {
       'filter': 'FilterNode',
       'merge': 'MergeNode',
       'output': 'OutputNode',
-      'copy': 'CopyNode',
       'graph': 'GraphNode',
       // Backend may return capitalized variants
       'DataSource': 'DataSourceNode',
@@ -230,7 +229,6 @@ export class ReactFlowAdapter {
       'Filter': 'FilterNode',
       'Merge': 'MergeNode',
       'Output': 'OutputNode',
-      'Copy': 'CopyNode',
       'Graph': 'GraphNode',
       // TypeScript enum format (PascalCase) - pass through
       'DataSourceNode': 'DataSourceNode',
@@ -238,7 +236,6 @@ export class ReactFlowAdapter {
       'FilterNode': 'FilterNode',
       'MergeNode': 'MergeNode',
       'OutputNode': 'OutputNode',
-      'CopyNode': 'CopyNode',
       'GraphNode': 'GraphNode'
     }
 
@@ -260,7 +257,6 @@ export class ReactFlowAdapter {
       'FilterNode': 'filter',
       'MergeNode': 'merge',
       'OutputNode': 'output',
-      'CopyNode': 'copy',
       'GraphNode': 'graph'
     }
 
