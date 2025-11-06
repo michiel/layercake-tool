@@ -102,8 +102,8 @@ export const AssistantThread = ({
 }: {
   suggestions?: string[]
 }) => (
-  <ThreadPrimitive.Root className="relative flex h-full flex-col items-center">
-    <ThreadPrimitive.Viewport className="flex-1 w-full max-w-3xl space-y-3 overflow-y-auto px-1 pb-6">
+  <ThreadPrimitive.Root className="relative flex h-full flex-col items-center pb-6">
+    <ThreadPrimitive.Viewport className="flex-1 w-full max-w-3xl space-y-3 overflow-y-auto px-1 pb-20">
       <ThreadPrimitive.Empty>
         <div className="flex flex-col items-center gap-6 py-12">
           <div className="w-full rounded-xl border border-dashed border-border bg-background p-6">
@@ -133,7 +133,7 @@ export const AssistantThread = ({
       <ScrollToBottomButton />
     </ThreadPrimitive.Viewport>
 
-    <div className="w-full border-t border-border bg-background px-1 pt-4">
+    <div className="w-full border-t border-border bg-background px-1 pt-4 pb-2">
       <ThreadComposer />
     </div>
   </ThreadPrimitive.Root>
