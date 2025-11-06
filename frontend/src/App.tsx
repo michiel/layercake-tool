@@ -14,7 +14,6 @@ import { TopBar } from './components/layout/TopBar'
 import { useCollaborationV2 } from './hooks/useCollaborationV2'
 import { useConnectionStatus } from './hooks/useConnectionStatus'
 import { ProjectChatPage } from './pages/ProjectChatPage'
-import { AssistantUiChatPage } from './pages/AssistantUiChatPage'
 import { ChatLogsPage } from './pages/ChatLogsPage'
 import { getOrCreateSessionId } from './utils/session'
 import { Group, Stack } from './components/layout-primitives'
@@ -26,8 +25,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from './components/ui/tooltip'
 import { Separator } from './components/ui/separator'
-
-const ENABLE_ASSISTANT_UI = import.meta.env.VITE_ENABLE_ASSISTANT_UI === 'true'
 
 // Collaboration Context for providing project-level collaboration to all pages
 const CollaborationContext = React.createContext<any>(null)
@@ -362,30 +359,8 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                       <TooltipContent side="right">Chat</TooltipContent>
                     </Tooltip>
 
-                    {/* Show supplemental chat links when on Chat page */}
                     {isActiveRoutePrefix(`/projects/${projectId}/chat`) && (
-                      <Stack gap="xs" className={navCollapsed ? '' : 'pl-4'}>
-                        {ENABLE_ASSISTANT_UI && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant={isActiveRoute(`/projects/${projectId}/chat/assistant-ui`) ? 'default' : 'ghost'}
-                                className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start'}
-                                onClick={() => navigate(`/projects/${projectId}/chat/assistant-ui`)}
-                              >
-                                {navCollapsed ? (
-                                  <IconMessageDots className="h-4 w-4" />
-                                ) : (
-                                  <>
-                                    <IconMessageDots className="h-4 w-4 mr-2" />
-                                    Assistant UI (Preview)
-                                  </>
-                                )}
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent side="right">Assistant UI (preview)</TooltipContent>
-                          </Tooltip>
-                        )}
+                      <div className={navCollapsed ? '' : 'pl-4'}>
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
@@ -405,7 +380,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                           </TooltipTrigger>
                           <TooltipContent side="right">Chat logs</TooltipContent>
                         </Tooltip>
-                      </Stack>
+                      </div>
                     )}
                   </>
                 )}
@@ -1467,13 +1442,6 @@ function App() {
               <ChatLogsPage />
             </ErrorBoundary>
           } />
-          {ENABLE_ASSISTANT_UI && (
-            <Route path="/projects/:projectId/chat/assistant-ui" element={
-              <ErrorBoundary>
-                <AssistantUiChatPage />
-              </ErrorBoundary>
-            } />
-          )}
           <Route path="/projects/:projectId/plan-nodes/:graphId/edit" element={
             <ErrorBoundary>
               <GraphEditorPage />

@@ -87,8 +87,8 @@ assistant-ui can replace the bespoke chat view with manageable engineering effor
 - Key blockers: none identified; all required hooks exposed via `LocalRuntime`/`ExternalStoreRuntime`.
 - Next step: implement prototype branch following “Integration Spike Plan”, evaluate styling workload, and run UX review with the product team before deciding on full migration.
 
-## Prototype Implementation (2025-02-14)
-- Added an assistant-ui powered preview screen at `frontend/src/pages/AssistantUiChatPage.tsx`, composed with `useExternalStoreRuntime`, Mantine wrappers, and the existing `useChatSession` backend adapter.
-- Feature-gated the route (`/projects/:projectId/chat/assistant-ui`) and navigation entry behind `VITE_ENABLE_ASSISTANT_UI=true` so the experience can be toggled without impacting current users.
-- Bundled `@assistant-ui/react` and `@assistant-ui/styles` with minimal styling overrides to coexist with Mantine.
-- Reused GraphQL chat mutations/subscriptions; runtime converts existing `ChatMessageEntry` records into assistant-ui `ThreadMessageLike` payloads, including tool-call summaries.
+## Implementation Summary (2025-02-14)
+- Replaced the legacy chat page with an assistant-ui driven experience at `frontend/src/pages/ProjectChatPage.tsx`, styled via shadcn primitives and the existing layout wrappers.
+- Removed the Mantine-based implementation and feature flag; `/projects/:projectId/chat` now always renders assistant-ui while navigation exposes only the canonical chat and log views.
+- Continued to rely on `useChatSession` for GraphQL mutations/subscriptions; message payloads are translated into assistant-ui `ThreadMessageLike` structures (text and tool-call parts).
+- `@assistant-ui/react` and `@assistant-ui/styles` remain first-class dependencies alongside shadcn/ui, ensuring consistent Tailwind-based theming across the app.
