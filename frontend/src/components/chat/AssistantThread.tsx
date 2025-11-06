@@ -97,8 +97,8 @@ export const AssistantThread = ({
   showSuggestions?: boolean
   composerPlaceholder?: string
 }) => (
-  <ThreadPrimitive.Root className="relative flex h-full flex-col items-center pb-6">
-    <ThreadPrimitive.Viewport className="flex-1 w-full max-w-3xl space-y-3 overflow-y-auto px-1 pb-20">
+  <ThreadPrimitive.Root className="relative flex h-full flex-col items-center">
+    <ThreadPrimitive.Viewport className="flex-1 w-full max-w-3xl space-y-3 overflow-y-auto px-1 pb-4">
       <ThreadPrimitive.Empty>
         <div className="flex flex-col items-center gap-6 py-12">
           <div className="w-full rounded-xl border border-dashed border-border bg-background p-6">
@@ -127,7 +127,7 @@ export const AssistantThread = ({
 
     </ThreadPrimitive.Viewport>
 
-    <div className="w-full border-t border-border bg-background px-1 pt-4 pb-2">
+    <div className="sticky bottom-0 w-full border-t border-border bg-background/95 px-1 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
       <ThreadComposer disabled={composerDisabled} placeholder={composerPlaceholder} />
     </div>
   </ThreadPrimitive.Root>

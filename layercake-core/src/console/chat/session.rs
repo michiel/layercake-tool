@@ -816,7 +816,13 @@ fn parse_tool_command(command: &str) -> Option<ParsedToolInvocation> {
         return None;
     }
 
-    let name = command[..open_paren].trim();
+    let mut name = command[..open_paren].trim();
+    if let Some(eq_pos) = name.rfind('=') {
+        name = name[eq_pos + 1..].trim();
+    }
+    if name.starts_with("let ") {
+        name = name.trim_start_matches("let ").trim();
+    }
     if name.is_empty() {
         return None;
     }
