@@ -55,7 +55,7 @@ use crate::graphql::types::{
 
 fn generate_node_id_from_ids(
     node_type: &crate::graphql::types::PlanDagNodeType,
-    existing_node_ids: &[&str],
+    _existing_node_ids: &[&str],
 ) -> String {
     use crate::graphql::types::PlanDagNodeType;
 
@@ -69,49 +69,19 @@ fn generate_node_id_from_ids(
         PlanDagNodeType::Output => "output",
     };
 
-    let max_number = existing_node_ids
-        .iter()
-        .filter_map(|id| {
-            id.strip_prefix(prefix)
-                .and_then(|rest| rest.strip_prefix('_'))
-                .and_then(|raw| raw.parse::<i32>().ok())
-        })
-        .max()
-        .unwrap_or(0);
+    // Generate a globally unique ID using UUID to prevent collisions across projects/plans
+    let uuid = Uuid::new_v4().simple().to_string();
+    let short_uuid = uuid.chars().take(12).collect::<String>();
 
-    format!("{}_{}", prefix, format!("{:03}", max_number + 1))
+    format!("{}_{}", prefix, short_uuid)
 }
 
-fn generate_edge_id(source: &str, target: &str) -> String {
-    const MAX_ID_LEN: usize = 50;
-    const RANDOM_LEN: usize = 12;
-    let random_segment = {
-        let uuid = Uuid::new_v4().simple().to_string();
-        uuid.chars().take(RANDOM_LEN).collect::<String>()
-    };
+fn generate_edge_id(_source: &str, _target: &str) -> String {
+    // Generate a globally unique ID using UUID to prevent collisions
+    let uuid = Uuid::new_v4().simple().to_string();
+    let short_uuid = uuid.chars().take(12).collect::<String>();
 
-    let mut source_segment = source.chars().take(16).collect::<String>();
-    let mut target_segment = target.chars().take(16).collect::<String>();
-
-    let mut candidate = format!(
-        "edge_{}_{}_{}",
-        source_segment, target_segment, random_segment
-    );
-
-    if candidate.len() > MAX_ID_LEN {
-        source_segment = source.chars().take(10).collect();
-        target_segment = target.chars().take(10).collect();
-        candidate = format!(
-            "edge_{}_{}_{}",
-            source_segment, target_segment, random_segment
-        );
-    }
-
-    if candidate.len() > MAX_ID_LEN {
-        format!("edge_{}", random_segment)
-    } else {
-        candidate
-    }
+    format!("edge_{}", short_uuid)
 }
 
 pub struct Mutation;

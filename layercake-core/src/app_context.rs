@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
-use regex::Regex;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, Set,
 };
@@ -1540,56 +1539,27 @@ fn node_type_storage_name(node_type: &PlanDagNodeType) -> &'static str {
     }
 }
 
-fn generate_node_id(node_type: &PlanDagNodeType, existing_nodes: &[PlanDagNode]) -> Result<String> {
+fn generate_node_id(node_type: &PlanDagNodeType, _existing_nodes: &[PlanDagNode]) -> Result<String> {
+    // Generate a globally unique ID using UUID to prevent collisions across projects/plans
+    // Format: <node_type_prefix>_<uuid>
     let prefix = node_type_prefix(node_type);
-    let regex = Regex::new(r"_(\d+)$").map_err(|e| anyhow!("Invalid regex: {}", e))?;
+    let uuid = Uuid::new_v4().simple().to_string();
 
-    let max_number = existing_nodes
-        .iter()
-        .filter(|node| node.id.starts_with(prefix))
-        .filter_map(|node| {
-            regex
-                .captures(&node.id)
-                .and_then(|caps| caps.get(1))
-                .and_then(|m| m.as_str().parse::<i32>().ok())
-        })
-        .max()
-        .unwrap_or(0);
+    // Use first 12 characters of UUID for readability
+    let short_uuid = uuid.chars().take(12).collect::<String>();
 
-    Ok(format!("{}_{}", prefix, format!("{:03}", max_number + 1)))
+    Ok(format!("{}_{}", prefix, short_uuid))
 }
 
-fn generate_edge_id(source: &str, target: &str) -> String {
-    const MAX_ID_LEN: usize = 50;
-    const RANDOM_LEN: usize = 12;
-    // Keep generated IDs readable while respecting validation rules.
-    let random_segment = {
-        let uuid = Uuid::new_v4().simple().to_string();
-        uuid.chars().take(RANDOM_LEN).collect::<String>()
-    };
+fn generate_edge_id(_source: &str, _target: &str) -> String {
+    // Generate a globally unique ID using UUID to prevent collisions
+    // Format: edge_<uuid>
+    let uuid = Uuid::new_v4().simple().to_string();
 
-    let mut source_segment = source.chars().take(16).collect::<String>();
-    let mut target_segment = target.chars().take(16).collect::<String>();
+    // Use first 12 characters of UUID for readability while maintaining uniqueness
+    let short_uuid = uuid.chars().take(12).collect::<String>();
 
-    let mut candidate = format!(
-        "edge_{}_{}_{}",
-        source_segment, target_segment, random_segment
-    );
-
-    if candidate.len() > MAX_ID_LEN {
-        source_segment = source.chars().take(10).collect();
-        target_segment = target.chars().take(10).collect();
-        candidate = format!(
-            "edge_{}_{}_{}",
-            source_segment, target_segment, random_segment
-        );
-    }
-
-    if candidate.len() > MAX_ID_LEN {
-        format!("edge_{}", random_segment)
-    } else {
-        candidate
-    }
+    format!("edge_{}", short_uuid)
 }
 
 fn apply_preview_limit(content: String, format: ExportFileType, max_rows: Option<usize>) -> String {
