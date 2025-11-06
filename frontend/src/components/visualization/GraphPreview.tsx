@@ -49,6 +49,9 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
 
   // Graph rendering parameters (stored in ref for Tweakpane)
   const paramsRef = useRef({
+    // Interaction settings
+    enableHighlighting: true,
+
     // Node settings
     nodeRadius: 5,
     nodeLabelSize: 12,
@@ -72,6 +75,7 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
   const highlightNodesRef = useRef(new Set<any>());
   const highlightLinksRef = useRef(new Set<any>());
   const hoverNodeRef = useRef<any>(null);
+  const hoverTimeoutRef = useRef<number | null>(null);
 
   // Initialize Tweakpane
   useEffect(() => {
@@ -85,6 +89,12 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
     });
 
     const params = paramsRef.current;
+
+    // Interaction settings
+    const interactionFolder = pane.addFolder({ title: 'Interaction', expanded: true });
+    interactionFolder.addBinding(params, 'enableHighlighting', {
+      label: 'Enable Highlighting',
+    });
 
     // Node settings folder
     const nodeFolder = pane.addFolder({ title: 'Nodes', expanded: true });
@@ -171,7 +181,7 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
         .d3AlphaDecay(p.alphaDecay)
         .d3VelocityDecay(p.velocityDecay);
 
-      // Trigger re-render for visual changes (node/label sizes)
+      // Trigger re-render for visual changes (node/label sizes and highlighting toggle)
       forceUpdate({});
     });
 
@@ -300,11 +310,11 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
 
         // Check if this node should be highlighted
         const highlightNodes = highlightNodesRef.current;
-        const isHighlighted = highlightNodes.size === 0 || highlightNodes.has(node);
+        const isHighlighted = !p.enableHighlighting || highlightNodes.size === 0 || highlightNodes.has(node);
         const opacity = isHighlighted ? 1 : 0.3;
 
         // Draw highlight ring for hovered node and neighbors
-        if (highlightNodes.has(node)) {
+        if (p.enableHighlighting && highlightNodes.has(node)) {
           ctx.beginPath();
           ctx.arc(node.x, node.y, p.nodeRadius * 1.6, 0, 2 * Math.PI, false);
           ctx.fillStyle = node === hoverNodeRef.current ? 'rgba(239, 68, 68, 0.3)' : 'rgba(251, 146, 60, 0.3)';
@@ -349,7 +359,8 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
       })
       .linkColor((link: any) => {
         const highlightLinks = highlightLinksRef.current;
-        const isHighlighted = highlightLinks.size === 0 || highlightLinks.has(link);
+        const p = paramsRef.current;
+        const isHighlighted = !p.enableHighlighting || highlightLinks.size === 0 || highlightLinks.has(link);
         const baseColor = getLayerStyle(link.layer).linkColor;
         // Convert hex to rgba for opacity
         const rgb = parseInt(baseColor.slice(1), 16);
@@ -360,21 +371,26 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
       })
       .linkWidth((link: any) => {
         const highlightLinks = highlightLinksRef.current;
-        return highlightLinks.has(link) ? params.linkWidth * 2 : params.linkWidth;
+        const p = paramsRef.current;
+        return p.enableHighlighting && highlightLinks.has(link) ? params.linkWidth * 2 : params.linkWidth;
       })
       .linkDirectionalArrowLength((link: any) => {
         const highlightLinks = highlightLinksRef.current;
-        return highlightLinks.has(link) ? params.linkArrowLength * 1.5 : params.linkArrowLength;
+        const p = paramsRef.current;
+        return p.enableHighlighting && highlightLinks.has(link) ? params.linkArrowLength * 1.5 : params.linkArrowLength;
       })
       .linkDirectionalArrowRelPos(1)
       .linkDirectionalParticles((link: any) => {
         const highlightLinks = highlightLinksRef.current;
-        return highlightLinks.has(link) ? 4 : 0;
+        const p = paramsRef.current;
+        return p.enableHighlighting && highlightLinks.has(link) ? 4 : 0;
       })
       .linkDirectionalParticleWidth((link: any) => {
         const highlightLinks = highlightLinksRef.current;
-        return highlightLinks.has(link) ? 4 : 0;
+        const p = paramsRef.current;
+        return p.enableHighlighting && highlightLinks.has(link) ? 4 : 0;
       })
+      .linkDirectionalParticleSpeed(0.005)
       .linkCanvasObjectMode(() => 'after')
       .linkCanvasObject((link: any, ctx: CanvasRenderingContext2D) => {
         const start = link.source;
@@ -420,9 +436,25 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
       .d3AlphaDecay(params.alphaDecay)
       .d3VelocityDecay(params.velocityDecay)
       .onNodeHover((node: any) => {
-        highlightNodesRef.current.clear();
-        highlightLinksRef.current.clear();
-        if (node) {
+        // Clear any pending hover timeout
+        if (hoverTimeoutRef.current) {
+          clearTimeout(hoverTimeoutRef.current);
+          hoverTimeoutRef.current = null;
+        }
+
+        // If no node (mouse left), clear immediately
+        if (!node) {
+          highlightNodesRef.current.clear();
+          highlightLinksRef.current.clear();
+          hoverNodeRef.current = null;
+          return;
+        }
+
+        // Add delay before activating highlight to prevent flicker
+        hoverTimeoutRef.current = window.setTimeout(() => {
+          highlightNodesRef.current.clear();
+          highlightLinksRef.current.clear();
+
           highlightNodesRef.current.add(node);
           if (node.neighbors) {
             node.neighbors.forEach((neighbor: any) => highlightNodesRef.current.add(neighbor));
@@ -430,17 +462,34 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
           if (node.links) {
             node.links.forEach((link: any) => highlightLinksRef.current.add(link));
           }
-        }
-        hoverNodeRef.current = node || null;
+          hoverNodeRef.current = node;
+          hoverTimeoutRef.current = null;
+        }, 150);
       })
       .onLinkHover((link: any) => {
-        highlightNodesRef.current.clear();
-        highlightLinksRef.current.clear();
-        if (link) {
+        // Clear any pending hover timeout
+        if (hoverTimeoutRef.current) {
+          clearTimeout(hoverTimeoutRef.current);
+          hoverTimeoutRef.current = null;
+        }
+
+        // If no link (mouse left), clear immediately
+        if (!link) {
+          highlightNodesRef.current.clear();
+          highlightLinksRef.current.clear();
+          return;
+        }
+
+        // Add delay before activating highlight to prevent flicker
+        hoverTimeoutRef.current = window.setTimeout(() => {
+          highlightNodesRef.current.clear();
+          highlightLinksRef.current.clear();
+
           highlightLinksRef.current.add(link);
           highlightNodesRef.current.add(link.source);
           highlightNodesRef.current.add(link.target);
-        }
+          hoverTimeoutRef.current = null;
+        }, 150);
       });
 
     // Configure force simulation parameters
@@ -454,6 +503,10 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
 
     // Cleanup
     return () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+        hoverTimeoutRef.current = null;
+      }
       if (graphRef.current) {
         graphRef.current._destructor();
         graphRef.current = null;
