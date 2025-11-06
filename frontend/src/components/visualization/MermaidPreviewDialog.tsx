@@ -1,8 +1,7 @@
 import { useEffect, useId, useState } from 'react'
 import mermaid from 'mermaid'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { IconAlertCircle, IconX } from '@tabler/icons-react'
+import { IconAlertCircle } from '@tabler/icons-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
@@ -54,16 +53,8 @@ export const MermaidPreviewDialog = ({ open, onClose, diagram, title }: MermaidP
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogContent className="max-w-[90vw] h-[90vh] flex flex-col">
-        <DialogHeader className="flex flex-row items-center justify-between pr-10">
+        <DialogHeader>
           <DialogTitle>{title || 'Mermaid Preview'}</DialogTitle>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute right-4 top-4"
-            onClick={onClose}
-          >
-            <IconX size={18} />
-          </Button>
         </DialogHeader>
         <ScrollArea className="flex-1 w-full border rounded-lg bg-muted/40 p-4">
           {error ? (

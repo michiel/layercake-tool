@@ -1,12 +1,11 @@
 import { useMemo, useState, useEffect } from 'react';
-import { IconLayout2, IconHierarchy, IconX, IconAlertCircle } from '@tabler/icons-react';
+import { IconLayout2, IconHierarchy, IconAlertCircle } from '@tabler/icons-react';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Spinner } from '@/components/ui/spinner';
@@ -81,16 +80,8 @@ export const GraphPreviewDialog = ({ opened, onClose, data, title, loading = fal
   return (
     <Dialog open={opened} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-[90vw] h-[90vh] flex flex-col">
-        <DialogHeader className="flex flex-row items-center justify-between pr-10">
+        <DialogHeader>
           <DialogTitle>{title || 'Graph Preview'}</DialogTitle>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute right-4 top-4"
-            onClick={onClose}
-          >
-            <IconX size={18} />
-          </Button>
         </DialogHeader>
         <div className="flex-1 overflow-hidden">
           {loading ? (

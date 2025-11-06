@@ -391,6 +391,7 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
         return p.enableHighlighting && highlightLinks.has(link) ? 4 : 0;
       })
       .linkDirectionalParticleSpeed(0.005)
+      .autoPauseRedraw(false)
       .linkCanvasObjectMode(() => 'after')
       .linkCanvasObject((link: any, ctx: CanvasRenderingContext2D) => {
         const start = link.source;
