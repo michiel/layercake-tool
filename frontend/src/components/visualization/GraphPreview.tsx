@@ -7,6 +7,8 @@ export interface GraphNode {
   name: string;
   layer: string;
   attrs: Record<string, string>;
+  neighbors?: GraphNode[];
+  links?: GraphLink[];
 }
 
 export interface GraphLink {
@@ -65,6 +67,11 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
 
   const [, forceUpdate] = useState({});
   const dataSignatureRef = useRef<string>('');
+
+  // Highlighting state
+  const highlightNodesRef = useRef(new Set<any>());
+  const highlightLinksRef = useRef(new Set<any>());
+  const hoverNodeRef = useRef<any>(null);
 
   // Initialize Tweakpane
   useEffect(() => {
@@ -229,6 +236,24 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
 
     const params = paramsRef.current;
 
+    // Precompute neighbors and links for each node for highlighting
+    const graphData = { ...data };
+    graphData.links.forEach((link: any) => {
+      const a = graphData.nodes.find(n => n.id === link.source);
+      const b = graphData.nodes.find(n => n.id === link.target);
+      if (a && b) {
+        !a.neighbors && (a.neighbors = []);
+        !b.neighbors && (b.neighbors = []);
+        a.neighbors.push(b);
+        b.neighbors.push(a);
+
+        !a.links && (a.links = []);
+        !b.links && (b.links = []);
+        a.links.push(link);
+        b.links.push(link);
+      }
+    });
+
     // Build layer color map
     const layerColorMap = new Map<string, string>();
     if (data.layers) {
@@ -260,7 +285,7 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
     const graph = (ForceGraph as any)()(graphContainerRef.current)
       .width(currentWidth)
       .height(currentHeight)
-      .graphData(data)
+      .graphData(graphData)
       .nodeId('id')
       .nodeLabel((node: any) => node.name || node.id)
       .nodeCanvasObject((node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
@@ -273,6 +298,20 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
 
         const style = getLayerStyle(node.layer);
 
+        // Check if this node should be highlighted
+        const highlightNodes = highlightNodesRef.current;
+        const isHighlighted = highlightNodes.size === 0 || highlightNodes.has(node);
+        const opacity = isHighlighted ? 1 : 0.3;
+
+        // Draw highlight ring for hovered node and neighbors
+        if (highlightNodes.has(node)) {
+          ctx.beginPath();
+          ctx.arc(node.x, node.y, p.nodeRadius * 1.6, 0, 2 * Math.PI, false);
+          ctx.fillStyle = node === hoverNodeRef.current ? 'rgba(239, 68, 68, 0.3)' : 'rgba(251, 146, 60, 0.3)';
+          ctx.fill();
+        }
+
+        ctx.globalAlpha = opacity;
         ctx.beginPath();
         ctx.fillStyle = style.nodeColor;
         ctx.strokeStyle = style.borderColor;
@@ -293,6 +332,7 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
         ctx.textBaseline = 'middle';
         ctx.fillStyle = '#f8fafc';
         ctx.fillText(label, node.x, node.y - p.nodeRadius - bckgDimensions[1] / 2 - fontSize * 0.2);
+        ctx.globalAlpha = 1;
 
         (node as any).__bckgDimensions = bckgDimensions;
       })
@@ -307,10 +347,34 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
             bckgDimensions[1]
           );
       })
-      .linkColor((link: any) => getLayerStyle(link.layer).linkColor)
-      .linkWidth(params.linkWidth)
-      .linkDirectionalArrowLength(params.linkArrowLength)
+      .linkColor((link: any) => {
+        const highlightLinks = highlightLinksRef.current;
+        const isHighlighted = highlightLinks.size === 0 || highlightLinks.has(link);
+        const baseColor = getLayerStyle(link.layer).linkColor;
+        // Convert hex to rgba for opacity
+        const rgb = parseInt(baseColor.slice(1), 16);
+        const r = (rgb >> 16) & 255;
+        const g = (rgb >> 8) & 255;
+        const b = rgb & 255;
+        return `rgba(${r}, ${g}, ${b}, ${isHighlighted ? 1 : 0.2})`;
+      })
+      .linkWidth((link: any) => {
+        const highlightLinks = highlightLinksRef.current;
+        return highlightLinks.has(link) ? params.linkWidth * 2 : params.linkWidth;
+      })
+      .linkDirectionalArrowLength((link: any) => {
+        const highlightLinks = highlightLinksRef.current;
+        return highlightLinks.has(link) ? params.linkArrowLength * 1.5 : params.linkArrowLength;
+      })
       .linkDirectionalArrowRelPos(1)
+      .linkDirectionalParticles((link: any) => {
+        const highlightLinks = highlightLinksRef.current;
+        return highlightLinks.has(link) ? 4 : 0;
+      })
+      .linkDirectionalParticleWidth((link: any) => {
+        const highlightLinks = highlightLinksRef.current;
+        return highlightLinks.has(link) ? 4 : 0;
+      })
       .linkCanvasObjectMode(() => 'after')
       .linkCanvasObject((link: any, ctx: CanvasRenderingContext2D) => {
         const start = link.source;
@@ -354,7 +418,30 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
         ctx.restore();
       })
       .d3AlphaDecay(params.alphaDecay)
-      .d3VelocityDecay(params.velocityDecay);
+      .d3VelocityDecay(params.velocityDecay)
+      .onNodeHover((node: any) => {
+        highlightNodesRef.current.clear();
+        highlightLinksRef.current.clear();
+        if (node) {
+          highlightNodesRef.current.add(node);
+          if (node.neighbors) {
+            node.neighbors.forEach((neighbor: any) => highlightNodesRef.current.add(neighbor));
+          }
+          if (node.links) {
+            node.links.forEach((link: any) => highlightLinksRef.current.add(link));
+          }
+        }
+        hoverNodeRef.current = node || null;
+      })
+      .onLinkHover((link: any) => {
+        highlightNodesRef.current.clear();
+        highlightLinksRef.current.clear();
+        if (link) {
+          highlightLinksRef.current.add(link);
+          highlightNodesRef.current.add(link.source);
+          highlightNodesRef.current.add(link.target);
+        }
+      });
 
     // Configure force simulation parameters
     const chargeForce = graph.d3Force('charge');
