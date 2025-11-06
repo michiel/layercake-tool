@@ -13,13 +13,14 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Stack, Group } from '@/components/layout-primitives'
-import { IconDownload, IconEye, IconCopy, IconSelect, IconChartDots } from '@tabler/icons-react'
+import { IconDownload, IconEye, IconCopy, IconSelect, IconChartDots, IconNetwork } from '@tabler/icons-react'
 import { PlanDagNodeType, OutputNodeConfig } from '../../../../types/plan-dag'
 import { isNodeConfigured } from '../../../../utils/planDagValidation'
 import { EXPORT_NODE_OUTPUT, ExportNodeOutputResult } from '../../../../graphql/export'
 import { BaseNode } from './BaseNode'
 import { showErrorNotification, showSuccessNotification } from '../../../../utils/notifications'
 import { MermaidPreviewDialog } from '../../../visualization/MermaidPreviewDialog'
+import { DotPreviewDialog } from '../../../visualization/DotPreviewDialog'
 
 interface OutputNodeProps extends NodeProps {
   onEdit?: (nodeId: string) => void
@@ -50,12 +51,15 @@ export const OutputNode = memo((props: OutputNodeProps) => {
   const [previewContent, setPreviewContent] = useState('')
   const [mermaidOpen, setMermaidOpen] = useState(false)
   const [mermaidContent, setMermaidContent] = useState('')
-  const [previewTarget, setPreviewTarget] = useState<'text' | 'mermaid' | null>(null)
-  const [loadingTarget, setLoadingTarget] = useState<'text' | 'mermaid' | null>(null)
+  const [dotOpen, setDotOpen] = useState(false)
+  const [dotContent, setDotContent] = useState('')
+  const [previewTarget, setPreviewTarget] = useState<'text' | 'mermaid' | 'dot' | null>(null)
+  const [loadingTarget, setLoadingTarget] = useState<'text' | 'mermaid' | 'dot' | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const isTextPreviewLoading = loadingTarget === 'text'
   const isMermaidLoading = loadingTarget === 'mermaid'
+  const isDotLoading = loadingTarget === 'dot'
 
   const config = data.config as OutputNodeConfig
 
@@ -127,6 +131,9 @@ export const OutputNode = memo((props: OutputNodeProps) => {
           if (previewTarget === 'mermaid') {
             setMermaidContent(decodedContent)
             setMermaidOpen(true)
+          } else if (previewTarget === 'dot') {
+            setDotContent(decodedContent)
+            setDotOpen(true)
           } else {
             setPreviewContent(decodedContent)
             setPreviewOpen(true)
@@ -136,6 +143,8 @@ export const OutputNode = memo((props: OutputNodeProps) => {
           showErrorNotification('Preview Failed', 'Failed to decode export content')
           if (previewTarget === 'mermaid') {
             setMermaidContent('')
+          } else if (previewTarget === 'dot') {
+            setDotContent('')
           } else {
             setPreviewContent('Error: Failed to decode content')
           }
@@ -144,6 +153,8 @@ export const OutputNode = memo((props: OutputNodeProps) => {
         showErrorNotification('Preview Failed', result.message)
         if (previewTarget === 'mermaid') {
           setMermaidContent(`Error: ${result.message}`)
+        } else if (previewTarget === 'dot') {
+          setDotContent(`Error: ${result.message}`)
         } else {
           setPreviewContent(`Error: ${result.message}`)
         }
@@ -156,6 +167,8 @@ export const OutputNode = memo((props: OutputNodeProps) => {
       showErrorNotification('Preview Failed', error.message)
       if (previewTarget === 'mermaid') {
         setMermaidContent(`Error: ${error.message}`)
+      } else if (previewTarget === 'dot') {
+        setDotContent(`Error: ${error.message}`)
       } else {
         setPreviewContent(`Error: ${error.message}`)
       }
@@ -184,6 +197,20 @@ export const OutputNode = memo((props: OutputNodeProps) => {
     setPreviewTarget('mermaid')
     setLoadingTarget('mermaid')
     setMermaidContent('')
+    exportForPreview({
+      variables: {
+        projectId,
+        nodeId: props.id,
+      },
+    })
+  }
+
+  const handleDotPreview = async () => {
+    if (!projectId || !isConfigured) return
+
+    setPreviewTarget('dot')
+    setLoadingTarget('dot')
+    setDotContent('')
     exportForPreview({
       variables: {
         projectId,
@@ -279,6 +306,27 @@ export const OutputNode = memo((props: OutputNodeProps) => {
                     <TooltipContent>Render Mermaid preview</TooltipContent>
                   </Tooltip>
                 )}
+                {config.renderTarget === 'DOT' && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-9 w-9 rounded-full text-green-600"
+                        data-action-icon="dot"
+                        disabled={isDotLoading}
+                        onMouseDown={(e: React.MouseEvent) => {
+                          e.stopPropagation()
+                          e.preventDefault()
+                          handleDotPreview()
+                        }}
+                      >
+                        <IconNetwork size={12} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Render Graphviz preview</TooltipContent>
+                  </Tooltip>
+                )}
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -358,6 +406,13 @@ export const OutputNode = memo((props: OutputNodeProps) => {
         onClose={() => setMermaidOpen(false)}
         diagram={mermaidContent}
         title={`Mermaid Preview: ${data.metadata?.label || config.renderTarget || 'Output'}`}
+      />
+
+      <DotPreviewDialog
+        open={dotOpen}
+        onClose={() => setDotOpen(false)}
+        diagram={dotContent}
+        title={`Graphviz Preview: ${data.metadata?.label || config.renderTarget || 'Output'}`}
       />
     </>
   )
