@@ -1333,6 +1333,18 @@ const PlanEditorPage = () => {
   const projects = projectsData?.projects || []
   const selectedProject = projects.find((p: any) => p.id === parseInt(projectId || '0'))
 
+  const contextDescription = useMemo(() => {
+    if (projectsLoading) {
+      return 'Loading plan editor'
+    }
+    if (!selectedProject) {
+      return projectId ? `Plan editor unavailable for project ${projectId}` : 'Plan editor'
+    }
+    return `Editing plan for project ${selectedProject.name} (#${selectedProject.id})`
+  }, [projectsLoading, selectedProject, projectId])
+
+  useRegisterChatContext(contextDescription, selectedProject?.id)
+
   const handleNavigate = (route: string) => {
     navigate(route)
   }
@@ -1360,11 +1372,6 @@ const PlanEditorPage = () => {
 
   const searchParams = new URLSearchParams(location.search)
   const focusNodeId = searchParams.get('focusNode') || undefined
-
-  useRegisterChatContext(
-    `Editing plan for project ${selectedProject.name} (#${selectedProject.id})`,
-    selectedProject.id,
-  )
 
   return (
     <div className="h-full flex flex-col gap-0">
