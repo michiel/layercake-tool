@@ -175,6 +175,7 @@ export const AssistantThread = ({
 }) => {
   const pageLayout = layout === 'page'
   const widthClass = pageLayout ? 'max-w-none' : 'max-w-3xl'
+  const viewportPaddingBottom = pageLayout ? 'pb-4' : 'pb-24'
 
   const UserMessage = () => (
     <MessagePrimitive.Root
@@ -314,7 +315,7 @@ export const AssistantThread = ({
       )}
     >
       <ThreadPrimitive.Viewport
-        className={cn('flex-1 w-full space-y-3 overflow-y-auto px-1 pb-4', widthClass)}
+        className={cn('flex-1 w-full space-y-3 overflow-y-auto px-1', viewportPaddingBottom, widthClass)}
       >
         <ThreadPrimitive.Empty>
           <div className="flex flex-col gap-6 py-12">

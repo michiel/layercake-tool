@@ -39,6 +39,7 @@ import { ScrollArea } from '../ui/scroll-area'
 import { Spinner } from '../ui/spinner'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { Textarea } from '../ui/textarea'
+import PageContainer from '../layout/PageContainer'
 
 import { gql } from '@apollo/client'
 
@@ -251,17 +252,17 @@ export const DataSourceEditor: React.FC<DataSourceEditorProps> = () => {
 
   if (dataSourceLoading) {
     return (
-      <div className="container max-w-7xl py-12">
+      <PageContainer className="py-12">
         <div className="flex items-center justify-center" style={{ height: '400px' }}>
           <Spinner className="h-8 w-8" />
         </div>
-      </div>
+      </PageContainer>
     )
   }
 
   if (dataSourceError || !dataSource) {
     return (
-      <div className="container max-w-7xl py-12">
+      <PageContainer className="py-12">
         <Alert variant="destructive" className="mb-4">
           <IconAlertCircle className="h-4 w-4" />
           <AlertTitle>Error Loading Data Source</AlertTitle>
@@ -273,57 +274,53 @@ export const DataSourceEditor: React.FC<DataSourceEditorProps> = () => {
           <IconArrowLeft className="mr-2 h-4 w-4" />
           Back to Data Sources
         </Button>
-      </div>
+      </PageContainer>
     )
   }
 
   if (!selectedProject) {
     return (
-      <div className="container max-w-7xl py-12">
+      <PageContainer className="py-12">
         <h1 className="text-3xl font-bold">Project Not Found</h1>
         <Button onClick={() => navigate('/projects')} className="mt-4">
           Back to Projects
         </Button>
-      </div>
+      </PageContainer>
     )
   }
 
   return (
-    <div className="container max-w-7xl py-12">
+    <PageContainer className="py-8">
       <Breadcrumbs
         projectName={selectedProject.name}
         projectId={selectedProject.id}
-        currentPage={`Data Sources > ${dataSource.name}`}
+        sections={[{ title: 'Data Sources', href: `/projects/${selectedProject.id}/datasources` }]}
+        currentPage={dataSource.name}
         onNavigate={handleNavigate}
       />
 
       <Group justify="between" className="mb-4">
-        <Group gap="sm">
-          <Button variant="ghost" size="icon" onClick={handleBack}>
-            <IconArrowLeft className="h-[18px] w-[18px]" />
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold">{dataSource.name}</h1>
-            <Group gap="xs" className="mt-2">
-              <Badge variant="secondary" className="text-xs">
-                {getFileFormatDisplayName(dataSource.fileFormat)}/{getDataTypeDisplayName(dataSource.dataType)}
-              </Badge>
-              <Badge
-                variant="secondary"
-                className={
-                  dataSource.status === 'active'
-                    ? 'bg-green-100 text-green-900'
-                    : dataSource.status === 'processing'
-                      ? 'bg-blue-100 text-blue-900'
-                      : 'bg-red-100 text-red-900'
-                }
-              >
-                {getStatusIcon(dataSource.status)}
-                <span className="ml-1">{dataSource.status}</span>
-              </Badge>
-            </Group>
-          </div>
-        </Group>
+        <div>
+          <h1 className="text-3xl font-bold">{dataSource.name}</h1>
+          <Group gap="xs" className="mt-2">
+            <Badge variant="secondary" className="text-xs">
+              {getFileFormatDisplayName(dataSource.fileFormat)}/{getDataTypeDisplayName(dataSource.dataType)}
+            </Badge>
+            <Badge
+              variant="secondary"
+              className={
+                dataSource.status === 'active'
+                  ? 'bg-green-100 text-green-900'
+                  : dataSource.status === 'processing'
+                    ? 'bg-blue-100 text-blue-900'
+                    : 'bg-red-100 text-red-900'
+              }
+            >
+              {getStatusIcon(dataSource.status)}
+              <span className="ml-1">{dataSource.status}</span>
+            </Badge>
+          </Group>
+        </div>
 
         <Group gap="sm">
           <Button
@@ -531,6 +528,6 @@ export const DataSourceEditor: React.FC<DataSourceEditorProps> = () => {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+    </PageContainer>
   )
 }

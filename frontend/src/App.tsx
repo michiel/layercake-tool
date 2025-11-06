@@ -27,6 +27,7 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from './comp
 import { Separator } from './components/ui/separator'
 import { ChatProvider } from './components/chat/ChatProvider'
 import { useRegisterChatContext } from './hooks/useRegisterChatContext'
+import { cn } from './lib/utils'
 
 // Collaboration Context for providing project-level collaboration to all pages
 const CollaborationContext = React.createContext<any>(null)
@@ -147,10 +148,29 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   })
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      {/* Sidebar Navigation */}
-      <aside className={`flex flex-col border-r ${navCollapsed ? 'w-[60px]' : 'w-[250px]'} transition-all duration-200`}>
-        <div className={navCollapsed ? 'p-2' : 'p-4'}>
+    <div className="flex h-screen flex-col overflow-hidden">
+      {/* Top Bar */}
+      <header className="flex items-center border-b px-4">
+        <div className="w-full max-w-full">
+          <TopBar
+            projectId={projectId}
+            connectionState={connectionStatus.state}
+            users={collaboration.users}
+            currentUserId={sessionId}
+            onNavigateHome={() => navigate('/')}
+          />
+        </div>
+      </header>
+
+      <div className="flex flex-1 min-h-0">
+        {/* Sidebar Navigation */}
+        <aside
+          className={cn(
+            'flex flex-col border-r transition-all duration-200',
+            navCollapsed ? 'w-[60px]' : 'w-[250px]'
+          )}
+        >
+          <div className={cn(navCollapsed ? 'p-2' : 'p-4', 'min-h-0 flex-1 overflow-y-auto')}>
           <Stack gap="xs" className="h-full">
             <TooltipProvider>
               <Group justify="between" className="mb-2">
@@ -260,11 +280,11 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
 
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button
-                          variant={isActiveRoute(`/projects/${projectId}/datasources`) ? 'default' : 'ghost'}
-                          className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start'}
-                          onClick={() => navigate(`/projects/${projectId}/datasources`)}
-                        >
+                    <Button
+                      variant={isActiveRoutePrefix(`/projects/${projectId}/datasources`) ? 'default' : 'ghost'}
+                      className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start'}
+                      onClick={() => navigate(`/projects/${projectId}/datasources`)}
+                    >
                           {navCollapsed ? (
                             <IconFileDatabase className="h-4 w-4" />
                           ) : (
@@ -431,28 +451,17 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
               </div>
             </TooltipProvider>
           </Stack>
+          </div>
+        </aside>
+
+        {/* Main Content Area */}
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <main className="flex-1 overflow-auto p-4">
+            <CollaborationContext.Provider value={collaboration}>
+              {children}
+            </CollaborationContext.Provider>
+          </main>
         </div>
-      </aside>
-
-      {/* Main Content Area */}
-      <div className="flex flex-col flex-1 overflow-hidden">
-        {/* Top Bar */}
-        <header className="h-[60px] border-b">
-          <TopBar
-            projectId={projectId}
-            connectionState={connectionStatus.state}
-            users={collaboration.users}
-            currentUserId={sessionId}
-            onNavigateHome={() => navigate('/')}
-          />
-        </header>
-
-        {/* Main Content */}
-        <main className="flex-1 overflow-auto p-4">
-          <CollaborationContext.Provider value={collaboration}>
-            {children}
-          </CollaborationContext.Provider>
-        </main>
       </div>
     </div>
   )
