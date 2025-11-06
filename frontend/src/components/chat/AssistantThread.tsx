@@ -72,7 +72,7 @@ const Suggestion = ({ prompt }: { prompt: string }) => (
 )
 
 const ThreadComposer = () => (
-  <ComposerPrimitive.Root className="flex items-end gap-3 rounded-xl border border-border bg-background px-4 py-3 shadow-sm">
+  <ComposerPrimitive.Root className="mx-auto flex w-full max-w-3xl items-end gap-3 rounded-xl border border-border bg-background px-4 py-3 shadow-sm">
     <ComposerPrimitive.Input
       aria-label="Ask the assistant"
       placeholder="Write a message…"
@@ -102,11 +102,11 @@ export const AssistantThread = ({
 }: {
   suggestions?: string[]
 }) => (
-  <ThreadPrimitive.Root className="relative flex h-full flex-col">
-    <ThreadPrimitive.Viewport className="flex-1 space-y-3 overflow-y-auto px-1 pb-6">
+  <ThreadPrimitive.Root className="relative flex h-full flex-col items-center">
+    <ThreadPrimitive.Viewport className="flex-1 w-full max-w-3xl space-y-3 overflow-y-auto px-1 pb-6">
       <ThreadPrimitive.Empty>
         <div className="flex flex-col items-center gap-6 py-12">
-          <div className="w-full max-w-3xl rounded-xl border border-dashed border-border bg-background p-6">
+          <div className="w-full rounded-xl border border-dashed border-border bg-background p-6">
             <h3 className="text-base font-semibold">Start a conversation</h3>
             <p className="mt-2 text-sm text-muted-foreground">
               Ask a question about this project. The assistant can run Layercake tools whenever additional context is helpful.
@@ -133,7 +133,7 @@ export const AssistantThread = ({
       <ScrollToBottomButton />
     </ThreadPrimitive.Viewport>
 
-    <div className="border-t border-border bg-background px-1 pt-4">
+    <div className="w-full border-t border-border bg-background px-1 pt-4">
       <ThreadComposer />
     </div>
   </ThreadPrimitive.Root>

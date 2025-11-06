@@ -15,11 +15,13 @@ interface ProviderSession {
 
 interface ChatSessionState {
   sessions: Record<ChatProviderOption, ProviderSession>
+  hydrated: boolean
   updateProvider: (
     provider: ChatProviderOption,
     updater: (prev: ProviderSession) => ProviderSession,
   ) => void
   resetProvider: (provider: ChatProviderOption) => void
+  setHydrated: (value: boolean) => void
 }
 
 const DEFAULT_SESSION: ProviderSession = {
@@ -39,6 +41,7 @@ export const useChatSessionStore = create(
   persist<ChatSessionState>(
     (set) => ({
       sessions: {} as Record<ChatProviderOption, ProviderSession>,
+      hydrated: false,
       updateProvider: (provider, updater) =>
         set((state) => {
           const previous = state.sessions[provider] ?? DEFAULT_SESSION
@@ -55,11 +58,18 @@ export const useChatSessionStore = create(
           delete nextSessions[provider]
           return { sessions: nextSessions }
         }),
+      setHydrated: (value: boolean) =>
+        set(() => ({
+          hydrated: value,
+        })),
     }),
     {
       name: 'layercake-chat-sessions',
       storage,
       version: 1,
+      onRehydrateStorage: () => () => {
+        useChatSessionStore.setState({ hydrated: true })
+      },
     },
   ),
 )
@@ -69,6 +79,9 @@ export const useProviderSession = (provider: ChatProviderOption) =>
     (state) => state.sessions[provider] ?? DEFAULT_SESSION,
     shallow,
   )
+
+export const useChatSessionsHydrated = () =>
+  useChatSessionStore((state) => state.hydrated)
 
 export const appendMessageToProvider = (
   provider: ChatProviderOption,

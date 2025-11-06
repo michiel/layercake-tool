@@ -18,6 +18,7 @@ import {
   setMessagesForProvider,
   setSessionForProvider,
   useProviderSession,
+  useChatSessionsHydrated,
 } from '../state/chatSessionStore'
 
 interface UseChatSessionArgs {
@@ -65,6 +66,7 @@ export function useChatSession({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const providerState = useProviderSession(provider)
+  const hasHydrated = useChatSessionsHydrated()
   const [startSession] = useMutation<{ startChatSession: StartChatSessionPayload }>(START_CHAT_SESSION)
   const [sendChat] = useMutation(SEND_CHAT_MESSAGE)
   const client = useApolloClient()
@@ -89,14 +91,17 @@ export function useChatSession({
 
   // Ensure project id is tracked alongside the provider session
   useEffect(() => {
+    if (!hasHydrated) {
+      return
+    }
     if (providerState.session && projectId !== undefined) {
       setSessionForProvider(provider, providerState.session, projectId)
     }
-  }, [provider, providerState.session, projectId])
+  }, [provider, providerState.session, projectId, hasHydrated])
 
   // Establish or reuse chat session
   useEffect(() => {
-    if (!projectId) {
+    if (!projectId || !hasHydrated) {
       return
     }
 
@@ -135,17 +140,11 @@ export function useChatSession({
     return () => {
       cancelled = true
     }
-  }, [
-    projectId,
-    provider,
-    sessionId,
-    providerState.session?.sessionId,
-    startSession,
-  ])
+  }, [projectId, provider, sessionId, providerState.session?.sessionId, startSession, hasHydrated])
 
   // Load history if needed (e.g., after reload)
   useEffect(() => {
-    if (!activeSessionId || providerState.messages.length > 0) {
+    if (!hasHydrated || !activeSessionId || providerState.messages.length > 0) {
       return
     }
 
@@ -178,11 +177,11 @@ export function useChatSession({
     return () => {
       cancelled = true
     }
-  }, [activeSessionId, provider, providerState.messages.length, client])
+  }, [activeSessionId, provider, providerState.messages.length, client, hasHydrated])
 
   // Subscribe to real-time chat events from the active session
   useEffect(() => {
-    if (!providerState.session?.sessionId) {
+    if (!hasHydrated || !providerState.session?.sessionId) {
       return
     }
 
@@ -220,12 +219,15 @@ export function useChatSession({
     return () => {
       teardownSubscription()
     }
-  }, [client, provider, providerState.session?.sessionId, teardownSubscription])
+  }, [client, provider, providerState.session?.sessionId, teardownSubscription, hasHydrated])
 
   useEffect(() => () => teardownSubscription(), [teardownSubscription])
 
   const sendMessage = useCallback(
     async (content: string) => {
+      if (!hasHydrated) {
+        return
+      }
       const trimmed = content.trim()
       const sessionIdentifier = providerState.session?.sessionId
       if (!trimmed || !sessionIdentifier) {
