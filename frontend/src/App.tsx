@@ -1214,13 +1214,6 @@ const ProjectDetailPage = () => {
       icon: <IconDatabase size={20} />,
       onClick: () => navigate(`/projects/${projectId}/graphs`),
     },
-    {
-      title: 'Project Settings',
-      description: 'Configure project settings and permissions',
-      icon: <IconSettings size={20} />,
-      onClick: () => {},
-      disabled: true,
-    },
   ]
 
   return (
@@ -1240,6 +1233,15 @@ const ProjectDetailPage = () => {
             <Badge className="bg-green-100 text-green-900">Active</Badge>
           </Group>
         </div>
+        <Group gap="sm">
+          <Button
+            variant="outline"
+            onClick={() => navigate(`/projects/${selectedProject.id}/edit`)}
+          >
+            <IconSettings className="mr-2 h-4 w-4" />
+            Edit Details
+          </Button>
+        </Group>
       </Group>
 
       <h2 className="text-2xl font-bold mb-4">Project Tools</h2>
@@ -1250,61 +1252,50 @@ const ProjectDetailPage = () => {
             <Card
               key={action.title}
               className={`border p-4 ${
-                action.disabled
-                  ? 'cursor-not-allowed opacity-60'
-                  : 'cursor-pointer hover:shadow-md transition-shadow'
+                'cursor-pointer hover:shadow-md transition-shadow'
               }`}
-              onClick={action.disabled ? undefined : action.onClick}
+              onClick={action.onClick}
             >
               <Group justify="between" align="start">
                 <Group align="start" gap="md">
                   {action.icon}
                   <div>
-                    <h4 className="text-lg font-semibold mb-2">
-                      {action.title}
-                      {action.disabled && (
-                        <Badge variant="secondary" className="ml-2 text-xs">
-                          Coming Soon
-                        </Badge>
-                      )}
-                    </h4>
+                    <h4 className="text-lg font-semibold mb-2">{action.title}</h4>
                     <p className="text-sm text-muted-foreground">
                       {action.description}
                     </p>
                   </div>
                 </Group>
-                {!action.disabled && (
-                  <Group gap="xs">
-                    {action.title === 'Plan' && planDag && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleDownloadYAML()
-                            }}
-                          >
-                            <IconDownload className="h-5 w-5" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Download Plan DAG as YAML</TooltipContent>
-                      </Tooltip>
-                    )}
-                    <Button
-                      variant={action.primary ? 'default' : 'ghost'}
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        action.onClick()
-                      }}
-                    >
-                      {action.icon}
-                      <span className="ml-2">Open</span>
-                    </Button>
-                  </Group>
-                )}
+                <Group gap="xs">
+                  {action.title === 'Plan' && planDag && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleDownloadYAML()
+                          }}
+                        >
+                          <IconDownload className="h-5 w-5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Download Plan DAG as YAML</TooltipContent>
+                    </Tooltip>
+                  )}
+                  <Button
+                    variant={action.primary ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      action.onClick()
+                    }}
+                  >
+                    {action.icon}
+                    <span className="ml-2">Open</span>
+                  </Button>
+                </Group>
               </Group>
             </Card>
           ))}
@@ -1404,6 +1395,7 @@ import { GraphEditorPage } from './pages/GraphEditorPage'
 import { DatabaseSettings } from './components/settings/DatabaseSettings'
 import { SystemSettingsPage } from './pages/SystemSettingsPage'
 import PageContainer from './components/layout/PageContainer'
+import { EditProjectPage } from './pages/EditProjectPage'
 
 // Main App component with routing
 function App() {
@@ -1430,6 +1422,11 @@ function App() {
           <Route path="/projects/:projectId" element={
             <ErrorBoundary>
               <ProjectDetailPage />
+            </ErrorBoundary>
+          } />
+          <Route path="/projects/:projectId/edit" element={
+            <ErrorBoundary>
+              <EditProjectPage />
             </ErrorBoundary>
           } />
           <Route path="/projects/:projectId/plan" element={
