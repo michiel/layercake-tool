@@ -163,6 +163,7 @@ export const ProjectChatPage = () => {
               composerDisabled={isAwaitingAssistant}
               showSuggestions={!messages.length}
               composerPlaceholder={loading ? 'Connecting…' : undefined}
+              layout="page"
             />
           </AssistantRuntimeProvider>
         </CardContent>
