@@ -41,7 +41,7 @@ export const useChatSessionStore = create(
   persist<ChatSessionState>(
     (set) => ({
       sessions: {} as Record<ChatProviderOption, ProviderSession>,
-      hydrated: false,
+      hydrated: true,
       updateProvider: (provider, updater) =>
         set((state) => {
           const previous = state.sessions[provider] ?? DEFAULT_SESSION
@@ -67,8 +67,10 @@ export const useChatSessionStore = create(
       name: 'layercake-chat-sessions',
       storage,
       version: 1,
-      onRehydrateStorage: () => () => {
-        useChatSessionStore.setState({ hydrated: true })
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          useChatSessionStore.setState({ hydrated: true })
+        }
       },
     },
   ),
