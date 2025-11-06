@@ -215,10 +215,10 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
 
   const layerStyles = useMemo(() => {
     const defaults = {
-      nodeColor: '#4c6ef5',
-      borderColor: '#364fc7',
-      textColor: '#f8fafc',
-      linkColor: '#64748b'
+      nodeColor: 'rgba(156, 163, 175, 0.4)', // transparent gray
+      borderColor: '#9ca3af', // gray border
+      textColor: '#000000', // black text
+      linkColor: 'rgba(156, 163, 175, 0.4)' // transparent gray
     };
 
     // Build layer color map from data.layers
@@ -336,7 +336,7 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
         ctx.fill();
         ctx.stroke();
 
-        ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
         ctx.fillRect(
           node.x - bckgDimensions[0] / 2,
           node.y - p.nodeRadius - bckgDimensions[1] - fontSize * 0.2,
@@ -346,7 +346,7 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
 
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillStyle = '#f8fafc';
+        ctx.fillStyle = style.textColor;
         ctx.fillText(label, node.x, node.y - p.nodeRadius - bckgDimensions[1] / 2 - fontSize * 0.2);
         ctx.globalAlpha = 1;
 
@@ -368,6 +368,12 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
         const p = paramsRef.current;
         const isHighlighted = !p.enableHighlighting || highlightLinks.size === 0 || highlightLinks.has(link);
         const baseColor = getLayerStyle(link.layer).linkColor;
+
+        // If baseColor is already rgba, modify its opacity
+        if (baseColor.startsWith('rgba')) {
+          return baseColor.replace(/[\d.]+\)$/, `${isHighlighted ? 1 : 0.2})`);
+        }
+
         // Convert hex to rgba for opacity
         const rgb = parseInt(baseColor.slice(1), 16);
         const r = (rgb >> 16) & 255;
@@ -408,6 +414,7 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
         if (textAngle < -Math.PI / 2) textAngle = -(-Math.PI - textAngle);
 
         const label = link.name || '';
+        const style = getLayerStyle(link.layer);
 
         ctx.save();
         ctx.translate(textPos.x, textPos.y);
@@ -418,9 +425,9 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
         const textWidth = ctx.measureText(label).width;
 
         if (textWidth > 0) {
-          ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
           ctx.fillRect(-textWidth / 2 - 4, -fontSize / 2 - 2, textWidth + 8, fontSize + 4);
-          ctx.fillStyle = '#f8fafc';
+          ctx.fillStyle = style.textColor;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText(label, 0, 0);
