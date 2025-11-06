@@ -3,6 +3,8 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 
 import type { ChatProviderOption } from '../graphql/chat'
 
+const DEBUG = import.meta.env.DEV
+
 interface ChatContextState {
   provider: ChatProviderOption
   projectId?: number
@@ -33,6 +35,16 @@ export const useChatContextStore = create(
       name: 'layercake-chat-context',
       storage,
       version: 1,
+      onRehydrateStorage: () => {
+        if (DEBUG) {
+          console.log('[chatContextStore] Hydration starting')
+        }
+        return (state, error) => {
+          if (DEBUG) {
+            console.log('[chatContextStore] Hydration completed', { error, state })
+          }
+        }
+      },
     },
   ),
 )

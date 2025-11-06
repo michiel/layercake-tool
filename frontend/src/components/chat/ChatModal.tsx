@@ -7,7 +7,7 @@ import { AssistantThread } from './AssistantThread'
 import { DEFAULT_CHAT_SUGGESTIONS } from '../../config/chat'
 
 export const ChatModal = () => {
-  const { runtime, provider, isAwaitingAssistant, restart, session, messages } = useChat()
+  const { runtime, provider, isAwaitingAssistant, restart, session, messages, loading } = useChat()
 
   return (
     <AssistantModalPrimitive.Root>
@@ -35,7 +35,6 @@ export const ChatModal = () => {
               size="sm"
               variant="ghost"
               onClick={() => restart()}
-              disabled={isAwaitingAssistant}
             >
               Restart
             </Button>
@@ -46,6 +45,7 @@ export const ChatModal = () => {
             suggestions={DEFAULT_CHAT_SUGGESTIONS}
             composerDisabled={isAwaitingAssistant}
             showSuggestions={!messages.length}
+            composerPlaceholder={loading ? 'Connecting…' : undefined}
           />
         </AssistantRuntimeProvider>
       </AssistantModalPrimitive.Content>

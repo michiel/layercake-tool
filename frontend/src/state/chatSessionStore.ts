@@ -5,6 +5,8 @@ import { shallow } from 'zustand/shallow'
 import type { StartChatSessionPayload, ChatProviderOption } from '../graphql/chat'
 import type { ChatMessageEntry } from '../types/chat'
 
+const DEBUG = import.meta.env.DEV
+
 interface ProviderSession {
   session?: StartChatSessionPayload
   messages: ChatMessageEntry[]
@@ -70,14 +72,35 @@ export const useChatSessionStore = create(
       name: 'layercake-chat-sessions',
       storage,
       version: 1,
-      onRehydrateStorage: () => (_state, error) => {
-        useChatSessionStore.setState({
-          hydrationStatus: error ? 'error' : 'ready',
-        })
+      onRehydrateStorage: (state) => {
+        if (DEBUG) {
+          console.log('[chatSessionStore] Hydration starting', { state })
+        }
+        return (state, error) => {
+          if (DEBUG) {
+            console.log('[chatSessionStore] Hydration completed', { error, state })
+          }
+          useChatSessionStore.setState({
+            hydrationStatus: error ? 'error' : 'ready',
+          })
+        }
       },
     },
   ),
 )
+
+// Safety fallback: If hydration doesn't complete within 1 second, force it to ready
+if (typeof window !== 'undefined') {
+  setTimeout(() => {
+    const state = useChatSessionStore.getState()
+    if (state.hydrationStatus === 'pending') {
+      if (DEBUG) {
+        console.warn('[chatSessionStore] Hydration timeout - forcing ready state')
+      }
+      useChatSessionStore.setState({ hydrationStatus: 'ready' })
+    }
+  }, 1000)
+}
 
 export const useProviderSession = (provider: ChatProviderOption) =>
   useChatSessionStore(

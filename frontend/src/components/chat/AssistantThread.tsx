@@ -59,11 +59,11 @@ const Suggestion = ({ prompt }: { prompt: string }) => (
   </ThreadPrimitive.Suggestion>
 )
 
-const ThreadComposer = ({ disabled }: { disabled: boolean }) => (
+const ThreadComposer = ({ disabled, placeholder }: { disabled: boolean; placeholder?: string }) => (
   <ComposerPrimitive.Root className="mx-auto flex w-full max-w-3xl items-end gap-3 rounded-xl border border-border bg-background px-4 py-3 shadow-sm">
     <ComposerPrimitive.Input
       aria-label="Ask the assistant"
-      placeholder={disabled ? 'Connecting…' : 'Write a message…'}
+      placeholder={placeholder ?? (disabled ? 'Waiting for response…' : 'Write a message…')}
       className="flex-1 resize-none border-none bg-transparent p-0 text-sm outline-none focus-visible:ring-0 disabled:cursor-not-allowed disabled:text-muted-foreground"
       disabled={disabled}
     />
@@ -90,10 +90,12 @@ export const AssistantThread = ({
   suggestions = [],
   composerDisabled = false,
   showSuggestions = true,
+  composerPlaceholder,
 }: {
   suggestions?: string[]
   composerDisabled?: boolean
   showSuggestions?: boolean
+  composerPlaceholder?: string
 }) => (
   <ThreadPrimitive.Root className="relative flex h-full flex-col items-center pb-6">
     <ThreadPrimitive.Viewport className="flex-1 w-full max-w-3xl space-y-3 overflow-y-auto px-1 pb-20">
@@ -126,7 +128,7 @@ export const AssistantThread = ({
     </ThreadPrimitive.Viewport>
 
     <div className="w-full border-t border-border bg-background px-1 pt-4 pb-2">
-      <ThreadComposer disabled={composerDisabled} />
+      <ThreadComposer disabled={composerDisabled} placeholder={composerPlaceholder} />
     </div>
   </ThreadPrimitive.Root>
 )

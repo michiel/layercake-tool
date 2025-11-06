@@ -9,7 +9,8 @@ export const CHAT_PROVIDER_OPTIONS: Array<{ value: ChatProviderOption; label: st
   { value: 'Claude', label: 'Anthropic Claude' },
 ]
 
-export type ChatEventKind = 'AssistantMessage' | 'ToolInvocation'
+// Note: Backend sends SCREAMING_SNAKE_CASE but type is defined as PascalCase
+export type ChatEventKind = 'AssistantMessage' | 'ToolInvocation' | 'ASSISTANT_MESSAGE' | 'TOOL_INVOCATION'
 
 export interface StartChatSessionPayload {
   sessionId: string

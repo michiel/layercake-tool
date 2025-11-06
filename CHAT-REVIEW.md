@@ -18,6 +18,7 @@
 ## Remaining Follow-ups
 - The history buffer is capped at 64 events and is per-session; we should adjust the size if longer conversations are introduced or persist transcripts server-side if we need auditability.
 - Frontend state resets completely on restart/provider change. If we want to preserve prior transcripts per provider, we may need a higher-level store.
+- **Backend enum naming**: The `ChatEventKind` enum in `layercake-core/src/graphql/types/chat.rs` should use `#[graphql(rename_all = "PascalCase")]` to match frontend expectations. Currently sends `ASSISTANT_MESSAGE` but frontend types expect `AssistantMessage`. Frontend now handles both formats defensively.
 
 ## Validation
 - `cargo test -p layercake-core`

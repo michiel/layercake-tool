@@ -57,6 +57,8 @@ const getErrorMessage = (error: unknown) => {
   return String(error)
 }
 
+const DEBUG = import.meta.env.DEV
+
 export function useChatSession({
   projectId,
   provider,
@@ -73,6 +75,7 @@ export function useChatSession({
   const client = useApolloClient()
   const subscriptionRef = useRef<{ unsubscribe: () => void } | null>(null)
   const pendingMessagesRef = useRef<string[]>([])
+  const awaitingTimeoutRef = useRef<number | null>(null)
 
   const teardownSubscription = useCallback(() => {
     if (subscriptionRef.current) {
@@ -85,11 +88,47 @@ export function useChatSession({
     providerState.session?.sessionId ?? sessionId ?? undefined
 
   const restart = useCallback(() => {
+    if (DEBUG) {
+      console.log('[useChatSession] Restarting session', { provider })
+    }
     teardownSubscription()
     resetProviderSession(provider)
     setLoading(false)
     setError(null)
+    if (awaitingTimeoutRef.current) {
+      clearTimeout(awaitingTimeoutRef.current)
+      awaitingTimeoutRef.current = null
+    }
   }, [provider, teardownSubscription])
+
+  // Debug logging effect
+  useEffect(() => {
+    if (DEBUG) {
+      console.log('[useChatSession] State update', {
+        provider,
+        isHydrated,
+        hydrationStatus,
+        hasSession: !!providerState.session?.sessionId,
+        sessionId: providerState.session?.sessionId,
+        loading,
+        isAwaitingAssistant: providerState.isAwaitingAssistant,
+        messagesCount: providerState.messages.length,
+        pendingCount: pendingMessagesRef.current.length,
+        projectId,
+        error,
+      })
+    }
+  }, [
+    provider,
+    isHydrated,
+    hydrationStatus,
+    providerState.session?.sessionId,
+    providerState.isAwaitingAssistant,
+    providerState.messages.length,
+    loading,
+    projectId,
+    error,
+  ])
 
   // Ensure project id is tracked alongside the provider session
   useEffect(() => {
@@ -104,10 +143,19 @@ export function useChatSession({
   // Establish or reuse chat session
   useEffect(() => {
     if (!projectId || !isHydrated) {
+      if (DEBUG && !isHydrated) {
+        console.log('[useChatSession] Waiting for hydration before starting session')
+      }
+      if (DEBUG && !projectId) {
+        console.log('[useChatSession] No projectId provided, skipping session start')
+      }
       return
     }
 
     if (providerState.session?.sessionId) {
+      if (DEBUG) {
+        console.log('[useChatSession] Reusing existing session', { sessionId: providerState.session.sessionId })
+      }
       setLoading(false)
       setAwaitingForProvider(provider, false)
       return
@@ -117,6 +165,10 @@ export function useChatSession({
     setLoading(true)
     setAwaitingForProvider(provider, false)
 
+    if (DEBUG) {
+      console.log('[useChatSession] Starting new session', { projectId, provider })
+    }
+
     ;(async () => {
       try {
         const { data } = await startSession({
@@ -124,13 +176,24 @@ export function useChatSession({
         })
         if (cancelled) return
         if (data?.startChatSession) {
+          if (DEBUG) {
+            console.log('[useChatSession] Session started', data.startChatSession)
+          }
           setSessionForProvider(provider, data.startChatSession, projectId)
         } else {
-          setError('Failed to establish chat session.')
+          const errorMsg = 'Failed to establish chat session.'
+          if (DEBUG) {
+            console.error('[useChatSession] Session start failed - no data returned')
+          }
+          setError(errorMsg)
         }
       } catch (err) {
         if (!cancelled) {
-          setError(getErrorMessage(err))
+          const errorMsg = getErrorMessage(err)
+          if (DEBUG) {
+            console.error('[useChatSession] Session start error', errorMsg, err)
+          }
+          setError(errorMsg)
         }
       } finally {
         if (!cancelled) {
@@ -150,6 +213,10 @@ export function useChatSession({
       return
     }
 
+    if (DEBUG) {
+      console.log('[useChatSession] Loading chat history', { sessionId: activeSessionId })
+    }
+
     let cancelled = false
     ;(async () => {
       try {
@@ -160,6 +227,9 @@ export function useChatSession({
         })
         if (cancelled) return
         if (data?.chatHistory) {
+          if (DEBUG) {
+            console.log('[useChatSession] Loaded chat history', { count: data.chatHistory.length })
+          }
           const loadedMessages: ChatMessageEntry[] = data.chatHistory.map((msg) => ({
             id: msg.message_id,
             role: msg.role as ChatMessageRole,
@@ -171,7 +241,11 @@ export function useChatSession({
         }
       } catch (err) {
         if (!cancelled) {
-          setError(getErrorMessage(err))
+          const errorMsg = getErrorMessage(err)
+          if (DEBUG) {
+            console.error('[useChatSession] Failed to load history', errorMsg, err)
+          }
+          setError(errorMsg)
         }
       }
     })()
@@ -187,6 +261,10 @@ export function useChatSession({
       return
     }
 
+    if (DEBUG) {
+      console.log('[useChatSession] Setting up subscription', { sessionId: providerState.session.sessionId })
+    }
+
     const observable = client.subscribe<{ chatEvents: ChatEventPayload }>({
       query: CHAT_EVENTS_SUBSCRIPTION,
       variables: { sessionId: providerState.session.sessionId },
@@ -200,21 +278,45 @@ export function useChatSession({
           return
         }
 
+        if (DEBUG) {
+          console.log('[useChatSession] Received chat event', payload)
+        }
+
+        const isToolInvocation = payload.kind === 'ToolInvocation' || payload.kind === 'TOOL_INVOCATION'
+        const isAssistantMessage = payload.kind === 'AssistantMessage' || payload.kind === 'ASSISTANT_MESSAGE'
+
         appendMessageToProvider(provider, {
           id: makeId(),
-          role: payload.kind === 'ToolInvocation' ? 'tool' : 'assistant',
+          role: isToolInvocation ? 'tool' : 'assistant',
           content: payload.message,
           toolName: payload.toolName ?? undefined,
           createdAt: nowIso(),
         })
 
-        if (payload.kind === 'AssistantMessage') {
+        if (isAssistantMessage) {
+          if (DEBUG) {
+            console.log('[useChatSession] Assistant response complete, clearing awaiting state')
+          }
           setAwaitingForProvider(provider, false)
+          // Clear timeout when response arrives
+          if (awaitingTimeoutRef.current) {
+            clearTimeout(awaitingTimeoutRef.current)
+            awaitingTimeoutRef.current = null
+          }
         }
       },
       error: (subscriptionErr) => {
-        setError(getErrorMessage(subscriptionErr))
+        const errorMsg = getErrorMessage(subscriptionErr)
+        if (DEBUG) {
+          console.error('[useChatSession] Subscription error', errorMsg, subscriptionErr)
+        }
+        setError(errorMsg)
         setAwaitingForProvider(provider, false)
+        // Clear timeout on error
+        if (awaitingTimeoutRef.current) {
+          clearTimeout(awaitingTimeoutRef.current)
+          awaitingTimeoutRef.current = null
+        }
       },
     })
 
@@ -227,6 +329,9 @@ export function useChatSession({
 
   const deliverMessage = useCallback(
     async (sessionIdentifier: string, message: string) => {
+      if (DEBUG) {
+        console.log('[useChatSession] Delivering message', { sessionId: sessionIdentifier, messageLength: message.length })
+      }
       try {
         await sendChat({
           variables: {
@@ -234,8 +339,14 @@ export function useChatSession({
             message,
           },
         })
+        if (DEBUG) {
+          console.log('[useChatSession] Message sent successfully')
+        }
       } catch (err) {
         const errorMessage = getErrorMessage(err)
+        if (DEBUG) {
+          console.error('[useChatSession] Failed to send message', errorMessage, err)
+        }
         appendMessageToProvider(provider, {
           id: makeId(),
           role: 'assistant',
@@ -244,6 +355,12 @@ export function useChatSession({
         })
         setAwaitingForProvider(provider, false)
         setError(errorMessage)
+        // Clear timeout on error
+        if (awaitingTimeoutRef.current) {
+          clearTimeout(awaitingTimeoutRef.current)
+          awaitingTimeoutRef.current = null
+        }
+        throw err // Re-throw to let pending message handler know it failed
       }
     },
     [provider, sendChat],
@@ -261,18 +378,35 @@ export function useChatSession({
     const queue = [...pendingMessagesRef.current]
     pendingMessagesRef.current = []
 
-    queue.reduce(
-      (promise, message) =>
-        promise.then(() => deliverMessage(sessionIdentifier, message)),
-      Promise.resolve(),
-    )
-  }, [providerState.session?.sessionId, deliverMessage])
+    if (DEBUG) {
+      console.log('[useChatSession] Processing pending messages', { count: queue.length })
+    }
+
+    // Process pending messages sequentially with proper error handling
+    ;(async () => {
+      for (const message of queue) {
+        try {
+          await deliverMessage(sessionIdentifier, message)
+        } catch (err) {
+          if (DEBUG) {
+            console.error('[useChatSession] Failed to deliver pending message', err)
+          }
+          // Stop processing on first error - user can retry
+          break
+        }
+      }
+    })()
+  }, [providerState.session?.sessionId, deliverMessage, provider])
 
   const sendMessage = useCallback(
     async (content: string) => {
       const trimmed = content.trim()
       if (!trimmed) {
         return
+      }
+
+      if (DEBUG) {
+        console.log('[useChatSession] Sending message', { hasSession: !!providerState.session?.sessionId })
       }
 
       const enriched =
@@ -289,8 +423,24 @@ export function useChatSession({
       appendMessageToProvider(provider, userMessage)
       setAwaitingForProvider(provider, true)
 
+      // Set timeout to automatically reset awaiting state after 30 seconds
+      if (awaitingTimeoutRef.current) {
+        clearTimeout(awaitingTimeoutRef.current)
+      }
+      awaitingTimeoutRef.current = setTimeout(() => {
+        if (DEBUG) {
+          console.warn('[useChatSession] Message timeout - no response received')
+        }
+        setAwaitingForProvider(provider, false)
+        setError('Response timeout - please try again')
+        awaitingTimeoutRef.current = null
+      }, 30000) // 30 second timeout
+
       const sessionIdentifier = providerState.session?.sessionId
       if (!sessionIdentifier) {
+        if (DEBUG) {
+          console.log('[useChatSession] No session yet, queuing message')
+        }
         pendingMessagesRef.current.push(enriched)
         return
       }

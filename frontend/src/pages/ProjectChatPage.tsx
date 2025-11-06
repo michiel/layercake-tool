@@ -121,7 +121,7 @@ export const ProjectChatPage = () => {
           <Button
             variant="secondary"
             onClick={() => restart()}
-            disabled={loading || isAwaitingAssistant}
+            disabled={loading}
           >
             Restart Session
           </Button>
@@ -162,6 +162,7 @@ export const ProjectChatPage = () => {
               suggestions={DEFAULT_CHAT_SUGGESTIONS}
               composerDisabled={isAwaitingAssistant}
               showSuggestions={!messages.length}
+              composerPlaceholder={loading ? 'Connecting…' : undefined}
             />
           </AssistantRuntimeProvider>
         </CardContent>
