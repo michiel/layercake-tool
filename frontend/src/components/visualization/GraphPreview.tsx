@@ -221,13 +221,44 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
       linkColor: '#64748b'
     };
 
+    // Build layer color map from data.layers
+    const layerColorMap = new Map<string, string>();
+    if (data.layers) {
+      data.layers.forEach(layer => {
+        if (layer.backgroundColor) {
+          layerColorMap.set(layer.layerId, `#${layer.backgroundColor}`);
+        }
+      });
+    }
+
+    // Generate default colors for layers without explicit colors
+    const defaultColors = [
+      '#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f59e0b',
+      '#10b981', '#14b8a6', '#06b6d4', '#3b82f6', '#6366f1'
+    ];
+    let colorIndex = 0;
+    const layerSet = new Set<string>();
+    data.nodes.forEach(node => layerSet.add(node.layer));
+    layerSet.forEach(layer => {
+      if (!layerColorMap.has(layer)) {
+        layerColorMap.set(layer, defaultColors[colorIndex % defaultColors.length]);
+        colorIndex++;
+      }
+    });
+
     return {
       defaults,
-      getStyle(_layerId?: string) {
-        return defaults;
+      getStyle(layerId?: string) {
+        const nodeColor = layerId ? layerColorMap.get(layerId) ?? defaults.nodeColor : defaults.nodeColor;
+        return {
+          nodeColor,
+          borderColor: defaults.borderColor,
+          textColor: defaults.textColor,
+          linkColor: nodeColor // Use same color as node for links
+        };
       }
     };
-  }, []);
+  }, [data]);
 
   // Initialize graph when data changes
   useEffect(() => {
@@ -261,31 +292,6 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
         !b.links && (b.links = []);
         a.links.push(link);
         b.links.push(link);
-      }
-    });
-
-    // Build layer color map
-    const layerColorMap = new Map<string, string>();
-    if (data.layers) {
-      data.layers.forEach(layer => {
-        if (layer.backgroundColor) {
-          layerColorMap.set(layer.layerId, `#${layer.backgroundColor}`);
-        }
-      });
-    }
-
-    // Generate default colors for layers without explicit colors
-    const defaultColors = [
-      '#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f59e0b',
-      '#10b981', '#14b8a6', '#06b6d4', '#3b82f6', '#6366f1'
-    ];
-    let colorIndex = 0;
-    const layerSet = new Set<string>();
-    data.nodes.forEach(node => layerSet.add(node.layer));
-    layerSet.forEach(layer => {
-      if (!layerColorMap.has(layer)) {
-        layerColorMap.set(layer, defaultColors[colorIndex % defaultColors.length]);
-        colorIndex++;
       }
     });
 
@@ -501,7 +507,7 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
         graphRef.current = null;
       }
     };
-  }, [data, width, height, computeSignature]);
+  }, [data, width, height, layerStyles, computeSignature]);
 
   // Handle window resize events
   useEffect(() => {
