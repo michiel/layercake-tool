@@ -6,7 +6,7 @@ import { useChat } from './ChatProvider'
 import { AssistantThread } from './AssistantThread'
 
 export const ChatModal = () => {
-  const { runtime, provider, isAwaitingAssistant, restart, session } = useChat()
+  const { runtime, provider, isAwaitingAssistant, restart, session, messages } = useChat()
 
   return (
     <AssistantModalPrimitive.Root>
@@ -47,6 +47,8 @@ export const ChatModal = () => {
               'List recent tool invocations for this project.',
               'What are the open tasks for this project?',
             ]}
+            composerDisabled={!session?.sessionId || isAwaitingAssistant}
+            showSuggestions={!messages.length}
           />
         </AssistantRuntimeProvider>
       </AssistantModalPrimitive.Content>

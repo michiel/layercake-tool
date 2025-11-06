@@ -4,7 +4,7 @@ import {
   ThreadPrimitive,
   type ToolCallMessagePartComponent,
 } from '@assistant-ui/react'
-import { IconArrowDown, IconCircleX, IconSend } from '@tabler/icons-react'
+import { IconCircleX, IconSend } from '@tabler/icons-react'
 
 import { Button } from '../ui/button'
 
@@ -48,18 +48,6 @@ const SystemMessage = () => (
   </MessagePrimitive.Root>
 )
 
-const ScrollToBottomButton = () => (
-  <ThreadPrimitive.ScrollToBottom asChild>
-    <Button
-      size="icon"
-      variant="secondary"
-      className="absolute -top-12 right-4 rounded-full shadow"
-    >
-      <IconArrowDown className="h-4 w-4" />
-    </Button>
-  </ThreadPrimitive.ScrollToBottom>
-)
-
 const Suggestion = ({ prompt }: { prompt: string }) => (
   <ThreadPrimitive.Suggestion
     prompt={prompt}
@@ -71,12 +59,13 @@ const Suggestion = ({ prompt }: { prompt: string }) => (
   </ThreadPrimitive.Suggestion>
 )
 
-const ThreadComposer = () => (
+const ThreadComposer = ({ disabled }: { disabled: boolean }) => (
   <ComposerPrimitive.Root className="mx-auto flex w-full max-w-3xl items-end gap-3 rounded-xl border border-border bg-background px-4 py-3 shadow-sm">
     <ComposerPrimitive.Input
       aria-label="Ask the assistant"
-      placeholder="Write a message…"
-      className="flex-1 resize-none border-none bg-transparent p-0 text-sm outline-none focus-visible:ring-0"
+      placeholder={disabled ? 'Connecting…' : 'Write a message…'}
+      className="flex-1 resize-none border-none bg-transparent p-0 text-sm outline-none focus-visible:ring-0 disabled:cursor-not-allowed disabled:text-muted-foreground"
+      disabled={disabled}
     />
     <div className="flex items-center gap-2">
       <ThreadPrimitive.If running>
@@ -88,7 +77,7 @@ const ThreadComposer = () => (
       </ThreadPrimitive.If>
       <ThreadPrimitive.If running={false}>
         <ComposerPrimitive.Send asChild>
-          <Button size="icon">
+          <Button size="icon" disabled={disabled}>
             <IconSend className="h-4 w-4" />
           </Button>
         </ComposerPrimitive.Send>
@@ -97,11 +86,17 @@ const ThreadComposer = () => (
   </ComposerPrimitive.Root>
 )
 
+interface AssistantThreadProps {
+  suggestions?: string[]
+  composerDisabled?: boolean
+  showSuggestions?: boolean
+}
+
 export const AssistantThread = ({
   suggestions = [],
-}: {
-  suggestions?: string[]
-}) => (
+  composerDisabled = false,
+  showSuggestions = true,
+}: AssistantThreadProps) => (
   <ThreadPrimitive.Root className="relative flex h-full flex-col items-center pb-6">
     <ThreadPrimitive.Viewport className="flex-1 w-full max-w-3xl space-y-3 overflow-y-auto px-1 pb-20">
       <ThreadPrimitive.Empty>
@@ -112,7 +107,7 @@ export const AssistantThread = ({
               Ask a question about this project. The assistant can run Layercake tools whenever additional context is helpful.
             </p>
           </div>
-          {suggestions.length > 0 && (
+          {showSuggestions && suggestions.length > 0 && (
             <div className="flex max-w-3xl flex-wrap items-stretch gap-3">
               {suggestions.map((prompt) => (
                 <Suggestion key={prompt} prompt={prompt} />
@@ -130,11 +125,10 @@ export const AssistantThread = ({
         }}
       />
 
-      <ScrollToBottomButton />
     </ThreadPrimitive.Viewport>
 
     <div className="w-full border-t border-border bg-background px-1 pt-4 pb-2">
-      <ThreadComposer />
+      <ThreadComposer disabled={composerDisabled} />
     </div>
   </ThreadPrimitive.Root>
 )
