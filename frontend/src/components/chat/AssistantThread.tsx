@@ -4,6 +4,7 @@ import {
   ThreadPrimitive,
   type ToolCallMessagePartComponent,
 } from '@assistant-ui/react'
+import { MarkdownText } from './MarkdownText'
 import { IconCircleX, IconSend } from '@tabler/icons-react'
 
 import { Button } from '../ui/button'
@@ -30,14 +31,6 @@ const UserMessage = () => (
   <MessagePrimitive.Root className="grid w-full max-w-3xl auto-rows-auto grid-cols-[minmax(48px,1fr)_auto] gap-y-2 self-end py-3 [&>*]:col-start-2">
     <div className="rounded-2xl bg-primary px-4 py-3 text-sm text-primary-foreground shadow">
       <MessagePrimitive.Parts />
-    </div>
-  </MessagePrimitive.Root>
-)
-
-const AssistantMessage = () => (
-  <MessagePrimitive.Root className="grid w-full max-w-3xl auto-rows-auto grid-cols-[auto_minmax(48px,1fr)] gap-y-2 self-start py-3 [&>*]:col-start-1">
-    <div className="rounded-2xl border border-border bg-muted px-4 py-3 text-sm shadow-sm">
-      <MessagePrimitive.Parts components={{ tools: { Override: ToolCallPart } }} />
     </div>
   </MessagePrimitive.Root>
 )
@@ -120,7 +113,13 @@ export const AssistantThread = ({
       <ThreadPrimitive.Messages
         components={{
           UserMessage,
-          AssistantMessage,
+          AssistantMessage: () => (
+            <MessagePrimitive.Root className="grid w-full max-w-3xl auto-rows-auto grid-cols-[auto_minmax(48px,1fr)] gap-y-2 self-start py-3 [&>*]:col-start-1">
+              <div className="rounded-2xl border border-border bg-muted px-4 py-3 text-sm shadow-sm">
+                <MessagePrimitive.Parts components={{ Text: MarkdownText, tools: { Override: ToolCallPart } }} />
+              </div>
+            </MessagePrimitive.Root>
+          ),
           SystemMessage,
         }}
       />
