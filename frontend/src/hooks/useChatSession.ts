@@ -18,7 +18,7 @@ import {
   setMessagesForProvider,
   setSessionForProvider,
   useProviderSession,
-  useChatSessionsHydrated,
+  useChatSessionsHydrationStatus,
 } from '../state/chatSessionStore'
 
 interface UseChatSessionArgs {
@@ -66,11 +66,13 @@ export function useChatSession({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const providerState = useProviderSession(provider)
-  const hasHydrated = useChatSessionsHydrated()
+  const hydrationStatus = useChatSessionsHydrationStatus()
+  const isHydrated = hydrationStatus === 'ready'
   const [startSession] = useMutation<{ startChatSession: StartChatSessionPayload }>(START_CHAT_SESSION)
   const [sendChat] = useMutation(SEND_CHAT_MESSAGE)
   const client = useApolloClient()
   const subscriptionRef = useRef<{ unsubscribe: () => void } | null>(null)
+  const pendingMessagesRef = useRef<string[]>([])
 
   const teardownSubscription = useCallback(() => {
     if (subscriptionRef.current) {
@@ -91,17 +93,17 @@ export function useChatSession({
 
   // Ensure project id is tracked alongside the provider session
   useEffect(() => {
-    if (!hasHydrated) {
+    if (!isHydrated) {
       return
     }
     if (providerState.session && projectId !== undefined) {
       setSessionForProvider(provider, providerState.session, projectId)
     }
-  }, [provider, providerState.session, projectId, hasHydrated])
+  }, [provider, providerState.session, projectId, isHydrated])
 
   // Establish or reuse chat session
   useEffect(() => {
-    if (!projectId || !hasHydrated) {
+    if (!projectId || !isHydrated) {
       return
     }
 
@@ -140,11 +142,11 @@ export function useChatSession({
     return () => {
       cancelled = true
     }
-  }, [projectId, provider, sessionId, providerState.session?.sessionId, startSession, hasHydrated])
+  }, [projectId, provider, sessionId, providerState.session?.sessionId, startSession, isHydrated])
 
   // Load history if needed (e.g., after reload)
   useEffect(() => {
-    if (!hasHydrated || !activeSessionId || providerState.messages.length > 0) {
+    if (!isHydrated || !activeSessionId || providerState.messages.length > 0) {
       return
     }
 
@@ -177,11 +179,11 @@ export function useChatSession({
     return () => {
       cancelled = true
     }
-  }, [activeSessionId, provider, providerState.messages.length, client, hasHydrated])
+  }, [activeSessionId, provider, providerState.messages.length, client, isHydrated])
 
   // Subscribe to real-time chat events from the active session
   useEffect(() => {
-    if (!hasHydrated || !providerState.session?.sessionId) {
+    if (!isHydrated || !providerState.session?.sessionId) {
       return
     }
 
@@ -219,18 +221,57 @@ export function useChatSession({
     return () => {
       teardownSubscription()
     }
-  }, [client, provider, providerState.session?.sessionId, teardownSubscription, hasHydrated])
+  }, [client, provider, providerState.session?.sessionId, teardownSubscription, isHydrated])
 
   useEffect(() => () => teardownSubscription(), [teardownSubscription])
 
+  const deliverMessage = useCallback(
+    async (sessionIdentifier: string, message: string) => {
+      try {
+        await sendChat({
+          variables: {
+            sessionId: sessionIdentifier,
+            message,
+          },
+        })
+      } catch (err) {
+        const errorMessage = getErrorMessage(err)
+        appendMessageToProvider(provider, {
+          id: makeId(),
+          role: 'assistant',
+          content: `Error sending message: ${errorMessage}`,
+          createdAt: nowIso(),
+        })
+        setAwaitingForProvider(provider, false)
+        setError(errorMessage)
+      }
+    },
+    [provider, sendChat],
+  )
+
+  useEffect(() => {
+    if (!providerState.session?.sessionId) {
+      return
+    }
+    if (pendingMessagesRef.current.length === 0) {
+      return
+    }
+
+    const sessionIdentifier = providerState.session.sessionId
+    const queue = [...pendingMessagesRef.current]
+    pendingMessagesRef.current = []
+
+    queue.reduce(
+      (promise, message) =>
+        promise.then(() => deliverMessage(sessionIdentifier, message)),
+      Promise.resolve(),
+    )
+  }, [providerState.session?.sessionId, deliverMessage])
+
   const sendMessage = useCallback(
     async (content: string) => {
-      if (!hasHydrated) {
-        return
-      }
       const trimmed = content.trim()
-      const sessionIdentifier = providerState.session?.sessionId
-      if (!trimmed || !sessionIdentifier) {
+      if (!trimmed) {
         return
       }
 
@@ -248,25 +289,15 @@ export function useChatSession({
       appendMessageToProvider(provider, userMessage)
       setAwaitingForProvider(provider, true)
 
-      try {
-        await sendChat({
-          variables: {
-            sessionId: sessionIdentifier,
-            message: enriched,
-          },
-        })
-      } catch (err) {
-        const errorMessage = getErrorMessage(err)
-        setAwaitingForProvider(provider, false)
-        appendMessageToProvider(provider, {
-          id: makeId(),
-          role: 'assistant',
-          content: `Error sending message: ${errorMessage}`,
-          createdAt: nowIso(),
-        })
+      const sessionIdentifier = providerState.session?.sessionId
+      if (!sessionIdentifier) {
+        pendingMessagesRef.current.push(enriched)
+        return
       }
+
+      deliverMessage(sessionIdentifier, enriched)
     },
-    [context, provider, providerState.session?.sessionId, sendChat],
+    [context, provider, providerState.session?.sessionId, deliverMessage],
   )
 
   return {

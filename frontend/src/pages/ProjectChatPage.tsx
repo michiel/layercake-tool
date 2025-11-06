@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Spinner } from '../components/ui/spinner'
 import { CHAT_PROVIDER_OPTIONS, ChatProviderOption } from '../graphql/chat'
 import { useRegisterChatContext } from '../hooks/useRegisterChatContext'
+import { DEFAULT_CHAT_SUGGESTIONS } from '../config/chat'
 
 const GET_PROJECT = gql`
   query GetProjectName($id: Int!) {
@@ -158,12 +159,8 @@ export const ProjectChatPage = () => {
 
           <AssistantRuntimeProvider runtime={runtime}>
             <AssistantThread
-              suggestions={[
-                'Summarize the latest project updates.',
-                'List recent tool invocations for this project.',
-                'What are the open tasks for this project?',
-              ]}
-              composerDisabled={loading || isAwaitingAssistant}
+              suggestions={DEFAULT_CHAT_SUGGESTIONS}
+              composerDisabled={isAwaitingAssistant}
               showSuggestions={!messages.length}
             />
           </AssistantRuntimeProvider>

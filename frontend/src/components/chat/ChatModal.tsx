@@ -4,9 +4,10 @@ import { IconMessageDots } from '@tabler/icons-react'
 import { Button } from '../ui/button'
 import { useChat } from './ChatProvider'
 import { AssistantThread } from './AssistantThread'
+import { DEFAULT_CHAT_SUGGESTIONS } from '../../config/chat'
 
 export const ChatModal = () => {
-  const { runtime, provider, isAwaitingAssistant, restart, session, messages, loading } = useChat()
+  const { runtime, provider, isAwaitingAssistant, restart, session, messages } = useChat()
 
   return (
     <AssistantModalPrimitive.Root>
@@ -42,12 +43,8 @@ export const ChatModal = () => {
         </div>
         <AssistantRuntimeProvider runtime={runtime}>
           <AssistantThread
-            suggestions={[
-              'Summarize the latest project updates.',
-              'List recent tool invocations for this project.',
-              'What are the open tasks for this project?',
-            ]}
-            composerDisabled={loading || isAwaitingAssistant}
+            suggestions={DEFAULT_CHAT_SUGGESTIONS}
+            composerDisabled={isAwaitingAssistant}
             showSuggestions={!messages.length}
           />
         </AssistantRuntimeProvider>

@@ -13,15 +13,17 @@ interface ProviderSession {
   lastUpdatedAt?: string
 }
 
+type HydrationStatus = 'pending' | 'ready' | 'error'
+
 interface ChatSessionState {
   sessions: Record<ChatProviderOption, ProviderSession>
-  hydrated: boolean
+  hydrationStatus: HydrationStatus
   updateProvider: (
     provider: ChatProviderOption,
     updater: (prev: ProviderSession) => ProviderSession,
   ) => void
   resetProvider: (provider: ChatProviderOption) => void
-  setHydrated: (value: boolean) => void
+  setHydrationStatus: (value: HydrationStatus) => void
 }
 
 const DEFAULT_SESSION: ProviderSession = {
@@ -41,7 +43,8 @@ export const useChatSessionStore = create(
   persist<ChatSessionState>(
     (set) => ({
       sessions: {} as Record<ChatProviderOption, ProviderSession>,
-      hydrated: true,
+      hydrationStatus:
+        typeof window === 'undefined' ? ('ready' as HydrationStatus) : 'pending',
       updateProvider: (provider, updater) =>
         set((state) => {
           const previous = state.sessions[provider] ?? DEFAULT_SESSION
@@ -58,19 +61,19 @@ export const useChatSessionStore = create(
           delete nextSessions[provider]
           return { sessions: nextSessions }
         }),
-      setHydrated: (value: boolean) =>
+      setHydrationStatus: (value: HydrationStatus) =>
         set(() => ({
-          hydrated: value,
+          hydrationStatus: value,
         })),
     }),
     {
       name: 'layercake-chat-sessions',
       storage,
       version: 1,
-      onRehydrateStorage: () => (state) => {
-        if (state) {
-          useChatSessionStore.setState({ hydrated: true })
-        }
+      onRehydrateStorage: () => (_state, error) => {
+        useChatSessionStore.setState({
+          hydrationStatus: error ? 'error' : 'ready',
+        })
       },
     },
   ),
@@ -82,8 +85,8 @@ export const useProviderSession = (provider: ChatProviderOption) =>
     shallow,
   )
 
-export const useChatSessionsHydrated = () =>
-  useChatSessionStore((state) => state.hydrated)
+export const useChatSessionsHydrationStatus = () =>
+  useChatSessionStore((state) => state.hydrationStatus)
 
 export const appendMessageToProvider = (
   provider: ChatProviderOption,
