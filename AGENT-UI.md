@@ -92,3 +92,10 @@ assistant-ui can replace the bespoke chat view with manageable engineering effor
 - Removed the Mantine-based implementation and feature flag; `/projects/:projectId/chat` now always renders assistant-ui while navigation exposes only the canonical chat and log views.
 - Continued to rely on `useChatSession` for GraphQL mutations/subscriptions; message payloads are translated into assistant-ui `ThreadMessageLike` structures (text and tool-call parts).
 - `@assistant-ui/react` and `@assistant-ui/styles` remain first-class dependencies alongside shadcn/ui, ensuring consistent Tailwind-based theming across the app.
+
+## UI Integration Recommendations
+- Prefer assistant-ui’s higher-level primitives (e.g., `Thread`, `ThreadPrimitive.Messages`, `ComposerPrimitive.Root`) for layout instead of wrapping them in bespoke shadcn components. This keeps styling hooks aligned with upstream defaults and reduces custom CSS.
+- Import ready-made assistant-ui subcomponents from `examples/components/assistant-ui/thread.tsx` as a starting point. They deliver polished message bubbles, welcome cards, and sticky composers that can be themed via CSS variables rather than manual markup.
+- Leverage assistant-ui’s `ThreadPrimitive.ScrollToBottom`, `ThreadPrimitive.Suggestion`, and `ActionBarPrimitive` elements to implement UX affordances like quick prompts, scroll controls, message editing, and retries without recreating those mechanisms in shadcn.
+- Compose Mantine-era controls (provider selector, status badges) around the runtime provider, but let assistant-ui own the message viewport and composer. Only override styles where product branding requires it, using CSS custom properties (`--thread-max-width`, color tokens) defined by `@assistant-ui/styles`.
+- For tool call rendering, register custom components via `MessagePrimitive.Parts` `tools.Override` rather than building entire card structures. Assistant-ui handles grouping/tool status automatically; overrides should focus on content presentation.

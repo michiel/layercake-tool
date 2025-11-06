@@ -7,16 +7,20 @@ import {
   ThreadPrimitive,
   type MessageStatus,
   type ThreadMessageLike,
-  useAssistantState,
   useExternalStoreRuntime,
 } from '@assistant-ui/react'
 import type {
-  TextMessagePartComponent,
   ToolCallMessagePartComponent,
 } from '@assistant-ui/react'
 import { gql } from '@apollo/client'
 import { useQuery } from '@apollo/client/react'
-import { IconMessageDots, IconRefresh } from '@tabler/icons-react'
+import {
+  IconArrowDown,
+  IconCircleX,
+  IconMessageDots,
+  IconRefresh,
+  IconSend,
+} from '@tabler/icons-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 
@@ -36,7 +40,6 @@ import { Spinner } from '../components/ui/spinner'
 import { Label } from '../components/ui/label'
 import { CHAT_PROVIDER_OPTIONS, type ChatProviderOption } from '../graphql/chat'
 import { useChatSession, type ChatMessageEntry } from '../hooks/useChatSession'
-import { cn } from '@/lib/utils'
 
 const GET_PROJECT = gql`
   query GetProjectName($id: Int!) {
@@ -90,12 +93,6 @@ const convertMessages = (
     }
   })
 
-const TextPart: TextMessagePartComponent = ({ text }) => (
-  <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
-    {text}
-  </p>
-)
-
 const ToolCallPart: ToolCallMessagePartComponent<unknown, unknown> = ({
   toolName,
   result,
@@ -114,33 +111,50 @@ const ToolCallPart: ToolCallMessagePartComponent<unknown, unknown> = ({
   </div>
 )
 
-const ThreadMessageBubble = () => {
-  const role = useAssistantState(({ message }) => message.role)
-
-  const alignment =
-    role === 'user' ? 'justify-end' : role === 'assistant' ? 'justify-start' : 'justify-start'
-  const bubbleClasses = cn(
-    'max-w-[75%] rounded-2xl px-4 py-3 text-sm shadow-sm border',
-    role === 'user'
-      ? 'bg-primary text-primary-foreground border-primary/80'
-      : role === 'assistant'
-        ? 'bg-muted text-foreground border-muted/80'
-        : 'bg-secondary text-foreground border-secondary/80',
-  )
-
-  return (
-    <div className={cn('flex w-full', alignment)}>
-      <div className={bubbleClasses}>
-        <MessagePrimitive.Parts
-          components={{
-            Text: TextPart,
-            tools: { Override: ToolCallPart },
-          }}
-        />
-      </div>
+const UserMessage = () => (
+  <MessagePrimitive.Root className="grid w-full max-w-3xl auto-rows-auto grid-cols-[minmax(48px,1fr)_auto] gap-y-2 self-end py-3 [&>*]:col-start-2">
+    <div className="rounded-2xl bg-primary px-4 py-3 text-sm text-primary-foreground shadow">
+      <MessagePrimitive.Parts />
     </div>
-  )
-}
+  </MessagePrimitive.Root>
+)
+
+const AssistantMessage = () => (
+  <MessagePrimitive.Root className="grid w-full max-w-3xl auto-rows-auto grid-cols-[auto_minmax(48px,1fr)] gap-y-2 self-start py-3 [&>*]:col-start-1">
+    <div className="rounded-2xl border border-border bg-muted px-4 py-3 text-sm shadow-sm">
+      <MessagePrimitive.Parts components={{ tools: { Override: ToolCallPart } }} />
+    </div>
+  </MessagePrimitive.Root>
+)
+
+const SystemMessage = () => (
+  <MessagePrimitive.Root className="mx-auto max-w-2xl py-2 text-xs text-muted-foreground">
+    <MessagePrimitive.Parts />
+  </MessagePrimitive.Root>
+)
+
+const ScrollToBottomButton = () => (
+  <ThreadPrimitive.ScrollToBottom asChild>
+    <Button
+      size="icon"
+      variant="secondary"
+      className="absolute -top-12 right-4 rounded-full shadow"
+    >
+      <IconArrowDown className="h-4 w-4" />
+    </Button>
+  </ThreadPrimitive.ScrollToBottom>
+)
+
+const Suggestion = ({ prompt }: { prompt: string }) => (
+  <ThreadPrimitive.Suggestion
+    prompt={prompt}
+    method="replace"
+    autoSend
+    className="flex flex-col gap-1 rounded-xl border border-dashed border-border bg-muted/50 p-3 text-left text-sm transition-colors hover:bg-muted"
+  >
+    {prompt}
+  </ThreadPrimitive.Suggestion>
+)
 
 const ThreadComposer = () => (
   <ComposerPrimitive.Root className="flex items-end gap-3 rounded-xl border border-border bg-background px-4 py-3 shadow-sm">
@@ -152,14 +166,16 @@ const ThreadComposer = () => (
     <Group gap="sm">
       <ThreadPrimitive.If running>
         <ComposerPrimitive.Cancel asChild>
-          <Button variant="ghost" size="sm">
-            Cancel
+          <Button variant="ghost" size="icon">
+            <IconCircleX className="h-4 w-4" />
           </Button>
         </ComposerPrimitive.Cancel>
       </ThreadPrimitive.If>
       <ThreadPrimitive.If running={false}>
         <ComposerPrimitive.Send asChild>
-          <Button size="sm">Send</Button>
+          <Button size="icon">
+            <IconSend className="h-4 w-4" />
+          </Button>
         </ComposerPrimitive.Send>
       </ThreadPrimitive.If>
     </Group>
@@ -167,28 +183,42 @@ const ThreadComposer = () => (
 )
 
 const ThreadView = () => (
-  <ThreadPrimitive.Root className="flex h-full flex-col gap-4">
-    <ThreadPrimitive.Viewport className="flex-1 space-y-3 overflow-y-auto pr-1">
+  <ThreadPrimitive.Root className="relative flex h-full flex-col">
+    <ThreadPrimitive.Viewport className="flex-1 space-y-3 overflow-y-auto px-1 pb-6">
       <ThreadPrimitive.Empty>
-        <Card className="border border-dashed">
-          <CardContent className="pt-6">
-            <Stack gap="xs">
-              <h3 className="text-base font-semibold">
-                Start a conversation
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                Ask a question about this project. The assistant can run Layercake
-                tools whenever additional context is helpful.
-              </p>
-            </Stack>
-          </CardContent>
-        </Card>
+        <Stack gap="lg" className="items-center py-12">
+          <Card className="w-full max-w-3xl border border-dashed">
+            <CardContent className="pt-6">
+              <Stack gap="xs">
+                <h3 className="text-base font-semibold">
+                  Start a conversation
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Ask a question about this project. The assistant can run Layercake tools whenever additional context is helpful.
+                </p>
+              </Stack>
+            </CardContent>
+          </Card>
+          <Group gap="sm" wrap className="max-w-3xl">
+            <Suggestion prompt="Summarize the latest project updates." />
+            <Suggestion prompt="List recent tool invocations for this project." />
+            <Suggestion prompt="What are the open tasks for this project?" />
+          </Group>
+        </Stack>
       </ThreadPrimitive.Empty>
 
-      <ThreadPrimitive.Messages components={{ Message: ThreadMessageBubble }} />
+      <ThreadPrimitive.Messages
+        components={{
+          UserMessage,
+          AssistantMessage,
+          SystemMessage,
+        }}
+      />
+
+      <ScrollToBottomButton />
     </ThreadPrimitive.Viewport>
 
-    <div className="border-t border-border pt-4">
+    <div className="border-t border-border bg-background px-1 pt-4">
       <ThreadComposer />
     </div>
   </ThreadPrimitive.Root>
