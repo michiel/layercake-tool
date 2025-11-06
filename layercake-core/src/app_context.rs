@@ -1539,7 +1539,10 @@ fn node_type_storage_name(node_type: &PlanDagNodeType) -> &'static str {
     }
 }
 
-fn generate_node_id(node_type: &PlanDagNodeType, _existing_nodes: &[PlanDagNode]) -> Result<String> {
+fn generate_node_id(
+    node_type: &PlanDagNodeType,
+    _existing_nodes: &[PlanDagNode],
+) -> Result<String> {
     // Generate a globally unique ID using UUID to prevent collisions across projects/plans
     // Format: <node_type_prefix>_<uuid>
     let prefix = node_type_prefix(node_type);

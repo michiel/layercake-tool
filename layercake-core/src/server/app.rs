@@ -221,6 +221,7 @@ async fn graphql_handler(
         let has_errors = !response.errors.is_empty();
         let status = if has_errors { "ERROR" } else { "OK" };
 
+        let log_target = "graphql::mutation";
         if has_errors {
             let error_summary = response
                 .errors
@@ -228,8 +229,8 @@ async fn graphql_handler(
                 .map(|err| err.message.as_str())
                 .collect::<Vec<_>>()
                 .join(" | ");
-            tracing::info!(
-                target: "graphql::mutation",
+            tracing::error!(
+                target: log_target,
                 "mutation={} status={} params={} error={}",
                 info.field_name,
                 status,
@@ -238,7 +239,7 @@ async fn graphql_handler(
             );
         } else {
             tracing::info!(
-                target: "graphql::mutation",
+                target: log_target,
                 "mutation={} status={} params={}",
                 info.field_name,
                 status,
