@@ -13,12 +13,13 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Stack, Group } from '@/components/layout-primitives'
-import { IconDownload, IconEye, IconCopy, IconSelect } from '@tabler/icons-react'
+import { IconDownload, IconEye, IconCopy, IconSelect, IconChartDots } from '@tabler/icons-react'
 import { PlanDagNodeType, OutputNodeConfig } from '../../../../types/plan-dag'
 import { isNodeConfigured } from '../../../../utils/planDagValidation'
 import { EXPORT_NODE_OUTPUT, ExportNodeOutputResult } from '../../../../graphql/export'
 import { BaseNode } from './BaseNode'
 import { showErrorNotification, showSuccessNotification } from '../../../../utils/notifications'
+import { MermaidPreviewDialog } from '../../../visualization/MermaidPreviewDialog'
 
 interface OutputNodeProps extends NodeProps {
   onEdit?: (nodeId: string) => void
@@ -47,8 +48,14 @@ export const OutputNode = memo((props: OutputNodeProps) => {
   const [downloading, setDownloading] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [previewContent, setPreviewContent] = useState('')
-  const [previewLoading, setPreviewLoading] = useState(false)
+  const [mermaidOpen, setMermaidOpen] = useState(false)
+  const [mermaidContent, setMermaidContent] = useState('')
+  const [previewTarget, setPreviewTarget] = useState<'text' | 'mermaid' | null>(null)
+  const [loadingTarget, setLoadingTarget] = useState<'text' | 'mermaid' | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const isTextPreviewLoading = loadingTarget === 'text'
+  const isMermaidLoading = loadingTarget === 'mermaid'
 
   const config = data.config as OutputNodeConfig
 
@@ -115,35 +122,68 @@ export const OutputNode = memo((props: OutputNodeProps) => {
     onCompleted: (data: any) => {
       const result = data.exportNodeOutput as ExportNodeOutputResult
       if (result.success) {
-        // Decode base64 content and display as text
         try {
           const decodedContent = atob(result.content)
-          setPreviewContent(decodedContent)
-          setPreviewOpen(true)
+          if (previewTarget === 'mermaid') {
+            setMermaidContent(decodedContent)
+            setMermaidOpen(true)
+          } else {
+            setPreviewContent(decodedContent)
+            setPreviewOpen(true)
+          }
         } catch (error) {
           console.error('Failed to decode content:', error)
           showErrorNotification('Preview Failed', 'Failed to decode export content')
-          setPreviewContent('Error: Failed to decode content')
+          if (previewTarget === 'mermaid') {
+            setMermaidContent('')
+          } else {
+            setPreviewContent('Error: Failed to decode content')
+          }
         }
       } else {
         showErrorNotification('Preview Failed', result.message)
-        setPreviewContent(`Error: ${result.message}`)
+        if (previewTarget === 'mermaid') {
+          setMermaidContent(`Error: ${result.message}`)
+        } else {
+          setPreviewContent(`Error: ${result.message}`)
+        }
       }
-      setPreviewLoading(false)
+      setLoadingTarget(null)
+      setPreviewTarget(null)
     },
     onError: (error: any) => {
       console.error('Export failed:', error.message)
       showErrorNotification('Preview Failed', error.message)
-      setPreviewContent(`Error: ${error.message}`)
-      setPreviewLoading(false)
+      if (previewTarget === 'mermaid') {
+        setMermaidContent(`Error: ${error.message}`)
+      } else {
+        setPreviewContent(`Error: ${error.message}`)
+      }
+      setLoadingTarget(null)
+      setPreviewTarget(null)
     },
   })
 
   const handlePreview = async () => {
     if (!projectId || !isConfigured) return
 
-    setPreviewLoading(true)
+    setPreviewTarget('text')
+    setLoadingTarget('text')
     setPreviewContent('')
+    exportForPreview({
+      variables: {
+        projectId,
+        nodeId: props.id,
+      },
+    })
+  }
+
+  const handleMermaidPreview = async () => {
+    if (!projectId || !isConfigured) return
+
+    setPreviewTarget('mermaid')
+    setLoadingTarget('mermaid')
+    setMermaidContent('')
     exportForPreview({
       variables: {
         projectId,
@@ -206,7 +246,7 @@ export const OutputNode = memo((props: OutputNodeProps) => {
                       variant="ghost"
                       className="h-9 w-9 rounded-full"
                       data-action-icon="preview"
-                      disabled={previewLoading}
+                      disabled={isTextPreviewLoading}
                       onMouseDown={(e: React.MouseEvent) => {
                         e.stopPropagation()
                         e.preventDefault()
@@ -218,6 +258,27 @@ export const OutputNode = memo((props: OutputNodeProps) => {
                   </TooltipTrigger>
                   <TooltipContent>Preview export</TooltipContent>
                 </Tooltip>
+                {config.renderTarget === 'Mermaid' && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-9 w-9 rounded-full text-purple-600"
+                        data-action-icon="mermaid"
+                        disabled={isMermaidLoading}
+                        onMouseDown={(e: React.MouseEvent) => {
+                          e.stopPropagation()
+                          e.preventDefault()
+                          handleMermaidPreview()
+                        }}
+                      >
+                        <IconChartDots size={12} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Render Mermaid preview</TooltipContent>
+                  </Tooltip>
+                )}
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -289,8 +350,15 @@ export const OutputNode = memo((props: OutputNodeProps) => {
               </ScrollArea>
             </Stack>
           </div>
-        </DialogContent>
-      </Dialog>
+      </DialogContent>
+    </Dialog>
+
+      <MermaidPreviewDialog
+        open={mermaidOpen}
+        onClose={() => setMermaidOpen(false)}
+        diagram={mermaidContent}
+        title={`Mermaid Preview: ${data.metadata?.label || config.renderTarget || 'Output'}`}
+      />
     </>
   )
 })
