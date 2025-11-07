@@ -59,7 +59,9 @@ impl VersionManager for GitHubVersionManager {
             .await?;
 
         if !response.status().is_success() {
-            return Err(UpdateError::NetworkError(response.error_for_status().unwrap_err()));
+            return Err(UpdateError::NetworkError(
+                response.error_for_status().unwrap_err(),
+            ));
         }
 
         let json: Value = response.json().await?;

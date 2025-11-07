@@ -532,7 +532,13 @@ impl AppContext {
             .filter(data_sources::Column::Id.is_in(data_source_ids.clone()))
             .count(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to verify data sources for project {}: {}", project_id, e))?;
+            .map_err(|e| {
+                anyhow!(
+                    "Failed to verify data sources for project {}: {}",
+                    project_id,
+                    e
+                )
+            })?;
 
         if matching_count != data_source_ids.len() as u64 {
             return Err(anyhow!(

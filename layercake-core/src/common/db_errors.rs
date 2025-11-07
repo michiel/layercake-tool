@@ -1,5 +1,5 @@
 //! Database error categorization and message formatting
-//! 
+//!
 //! This module provides utilities for categorizing and formatting database errors
 //! in a consistent way across both GraphQL and MCP APIs.
 //!

@@ -6,8 +6,7 @@ use anyhow::anyhow;
 use clap::ValueEnum;
 
 /// Supported chat providers.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, ValueEnum)]
-#[derive(Default)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, ValueEnum, Default)]
 pub enum ChatProvider {
     #[default]
     Ollama,
@@ -15,7 +14,6 @@ pub enum ChatProvider {
     Gemini,
     Claude,
 }
-
 
 impl fmt::Display for ChatProvider {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

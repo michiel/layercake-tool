@@ -113,8 +113,8 @@ impl GraphService {
         use crate::database::entities::graphs;
         use sea_orm::{ActiveModelTrait, Set};
 
-        let node_id = node_id
-            .unwrap_or_else(|| format!("graphnode_{}", uuid::Uuid::new_v4().simple()));
+        let node_id =
+            node_id.unwrap_or_else(|| format!("graphnode_{}", uuid::Uuid::new_v4().simple()));
 
         let mut graph = graphs::ActiveModel::new();
         graph.project_id = Set(project_id);
