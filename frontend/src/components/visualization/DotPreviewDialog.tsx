@@ -1,5 +1,6 @@
 import { useEffect, useId, useState, useRef } from 'react'
-import { graphviz } from 'd3-graphviz'
+import { select } from 'd3-selection'
+import 'd3-graphviz'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { IconAlertCircle, IconZoomIn, IconZoomOut, IconZoomScan, IconDownload } from '@tabler/icons-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -35,42 +36,41 @@ export const DotPreviewDialog = ({ open, onClose, diagram, title }: DotPreviewDi
     let cancelled = false
     setIsRendering(true)
 
-    const renderDiagram = async () => {
+    const renderDiagram = () => {
       try {
         // Clear previous content
         if (containerRef.current) {
           containerRef.current.innerHTML = ''
         }
 
-        const viz = graphviz(`#graphviz-${renderId}`, {
-          fit: true,
-          width: containerRef.current?.clientWidth || 800,
-          height: containerRef.current?.clientHeight || 600,
-          zoom: false, // We'll handle zoom manually
-        })
+        const viz = select(`#graphviz-${renderId}`)
+          .graphviz()
+          .fit(true)
+          .zoom(false)
+          .on('end', () => {
+            if (!cancelled) {
+              setError(null)
+              setIsRendering(false)
+            }
+          })
+          .renderDot(diagram)
 
-        await viz.renderDot(diagram).then(() => {
-          if (!cancelled) {
-            setError(null)
-            graphvizRef.current = viz
-          }
-        })
+        graphvizRef.current = viz
       } catch (err) {
         if (!cancelled) {
           console.error('Failed to render Graphviz diagram', err)
           setError(err instanceof Error ? err.message : 'Failed to render Graphviz diagram')
-        }
-      } finally {
-        if (!cancelled) {
           setIsRendering(false)
         }
       }
     }
 
-    renderDiagram()
+    // Delay rendering slightly to ensure DOM is ready
+    const timeoutId = setTimeout(renderDiagram, 100)
 
     return () => {
       cancelled = true
+      clearTimeout(timeoutId)
     }
   }, [diagram, open, renderId])
 
