@@ -43,15 +43,17 @@ export const DotPreviewDialog = ({ open, onClose, diagram, title }: DotPreviewDi
       return
     }
 
-    if (!containerRef.current) {
-      console.log('[DotPreview] Container ref not ready')
-      return
-    }
-
     let cancelled = false
     setIsRendering(true)
 
     const renderDiagram = () => {
+      // Wait for container to be ready
+      if (!containerRef.current) {
+        console.log('[DotPreview] Container not ready, retrying...')
+        setTimeout(renderDiagram, 50)
+        return
+      }
+
       try {
         console.log('[DotPreview] Starting render', {
           renderId,
@@ -92,7 +94,7 @@ export const DotPreviewDialog = ({ open, onClose, diagram, title }: DotPreviewDi
       }
     }
 
-    // Delay rendering slightly to ensure DOM is ready
+    // Start rendering with a small delay
     const timeoutId = setTimeout(renderDiagram, 100)
 
     return () => {
