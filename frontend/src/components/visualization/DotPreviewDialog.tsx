@@ -1,6 +1,5 @@
 import { useEffect, useId, useState, useRef } from 'react'
-import { select } from 'd3-selection'
-import 'd3-graphviz'
+import { graphviz } from 'd3-graphviz'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { IconAlertCircle, IconZoomIn, IconZoomOut, IconZoomScan, IconDownload } from '@tabler/icons-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -38,16 +37,27 @@ export const DotPreviewDialog = ({ open, onClose, diagram, title }: DotPreviewDi
 
     const renderDiagram = () => {
       try {
-        // Clear previous content
-        if (containerRef.current) {
-          containerRef.current.innerHTML = ''
+        console.log('[DotPreview] Starting render', {
+          renderId,
+          selector: `#graphviz-${renderId}`,
+          diagramLength: diagram.length,
+          containerExists: !!containerRef.current
+        })
+
+        const selector = `#graphviz-${renderId}`
+        const element = document.querySelector(selector)
+
+        console.log('[DotPreview] Element found:', !!element)
+
+        if (!element) {
+          throw new Error(`Element not found: ${selector}`)
         }
 
-        const viz = select(`#graphviz-${renderId}`)
-          .graphviz()
+        const viz = graphviz(selector)
           .fit(true)
           .zoom(false)
           .on('end', () => {
+            console.log('[DotPreview] Render complete')
             if (!cancelled) {
               setError(null)
               setIsRendering(false)
@@ -55,10 +65,11 @@ export const DotPreviewDialog = ({ open, onClose, diagram, title }: DotPreviewDi
           })
           .renderDot(diagram)
 
+        console.log('[DotPreview] Graphviz instance created:', !!viz)
         graphvizRef.current = viz
       } catch (err) {
         if (!cancelled) {
-          console.error('Failed to render Graphviz diagram', err)
+          console.error('[DotPreview] Failed to render Graphviz diagram', err)
           setError(err instanceof Error ? err.message : 'Failed to render Graphviz diagram')
           setIsRendering(false)
         }
