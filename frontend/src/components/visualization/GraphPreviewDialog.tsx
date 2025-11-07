@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
-import { IconLayout2, IconHierarchy, IconAlertCircle } from '@tabler/icons-react';
+import { IconLayout2, IconHierarchy, IconAlertCircle, IconMaximize, IconMinimize } from '@tabler/icons-react';
 import {
   Dialog,
   DialogContent,
@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Spinner } from '@/components/ui/spinner';
 import { Stack } from '@/components/layout-primitives';
+import { cn } from '@/lib/utils';
 import { GraphPreview, GraphData } from './GraphPreview';
 
 interface GraphPreviewDialogProps {
@@ -23,6 +24,7 @@ interface GraphPreviewDialogProps {
 
 export const GraphPreviewDialog = ({ opened, onClose, data, title, loading = false, error }: GraphPreviewDialogProps) => {
   const [tab, setTab] = useState<string | null>('flow');
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const normalizedData = useMemo(() => {
     if (!data) return { flow: null, hierarchy: null };
@@ -74,12 +76,27 @@ export const GraphPreviewDialog = ({ opened, onClose, data, title, loading = fal
   useEffect(() => {
     if (opened) {
       setTab('flow');
+      setIsFullscreen(false);
     }
   }, [opened]);
 
   return (
     <Dialog open={opened} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-[90vw] h-[90vh] flex flex-col">
+      <DialogContent
+        className={cn(
+          'max-w-[90vw] h-[90vh] flex flex-col',
+          isFullscreen && 'max-w-[100vw] w-screen h-screen sm:rounded-none !left-0 !top-0 !translate-x-0 !translate-y-0'
+        )}
+      >
+        <button
+          type="button"
+          onClick={() => setIsFullscreen(prev => !prev)}
+          className="absolute right-12 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+          title={isFullscreen ? 'Exit full screen' : 'Enter full screen'}
+          aria-label={isFullscreen ? 'Exit full screen' : 'Enter full screen'}
+        >
+          {isFullscreen ? <IconMinimize className="h-4 w-4" /> : <IconMaximize className="h-4 w-4" />}
+        </button>
         <DialogHeader>
           <DialogTitle>{title || 'Graph Preview'}</DialogTitle>
         </DialogHeader>

@@ -1,10 +1,11 @@
 import { useEffect, useId, useState, useRef } from 'react'
 import mermaid from 'mermaid'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { IconAlertCircle, IconZoomIn, IconZoomOut, IconZoomScan, IconDownload, IconSun, IconMoon } from '@tabler/icons-react'
+import { IconAlertCircle, IconZoomIn, IconZoomOut, IconZoomScan, IconDownload, IconSun, IconMoon, IconMaximize, IconMinimize } from '@tabler/icons-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 type MermaidPreviewDialogProps = {
   open: boolean
@@ -20,6 +21,7 @@ export const MermaidPreviewDialog = ({ open, onClose, diagram, title }: MermaidP
   const [error, setError] = useState<string | null>(null)
   const [zoom, setZoom] = useState(1)
   const [theme, setTheme] = useState<MermaidTheme>('default')
+  const [isFullscreen, setIsFullscreen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const renderId = useId().replace(/[^a-zA-Z0-9_-]/g, '')
 
@@ -28,6 +30,7 @@ export const MermaidPreviewDialog = ({ open, onClose, diagram, title }: MermaidP
       setRenderedSvg('')
       setError(null)
       setZoom(1)
+      setIsFullscreen(false)
       return
     }
 
@@ -123,7 +126,21 @@ export const MermaidPreviewDialog = ({ open, onClose, diagram, title }: MermaidP
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="max-w-[90vw] h-[90vh] flex flex-col">
+      <DialogContent
+        className={cn(
+          'max-w-[90vw] h-[90vh] flex flex-col',
+          isFullscreen && 'max-w-[100vw] w-screen h-screen sm:rounded-none !left-0 !top-0 !translate-x-0 !translate-y-0'
+        )}
+      >
+        <button
+          type="button"
+          onClick={() => setIsFullscreen(prev => !prev)}
+          className="absolute right-12 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+          title={isFullscreen ? 'Exit full screen' : 'Enter full screen'}
+          aria-label={isFullscreen ? 'Exit full screen' : 'Enter full screen'}
+        >
+          {isFullscreen ? <IconMinimize className="h-4 w-4" /> : <IconMaximize className="h-4 w-4" />}
+        </button>
         <DialogHeader>
           <DialogTitle>{title || 'Mermaid Preview'}</DialogTitle>
         </DialogHeader>
