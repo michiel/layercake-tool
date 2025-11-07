@@ -20,15 +20,15 @@ impl ConsolePrompt {
 }
 
 impl Prompt for ConsolePrompt {
-    fn render_prompt_left(&self) -> Cow<str> {
+    fn render_prompt_left(&self) -> Cow<'_, str> {
         Cow::Owned(format!("{} > ", Color::Cyan.bold().paint(&self.label)))
     }
 
-    fn render_prompt_right(&self) -> Cow<str> {
+    fn render_prompt_right(&self) -> Cow<'_, str> {
         Cow::Borrowed("")
     }
 
-    fn render_prompt_indicator(&self, mode: PromptEditMode) -> Cow<str> {
+    fn render_prompt_indicator(&self, mode: PromptEditMode) -> Cow<'_, str> {
         let indicator = match mode {
             PromptEditMode::Default => "»".to_string(),
             PromptEditMode::Emacs => "emacs»".to_string(),
@@ -41,14 +41,14 @@ impl Prompt for ConsolePrompt {
         Cow::Owned(format!("{} ", Color::Yellow.paint(indicator)))
     }
 
-    fn render_prompt_multiline_indicator(&self) -> Cow<str> {
+    fn render_prompt_multiline_indicator(&self) -> Cow<'_, str> {
         Cow::Borrowed("· ")
     }
 
     fn render_prompt_history_search_indicator(
         &self,
         _history_search: PromptHistorySearch,
-    ) -> Cow<str> {
+    ) -> Cow<'_, str> {
         Cow::Borrowed("⌕ ")
     }
 }

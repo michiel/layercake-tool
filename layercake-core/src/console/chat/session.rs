@@ -555,7 +555,7 @@ impl ChatSession {
                     openai::Client::new(&api_key)
                 };
 
-                let mut builder = client.agent(model);
+                let builder = client.agent(model);
 
                 #[cfg(feature = "rmcp")]
                 if let Some(ref rmcp_client) = self.rmcp_client {
@@ -580,7 +580,7 @@ impl ChatSession {
                     return Err(anyhow!("Anthropic requires API key"));
                 };
 
-                let mut builder = client.agent(model);
+                let builder = client.agent(model);
 
                 #[cfg(feature = "rmcp")]
                 if let Some(ref rmcp_client) = self.rmcp_client {
@@ -609,7 +609,7 @@ impl ChatSession {
                 let gen_cfg = GenerationConfig::default();
                 let additional_params = AdditionalParameters::default().with_config(gen_cfg);
 
-                let mut builder = client
+                let builder = client
                     .agent(model)
                     .additional_params(serde_json::to_value(additional_params)?);
 
@@ -639,7 +639,7 @@ impl ChatSession {
                     ollama::Client::new()
                 };
 
-                let mut builder = client.agent(model);
+                let builder = client.agent(model);
 
                 #[cfg(feature = "rmcp")]
                 if let Some(ref rmcp_client) = self.rmcp_client {
@@ -701,7 +701,7 @@ impl ChatSession {
     async fn handle_tool_invocation<F>(
         &mut self,
         raw_response: String,
-        mut invocation: ParsedToolInvocation,
+        invocation: ParsedToolInvocation,
         observer: &mut F,
     ) -> Result<()>
     where
@@ -800,7 +800,7 @@ fn extract_tool_invocation(text: &str) -> Option<ParsedToolInvocation> {
     const TOOL_CODE_PREFIX: &str = "```tool_code";
     let start = text.find(TOOL_CODE_PREFIX)?;
     let after_prefix = &text[start + TOOL_CODE_PREFIX.len()..];
-    let after_prefix = after_prefix.trim_start_matches(|c| c == '\n' || c == '\r' || c == ' ');
+    let after_prefix = after_prefix.trim_start_matches(['\n', '\r', ' ']);
     let end = after_prefix.find("```")?;
     let block = after_prefix[..end].trim();
 
@@ -913,7 +913,7 @@ fn compose_system_prompt(config: &ChatConfig, project_id: i32, tool_names: &[Str
     if !tool_names.is_empty() {
         prompt.push_str("\n\nYou have access to the following tools:\n");
         for name in tool_names {
-            write!(&mut prompt, "- {}\n", name).unwrap();
+            writeln!(&mut prompt, "- {}", name).unwrap();
         }
         prompt.push_str("\nUse these tools when appropriate to help answer questions.");
     }

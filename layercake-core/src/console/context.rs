@@ -13,7 +13,7 @@ use crate::{
 };
 
 use super::{
-    chat::{ChatConfig, ChatProvider},
+    chat::ChatProvider,
     commands::SettingsCommand,
     output::{print_table, TableRow},
 };

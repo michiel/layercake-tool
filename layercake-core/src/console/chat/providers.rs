@@ -7,18 +7,15 @@ use clap::ValueEnum;
 
 /// Supported chat providers.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, ValueEnum)]
+#[derive(Default)]
 pub enum ChatProvider {
+    #[default]
     Ollama,
     OpenAi,
     Gemini,
     Claude,
 }
 
-impl Default for ChatProvider {
-    fn default() -> Self {
-        ChatProvider::Ollama
-    }
-}
 
 impl fmt::Display for ChatProvider {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

@@ -17,7 +17,7 @@ pub mod chat;
 use anyhow::Result;
 use clap::Parser;
 use clap_repl::{ClapEditor, ReadCommandOutput};
-use commands::{ConsoleCommand, ConsoleReplCommand, SettingsCommand};
+use commands::{ConsoleCommand, ConsoleReplCommand};
 use context::ConsoleContext;
 use output::print_banner;
 use prompt::ConsolePrompt;

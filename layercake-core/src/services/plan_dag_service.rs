@@ -8,7 +8,7 @@ use crate::database::entities::{data_sources, plan_dag_edges, plan_dag_nodes, pl
 use crate::graphql::mutations::plan_dag_delta;
 use crate::graphql::types::{PlanDagEdge, PlanDagNode, Position};
 use crate::services::ValidationService;
-use serde_json::{Map, Value};
+use serde_json::Value;
 
 /// Service layer for Plan DAG operations
 /// Separates business logic from GraphQL mutation layer
@@ -221,7 +221,7 @@ impl PlanDagService {
                                 serde_json::from_str::<Value>(&metadata_json_current)
                                     .ok()
                                     .and_then(|value| value.as_object().cloned())
-                                    .unwrap_or_else(Map::new);
+                                    .unwrap_or_default();
 
                             let needs_update = match metadata_obj.get("label") {
                                 Some(Value::String(current_label))

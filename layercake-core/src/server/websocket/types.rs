@@ -183,7 +183,7 @@ impl CollaborationState {
     pub fn get_or_create_project(
         &self,
         project_id: i32,
-    ) -> dashmap::mapref::one::Ref<i32, ProjectSession> {
+    ) -> dashmap::mapref::one::Ref<'_, i32, ProjectSession> {
         // Use or_insert_with to create the entry if it doesn't exist
         self.projects
             .entry(project_id)

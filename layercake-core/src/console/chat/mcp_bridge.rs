@@ -1,6 +1,5 @@
 #![cfg(feature = "console")]
 
-use anyhow::Result;
 use axum_mcp::prelude::*;
 use axum_mcp::protocol::messages::{Tool, ToolContent, ToolsCallResult};
 use axum_mcp::server::registry::ToolExecutionContext;

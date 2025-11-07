@@ -219,40 +219,38 @@ pub fn get_handlebars() -> Handlebars<'static> {
                     }).collect();
                     result += &children_rendered.join("");
                     result += &format!("{}  }}\n", indent);
-                } else {
-                    if use_default_styling {
-                        let mut fillcolor = default_fill.trim_start_matches('#').to_string();
-                        let mut fontcolor = default_font.trim_start_matches('#').to_string();
-                        let mut bordercolor = default_border.trim_start_matches('#').to_string();
+                } else if use_default_styling {
+                    let mut fillcolor = default_fill.trim_start_matches('#').to_string();
+                    let mut fontcolor = default_font.trim_start_matches('#').to_string();
+                    let mut bordercolor = default_border.trim_start_matches('#').to_string();
 
-                        if let Some(layer_props) = layermap.get(layer) {
-                            if let Some(background_color) =
-                                layer_props.get("background_color").and_then(|v| v.as_str())
-                            {
-                                fillcolor = background_color.to_string();
-                            }
-                            if let Some(text_color) =
-                                layer_props.get("text_color").and_then(|v| v.as_str())
-                            {
-                                fontcolor = text_color.to_string();
-                            }
-                            if let Some(border_color) =
-                                layer_props.get("border_color").and_then(|v| v.as_str())
-                            {
-                                bordercolor = border_color.to_string();
-                            }
+                    if let Some(layer_props) = layermap.get(layer) {
+                        if let Some(background_color) =
+                            layer_props.get("background_color").and_then(|v| v.as_str())
+                        {
+                            fillcolor = background_color.to_string();
                         }
-
-                        result += &format!(
-                            "{}{} [label=\"{}\", layer=\"{}\", style=\"filled,rounded\", fillcolor=\"#{}\", fontcolor=\"#{}\", color=\"#{}\"];\n",
-                            indent, id, label, layer, fillcolor, fontcolor, bordercolor
-                        );
-                    } else {
-                        result += &format!(
-                            "{}{} [label=\"{}\", layer=\"{}\"];\n",
-                            indent, id, label, layer
-                        );
+                        if let Some(text_color) =
+                            layer_props.get("text_color").and_then(|v| v.as_str())
+                        {
+                            fontcolor = text_color.to_string();
+                        }
+                        if let Some(border_color) =
+                            layer_props.get("border_color").and_then(|v| v.as_str())
+                        {
+                            bordercolor = border_color.to_string();
+                        }
                     }
+
+                    result += &format!(
+                        "{}{} [label=\"{}\", layer=\"{}\", style=\"filled,rounded\", fillcolor=\"#{}\", fontcolor=\"#{}\", color=\"#{}\"];\n",
+                        indent, id, label, layer, fillcolor, fontcolor, bordercolor
+                    );
+                } else {
+                    result += &format!(
+                        "{}{} [label=\"{}\", layer=\"{}\"];\n",
+                        indent, id, label, layer
+                    );
                 }
 
                 result

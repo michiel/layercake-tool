@@ -207,7 +207,7 @@ impl DataSourceBulkService {
                     );
                     // Write error message to sheet
                     worksheet.write_string(0, 0, "Error")?;
-                    worksheet.write_string(0, 1, &format!("Failed to export: {}", e))?;
+                    worksheet.write_string(0, 1, format!("Failed to export: {}", e))?;
                 }
             }
         }
@@ -409,7 +409,7 @@ impl DataSourceBulkService {
                     .create_from_file(
                         project_id,
                         sheet_name.clone(),
-                        Some(format!("Imported from spreadsheet")),
+                        Some("Imported from spreadsheet".to_string()),
                         filename,
                         FileFormat::Csv,
                         data_type,
@@ -535,7 +535,7 @@ impl DataSourceBulkService {
                     .create_from_file(
                         project_id,
                         sheet_name.clone(),
-                        Some(format!("Imported from spreadsheet")),
+                        Some("Imported from spreadsheet".to_string()),
                         filename,
                         FileFormat::Csv,
                         data_type,

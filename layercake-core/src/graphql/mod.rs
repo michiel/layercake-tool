@@ -18,10 +18,6 @@ pub mod subscriptions;
 pub mod types;
 
 #[cfg(feature = "graphql")]
-pub use chat_manager::*;
-#[cfg(feature = "graphql")]
 pub use context::*;
-#[cfg(feature = "graphql")]
-pub use errors::*;
 #[cfg(feature = "graphql")]
 pub use schema::*;
