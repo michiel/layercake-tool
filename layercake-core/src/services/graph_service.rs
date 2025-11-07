@@ -16,6 +16,7 @@ impl GraphService {
     }
 
     /// Get database graph_layers for a graph
+    #[allow(dead_code)]
     pub async fn get_layers_for_graph(&self, graph_id: i32) -> Result<Vec<graph_layers::Model>> {
         let db_layers = Layers::find()
             .filter(graph_layers::Column::GraphId.eq(graph_id))

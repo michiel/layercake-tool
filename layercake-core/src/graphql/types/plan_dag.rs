@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use anyhow::{anyhow, Context, Result as AnyResult};
 use async_graphql::*;
 use chrono::{DateTime, Utc};

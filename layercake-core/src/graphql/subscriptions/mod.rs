@@ -71,6 +71,7 @@ pub struct CursorEventData {
 
 /// User presence information for collaborative editing
 #[derive(Clone, Debug, SimpleObject)]
+#[allow(dead_code)]
 pub struct UserPresenceEvent {
     pub user_id: String,
     pub user_name: String,

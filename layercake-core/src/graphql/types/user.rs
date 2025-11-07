@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use async_graphql::*;
 use chrono::{DateTime, Utc};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};

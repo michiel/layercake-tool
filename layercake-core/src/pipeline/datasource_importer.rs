@@ -300,6 +300,7 @@ impl DatasourceImporter {
     }
 
     /// Get datasource by node ID
+    #[allow(dead_code)]
     pub async fn get_by_node(
         &self,
         project_id: i32,
@@ -318,6 +319,7 @@ impl DatasourceImporter {
     }
 
     /// Get datasource rows with pagination
+    #[allow(dead_code)]
     pub async fn get_rows(
         &self,
         datasource_id: i32,
@@ -339,6 +341,7 @@ impl DatasourceImporter {
     }
 
     /// Get total row count for a datasource
+    #[allow(dead_code)]
     pub async fn get_row_count(&self, datasource_id: i32) -> Result<u64> {
         use crate::database::entities::datasource_rows::{Column, Entity};
         use sea_orm::{ColumnTrait, QueryFilter};

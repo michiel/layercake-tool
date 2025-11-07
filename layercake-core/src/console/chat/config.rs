@@ -20,18 +20,22 @@ pub struct ProviderConfig {
 #[derive(Clone)]
 pub struct ChatConfig {
     pub default_provider: ChatProvider,
+    #[allow(dead_code)]
     pub request_timeout: Duration,
     pub system_prompt: Option<String>,
     pub providers: HashMap<ChatProvider, ProviderConfig>,
+    #[allow(dead_code)]
     pub mcp_server_url: String,
 }
 
 impl ChatConfig {
+    #[allow(dead_code)]
     pub async fn load(db: &DatabaseConnection) -> Result<Self> {
         let _ = db;
         Ok(Self::from_env())
     }
 
+    #[allow(dead_code)]
     pub fn from_env() -> Self {
         let mut values = HashMap::new();
         for (key, default) in Self::tracked_keys() {
@@ -111,6 +115,7 @@ impl ChatConfig {
         }
     }
 
+    #[allow(dead_code)]
     fn tracked_keys() -> Vec<(&'static str, &'static str)> {
         vec![
             ("LAYERCAKE_CHAT_PROVIDER", "ollama"),
@@ -145,6 +150,7 @@ pub struct ChatCredentialStore {
 }
 
 impl ChatCredentialStore {
+    #[allow(dead_code)]
     pub fn new(db: DatabaseConnection) -> Self {
         Self {
             _db: db,

@@ -1,5 +1,5 @@
 //! Database error categorization and message formatting
-//!
+//! 
 //! This module provides utilities for categorizing and formatting database errors
 //! in a consistent way across both GraphQL and MCP APIs.
 //!
@@ -22,6 +22,8 @@
 //!     // Retry the operation
 //! }
 //! ```
+
+#![allow(dead_code)]
 
 use sea_orm::DbErr;
 

@@ -138,7 +138,7 @@ impl ChatManager {
         &self,
         db: DatabaseConnection,
         session: chat_sessions::Model,
-        user: users::Model,
+        _user: users::Model,
         config: Arc<ChatConfig>,
         settings: Arc<SystemSettingsService>,
     ) -> Result<StartedChatSession> {

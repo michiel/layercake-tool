@@ -759,6 +759,7 @@ impl GraphBuilder {
     }
 
     /// Extract nodes from a nodes datasource
+    #[allow(dead_code)]
     async fn extract_nodes_from_datasource(
         &self,
         datasource: &datasources::Model,
@@ -798,6 +799,7 @@ impl GraphBuilder {
     }
 
     /// Extract edges from an edges datasource
+    #[allow(dead_code)]
     async fn extract_edges_from_datasource(
         &self,
         datasource: &datasources::Model,
@@ -846,6 +848,7 @@ impl GraphBuilder {
     }
 
     /// Extract graph from JSON datasource
+    #[allow(dead_code)]
     async fn extract_graph_from_json(
         &self,
         datasource: &datasources::Model,

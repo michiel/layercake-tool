@@ -91,6 +91,7 @@ impl ChatHistoryService {
     }
 
     /// Get a specific chat session by internal id
+    #[allow(dead_code)]
     pub async fn get_session_by_id(&self, id: i32) -> Result<Option<chat_sessions::Model>> {
         chat_sessions::Entity::find_by_id(id)
             .one(&self.db)

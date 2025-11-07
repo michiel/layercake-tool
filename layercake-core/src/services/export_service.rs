@@ -5,12 +5,12 @@ use crate::export::{to_csv_edges, to_csv_nodes, to_dot, to_gml, to_json, to_merm
 use crate::graph::Graph;
 use crate::plan::{ExportFileType, Plan, RenderConfig, RenderConfigOrientation, RenderConfigTheme};
 pub struct ExportService {
-    db: DatabaseConnection,
+    _db: DatabaseConnection,
 }
 
 impl ExportService {
     pub fn new(db: DatabaseConnection) -> Self {
-        Self { db }
+        Self { _db: db }
     }
 
     pub fn export_to_string(

@@ -58,6 +58,7 @@ struct ChatMessage {
 }
 
 #[derive(Clone, Debug)]
+#[allow(dead_code)]
 struct ToolCallData {
     id: String,
     name: String,
@@ -65,6 +66,7 @@ struct ToolCallData {
 }
 
 #[derive(Clone, Debug)]
+#[allow(dead_code)]
 struct ToolResultData {
     call_id: String,
     output: String,

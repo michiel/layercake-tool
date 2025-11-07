@@ -202,11 +202,13 @@ impl McpAgentService {
     }
 
     /// Check if a user is an MCP agent
+    #[allow(dead_code)]
     pub fn is_mcp_agent(user: &users::Model) -> bool {
         user.user_type == "mcp_agent"
     }
 
     /// Get the project scope for an MCP agent
+    #[allow(dead_code)]
     pub fn get_agent_project_scope(agent: &users::Model) -> Option<i32> {
         if Self::is_mcp_agent(agent) {
             agent.scoped_project_id

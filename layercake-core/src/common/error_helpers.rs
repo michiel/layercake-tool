@@ -27,6 +27,8 @@
 //! let msg = validation::invalid_format("email", "must be valid email");
 //! ```
 
+#![allow(dead_code)]
+
 /// Create contextualized error message
 ///
 /// Combines context string with an error message.

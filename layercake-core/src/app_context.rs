@@ -3,7 +3,8 @@ use std::sync::Arc;
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, Set,
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
+    QueryOrder, Set,
 };
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -85,10 +86,12 @@ impl AppContext {
         self.graph_service.clone()
     }
 
+    #[allow(dead_code)]
     pub fn data_source_service(&self) -> Arc<DataSourceService> {
         self.data_source_service.clone()
     }
 
+    #[allow(dead_code)]
     pub fn data_source_bulk_service(&self) -> Arc<DataSourceBulkService> {
         self.data_source_bulk_service.clone()
     }
@@ -97,10 +100,12 @@ impl AppContext {
         self.plan_dag_service.clone()
     }
 
+    #[allow(dead_code)]
     pub fn graph_edit_service(&self) -> Arc<GraphEditService> {
         self.graph_edit_service.clone()
     }
 
+    #[allow(dead_code)]
     pub fn graph_analysis_service(&self) -> Arc<GraphAnalysisService> {
         self.graph_analysis_service.clone()
     }
@@ -186,6 +191,7 @@ impl AppContext {
 
     // ----- Plan summary helpers -------------------------------------------
 
+    #[allow(dead_code)]
     pub async fn list_plans(&self, project_id: Option<i32>) -> Result<Vec<PlanSummary>> {
         let mut query = plans::Entity::find().order_by_desc(plans::Column::UpdatedAt);
 
@@ -515,15 +521,35 @@ impl AppContext {
         &self,
         request: DataSourceExportRequest,
     ) -> Result<DataSourceExportResult> {
-        let bytes = match request.format {
+        let DataSourceExportRequest {
+            project_id,
+            data_source_ids,
+            format,
+        } = request;
+
+        let matching_count = data_sources::Entity::find()
+            .filter(data_sources::Column::ProjectId.eq(project_id))
+            .filter(data_sources::Column::Id.is_in(data_source_ids.clone()))
+            .count(&self.db)
+            .await
+            .map_err(|e| anyhow!("Failed to verify data sources for project {}: {}", project_id, e))?;
+
+        if matching_count != data_source_ids.len() as u64 {
+            return Err(anyhow!(
+                "Export request included data sources outside project {}",
+                project_id
+            ));
+        }
+
+        let bytes = match format {
             DataSourceExportFormat::Xlsx => self
                 .data_source_bulk_service
-                .export_to_xlsx(&request.data_source_ids)
+                .export_to_xlsx(&data_source_ids)
                 .await
                 .map_err(|e| anyhow!("Failed to export datasources to XLSX: {}", e))?,
             DataSourceExportFormat::Ods => self
                 .data_source_bulk_service
-                .export_to_ods(&request.data_source_ids)
+                .export_to_ods(&data_source_ids)
                 .await
                 .map_err(|e| anyhow!("Failed to export datasources to ODS: {}", e))?,
         };
@@ -531,13 +557,13 @@ impl AppContext {
         let filename = format!(
             "datasources_export_{}.{}",
             chrono::Utc::now().timestamp(),
-            request.format.extension()
+            format.extension()
         );
 
         Ok(DataSourceExportResult {
             data: bytes,
             filename,
-            format: request.format,
+            format,
         })
     }
 

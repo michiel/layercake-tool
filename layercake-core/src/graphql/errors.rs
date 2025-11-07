@@ -36,6 +36,7 @@ impl StructuredError {
     }
 
     /// Create a "not found" error with custom message
+    #[allow(dead_code)]
     pub fn not_found_msg(message: impl Into<String>) -> Error {
         Error::new(message.into()).extend_with(|_, e| {
             e.set("code", "NOT_FOUND");
@@ -109,6 +110,7 @@ impl StructuredError {
 }
 
 /// Extension trait for Result to add context
+#[allow(dead_code)]
 pub trait ResultExt<T> {
     /// Add context to an error
     fn context(self, message: impl Into<String>) -> Result<T>;

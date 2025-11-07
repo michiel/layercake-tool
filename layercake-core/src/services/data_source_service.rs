@@ -17,6 +17,7 @@ impl DataSourceService {
     }
 
     /// DEPRECATED: Create a new DataSource from uploaded file data (old signature for compatibility)
+    #[allow(dead_code)]
     pub async fn create_from_file_legacy(
         &self,
         project_id: i32,

@@ -164,6 +164,7 @@ impl GraphEditService {
     }
 
     /// Mark multiple edits as applied
+    #[allow(dead_code)]
     pub async fn mark_edits_applied(&self, edit_ids: Vec<i32>) -> Result<()> {
         for edit_id in edit_ids {
             self.mark_edit_applied(edit_id).await?;

@@ -32,6 +32,7 @@ impl LibrarySourceService {
         Self { db }
     }
 
+    #[allow(dead_code)]
     pub async fn list(&self) -> Result<Vec<library_sources::Model>> {
         let items = library_sources::Entity::find().all(&self.db).await?;
         Ok(items)
@@ -369,6 +370,7 @@ impl LibrarySourceService {
         Ok(imported)
     }
 
+    #[allow(dead_code)]
     pub async fn find_by_ids(&self, ids: &[i32]) -> Result<Vec<library_sources::Model>> {
         if ids.is_empty() {
             return Ok(Vec::new());
