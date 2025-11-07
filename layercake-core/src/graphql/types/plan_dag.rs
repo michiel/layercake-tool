@@ -144,7 +144,6 @@ impl From<DataSourceSummary> for DataSourceReference {
 #[graphql(input_name = "GraphNodeConfigInput")]
 pub struct GraphNodeConfig {
     // Removed: graph_id - graph connections handled by visual edges in DAG
-    pub is_reference: bool,
     pub metadata: GraphNodeMetadata,
 }
 
@@ -1467,12 +1466,20 @@ pub enum RenderTarget {
 pub struct RenderConfig {
     pub contain_nodes: Option<bool>,
     pub orientation: Option<Orientation>,
+    pub use_default_styling: Option<bool>,
+    pub theme: Option<RenderTheme>,
 }
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub enum Orientation {
     Lr,
     Tb,
+}
+
+#[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
+pub enum RenderTheme {
+    Light,
+    Dark,
 }
 
 #[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]

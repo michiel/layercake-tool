@@ -257,14 +257,12 @@ export const GraphNode = memo((props: GraphNodeProps) => {
   )
 
   // Custom label badges for graph node
-  const hasBadges = config.isReference || !isConfigured || ((graphExecution || executionPreview) && !isExecutionComplete((graphExecution || executionPreview)!.executionState))
+  const hasBadges =
+    !isConfigured ||
+    ((graphExecution || executionPreview) &&
+      !isExecutionComplete((graphExecution || executionPreview)!.executionState))
   const labelBadges = hasBadges ? (
     <>
-      {config.isReference && (
-        <Badge variant="outline" className={`text-xs ${getBadgeClasses('blue', 'outline')}`}>
-          Reference
-        </Badge>
-      )}
       {!isConfigured && (
         <Badge variant="outline" className={`text-xs ${getBadgeClasses('orange', 'outline')}`}>
           Not Configured

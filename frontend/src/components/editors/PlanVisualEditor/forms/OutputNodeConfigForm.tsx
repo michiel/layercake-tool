@@ -21,10 +21,18 @@ export const OutputNodeConfigForm: React.FC<OutputNodeConfigFormProps> = ({
   setIsValid,
   projectId: _projectId,
 }) => {
+  const initialRenderConfig = {
+    ...config.renderConfig,
+    containNodes: config.renderConfig?.containNodes ?? true,
+    orientation: config.renderConfig?.orientation ?? 'TB',
+    useDefaultStyling: config.renderConfig?.useDefaultStyling ?? true,
+    theme: config.renderConfig?.theme ?? 'Light'
+  };
+
   const [localConfig, setLocalConfig] = useState<OutputNodeConfig>({
     renderTarget: config.renderTarget || 'DOT',
     outputPath: config.outputPath ?? '',
-    renderConfig: config.renderConfig || {},
+    renderConfig: initialRenderConfig,
     graphConfig: config.graphConfig || {}
   });
 
@@ -87,13 +95,52 @@ export const OutputNodeConfigForm: React.FC<OutputNodeConfigFormProps> = ({
       <div className="flex items-center space-x-2">
         <Switch
           id="contain-nodes"
-          checked={localConfig.renderConfig?.containNodes || false}
+          checked={localConfig.renderConfig?.containNodes ?? true}
           onCheckedChange={(checked) => setLocalConfig(prev => ({
             ...prev,
-            renderConfig: { ...prev.renderConfig, containNodes: checked }
+            renderConfig: { ...(prev.renderConfig ?? {}), containNodes: checked }
           }))}
         />
         <Label htmlFor="contain-nodes">Contain Nodes</Label>
+      </div>
+
+      <div className="flex flex-col space-y-2">
+        <div className="flex items-center space-x-2">
+          <Switch
+            id="use-default-styling"
+            checked={localConfig.renderConfig?.useDefaultStyling ?? true}
+            onCheckedChange={(checked) => setLocalConfig(prev => ({
+              ...prev,
+              renderConfig: { ...(prev.renderConfig ?? {}), useDefaultStyling: checked }
+            }))}
+          />
+          <div>
+            <Label htmlFor="use-default-styling">Use Default Styling</Label>
+            <p className="text-sm text-muted-foreground">
+              Apply Layercake&apos;s built-in colors and layout accents in supported exports.
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="theme">Default Styling Theme</Label>
+          <Select
+            value={localConfig.renderConfig?.theme || 'Light'}
+            onValueChange={(value) => setLocalConfig(prev => ({
+              ...prev,
+              renderConfig: { ...(prev.renderConfig ?? {}), theme: value as 'Light' | 'Dark' }
+            }))}
+            disabled={!(localConfig.renderConfig?.useDefaultStyling ?? true)}
+          >
+            <SelectTrigger id="theme">
+              <SelectValue placeholder="Select theme" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Light">Light</SelectItem>
+              <SelectItem value="Dark">Dark</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="space-y-2">
@@ -102,7 +149,7 @@ export const OutputNodeConfigForm: React.FC<OutputNodeConfigFormProps> = ({
           value={localConfig.renderConfig?.orientation || 'TB'}
           onValueChange={(value) => setLocalConfig(prev => ({
             ...prev,
-            renderConfig: { ...prev.renderConfig, orientation: value as any }
+            renderConfig: { ...(prev.renderConfig ?? {}), orientation: value as any }
           }))}
         >
           <SelectTrigger id="orientation">

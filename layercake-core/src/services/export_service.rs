@@ -3,7 +3,7 @@ use sea_orm::DatabaseConnection;
 
 use crate::export::{to_csv_edges, to_csv_nodes, to_dot, to_gml, to_json, to_mermaid, to_plantuml};
 use crate::graph::Graph;
-use crate::plan::{ExportFileType, Plan, RenderConfig, RenderConfigOrientation};
+use crate::plan::{ExportFileType, Plan, RenderConfig, RenderConfigOrientation, RenderConfigTheme};
 pub struct ExportService {
     db: DatabaseConnection,
 }
@@ -13,12 +13,20 @@ impl ExportService {
         Self { db }
     }
 
-    pub fn export_to_string(&self, graph: &Graph, format: &ExportFileType) -> Result<String> {
+    pub fn export_to_string(
+        &self,
+        graph: &Graph,
+        format: &ExportFileType,
+        render_config_override: Option<RenderConfig>,
+    ) -> Result<String> {
         // Default render config
-        let render_config = RenderConfig {
+        let default_render_config = RenderConfig {
             contain_nodes: true,
             orientation: RenderConfigOrientation::TB,
+            use_default_styling: true,
+            theme: RenderConfigTheme::Light,
         };
+        let render_config = render_config_override.unwrap_or(default_render_config);
 
         match format {
             ExportFileType::DOT => Ok(to_dot::render(graph.clone(), render_config)
@@ -55,6 +63,7 @@ impl ExportService {
 
         for export_item in &plan.export.profiles {
             let graph_config = export_item.get_graph_config();
+            let render_config = export_item.get_render_config();
 
             // Apply transformations if specified
             if graph_config.invert_graph {
@@ -72,7 +81,8 @@ impl ExportService {
             }
 
             // Generate export
-            let output = self.export_to_string(&graph, &export_item.exporter)?;
+            let output =
+                self.export_to_string(&graph, &export_item.exporter, Some(render_config))?;
             outputs.push(output);
         }
 

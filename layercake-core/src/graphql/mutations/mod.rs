@@ -21,6 +21,7 @@ use crate::graphql::errors::StructuredError;
 use crate::services::auth_service::AuthService;
 use crate::services::authorization::AuthorizationService;
 use crate::services::chat_history_service::ChatHistoryService;
+use serde::Deserialize;
 use serde_json::Value;
 use uuid::Uuid;
 
@@ -52,6 +53,7 @@ use crate::graphql::types::{
     SystemSettingUpdateInput, UpdateCollaboratorRoleInput, UpdateDataSourceInput,
     UpdateLibrarySourceInput, UpdateUserInput, User,
 };
+use crate::plan::{RenderConfig, RenderConfigOrientation, RenderConfigTheme};
 
 fn generate_node_id_from_ids(
     node_type: &crate::graphql::types::PlanDagNodeType,
@@ -81,6 +83,56 @@ fn generate_edge_id(_source: &str, _target: &str) -> String {
     let short_uuid = uuid.chars().take(12).collect::<String>();
 
     format!("edge_{}", short_uuid)
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct StoredOutputNodeConfig {
+    render_target: Option<String>,
+    output_path: Option<String>,
+    render_config: Option<StoredRenderConfig>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct StoredRenderConfig {
+    contain_nodes: Option<bool>,
+    orientation: Option<String>,
+    use_default_styling: Option<bool>,
+    theme: Option<String>,
+}
+
+impl StoredRenderConfig {
+    fn into_render_config(self) -> RenderConfig {
+        RenderConfig {
+            contain_nodes: self.contain_nodes.unwrap_or(true),
+            orientation: self
+                .orientation
+                .as_deref()
+                .map(parse_orientation)
+                .unwrap_or(RenderConfigOrientation::TB),
+            use_default_styling: self.use_default_styling.unwrap_or(true),
+            theme: self
+                .theme
+                .as_deref()
+                .map(parse_theme)
+                .unwrap_or(RenderConfigTheme::Light),
+        }
+    }
+}
+
+fn parse_orientation(value: &str) -> RenderConfigOrientation {
+    match value {
+        "LR" | "lr" | "Lr" | "lR" => RenderConfigOrientation::LR,
+        _ => RenderConfigOrientation::TB,
+    }
+}
+
+fn parse_theme(value: &str) -> RenderConfigTheme {
+    match value {
+        "DARK" | "dark" | "Dark" => RenderConfigTheme::Dark,
+        _ => RenderConfigTheme::Light,
+    }
 }
 
 pub struct Mutation;
@@ -2161,18 +2213,19 @@ impl Mutation {
             })?
             .ok_or_else(|| StructuredError::not_found("Output node", &node_id))?;
 
-        // Parse node config to get renderTarget and outputPath
-        let config: serde_json::Value =
-            serde_json::from_str(&output_node.config_json).map_err(|e| {
+        // Parse node config to get renderTarget/outputPath/renderConfig overrides
+        let stored_config: StoredOutputNodeConfig = serde_json::from_str(&output_node.config_json)
+            .map_err(|e| {
                 StructuredError::bad_request(format!("Failed to parse node config: {}", e))
             })?;
 
-        let render_target = config
-            .get("renderTarget")
-            .and_then(|v| v.as_str())
-            .unwrap_or("GML");
-
-        let output_path = config.get("outputPath").and_then(|v| v.as_str());
+        let render_config_override = stored_config
+            .render_config
+            .map(|rc| rc.into_render_config());
+        let render_target = stored_config
+            .render_target
+            .unwrap_or_else(|| "GML".to_string());
+        let output_path = stored_config.output_path;
 
         // Get project name for default filename
         let project = projects::Entity::find_by_id(project_id)
@@ -2182,10 +2235,8 @@ impl Mutation {
             .ok_or_else(|| StructuredError::not_found("Project", project_id))?;
 
         // Generate filename
-        let extension = get_extension_for_format(render_target);
-        let filename = output_path
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| format!("{}.{}", project.name, extension));
+        let extension = get_extension_for_format(render_target.as_str());
+        let filename = output_path.unwrap_or_else(|| format!("{}.{}", project.name, extension));
 
         // Find the upstream GraphNode connected to this OutputNode
         let edges = plan_dag_edges::Entity::find()
@@ -2237,7 +2288,7 @@ impl Mutation {
                 StructuredError::not_found("Graph for node", upstream_node_id.clone())
             })?;
 
-        let export_format = parse_export_format(render_target)?;
+        let export_format = parse_export_format(render_target.as_str())?;
 
         let preview_limit = preview_rows.and_then(|value| {
             if value > 0 {
@@ -2249,7 +2300,12 @@ impl Mutation {
 
         let content = context
             .app
-            .preview_graph_export(graph_model.id, export_format, preview_limit)
+            .preview_graph_export(
+                graph_model.id,
+                export_format,
+                render_config_override,
+                preview_limit,
+            )
             .await
             .map_err(|e| StructuredError::service("AppContext::preview_graph_export", e))?;
 
@@ -2258,7 +2314,7 @@ impl Mutation {
         let encoded_content = base64::engine::general_purpose::STANDARD.encode(content.as_bytes());
 
         // Get MIME type
-        let mime_type = get_mime_type_for_format(render_target);
+        let mime_type = get_mime_type_for_format(render_target.as_str());
 
         Ok(ExportNodeOutputResult {
             success: true,

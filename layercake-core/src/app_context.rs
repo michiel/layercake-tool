@@ -20,7 +20,7 @@ use crate::graphql::types::plan_dag::{
     DataSourceExecutionMetadata, GraphExecutionMetadata, PlanDagEdge, PlanDagMetadata, PlanDagNode,
     PlanDagNodeType, Position,
 };
-use crate::plan::ExportFileType;
+use crate::plan::{ExportFileType, RenderConfig};
 use crate::services::graph_analysis_service::{GraphAnalysisService, GraphConnectivityReport};
 use crate::services::graph_edit_service::{
     GraphEditService, ReplaySummary as GraphEditReplaySummary,
@@ -1199,6 +1199,7 @@ impl AppContext {
         &self,
         graph_id: i32,
         format: ExportFileType,
+        render_config: Option<RenderConfig>,
         max_rows: Option<usize>,
     ) -> Result<String> {
         let graph = self
@@ -1209,7 +1210,7 @@ impl AppContext {
 
         let content = self
             .export_service
-            .export_to_string(&graph, &format)
+            .export_to_string(&graph, &format, render_config)
             .map_err(|e| anyhow!("Failed to render graph export: {}", e))?;
 
         Ok(apply_preview_limit(content, format, max_rows))

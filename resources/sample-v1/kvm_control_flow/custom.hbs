@@ -22,7 +22,7 @@ digraph G {
 node [style="filled, rounded" fillcolor="#dddddd" fontcolor="#000000"];
 
   {{#each tree as |rootnode|}}
-{{{dot_render_tree rootnode ../layers}}}
+{{{dot_render_tree rootnode ../layers ../config}}}
   {{/each}}
 
   {{#each edges as |edge|}}

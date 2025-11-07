@@ -32,7 +32,6 @@ export const getDefaultNodeConfig = (type: PlanDagNodeType): NodeConfig => {
 
     case PlanDagNodeType.GRAPH:
       return {
-        isReference: false,
         metadata: {}
       };
 
@@ -67,7 +66,12 @@ export const getDefaultNodeConfig = (type: PlanDagNodeType): NodeConfig => {
       return {
         renderTarget: 'DOT',
         outputPath: '',
-        renderConfig: {},
+        renderConfig: {
+          containNodes: true,
+          orientation: 'TB',
+          useDefaultStyling: true,
+          theme: 'Light'
+        },
         graphConfig: {}
       };
 

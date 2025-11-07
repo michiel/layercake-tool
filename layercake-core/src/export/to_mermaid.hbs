@@ -5,11 +5,16 @@
 ---
 flowchart {{config.orientation}}
 
-{{#each hierarchy_tree as |rootnode|}}
+{{#if config.contain_nodes}}
+  {{#each hierarchy_tree as |rootnode|}}
 {{{mermaid_render_tree rootnode}}}
-{{/each}}
+  {{/each}}
+{{else}}
+  {{#each flow_nodes as |node|}}
+ {{node.id}}["{{node.label}}"]
+  {{/each}}
+{{/if}}
 
 {{#each flow_edges as |edge|}}
  {{edge.source}} -->{{#if edge.label}}|"{{edge.label}}"|{{/if}} {{edge.target}}
 {{/each}}
-

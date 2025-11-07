@@ -112,12 +112,20 @@ pub struct ExportProfileGraphConfig {
 pub struct ExportProfileRenderConfig {
     pub contain_nodes: Option<bool>,
     pub orientation: Option<RenderConfigOrientation>,
+    pub use_default_styling: Option<bool>,
+    pub theme: Option<RenderConfigTheme>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Copy)]
 pub enum RenderConfigOrientation {
     LR,
     TB,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Copy)]
+pub enum RenderConfigTheme {
+    Light,
+    Dark,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -146,6 +154,8 @@ impl Default for ExportProfileRenderConfig {
         Self {
             contain_nodes: Some(true),
             orientation: Some(RenderConfigOrientation::TB),
+            use_default_styling: Some(true),
+            theme: Some(RenderConfigTheme::Light),
         }
     }
 }
@@ -154,6 +164,8 @@ impl Default for ExportProfileRenderConfig {
 pub struct RenderConfig {
     pub contain_nodes: bool,
     pub orientation: RenderConfigOrientation,
+    pub use_default_styling: bool,
+    pub theme: RenderConfigTheme,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Copy)]
@@ -217,10 +229,14 @@ impl ExportProfileItem {
             .orientation
             .unwrap_or(RenderConfigOrientation::TB);
         let contain_nodes = render_config.contain_nodes.unwrap_or(true);
+        let use_default_styling = render_config.use_default_styling.unwrap_or(true);
+        let theme = render_config.theme.unwrap_or(RenderConfigTheme::Light);
 
         RenderConfig {
             contain_nodes,
             orientation,
+            use_default_styling,
+            theme,
         }
     }
 }

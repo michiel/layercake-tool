@@ -135,8 +135,9 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
     <Dialog
       open={opened}
       onOpenChange={(open) => {
-        // Only allow closing via Cancel button (closeOnClickOutside={false}, closeOnEscape={false})
-        if (!open) return;
+        if (!open) {
+          onClose();
+        }
       }}
     >
       <DialogContent className="sm:max-w-[600px]">

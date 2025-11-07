@@ -49,7 +49,6 @@ export interface DataSourceNodeConfig {
 // Graph Node Configuration
 export interface GraphNodeConfig {
   // Removed: graphId - graph connections handled by visual edges in DAG
-  isReference: boolean;
   metadata: {
     nodeCount?: number;
     edgeCount?: number;
@@ -121,6 +120,8 @@ export interface OutputNodeConfig {
   renderConfig?: {
     containNodes?: boolean;
     orientation?: 'LR' | 'TB';
+    useDefaultStyling?: boolean;
+    theme?: 'Light' | 'Dark';
   };
   graphConfig?: {
     generateHierarchy?: boolean;

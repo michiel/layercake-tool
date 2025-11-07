@@ -53,8 +53,13 @@ pub fn get_handlebars() -> Handlebars<'static> {
     });
     handlebars.register_helper("is_empty", Box::new(is_empty));
 
-    handlebars_helper!(puml_render_tree: |node: Value, layermap: Value| {
-        fn render_tree(node: Value, layermap: &serde_json::Map<String, Value>, acc: i32) -> String {
+    handlebars_helper!(puml_render_tree: |node: Value, layermap: Value, style_config: Value| {
+        fn render_tree(
+            node: Value,
+            layermap: &serde_json::Map<String, Value>,
+            acc: i32,
+            use_default_styling: bool,
+        ) -> String {
             if let Value::Object(map) = node {
                 let id = map.get("id").and_then(|v| v.as_str()).unwrap_or("no-id");
                 let label = map.get("label").and_then(|v| v.as_str()).unwrap_or("Unnamed");
@@ -64,11 +69,15 @@ pub fn get_handlebars() -> Handlebars<'static> {
 
                 let indent = " ".repeat((acc * 2) as usize);
 
-                let mut result = format!("{}rectangle \"{}\" as {} <<{}>> ", indent, label, id, layer);
+                let mut result = if use_default_styling {
+                    format!("{}rectangle \"{}\" as {} <<{}>> ", indent, label, id, layer)
+                } else {
+                    format!("{}rectangle \"{}\" as {} ", indent, label, id)
+                };
                 if !children.is_empty() {
                     result += "{\n";
                     let children_rendered: Vec<String> = children.iter().map(|child| {
-                        render_tree(child.clone(), layermap, acc + 1)
+                        render_tree(child.clone(), layermap, acc + 1, use_default_styling)
                     }).collect();
                     result += &children_rendered.join("");
                     result += &format!("{}}}\n", indent);
@@ -90,7 +99,17 @@ pub fn get_handlebars() -> Handlebars<'static> {
             }
         };
 
-        render_tree(node, &layermap, 0)
+        let style_map = match style_config {
+            serde_json::Value::Object(map) => map,
+            _ => serde_json::Map::new(),
+        };
+
+        let use_default_styling = style_map
+            .get("use_default_styling")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true);
+
+        render_tree(node, &layermap, 0, use_default_styling)
     });
     handlebars.register_helper("puml_render_tree", Box::new(puml_render_tree));
 
@@ -127,8 +146,21 @@ pub fn get_handlebars() -> Handlebars<'static> {
     });
     handlebars.register_helper("mermaid_render_tree", Box::new(mermaid_render_tree));
 
-    handlebars_helper!(dot_render_tree: |node: Value, layermap: Value| {
-        fn render_tree(node: Value, layermap: &serde_json::Map<String, Value>, acc: i32) -> String {
+    handlebars_helper!(dot_render_tree: |node: Value, layermap: Value, style_config: Value| {
+        fn theme_palette(theme: &str) -> (&'static str, &'static str, &'static str, &'static str) {
+            match theme {
+                "Dark" => ("#1e1e1e", "#f5f5f5", "#444444", "#888888"),
+                _ => ("#dddddd", "#000000", "#cccccc", "#444444"),
+            }
+        }
+
+        fn render_tree(
+            node: Value,
+            layermap: &serde_json::Map<String, Value>,
+            acc: i32,
+            use_default_styling: bool,
+            theme: &str,
+        ) -> String {
             if let Value::Object(map) = node {
                 let id = map.get("id").and_then(|v| v.as_str()).unwrap_or("no-id");
                 let label = map.get("label").and_then(|v| v.as_str()).unwrap_or("Unnamed");
@@ -139,30 +171,88 @@ pub fn get_handlebars() -> Handlebars<'static> {
                 let indent = " ".repeat((acc * 2) as usize);
                 let mut result = String::new();
 
+                let (default_fill, default_font, default_border, default_container_border) =
+                    theme_palette(theme);
+
                 if !children.is_empty() {
                     result += &format!("{}subgraph cluster_{} {{\n", indent, id);
                     result += &format!("{}  label=\"{}\"\n", indent, label);
 
-                    if let Some(layer_props) = layermap.get(layer) {
+                    if use_default_styling {
+                        let mut fillcolor = default_fill.trim_start_matches('#').to_string();
+                        let mut bordercolor =
+                            default_container_border.trim_start_matches('#').to_string();
+                        let mut fontcolor = default_font.trim_start_matches('#').to_string();
+
+                        if let Some(layer_props) = layermap.get(layer) {
+                            if let Some(background_color) =
+                                layer_props.get("background_color").and_then(|v| v.as_str())
+                            {
+                                fillcolor = background_color.to_string();
+                            }
+                            if let Some(border_color) =
+                                layer_props.get("border_color").and_then(|v| v.as_str())
+                            {
+                                bordercolor = border_color.to_string();
+                            }
+                            if let Some(text_color) =
+                                layer_props.get("text_color").and_then(|v| v.as_str())
+                            {
+                                fontcolor = text_color.to_string();
+                            }
+                        }
+
                         result += &format!("{}  style=filled\n", indent);
-                        if let Some(background_color) = layer_props.get("background_color").and_then(|v| v.as_str()) {
-                            result += &format!("{}  fillcolor=\"#{}\"\n", indent, background_color);
-                        }
-                        if let Some(border_color) = layer_props.get("border_color").and_then(|v| v.as_str()) {
-                            result += &format!("{}  color=\"#{}\"\n", indent, border_color);
-                        }
-                        if let Some(text_color) = layer_props.get("text_color").and_then(|v| v.as_str()) {
-                            result += &format!("{}  fontcolor=\"#{}\"\n", indent, text_color);
-                        }
+                        result += &format!("{}  fillcolor=\"#{}\"\n", indent, fillcolor);
+                        result += &format!("{}  color=\"#{}\"\n", indent, bordercolor);
+                        result += &format!("{}  fontcolor=\"#{}\"\n", indent, fontcolor);
                     }
 
                     let children_rendered: Vec<String> = children.iter().map(|child| {
-                        render_tree(child.clone(), layermap, acc + 1)
+                        render_tree(
+                            child.clone(),
+                            layermap,
+                            acc + 1,
+                            use_default_styling,
+                            theme,
+                        )
                     }).collect();
                     result += &children_rendered.join("");
                     result += &format!("{}  }}\n", indent);
                 } else {
-                    result += &format!("{}{} [label=\"{}\", layer=\"{}\"];\n", indent, id, label, layer);
+                    if use_default_styling {
+                        let mut fillcolor = default_fill.trim_start_matches('#').to_string();
+                        let mut fontcolor = default_font.trim_start_matches('#').to_string();
+                        let mut bordercolor = default_border.trim_start_matches('#').to_string();
+
+                        if let Some(layer_props) = layermap.get(layer) {
+                            if let Some(background_color) =
+                                layer_props.get("background_color").and_then(|v| v.as_str())
+                            {
+                                fillcolor = background_color.to_string();
+                            }
+                            if let Some(text_color) =
+                                layer_props.get("text_color").and_then(|v| v.as_str())
+                            {
+                                fontcolor = text_color.to_string();
+                            }
+                            if let Some(border_color) =
+                                layer_props.get("border_color").and_then(|v| v.as_str())
+                            {
+                                bordercolor = border_color.to_string();
+                            }
+                        }
+
+                        result += &format!(
+                            "{}{} [label=\"{}\", layer=\"{}\", style=\"filled,rounded\", fillcolor=\"#{}\", fontcolor=\"#{}\", color=\"#{}\"];\n",
+                            indent, id, label, layer, fillcolor, fontcolor, bordercolor
+                        );
+                    } else {
+                        result += &format!(
+                            "{}{} [label=\"{}\", layer=\"{}\"];\n",
+                            indent, id, label, layer
+                        );
+                    }
                 }
 
                 result
@@ -180,7 +270,27 @@ pub fn get_handlebars() -> Handlebars<'static> {
             }
         };
 
-        render_tree(node, &layermap, 0)
+        let style_map = match style_config {
+            serde_json::Value::Object(map) => map,
+            _ => serde_json::Map::new(),
+        };
+
+        let use_default_styling = style_map
+            .get("use_default_styling")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true);
+        let theme = style_map
+            .get("theme")
+            .and_then(|v| v.as_str())
+            .unwrap_or("Light");
+
+        render_tree(
+            node,
+            &layermap,
+            0,
+            use_default_styling,
+            theme,
+        )
     });
     handlebars.register_helper("dot_render_tree", Box::new(dot_render_tree));
 

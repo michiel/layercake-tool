@@ -5,7 +5,6 @@ import { Stack } from '@/components/layout-primitives';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 
 interface GraphNodeConfigFormProps {
   config: GraphNodeConfig;
@@ -24,9 +23,8 @@ export const GraphNodeConfigForm: React.FC<GraphNodeConfigFormProps> = ({
   metadata,
   setMetadata,
 }) => {
-  const [localConfig, setLocalConfig] = useState<GraphNodeConfig>({
+  const [localConfig] = useState<GraphNodeConfig>({
     ...config,
-    isReference: config.isReference ?? false,
     metadata: config.metadata || {},
   });
   const [nodeName, setNodeName] = useState<string>(metadata?.label ?? '');
@@ -74,14 +72,6 @@ export const GraphNodeConfigForm: React.FC<GraphNodeConfigFormProps> = ({
         </AlertDescription>
       </Alert>
 
-      <div className="flex items-center space-x-2">
-        <Switch
-          id="is-reference"
-          checked={localConfig.isReference}
-          onCheckedChange={(checked) => setLocalConfig(prev => ({ ...prev, isReference: checked }))}
-        />
-        <Label htmlFor="is-reference">Is Reference</Label>
-      </div>
     </Stack>
   );
 };

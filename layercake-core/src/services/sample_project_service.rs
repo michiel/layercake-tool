@@ -194,10 +194,7 @@ impl SampleProjectService {
             source_position: Set(None),
             target_position: Set(None),
             metadata_json: Set(graph_metadata_json.clone()),
-            config_json: Set(serde_json::json!({
-                "isReference": false
-            })
-            .to_string()),
+            config_json: Set(serde_json::json!({}).to_string()),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -215,7 +212,6 @@ impl SampleProjectService {
         {
             let mut graph_node_active: plan_dag_nodes::ActiveModel = existing_graph_node.into();
             graph_node_active.config_json = Set(serde_json::json!({
-                "isReference": false,
                 "projectId": project.id,
                 "graphId": graph.id,
                 "metadata": {
