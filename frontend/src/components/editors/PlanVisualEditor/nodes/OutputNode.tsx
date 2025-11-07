@@ -125,16 +125,13 @@ export const OutputNode = memo((props: OutputNodeProps) => {
   const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
     onCompleted: (data: any) => {
       const result = data.exportNodeOutput as ExportNodeOutputResult
-      console.log('[OutputNode] Export completed', { success: result.success, previewTarget, contentLength: result.content?.length })
       if (result.success) {
         try {
           const decodedContent = atob(result.content)
-          console.log('[OutputNode] Decoded content', { previewTarget, decodedLength: decodedContent.length })
           if (previewTarget === 'mermaid') {
             setMermaidContent(decodedContent)
             setMermaidOpen(true)
           } else if (previewTarget === 'dot') {
-            console.log('[OutputNode] Setting DOT content and opening dialog')
             setDotContent(decodedContent)
             setDotOpen(true)
           } else {
@@ -209,7 +206,6 @@ export const OutputNode = memo((props: OutputNodeProps) => {
   }
 
   const handleDotPreview = async () => {
-    console.log('[OutputNode] DOT preview clicked', { projectId, isConfigured, nodeId: props.id })
     if (!projectId || !isConfigured) return
 
     setPreviewTarget('dot')

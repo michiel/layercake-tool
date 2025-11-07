@@ -21,25 +21,14 @@ export const DotPreviewDialog = ({ open, onClose, diagram, title }: DotPreviewDi
   const graphvizRef = useRef<any>(null)
   const renderId = useId().replace(/[^a-zA-Z0-9_-]/g, '')
 
-  console.log('[DotPreview] Component render:', { open, diagramLength: diagram?.length, title })
-
   useEffect(() => {
-    console.log('[DotPreview] useEffect triggered:', {
-      open,
-      diagramLength: diagram?.length,
-      containerExists: !!containerRef.current,
-      renderId
-    })
-
     if (!open) {
-      console.log('[DotPreview] Dialog not open, skipping')
       setError(null)
       setZoom(1)
       return
     }
 
     if (!diagram) {
-      console.log('[DotPreview] No diagram content')
       return
     }
 
@@ -49,23 +38,13 @@ export const DotPreviewDialog = ({ open, onClose, diagram, title }: DotPreviewDi
     const renderDiagram = () => {
       // Wait for container to be ready
       if (!containerRef.current) {
-        console.log('[DotPreview] Container not ready, retrying...')
         setTimeout(renderDiagram, 50)
         return
       }
 
       try {
-        console.log('[DotPreview] Starting render', {
-          renderId,
-          selector: `#graphviz-${renderId}`,
-          diagramLength: diagram.length,
-          containerExists: !!containerRef.current
-        })
-
         const selector = `#graphviz-${renderId}`
         const element = document.querySelector(selector)
-
-        console.log('[DotPreview] Element found:', !!element)
 
         if (!element) {
           throw new Error(`Element not found: ${selector}`)
@@ -75,7 +54,6 @@ export const DotPreviewDialog = ({ open, onClose, diagram, title }: DotPreviewDi
           .fit(true)
           .zoom(false)
           .on('end', () => {
-            console.log('[DotPreview] Render complete')
             if (!cancelled) {
               setError(null)
               setIsRendering(false)
@@ -83,11 +61,10 @@ export const DotPreviewDialog = ({ open, onClose, diagram, title }: DotPreviewDi
           })
           .renderDot(diagram)
 
-        console.log('[DotPreview] Graphviz instance created:', !!viz)
         graphvizRef.current = viz
       } catch (err) {
         if (!cancelled) {
-          console.error('[DotPreview] Failed to render Graphviz diagram', err)
+          console.error('Failed to render Graphviz diagram', err)
           setError(err instanceof Error ? err.message : 'Failed to render Graphviz diagram')
           setIsRendering(false)
         }
