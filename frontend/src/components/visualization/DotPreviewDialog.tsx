@@ -21,14 +21,30 @@ export const DotPreviewDialog = ({ open, onClose, diagram, title }: DotPreviewDi
   const graphvizRef = useRef<any>(null)
   const renderId = useId().replace(/[^a-zA-Z0-9_-]/g, '')
 
+  console.log('[DotPreview] Component render:', { open, diagramLength: diagram?.length, title })
+
   useEffect(() => {
+    console.log('[DotPreview] useEffect triggered:', {
+      open,
+      diagramLength: diagram?.length,
+      containerExists: !!containerRef.current,
+      renderId
+    })
+
     if (!open) {
+      console.log('[DotPreview] Dialog not open, skipping')
       setError(null)
       setZoom(1)
       return
     }
 
-    if (!diagram || !containerRef.current) {
+    if (!diagram) {
+      console.log('[DotPreview] No diagram content')
+      return
+    }
+
+    if (!containerRef.current) {
+      console.log('[DotPreview] Container ref not ready')
       return
     }
 
