@@ -1,10 +1,5 @@
 use anyhow::{anyhow, Result};
-use axum::{
-    extract::{Json, State},
-    response::IntoResponse,
-    routing::get,
-    Router,
-};
+use axum::{extract::State, response::IntoResponse, routing::get, Router};
 use sea_orm::DatabaseConnection;
 use std::sync::Arc;
 use tower::ServiceBuilder;
@@ -26,7 +21,7 @@ use crate::{
 #[cfg(feature = "graphql")]
 use async_graphql::{
     parser::types::{DocumentOperations, OperationType, Selection},
-    Request, Response as GraphQLResponse, Schema,
+    Request, Schema,
 };
 #[cfg(feature = "graphql")]
 use async_graphql_axum::{GraphQLRequest, GraphQLResponse as AxumGraphQLResponse};
@@ -280,11 +275,12 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
 async fn graphql_handler(
     State(state): State<AppState>,
     headers: axum::http::HeaderMap,
-    GraphQLRequest(mut req): GraphQLRequest,
+    request: GraphQLRequest,
 ) -> AxumGraphQLResponse {
     use crate::graphql::context::RequestSession;
 
     tracing::debug!("GraphQL request received");
+    let mut req = request.into_inner();
 
     if let Some(session_header) = headers
         .get("x-layercake-session")
@@ -327,7 +323,7 @@ async fn graphql_handler(
     }
 
     tracing::debug!("GraphQL request completed");
-    AxumGraphQLResponse(response)
+    AxumGraphQLResponse(response.into())
 }
 
 #[cfg(feature = "graphql")]
