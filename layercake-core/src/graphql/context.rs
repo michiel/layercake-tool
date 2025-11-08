@@ -122,10 +122,10 @@ impl GraphQLContext {
         chat_manager: Arc<ChatManager>,
     ) -> Self {
         let db = app.db().clone();
-        let import_service = app.import_service();
-        let export_service = app.export_service();
-        let graph_service = app.graph_service();
-        let plan_dag_service = app.plan_dag_service();
+        let import_service = Arc::clone(app.import_service());
+        let export_service = Arc::clone(app.export_service());
+        let graph_service = Arc::clone(app.graph_service());
+        let plan_dag_service = Arc::clone(app.plan_dag_service());
 
         Self {
             app,

@@ -74,40 +74,40 @@ impl AppContext {
         &self.db
     }
 
-    pub fn import_service(&self) -> Arc<ImportService> {
-        self.import_service.clone()
+    pub fn import_service(&self) -> &Arc<ImportService> {
+        &self.import_service
     }
 
-    pub fn export_service(&self) -> Arc<ExportService> {
-        self.export_service.clone()
+    pub fn export_service(&self) -> &Arc<ExportService> {
+        &self.export_service
     }
 
-    pub fn graph_service(&self) -> Arc<GraphService> {
-        self.graph_service.clone()
-    }
-
-    #[allow(dead_code)]
-    pub fn data_source_service(&self) -> Arc<DataSourceService> {
-        self.data_source_service.clone()
+    pub fn graph_service(&self) -> &Arc<GraphService> {
+        &self.graph_service
     }
 
     #[allow(dead_code)]
-    pub fn data_source_bulk_service(&self) -> Arc<DataSourceBulkService> {
-        self.data_source_bulk_service.clone()
-    }
-
-    pub fn plan_dag_service(&self) -> Arc<PlanDagService> {
-        self.plan_dag_service.clone()
+    pub fn data_source_service(&self) -> &Arc<DataSourceService> {
+        &self.data_source_service
     }
 
     #[allow(dead_code)]
-    pub fn graph_edit_service(&self) -> Arc<GraphEditService> {
-        self.graph_edit_service.clone()
+    pub fn data_source_bulk_service(&self) -> &Arc<DataSourceBulkService> {
+        &self.data_source_bulk_service
+    }
+
+    pub fn plan_dag_service(&self) -> &Arc<PlanDagService> {
+        &self.plan_dag_service
     }
 
     #[allow(dead_code)]
-    pub fn graph_analysis_service(&self) -> Arc<GraphAnalysisService> {
-        self.graph_analysis_service.clone()
+    pub fn graph_edit_service(&self) -> &Arc<GraphEditService> {
+        &self.graph_edit_service
+    }
+
+    #[allow(dead_code)]
+    pub fn graph_analysis_service(&self) -> &Arc<GraphAnalysisService> {
+        &self.graph_analysis_service
     }
 
     // ----- Project helpers -------------------------------------------------
