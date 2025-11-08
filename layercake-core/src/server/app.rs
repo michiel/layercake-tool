@@ -28,6 +28,8 @@ use async_graphql::{
     parser::types::{DocumentOperations, OperationType, Selection},
     Request, Response as GraphQLResponse, Schema,
 };
+#[cfg(feature = "graphql")]
+use async_graphql_axum::{GraphQLRequest, GraphQLResponse as AxumGraphQLResponse};
 
 use super::handlers::health;
 use layercake_data_acquisition::{
@@ -278,8 +280,8 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
 async fn graphql_handler(
     State(state): State<AppState>,
     headers: axum::http::HeaderMap,
-    Json(mut req): Json<Request>,
-) -> Json<GraphQLResponse> {
+    GraphQLRequest(mut req): GraphQLRequest,
+) -> AxumGraphQLResponse {
     use crate::graphql::context::RequestSession;
 
     tracing::debug!("GraphQL request received");
@@ -325,7 +327,7 @@ async fn graphql_handler(
     }
 
     tracing::debug!("GraphQL request completed");
-    Json(response)
+    AxumGraphQLResponse(response)
 }
 
 #[cfg(feature = "graphql")]
