@@ -3177,6 +3177,7 @@ dependencies = [
  "serde_yaml",
  "sha2",
  "spreadsheet-ods",
+ "strum 0.26.3",
  "thiserror 1.0.69",
  "tokio",
  "tokio-test",

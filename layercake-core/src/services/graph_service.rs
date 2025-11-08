@@ -2,8 +2,8 @@ use crate::database::entities::{
     graph_edges, graph_edges::Entity as GraphEdges, graph_layers, graph_layers::Entity as Layers,
     graph_nodes, graph_nodes::Entity as GraphNodes, plan_dag_edges, plan_dag_nodes,
 };
+use crate::errors::{GraphError, GraphResult};
 use crate::graph::{Edge, Graph, Layer, Node};
-use anyhow::Result;
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
 
 pub struct GraphService {
@@ -17,34 +17,38 @@ impl GraphService {
 
     /// Get database graph_layers for a graph
     #[allow(dead_code)]
-    pub async fn get_layers_for_graph(&self, graph_id: i32) -> Result<Vec<graph_layers::Model>> {
+    pub async fn get_layers_for_graph(&self, graph_id: i32) -> GraphResult<Vec<graph_layers::Model>> {
         let db_layers = Layers::find()
             .filter(graph_layers::Column::GraphId.eq(graph_id))
             .all(&self.db)
-            .await?;
+            .await
+            .map_err(GraphError::Database)?;
         Ok(db_layers)
     }
 
     /// Build a Graph from a DAG-built graph in the graphs table
-    pub async fn build_graph_from_dag_graph(&self, graph_id: i32) -> Result<Graph> {
+    pub async fn build_graph_from_dag_graph(&self, graph_id: i32) -> GraphResult<Graph> {
         // Fetch the graph metadata
         use crate::database::entities::graphs::Entity as Graphs;
         let graph_meta = Graphs::find_by_id(graph_id)
             .one(&self.db)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Graph {} not found", graph_id))?;
+            .await
+            .map_err(GraphError::Database)?
+            .ok_or(GraphError::NotFound(graph_id))?;
 
         // Fetch graph nodes
         let db_graph_nodes = GraphNodes::find()
             .filter(graph_nodes::Column::GraphId.eq(graph_id))
             .all(&self.db)
-            .await?;
+            .await
+            .map_err(GraphError::Database)?;
 
         // Fetch graph edges
         let db_graph_edges = GraphEdges::find()
             .filter(graph_edges::Column::GraphId.eq(graph_id))
             .all(&self.db)
-            .await?;
+            .await
+            .map_err(GraphError::Database)?;
 
         // Get unique graph_layers from nodes
         use std::collections::HashSet;
@@ -109,7 +113,7 @@ impl GraphService {
         project_id: i32,
         name: String,
         node_id: Option<String>,
-    ) -> Result<crate::database::entities::graphs::Model> {
+    ) -> GraphResult<crate::database::entities::graphs::Model> {
         use crate::database::entities::graphs;
         use sea_orm::{ActiveModelTrait, Set};
 
@@ -121,7 +125,8 @@ impl GraphService {
         graph.name = Set(name);
         graph.node_id = Set(node_id);
 
-        let graph = graph.insert(&self.db).await?;
+        let graph = graph.insert(&self.db).await
+            .map_err(GraphError::Database)?;
 
         Ok(graph)
     }
@@ -130,14 +135,15 @@ impl GraphService {
         &self,
         id: i32,
         name: Option<String>,
-    ) -> Result<crate::database::entities::graphs::Model> {
+    ) -> GraphResult<crate::database::entities::graphs::Model> {
         use crate::database::entities::graphs;
         use sea_orm::{ActiveModelTrait, Set};
 
         let graph = graphs::Entity::find_by_id(id)
             .one(&self.db)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Graph not found"))?;
+            .await
+            .map_err(GraphError::Database)?
+            .ok_or(GraphError::NotFound(id))?;
 
         let mut active_model: graphs::ActiveModel = graph.into();
 
@@ -146,46 +152,53 @@ impl GraphService {
         }
         active_model.updated_at = Set(chrono::Utc::now());
 
-        let updated = active_model.update(&self.db).await?;
+        let updated = active_model.update(&self.db).await
+            .map_err(GraphError::Database)?;
         Ok(updated)
     }
 
-    pub async fn delete_graph(&self, id: i32) -> Result<()> {
+    pub async fn delete_graph(&self, id: i32) -> GraphResult<()> {
         use crate::database::entities::graphs;
 
         let graph = graphs::Entity::find_by_id(id)
             .one(&self.db)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Graph not found"))?;
+            .await
+            .map_err(GraphError::Database)?
+            .ok_or(GraphError::NotFound(id))?;
 
         // Find and delete all plan_dag_nodes that reference this graph by node_id
         let dag_nodes = plan_dag_nodes::Entity::find()
             .filter(plan_dag_nodes::Column::Id.eq(&graph.node_id))
             .all(&self.db)
-            .await?;
+            .await
+            .map_err(GraphError::Database)?;
 
         for dag_node in dag_nodes {
             // Delete connected edges first
             plan_dag_edges::Entity::delete_many()
                 .filter(plan_dag_edges::Column::SourceNodeId.eq(&dag_node.id))
                 .exec(&self.db)
-                .await?;
+                .await
+                .map_err(GraphError::Database)?;
 
             plan_dag_edges::Entity::delete_many()
                 .filter(plan_dag_edges::Column::TargetNodeId.eq(&dag_node.id))
                 .exec(&self.db)
-                .await?;
+                .await
+                .map_err(GraphError::Database)?;
 
             // Delete the node
             plan_dag_nodes::Entity::delete_by_id(&dag_node.id)
                 .exec(&self.db)
-                .await?;
+                .await
+                .map_err(GraphError::Database)?;
         }
 
         // Delete the graph itself
         graphs::Entity::delete_by_id(graph.id)
             .exec(&self.db)
-            .await?;
+            .await
+            .map_err(GraphError::Database)?;
 
         Ok(())
     }
@@ -200,7 +213,7 @@ impl GraphService {
         belongs_to: Option<String>,
         weight: Option<f64>,
         attrs: Option<serde_json::Value>,
-    ) -> Result<graph_nodes::Model> {
+    ) -> GraphResult<graph_nodes::Model> {
         use sea_orm::{ActiveModelTrait, Set};
 
         let now = chrono::Utc::now();
@@ -218,7 +231,8 @@ impl GraphService {
             created_at: Set(now),
         };
 
-        let inserted = active_model.insert(&self.db).await?;
+        let inserted = active_model.insert(&self.db).await
+            .map_err(GraphError::Database)?;
         Ok(inserted)
     }
 
@@ -226,22 +240,24 @@ impl GraphService {
         &self,
         graph_id: i32,
         node_id: String,
-    ) -> Result<graph_nodes::Model> {
+    ) -> GraphResult<graph_nodes::Model> {
         use sea_orm::{EntityTrait, QueryFilter};
 
         let node = GraphNodes::find()
             .filter(graph_nodes::Column::GraphId.eq(graph_id))
             .filter(graph_nodes::Column::Id.eq(&node_id))
             .one(&self.db)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Graph node not found"))?;
+            .await
+            .map_err(GraphError::Database)?
+            .ok_or_else(|| GraphError::InvalidNode(node_id.clone()))?;
 
         // Delete the node
         GraphNodes::delete_many()
             .filter(graph_nodes::Column::GraphId.eq(graph_id))
             .filter(graph_nodes::Column::Id.eq(&node_id))
             .exec(&self.db)
-            .await?;
+            .await
+            .map_err(GraphError::Database)?;
 
         Ok(node)
     }
@@ -254,15 +270,16 @@ impl GraphService {
         layer: Option<String>,
         attrs: Option<serde_json::Value>,
         belongs_to: Option<Option<String>>,
-    ) -> Result<graph_nodes::Model> {
+    ) -> GraphResult<graph_nodes::Model> {
         use sea_orm::{ActiveModelTrait, Set};
 
         let node = GraphNodes::find()
             .filter(graph_nodes::Column::GraphId.eq(graph_id))
             .filter(graph_nodes::Column::Id.eq(&node_id))
             .one(&self.db)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Graph node not found"))?;
+            .await
+            .map_err(GraphError::Database)?
+            .ok_or_else(|| GraphError::InvalidNode(node_id.clone()))?;
 
         let mut active_model: graph_nodes::ActiveModel = node.into();
 
@@ -282,7 +299,8 @@ impl GraphService {
             active_model.belongs_to = Set(belongs_to_value);
         }
 
-        let updated = active_model.update(&self.db).await?;
+        let updated = active_model.update(&self.db).await
+            .map_err(GraphError::Database)?;
         Ok(updated)
     }
 
@@ -291,13 +309,14 @@ impl GraphService {
         layer_id: i32,
         name: Option<String>,
         properties: Option<serde_json::Value>,
-    ) -> Result<graph_layers::Model> {
+    ) -> GraphResult<graph_layers::Model> {
         use sea_orm::{ActiveModelTrait, Set};
 
         let layer = Layers::find_by_id(layer_id)
             .one(&self.db)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Layer not found"))?;
+            .await
+            .map_err(GraphError::Database)?
+            .ok_or_else(|| GraphError::InvalidLayer(format!("Layer {} not found", layer_id)))?;
 
         let mut active_model: graph_layers::ActiveModel = layer.into();
 
@@ -306,11 +325,13 @@ impl GraphService {
         }
 
         if let Some(properties) = properties {
-            let properties_string = serde_json::to_string(&properties)?;
+            let properties_string = serde_json::to_string(&properties)
+                .map_err(|e| GraphError::Validation(format!("Invalid layer properties JSON: {}", e)))?;
             active_model.properties = Set(Some(properties_string));
         }
 
-        let updated = active_model.update(&self.db).await?;
+        let updated = active_model.update(&self.db).await
+            .map_err(GraphError::Database)?;
         Ok(updated)
     }
 }
