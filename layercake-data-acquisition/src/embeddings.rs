@@ -1,5 +1,6 @@
 use anyhow::Result;
 use rig::client::EmbeddingsClient;
+use rig::embeddings::EmbeddingModel;
 use rig::providers::{ollama, openai};
 use serde_json::Value;
 

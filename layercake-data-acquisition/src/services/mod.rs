@@ -122,9 +122,9 @@ impl DataAcquisitionService {
                             .clone()
                             .or_else(|| std::env::var("OPENAI_BASE_URL").ok())
                             .filter(|value| !value.is_empty());
-                        let mut builder = openai::Client::builder(&api_key);
-                        if let Some(url) = base_url {
-                            builder = builder.base_url(&url);
+                        let mut builder = openai::Client::builder(api_key.as_str());
+                        if let Some(ref url) = base_url {
+                            builder = builder.base_url(url);
                         }
                         let client = builder.build();
                         let model = provider_config
@@ -165,8 +165,8 @@ impl DataAcquisitionService {
                     .or_else(|| std::env::var("OLLAMA_BASE_URL").ok())
                     .or_else(|| std::env::var("OLLAMA_API_BASE_URL").ok())
                     .filter(|value| !value.is_empty());
-                let client = if let Some(url) = base_url {
-                    ollama::Client::builder().base_url(&url).build()
+                let client = if let Some(ref url) = base_url {
+                    ollama::Client::builder().base_url(url).build()
                 } else {
                     ollama::Client::new()
                 };
