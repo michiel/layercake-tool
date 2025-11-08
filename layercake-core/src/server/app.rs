@@ -99,7 +99,7 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
             chat_manager.clone(),
         );
 
-        let schema = Schema::build(Query, Mutation, Subscription)
+        let schema: Schema<Query, Mutation, Subscription> = Schema::build(Query, Mutation::default(), Subscription)
             .data(graphql_context)
             .finish();
 
