@@ -158,7 +158,7 @@ impl DataAcquisitionService {
                     .clone()
                     .or_else(|| std::env::var("LAYERCAKE_OLLAMA_EMBEDDING_MODEL").ok())
                     .filter(|value| !value.is_empty())
-                    .unwrap_or_else(|| "nomic-embed-text-v1.5".to_string());
+                    .unwrap_or_else(|| "nomic-embed-text:v1.5".to_string());
                 let base_url = provider_config
                     .ollama_base_url
                     .clone()
