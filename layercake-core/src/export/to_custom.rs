@@ -5,20 +5,20 @@ use std::fs;
 use tracing::error;
 
 pub fn render(
-    graph: Graph,
-    render_config: RenderConfig,
-    params: CustomExportProfile,
+    graph: &Graph,
+    render_config: &RenderConfig,
+    params: &CustomExportProfile,
 ) -> Result<String, Box<dyn Error>> {
     use serde_json::json;
 
     let tree = graph.build_json_tree();
     let mut handlebars = crate::common::get_handlebars();
 
-    if let Some(partials) = params.partials {
+    if let Some(partials) = &params.partials {
         for (name, partial) in partials {
-            match fs::read_to_string(&partial) {
+            match fs::read_to_string(partial) {
                 Ok(partial_content) => {
-                    if let Err(err) = handlebars.register_partial(&name, partial_content) {
+                    if let Err(err) = handlebars.register_partial(name, partial_content) {
                         error!("Failed to register partial '{}': {}", name, err);
                     }
                 }

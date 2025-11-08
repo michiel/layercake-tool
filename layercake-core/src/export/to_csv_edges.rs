@@ -3,23 +3,24 @@ use crate::plan::RenderConfig;
 use csv::Writer;
 use std::error::Error;
 
-pub fn render(graph: Graph, _render_config: RenderConfig) -> Result<String, Box<dyn Error>> {
+pub fn render(graph: &Graph, _render_config: &RenderConfig) -> Result<String, Box<dyn Error>> {
     let mut wtr = Writer::from_writer(vec![]);
 
     // Write the header
     wtr.write_record(["id", "source", "target", "label", "layer", "comment"])?;
 
-    let mut edges = graph.edges.clone();
-    edges.sort_by(|a, b| a.id.cmp(&b.id));
+    // Collect references and sort by ID
+    let mut edge_refs: Vec<_> = graph.edges.iter().collect();
+    edge_refs.sort_by_key(|e| &e.id);
 
-    for edge in edges {
+    for edge in edge_refs {
         wtr.write_record(&[
-            edge.id.to_string(),
-            edge.source,
-            edge.target,
-            edge.label,
-            edge.layer,
-            edge.comment.unwrap_or("".to_string()),
+            &edge.id.to_string(),
+            &edge.source,
+            &edge.target,
+            &edge.label,
+            &edge.layer,
+            edge.comment.as_deref().unwrap_or(""),
         ])?;
     }
 

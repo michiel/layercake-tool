@@ -3,7 +3,7 @@ use crate::plan::RenderConfig;
 use csv::Writer;
 use std::error::Error;
 
-pub fn render(graph: Graph, _render_config: RenderConfig) -> Result<String, Box<dyn Error>> {
+pub fn render(graph: &Graph, _render_config: &RenderConfig) -> Result<String, Box<dyn Error>> {
     let mut wtr = Writer::from_writer(vec![]);
 
     // Write the header
@@ -16,17 +16,18 @@ pub fn render(graph: Graph, _render_config: RenderConfig) -> Result<String, Box<
         "comment",
     ])?;
 
-    let mut nodes = graph.nodes.clone();
-    nodes.sort_by(|a, b| a.id.cmp(&b.id));
+    // Collect references and sort by ID
+    let mut node_refs: Vec<_> = graph.nodes.iter().collect();
+    node_refs.sort_by_key(|n| &n.id);
 
-    for node in nodes {
+    for node in node_refs {
         wtr.write_record(&[
-            node.id.to_string(),
-            node.label,
-            node.layer,
-            node.is_partition.to_string(),
-            node.belongs_to.unwrap_or("".to_string()),
-            node.comment.unwrap_or("".to_string()),
+            &node.id.to_string(),
+            &node.label,
+            &node.layer,
+            &node.is_partition.to_string(),
+            node.belongs_to.as_deref().unwrap_or(""),
+            node.comment.as_deref().unwrap_or(""),
         ])?;
     }
 

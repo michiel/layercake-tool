@@ -8,7 +8,7 @@ use std::collections::HashSet;
 use std::error::Error;
 use tracing::warn;
 
-pub fn render(graph: Graph, _render_config: RenderConfig) -> Result<String, Box<dyn Error>> {
+pub fn render(graph: &Graph, _render_config: &RenderConfig) -> Result<String, Box<dyn Error>> {
     warn!("Rendering to CSV matrix is an experimental feature, may not work as expected and will change.");
 
     fn create_dynamic_2d_array<T: Clone>(rows: usize, cols: usize, default: T) -> Vec<Vec<T>> {
@@ -30,7 +30,7 @@ pub fn render(graph: Graph, _render_config: RenderConfig) -> Result<String, Box<
         let mut seen_ids = HashSet::new();
         for item in items {
             let id = id_extractor(item);
-            if !seen_ids.insert(id.clone()) {
+            if !seen_ids.insert(id) {
                 return false; // Duplicate found
             }
         }
@@ -54,27 +54,27 @@ pub fn render(graph: Graph, _render_config: RenderConfig) -> Result<String, Box<
         create_dynamic_2d_array(nodes.len() + offset, nodes.len() + offset, JsonValue::Null);
 
     nodes.sort_by(|a, b| a.id.cmp(&b.id));
-    let positions: HashMap<String, usize> = nodes
+    let positions: HashMap<&str, usize> = nodes
         .iter()
         .enumerate()
-        .map(|(i, node)| (node.id.clone(), i))
+        .map(|(i, node)| (node.id.as_str(), i))
         .collect();
 
     matrix[0][1] = json!("Source");
     matrix[1][0] = json!("Target");
 
-    for node in nodes.clone() {
-        let i = positions[&node.id];
+    for node in &nodes {
+        let i = positions[node.id.as_str()];
         // row
-        matrix[i + offset][1] = json!(node.label);
+        matrix[i + offset][1] = json!(&node.label);
         // column
-        matrix[1][i + offset] = json!(node.label);
+        matrix[1][i + offset] = json!(&node.label);
     }
 
     edges.sort_by(|a, b| a.id.cmp(&b.id));
-    for edge in edges.clone() {
-        let i = positions[&edge.source];
-        let j = positions[&edge.target];
+    for edge in &edges {
+        let i = positions[edge.source.as_str()];
+        let j = positions[edge.target.as_str()];
         matrix[i + offset][j + offset] = json!(edge.weight);
     }
 

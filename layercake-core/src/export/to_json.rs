@@ -2,7 +2,7 @@ use crate::graph::Graph;
 use crate::plan::RenderConfig;
 use std::error::Error;
 
-pub fn render(graph: Graph, _render_config: RenderConfig) -> Result<String, Box<dyn Error>> {
+pub fn render(graph: &Graph, _render_config: &RenderConfig) -> Result<String, Box<dyn Error>> {
     use serde_json::json;
 
     let tree = graph.build_json_tree();

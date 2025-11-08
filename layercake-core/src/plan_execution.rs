@@ -213,28 +213,28 @@ fn export_graph(graph: &Graph, profile: &ExportProfileItem) -> Result<()> {
     let render_config = profile.get_render_config();
 
     let result = match &profile.exporter {
-        ExportFileType::GML => crate::export::to_gml::render(graph.clone(), render_config),
-        ExportFileType::DOT => crate::export::to_dot::render(graph.clone(), render_config),
+        ExportFileType::GML => crate::export::to_gml::render(&graph, &render_config),
+        ExportFileType::DOT => crate::export::to_dot::render(&graph, &render_config),
         ExportFileType::DOTHierarchy => {
-            crate::export::to_dot_hierarchy::render(graph.clone(), render_config)
+            crate::export::to_dot_hierarchy::render(&graph, &render_config)
         }
-        ExportFileType::JSON => crate::export::to_json::render(graph.clone(), render_config),
+        ExportFileType::JSON => crate::export::to_json::render(&graph, &render_config),
         ExportFileType::CSVNodes => {
-            crate::export::to_csv_nodes::render(graph.clone(), render_config)
+            crate::export::to_csv_nodes::render(&graph, &render_config)
         }
         ExportFileType::CSVEdges => {
-            crate::export::to_csv_edges::render(graph.clone(), render_config)
+            crate::export::to_csv_edges::render(&graph, &render_config)
         }
         ExportFileType::CSVMatrix => {
-            crate::export::to_csv_matrix::render(graph.clone(), render_config)
+            crate::export::to_csv_matrix::render(&graph, &render_config)
         }
         ExportFileType::PlantUML => {
-            crate::export::to_plantuml::render(graph.clone(), render_config)
+            crate::export::to_plantuml::render(&graph, &render_config)
         }
-        ExportFileType::Mermaid => crate::export::to_mermaid::render(graph.clone(), render_config),
-        ExportFileType::JSGraph => crate::export::to_jsgraph::render(graph.clone(), render_config),
+        ExportFileType::Mermaid => crate::export::to_mermaid::render(&graph, &render_config),
+        ExportFileType::JSGraph => crate::export::to_jsgraph::render(&graph, &render_config),
         ExportFileType::Custom(template_config) => {
-            crate::export::to_custom::render(graph.clone(), render_config, template_config.clone())
+            crate::export::to_custom::render(&graph, &render_config, template_config)
         }
     };
 
