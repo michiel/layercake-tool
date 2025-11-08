@@ -4,7 +4,7 @@ import { getMainDefinition } from '@apollo/client/utilities'
 import { onError } from '@apollo/client/link/error'
 import { setContext } from '@apollo/client/link/context'
 import { createClient } from 'graphql-ws'
-import { createUploadLink } from 'apollo-upload-client/createUploadLink.mjs'
+import UploadHttpLink from 'apollo-upload-client/UploadHttpLink.mjs'
 import { getServerInfo, isTauriApp, waitForServer } from '../utils/tauri'
 import { getOrCreateSessionId } from '../utils/session'
 import { extractGraphQLErrorMessage } from '../utils/errorHandling'
@@ -103,7 +103,7 @@ function createApolloClient(): ApolloClient {
 
   // HTTP Link for queries and mutations with timeout using AbortController
   // Use a function to get the current endpoint (supports dynamic reconfiguration)
-  const httpLink = createUploadLink({
+  const httpLink = new UploadHttpLink({
     uri: () => {
       const { httpUrl } = getGraphQLEndpoints()
       console.log('[GraphQL HTTP] Using endpoint:', httpUrl)
@@ -114,7 +114,7 @@ function createApolloClient(): ApolloClient {
       const controller = new AbortController()
       const timeout = setTimeout(() => {
         controller.abort()
-      }, 30000) // 30 second timeout
+      }, 30000)
 
       const requestOptions: RequestInit = {
         ...(options ?? {}),

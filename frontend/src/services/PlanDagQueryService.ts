@@ -2,6 +2,7 @@ import { ApolloClient } from '@apollo/client'
 import * as PlanDagGraphQL from '../graphql/plan-dag'
 import { PlanDag } from '../types/plan-dag'
 import { applyPatch, Operation } from 'fast-json-patch'
+import { asGraphQLSubscribable } from '../utils/graphqlSubscription'
 
 /**
  * CQRS Query Service - Handles all queries and subscriptions (reads)
@@ -55,7 +56,7 @@ export class PlanDagQueryService {
       variables: { projectId: query.projectId }
     })
 
-    return subscription.subscribe({
+    return asGraphQLSubscribable<any>(subscription).subscribe({
       next: (result: any) => {
         const subscriptionData = result.data?.planDagChanged
 
@@ -100,7 +101,7 @@ export class PlanDagQueryService {
 
     console.log('[PlanDagQueryService] Delta subscription created, waiting for updates...')
 
-    return subscription.subscribe({
+    return asGraphQLSubscribable<any>(subscription).subscribe({
       next: (result: any) => {
         console.log('[PlanDagQueryService] Raw subscription result:', result)
         const deltaData = result.data?.planDagDeltaChanged
@@ -229,12 +230,12 @@ export class PlanDagQueryService {
     })
 
     return watchQuery.subscribe({
-      next: (result) => {
+      next: (result: any) => {
         const planDag = (result.data as any)?.getPlanDag || null
         console.log('[PlanDagQueryService] Watch update:', planDag?.version)
         onUpdate(planDag)
       },
-      error: (error) => {
+      error: (error: Error) => {
         console.error('[PlanDagQueryService] Watch error:', error)
         onError?.(error)
       }
@@ -254,7 +255,7 @@ export class PlanDagQueryService {
       variables: { projectId: query.projectId }
     })
 
-    return subscription.subscribe({
+    return asGraphQLSubscribable<any>(subscription).subscribe({
       next: (result: any) => {
         const statusData = result.data?.nodeExecutionStatusChanged
 
