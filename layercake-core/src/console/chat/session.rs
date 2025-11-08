@@ -915,7 +915,8 @@ fn compose_system_prompt(config: &ChatConfig, project_id: i32, tool_names: &[Str
     if !tool_names.is_empty() {
         prompt.push_str("\n\nYou have access to the following tools:\n");
         for name in tool_names {
-            writeln!(&mut prompt, "- {}", name).unwrap();
+            // Writing to String cannot fail
+            writeln!(&mut prompt, "- {}", name).expect("Writing to String should not fail");
         }
         prompt.push_str("\nUse these tools when appropriate to help answer questions.");
     }
@@ -1029,27 +1030,27 @@ mod tests {
     #[test]
     fn test_chat_provider_from_str() {
         assert_eq!(
-            "ollama".parse::<ChatProvider>().unwrap(),
+            "ollama".parse::<ChatProvider>().expect("Should parse ollama"),
             ChatProvider::Ollama
         );
         assert_eq!(
-            "openai".parse::<ChatProvider>().unwrap(),
+            "openai".parse::<ChatProvider>().expect("Should parse openai"),
             ChatProvider::OpenAi
         );
         assert_eq!(
-            "open-ai".parse::<ChatProvider>().unwrap(),
+            "open-ai".parse::<ChatProvider>().expect("Should parse open-ai"),
             ChatProvider::OpenAi
         );
         assert_eq!(
-            "gemini".parse::<ChatProvider>().unwrap(),
+            "gemini".parse::<ChatProvider>().expect("Should parse gemini"),
             ChatProvider::Gemini
         );
         assert_eq!(
-            "claude".parse::<ChatProvider>().unwrap(),
+            "claude".parse::<ChatProvider>().expect("Should parse claude"),
             ChatProvider::Claude
         );
         assert_eq!(
-            "anthropic".parse::<ChatProvider>().unwrap(),
+            "anthropic".parse::<ChatProvider>().expect("Should parse anthropic"),
             ChatProvider::Claude
         );
 
@@ -1084,7 +1085,7 @@ mod tests {
         let msg = ChatMessage::assistant("Searching...").with_tool_calls(vec![tool_call]);
         assert_eq!(msg.role, "assistant");
         assert!(msg.tool_calls.is_some());
-        assert_eq!(msg.tool_calls.as_ref().unwrap().len(), 1);
+        assert_eq!(msg.tool_calls.as_ref().expect("Tool calls should be present").len(), 1);
 
         let msg = ChatMessage::tool_result("call_1", "Result: Found 5 items");
         assert_eq!(msg.role, "tool");

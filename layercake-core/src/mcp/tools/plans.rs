@@ -367,7 +367,8 @@ pub async fn execute_plan(
 
         return Ok(ToolsCallResult {
             content: vec![ToolContent::Text {
-                text: serde_json::to_string_pretty(&result).unwrap(),
+                text: serde_json::to_string_pretty(&result)
+                    .map_err(|e| anyhow::anyhow!("Failed to serialize result to JSON: {}", e))?,
             }],
             is_error: false,
             metadata: HashMap::new(),

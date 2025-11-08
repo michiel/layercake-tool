@@ -1247,8 +1247,9 @@ mod query_filter_executor {
                 let values = parse_value_list(raw_value, ColumnValueType::Number);
                 if let Some(mut values) = values {
                     if values.len() == 2 {
-                        let right = values.pop().unwrap();
-                        let left = values.pop().unwrap();
+                        // Safe to unwrap: we just checked that values.len() == 2
+                        let right = values.pop().expect("Expected right value in BETWEEN clause");
+                        let left = values.pop().expect("Expected left value in BETWEEN clause");
                         Some(SqlFragment {
                             sql: format!("({expr} BETWEEN ? AND ?)", expr = expr),
                             params: vec![left, right],

@@ -564,16 +564,23 @@ impl ChatSession {
 
     /// Sanitise API keys from error messages to prevent leaking secrets in logs
     fn sanitise_api_keys(msg: &str) -> String {
+        use once_cell::sync::Lazy;
         use regex::Regex;
 
         // Pattern to match API keys in URLs (query parameters)
         // Matches patterns like: ?key=ACTUAL_KEY or &key=ACTUAL_KEY
-        let re = Regex::new(r"([?&]key=)[A-Za-z0-9_-]+").unwrap();
-        let sanitised = re.replace_all(msg, "${1}[REDACTED]");
+        static RE_API_KEY: Lazy<Regex> = Lazy::new(|| {
+            Regex::new(r"([?&]key=)[A-Za-z0-9_-]+")
+                .expect("Invalid regex pattern for API key sanitisation")
+        });
+        let sanitised = RE_API_KEY.replace_all(msg, "${1}[REDACTED]");
 
         // Also sanitise bearer tokens if present
-        let re_bearer = Regex::new(r"(Bearer\s+)[A-Za-z0-9_.-]+").unwrap();
-        re_bearer.replace_all(&sanitised, "${1}[REDACTED]").to_string()
+        static RE_BEARER: Lazy<Regex> = Lazy::new(|| {
+            Regex::new(r"(Bearer\s+)[A-Za-z0-9_.-]+")
+                .expect("Invalid regex pattern for bearer token sanitisation")
+        });
+        RE_BEARER.replace_all(&sanitised, "${1}[REDACTED]").to_string()
     }
 
     fn should_disable_tools(&self, err: &LLMError) -> bool {

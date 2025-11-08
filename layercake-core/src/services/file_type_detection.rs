@@ -128,7 +128,7 @@ mod tests {
         let csv_data = b"id,label,layer,x,y\nnode1,Node 1,layer1,10,20\n";
         let result = detect_from_csv(csv_data, b',');
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), DataType::Nodes);
+        assert_eq!(result.expect("Should detect nodes"), DataType::Nodes);
     }
 
     #[test]
@@ -136,7 +136,7 @@ mod tests {
         let csv_data = b"id,source,target,label\nedge1,node1,node2,connects\n";
         let result = detect_from_csv(csv_data, b',');
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), DataType::Edges);
+        assert_eq!(result.expect("Should detect edges"), DataType::Edges);
     }
 
     #[test]
@@ -144,7 +144,7 @@ mod tests {
         let csv_data = b"id,name,color\nlayer1,Layer 1,#FF0000\n";
         let result = detect_from_csv(csv_data, b',');
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), DataType::Layers);
+        assert_eq!(result.expect("Should detect layers"), DataType::Layers);
     }
 
     #[test]
@@ -152,7 +152,7 @@ mod tests {
         let json_data = br#"{"nodes": [], "edges": []}"#;
         let result = detect_from_json(json_data);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), DataType::Graph);
+        assert_eq!(result.expect("Should detect graph"), DataType::Graph);
     }
 
     #[test]
@@ -160,7 +160,7 @@ mod tests {
         let json_data = br#"[{"id": "1", "label": "Node 1"}]"#;
         let result = detect_from_json(json_data);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), DataType::Nodes);
+        assert_eq!(result.expect("Should detect nodes array"), DataType::Nodes);
     }
 
     #[test]
@@ -168,6 +168,6 @@ mod tests {
         let json_data = br#"[{"id": "e1", "source": "n1", "target": "n2"}]"#;
         let result = detect_from_json(json_data);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), DataType::Edges);
+        assert_eq!(result.expect("Should detect edges array"), DataType::Edges);
     }
 }

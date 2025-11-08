@@ -126,7 +126,9 @@ fn find_all_paths(
             break;
         }
 
-        let current_node = current_path.last().unwrap();
+        // Safe: paths are initialized with at least one element and only extended
+        let current_node = current_path.last()
+            .expect("Current path should not be empty");
 
         if current_node == target {
             paths.push(current_path);

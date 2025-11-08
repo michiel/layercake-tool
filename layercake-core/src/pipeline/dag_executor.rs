@@ -737,8 +737,11 @@ impl DagExecutor {
         for (source, target) in edges {
             // Only consider edges between nodes in our set
             if in_degree.contains_key(source) && in_degree.contains_key(target) {
-                adj_list.get_mut(source).unwrap().push(target.clone());
-                *in_degree.get_mut(target).unwrap() += 1;
+                adj_list.get_mut(source)
+                    .expect("Source node must exist in adjacency list")
+                    .push(target.clone());
+                *in_degree.get_mut(target)
+                    .expect("Target node must exist in in-degree map") += 1;
             }
         }
 
@@ -757,7 +760,8 @@ impl DagExecutor {
             // Reduce in-degree for neighbors
             if let Some(neighbors) = adj_list.get(&node_id) {
                 for neighbor in neighbors {
-                    let deg = in_degree.get_mut(neighbor).unwrap();
+                    let deg = in_degree.get_mut(neighbor)
+                        .expect("Neighbor node must exist in in-degree map");
                     *deg -= 1;
                     if *deg == 0 {
                         queue.push_back(neighbor.clone());
@@ -931,12 +935,16 @@ mod tests {
             ("B".to_string(), "C".to_string()),
         ];
 
-        let sorted = executor.topological_sort(&nodes, &edges).unwrap();
+        let sorted = executor.topological_sort(&nodes, &edges)
+            .expect("Topological sort should succeed in test");
 
         // C should come after both A and B
-        let c_pos = sorted.iter().position(|id| id == "C").unwrap();
-        let a_pos = sorted.iter().position(|id| id == "A").unwrap();
-        let b_pos = sorted.iter().position(|id| id == "B").unwrap();
+        let c_pos = sorted.iter().position(|id| id == "C")
+            .expect("Node C should be in sorted result");
+        let a_pos = sorted.iter().position(|id| id == "A")
+            .expect("Node A should be in sorted result");
+        let b_pos = sorted.iter().position(|id| id == "B")
+            .expect("Node B should be in sorted result");
 
         assert!(c_pos > a_pos);
         assert!(c_pos > b_pos);

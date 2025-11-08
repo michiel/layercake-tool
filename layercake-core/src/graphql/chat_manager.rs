@@ -265,12 +265,14 @@ impl ChatManager {
         let rx = {
             let sessions = self.inner.sessions.lock().await;
             tracing::debug!("Active sessions for subscription: {}", sessions.len());
-            sessions.get(session_id).map(|session| {
+            sessions.get(session_id).and_then(|session| {
                 let history = {
-                    let guard = session.history.lock().unwrap();
+                    let guard = session.history.lock()
+                        .map_err(|e| tracing::error!("Failed to acquire lock on session history: {}", e))
+                        .ok()?;
                     guard.iter().cloned().collect::<Vec<_>>()
                 };
-                (history, session.event_tx.subscribe())
+                Some((history, session.event_tx.subscribe()))
             })
         };
 
@@ -284,25 +286,38 @@ impl ChatManager {
 }
 
 fn store_event(history: &Arc<StdMutex<VecDeque<ChatEvent>>>, event: &ChatEvent) {
-    let mut guard = history.lock().unwrap();
-    guard.push_back(event.clone());
-    if guard.len() > MAX_EVENT_HISTORY {
-        guard.pop_front();
+    match history.lock() {
+        Ok(mut guard) => {
+            guard.push_back(event.clone());
+            if guard.len() > MAX_EVENT_HISTORY {
+                guard.pop_front();
+            }
+        }
+        Err(e) => {
+            tracing::error!("Failed to acquire lock on event history for storage: {}", e);
+        }
     }
 }
 
 /// Sanitise API keys and secrets from error messages before sending to clients
 fn sanitise_error_message(msg: &str) -> String {
+    use once_cell::sync::Lazy;
     use regex::Regex;
 
     // Pattern to match API keys in URLs (query parameters)
     // Matches patterns like: ?key=ACTUAL_KEY or &key=ACTUAL_KEY
-    let re = Regex::new(r"([?&]key=)[A-Za-z0-9_-]+").unwrap();
-    let sanitised = re.replace_all(msg, "${1}[REDACTED]");
+    static RE_API_KEY: Lazy<Regex> = Lazy::new(|| {
+        Regex::new(r"([?&]key=)[A-Za-z0-9_-]+")
+            .expect("Invalid regex pattern for API key sanitisation")
+    });
+    let sanitised = RE_API_KEY.replace_all(msg, "${1}[REDACTED]");
 
     // Also sanitise bearer tokens if present
-    let re_bearer = Regex::new(r"(Bearer\s+)[A-Za-z0-9_.-]+").unwrap();
-    re_bearer
+    static RE_BEARER: Lazy<Regex> = Lazy::new(|| {
+        Regex::new(r"(Bearer\s+)[A-Za-z0-9_.-]+")
+            .expect("Invalid regex pattern for bearer token sanitisation")
+    });
+    RE_BEARER
         .replace_all(&sanitised, "${1}[REDACTED]")
         .to_string()
 }
