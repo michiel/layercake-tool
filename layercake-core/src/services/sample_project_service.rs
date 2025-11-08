@@ -6,7 +6,8 @@ use serde_yaml::Value;
 use tracing::{debug, warn};
 use uuid::Uuid;
 
-use crate::database::entities::data_sources::{self, DataType, FileFormat};
+use crate::database::entities::common_types::{DataType, FileFormat};
+use crate::database::entities::data_sources::{self};
 use crate::database::entities::{plan_dag_edges, plan_dag_nodes, plans, projects};
 use crate::services::{data_source_service::DataSourceService, graph_service::GraphService};
 

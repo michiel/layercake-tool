@@ -10,9 +10,9 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use uuid::Uuid;
 
+use crate::database::entities::common_types::{DataType as DataSourceDataType, FileFormat as DataSourceFileFormat};
 use crate::database::entities::{
     data_sources,
-    data_sources::{DataType as DataSourceDataType, FileFormat as DataSourceFileFormat},
     graphs, plans, projects,
 };
 use crate::graphql::types::graph_node::GraphNode as GraphNodeDto;

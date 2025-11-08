@@ -181,22 +181,23 @@ pub enum FileFormat {
     JSON,
 }
 
-impl From<crate::database::entities::data_sources::FileFormat> for FileFormat {
-    fn from(db_format: crate::database::entities::data_sources::FileFormat) -> Self {
+impl From<crate::database::entities::common_types::FileFormat> for FileFormat {
+    fn from(db_format: crate::database::entities::common_types::FileFormat) -> Self {
         match db_format {
-            crate::database::entities::data_sources::FileFormat::Csv => FileFormat::CSV,
-            crate::database::entities::data_sources::FileFormat::Tsv => FileFormat::TSV,
-            crate::database::entities::data_sources::FileFormat::Json => FileFormat::JSON,
+            crate::database::entities::common_types::FileFormat::Csv => FileFormat::CSV,
+            crate::database::entities::common_types::FileFormat::Tsv => FileFormat::TSV,
+            crate::database::entities::common_types::FileFormat::Json => FileFormat::JSON,
+            _ => panic!("Unsupported file format for GraphQL conversion"),
         }
     }
 }
 
-impl From<FileFormat> for crate::database::entities::data_sources::FileFormat {
+impl From<FileFormat> for crate::database::entities::common_types::FileFormat {
     fn from(gql_format: FileFormat) -> Self {
         match gql_format {
-            FileFormat::CSV => crate::database::entities::data_sources::FileFormat::Csv,
-            FileFormat::TSV => crate::database::entities::data_sources::FileFormat::Tsv,
-            FileFormat::JSON => crate::database::entities::data_sources::FileFormat::Json,
+            FileFormat::CSV => crate::database::entities::common_types::FileFormat::Csv,
+            FileFormat::TSV => crate::database::entities::common_types::FileFormat::Tsv,
+            FileFormat::JSON => crate::database::entities::common_types::FileFormat::Json,
         }
     }
 }
@@ -211,24 +212,24 @@ pub enum DataSourceDataType {
     GRAPH,
 }
 
-impl From<crate::database::entities::data_sources::DataType> for DataSourceDataType {
-    fn from(db_type: crate::database::entities::data_sources::DataType) -> Self {
+impl From<crate::database::entities::common_types::DataType> for DataSourceDataType {
+    fn from(db_type: crate::database::entities::common_types::DataType) -> Self {
         match db_type {
-            crate::database::entities::data_sources::DataType::Nodes => DataSourceDataType::NODES,
-            crate::database::entities::data_sources::DataType::Edges => DataSourceDataType::EDGES,
-            crate::database::entities::data_sources::DataType::Layers => DataSourceDataType::LAYERS,
-            crate::database::entities::data_sources::DataType::Graph => DataSourceDataType::GRAPH,
+            crate::database::entities::common_types::DataType::Nodes => DataSourceDataType::NODES,
+            crate::database::entities::common_types::DataType::Edges => DataSourceDataType::EDGES,
+            crate::database::entities::common_types::DataType::Layers => DataSourceDataType::LAYERS,
+            crate::database::entities::common_types::DataType::Graph => DataSourceDataType::GRAPH,
         }
     }
 }
 
-impl From<DataSourceDataType> for crate::database::entities::data_sources::DataType {
+impl From<DataSourceDataType> for crate::database::entities::common_types::DataType {
     fn from(gql_type: DataSourceDataType) -> Self {
         match gql_type {
-            DataSourceDataType::NODES => crate::database::entities::data_sources::DataType::Nodes,
-            DataSourceDataType::EDGES => crate::database::entities::data_sources::DataType::Edges,
-            DataSourceDataType::LAYERS => crate::database::entities::data_sources::DataType::Layers,
-            DataSourceDataType::GRAPH => crate::database::entities::data_sources::DataType::Graph,
+            DataSourceDataType::NODES => crate::database::entities::common_types::DataType::Nodes,
+            DataSourceDataType::EDGES => crate::database::entities::common_types::DataType::Edges,
+            DataSourceDataType::LAYERS => crate::database::entities::common_types::DataType::Layers,
+            DataSourceDataType::GRAPH => crate::database::entities::common_types::DataType::Graph,
         }
     }
 }

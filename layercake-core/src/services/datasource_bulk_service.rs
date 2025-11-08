@@ -4,8 +4,8 @@ use rust_xlsxwriter::*;
 use sea_orm::{DatabaseConnection, EntityTrait};
 use spreadsheet_ods::{Sheet, Value, WorkBook};
 
+use crate::database::entities::common_types::{DataType, FileFormat};
 use crate::database::entities::data_sources;
-use crate::database::entities::data_sources::{DataType, FileFormat};
 use crate::services::data_source_service::DataSourceService;
 
 pub struct DataSourceBulkService {

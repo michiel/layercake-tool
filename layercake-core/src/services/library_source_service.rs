@@ -7,7 +7,8 @@ use anyhow::{anyhow, Context, Result};
 use csv::ReaderBuilder;
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 
-use crate::database::entities::data_sources::{self, DataType, FileFormat};
+use crate::database::entities::common_types::{DataType, FileFormat};
+use crate::database::entities::data_sources::{self};
 use crate::database::entities::{library_sources, projects};
 use crate::services::source_processing;
 
@@ -136,8 +137,8 @@ impl LibrarySourceService {
         if !data_type.is_compatible_with_format(&file_format) {
             return Err(anyhow!(
                 "Invalid combination: {} format cannot contain {} data",
-                file_format.as_str(),
-                data_type.as_str()
+                file_format.as_ref(),
+                data_type.as_ref()
             ));
         }
 
@@ -146,16 +147,16 @@ impl LibrarySourceService {
         if detected_format != file_format {
             return Err(anyhow!(
                 "File extension doesn't match declared format. Expected {}, got {}",
-                file_format.as_str(),
-                detected_format.as_str()
+                file_format.as_ref(),
+                detected_format.as_ref()
             ));
         }
 
         let active_model = library_sources::ActiveModel {
             name: Set(name),
             description: Set(description),
-            file_format: Set(file_format.as_str().to_string()),
-            data_type: Set(data_type.as_str().to_string()),
+            file_format: Set(file_format.as_ref().to_string()),
+            data_type: Set(data_type.as_ref().to_string()),
             filename: Set(filename),
             blob: Set(file_data.clone()),
             file_size: Set(file_data.len() as i64),
@@ -231,8 +232,8 @@ impl LibrarySourceService {
         if !data_type.is_compatible_with_format(&file_format) {
             return Err(anyhow!(
                 "Invalid combination: {} format cannot contain {} data",
-                file_format.as_str(),
-                data_type.as_str()
+                file_format.as_ref(),
+                data_type.as_ref()
             ));
         }
 
@@ -240,7 +241,7 @@ impl LibrarySourceService {
         active.filename = Set(filename);
         active.blob = Set(file_data.clone());
         active.file_size = Set(file_data.len() as i64);
-        active.file_format = Set(file_format.as_str().to_string());
+        active.file_format = Set(file_format.as_ref().to_string());
         active.status = Set("processing".to_string());
         active.error_message = Set(None);
         active.updated_at = Set(chrono::Utc::now());
@@ -395,6 +396,9 @@ fn infer_data_type(filename: &str, file_format: &FileFormat, file_data: &[u8]) -
     match file_format {
         FileFormat::Json => Ok(DataType::Graph),
         FileFormat::Csv | FileFormat::Tsv => infer_data_type_from_headers(file_format, file_data),
+        FileFormat::Xlsx | FileFormat::Ods | FileFormat::Pdf | FileFormat::Xml => {
+            Err(anyhow!("File format {:?} is not supported for data type inference", file_format))
+        }
     }
 }
 

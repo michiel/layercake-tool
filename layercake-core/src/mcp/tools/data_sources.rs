@@ -5,7 +5,7 @@ use crate::app_context::{
     DataSourceFileCreateRequest, DataSourceFileReplacement, DataSourceImportFormat,
     DataSourceImportRequest, DataSourceUpdateRequest,
 };
-use crate::database::entities::data_sources::{DataType as DataSourceDataType, FileFormat};
+use crate::database::entities::common_types::{DataType as DataSourceDataType, FileFormat};
 use crate::mcp::tools::{create_success_response, get_required_param};
 use axum_mcp::prelude::*;
 use serde_json::{json, Value};

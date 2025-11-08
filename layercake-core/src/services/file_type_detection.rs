@@ -3,7 +3,7 @@ use csv::ReaderBuilder;
 use serde_json::Value;
 use std::collections::HashSet;
 
-use crate::database::entities::data_sources::{DataType, FileFormat};
+use crate::database::entities::common_types::{DataType, FileFormat};
 
 /// Detect data type from file content using heuristics
 pub fn detect_data_type(file_format: &FileFormat, file_data: &[u8]) -> Result<DataType> {
@@ -11,6 +11,9 @@ pub fn detect_data_type(file_format: &FileFormat, file_data: &[u8]) -> Result<Da
         FileFormat::Csv => detect_from_csv(file_data, b','),
         FileFormat::Tsv => detect_from_csv(file_data, b'\t'),
         FileFormat::Json => detect_from_json(file_data),
+        FileFormat::Xlsx | FileFormat::Ods | FileFormat::Pdf | FileFormat::Xml => {
+            anyhow::bail!("File format {:?} is not supported for data type detection", file_format)
+        }
     }
 }
 

@@ -1,0 +1,322 @@
+//! Common types shared across database entities
+//!
+//! This module contains enums and types that are used by multiple entity modules,
+//! reducing duplication and ensuring consistency.
+
+use serde::{Deserialize, Serialize};
+use strum::{AsRefStr, Display, EnumIter, EnumString};
+
+/// File formats supported for data source imports/exports
+///
+/// This enum represents the physical file format used to store graph data.
+/// Each format has specific characteristics and use cases:
+///
+/// - `Csv`: Comma-separated values, suitable for nodes, edges, and layers
+/// - `Tsv`: Tab-separated values, alternative to CSV with different delimiter
+/// - `Json`: JavaScript Object Notation, suitable for complete graph structures
+/// - `Xlsx`: Excel spreadsheet format, used for multi-sheet exports
+/// - `Ods`: OpenDocument Spreadsheet format, open alternative to Excel
+/// - `Pdf`: Portable Document Format, for read-only exports
+/// - `Xml`: Extensible Markup Language, for structured data exchange
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumString, AsRefStr, Display, EnumIter, Serialize, Deserialize)]
+#[strum(serialize_all = "lowercase")]
+#[strum(ascii_case_insensitive)]
+pub enum FileFormat {
+    Csv,
+    Tsv,
+    Json,
+    Xlsx,
+    Ods,
+    Pdf,
+    Xml,
+}
+
+impl FileFormat {
+    /// Determine file format from filename extension
+    ///
+    /// This method extracts the file extension from a filename and attempts
+    /// to parse it into a known FileFormat. The comparison is case-insensitive.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use layercake::database::entities::common_types::FileFormat;
+    /// assert_eq!(FileFormat::from_extension("data.csv"), Some(FileFormat::Csv));
+    /// assert_eq!(FileFormat::from_extension("data.CSV"), Some(FileFormat::Csv));
+    /// assert_eq!(FileFormat::from_extension("report.xlsx"), Some(FileFormat::Xlsx));
+    /// assert_eq!(FileFormat::from_extension("unknown.xyz"), None);
+    /// assert_eq!(FileFormat::from_extension("noext"), None);
+    /// ```
+    pub fn from_extension(filename: &str) -> Option<Self> {
+        let ext = filename.split('.').last()?.to_lowercase();
+        ext.parse().ok()
+    }
+
+    /// Get the delimiter character for delimited file formats
+    ///
+    /// Returns the delimiter byte used by CSV and TSV formats.
+    /// Returns None for formats that don't use delimiters.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use layercake::database::entities::common_types::FileFormat;
+    /// assert_eq!(FileFormat::Csv.get_delimiter(), Some(b','));
+    /// assert_eq!(FileFormat::Tsv.get_delimiter(), Some(b'\t'));
+    /// assert_eq!(FileFormat::Json.get_delimiter(), None);
+    /// ```
+    pub fn get_delimiter(&self) -> Option<u8> {
+        match self {
+            FileFormat::Csv => Some(b','),
+            FileFormat::Tsv => Some(b'\t'),
+            _ => None,
+        }
+    }
+}
+
+/// Data types for graph elements
+///
+/// This enum represents the semantic meaning of data within a file,
+/// independent of the physical file format. Each type has specific
+/// requirements for required and optional fields:
+///
+/// - `Nodes`: Graph vertices with id and label (required), plus optional attributes
+/// - `Edges`: Graph connections with id, source, target (required), plus optional attributes
+/// - `Layers`: Grouping/layering information with id and label (required)
+/// - `Graph`: Complete graph structure containing nodes, edges, and layers
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumString, AsRefStr, Display, EnumIter, Serialize, Deserialize)]
+#[strum(serialize_all = "lowercase")]
+#[strum(ascii_case_insensitive)]
+pub enum DataType {
+    Nodes,
+    Edges,
+    Layers,
+    Graph,
+}
+
+impl DataType {
+    /// Get the expected header fields for this data type
+    ///
+    /// Returns the minimum required column headers for CSV/TSV files
+    /// or the required JSON fields for graph data.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use layercake::database::entities::common_types::DataType;
+    /// assert_eq!(DataType::Nodes.get_expected_headers(), vec!["id", "label"]);
+    /// assert_eq!(DataType::Edges.get_expected_headers(), vec!["id", "source", "target"]);
+    /// ```
+    pub fn get_expected_headers(&self) -> Vec<&'static str> {
+        match self {
+            DataType::Nodes => vec!["id", "label"],
+            DataType::Edges => vec!["id", "source", "target"],
+            DataType::Layers => vec!["id", "label"],
+            DataType::Graph => vec![], // JSON doesn't have headers
+        }
+    }
+
+    /// Get the optional header fields for this data type
+    ///
+    /// Returns additional column headers that may be present but are not required
+    /// for this data type.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use layercake::database::entities::common_types::DataType;
+    /// let optional = DataType::Nodes.get_optional_headers();
+    /// assert!(optional.contains(&"layer"));
+    /// assert!(optional.contains(&"color"));
+    /// ```
+    pub fn get_optional_headers(&self) -> Vec<&'static str> {
+        match self {
+            DataType::Nodes => vec!["layer", "x", "y", "description", "color"],
+            DataType::Edges => vec!["label", "description", "weight", "color"],
+            DataType::Layers => vec!["color", "description", "z_index"],
+            DataType::Graph => vec![],
+        }
+    }
+
+    /// Check if this data type is compatible with a given file format
+    ///
+    /// Different data types can only be stored in certain file formats.
+    /// For example, a complete Graph can only be stored in JSON format,
+    /// while Nodes, Edges, and Layers can be stored in CSV or TSV.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use layercake::database::entities::common_types::{DataType, FileFormat};
+    /// assert!(DataType::Nodes.is_compatible_with_format(&FileFormat::Csv));
+    /// assert!(DataType::Graph.is_compatible_with_format(&FileFormat::Json));
+    /// assert!(!DataType::Graph.is_compatible_with_format(&FileFormat::Csv));
+    /// ```
+    pub fn is_compatible_with_format(&self, format: &FileFormat) -> bool {
+        match (format, self) {
+            (FileFormat::Csv, DataType::Nodes)
+            | (FileFormat::Csv, DataType::Edges)
+            | (FileFormat::Csv, DataType::Layers)
+            | (FileFormat::Tsv, DataType::Nodes)
+            | (FileFormat::Tsv, DataType::Edges)
+            | (FileFormat::Tsv, DataType::Layers)
+            | (FileFormat::Json, DataType::Graph) => true,
+            _ => false,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use strum::IntoEnumIterator;
+
+    #[test]
+    fn test_file_format_as_ref() {
+        assert_eq!(FileFormat::Csv.as_ref(), "csv");
+        assert_eq!(FileFormat::Tsv.as_ref(), "tsv");
+        assert_eq!(FileFormat::Json.as_ref(), "json");
+        assert_eq!(FileFormat::Xlsx.as_ref(), "xlsx");
+        assert_eq!(FileFormat::Ods.as_ref(), "ods");
+        assert_eq!(FileFormat::Pdf.as_ref(), "pdf");
+        assert_eq!(FileFormat::Xml.as_ref(), "xml");
+    }
+
+    #[test]
+    fn test_file_format_display() {
+        assert_eq!(FileFormat::Csv.to_string(), "csv");
+        assert_eq!(FileFormat::Xlsx.to_string(), "xlsx");
+    }
+
+    #[test]
+    fn test_file_format_from_str() {
+        assert_eq!("csv".parse::<FileFormat>().ok(), Some(FileFormat::Csv));
+        assert_eq!("CSV".parse::<FileFormat>().ok(), Some(FileFormat::Csv));
+        assert_eq!("tsv".parse::<FileFormat>().ok(), Some(FileFormat::Tsv));
+        assert_eq!("json".parse::<FileFormat>().ok(), Some(FileFormat::Json));
+        assert_eq!("xlsx".parse::<FileFormat>().ok(), Some(FileFormat::Xlsx));
+        assert_eq!("ods".parse::<FileFormat>().ok(), Some(FileFormat::Ods));
+        assert_eq!("pdf".parse::<FileFormat>().ok(), Some(FileFormat::Pdf));
+        assert_eq!("xml".parse::<FileFormat>().ok(), Some(FileFormat::Xml));
+        assert!("unknown".parse::<FileFormat>().is_err());
+    }
+
+    #[test]
+    fn test_file_format_from_extension() {
+        assert_eq!(FileFormat::from_extension("data.csv"), Some(FileFormat::Csv));
+        assert_eq!(FileFormat::from_extension("data.CSV"), Some(FileFormat::Csv));
+        assert_eq!(FileFormat::from_extension("report.xlsx"), Some(FileFormat::Xlsx));
+        assert_eq!(FileFormat::from_extension("doc.pdf"), Some(FileFormat::Pdf));
+        assert_eq!(FileFormat::from_extension("data.xml"), Some(FileFormat::Xml));
+        assert_eq!(FileFormat::from_extension("sheet.ods"), Some(FileFormat::Ods));
+        assert_eq!(FileFormat::from_extension("noext"), None);
+        assert_eq!(FileFormat::from_extension("unknown.xyz"), None);
+    }
+
+    #[test]
+    fn test_file_format_get_delimiter() {
+        assert_eq!(FileFormat::Csv.get_delimiter(), Some(b','));
+        assert_eq!(FileFormat::Tsv.get_delimiter(), Some(b'\t'));
+        assert_eq!(FileFormat::Json.get_delimiter(), None);
+        assert_eq!(FileFormat::Xlsx.get_delimiter(), None);
+    }
+
+    #[test]
+    fn test_file_format_iter() {
+        let formats: Vec<_> = FileFormat::iter().collect();
+        assert_eq!(formats.len(), 7);
+        assert!(formats.contains(&FileFormat::Csv));
+        assert!(formats.contains(&FileFormat::Json));
+        assert!(formats.contains(&FileFormat::Xlsx));
+        assert!(formats.contains(&FileFormat::Ods));
+        assert!(formats.contains(&FileFormat::Pdf));
+        assert!(formats.contains(&FileFormat::Xml));
+    }
+
+    #[test]
+    fn test_data_type_as_ref() {
+        assert_eq!(DataType::Nodes.as_ref(), "nodes");
+        assert_eq!(DataType::Edges.as_ref(), "edges");
+        assert_eq!(DataType::Layers.as_ref(), "layers");
+        assert_eq!(DataType::Graph.as_ref(), "graph");
+    }
+
+    #[test]
+    fn test_data_type_display() {
+        assert_eq!(DataType::Nodes.to_string(), "nodes");
+        assert_eq!(DataType::Edges.to_string(), "edges");
+    }
+
+    #[test]
+    fn test_data_type_from_str() {
+        assert_eq!("nodes".parse::<DataType>().ok(), Some(DataType::Nodes));
+        assert_eq!("NODES".parse::<DataType>().ok(), Some(DataType::Nodes));
+        assert_eq!("edges".parse::<DataType>().ok(), Some(DataType::Edges));
+        assert_eq!("layers".parse::<DataType>().ok(), Some(DataType::Layers));
+        assert_eq!("graph".parse::<DataType>().ok(), Some(DataType::Graph));
+        assert!("invalid".parse::<DataType>().is_err());
+    }
+
+    #[test]
+    fn test_data_type_expected_headers() {
+        assert_eq!(DataType::Nodes.get_expected_headers(), vec!["id", "label"]);
+        assert_eq!(DataType::Edges.get_expected_headers(), vec!["id", "source", "target"]);
+        assert_eq!(DataType::Layers.get_expected_headers(), vec!["id", "label"]);
+        assert_eq!(DataType::Graph.get_expected_headers(), Vec::<&str>::new());
+    }
+
+    #[test]
+    fn test_data_type_optional_headers() {
+        let node_optional = DataType::Nodes.get_optional_headers();
+        assert!(node_optional.contains(&"layer"));
+        assert!(node_optional.contains(&"x"));
+        assert!(node_optional.contains(&"y"));
+        assert!(node_optional.contains(&"color"));
+
+        let edge_optional = DataType::Edges.get_optional_headers();
+        assert!(edge_optional.contains(&"label"));
+        assert!(edge_optional.contains(&"weight"));
+    }
+
+    #[test]
+    fn test_data_type_format_compatibility() {
+        // CSV/TSV compatible with Nodes, Edges, Layers
+        assert!(DataType::Nodes.is_compatible_with_format(&FileFormat::Csv));
+        assert!(DataType::Edges.is_compatible_with_format(&FileFormat::Csv));
+        assert!(DataType::Layers.is_compatible_with_format(&FileFormat::Csv));
+        assert!(DataType::Nodes.is_compatible_with_format(&FileFormat::Tsv));
+        assert!(DataType::Edges.is_compatible_with_format(&FileFormat::Tsv));
+        assert!(DataType::Layers.is_compatible_with_format(&FileFormat::Tsv));
+
+        // JSON compatible only with Graph
+        assert!(DataType::Graph.is_compatible_with_format(&FileFormat::Json));
+
+        // Incompatible combinations
+        assert!(!DataType::Graph.is_compatible_with_format(&FileFormat::Csv));
+        assert!(!DataType::Nodes.is_compatible_with_format(&FileFormat::Json));
+        assert!(!DataType::Edges.is_compatible_with_format(&FileFormat::Xlsx));
+    }
+
+    #[test]
+    fn test_data_type_iter() {
+        let types: Vec<_> = DataType::iter().collect();
+        assert_eq!(types.len(), 4);
+        assert!(types.contains(&DataType::Nodes));
+        assert!(types.contains(&DataType::Edges));
+        assert!(types.contains(&DataType::Layers));
+        assert!(types.contains(&DataType::Graph));
+    }
+
+    #[test]
+    fn test_serialization() {
+        // FileFormat serialization
+        let csv = FileFormat::Csv;
+        let json = serde_json::to_string(&csv).unwrap();
+        assert_eq!(json, "\"Csv\"");
+
+        // DataType serialization
+        let nodes = DataType::Nodes;
+        let json = serde_json::to_string(&nodes).unwrap();
+        assert_eq!(json, "\"Nodes\"");
+    }
+}

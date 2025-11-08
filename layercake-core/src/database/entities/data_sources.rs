@@ -2,6 +2,9 @@ use sea_orm::entity::prelude::*;
 use sea_orm::{ActiveValue, Set};
 use serde::{Deserialize, Serialize};
 
+// Re-export common types for backwards compatibility
+pub use super::common_types::{DataType, FileFormat};
+
 /// DataSource entity for uploaded file data (CSV/TSV/JSON)
 ///
 /// This entity stores the actual uploaded data files and their metadata. Each record
@@ -102,23 +105,12 @@ impl ActiveModel {
 impl Model {
     /// Get the file format as an enum for type safety
     pub fn get_file_format(&self) -> Option<FileFormat> {
-        match self.file_format.as_str() {
-            "csv" => Some(FileFormat::Csv),
-            "tsv" => Some(FileFormat::Tsv),
-            "json" => Some(FileFormat::Json),
-            _ => None,
-        }
+        self.file_format.parse().ok()
     }
 
     /// Get the data type as an enum for type safety
     pub fn get_data_type(&self) -> Option<DataType> {
-        match self.data_type.as_str() {
-            "nodes" => Some(DataType::Nodes),
-            "edges" => Some(DataType::Edges),
-            "layers" => Some(DataType::Layers),
-            "graph" => Some(DataType::Graph),
-            _ => None,
-        }
+        self.data_type.parse().ok()
     }
 
     /// Check if the DataSource is ready for use
@@ -149,123 +141,20 @@ impl Model {
 
     /// Validate that the format and type combination is valid
     pub fn validate_format_type_combination(&self) -> Result<(), String> {
-        match (self.file_format.as_str(), self.data_type.as_str()) {
-            ("csv", "nodes") | ("csv", "edges") | ("csv", "layers") => Ok(()),
-            ("tsv", "nodes") | ("tsv", "edges") | ("tsv", "layers") => Ok(()),
-            ("json", "graph") => Ok(()),
-            (format, dtype) => Err(format!(
+        let format = self.get_file_format().ok_or_else(|| {
+            format!("Invalid file format: {}", self.file_format)
+        })?;
+        let dtype = self.get_data_type().ok_or_else(|| {
+            format!("Invalid data type: {}", self.data_type)
+        })?;
+
+        if dtype.is_compatible_with_format(&format) {
+            Ok(())
+        } else {
+            Err(format!(
                 "Invalid combination: {} format cannot contain {} data",
                 format, dtype
-            )),
-        }
-    }
-}
-
-// File format enum (physical representation)
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub enum FileFormat {
-    Csv,
-    Tsv,
-    Json,
-}
-
-impl FileFormat {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            FileFormat::Csv => "csv",
-            FileFormat::Tsv => "tsv",
-            FileFormat::Json => "json",
-        }
-    }
-
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s.to_lowercase().as_str() {
-            "csv" => Some(FileFormat::Csv),
-            "tsv" => Some(FileFormat::Tsv),
-            "json" => Some(FileFormat::Json),
-            _ => None,
-        }
-    }
-
-    pub fn from_extension(filename: &str) -> Option<Self> {
-        let lower = filename.to_lowercase();
-        if lower.ends_with(".csv") {
-            Some(FileFormat::Csv)
-        } else if lower.ends_with(".tsv") {
-            Some(FileFormat::Tsv)
-        } else if lower.ends_with(".json") {
-            Some(FileFormat::Json)
-        } else {
-            None
-        }
-    }
-
-    pub fn get_delimiter(&self) -> Option<u8> {
-        match self {
-            FileFormat::Csv => Some(b','),
-            FileFormat::Tsv => Some(b'\t'),
-            FileFormat::Json => None,
-        }
-    }
-}
-
-// Data type enum (semantic meaning)
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub enum DataType {
-    Nodes,
-    Edges,
-    Layers,
-    Graph,
-}
-
-impl DataType {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            DataType::Nodes => "nodes",
-            DataType::Edges => "edges",
-            DataType::Layers => "layers",
-            DataType::Graph => "graph",
-        }
-    }
-
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s.to_lowercase().as_str() {
-            "nodes" => Some(DataType::Nodes),
-            "edges" => Some(DataType::Edges),
-            "layers" => Some(DataType::Layers),
-            "graph" => Some(DataType::Graph),
-            _ => None,
-        }
-    }
-
-    pub fn get_expected_headers(&self) -> Vec<&'static str> {
-        match self {
-            DataType::Nodes => vec!["id", "label"],
-            DataType::Edges => vec!["id", "source", "target"],
-            DataType::Layers => vec!["id", "label"],
-            DataType::Graph => vec![], // JSON doesn't have headers
-        }
-    }
-
-    pub fn get_optional_headers(&self) -> Vec<&'static str> {
-        match self {
-            DataType::Nodes => vec!["layer", "x", "y", "description", "color"],
-            DataType::Edges => vec!["label", "description", "weight", "color"],
-            DataType::Layers => vec!["color", "description", "z_index"],
-            DataType::Graph => vec![],
-        }
-    }
-
-    pub fn is_compatible_with_format(&self, format: &FileFormat) -> bool {
-        match (format, self) {
-            (FileFormat::Csv, DataType::Nodes)
-            | (FileFormat::Csv, DataType::Edges)
-            | (FileFormat::Csv, DataType::Layers)
-            | (FileFormat::Tsv, DataType::Nodes)
-            | (FileFormat::Tsv, DataType::Edges)
-            | (FileFormat::Tsv, DataType::Layers)
-            | (FileFormat::Json, DataType::Graph) => true,
-            _ => false,
+            ))
         }
     }
 }
@@ -273,39 +162,6 @@ impl DataType {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_file_format_from_extension() {
-        assert_eq!(
-            FileFormat::from_extension("test.csv"),
-            Some(FileFormat::Csv)
-        );
-        assert_eq!(
-            FileFormat::from_extension("test.tsv"),
-            Some(FileFormat::Tsv)
-        );
-        assert_eq!(
-            FileFormat::from_extension("test.json"),
-            Some(FileFormat::Json)
-        );
-        assert_eq!(FileFormat::from_extension("test.txt"), None);
-    }
-
-    #[test]
-    fn test_data_type_headers() {
-        let node_type = DataType::Nodes;
-        assert_eq!(node_type.get_expected_headers(), vec!["id", "label"]);
-        assert!(node_type.get_optional_headers().contains(&"layer"));
-    }
-
-    #[test]
-    fn test_format_type_compatibility() {
-        assert!(DataType::Nodes.is_compatible_with_format(&FileFormat::Csv));
-        assert!(DataType::Edges.is_compatible_with_format(&FileFormat::Tsv));
-        assert!(DataType::Graph.is_compatible_with_format(&FileFormat::Json));
-        assert!(!DataType::Graph.is_compatible_with_format(&FileFormat::Csv));
-        assert!(!DataType::Nodes.is_compatible_with_format(&FileFormat::Json));
-    }
 
     #[test]
     fn test_model_validation() {

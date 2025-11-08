@@ -2,7 +2,8 @@ use sea_orm::entity::prelude::*;
 use sea_orm::{ActiveValue, Set};
 use serde::{Deserialize, Serialize};
 
-use super::data_sources::{DataType, FileFormat};
+// Re-export common types for convenience
+pub use super::common_types::{DataType, FileFormat};
 
 /// LibrarySource entity for managing reusable datasource files outside of projects
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
@@ -61,11 +62,11 @@ impl ActiveModel {
 
 impl Model {
     pub fn get_file_format(&self) -> Option<FileFormat> {
-        FileFormat::from_str(&self.file_format)
+        self.file_format.parse().ok()
     }
 
     pub fn get_data_type(&self) -> Option<DataType> {
-        DataType::from_str(&self.data_type)
+        self.data_type.parse().ok()
     }
 
     pub fn is_ready(&self) -> bool {

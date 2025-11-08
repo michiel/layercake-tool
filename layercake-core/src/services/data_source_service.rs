@@ -1,7 +1,8 @@
 use anyhow::{anyhow, Result};
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 
-use crate::database::entities::data_sources::{self, DataType, FileFormat};
+use crate::database::entities::common_types::{DataType, FileFormat};
+use crate::database::entities::data_sources::{self};
 use crate::database::entities::{plan_dag_edges, plan_dag_nodes, projects};
 use crate::services::{file_type_detection, source_processing};
 
@@ -86,7 +87,7 @@ impl DataSourceService {
             name: Set(name),
             description: Set(description),
             file_format: Set("json".to_string()), // Use JSON as default format for empty datasources
-            data_type: Set(data_type.as_str().to_string()),
+            data_type: Set(data_type.as_ref().to_string()),
             filename: Set(format!("{}.json", chrono::Utc::now().timestamp())),
             blob: Set(Vec::new()),
             file_size: Set(0),
@@ -121,8 +122,8 @@ impl DataSourceService {
         if !data_type.is_compatible_with_format(&file_format) {
             return Err(anyhow!(
                 "Invalid combination: {} format cannot contain {} data",
-                file_format.as_str(),
-                data_type.as_str()
+                file_format.as_ref(),
+                data_type.as_ref()
             ));
         }
 
@@ -132,8 +133,8 @@ impl DataSourceService {
         if detected_format != file_format {
             return Err(anyhow!(
                 "File extension doesn't match declared format. Expected {}, got {}",
-                file_format.as_str(),
-                detected_format.as_str()
+                file_format.as_ref(),
+                detected_format.as_ref()
             ));
         }
 
@@ -143,8 +144,8 @@ impl DataSourceService {
             name: Set(name),
             description: Set(description),
 
-            file_format: Set(file_format.as_str().to_string()),
-            data_type: Set(data_type.as_str().to_string()),
+            file_format: Set(file_format.as_ref().to_string()),
+            data_type: Set(data_type.as_ref().to_string()),
             filename: Set(filename),
             blob: Set(file_data.clone()),
             file_size: Set(file_data.len() as i64),
@@ -314,8 +315,8 @@ impl DataSourceService {
         if !data_type.is_compatible_with_format(&file_format) {
             return Err(anyhow!(
                 "Invalid combination: {} format cannot contain {} data",
-                file_format.as_str(),
-                data_type.as_str()
+                file_format.as_ref(),
+                data_type.as_ref()
             ));
         }
 
@@ -324,7 +325,7 @@ impl DataSourceService {
         active_model.filename = Set(filename);
         active_model.blob = Set(file_data.clone());
         active_model.file_size = Set(file_data.len() as i64);
-        active_model.file_format = Set(file_format.as_str().to_string());
+        active_model.file_format = Set(file_format.as_ref().to_string());
         active_model.status = Set("processing".to_string());
         active_model.error_message = Set(None);
         active_model.updated_at = Set(chrono::Utc::now());

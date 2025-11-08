@@ -3,7 +3,7 @@ use csv::ReaderBuilder;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 
-use crate::database::entities::data_sources::{DataType, FileFormat};
+use crate::database::entities::common_types::{DataType, FileFormat};
 
 /// Shared routines for processing datasource files into graph JSON payloads
 pub async fn process_file(
