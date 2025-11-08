@@ -10,11 +10,10 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use uuid::Uuid;
 
-use crate::database::entities::common_types::{DataType as DataSourceDataType, FileFormat as DataSourceFileFormat};
-use crate::database::entities::{
-    data_sources,
-    graphs, plans, projects,
+use crate::database::entities::common_types::{
+    DataType as DataSourceDataType, FileFormat as DataSourceFileFormat,
 };
+use crate::database::entities::{data_sources, graphs, plans, projects};
 use crate::graphql::types::graph_node::GraphNode as GraphNodeDto;
 use crate::graphql::types::layer::Layer as LayerDto;
 use crate::graphql::types::plan_dag::{
@@ -31,6 +30,9 @@ use crate::services::{
     data_source_service::DataSourceService, datasource_bulk_service::DataSourceBulkService,
     ExportService, GraphService, ImportService, PlanDagService,
 };
+use layercake_data_acquisition::{
+    config::EmbeddingProviderConfig, services::DataAcquisitionService,
+};
 
 /// Shared application context exposing core services for GraphQL, MCP, and console layers.
 #[derive(Clone)]
@@ -44,10 +46,27 @@ pub struct AppContext {
     plan_dag_service: Arc<PlanDagService>,
     graph_edit_service: Arc<GraphEditService>,
     graph_analysis_service: Arc<GraphAnalysisService>,
+    data_acquisition_service: Arc<DataAcquisitionService>,
 }
 
 impl AppContext {
     pub fn new(db: DatabaseConnection) -> Self {
+        let provider_hint = std::env::var("LAYERCAKE_EMBEDDING_PROVIDER")
+            .ok()
+            .or_else(|| std::env::var("LAYERCAKE_CHAT_PROVIDER").ok());
+        let provider_config = EmbeddingProviderConfig::from_env();
+        let data_acquisition_service = Arc::new(DataAcquisitionService::new(
+            db.clone(),
+            provider_hint,
+            provider_config,
+        ));
+        Self::with_data_acquisition(db, data_acquisition_service)
+    }
+
+    pub fn with_data_acquisition(
+        db: DatabaseConnection,
+        data_acquisition_service: Arc<DataAcquisitionService>,
+    ) -> Self {
         let import_service = Arc::new(ImportService::new(db.clone()));
         let export_service = Arc::new(ExportService::new(db.clone()));
         let graph_service = Arc::new(GraphService::new(db.clone()));
@@ -67,6 +86,7 @@ impl AppContext {
             plan_dag_service,
             graph_edit_service,
             graph_analysis_service,
+            data_acquisition_service,
         }
     }
 
@@ -108,6 +128,10 @@ impl AppContext {
     #[allow(dead_code)]
     pub fn graph_analysis_service(&self) -> &Arc<GraphAnalysisService> {
         &self.graph_analysis_service
+    }
+
+    pub fn data_acquisition_service(&self) -> &Arc<DataAcquisitionService> {
+        &self.data_acquisition_service
     }
 
     // ----- Project helpers -------------------------------------------------

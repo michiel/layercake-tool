@@ -30,6 +30,9 @@ use async_graphql::{
 };
 
 use super::handlers::health;
+use layercake_data_acquisition::{
+    config::EmbeddingProviderConfig, services::DataAcquisitionService,
+};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -42,7 +45,81 @@ pub struct AppState {
 }
 
 pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Result<Router> {
-    let app_context = Arc::new(AppContext::new(db.clone()));
+    #[cfg(feature = "graphql")]
+    let system_settings = Arc::new(SystemSettingsService::new(db.clone()).await?);
+
+    #[cfg(feature = "graphql")]
+    let provider_hint = {
+        let explicit = system_settings
+            .raw_value("LAYERCAKE_EMBEDDING_PROVIDER")
+            .await
+            .filter(|value| !value.trim().is_empty());
+        if explicit.is_some() {
+            explicit
+        } else {
+            system_settings
+                .raw_value("LAYERCAKE_CHAT_PROVIDER")
+                .await
+                .filter(|value| !value.trim().is_empty())
+        }
+    };
+
+    #[cfg(not(feature = "graphql"))]
+    let provider_hint = std::env::var("LAYERCAKE_EMBEDDING_PROVIDER")
+        .ok()
+        .or_else(|| std::env::var("LAYERCAKE_CHAT_PROVIDER").ok());
+
+    let mut embedding_config = EmbeddingProviderConfig::from_env();
+
+    #[cfg(feature = "graphql")]
+    {
+        if let Some(value) = system_settings.raw_value("OPENAI_API_KEY").await {
+            if !value.is_empty() {
+                embedding_config.openai_api_key = Some(value);
+            }
+        }
+        if let Some(value) = system_settings.raw_value("OPENAI_BASE_URL").await {
+            if !value.is_empty() {
+                embedding_config.openai_base_url = Some(value);
+            }
+        }
+        if let Some(value) = system_settings
+            .raw_value("LAYERCAKE_OPENAI_EMBEDDING_MODEL")
+            .await
+        {
+            if !value.is_empty() {
+                embedding_config.openai_model = Some(value);
+            }
+        }
+        if let Some(value) = system_settings.raw_value("OLLAMA_BASE_URL").await {
+            if !value.is_empty() {
+                embedding_config.ollama_base_url = Some(value);
+            }
+        }
+        if let Some(value) = system_settings.raw_value("OLLAMA_API_KEY").await {
+            if !value.is_empty() {
+                embedding_config.ollama_api_key = Some(value);
+            }
+        }
+        if let Some(value) = system_settings
+            .raw_value("LAYERCAKE_OLLAMA_EMBEDDING_MODEL")
+            .await
+        {
+            if !value.is_empty() {
+                embedding_config.ollama_model = Some(value);
+            }
+        }
+    }
+
+    let data_acquisition_service = Arc::new(DataAcquisitionService::new(
+        db.clone(),
+        provider_hint,
+        embedding_config,
+    ));
+    let app_context = Arc::new(AppContext::with_data_acquisition(
+        db.clone(),
+        data_acquisition_service.clone(),
+    ));
 
     #[cfg(feature = "graphql")]
     let (graphql_schema, coordinator_handle) = {
@@ -90,7 +167,6 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
             }
         });
 
-        let system_settings = Arc::new(SystemSettingsService::new(db.clone()).await?);
         let chat_manager = Arc::new(ChatManager::new());
 
         let graphql_context = GraphQLContext::new(
@@ -99,9 +175,10 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
             chat_manager.clone(),
         );
 
-        let schema: Schema<Query, Mutation, Subscription> = Schema::build(Query, Mutation::default(), Subscription)
-            .data(graphql_context)
-            .finish();
+        let schema: Schema<Query, Mutation, Subscription> =
+            Schema::build(Query, Mutation::default(), Subscription)
+                .data(graphql_context)
+                .finish();
 
         (schema, coordinator_handle)
     };
