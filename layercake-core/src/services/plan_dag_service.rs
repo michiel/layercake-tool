@@ -4,7 +4,7 @@ use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, Set,
 };
 
-use crate::database::entities::{data_sources, plan_dag_edges, plan_dag_nodes, plans};
+use crate::database::entities::{data_sets, plan_dag_edges, plan_dag_nodes, plans};
 use crate::graphql::mutations::plan_dag_delta;
 use crate::graphql::types::{PlanDagEdge, PlanDagNode, Position};
 use crate::services::ValidationService;
@@ -204,17 +204,17 @@ impl PlanDagService {
                 patch_ops.push(patch);
             }
 
-            if node_type == "DataSourceNode" {
+            if node_type == "DataSetNode" {
                 if let Ok(config_value) = serde_json::from_str::<Value>(config) {
-                    if let Some(data_source_id) =
-                        config_value.get("dataSourceId").and_then(|v| v.as_i64())
+                    if let Some(data_set_id) =
+                        config_value.get("dataSetId").and_then(|v| v.as_i64())
                     {
-                        if let Some(data_source) =
-                            data_sources::Entity::find_by_id(data_source_id as i32)
+                        if let Some(data_set) =
+                            data_sets::Entity::find_by_id(data_set_id as i32)
                                 .one(&self.db)
                                 .await
                                 .map_err(|e| {
-                                    anyhow!("Failed to load data source {}: {}", data_source_id, e)
+                                    anyhow!("Failed to load data source {}: {}", data_set_id, e)
                                 })?
                         {
                             let mut metadata_obj =
@@ -225,7 +225,7 @@ impl PlanDagService {
 
                             let needs_update = match metadata_obj.get("label") {
                                 Some(Value::String(current_label))
-                                    if current_label == &data_source.name =>
+                                    if current_label == &data_set.name =>
                                 {
                                     false
                                 }
@@ -235,7 +235,7 @@ impl PlanDagService {
                             if needs_update {
                                 metadata_obj.insert(
                                     "label".to_string(),
-                                    Value::String(data_source.name.clone()),
+                                    Value::String(data_set.name.clone()),
                                 );
                                 let metadata_value = Value::Object(metadata_obj);
                                 let metadata_json = metadata_value.to_string();

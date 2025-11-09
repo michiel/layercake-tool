@@ -9,7 +9,7 @@
 
 ## Overview
 
-Successfully implemented real-time execution status updates for the Plan DAG editor, addressing the critical issue where node execution status changes (e.g., datasource processing, graph computation) did not reflect on the canvas without manual reload.
+Successfully implemented real-time execution status updates for the Plan DAG editor, addressing the critical issue where node execution status changes (e.g., dataset processing, graph computation) did not reflect on the canvas without manual reload.
 
 ## What Was Implemented
 
@@ -24,7 +24,7 @@ Successfully implemented real-time execution status updates for the Plan DAG edi
 
 2. **Event Type Definition** (`layercake-core/src/graphql/types/plan_dag.rs`)
    - Created `NodeExecutionStatusEvent` struct (line 745-758)
-   - Includes execution metadata for both datasource and graph nodes
+   - Includes execution metadata for both dataset and graph nodes
    - Timestamp for ordering and debugging
 
 **Files Modified:**
@@ -180,7 +180,7 @@ All type checks pass successfully.
 ┌────────────────────────────────────────────────────────────┐
 │              ReactFlow Canvas                              │
 │                                                            │
-│  DataSourceNode, GraphNode components display badges      │
+│  DataSetNode, GraphNode components display badges      │
 │  showing real-time execution status                       │
 └────────────────────────────────────────────────────────────┘
 ```
@@ -229,16 +229,16 @@ grep -r "ExecutionState::" layercake-core/src --include="*.rs"
 
 **Step 2:** Add publish calls
 
-Example for datasource processing:
+Example for dataset processing:
 ```rust
 use crate::graphql::subscriptions::publish_execution_status_event;
 
-// After updating datasource execution state
+// After updating dataset execution state
 let event = NodeExecutionStatusEvent {
     project_id,
-    node_id: /* map from datasource_id to node_id */,
-    node_type: PlanDagNodeType::DataSource,
-    datasource_execution: Some(/* execution metadata */),
+    node_id: /* map from dataset_id to node_id */,
+    node_type: PlanDagNodeType::DataSet,
+    dataset_execution: Some(/* execution metadata */),
     graph_execution: None,
     timestamp: chrono::Utc::now().to_rfc3339(),
 };
@@ -275,7 +275,7 @@ These were planned but deferred to keep the implementation focused:
 Once backend publishing is integrated:
 
 1. **Real-time Status Updates**
-   - Create datasource node
+   - Create dataset node
    - Trigger processing
    - Verify badge updates: Pending → Processing → Completed (without reload)
 
@@ -311,7 +311,7 @@ Once backend publishing is integrated:
 
 ### Backend Integration (⏸️ Pending)
 - [ ] Identify all execution state change points
-- [ ] Add publish calls for datasource processing
+- [ ] Add publish calls for dataset processing
 - [ ] Add publish calls for graph computation
 - [ ] Test real-time updates end-to-end
 

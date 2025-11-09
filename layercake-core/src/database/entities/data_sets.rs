@@ -5,22 +5,22 @@ use serde::{Deserialize, Serialize};
 // Re-export common types for backwards compatibility
 pub use super::common_types::{DataType, FileFormat};
 
-/// DataSource entity for uploaded file data (CSV/TSV/JSON)
+/// DataSet entity for uploaded file data (CSV/TSV/JSON)
 ///
 /// This entity stores the actual uploaded data files and their metadata. Each record
 /// represents a file that has been uploaded to a project, containing the raw binary
 /// data, parsed graph JSON, and processing status.
 ///
-/// This is distinct from the `datasources` table, which tracks datasource node
+/// This is distinct from the `datasets` table, which tracks dataset node
 /// execution in the DAG pipeline. Think of it as:
-/// - `data_sources` = the library of available data files
-/// - `datasources` = references to those files being used in pipeline execution
+/// - `data_sets` = the library of available data files
+/// - `datasets` = references to those files being used in pipeline execution
 ///
 /// Related entities:
 /// - `projects`: The project this data source belongs to
-/// - `datasources`: DAG execution nodes that reference this data source
+/// - `datasets`: DAG execution nodes that reference this data source
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
-#[sea_orm(table_name = "data_sources")]
+#[sea_orm(table_name = "data_sets")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
@@ -113,12 +113,12 @@ impl Model {
         self.data_type.parse().ok()
     }
 
-    /// Check if the DataSource is ready for use
+    /// Check if the DataSet is ready for use
     pub fn is_ready(&self) -> bool {
         self.status == "active" && !self.graph_json.is_empty()
     }
 
-    /// Check if the DataSource has an error
+    /// Check if the DataSet has an error
     pub fn has_error(&self) -> bool {
         self.status == "error"
     }

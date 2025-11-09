@@ -269,7 +269,7 @@ fn json_node(node: &GraphNodeDto) -> Value {
         "isPartition": node.is_partition,
         "belongsTo": node.belongs_to,
         "attrs": node.attrs,
-        "datasourceId": node.datasource_id,
+        "datasetId": node.dataset_id,
         "createdAt": node.created_at
     })
 }

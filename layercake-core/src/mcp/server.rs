@@ -257,7 +257,7 @@ impl ToolRegistry for LayercakeToolRegistry {
         tools.extend(super::tools::plans::get_plan_tools());
 
         // Data source tools
-        tools.extend(super::tools::data_sources::get_data_source_tools());
+        tools.extend(super::tools::data_sets::get_data_set_tools());
 
         // Plan DAG tools
         tools.extend(super::tools::plan_dag::get_plan_dag_tools());
@@ -418,7 +418,7 @@ impl ToolRegistry for LayercakeToolRegistry {
                     "type": "object",
                     "properties": {
                         "project_id": {"type": "integer", "description": "Project identifier"},
-                        "node_type": {"type": "string", "description": "Node type (e.g. DataSourceNode)"},
+                        "node_type": {"type": "string", "description": "Node type (e.g. DataSetNode)"},
                         "position": {
                             "type": "object",
                             "properties": {"x": {"type": "number"}, "y": {"type": "number"}},
@@ -772,38 +772,38 @@ impl ToolRegistry for LayercakeToolRegistry {
             // Plan tools
 
             // Data source tools
-            "list_data_sources" => {
-                super::tools::data_sources::list_data_sources(context.arguments, &self.app).await
+            "list_data_sets" => {
+                super::tools::data_sets::list_data_sets(context.arguments, &self.app).await
             }
-            "get_data_source" => {
-                super::tools::data_sources::get_data_source(context.arguments, &self.app).await
+            "get_data_set" => {
+                super::tools::data_sets::get_data_set(context.arguments, &self.app).await
             }
-            "create_data_source_from_file" => {
-                super::tools::data_sources::create_data_source_from_file(
+            "create_data_set_from_file" => {
+                super::tools::data_sets::create_data_set_from_file(
                     context.arguments,
                     &self.app,
                 )
                 .await
             }
-            "create_empty_data_source" => {
-                super::tools::data_sources::create_empty_data_source(context.arguments, &self.app)
+            "create_empty_data_set" => {
+                super::tools::data_sets::create_empty_data_set(context.arguments, &self.app)
                     .await
             }
-            "update_data_source" => {
-                super::tools::data_sources::update_data_source(context.arguments, &self.app).await
+            "update_data_set" => {
+                super::tools::data_sets::update_data_set(context.arguments, &self.app).await
             }
-            "delete_data_source" => {
-                super::tools::data_sources::delete_data_source(context.arguments, &self.app).await
+            "delete_data_set" => {
+                super::tools::data_sets::delete_data_set(context.arguments, &self.app).await
             }
-            "reprocess_data_source" => {
-                super::tools::data_sources::reprocess_data_source(context.arguments, &self.app)
+            "reprocess_data_set" => {
+                super::tools::data_sets::reprocess_data_set(context.arguments, &self.app)
                     .await
             }
-            "export_data_sources" => {
-                super::tools::data_sources::export_data_sources(context.arguments, &self.app).await
+            "export_data_sets" => {
+                super::tools::data_sets::export_data_sets(context.arguments, &self.app).await
             }
-            "import_data_sources" => {
-                super::tools::data_sources::import_data_sources(context.arguments, &self.app).await
+            "import_data_sets" => {
+                super::tools::data_sets::import_data_sets(context.arguments, &self.app).await
             }
 
             "create_plan" => super::tools::plans::create_plan(context.arguments, &self.app).await,
@@ -887,15 +887,15 @@ impl ToolRegistry for LayercakeToolRegistry {
                 | "create_plan"
                 | "execute_plan"
                 | "get_plan_status"
-                | "list_data_sources"
-                | "get_data_source"
-                | "create_data_source_from_file"
-                | "create_empty_data_source"
-                | "update_data_source"
-                | "delete_data_source"
-                | "reprocess_data_source"
-                | "export_data_sources"
-                | "import_data_sources"
+                | "list_data_sets"
+                | "get_data_set"
+                | "create_data_set_from_file"
+                | "create_empty_data_set"
+                | "update_data_set"
+                | "delete_data_set"
+                | "reprocess_data_set"
+                | "export_data_sets"
+                | "import_data_sets"
                 | "get_plan_dag"
                 | "add_plan_dag_node"
                 | "update_plan_dag_node"

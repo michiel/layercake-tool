@@ -53,7 +53,7 @@ This session successfully completed the first 5-6 weeks of the planned codebase 
 **Error Types Created:**
 - `GraphError` (16 variants) - Graph operations
 - `PlanError` (18 variants) - Plan and DAG execution
-- `DataSourceError` (19 variants) - Data source operations
+- `DataSetError` (19 variants) - Data source operations
 - `AuthError` (19 variants) - Authentication/authorization
 - `ImportExportError` (19 variants) - Import/export operations
 

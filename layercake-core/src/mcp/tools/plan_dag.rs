@@ -20,7 +20,7 @@ pub fn get_plan_dag_tools() -> Vec<Tool> {
                 "type": "object",
                 "properties": {
                     "project_id": {"type": "integer"},
-                    "node_type": {"type": "string", "description": "Plan DAG node type (DataSourceNode, GraphNode, TransformNode, FilterNode, MergeNode, OutputNode)"},
+                    "node_type": {"type": "string", "description": "Plan DAG node type (DataSetNode, GraphNode, TransformNode, FilterNode, MergeNode, OutputNode)"},
                     "position": {
                         "type": "object",
                         "properties": {
@@ -472,7 +472,7 @@ fn extract_project_id(arguments: &Option<Value>) -> McpResult<i32> {
 
 fn parse_node_type(value: &str) -> McpResult<PlanDagNodeType> {
     match value {
-        "DataSourceNode" | "DataSource" => Ok(PlanDagNodeType::DataSource),
+        "DataSetNode" | "DataSet" => Ok(PlanDagNodeType::DataSet),
         "GraphNode" | "Graph" => Ok(PlanDagNodeType::Graph),
         "TransformNode" | "Transform" => Ok(PlanDagNodeType::Transform),
         "FilterNode" | "Filter" => Ok(PlanDagNodeType::Filter),

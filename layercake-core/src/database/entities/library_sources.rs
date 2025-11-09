@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 // Re-export common types for convenience
 pub use super::common_types::{DataType, FileFormat};
 
-/// LibrarySource entity for managing reusable datasource files outside of projects
+/// LibrarySource entity for managing reusable dataset files outside of projects
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
 #[sea_orm(table_name = "library_sources")]
 pub struct Model {

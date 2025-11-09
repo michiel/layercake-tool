@@ -147,15 +147,15 @@ use crate::graphql::errors::StructuredError;
 async fn import_data_sources(
     &self,
     ctx: &Context<'_>,
-    input: ImportDataSourcesInput,
-) -> Result<ImportDataSourcesResult> {
+    input: ImportDataSetsInput,
+) -> Result<ImportDataSetsResult> {
     let context = ctx.data::<GraphQLContext>()?;
-    let service = DataSourceService::new(context.db.clone());
+    let service = DataSetService::new(context.db.clone());
 
     let result = service
         .import_from_file(&input.file_path)
         .await
-        .map_err(|e| StructuredError::service("DataSourceService", e))?;
+        .map_err(|e| StructuredError::service("DataSetService", e))?;
 
     Ok(result.into())
 }

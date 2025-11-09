@@ -6,8 +6,8 @@ import { gql } from '@apollo/client'
 import { Breadcrumbs } from './components/common/Breadcrumbs'
 import { PlanVisualEditor } from './components/editors/PlanVisualEditor/PlanVisualEditor'
 import { ErrorBoundary } from './components/common/ErrorBoundary'
-import { DataSourcesPage } from './components/datasources/DataSourcesPage'
-import { DataSourceEditor } from './components/datasources/DataSourceEditor'
+import { DataSetsPage } from './components/datasets/DataSetsPage'
+import { DataSetEditor } from './components/datasets/DataSetEditor'
 import { LibrarySourcesPage } from './components/library/LibrarySourcesPage'
 import { CreateProjectModal } from './components/project/CreateProjectModal'
 import { TopBar } from './components/layout/TopBar'
@@ -179,8 +179,8 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
       {
         key: 'data-sources',
         label: 'Data Sources',
-        route: `/projects/${projectId}/datasources`,
-        isActive: makeRouteMatcher(`/projects/${projectId}/datasources`),
+        route: `/projects/${projectId}/datasets`,
+        isActive: makeRouteMatcher(`/projects/${projectId}/datasets`),
       },
       {
         key: 'source-management',
@@ -681,7 +681,7 @@ const HomePage = () => {
                       variant="ghost"
                       onClick={(e) => {
                         e.stopPropagation()
-                        navigate(`/projects/${project.id}/datasources`)
+                        navigate(`/projects/${project.id}/datasets`)
                       }}
                     >
                       <IconFileDatabase className="mr-2 h-3.5 w-3.5" />
@@ -1259,7 +1259,7 @@ const ProjectDetailPage = () => {
               </p>
             </div>
             <Group gap="xs">
-              <Button variant="outline" onClick={() => navigate(`/projects/${projectId}/datasources`)}>
+              <Button variant="outline" onClick={() => navigate(`/projects/${projectId}/datasets`)}>
                 Manage sources
               </Button>
               <Button onClick={() => navigate(`/projects/${projectId}/data-acquisition/source-management`)}>
@@ -1279,7 +1279,7 @@ const ProjectDetailPage = () => {
                 <p className="text-sm text-muted-foreground">
                   View imported CSV/JSON files and connect shared library sources.
                 </p>
-                <Button variant="secondary" className="w-full" onClick={() => navigate(`/projects/${projectId}/datasources`)}>
+                <Button variant="secondary" className="w-full" onClick={() => navigate(`/projects/${projectId}/datasets`)}>
                   Open data sources
                 </Button>
               </CardContent>
@@ -1624,9 +1624,9 @@ function App() {
               <GraphEditorPage />
             </ErrorBoundary>
           } />
-          <Route path="/projects/:projectId/datasources" element={
+          <Route path="/projects/:projectId/datasets" element={
             <ErrorBoundary>
-              <DataSourcesPage />
+              <DataSetsPage />
             </ErrorBoundary>
           } />
           <Route path="/projects/:projectId/data-acquisition/source-management" element={
@@ -1649,9 +1649,9 @@ function App() {
               <ProjectSharingPage />
             </ErrorBoundary>
           } />
-          <Route path="/projects/:projectId/datasources/:dataSourceId/edit" element={
+          <Route path="/projects/:projectId/datasets/:dataSetId/edit" element={
             <ErrorBoundary>
-              <DataSourceEditor />
+              <DataSetEditor />
             </ErrorBoundary>
           } />
           <Route path="/settings/database" element={

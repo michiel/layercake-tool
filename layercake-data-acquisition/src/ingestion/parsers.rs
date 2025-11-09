@@ -1,9 +1,16 @@
+use std::io::{Cursor, Read};
+
 use async_trait::async_trait;
+use calamine::{open_workbook_auto_from_rs, Reader};
+use csv::ReaderBuilder;
+use quick_xml::events::Event;
+use quick_xml::Reader as XmlReader;
 use serde_json::json;
 use tokio::task;
+use zip::read::ZipArchive;
 
 use crate::config::DataAcquisitionConfig;
-use crate::errors::Result;
+use crate::errors::{DataAcquisitionError, Result};
 use crate::ingestion::{DocumentChunk, DocumentParser, ParsedDocument};
 
 #[derive(Default)]
@@ -55,6 +62,26 @@ pub fn default_parsers() -> Vec<(String, Box<dyn DocumentParser>)> {
             "application/pdf".to_string(),
             Box::new(PdfParser::default()) as Box<dyn DocumentParser>,
         ),
+        (
+            "text/markdown".to_string(),
+            Box::new(MarkdownParser::default()) as Box<dyn DocumentParser>,
+        ),
+        (
+            "text/csv".to_string(),
+            Box::new(CsvParser::default()) as Box<dyn DocumentParser>,
+        ),
+        (
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet".to_string(),
+            Box::new(SpreadsheetParser::default()) as Box<dyn DocumentParser>,
+        ),
+        (
+            "application/vnd.oasis.opendocument.spreadsheet".to_string(),
+            Box::new(SpreadsheetParser::default()) as Box<dyn DocumentParser>,
+        ),
+        (
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document".to_string(),
+            Box::new(DocxParser::default()) as Box<dyn DocumentParser>,
+        ),
     ]
 }
 
@@ -84,4 +111,180 @@ fn build_parsed_document(
         chunks,
         metadata: json!({ "source": filename }),
     }
+}
+
+#[derive(Default)]
+pub struct MarkdownParser;
+
+#[async_trait]
+impl DocumentParser for MarkdownParser {
+    async fn parse(
+        &self,
+        bytes: &[u8],
+        filename: &str,
+        media_type: &str,
+        config: &DataAcquisitionConfig,
+    ) -> Result<ParsedDocument> {
+        let text = String::from_utf8_lossy(bytes).to_string();
+        Ok(build_parsed_document(filename, media_type, &text, config))
+    }
+}
+
+#[derive(Default)]
+pub struct CsvParser;
+
+#[async_trait]
+impl DocumentParser for CsvParser {
+    async fn parse(
+        &self,
+        bytes: &[u8],
+        filename: &str,
+        media_type: &str,
+        config: &DataAcquisitionConfig,
+    ) -> Result<ParsedDocument> {
+        let csv_bytes = bytes.to_vec();
+        let text = task::spawn_blocking(move || parse_csv(csv_bytes))
+            .await
+            .map_err(|err| DataAcquisitionError::Ingestion(err.into()))??;
+
+        Ok(build_parsed_document(filename, media_type, &text, config))
+    }
+}
+
+#[derive(Default)]
+pub struct SpreadsheetParser;
+
+#[async_trait]
+impl DocumentParser for SpreadsheetParser {
+    async fn parse(
+        &self,
+        bytes: &[u8],
+        filename: &str,
+        media_type: &str,
+        config: &DataAcquisitionConfig,
+    ) -> Result<ParsedDocument> {
+        let spreadsheet_bytes = bytes.to_vec();
+        let text = task::spawn_blocking(move || parse_spreadsheet(spreadsheet_bytes))
+            .await
+            .map_err(|err| DataAcquisitionError::Ingestion(err.into()))??;
+
+        Ok(build_parsed_document(filename, media_type, &text, config))
+    }
+}
+
+#[derive(Default)]
+pub struct DocxParser;
+
+#[async_trait]
+impl DocumentParser for DocxParser {
+    async fn parse(
+        &self,
+        bytes: &[u8],
+        filename: &str,
+        media_type: &str,
+        config: &DataAcquisitionConfig,
+    ) -> Result<ParsedDocument> {
+        let docx_bytes = bytes.to_vec();
+        let text = task::spawn_blocking(move || parse_docx(docx_bytes))
+            .await
+            .map_err(|err| DataAcquisitionError::Ingestion(err.into()))??;
+
+        Ok(build_parsed_document(filename, media_type, &text, config))
+    }
+}
+
+fn parse_csv(bytes: Vec<u8>) -> Result<String> {
+    let mut reader = ReaderBuilder::new()
+        .from_reader(bytes.as_slice());
+    let mut buffer = String::new();
+
+    if let Ok(headers) = reader.headers().map_err(|err| DataAcquisitionError::Ingestion(err.into())) {
+        buffer.push_str(&headers.iter().collect::<Vec<_>>().join(","));
+        buffer.push('\n');
+    }
+
+    for record in reader.records() {
+        let record = record.map_err(|err| DataAcquisitionError::Ingestion(err.into()))?;
+        buffer.push_str(&record.iter().collect::<Vec<_>>().join(","));
+        buffer.push('\n');
+    }
+
+    Ok(buffer)
+}
+
+fn parse_spreadsheet(bytes: Vec<u8>) -> Result<String> {
+    let cursor = Cursor::new(bytes);
+    let mut workbook = open_workbook_auto_from_rs(cursor)
+        .map_err(|err| DataAcquisitionError::Ingestion(err.into()))?;
+
+    let mut output = String::new();
+    for sheet in workbook.sheet_names().to_owned() {
+        if let Ok(range) = workbook.worksheet_range(&sheet) {
+            output.push_str(&format!("Sheet: {}\n", sheet));
+            for row in range.rows() {
+                let values: Vec<String> = row.iter().map(|cell| cell.to_string()).collect();
+                output.push_str(&values.join(","));
+                output.push('\n');
+            }
+            output.push('\n');
+        }
+    }
+
+    if output.trim().is_empty() {
+        Err(DataAcquisitionError::Ingestion(anyhow::anyhow!(
+            "No readable cells found in spreadsheet"
+        )))
+    } else {
+        Ok(output)
+    }
+}
+
+fn parse_docx(bytes: Vec<u8>) -> Result<String> {
+    let cursor = Cursor::new(bytes);
+    let mut archive =
+        ZipArchive::new(cursor).map_err(|err| DataAcquisitionError::Ingestion(err.into()))?;
+
+    let mut xml = String::new();
+    archive
+        .by_name("word/document.xml")
+        .map_err(|err| DataAcquisitionError::Ingestion(err.into()))?
+        .read_to_string(&mut xml)
+        .map_err(|err| DataAcquisitionError::Ingestion(err.into()))?;
+
+    let mut reader = XmlReader::from_str(&xml);
+    reader.trim_text(true);
+
+    let mut buf = Vec::new();
+    let mut text = String::new();
+    let mut last_event_was_paragraph = false;
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref e)) if e.name().as_ref() == b"w:p" => {
+                if !text.ends_with('\n') {
+                    text.push('\n');
+                }
+                last_event_was_paragraph = true;
+            }
+            Ok(Event::Text(e)) => {
+                let content = e
+                    .unescape()
+                    .map_err(|err| DataAcquisitionError::Ingestion(err.into()))?;
+                if last_event_was_paragraph && content.trim().is_empty() {
+                    // Ignore empty text nodes created by paragraph boundaries
+                } else {
+                    text.push_str(content.as_ref());
+                    text.push(' ');
+                }
+                last_event_was_paragraph = false;
+            }
+            Ok(Event::Eof) => break,
+            Ok(_) => {}
+            Err(err) => {
+                return Err(DataAcquisitionError::Ingestion(err.into()));
+            }
+        }
+    }
+
+    Ok(text)
 }

@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 use crate::database::entities::common_types::{DataType, FileFormat};
 
-/// Shared routines for processing datasource files into graph JSON payloads
+/// Shared routines for processing dataset files into graph JSON payloads
 pub async fn process_file(
     file_format: &FileFormat,
     data_type: &DataType,

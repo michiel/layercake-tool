@@ -7,25 +7,25 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Spinner } from '@/components/ui/spinner'
 import { Group } from '@/components/layout-primitives'
 import { IconAlertCircle, IconTable } from '@tabler/icons-react'
-import { PlanDagNodeType, DataSourceNodeConfig } from '../../../../types/plan-dag'
+import { PlanDagNodeType, DataSetNodeConfig } from '../../../../types/plan-dag'
 import { isNodeConfigured } from '../../../../utils/planDagValidation'
-import { GET_DATASOURCE, DataSource } from '../../../../graphql/datasources'
+import { GET_DATASOURCE, DataSet } from '../../../../graphql/datasets'
 import { getExecutionStateLabel, getExecutionStateColor, isExecutionComplete, isExecutionInProgress } from '../../../../graphql/preview'
-import { DataSourceDataDialog } from '../dialogs/DataSourceDataDialog'
+import { DataSetDataDialog } from '../dialogs/DataSetDataDialog'
 import { BaseNode } from './BaseNode'
 
-interface DataSourceNodeProps extends NodeProps {
+interface DataSetNodeProps extends NodeProps {
   onEdit?: (nodeId: string) => void
   onDelete?: (nodeId: string) => void
   readonly?: boolean
 }
 
-export const DataSourceNode = memo((props: DataSourceNodeProps) => {
+export const DataSetNode = memo((props: DataSetNodeProps) => {
   const { data, onEdit, onDelete, readonly = false } = props
-  const [dataSourceInfo, setDataSourceInfo] = useState<DataSource | null>(null)
+  const [dataSourceInfo, setDataSetInfo] = useState<DataSet | null>(null)
   const [showDataDialog, setShowDataDialog] = useState(false)
 
-  const config = data.config as DataSourceNodeConfig
+  const config = data.config as DataSetNodeConfig
 
   // Check if node is configured
   const edges = data.edges || []
@@ -33,19 +33,19 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
   const isConfigured = isNodeConfigured(PlanDagNodeType.DATA_SOURCE, props.id, edges, hasValidConfig)
 
   // Use inline execution metadata from PlanDAG query, only query if not available
-  const datasourceExecution = data.datasourceExecution
-  const needsQuery = !datasourceExecution && config.dataSourceId
+  const datasetExecution = data.datasetExecution
+  const needsQuery = !datasetExecution && config.dataSetId
 
   // Fallback query only if inline data not available
   const { data: dataSourceData } = useQuery(GET_DATASOURCE, {
-    variables: { id: config.dataSourceId || 0 },
+    variables: { id: config.dataSetId || 0 },
     skip: !needsQuery,
     errorPolicy: 'ignore'
   })
 
   useEffect(() => {
     if ((dataSourceData as any)?.dataSource) {
-      setDataSourceInfo((dataSourceData as any).dataSource as DataSource)
+      setDataSetInfo((dataSourceData as any).dataSource as DataSet)
     }
   }, [dataSourceData])
 
@@ -87,7 +87,7 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
   }
 
   // Custom label badges for data source node
-  const hasBadges = !isConfigured || (datasourceExecution && !isExecutionComplete(datasourceExecution.executionState))
+  const hasBadges = !isConfigured || (datasetExecution && !isExecutionComplete(datasetExecution.executionState))
   const labelBadges = hasBadges ? (
     <>
       {!isConfigured && (
@@ -95,17 +95,17 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
           Not Configured
         </Badge>
       )}
-      {datasourceExecution && !isExecutionComplete(datasourceExecution.executionState) && (
+      {datasetExecution && !isExecutionComplete(datasetExecution.executionState) && (
         <Badge
-          variant={isExecutionComplete(datasourceExecution.executionState) ? 'secondary' : 'default'}
+          variant={isExecutionComplete(datasetExecution.executionState) ? 'secondary' : 'default'}
           className={`text-xs ${getBadgeClasses(
-            getExecutionStateColor(datasourceExecution.executionState),
-            isExecutionComplete(datasourceExecution.executionState) ? 'light' : 'filled'
+            getExecutionStateColor(datasetExecution.executionState),
+            isExecutionComplete(datasetExecution.executionState) ? 'light' : 'filled'
           )}`}
         >
           <span className="flex items-center gap-1">
-            {isExecutionInProgress(datasourceExecution.executionState) && <Spinner size="xs" />}
-            {getExecutionStateLabel(datasourceExecution.executionState)}
+            {isExecutionInProgress(datasetExecution.executionState) && <Spinner size="xs" />}
+            {getExecutionStateLabel(datasetExecution.executionState)}
           </span>
         </Badge>
       )}
@@ -127,7 +127,7 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
         labelBadges={labelBadges}
       >
         {/* View data button - only show if configured and active */}
-        {!readonly && isConfigured && (datasourceExecution?.status === 'active' || dataSourceInfo?.status === 'active') && (
+        {!readonly && isConfigured && (datasetExecution?.status === 'active' || dataSourceInfo?.status === 'active') && (
           <Group justify="center">
             <TooltipProvider>
               <Tooltip>
@@ -146,17 +146,17 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
                     <IconTable size={12} />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>View datasource data (nodes, edges, layers)</TooltipContent>
+                <TooltipContent>View dataset data (nodes, edges, layers)</TooltipContent>
               </Tooltip>
             </TooltipProvider>
           </Group>
         )}
 
         {/* Show error message if there's an error */}
-        {datasourceExecution?.status === 'error' && datasourceExecution.errorMessage && (
+        {datasetExecution?.status === 'error' && datasetExecution.errorMessage && (
           <Group gap="xs">
             <IconAlertCircle size={12} className="text-red-600" />
-            <p className="text-xs text-red-600 line-clamp-1" title={datasourceExecution.errorMessage}>
+            <p className="text-xs text-red-600 line-clamp-1" title={datasetExecution.errorMessage}>
               Error processing
             </p>
           </Group>
@@ -172,14 +172,14 @@ export const DataSourceNode = memo((props: DataSourceNodeProps) => {
       </BaseNode>
 
       {/* Data Source Data Dialog */}
-      <DataSourceDataDialog
+      <DataSetDataDialog
         opened={showDataDialog}
         onClose={() => setShowDataDialog(false)}
-        dataSourceId={config.dataSourceId || null}
+        dataSetId={config.dataSetId || null}
         title={`Data Source: ${data.metadata.label}`}
       />
     </>
   )
 })
 
-DataSourceNode.displayName = 'DataSourceNode'
+DataSetNode.displayName = 'DataSetNode'

@@ -4,7 +4,7 @@ pub mod project;
 // REMOVED: node, edge - dead code, GraphQL types not used
 pub mod chat;
 pub mod data_acquisition;
-pub mod data_source;
+pub mod data_set;
 pub mod graph;
 pub mod graph_edge;
 pub mod graph_edit;
@@ -20,7 +20,7 @@ pub mod user;
 
 pub use chat::*;
 pub use data_acquisition::*;
-pub use data_source::*;
+pub use data_set::*;
 pub use graph_edit::*;
 pub use json_patch::*;
 pub use layer::*;

@@ -7,7 +7,7 @@ This guide explains how to migrate services from generic `anyhow::Result` to dom
 We've created comprehensive domain-specific error types to improve error handling:
 - `GraphError` - Graph operations
 - `PlanError` - Plan and DAG operations
-- `DataSourceError` - Data source operations
+- `DataSetError` - Data source operations
 - `AuthError` - Authentication/authorization
 - `ImportExportError` - Import/export operations
 
@@ -15,7 +15,7 @@ We've created comprehensive domain-specific error types to improve error handlin
 
 Convenient type aliases are available:
 ```rust
-use crate::errors::{GraphResult, PlanResult, DataSourceResult, AuthResult, ImportExportResult};
+use crate::errors::{GraphResult, PlanResult, DataSetResult, AuthResult, ImportExportResult};
 
 // Instead of Result<T, GraphError>
 pub fn my_function() -> GraphResult<Graph> { ... }
@@ -76,7 +76,7 @@ impl GraphService {
 // After - explicit conversion
 .await.map_err(GraphError::Database)?
 .await.map_err(PlanError::Database)?
-.await.map_err(DataSourceError::Database)?
+.await.map_err(DataSetError::Database)?
 ```
 
 ### Not Found Errors
@@ -87,7 +87,7 @@ impl GraphService {
 // After
 .ok_or(GraphError::NotFound(id))?
 .ok_or(PlanError::NotFound(id))?
-.ok_or(DataSourceError::NotFound(id))?
+.ok_or(DataSetError::NotFound(id))?
 ```
 
 ### Validation Errors
@@ -140,7 +140,7 @@ Methods related to:
 - `PlanError::ExecutionFailed { node, reason }` - Execution error
 - `PlanError::CycleDetected(msg)` - Cycle in DAG
 
-### DataSourceService → DataSourceError
+### DataSetService → DataSetError
 Methods related to:
 - Data source upload/import
 - File format handling
@@ -148,10 +148,10 @@ Methods related to:
 - Export operations
 
 **Example variants:**
-- `DataSourceError::NotFound(id)` - Data source not found
-- `DataSourceError::UnsupportedFormat(fmt)` - Unsupported format
-- `DataSourceError::InvalidCsv(msg)` - CSV parsing error
-- `DataSourceError::ImportFailed(msg)` - Import error
+- `DataSetError::NotFound(id)` - Data source not found
+- `DataSetError::UnsupportedFormat(fmt)` - Unsupported format
+- `DataSetError::InvalidCsv(msg)` - CSV parsing error
+- `DataSetError::ImportFailed(msg)` - Import error
 
 ### AuthService → AuthError
 Methods related to:
@@ -324,7 +324,7 @@ Recommended migration order:
 1. **High-traffic services first:**
    - graph_service.rs → GraphError
    - plan_dag_service.rs → PlanError
-   - data_source_service.rs → DataSourceError
+   - data_source_service.rs → DataSetError
 
 2. **Authentication layer:**
    - auth_service.rs → AuthError

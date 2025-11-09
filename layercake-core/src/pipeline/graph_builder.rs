@@ -7,7 +7,7 @@ use super::layer_operations::insert_layers_to_db;
 use super::types::LayerData;
 use crate::database::entities::ExecutionState;
 use crate::database::entities::{
-    data_sources, datasources, graph_edges, graph_layers, graph_nodes, graphs, plan_dag_nodes,
+    data_sets, datasets, graph_edges, graph_layers, graph_nodes, graphs, plan_dag_nodes,
 };
 use crate::services::GraphEditService;
 use tracing::{info, warn};
@@ -29,7 +29,7 @@ fn parse_is_partition(value: &Value) -> bool {
     false
 }
 
-/// Service for building graphs from datasources
+/// Service for building graphs from datasets
 pub struct GraphBuilder {
     db: DatabaseConnection,
 }
@@ -39,9 +39,9 @@ impl GraphBuilder {
         Self { db }
     }
 
-    /// Build a graph from upstream datasources
+    /// Build a graph from upstream datasets
     /// Returns the created/updated graph entity
-    /// Reads directly from data_sources table (no pipeline processing needed)
+    /// Reads directly from data_sets table (no pipeline processing needed)
     pub async fn build_graph(
         &self,
         project_id: i32,
@@ -66,8 +66,8 @@ impl GraphBuilder {
         .await;
 
         // Fetch upstream sources by reading plan_dag_nodes
-        // Upstream can be DataSource nodes OR Graph/Merge nodes
-        let mut data_sources_list = Vec::new();
+        // Upstream can be DataSet nodes OR Graph/Merge nodes
+        let mut data_sets_list = Vec::new();
         for upstream_id in &upstream_node_ids {
             // Get the upstream node to check its type
             let upstream_node = plan_dag_nodes::Entity::find_by_id(upstream_id)
@@ -76,26 +76,26 @@ impl GraphBuilder {
                 .ok_or_else(|| anyhow!("Upstream node not found: {}", upstream_id))?;
 
             match upstream_node.node_type.as_str() {
-                "DataSourceNode" => {
-                    let data_source = self.get_data_source_from_node(&upstream_node).await?;
+                "DataSetNode" => {
+                    let data_set = self.get_data_set_from_node(&upstream_node).await?;
 
                     // Check if data source is ready
-                    if data_source.status != "active" {
+                    if data_set.status != "active" {
                         return Err(anyhow!(
                             "Upstream data source {} is not ready (status: {})",
                             upstream_id,
-                            data_source.status
+                            data_set.status
                         ));
                     }
-                    data_sources_list.push(data_source);
+                    data_sets_list.push(data_set);
                 }
                 "GraphNode" | "MergeNode" | "TransformNode" | "FilterNode" => {
-                    // Read from graphs table and convert to data_source-like structure
+                    // Read from graphs table and convert to data_set-like structure
                     let graph = self.get_upstream_graph(project_id, upstream_id).await?;
 
-                    // Convert graph data to data_source format
-                    let graph_as_data_source = self.graph_to_data_source(&graph).await?;
-                    data_sources_list.push(graph_as_data_source);
+                    // Convert graph data to data_set format
+                    let graph_as_data_set = self.graph_to_data_set(&graph).await?;
+                    data_sets_list.push(graph_as_data_set);
                 }
                 _ => {
                     return Err(anyhow!(
@@ -107,7 +107,7 @@ impl GraphBuilder {
         }
 
         // Compute source hash for change detection
-        let source_hash = self.compute_data_source_hash(&data_sources_list)?;
+        let source_hash = self.compute_data_set_hash(&data_sets_list)?;
 
         // Check if recomputation is needed
         if let Some(existing_hash) = graph.source_hash.clone() {
@@ -128,9 +128,9 @@ impl GraphBuilder {
             }
         }
 
-        // Build graph data from data_sources
+        // Build graph data from data_sets
         let result = self
-            .build_graph_from_data_sources(&graph, &data_sources_list)
+            .build_graph_from_data_sets(&graph, &data_sets_list)
             .await;
 
         match result {
@@ -232,26 +232,26 @@ impl GraphBuilder {
         Ok(graph)
     }
 
-    /// Get data_source from a plan_dag_node
-    async fn get_data_source_from_node(
+    /// Get data_set from a plan_dag_node
+    async fn get_data_set_from_node(
         &self,
         dag_node: &plan_dag_nodes::Model,
-    ) -> Result<data_sources::Model> {
-        // Parse config to get dataSourceId
+    ) -> Result<data_sets::Model> {
+        // Parse config to get dataSetId
         let config: serde_json::Value = serde_json::from_str(&dag_node.config_json)
             .map_err(|e| anyhow!("Failed to parse node config: {}", e))?;
 
-        let data_source_id = config
-            .get("dataSourceId")
+        let data_set_id = config
+            .get("dataSetId")
             .and_then(|v| v.as_i64())
             .map(|v| v as i32)
-            .ok_or_else(|| anyhow!("Node config does not have dataSourceId: {}", dag_node.id))?;
+            .ok_or_else(|| anyhow!("Node config does not have dataSetId: {}", dag_node.id))?;
 
-        // Query the data_sources table
-        data_sources::Entity::find_by_id(data_source_id)
+        // Query the data_sets table
+        data_sets::Entity::find_by_id(data_set_id)
             .one(&self.db)
             .await?
-            .ok_or_else(|| anyhow!("DataSource not found with id {}", data_source_id))
+            .ok_or_else(|| anyhow!("DataSet not found with id {}", data_set_id))
     }
 
     /// Get upstream graph (from Graph or Merge node)
@@ -266,8 +266,8 @@ impl GraphBuilder {
             .ok_or_else(|| anyhow!("Graph not found for node: {}", node_id))
     }
 
-    /// Convert a graph to data_source format for consistent processing
-    async fn graph_to_data_source(&self, graph: &graphs::Model) -> Result<data_sources::Model> {
+    /// Convert a graph to data_set format for consistent processing
+    async fn graph_to_data_set(&self, graph: &graphs::Model) -> Result<data_sets::Model> {
         use sea_orm::{ColumnTrait, QueryFilter};
 
         // Read graph nodes, edges, and graph_layers from database
@@ -341,8 +341,8 @@ impl GraphBuilder {
             }).collect::<Vec<_>>()
         });
 
-        // Create a virtual data_source
-        Ok(data_sources::Model {
+        // Create a virtual data_set
+        Ok(data_sets::Model {
             id: graph.id, // Use graph id as virtual data source id
             project_id: graph.project_id,
             name: graph.name.clone(),
@@ -362,13 +362,13 @@ impl GraphBuilder {
         })
     }
 
-    /// Compute hash of upstream data_sources for change detection
-    fn compute_data_source_hash(&self, data_sources: &[data_sources::Model]) -> Result<String> {
+    /// Compute hash of upstream data_sets for change detection
+    fn compute_data_set_hash(&self, data_sets: &[data_sets::Model]) -> Result<String> {
         use sha2::{Digest, Sha256};
 
         let mut hasher = Sha256::new();
 
-        for ds in data_sources {
+        for ds in data_sets {
             // Hash data source ID, filename, and processed_at timestamp
             hasher.update(ds.id.to_string().as_bytes());
             hasher.update(ds.filename.as_bytes());
@@ -381,11 +381,11 @@ impl GraphBuilder {
         Ok(hash)
     }
 
-    /// Build graph from data_sources (reads graph_json directly)
-    async fn build_graph_from_data_sources(
+    /// Build graph from data_sets (reads graph_json directly)
+    async fn build_graph_from_data_sets(
         &self,
         graph: &graphs::Model,
-        data_sources: &[data_sources::Model],
+        data_sets: &[data_sets::Model],
     ) -> Result<(usize, usize)> {
         // Clear existing graph data
         self.clear_graph_data(graph.id).await?;
@@ -395,7 +395,7 @@ impl GraphBuilder {
         let mut all_layers = HashMap::new(); // layer_id -> layer data
 
         // Process each data source
-        for ds in data_sources {
+        for ds in data_sets {
             // Parse graph_json
             let graph_data: serde_json::Value = serde_json::from_str(&ds.graph_json)
                 .map_err(|e| anyhow!("Failed to parse graph JSON for {}: {}", ds.name, e))?;
@@ -421,7 +421,7 @@ impl GraphBuilder {
                                     .filter(|s| !s.is_empty())
                                     .map(|s| s.to_string()),
                                 attrs: Some(node_val.clone()),
-                                datasource_id: Some(ds.id),
+                                dataset_id: Some(ds.id),
                             };
 
                             all_nodes.insert(id, node);
@@ -453,7 +453,7 @@ impl GraphBuilder {
                                 layer: edge_val["layer"].as_str().map(|s| s.to_string()),
                                 weight: edge_val["weight"].as_f64(),
                                 attrs: Some(edge_val.clone()),
-                                datasource_id: Some(ds.id),
+                                dataset_id: Some(ds.id),
                             };
 
                             all_edges.push(edge);
@@ -479,7 +479,7 @@ impl GraphBuilder {
                                     .filter(|s| !s.is_empty())
                                     .map(|s| s.to_string()),
                                 attrs: Some(node_val.clone()),
-                                datasource_id: Some(ds.id),
+                                dataset_id: Some(ds.id),
                             };
 
                             all_nodes.insert(id, node);
@@ -509,7 +509,7 @@ impl GraphBuilder {
                                 layer: edge_val["layer"].as_str().map(|s| s.to_string()),
                                 weight: edge_val["weight"].as_f64(),
                                 attrs: Some(edge_val.clone()),
-                                datasource_id: Some(ds.id),
+                                dataset_id: Some(ds.id),
                             };
 
                             all_edges.push(edge);
@@ -584,7 +584,7 @@ impl GraphBuilder {
                                 border_color,
                                 comment,
                                 properties: properties_json,
-                                datasource_id: Some(ds.id),
+                                dataset_id: Some(ds.id),
                             };
 
                             all_layers.insert(layer_id, layer);
@@ -592,7 +592,7 @@ impl GraphBuilder {
                     }
                 }
                 "graph_layers" => {
-                    // Extract graph_layers from datasource
+                    // Extract graph_layers from dataset
                     if let Some(layers_array) =
                         graph_data.get("graph_layers").and_then(|v| v.as_array())
                     {
@@ -660,7 +660,7 @@ impl GraphBuilder {
                                 border_color,
                                 comment,
                                 properties: properties_json,
-                                datasource_id: Some(ds.id),
+                                dataset_id: Some(ds.id),
                             };
 
                             all_layers.insert(layer_id, layer);
@@ -722,7 +722,7 @@ impl GraphBuilder {
                 weight: Set(node_data.weight),
                 is_partition: Set(node_data.is_partition),
                 belongs_to: Set(node_data.belongs_to),
-                datasource_id: Set(node_data.datasource_id),
+                dataset_id: Set(node_data.dataset_id),
                 attrs: Set(node_data.attrs),
                 comment: Set(None),
                 created_at: Set(chrono::Utc::now()),
@@ -742,7 +742,7 @@ impl GraphBuilder {
                 label: Set(edge_data.label),
                 layer: Set(edge_data.layer),
                 weight: Set(edge_data.weight),
-                datasource_id: Set(edge_data.datasource_id),
+                dataset_id: Set(edge_data.dataset_id),
                 attrs: Set(edge_data.attrs),
                 comment: Set(None),
                 created_at: Set(chrono::Utc::now()),
@@ -758,17 +758,17 @@ impl GraphBuilder {
         Ok((node_count, edge_count))
     }
 
-    /// Extract nodes from a nodes datasource
+    /// Extract nodes from a nodes dataset
     #[allow(dead_code)]
-    async fn extract_nodes_from_datasource(
+    async fn extract_nodes_from_dataset(
         &self,
-        datasource: &datasources::Model,
+        dataset: &datasets::Model,
     ) -> Result<HashMap<String, NodeData>> {
-        use crate::database::entities::datasource_rows::{Column, Entity};
+        use crate::database::entities::dataset_rows::{Column, Entity};
         use sea_orm::{ColumnTrait, QueryFilter, QueryOrder};
 
         let rows = Entity::find()
-            .filter(Column::DatasourceId.eq(datasource.id))
+            .filter(Column::DatasetNodeId.eq(dataset.id))
             .order_by_asc(Column::RowNumber)
             .all(&self.db)
             .await?;
@@ -789,7 +789,7 @@ impl GraphBuilder {
                 is_partition: parse_is_partition(&data["is_partition"]),
                 belongs_to: data["belongs_to"].as_str().map(|s| s.to_string()),
                 attrs: Some(data.clone()),
-                datasource_id: Some(datasource.id),
+                dataset_id: Some(dataset.id),
             };
 
             nodes.insert(id, node);
@@ -798,17 +798,17 @@ impl GraphBuilder {
         Ok(nodes)
     }
 
-    /// Extract edges from an edges datasource
+    /// Extract edges from an edges dataset
     #[allow(dead_code)]
-    async fn extract_edges_from_datasource(
+    async fn extract_edges_from_dataset(
         &self,
-        datasource: &datasources::Model,
+        dataset: &datasets::Model,
     ) -> Result<Vec<EdgeData>> {
-        use crate::database::entities::datasource_rows::{Column, Entity};
+        use crate::database::entities::dataset_rows::{Column, Entity};
         use sea_orm::{ColumnTrait, QueryFilter, QueryOrder};
 
         let rows = Entity::find()
-            .filter(Column::DatasourceId.eq(datasource.id))
+            .filter(Column::DatasetNodeId.eq(dataset.id))
             .order_by_asc(Column::RowNumber)
             .all(&self.db)
             .await?;
@@ -838,7 +838,7 @@ impl GraphBuilder {
                 layer: data["layer"].as_str().map(|s| s.to_string()),
                 weight: data["weight"].as_f64(),
                 attrs: Some(data.clone()),
-                datasource_id: Some(datasource.id),
+                dataset_id: Some(dataset.id),
             };
 
             edges.push(edge);
@@ -847,18 +847,18 @@ impl GraphBuilder {
         Ok(edges)
     }
 
-    /// Extract graph from JSON datasource
+    /// Extract graph from JSON dataset
     #[allow(dead_code)]
     async fn extract_graph_from_json(
         &self,
-        datasource: &datasources::Model,
+        dataset: &datasets::Model,
     ) -> Result<(HashMap<String, NodeData>, Vec<EdgeData>)> {
-        use crate::database::entities::datasource_rows::{Column, Entity};
+        use crate::database::entities::dataset_rows::{Column, Entity};
         use sea_orm::{ColumnTrait, QueryFilter};
 
         // JSON graphs are stored as single row with row_number = 0
         let row = Entity::find()
-            .filter(Column::DatasourceId.eq(datasource.id))
+            .filter(Column::DatasetNodeId.eq(dataset.id))
             .filter(Column::RowNumber.eq(0))
             .one(&self.db)
             .await?
@@ -882,7 +882,7 @@ impl GraphBuilder {
                     is_partition: node_val["is_partition"].as_bool().unwrap_or(false),
                     belongs_to: node_val["belongs_to"].as_str().map(|s| s.to_string()),
                     attrs: Some(node_val.clone()),
-                    datasource_id: Some(datasource.id),
+                    dataset_id: Some(dataset.id),
                 };
 
                 nodes.insert(id, node);
@@ -914,7 +914,7 @@ impl GraphBuilder {
                     layer: edge_val["layer"].as_str().map(|s| s.to_string()),
                     weight: edge_val["weight"].as_f64(),
                     attrs: Some(edge_val.clone()),
-                    datasource_id: Some(datasource.id),
+                    dataset_id: Some(dataset.id),
                 };
 
                 edges.push(edge);
@@ -963,7 +963,7 @@ struct NodeData {
     is_partition: bool,
     belongs_to: Option<String>,
     attrs: Option<Value>,
-    datasource_id: Option<i32>,
+    dataset_id: Option<i32>,
 }
 
 /// Internal edge data structure
@@ -975,7 +975,7 @@ struct EdgeData {
     layer: Option<String>,
     weight: Option<f64>,
     attrs: Option<Value>,
-    datasource_id: Option<i32>,
+    dataset_id: Option<i32>,
 }
 
 // LayerData now imported from super::types (was previously defined here)

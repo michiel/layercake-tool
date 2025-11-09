@@ -24,8 +24,8 @@ pub struct GraphNode {
     #[graphql(name = "belongsTo")]
     pub belongs_to: Option<String>,
     pub attrs: Option<serde_json::Value>,
-    #[graphql(name = "datasourceId")]
-    pub datasource_id: Option<i32>,
+    #[graphql(name = "datasetId")]
+    pub dataset_id: Option<i32>,
     #[graphql(name = "createdAt")]
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
@@ -41,7 +41,7 @@ impl From<crate::database::entities::graph_nodes::Model> for GraphNode {
             is_partition: model.is_partition,
             belongs_to: model.belongs_to,
             attrs: model.attrs,
-            datasource_id: model.datasource_id,
+            dataset_id: model.dataset_id,
             created_at: model.created_at,
         }
     }

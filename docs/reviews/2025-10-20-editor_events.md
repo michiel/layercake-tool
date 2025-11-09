@@ -9,7 +9,7 @@
 
 The Plan DAG editor suffers from **incomplete event propagation** causing UI state to become stale without manual reload. The root cause is a **mismatch between delta subscription coverage and UI display requirements**, compounded by **excessive defensive complexity** in state synchronisation logic.
 
-**Critical Finding:** Node execution status changes (e.g., when a datasource is processed or a graph is computed) are **not propagated via the delta subscription**, despite being displayed in the UI. This causes the canvas to show outdated execution states until a full page reload.
+**Critical Finding:** Node execution status changes (e.g., when a dataset is processed or a graph is computed) are **not propagated via the delta subscription**, despite being displayed in the UI. This causes the canvas to show outdated execution states until a full page reload.
 
 ## Architecture Overview
 
@@ -108,16 +108,16 @@ The Plan DAG editor suffers from **incomplete event propagation** causing UI sta
 **Impact:** UI shows stale execution status until reload
 
 **Problem:**
-The `PLAN_DAG_DELTA_SUBSCRIPTION` only propagates structural changes (nodes, edges, metadata) but **excludes execution state** (`datasourceExecution`, `graphExecution`). When a node's execution status changes (e.g., datasource processed, graph computed), the delta subscription does not include these updates.
+The `PLAN_DAG_DELTA_SUBSCRIPTION` only propagates structural changes (nodes, edges, metadata) but **excludes execution state** (`datasetExecution`, `graphExecution`). When a node's execution status changes (e.g., dataset processed, graph computed), the delta subscription does not include these updates.
 
 **Evidence:**
-- `GET_PLAN_DAG` query includes `datasourceExecution` and `graphExecution` fields (plan-dag.ts:22-37)
+- `GET_PLAN_DAG` query includes `datasetExecution` and `graphExecution` fields (plan-dag.ts:22-37)
 - `PLAN_DAG_DELTA_SUBSCRIPTION` only includes JSON Patch operations on structure (plan-dag.ts:296-311)
-- Nodes display execution status badges (DataSourceNode.tsx:49-68)
+- Nodes display execution status badges (DataSetNode.tsx:49-68)
 - Delta subscription handler applies patches to Plan DAG structure only (PlanDagQueryService.ts:138-173)
 
 **Result:**
-When backend processes a datasource or computes a graph:
+When backend processes a dataset or computes a graph:
 1. Backend updates execution state in database
 2. Delta subscription doesn't include execution state changes
 3. UI continues showing old status ("Pending", "Processing")
@@ -126,7 +126,7 @@ When backend processes a datasource or computes a graph:
 **Code Location:**
 - Subscription definition: `frontend/src/graphql/plan-dag.ts:296-311`
 - Delta handler: `frontend/src/services/PlanDagQueryService.ts:87-180`
-- Display logic: `frontend/src/components/editors/PlanVisualEditor/nodes/DataSourceNode.tsx:32-68`
+- Display logic: `frontend/src/components/editors/PlanVisualEditor/nodes/DataSetNode.tsx:32-68`
 
 ### 2. Excessive Defensive Complexity
 
@@ -355,7 +355,7 @@ subscription PlanDagDeltaChanged($projectId: Int!) {
     # Add execution state separately to avoid patch complexity
     executionStateChanges {
       nodeId
-      datasourceExecution { ... }
+      datasetExecution { ... }
       graphExecution { ... }
     }
   }
@@ -369,7 +369,7 @@ subscription NodeExecutionStatusChanged($projectId: Int!) {
   nodeExecutionStatusChanged(projectId: $projectId) {
     nodeId
     nodeType
-    datasourceExecution { ... }
+    datasetExecution { ... }
     graphExecution { ... }
   }
 }
@@ -691,7 +691,7 @@ describe('usePlanDagCQRS', () => {
           planDagDeltaChanged: {
             executionStateChanges: [{
               nodeId: 'node-1',
-              datasourceExecution: { executionState: 'COMPLETE' }
+              datasetExecution: { executionState: 'COMPLETE' }
             }]
           }
         }
@@ -700,7 +700,7 @@ describe('usePlanDagCQRS', () => {
 
     // Verify UI reflects execution status
     const node = result.current.nodes.find(n => n.id === 'node-1')
-    expect(node.data.datasourceExecution.executionState).toBe('COMPLETE')
+    expect(node.data.datasetExecution.executionState).toBe('COMPLETE')
   })
 
   it('should not echo own mutations', async () => {
@@ -754,13 +754,13 @@ describe('Plan DAG Editor - Multi-user Scenarios', () => {
   it('should handle execution status updates', async () => {
     const editor = renderPlanEditor({ projectId: 1 })
 
-    // Trigger datasource processing (backend)
+    // Trigger dataset processing (backend)
     await backend.processDatasource('node-1')
 
     // Editor should show updated status without reload
     await waitFor(() => {
       const node = editor.getNode('node-1')
-      expect(node.data.datasourceExecution.executionState).toBe('PROCESSING')
+      expect(node.data.datasetExecution.executionState).toBe('PROCESSING')
     })
 
     // Wait for completion
@@ -769,7 +769,7 @@ describe('Plan DAG Editor - Multi-user Scenarios', () => {
     // Status should update to COMPLETE
     await waitFor(() => {
       const node = editor.getNode('node-1')
-      expect(node.data.datasourceExecution.executionState).toBe('COMPLETE')
+      expect(node.data.datasetExecution.executionState).toBe('COMPLETE')
     })
   })
 })
@@ -779,7 +779,7 @@ describe('Plan DAG Editor - Multi-user Scenarios', () => {
 
 - [ ] Drop node on canvas → appears immediately
 - [ ] Delete node → disappears immediately
-- [ ] Execute datasource → status updates to "Processing" without reload
+- [ ] Execute dataset → status updates to "Processing" without reload
 - [ ] Datasource completes → status updates to "Complete" without reload
 - [ ] Compute graph → status updates in real-time
 - [ ] Multi-user: User A adds node → User B sees it appear
@@ -848,7 +848,7 @@ describe('Plan DAG Editor - Multi-user Scenarios', () => {
 
 The Plan DAG editor's event handling suffers from a **critical gap in delta subscription coverage** (execution status not propagated) and **excessive defensive complexity** (4 overlapping suppression mechanisms).
 
-The root cause of the user's reported issue—UI not updating without reload—is the **missing execution status in the delta subscription**. Node execution state changes (datasource processing, graph computation) do not trigger UI updates because they are not included in the JSON Patch operations.
+The root cause of the user's reported issue—UI not updating without reload—is the **missing execution status in the delta subscription**. Node execution state changes (dataset processing, graph computation) do not trigger UI updates because they are not included in the JSON Patch operations.
 
 Implementing the recommended fixes will:
 1. **Restore live updates** for execution status (fixes user issue)

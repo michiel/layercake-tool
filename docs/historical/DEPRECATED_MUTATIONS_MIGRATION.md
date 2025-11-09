@@ -33,8 +33,8 @@ mutation {
   updatePlanDag(projectId: 1, planDag: {
     version: "1.0"
     nodes: [
-      { id: "datasource_001", type: DataSourceNode, ...existing nodes... },
-      { id: "datasource_002", type: DataSourceNode, ...NEW NODE... }
+      { id: "dataset_001", type: DataSetNode, ...existing nodes... },
+      { id: "dataset_002", type: DataSetNode, ...NEW NODE... }
     ]
     edges: [...all existing edges...]
   })
@@ -60,13 +60,13 @@ mutation {
   addPlanDagNode(
     projectId: 1,
     node: {
-      nodeType: DataSourceNode,
+      nodeType: DataSetNode,
       position: { x: 100, y: 200 },
       metadata: { label: "My Data Source", description: "CSV import" },
       config: "{\"dataSourceId\": 42}"
     }
   ) {
-    id  # Returns generated ID like "datasource_002"
+    id  # Returns generated ID like "dataset_002"
     type
     position { x y }
   }
@@ -80,7 +80,7 @@ mutation {
 mutation {
   updatePlanDag(projectId: 1, planDag: {
     nodes: [
-      { id: "datasource_001", ...UPDATED FIELDS... },
+      { id: "dataset_001", ...UPDATED FIELDS... },
       ...all other nodes unchanged...
     ]
     edges: [...all edges...]
@@ -105,7 +105,7 @@ mutation UpdateNode($projectId: Int!, $nodeId: String!, $updates: PlanDagNodeUpd
 mutation {
   updatePlanDagNode(
     projectId: 1,
-    nodeId: "datasource_001",
+    nodeId: "dataset_001",
     updates: {
       position: { x: 150, y: 250 },
       metadata: { label: "Updated Label", description: "New description" }
@@ -139,7 +139,7 @@ mutation DeleteNode($projectId: Int!, $nodeId: String!) {
 **Example:**
 ```graphql
 mutation {
-  deletePlanDagNode(projectId: 1, nodeId: "datasource_001")  # Returns true
+  deletePlanDagNode(projectId: 1, nodeId: "dataset_001")  # Returns true
 }
 ```
 
@@ -152,7 +152,7 @@ mutation {
     nodes: [...all nodes...],
     edges: [
       ...existing edges...,
-      { source: "datasource_001", target: "graph_001", ...NEW EDGE... }
+      { source: "dataset_001", target: "graph_001", ...NEW EDGE... }
     ]
   })
 }
@@ -176,12 +176,12 @@ mutation {
   addPlanDagEdge(
     projectId: 1,
     edge: {
-      source: "datasource_001",
+      source: "dataset_001",
       target: "graph_001",
       metadata: { label: "nodes", dataType: GraphData }
     }
   ) {
-    id  # Returns generated ID like "edge-datasource_001-graph_001-abc123"
+    id  # Returns generated ID like "edge-dataset_001-graph_001-abc123"
     source
     target
   }
@@ -210,7 +210,7 @@ mutation DeleteEdge($projectId: Int!, $edgeId: String!) {
 **Example:**
 ```graphql
 mutation {
-  deletePlanDagEdge(projectId: 1, edgeId: "edge-datasource_001-graph_001-abc123")  # Returns true
+  deletePlanDagEdge(projectId: 1, edgeId: "edge-dataset_001-graph_001-abc123")  # Returns true
 }
 ```
 
@@ -221,7 +221,7 @@ mutation {
 mutation {
   updatePlanDag(projectId: 1, planDag: {
     nodes: [
-      { id: "datasource_001", position: { x: 100, y: 200 }, ...rest... },
+      { id: "dataset_001", position: { x: 100, y: 200 }, ...rest... },
       { id: "graph_001", position: { x: 300, y: 200 }, ...rest... },
       ...all other nodes...
     ]
@@ -243,7 +243,7 @@ mutation {
   batchMovePlanDagNodes(
     projectId: 1,
     positions: [
-      { nodeId: "datasource_001", position: { x: 100, y: 200 } },
+      { nodeId: "dataset_001", position: { x: 100, y: 200 } },
       { nodeId: "graph_001", position: { x: 300, y: 200 } }
     ]
   )  # Returns true
@@ -311,7 +311,7 @@ const addNode = async () => {
     variables: {
       projectId: 1,
       node: {
-        nodeType: 'DataSourceNode',
+        nodeType: 'DataSetNode',
         position: { x: 100, y: 200 },
         metadata: { label: 'My Node' },
         config: JSON.stringify({ dataSourceId: 42 })
@@ -383,7 +383,7 @@ With bulk replace:
 
 ### 4. Auditability
 Individual mutations create clear audit trail:
-- "User added datasource_042 at 10:30:15"
+- "User added dataset_042 at 10:30:15"
 - "User moved graph_003 to (150, 200) at 10:30:22"
 
 Bulk replace:
@@ -412,7 +412,7 @@ If you encounter issues during migration:
 ```graphql
 # Test 1: Add a node
 mutation TestAdd {
-  addPlanDagNode(projectId: 1, node: { nodeType: DataSourceNode, position: { x: 0, y: 0 }, metadata: { label: "Test" }, config: "{}" }) {
+  addPlanDagNode(projectId: 1, node: { nodeType: DataSetNode, position: { x: 0, y: 0 }, metadata: { label: "Test" }, config: "{}" }) {
     id
   }
 }

@@ -9,7 +9,7 @@ use super::helpers::{
     StoredOutputNodeConfig,
 };
 use crate::database::entities::{
-    datasources, graphs, plan_dag_edges, plan_dag_nodes, plans, projects, ExecutionState,
+    datasets, graphs, plan_dag_edges, plan_dag_nodes, plans, projects, ExecutionState,
 };
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
@@ -60,7 +60,7 @@ impl PlanDagMutation {
             existing_node_ids.push(node_id.clone());
 
             let node_type_str = match node.node_type {
-                crate::graphql::types::PlanDagNodeType::DataSource => "DataSourceNode",
+                crate::graphql::types::PlanDagNodeType::DataSet => "DataSetNode",
                 crate::graphql::types::PlanDagNodeType::Graph => "GraphNode",
                 crate::graphql::types::PlanDagNodeType::Transform => "TransformNode",
                 crate::graphql::types::PlanDagNodeType::Filter => "FilterNode",
@@ -277,7 +277,7 @@ impl PlanDagMutation {
         })
     }
 
-    /// Clear execution state for all nodes in a project (keeps edits, config, and datasources)
+    /// Clear execution state for all nodes in a project (keeps edits, config, and datasets)
     async fn clear_project_execution(
         &self,
         ctx: &Context<'_>,
@@ -302,20 +302,20 @@ impl PlanDagMutation {
 
         let graphs_deleted = delete_result.rows_affected;
 
-        // Delete all datasources imported for this project
-        let datasources_result = datasources::Entity::delete_many()
-            .filter(datasources::Column::ProjectId.eq(project_id))
+        // Delete all datasets imported for this project
+        let datasets_result = datasets::Entity::delete_many()
+            .filter(datasets::Column::ProjectId.eq(project_id))
             .exec(&context.db)
             .await
-            .map_err(|e| StructuredError::database("datasources::Entity::delete_many", e))?;
+            .map_err(|e| StructuredError::database("datasets::Entity::delete_many", e))?;
 
-        let datasources_deleted = datasources_result.rows_affected;
+        let datasets_deleted = datasets_result.rows_affected;
 
         Ok(ExecutionActionResult {
         success: true,
         message: format!(
-            "Cleared execution state: deleted {} graphs and {} datasources. Configuration and edits preserved.",
-            graphs_deleted, datasources_deleted
+            "Cleared execution state: deleted {} graphs and {} datasets. Configuration and edits preserved.",
+            graphs_deleted, datasets_deleted
         ),
     })
     }
@@ -361,27 +361,27 @@ impl PlanDagMutation {
             stopped_count += 1;
         }
 
-        // Find all datasources in processing or pending state for this project
-        let processing_datasources = datasources::Entity::find()
-            .filter(datasources::Column::ProjectId.eq(project_id))
+        // Find all datasets in processing or pending state for this project
+        let processing_datasets = datasets::Entity::find()
+            .filter(datasets::Column::ProjectId.eq(project_id))
             .filter(
-                datasources::Column::ExecutionState
+                datasets::Column::ExecutionState
                     .eq(ExecutionState::Processing.as_str())
-                    .or(datasources::Column::ExecutionState.eq(ExecutionState::Pending.as_str())),
+                    .or(datasets::Column::ExecutionState.eq(ExecutionState::Pending.as_str())),
             )
             .all(&context.db)
             .await
-            .map_err(|e| StructuredError::database("datasources::Entity::find", e))?;
+            .map_err(|e| StructuredError::database("datasets::Entity::find", e))?;
 
-        // Update each datasource to not_started state
-        for datasource in processing_datasources {
-            let mut active: datasources::ActiveModel = datasource.into();
+        // Update each dataset to not_started state
+        for dataset in processing_datasets {
+            let mut active: datasets::ActiveModel = dataset.into();
             active.execution_state = Set(ExecutionState::NotStarted.as_str().to_string());
             active.error_message = Set(Some("Execution stopped by user".to_string()));
             active
                 .update(&context.db)
                 .await
-                .map_err(|e| StructuredError::database("datasources::Entity::update", e))?;
+                .map_err(|e| StructuredError::database("datasets::Entity::update", e))?;
             stopped_count += 1;
         }
 

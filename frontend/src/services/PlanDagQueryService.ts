@@ -262,14 +262,14 @@ export class PlanDagQueryService {
         if (statusData) {
           console.log('[PlanDagQueryService] Received execution status update:', {
             nodeId: statusData.nodeId,
-            datasourceState: statusData.datasourceExecution?.executionState,
+            datasetState: statusData.datasetExecution?.executionState,
             graphState: statusData.graphExecution?.executionState,
           })
 
           // Build execution data object
           const executionData: any = {}
-          if (statusData.datasourceExecution) {
-            executionData.datasourceExecution = statusData.datasourceExecution
+          if (statusData.datasetExecution) {
+            executionData.datasetExecution = statusData.datasetExecution
           }
           if (statusData.graphExecution) {
             executionData.graphExecution = statusData.graphExecution

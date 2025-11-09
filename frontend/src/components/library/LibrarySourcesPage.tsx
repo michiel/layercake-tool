@@ -12,7 +12,7 @@ import {
 } from '@tabler/icons-react'
 import { useForm } from 'react-hook-form'
 import PageContainer from '../layout/PageContainer'
-import { DataSourceUploader } from '../datasources/DataSourceUploader'
+import { DataSetUploader } from '../datasets/DataSetUploader'
 import { Stack, Group } from '../layout-primitives'
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert'
 import { Badge } from '../ui/badge'
@@ -256,7 +256,7 @@ export const LibrarySourcesPage: React.FC = () => {
                 <Stack align="center" className="py-12" gap="xs">
                   <p className="font-medium">No library sources yet</p>
                   <p className="text-sm text-muted-foreground text-center max-w-sm">
-                    Add datasources here to share them across projects. They can be imported into any
+                    Add datasets here to share them across projects. They can be imported into any
                     project without re-uploading.
                   </p>
                 </Stack>
@@ -360,7 +360,7 @@ export const LibrarySourcesPage: React.FC = () => {
         </Card>
       </Stack>
 
-      <DataSourceUploader
+      <DataSetUploader
         mode="library"
         opened={uploaderOpen}
         onClose={() => setUploaderOpen(false)}

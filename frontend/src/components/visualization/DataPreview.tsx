@@ -1,5 +1,5 @@
 import { IconAlertCircle } from '@tabler/icons-react';
-import { DataSourcePreview } from '../../graphql/preview';
+import { DataSetPreview } from '../../graphql/preview';
 import { Stack, Group, Center } from '@/components/layout-primitives';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Spinner } from '@/components/ui/spinner';
 
 export interface DataPreviewProps {
-  preview: DataSourcePreview | null;
+  preview: DataSetPreview | null;
   loading?: boolean;
   error?: Error | null;
 }

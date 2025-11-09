@@ -184,9 +184,9 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
       let hasValidConfig = false
       switch (nodeType) {
         case PlanDagNodeType.DATA_SOURCE: {
-          const dataSourceId = (parsedConfig as any)?.dataSourceId
+          const dataSetId = (parsedConfig as any)?.dataSetId
           const numericId =
-            typeof dataSourceId === 'number' ? dataSourceId : Number(dataSourceId)
+            typeof dataSetId === 'number' ? dataSetId : Number(dataSetId)
           hasValidConfig = Number.isFinite(numericId) && numericId > 0
           break
         }

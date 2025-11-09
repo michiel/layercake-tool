@@ -7,9 +7,9 @@ use tracing::{debug, warn};
 use uuid::Uuid;
 
 use crate::database::entities::common_types::{DataType, FileFormat};
-use crate::database::entities::data_sources::{self};
+use crate::database::entities::data_sets::{self};
 use crate::database::entities::{plan_dag_edges, plan_dag_nodes, plans, projects};
-use crate::services::{data_source_service::DataSourceService, graph_service::GraphService};
+use crate::services::{data_set_service::DataSetService, graph_service::GraphService};
 
 static SAMPLE_PROJECT_DIR: Dir<'_> = include_dir!("../resources/sample-v1");
 
@@ -93,10 +93,10 @@ impl SampleProjectService {
         .await?;
 
         // Create data sources for nodes, edges, layers
-        let data_source_service = DataSourceService::new(self.db.clone());
+        let data_set_service = DataSetService::new(self.db.clone());
         let nodes_ds = self
-            .create_sample_datasource(
-                &data_source_service,
+            .create_sample_dataset(
+                &data_set_service,
                 &project,
                 &assets.metadata,
                 &assets.nodes,
@@ -105,8 +105,8 @@ impl SampleProjectService {
             )
             .await?;
         let edges_ds = self
-            .create_sample_datasource(
-                &data_source_service,
+            .create_sample_dataset(
+                &data_set_service,
                 &project,
                 &assets.metadata,
                 &assets.edges,
@@ -115,8 +115,8 @@ impl SampleProjectService {
             )
             .await?;
         let layers_ds = self
-            .create_sample_datasource(
-                &data_source_service,
+            .create_sample_dataset(
+                &data_set_service,
                 &project,
                 &assets.metadata,
                 &assets.layers,
@@ -126,13 +126,13 @@ impl SampleProjectService {
             .await?;
 
         // Create Plan DAG nodes
-        let mut datasource_nodes = Vec::new();
+        let mut dataset_nodes = Vec::new();
         for (index, ds) in [nodes_ds, edges_ds, layers_ds].into_iter().enumerate() {
-            let node_id = format!("datasourcenode_{}_{}", sample_key, ds.id);
+            let node_id = format!("datasetnode_{}_{}", sample_key, ds.id);
             let metadata_json =
                 serde_json::json!({ "label": ds.name, "description": ds.description });
             let config_json = serde_json::json!({
-                "dataSourceId": ds.id,
+                "dataSetId": ds.id,
                 "displayMode": "summary",
                 "filename": ds.filename,
                 "dataType": data_type_display(&ds.data_type),
@@ -141,7 +141,7 @@ impl SampleProjectService {
             let node = plan_dag_nodes::ActiveModel {
                 id: Set(node_id.clone()),
                 plan_id: Set(plan.id),
-                node_type: Set("DataSourceNode".to_string()),
+                node_type: Set("DataSetNode".to_string()),
                 position_x: Set(120.0),
                 position_y: Set(120.0 + (index as f64 * 140.0)),
                 source_position: Set(None),
@@ -152,7 +152,7 @@ impl SampleProjectService {
                 updated_at: Set(now),
             };
             node.insert(&self.db).await?;
-            datasource_nodes.push(node_id);
+            dataset_nodes.push(node_id);
         }
 
         // Merge node that collates all data sources
@@ -228,7 +228,7 @@ impl SampleProjectService {
         }
 
         // Connect data sources -> merge node
-        for ds_id in datasource_nodes {
+        for ds_id in dataset_nodes {
             let edge_id = format!("edge_{}", Uuid::new_v4().simple());
             plan_dag_edges::ActiveModel {
                 id: Set(edge_id),
@@ -349,17 +349,17 @@ impl SampleProjectService {
         None
     }
 
-    async fn create_sample_datasource(
+    async fn create_sample_dataset(
         &self,
-        data_source_service: &DataSourceService,
+        data_set_service: &DataSetService,
         project: &projects::Model,
         metadata: &SampleProjectMetadata,
         file: &SampleFile,
         data_type: DataType,
         label: &str,
-    ) -> Result<data_sources::Model> {
+    ) -> Result<data_sets::Model> {
         let description = format!("{} {} sample dataset", metadata.name, label);
-        data_source_service
+        data_set_service
             .create_from_file(
                 project.id,
                 format!("{} {}", metadata.name, label),

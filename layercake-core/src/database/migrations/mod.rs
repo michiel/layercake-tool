@@ -18,6 +18,7 @@ mod m20251105_000014_create_system_settings;
 mod m20251106_000015_fix_plan_dag_nodes_uniqueness;
 mod m20251110_000016_create_data_acquisition_tables;
 mod m20251111_000017_add_embedding_provider_to_vector_state;
+mod m20251112_000018_rename_data_sources_to_data_sets;
 
 pub struct Migrator;
 
@@ -43,6 +44,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20251106_000015_fix_plan_dag_nodes_uniqueness::Migration),
             Box::new(m20251110_000016_create_data_acquisition_tables::Migration),
             Box::new(m20251111_000017_add_embedding_provider_to_vector_state::Migration),
+            Box::new(m20251112_000018_rename_data_sources_to_data_sets::Migration),
         ]
     }
 }

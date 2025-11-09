@@ -575,7 +575,7 @@ async fn upsert_node(
             is_partition: Set(is_partition),
             belongs_to: Set(belongs_to),
             attrs: Set(attrs),
-            datasource_id: Set(None),
+            dataset_id: Set(None),
             comment: Set(None),
             created_at: Set(Utc::now()),
         };
@@ -713,7 +713,7 @@ async fn upsert_edge(
             layer: Set(layer),
             weight: Set(weight),
             attrs: Set(attrs),
-            datasource_id: Set(None),
+            dataset_id: Set(None),
             comment: Set(None),
             created_at: Set(Utc::now()),
         };

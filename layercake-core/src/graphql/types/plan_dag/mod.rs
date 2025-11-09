@@ -32,8 +32,8 @@ pub use transforms::*;
 // Plan DAG Node Types (matching frontend enum)
 #[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub enum PlanDagNodeType {
-    #[graphql(name = "DataSourceNode")]
-    DataSource,
+    #[graphql(name = "DataSetNode")]
+    DataSet,
     #[graphql(name = "GraphNode")]
     Graph,
     #[graphql(name = "TransformNode")]

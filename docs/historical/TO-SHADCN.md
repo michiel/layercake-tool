@@ -369,8 +369,8 @@ import { Dialog, DialogContent, DialogHeader } from '@/components/ui/dialog'
 
 #### Files to Update (Priority):
 1. `src/components/project/CreateProjectModal.tsx` (uses useForm)
-2. `src/components/datasources/DataSourceUploader.tsx` (uses useForm, complex)
-3. `src/components/datasources/DataSourceEditor.tsx` (uses useForm, complex)
+2. `src/components/datasets/DataSetUploader.tsx` (uses useForm, complex)
+3. `src/components/datasets/DataSetEditor.tsx` (uses useForm, complex)
 4. `src/components/library/LibrarySourcesPage.tsx` (uses useForm)
 5. All form components in `src/components/editors/PlanVisualEditor/forms/` (16 files)
 6. `src/components/editors/PlanVisualEditor/EdgeConfigDialog.tsx` (uses useForm)

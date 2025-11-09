@@ -11,11 +11,11 @@ import {
 } from '@tabler/icons-react'
 import {
   GET_DATASOURCES,
-  DataSource,
+  DataSet,
   getFileFormatDisplayName,
   getDataTypeDisplayName,
   formatFileSize
-} from '../../../../graphql/datasources'
+} from '../../../../graphql/datasets'
 import { Stack, Group } from '../../../layout-primitives'
 import { Button } from '../../../ui/button'
 import { Badge } from '../../../ui/badge'
@@ -27,29 +27,29 @@ import { Alert, AlertDescription } from '../../../ui/alert'
 import { Spinner } from '../../../ui/spinner'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '../../../ui/tooltip'
 
-interface DataSourceSelectionDialogProps {
+interface DataSetSelectionDialogProps {
   opened: boolean
   onClose: () => void
-  onSelect: (dataSource: DataSource) => void
-  currentDataSourceId?: number
+  onSelect: (dataSource: DataSet) => void
+  currentDataSetId?: number
   projectId: number
 }
 
-export const DataSourceSelectionDialog: React.FC<DataSourceSelectionDialogProps> = ({
+export const DataSetSelectionDialog: React.FC<DataSetSelectionDialogProps> = ({
   opened,
   onClose,
   onSelect,
-  currentDataSourceId,
+  currentDataSetId,
   projectId
 }) => {
   const [searchQuery, setSearchQuery] = useState('')
 
-  // Query for DataSources in current project
+  // Query for DataSets in current project
   const {
     data: dataSourcesData,
     loading: dataSourcesLoading,
     error: dataSourcesError,
-    refetch: refetchDataSources
+    refetch: refetchDataSets
   } = useQuery(GET_DATASOURCES, {
     variables: { projectId },
     skip: !projectId || projectId === 0,
@@ -57,21 +57,21 @@ export const DataSourceSelectionDialog: React.FC<DataSourceSelectionDialogProps>
     fetchPolicy: 'cache-and-network'
   })
 
-  const dataSources: DataSource[] = (dataSourcesData as any)?.dataSources || []
+  const dataSources: DataSet[] = (dataSourcesData as any)?.dataSets || []
 
-  // Filter DataSources based on search query
-  const filteredDataSources = dataSources.filter(ds =>
+  // Filter DataSets based on search query
+  const filteredDataSets = dataSources.filter(ds =>
     ds.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     ds.filename.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (ds.description || '').toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  const handleSelect = (dataSource: DataSource) => {
+  const handleSelect = (dataSource: DataSet) => {
     onSelect(dataSource)
     onClose()
   }
 
-  const getStatusIcon = (status: DataSource['status']) => {
+  const getStatusIcon = (status: DataSet['status']) => {
     switch (status) {
       case 'active':
         return <IconCheck size={16} />
@@ -105,7 +105,7 @@ export const DataSourceSelectionDialog: React.FC<DataSourceSelectionDialogProps>
               </div>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="secondary" size="icon" onClick={() => refetchDataSources()}>
+                  <Button variant="secondary" size="icon" onClick={() => refetchDataSets()}>
                     <IconRefresh className="h-4 w-4" />
                   </Button>
                 </TooltipTrigger>
@@ -147,7 +147,7 @@ export const DataSourceSelectionDialog: React.FC<DataSourceSelectionDialogProps>
                   </div>
                 )}
 
-                {filteredDataSources.length === 0 && !dataSourcesLoading ? (
+                {filteredDataSets.length === 0 && !dataSourcesLoading ? (
                   <div className="flex flex-col items-center justify-center py-12 gap-4">
                     <IconFile size={48} className="text-gray-400" />
                     <div className="text-center">
@@ -162,7 +162,7 @@ export const DataSourceSelectionDialog: React.FC<DataSourceSelectionDialogProps>
                   </div>
                 ) : (
                   <Stack gap="sm">
-                    {filteredDataSources.map((dataSource) => (
+                    {filteredDataSets.map((dataSource) => (
                       <Card
                         key={dataSource.id}
                         className={`border p-4 transition-opacity ${
@@ -170,7 +170,7 @@ export const DataSourceSelectionDialog: React.FC<DataSourceSelectionDialogProps>
                             ? 'cursor-pointer hover:bg-accent'
                             : 'cursor-not-allowed opacity-70'
                         } ${
-                          currentDataSourceId === dataSource.id
+                          currentDataSetId === dataSource.id
                             ? 'border-blue-500 border-2 bg-blue-50'
                             : ''
                         }`}
@@ -180,7 +180,7 @@ export const DataSourceSelectionDialog: React.FC<DataSourceSelectionDialogProps>
                           <div className="flex-1">
                             <Group gap="sm" className="mb-2">
                               <p className="font-medium">{dataSource.name}</p>
-                              {currentDataSourceId === dataSource.id && (
+                              {currentDataSetId === dataSource.id && (
                                 <Badge variant="secondary">
                                   Current
                                 </Badge>

@@ -27,7 +27,7 @@ export const getDefaultNodeConfig = (type: PlanDagNodeType): NodeConfig => {
   switch (type) {
     case PlanDagNodeType.DATA_SOURCE:
       return {
-        dataSourceId: 0
+        dataSetId: 0
       };
 
     case PlanDagNodeType.GRAPH:

@@ -7,7 +7,7 @@
 //!
 //! - **GraphError**: Graph operations (nodes, edges, layers, validation)
 //! - **PlanError**: Plan and DAG execution errors
-//! - **DataSourceError**: Data source operations (import, export, validation)
+//! - **DataSetError**: Data source operations (import, export, validation)
 //! - **AuthError**: Authentication and authorisation errors
 //! - **ImportExportError**: Import/export format handling and transformation
 //!
@@ -60,14 +60,14 @@
 
 pub mod auth;
 pub mod common;
-pub mod data_source;
+pub mod data_set;
 pub mod graph;
 pub mod import_export;
 pub mod plan;
 
 // Re-export all error types
 pub use auth::AuthError;
-pub use data_source::DataSourceError;
+pub use data_set::DataSetError;
 pub use graph::GraphError;
 pub use import_export::ImportExportError;
 pub use plan::PlanError;
@@ -82,8 +82,8 @@ pub type GraphResult<T> = Result<T, GraphError>;
 /// Result type alias for plan operations
 pub type PlanResult<T> = Result<T, PlanError>;
 
-/// Result type alias for data source operations
-pub type DataSourceResult<T> = Result<T, DataSourceError>;
+/// Result type alias for data set operations
+pub type DataSetResult<T> = Result<T, DataSetError>;
 
 /// Result type alias for authentication operations
 pub type AuthResult<T> = Result<T, AuthError>;
@@ -108,8 +108,8 @@ mod tests {
     }
 
     #[test]
-    fn test_data_source_result_alias() {
-        let result: DataSourceResult<()> = Err(DataSourceError::NotFound(1));
+    fn test_data_set_result_alias() {
+        let result: DataSetResult<()> = Err(DataSetError::NotFound(1));
         assert!(result.is_err());
     }
 

@@ -446,7 +446,7 @@ layercake-core/src/graphql/types/plan_dag/
 ├── node.rs             (PlanDagNode type, ~400 lines)
 ├── edge.rs             (PlanDagEdge type, ~200 lines)
 ├── position.rs         (Position, NodePosition types, ~150 lines)
-├── metadata.rs         (DataSourceExecutionMetadata, etc., ~300 lines)
+├── metadata.rs         (DataSetExecutionMetadata, etc., ~300 lines)
 ├── config.rs           (Node configuration types, ~250 lines)
 ├── resolvers/
 │   ├── mod.rs
@@ -480,8 +480,8 @@ pub struct AppContext {
     import_service: Arc<ImportService>,
     export_service: Arc<ExportService>,
     graph_service: Arc<GraphService>,
-    data_source_service: Arc<DataSourceService>,
-    data_source_bulk_service: Arc<DataSourceBulkService>,
+    data_source_service: Arc<DataSetService>,
+    data_source_bulk_service: Arc<DataSetBulkService>,
     plan_dag_service: Arc<PlanDagService>,
     graph_edit_service: Arc<GraphEditService>,
     graph_analysis_service: Arc<GraphAnalysisService>,
@@ -511,8 +511,8 @@ pub struct DataContext {
     db: DatabaseConnection,
     import_service: Arc<ImportService>,
     export_service: Arc<ExportService>,
-    data_source_service: Arc<DataSourceService>,
-    data_source_bulk_service: Arc<DataSourceBulkService>,
+    data_source_service: Arc<DataSetService>,
+    data_source_bulk_service: Arc<DataSetBulkService>,
 }
 
 impl DataContext {
@@ -520,8 +520,8 @@ impl DataContext {
         Self {
             import_service: Arc::new(ImportService::new(db.clone())),
             export_service: Arc::new(ExportService::new(db.clone())),
-            data_source_service: Arc::new(DataSourceService::new(db.clone())),
-            data_source_bulk_service: Arc::new(DataSourceBulkService::new(db.clone())),
+            data_source_service: Arc::new(DataSetService::new(db.clone())),
+            data_source_bulk_service: Arc::new(DataSetBulkService::new(db.clone())),
             db,
         }
     }
@@ -612,7 +612,7 @@ let graph = ctx.app_context.graph().graph_service().do_something();
 
 **Problem:**
 
-Files: `database/entities/data_sources.rs` and `database/entities/datasources.rs`
+Files: `database/entities/data_sources.rs` and `database/entities/datasets.rs`
 
 Both contain similar enum patterns with duplicated implementations:
 
@@ -707,7 +707,7 @@ pub enum DataType {
 3. **Update Entity Files**
 
 ```rust
-// data_sources.rs and datasources.rs
+// data_sources.rs and datasets.rs
 use super::common_types::{FileFormat, DataType};
 
 // Remove duplicated enum implementations
@@ -798,7 +798,7 @@ pub enum PlanError {
 
 // layercake-core/src/errors/data_source.rs
 #[derive(Error, Debug)]
-pub enum DataSourceError {
+pub enum DataSetError {
     #[error("Data source {0} not found")]
     NotFound(i32),
 

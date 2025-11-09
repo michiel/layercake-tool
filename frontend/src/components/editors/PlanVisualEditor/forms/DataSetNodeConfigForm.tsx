@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { IconAlertCircle, IconLoader2 } from '@tabler/icons-react';
 import { useQuery } from '@apollo/client/react';
 import { gql } from '@apollo/client';
-import { DataSourceNodeConfig, NodeMetadata } from '../../../../types/plan-dag';
+import { DataSetNodeConfig, NodeMetadata } from '../../../../types/plan-dag';
 import { Stack } from '@/components/layout-primitives';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Label } from '@/components/ui/label';
@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 // GraphQL query for available data sources
 const GET_AVAILABLE_DATA_SOURCES = gql`
-  query GetAvailableDataSources($projectId: Int!) {
+  query GetAvailableDataSets($projectId: Int!) {
     dataSources(projectId: $projectId) {
       id
       name
@@ -22,7 +22,7 @@ const GET_AVAILABLE_DATA_SOURCES = gql`
   }
 `;
 
-interface DataSourceReference {
+interface DataSetReference {
   id: number;
   name: string;
   description?: string;
@@ -31,20 +31,20 @@ interface DataSourceReference {
   createdAt: string;
 }
 
-interface GetAvailableDataSourcesData {
-  dataSources: DataSourceReference[];
+interface GetAvailableDataSetsData {
+  dataSets: DataSetReference[];
 }
 
-interface DataSourceNodeConfigFormProps {
-  config: DataSourceNodeConfig;
-  setConfig: (config: DataSourceNodeConfig) => void;
+interface DataSetNodeConfigFormProps {
+  config: DataSetNodeConfig;
+  setConfig: (config: DataSetNodeConfig) => void;
   setIsValid: (isValid: boolean) => void;
   projectId: number;
   metadata: NodeMetadata;
   setMetadata: React.Dispatch<React.SetStateAction<NodeMetadata>>;
 }
 
-export const DataSourceNodeConfigForm: React.FC<DataSourceNodeConfigFormProps> = ({
+export const DataSetNodeConfigForm: React.FC<DataSetNodeConfigFormProps> = ({
   config,
   setConfig,
   setIsValid,
@@ -52,12 +52,12 @@ export const DataSourceNodeConfigForm: React.FC<DataSourceNodeConfigFormProps> =
   metadata: _metadata,
   setMetadata,
 }) => {
-  const [localConfig, setLocalConfig] = useState<DataSourceNodeConfig>({
+  const [localConfig, setLocalConfig] = useState<DataSetNodeConfig>({
     ...config,
   });
-  const lastSentConfigRef = React.useRef<DataSourceNodeConfig>(localConfig);
+  const lastSentConfigRef = React.useRef<DataSetNodeConfig>(localConfig);
 
-  const { data, loading, error } = useQuery<GetAvailableDataSourcesData>(GET_AVAILABLE_DATA_SOURCES, {
+  const { data, loading, error } = useQuery<GetAvailableDataSetsData>(GET_AVAILABLE_DATA_SOURCES, {
     variables: { projectId },
     skip: !projectId,
   });
@@ -72,18 +72,18 @@ export const DataSourceNodeConfigForm: React.FC<DataSourceNodeConfigFormProps> =
 
   // Validate configuration
   useEffect(() => {
-    const isValid = !!localConfig.dataSourceId;
+    const isValid = !!localConfig.dataSetId;
     setIsValid(isValid);
-  }, [localConfig.dataSourceId, setIsValid]);
+  }, [localConfig.dataSetId, setIsValid]);
 
-  const handleDataSourceChange = (value: string | undefined) => {
+  const handleDataSetChange = (value: string | undefined) => {
     if (value) {
-      const dataSourceId = parseInt(value, 10);
-      const newSelection = data?.dataSources?.find(ds => ds.id === dataSourceId);
+      const dataSetId = parseInt(value, 10);
+      const newSelection = data?.dataSets?.find(ds => ds.id === dataSetId);
 
       setLocalConfig(prev => ({
         ...prev,
-        dataSourceId,
+        dataSetId,
       }));
 
       if (newSelection) {
@@ -95,7 +95,7 @@ export const DataSourceNodeConfigForm: React.FC<DataSourceNodeConfigFormProps> =
     } else {
       setLocalConfig(prev => ({
         ...prev,
-        dataSourceId: undefined,
+        dataSetId: undefined,
       }));
       setMetadata(prev => ({
         ...prev,
@@ -132,14 +132,14 @@ export const DataSourceNodeConfigForm: React.FC<DataSourceNodeConfigFormProps> =
     );
   }
 
-  const dataSourceOptions = data?.dataSources?.map((ds: DataSourceReference) => ({
+  const dataSourceOptions = data?.dataSets?.map((ds: DataSetReference) => ({
     value: ds.id.toString(),
     label: ds.name,
     description: ds.description || `Type: ${ds.fileFormat}/${ds.dataType}`,
   })) || [];
 
-  const selectedDataSource = data?.dataSources?.find(
-    (ds: DataSourceReference) => ds.id === localConfig.dataSourceId
+  const selectedDataSet = data?.dataSets?.find(
+    (ds: DataSetReference) => ds.id === localConfig.dataSetId
   );
 
   return (
@@ -149,8 +149,8 @@ export const DataSourceNodeConfigForm: React.FC<DataSourceNodeConfigFormProps> =
           Data Source <span className="text-red-600">*</span>
         </Label>
         <Select
-          value={localConfig.dataSourceId?.toString() || undefined}
-          onValueChange={handleDataSourceChange}
+          value={localConfig.dataSetId?.toString() || undefined}
+          onValueChange={handleDataSetChange}
         >
           <SelectTrigger id="data-source">
             <SelectValue placeholder="Select a data source" />
@@ -171,21 +171,21 @@ export const DataSourceNodeConfigForm: React.FC<DataSourceNodeConfigFormProps> =
         </p>
       </div>
 
-      {selectedDataSource && (
+      {selectedDataSet && (
         <Alert>
           <AlertTitle>Selected Data Source Details</AlertTitle>
           <AlertDescription>
             <div className="space-y-1 text-xs">
               <div>
-                <strong>Type:</strong> {selectedDataSource.fileFormat}/{selectedDataSource.dataType}
+                <strong>Type:</strong> {selectedDataSet.fileFormat}/{selectedDataSet.dataType}
               </div>
-              {selectedDataSource.description && (
+              {selectedDataSet.description && (
                 <div>
-                  <strong>Description:</strong> {selectedDataSource.description}
+                  <strong>Description:</strong> {selectedDataSet.description}
                 </div>
               )}
               <div>
-                <strong>Created:</strong> {new Date(selectedDataSource.createdAt).toLocaleDateString()}
+                <strong>Created:</strong> {new Date(selectedDataSet.createdAt).toLocaleDateString()}
               </div>
             </div>
           </AlertDescription>

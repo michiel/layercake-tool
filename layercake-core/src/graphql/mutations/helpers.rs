@@ -16,7 +16,7 @@ pub fn generate_node_id_from_ids(
     use crate::graphql::types::PlanDagNodeType;
 
     let prefix = match node_type {
-        PlanDagNodeType::DataSource => "datasource",
+        PlanDagNodeType::DataSet => "dataset",
         PlanDagNodeType::Graph => "graph",
         PlanDagNodeType::Transform => "transform",
         PlanDagNodeType::Filter => "filter",

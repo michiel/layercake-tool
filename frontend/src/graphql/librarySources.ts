@@ -7,7 +7,7 @@ import {
   getDataTypeDisplayName,
   getStatusColor,
   detectFileFormat,
-} from './datasources'
+} from './datasets'
 
 export const GET_LIBRARY_SOURCES = gql`
   query GetLibrarySources {

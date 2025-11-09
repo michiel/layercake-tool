@@ -27,11 +27,11 @@ pub enum DataType {
     GraphReference,
 }
 
-// Execution metadata for DataSource nodes
+// Execution metadata for DataSet nodes
 #[derive(SimpleObject, Clone, Debug, Serialize, Deserialize)]
-pub struct DataSourceExecutionMetadata {
-    #[graphql(name = "dataSourceId")]
-    pub data_source_id: i32,
+pub struct DataSetExecutionMetadata {
+    #[graphql(name = "dataSetId")]
+    pub data_set_id: i32,
     pub filename: String,
     pub status: String,
     #[graphql(name = "processedAt")]
@@ -68,8 +68,8 @@ pub struct NodeExecutionStatusEvent {
     pub node_id: String,
     #[graphql(name = "nodeType")]
     pub node_type: PlanDagNodeType,
-    #[graphql(name = "datasourceExecution")]
-    pub datasource_execution: Option<DataSourceExecutionMetadata>,
+    #[graphql(name = "datasetExecution")]
+    pub dataset_execution: Option<DataSetExecutionMetadata>,
     #[graphql(name = "graphExecution")]
     pub graph_execution: Option<GraphExecutionMetadata>,
     pub timestamp: String,

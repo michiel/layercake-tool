@@ -8,7 +8,7 @@ use csv::ReaderBuilder;
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 
 use crate::database::entities::common_types::{DataType, FileFormat};
-use crate::database::entities::data_sources::{self};
+use crate::database::entities::data_sets::{self};
 use crate::database::entities::{library_sources, projects};
 use crate::services::source_processing;
 
@@ -22,7 +22,7 @@ pub struct SeedLibraryResult {
     pub failed_files: Vec<String>,
 }
 
-/// Service layer for managing reusable datasource definitions stored in the library
+/// Service layer for managing reusable dataset definitions stored in the library
 #[derive(Clone)]
 pub struct LibrarySourceService {
     db: DatabaseConnection,
@@ -325,7 +325,7 @@ impl LibrarySourceService {
         &self,
         project_id: i32,
         library_source_id: i32,
-    ) -> Result<data_sources::Model> {
+    ) -> Result<data_sets::Model> {
         projects::Entity::find_by_id(project_id)
             .one(&self.db)
             .await?
@@ -336,7 +336,7 @@ impl LibrarySourceService {
             .await?
             .ok_or_else(|| anyhow!("Library source not found"))?;
 
-        let model = data_sources::ActiveModel {
+        let model = data_sets::ActiveModel {
             project_id: Set(project_id),
             name: Set(source.name.clone()),
             description: Set(source.description.clone()),
@@ -351,7 +351,7 @@ impl LibrarySourceService {
             processed_at: Set(source.processed_at),
             created_at: Set(chrono::Utc::now()),
             updated_at: Set(chrono::Utc::now()),
-            ..data_sources::ActiveModel::new()
+            ..data_sets::ActiveModel::new()
         };
 
         let inserted = model.insert(&self.db).await?;
@@ -362,7 +362,7 @@ impl LibrarySourceService {
         &self,
         project_id: i32,
         library_source_ids: &[i32],
-    ) -> Result<Vec<data_sources::Model>> {
+    ) -> Result<Vec<data_sets::Model>> {
         let mut imported = Vec::new();
         for id in library_source_ids {
             let model = self.import_into_project(project_id, *id).await?;

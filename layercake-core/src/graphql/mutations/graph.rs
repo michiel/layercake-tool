@@ -77,7 +77,7 @@ impl GraphMutation {
             border_color: Set(None),
             comment: Set(None),
             properties: Set(None),
-            datasource_id: Set(None),
+            dataset_id: Set(None),
         };
 
         let inserted_layer = layer
@@ -221,7 +221,7 @@ impl GraphMutation {
             layer: Set(layer.clone()),
             weight: Set(weight),
             attrs: Set(attrs.clone()),
-            datasource_id: Set(None),
+            dataset_id: Set(None),
             comment: Set(None),
             created_at: Set(now),
         };

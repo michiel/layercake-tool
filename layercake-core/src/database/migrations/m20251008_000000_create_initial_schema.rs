@@ -467,64 +467,64 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // Create data_sources table
+        // Create data_sets table
         manager
             .create_table(
                 Table::create()
-                    .table(DataSources::Table)
+                    .table(DataSets::Table)
                     .if_not_exists()
                     .col(
-                        ColumnDef::new(DataSources::Id)
+                        ColumnDef::new(DataSets::Id)
                             .integer()
                             .not_null()
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(DataSources::ProjectId).integer().not_null())
-                    .col(ColumnDef::new(DataSources::Name).string().not_null())
-                    .col(ColumnDef::new(DataSources::Description).string())
-                    .col(ColumnDef::new(DataSources::Filename).string().not_null())
-                    .col(ColumnDef::new(DataSources::Blob).binary().not_null())
-                    .col(ColumnDef::new(DataSources::GraphJson).text().not_null())
+                    .col(ColumnDef::new(DataSets::ProjectId).integer().not_null())
+                    .col(ColumnDef::new(DataSets::Name).string().not_null())
+                    .col(ColumnDef::new(DataSets::Description).string())
+                    .col(ColumnDef::new(DataSets::Filename).string().not_null())
+                    .col(ColumnDef::new(DataSets::Blob).binary().not_null())
+                    .col(ColumnDef::new(DataSets::GraphJson).text().not_null())
                     .col(
-                        ColumnDef::new(DataSources::Status)
+                        ColumnDef::new(DataSets::Status)
                             .string()
                             .not_null()
                             .default("processing"),
                     )
-                    .col(ColumnDef::new(DataSources::ErrorMessage).string())
+                    .col(ColumnDef::new(DataSets::ErrorMessage).string())
                     .col(
-                        ColumnDef::new(DataSources::FileSize)
+                        ColumnDef::new(DataSets::FileSize)
                             .big_integer()
                             .not_null(),
                     )
-                    .col(ColumnDef::new(DataSources::ProcessedAt).timestamp())
+                    .col(ColumnDef::new(DataSets::ProcessedAt).timestamp())
                     .col(
-                        ColumnDef::new(DataSources::FileFormat)
+                        ColumnDef::new(DataSets::FileFormat)
                             .string()
                             .not_null()
                             .default("csv"),
                     )
                     .col(
-                        ColumnDef::new(DataSources::DataType)
+                        ColumnDef::new(DataSets::DataType)
                             .string()
                             .not_null()
                             .default("nodes"),
                     )
                     .col(
-                        ColumnDef::new(DataSources::CreatedAt)
+                        ColumnDef::new(DataSets::CreatedAt)
                             .timestamp()
                             .not_null(),
                     )
                     .col(
-                        ColumnDef::new(DataSources::UpdatedAt)
+                        ColumnDef::new(DataSets::UpdatedAt)
                             .timestamp()
                             .not_null(),
                     )
                     .foreign_key(
                         ForeignKey::create()
-                            .name("fk_data_sources_project_id")
-                            .from(DataSources::Table, DataSources::ProjectId)
+                            .name("fk_data_sets_project_id")
+                            .from(DataSets::Table, DataSets::ProjectId)
                             .to(Projects::Table, Projects::Id)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
@@ -532,56 +532,56 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // Create datasources table (for DAG DataSourceNode entities)
+        // Create datasets table (for DAG DataSetNode entities)
         manager
             .create_table(
                 Table::create()
-                    .table(Datasources::Table)
+                    .table(DatasetNodes::Table)
                     .if_not_exists()
                     .col(
-                        ColumnDef::new(Datasources::Id)
+                        ColumnDef::new(DatasetNodes::Id)
                             .integer()
                             .not_null()
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(Datasources::ProjectId).integer().not_null())
-                    .col(ColumnDef::new(Datasources::NodeId).string().not_null())
-                    .col(ColumnDef::new(Datasources::Name).string().not_null())
-                    .col(ColumnDef::new(Datasources::FilePath).string().not_null())
-                    .col(ColumnDef::new(Datasources::FileType).string().not_null()) // 'nodes' or 'edges'
-                    .col(ColumnDef::new(Datasources::ImportDate).timestamp())
-                    .col(ColumnDef::new(Datasources::RowCount).integer())
-                    .col(ColumnDef::new(Datasources::ColumnInfo).json_binary()) // Schema: [{name, type, nullable}, ...]
+                    .col(ColumnDef::new(DatasetNodes::ProjectId).integer().not_null())
+                    .col(ColumnDef::new(DatasetNodes::NodeId).string().not_null())
+                    .col(ColumnDef::new(DatasetNodes::Name).string().not_null())
+                    .col(ColumnDef::new(DatasetNodes::FilePath).string().not_null())
+                    .col(ColumnDef::new(DatasetNodes::FileType).string().not_null()) // 'nodes' or 'edges'
+                    .col(ColumnDef::new(DatasetNodes::ImportDate).timestamp())
+                    .col(ColumnDef::new(DatasetNodes::RowCount).integer())
+                    .col(ColumnDef::new(DatasetNodes::ColumnInfo).json_binary()) // Schema: [{name, type, nullable}, ...]
                     .col(
-                        ColumnDef::new(Datasources::ExecutionState)
+                        ColumnDef::new(DatasetNodes::ExecutionState)
                             .string()
                             .not_null()
                             .default("not_started"),
                     )
-                    .col(ColumnDef::new(Datasources::ErrorMessage).text())
-                    .col(ColumnDef::new(Datasources::Metadata).json_binary())
+                    .col(ColumnDef::new(DatasetNodes::ErrorMessage).text())
+                    .col(ColumnDef::new(DatasetNodes::Metadata).json_binary())
                     .col(
-                        ColumnDef::new(Datasources::CreatedAt)
+                        ColumnDef::new(DatasetNodes::CreatedAt)
                             .timestamp()
                             .not_null(),
                     )
                     .col(
-                        ColumnDef::new(Datasources::UpdatedAt)
+                        ColumnDef::new(DatasetNodes::UpdatedAt)
                             .timestamp()
                             .not_null(),
                     )
                     .foreign_key(
                         ForeignKey::create()
-                            .name("fk_datasources_project_id")
-                            .from(Datasources::Table, Datasources::ProjectId)
+                            .name("fk_datasets_project_id")
+                            .from(DatasetNodes::Table, DatasetNodes::ProjectId)
                             .to(Projects::Table, Projects::Id)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
                         ForeignKey::create()
-                            .name("fk_datasources_node_id")
-                            .from(Datasources::Table, Datasources::NodeId)
+                            .name("fk_datasets_node_id")
+                            .from(DatasetNodes::Table, DatasetNodes::NodeId)
                             .to(PlanDagNodes::Table, PlanDagNodes::Id)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
@@ -589,7 +589,7 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // Create datasource_rows table
+        // Create dataset_rows table
         manager
             .create_table(
                 Table::create()
@@ -624,9 +624,9 @@ impl MigrationTrait for Migration {
                     )
                     .foreign_key(
                         ForeignKey::create()
-                            .name("fk_datasource_rows_datasource_id")
+                            .name("fk_dataset_rows_dataset_id")
                             .from(DatasourceRows::Table, DatasourceRows::DatasourceId)
-                            .to(Datasources::Table, Datasources::Id)
+                            .to(DatasetNodes::Table, DatasetNodes::Id)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
                     .to_owned(),
@@ -808,10 +808,10 @@ impl MigrationTrait for Migration {
             .drop_table(Table::drop().table(DatasourceRows::Table).to_owned())
             .await?;
         manager
-            .drop_table(Table::drop().table(Datasources::Table).to_owned())
+            .drop_table(Table::drop().table(DatasetNodes::Table).to_owned())
             .await?;
         manager
-            .drop_table(Table::drop().table(DataSources::Table).to_owned())
+            .drop_table(Table::drop().table(DataSets::Table).to_owned())
             .await?;
         manager
             .drop_table(Table::drop().table(UserPresence::Table).to_owned())
@@ -965,7 +965,7 @@ enum UserPresence {
 }
 
 #[derive(Iden)]
-enum DataSources {
+enum DataSets {
     Table,
     Id,
     ProjectId,
@@ -985,7 +985,7 @@ enum DataSources {
 }
 
 #[derive(Iden)]
-enum Datasources {
+enum DatasetNodes {
     Table,
     Id,
     ProjectId,

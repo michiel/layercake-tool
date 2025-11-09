@@ -1,20 +1,20 @@
 //! Data source management tools for MCP backed by the shared AppContext.
 
 use crate::app_context::{
-    AppContext, DataSourceEmptyCreateRequest, DataSourceExportFormat, DataSourceExportRequest,
-    DataSourceFileCreateRequest, DataSourceFileReplacement, DataSourceImportFormat,
-    DataSourceImportRequest, DataSourceUpdateRequest,
+    AppContext, DataSetEmptyCreateRequest, DataSetExportFormat, DataSetExportRequest,
+    DataSetFileCreateRequest, DataSetFileReplacement, DataSetImportFormat,
+    DataSetImportRequest, DataSetUpdateRequest,
 };
-use crate::database::entities::common_types::{DataType as DataSourceDataType, FileFormat};
+use crate::database::entities::common_types::{DataType as DataSetDataType, FileFormat};
 use crate::mcp::tools::{create_success_response, get_required_param};
 use axum_mcp::prelude::*;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 
-pub fn get_data_source_tools() -> Vec<Tool> {
+pub fn get_data_set_tools() -> Vec<Tool> {
     vec![
         Tool {
-            name: "list_data_sources".to_string(),
+            name: "list_data_sets".to_string(),
             description: "List all data sources for a project".to_string(),
             input_schema: json!({
                 "type": "object",
@@ -27,20 +27,20 @@ pub fn get_data_source_tools() -> Vec<Tool> {
             metadata: HashMap::new(),
         },
         Tool {
-            name: "get_data_source".to_string(),
+            name: "get_data_set".to_string(),
             description: "Fetch a single data source by ID".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
-                    "data_source_id": { "type": "integer" }
+                    "data_set_id": { "type": "integer" }
                 },
-                "required": ["data_source_id"],
+                "required": ["data_set_id"],
                 "additionalProperties": false
             }),
             metadata: HashMap::new(),
         },
         Tool {
-            name: "create_data_source_from_file".to_string(),
+            name: "create_data_set_from_file".to_string(),
             description: "Create a data source from base64-encoded file content".to_string(),
             input_schema: json!({
                 "type": "object",
@@ -59,7 +59,7 @@ pub fn get_data_source_tools() -> Vec<Tool> {
             metadata: HashMap::new(),
         },
         Tool {
-            name: "create_empty_data_source".to_string(),
+            name: "create_empty_data_set".to_string(),
             description: "Create an empty data source without file content".to_string(),
             input_schema: json!({
                 "type": "object",
@@ -75,12 +75,12 @@ pub fn get_data_source_tools() -> Vec<Tool> {
             metadata: HashMap::new(),
         },
         Tool {
-            name: "update_data_source".to_string(),
+            name: "update_data_set".to_string(),
             description: "Update data source metadata and optionally replace its file".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
-                    "data_source_id": { "type": "integer" },
+                    "data_set_id": { "type": "integer" },
                     "name": { "type": "string" },
                     "description": { "type": "string" },
                     "file": {
@@ -93,57 +93,57 @@ pub fn get_data_source_tools() -> Vec<Tool> {
                         "additionalProperties": false
                     }
                 },
-                "required": ["data_source_id"],
+                "required": ["data_set_id"],
                 "additionalProperties": false
             }),
             metadata: HashMap::new(),
         },
         Tool {
-            name: "delete_data_source".to_string(),
+            name: "delete_data_set".to_string(),
             description: "Delete a data source and related DAG nodes".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
-                    "data_source_id": { "type": "integer" }
+                    "data_set_id": { "type": "integer" }
                 },
-                "required": ["data_source_id"],
+                "required": ["data_set_id"],
                 "additionalProperties": false
             }),
             metadata: HashMap::new(),
         },
         Tool {
-            name: "reprocess_data_source".to_string(),
+            name: "reprocess_data_set".to_string(),
             description: "Reprocess an existing data source file".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
-                    "data_source_id": { "type": "integer" }
+                    "data_set_id": { "type": "integer" }
                 },
-                "required": ["data_source_id"],
+                "required": ["data_set_id"],
                 "additionalProperties": false
             }),
             metadata: HashMap::new(),
         },
         Tool {
-            name: "export_data_sources".to_string(),
+            name: "export_data_sets".to_string(),
             description: "Export data sources to XLSX or ODS".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
                     "project_id": { "type": "integer" },
-                    "data_source_ids": {
+                    "data_set_ids": {
                         "type": "array",
                         "items": { "type": "integer" }
                     },
                     "format": { "type": "string", "enum": ["xlsx", "ods"] }
                 },
-                "required": ["project_id", "data_source_ids", "format"],
+                "required": ["project_id", "data_set_ids", "format"],
                 "additionalProperties": false
             }),
             metadata: HashMap::new(),
         },
         Tool {
-            name: "import_data_sources".to_string(),
+            name: "import_data_sets".to_string(),
             description: "Import data sources from XLSX or ODS content".to_string(),
             input_schema: json!({
                 "type": "object",
@@ -174,12 +174,12 @@ fn parse_file_format(value: &str) -> McpResult<FileFormat> {
     }
 }
 
-fn parse_data_type(value: &str) -> McpResult<DataSourceDataType> {
+fn parse_data_type(value: &str) -> McpResult<DataSetDataType> {
     match value.to_lowercase().as_str() {
-        "nodes" => Ok(DataSourceDataType::Nodes),
-        "edges" => Ok(DataSourceDataType::Edges),
-        "layers" => Ok(DataSourceDataType::Layers),
-        "graph" => Ok(DataSourceDataType::Graph),
+        "nodes" => Ok(DataSetDataType::Nodes),
+        "edges" => Ok(DataSetDataType::Edges),
+        "layers" => Ok(DataSetDataType::Layers),
+        "graph" => Ok(DataSetDataType::Graph),
         other => Err(McpError::Validation {
             message: format!(
                 "Unsupported data_type '{}'. Use nodes, edges, layers, or graph.",
@@ -189,7 +189,7 @@ fn parse_data_type(value: &str) -> McpResult<DataSourceDataType> {
     }
 }
 
-pub async fn list_data_sources(
+pub async fn list_data_sets(
     arguments: Option<Value>,
     app: &AppContext,
 ) -> McpResult<ToolsCallResult> {
@@ -199,8 +199,8 @@ pub async fn list_data_sources(
             message: "project_id must be an integer".to_string(),
         })? as i32;
 
-    let data_sources = app
-        .list_data_sources(project_id)
+    let data_sets = app
+        .list_data_sets(project_id)
         .await
         .map_err(|e| McpError::Internal {
             message: format!("Failed to list data sources: {}", e),
@@ -208,36 +208,36 @@ pub async fn list_data_sources(
 
     create_success_response(&json!({
         "projectId": project_id,
-        "count": data_sources.len(),
-        "dataSources": data_sources
+        "count": data_sets.len(),
+        "dataSets": data_sets
     }))
 }
 
-pub async fn get_data_source(
+pub async fn get_data_set(
     arguments: Option<Value>,
     app: &AppContext,
 ) -> McpResult<ToolsCallResult> {
-    let data_source_id = get_required_param(&arguments, "data_source_id")?
+    let data_set_id = get_required_param(&arguments, "data_set_id")?
         .as_i64()
         .ok_or_else(|| McpError::Validation {
-            message: "data_source_id must be an integer".to_string(),
+            message: "data_set_id must be an integer".to_string(),
         })? as i32;
 
-    let data_source = app
-        .get_data_source(data_source_id)
+    let data_set = app
+        .get_data_set(data_set_id)
         .await
         .map_err(|e| McpError::Internal {
             message: format!("Failed to load data source: {}", e),
         })?
         .ok_or_else(|| McpError::ToolExecution {
-            tool: "get_data_source".to_string(),
-            message: format!("Data source {} not found", data_source_id),
+            tool: "get_data_set".to_string(),
+            message: format!("Data source {} not found", data_set_id),
         })?;
 
-    create_success_response(&json!({ "dataSource": data_source }))
+    create_success_response(&json!({ "dataSet": data_set }))
 }
 
-pub async fn create_data_source_from_file(
+pub async fn create_data_set_from_file(
     arguments: Option<Value>,
     app: &AppContext,
 ) -> McpResult<ToolsCallResult> {
@@ -290,7 +290,7 @@ pub async fn create_data_source_from_file(
         })?;
 
     let summary = app
-        .create_data_source_from_file(DataSourceFileCreateRequest {
+        .create_data_set_from_file(DataSetFileCreateRequest {
             project_id,
             name,
             description,
@@ -305,12 +305,12 @@ pub async fn create_data_source_from_file(
         })?;
 
     create_success_response(&json!({
-        "dataSource": summary,
+        "dataSet": summary,
         "message": "Data source created successfully"
     }))
 }
 
-pub async fn create_empty_data_source(
+pub async fn create_empty_data_set(
     arguments: Option<Value>,
     app: &AppContext,
 ) -> McpResult<ToolsCallResult> {
@@ -338,7 +338,7 @@ pub async fn create_empty_data_source(
     let data_type = parse_data_type(args.get("data_type").and_then(|v| v.as_str()).unwrap_or(""))?;
 
     let summary = app
-        .create_empty_data_source(DataSourceEmptyCreateRequest {
+        .create_empty_data_set(DataSetEmptyCreateRequest {
             project_id,
             name,
             description,
@@ -350,12 +350,12 @@ pub async fn create_empty_data_source(
         })?;
 
     create_success_response(&json!({
-        "dataSource": summary,
+        "dataSet": summary,
         "message": "Empty data source created successfully"
     }))
 }
 
-pub async fn update_data_source(
+pub async fn update_data_set(
     arguments: Option<Value>,
     app: &AppContext,
 ) -> McpResult<ToolsCallResult> {
@@ -363,11 +363,11 @@ pub async fn update_data_source(
         message: "Arguments are required".to_string(),
     })?;
 
-    let data_source_id = args
-        .get("data_source_id")
+    let data_set_id = args
+        .get("data_set_id")
         .and_then(|v| v.as_i64())
         .ok_or_else(|| McpError::Validation {
-            message: "data_source_id must be an integer".to_string(),
+            message: "data_set_id must be an integer".to_string(),
         })? as i32;
 
     let name = args
@@ -405,7 +405,7 @@ pub async fn update_data_source(
                 message: format!("file.file_content must be valid base64: {}", e),
             })?;
 
-        Some(DataSourceFileReplacement {
+        Some(DataSetFileReplacement {
             filename: filename.to_string(),
             file_bytes: bytes,
         })
@@ -414,8 +414,8 @@ pub async fn update_data_source(
     };
 
     let summary = app
-        .update_data_source(DataSourceUpdateRequest {
-            id: data_source_id,
+        .update_data_set(DataSetUpdateRequest {
+            id: data_set_id,
             name,
             description,
             new_file,
@@ -426,57 +426,57 @@ pub async fn update_data_source(
         })?;
 
     create_success_response(&json!({
-        "dataSource": summary,
+        "dataSet": summary,
         "message": "Data source updated successfully"
     }))
 }
 
-pub async fn delete_data_source(
+pub async fn delete_data_set(
     arguments: Option<Value>,
     app: &AppContext,
 ) -> McpResult<ToolsCallResult> {
-    let data_source_id = get_required_param(&arguments, "data_source_id")?
+    let data_set_id = get_required_param(&arguments, "data_set_id")?
         .as_i64()
         .ok_or_else(|| McpError::Validation {
-            message: "data_source_id must be an integer".to_string(),
+            message: "data_set_id must be an integer".to_string(),
         })? as i32;
 
-    app.delete_data_source(data_source_id)
+    app.delete_data_set(data_set_id)
         .await
         .map_err(|e| McpError::Internal {
             message: format!("Failed to delete data source: {}", e),
         })?;
 
     create_success_response(&json!({
-        "dataSourceId": data_source_id,
+        "dataSetId": data_set_id,
         "message": "Data source deleted successfully"
     }))
 }
 
-pub async fn reprocess_data_source(
+pub async fn reprocess_data_set(
     arguments: Option<Value>,
     app: &AppContext,
 ) -> McpResult<ToolsCallResult> {
-    let data_source_id = get_required_param(&arguments, "data_source_id")?
+    let data_set_id = get_required_param(&arguments, "data_set_id")?
         .as_i64()
         .ok_or_else(|| McpError::Validation {
-            message: "data_source_id must be an integer".to_string(),
+            message: "data_set_id must be an integer".to_string(),
         })? as i32;
 
     let summary = app
-        .reprocess_data_source(data_source_id)
+        .reprocess_data_set(data_set_id)
         .await
         .map_err(|e| McpError::Internal {
             message: format!("Failed to reprocess data source: {}", e),
         })?;
 
     create_success_response(&json!({
-        "dataSource": summary,
+        "dataSet": summary,
         "message": "Data source reprocessed successfully"
     }))
 }
 
-pub async fn export_data_sources(
+pub async fn export_data_sets(
     arguments: Option<Value>,
     app: &AppContext,
 ) -> McpResult<ToolsCallResult> {
@@ -491,15 +491,15 @@ pub async fn export_data_sources(
             message: "project_id must be an integer".to_string(),
         })? as i32;
     let ids = args
-        .get("data_source_ids")
+        .get("data_set_ids")
         .and_then(|v| v.as_array())
         .ok_or_else(|| McpError::Validation {
-            message: "data_source_ids must be an array of integers".to_string(),
+            message: "data_set_ids must be an array of integers".to_string(),
         })?
         .iter()
         .map(|value| {
             value.as_i64().ok_or_else(|| McpError::Validation {
-                message: "data_source_ids must contain integers".to_string(),
+                message: "data_set_ids must contain integers".to_string(),
             })
         })
         .collect::<Result<Vec<_>, McpError>>()?
@@ -515,8 +515,8 @@ pub async fn export_data_sources(
             })?;
 
     let format = match format.to_lowercase().as_str() {
-        "xlsx" => DataSourceExportFormat::Xlsx,
-        "ods" => DataSourceExportFormat::Ods,
+        "xlsx" => DataSetExportFormat::Xlsx,
+        "ods" => DataSetExportFormat::Ods,
         other => {
             return Err(McpError::Validation {
                 message: format!("Unsupported export format '{}'", other),
@@ -525,9 +525,9 @@ pub async fn export_data_sources(
     };
 
     let exported = app
-        .export_data_sources(DataSourceExportRequest {
+        .export_data_sets(DataSetExportRequest {
             project_id,
-            data_source_ids: ids,
+            data_set_ids: ids,
             format,
         })
         .await
@@ -546,7 +546,7 @@ pub async fn export_data_sources(
     }))
 }
 
-pub async fn import_data_sources(
+pub async fn import_data_sets(
     arguments: Option<Value>,
     app: &AppContext,
 ) -> McpResult<ToolsCallResult> {
@@ -581,12 +581,12 @@ pub async fn import_data_sources(
         })?;
 
     let format =
-        DataSourceImportFormat::from_filename(filename).ok_or_else(|| McpError::Validation {
+        DataSetImportFormat::from_filename(filename).ok_or_else(|| McpError::Validation {
             message: "Only .xlsx and .ods filenames are supported for import".to_string(),
         })?;
 
     let outcome = app
-        .import_data_sources(DataSourceImportRequest {
+        .import_data_sets(DataSetImportRequest {
             project_id,
             format,
             file_bytes,
@@ -598,7 +598,7 @@ pub async fn import_data_sources(
 
     create_success_response(&json!({
         "projectId": project_id,
-        "dataSources": outcome.data_sources,
+        "dataSets": outcome.data_sets,
         "createdCount": outcome.created_count,
         "updatedCount": outcome.updated_count
     }))

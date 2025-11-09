@@ -56,7 +56,7 @@ const BASE_FIELDS: EntityField[] = [
     operators: BOOLEAN_OPERATORS,
   },
   {
-    name: 'node.datasource_id',
+    name: 'node.dataset_id',
     label: 'Node Datasource ID',
     entity: 'nodes',
     inputType: 'number',
@@ -78,7 +78,7 @@ const BASE_FIELDS: EntityField[] = [
     operators: NUMBER_OPERATORS,
   },
   {
-    name: 'edge.datasource_id',
+    name: 'edge.dataset_id',
     label: 'Edge Datasource ID',
     entity: 'edges',
     inputType: 'number',

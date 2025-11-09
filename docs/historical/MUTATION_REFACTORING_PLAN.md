@@ -353,7 +353,7 @@ impl {Domain}Mutations {
 - `export` - Export data sources
 
 **Lines**: ~400 lines
-**Dependencies**: `data_sources`, `DataSourceService`, `DataSourceBulkService`
+**Dependencies**: `data_sources`, `DataSetService`, `DataSetBulkService`
 
 ### 7. Graph Mutations (mutations/graph.rs)
 - `create` - Create graph

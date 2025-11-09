@@ -13,8 +13,7 @@ pub struct Model {
     pub text_color: Option<String>,
     pub border_color: Option<String>,
     pub comment: Option<String>,
-    #[sea_orm(column_name = "data_source_id")]
-    pub datasource_id: Option<i32>,
+    pub dataset_id: Option<i32>,
     pub properties: Option<String>, // JSON
 }
 

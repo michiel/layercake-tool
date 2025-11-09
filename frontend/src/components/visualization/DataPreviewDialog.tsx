@@ -5,12 +5,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { DataPreview } from './DataPreview';
-import { DataSourcePreview } from '../../graphql/preview';
+import { DataSetPreview } from '../../graphql/preview';
 
 interface DataPreviewDialogProps {
   opened: boolean;
   onClose: () => void;
-  preview: DataSourcePreview | null;
+  preview: DataSetPreview | null;
   loading?: boolean;
   error?: Error | null;
   title?: string;

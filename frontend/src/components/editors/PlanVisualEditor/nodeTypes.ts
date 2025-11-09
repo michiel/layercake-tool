@@ -1,4 +1,4 @@
-import { DataSourceNode } from './nodes/DataSourceNode'
+import { DataSetNode } from './nodes/DataSetNode'
 import { GraphNode } from './nodes/GraphNode'
 import { TransformNode } from './nodes/TransformNode'
 import { FilterNode } from './nodes/FilterNode'
@@ -10,7 +10,7 @@ import { OutputNode } from './nodes/OutputNode'
  * Defined in separate file to prevent recreation during hot module replacement
  */
 export const NODE_TYPES = {
-  DataSourceNode: DataSourceNode,
+  DataSetNode: DataSetNode,
   GraphNode: GraphNode,
   TransformNode: TransformNode,
   FilterNode: FilterNode,

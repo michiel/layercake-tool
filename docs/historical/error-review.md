@@ -223,8 +223,8 @@ let project = projects::Entity::find_by_id(id)
 **Current code** (30+ instances):
 ```rust
 // mutations/mod.rs:1484, 1852, 2148, etc.
-.map_err(|e| Error::new(format!("Failed to create DataSource: {}", e)))?
-.map_err(|e| Error::new(format!("Failed to delete DataSource: {}", e)))?
+.map_err(|e| Error::new(format!("Failed to create DataSet: {}", e)))?
+.map_err(|e| Error::new(format!("Failed to delete DataSet: {}", e)))?
 .map_err(|e| Error::new(format!("Failed to create Graph: {}", e)))?
 ```
 
@@ -235,8 +235,8 @@ let project = projects::Entity::find_by_id(id)
 
 **Should be**:
 ```rust
-.map_err(|e| StructuredError::service("DataSourceService", e))?
-.map_err(|e| StructuredError::service("DataSourceService", e))?
+.map_err(|e| StructuredError::service("DataSetService", e))?
+.map_err(|e| StructuredError::service("DataSetService", e))?
 .map_err(|e| StructuredError::service("GraphService", e))?
 ```
 
@@ -275,7 +275,7 @@ These messages appear repeatedly and should be standardized:
 | "Plan not found" | 4 | `StructuredError::not_found("Plan", id)` |
 | "Collaboration not found" | 4 | `StructuredError::not_found("Collaboration", id)` |
 | "Node not found" | 3 | `StructuredError::not_found("Node", id)` |
-| "DataSource not found" | 3 | `StructuredError::not_found("DataSource", id)` |
+| "DataSet not found" | 3 | `StructuredError::not_found("DataSet", id)` |
 | "Invalid role" | 2 | `StructuredError::validation("role", ...)` |
 | "Invalid email or password" | 2 | `StructuredError::unauthorized(...)` |
 | "Failed to decode base64" | 4 | `StructuredError::bad_request(...)` |
@@ -814,7 +814,7 @@ let project = projects::Entity::find_by_id(id)
 
 // Service errors
 .map_err(|e| StructuredError::service_msg(
-    &service_error_msg("DataSourceService", e)
+    &service_error_msg("DataSetService", e)
 ))?
 
 // Validation errors
@@ -1128,12 +1128,12 @@ let project = projects::Entity::find_by_id(id)
 
 **Before**:
 ```rust
-.map_err(|e| Error::new(format!("Failed to create DataSource: {}", e)))?
+.map_err(|e| Error::new(format!("Failed to create DataSet: {}", e)))?
 ```
 
 **After**:
 ```rust
-.map_err(|e| StructuredError::service("DataSourceService", e))?
+.map_err(|e| StructuredError::service("DataSetService", e))?
 ```
 
 ---

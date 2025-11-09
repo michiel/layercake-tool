@@ -31,7 +31,7 @@ impl LayercakeResourceRegistry {
             "graph".to_string(),
             "export".to_string(),
             "analysis".to_string(),
-            "datasource".to_string(),
+            "dataset".to_string(),
         ]);
 
         Self { scheme_config, app }
@@ -67,43 +67,43 @@ impl LayercakeResourceRegistry {
             },
         })
     }
-    async fn get_data_source_resource(&self, data_source_id: i32) -> McpResult<Resource> {
-        let data_source = self
+    async fn get_data_set_resource(&self, data_set_id: i32) -> McpResult<Resource> {
+        let data_set = self
             .app
-            .get_data_source(data_source_id)
+            .get_data_set(data_set_id)
             .await
             .map_err(|e| McpError::Internal {
                 message: format!("Failed to load data source: {}", e),
             })?
             .ok_or_else(|| McpError::ResourceNotFound {
-                uri: format!("layercake://datasources/{}", data_source_id),
+                uri: format!("layercake://datasets/{}", data_set_id),
             })?;
 
         let content =
-            serde_json::to_string_pretty(&data_source).map_err(|e| McpError::Internal {
+            serde_json::to_string_pretty(&data_set).map_err(|e| McpError::Internal {
                 message: format!("Failed to serialize data source: {}", e),
             })?;
 
         Ok(Resource {
-            uri: format!("layercake://datasources/{}", data_source_id),
-            name: format!("Data Source {}", data_source_id),
+            uri: format!("layercake://datasets/{}", data_set_id),
+            name: format!("Data Source {}", data_set_id),
             description: Some("Layercake data source metadata".to_string()),
             mime_type: Some("application/json".to_string()),
             content: ResourceContent::Text { text: content },
             metadata: {
                 let mut meta = HashMap::new();
-                meta.insert("data_source_id".to_string(), json!(data_source_id));
-                meta.insert("project_id".to_string(), json!(data_source.project_id));
-                meta.insert("resource_type".to_string(), json!("datasource"));
+                meta.insert("data_set_id".to_string(), json!(data_set_id));
+                meta.insert("project_id".to_string(), json!(data_set.project_id));
+                meta.insert("resource_type".to_string(), json!("dataset"));
                 meta
             },
         })
     }
 
-    async fn get_project_data_sources_resource(&self, project_id: i32) -> McpResult<Resource> {
-        let data_sources =
+    async fn get_project_data_sets_resource(&self, project_id: i32) -> McpResult<Resource> {
+        let data_sets =
             self.app
-                .list_data_sources(project_id)
+                .list_data_sets(project_id)
                 .await
                 .map_err(|e| McpError::Internal {
                     message: format!("Failed to list data sources: {}", e),
@@ -111,15 +111,15 @@ impl LayercakeResourceRegistry {
 
         let content = serde_json::to_string_pretty(&json!({
             "projectId": project_id,
-            "count": data_sources.len(),
-            "dataSources": data_sources,
+            "count": data_sets.len(),
+            "dataSets": data_sets,
         }))
         .map_err(|e| McpError::Internal {
             message: format!("Failed to serialize data source list: {}", e),
         })?;
 
         Ok(Resource {
-            uri: format!("layercake://projects/{}/datasources", project_id),
+            uri: format!("layercake://projects/{}/datasets", project_id),
             name: format!("Project {} Data Sources", project_id),
             description: Some("List of data sources for the project".to_string()),
             mime_type: Some("application/json".to_string()),
@@ -127,7 +127,7 @@ impl LayercakeResourceRegistry {
             metadata: {
                 let mut meta = HashMap::new();
                 meta.insert("project_id".to_string(), json!(project_id));
-                meta.insert("resource_type".to_string(), json!("datasource"));
+                meta.insert("resource_type".to_string(), json!("dataset"));
                 meta
             },
         })
@@ -295,24 +295,24 @@ impl ResourceRegistry for LayercakeResourceRegistry {
                 },
             },
             ResourceTemplate {
-                uri_template: "layercake://datasources/{data_source_id}".to_string(),
+                uri_template: "layercake://datasets/{data_set_id}".to_string(),
                 name: "Data Source Summary".to_string(),
                 description: Some("Layercake data source metadata".to_string()),
                 mime_type: Some("application/json".to_string()),
                 metadata: {
                     let mut meta = HashMap::new();
-                    meta.insert("category".to_string(), json!("datasources"));
+                    meta.insert("category".to_string(), json!("datasets"));
                     meta
                 },
             },
             ResourceTemplate {
-                uri_template: "layercake://projects/{project_id}/datasources".to_string(),
+                uri_template: "layercake://projects/{project_id}/datasets".to_string(),
                 name: "Project Data Sources".to_string(),
                 description: Some("List of data sources for a specific project".to_string()),
                 mime_type: Some("application/json".to_string()),
                 metadata: {
                     let mut meta = HashMap::new();
-                    meta.insert("category".to_string(), json!("datasources"));
+                    meta.insert("category".to_string(), json!("datasets"));
                     meta.insert("relationship".to_string(), json!("project"));
                     meta
                 },
@@ -349,17 +349,17 @@ impl ResourceRegistry for LayercakeResourceRegistry {
                 })?;
                 self.get_plan_resource(plan_id).await
             }
-            ["datasources", id] => {
-                let data_source_id = id.parse::<i32>().map_err(|_| McpError::Validation {
+            ["datasets", id] => {
+                let data_set_id = id.parse::<i32>().map_err(|_| McpError::Validation {
                     message: "Invalid data source ID".to_string(),
                 })?;
-                self.get_data_source_resource(data_source_id).await
+                self.get_data_set_resource(data_set_id).await
             }
-            ["projects", id, "datasources"] => {
+            ["projects", id, "datasets"] => {
                 let project_id = id.parse::<i32>().map_err(|_| McpError::Validation {
                     message: "Invalid project ID".to_string(),
                 })?;
-                self.get_project_data_sources_resource(project_id).await
+                self.get_project_data_sets_resource(project_id).await
             }
             ["analysis", id, analysis_type] => {
                 let project_id = id.parse::<i32>().map_err(|_| McpError::Validation {

@@ -431,8 +431,8 @@ mod query_filter_executor {
                     sql: "graph_nodes.is_partition",
                     value_type: ColumnValueType::Boolean,
                 }),
-                "datasource_id" => Some(ColumnSelector::Column {
-                    sql: "graph_nodes.data_source_id",
+                "dataset_id" => Some(ColumnSelector::Column {
+                    sql: "graph_nodes.data_set_id",
                     value_type: ColumnValueType::Number,
                 }),
                 "comment" => Some(ColumnSelector::Column {
@@ -474,8 +474,8 @@ mod query_filter_executor {
                     sql: "graph_edges.weight",
                     value_type: ColumnValueType::Number,
                 }),
-                "datasource_id" => Some(ColumnSelector::Column {
-                    sql: "graph_edges.data_source_id",
+                "dataset_id" => Some(ColumnSelector::Column {
+                    sql: "graph_edges.data_set_id",
                     value_type: ColumnValueType::Number,
                 }),
                 _ if field.starts_with("attrs.") => {
@@ -509,8 +509,8 @@ mod query_filter_executor {
                     sql: "graph_layers.border_color",
                     value_type: ColumnValueType::Text,
                 }),
-                "datasource_id" => Some(ColumnSelector::Column {
-                    sql: "graph_layers.data_source_id",
+                "dataset_id" => Some(ColumnSelector::Column {
+                    sql: "graph_layers.data_set_id",
                     value_type: ColumnValueType::Number,
                 }),
                 _ if field.starts_with("properties.") => {

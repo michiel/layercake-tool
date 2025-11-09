@@ -10,29 +10,29 @@ import { Spinner } from '@/components/ui/spinner';
 import { Stack } from '@/components/layout-primitives';
 import { IconAlertCircle } from '@tabler/icons-react';
 import { useQuery, useMutation } from '@apollo/client/react';
-import { GET_DATASOURCE, DataSource, UPDATE_DATASOURCE_GRAPH_DATA } from '../../../../graphql/datasources';
+import { GET_DATASOURCE, DataSet, UPDATE_DATASOURCE_GRAPH_DATA } from '../../../../graphql/datasets';
 import { GraphSpreadsheetEditor, GraphData } from '../../../editors/GraphSpreadsheetEditor/GraphSpreadsheetEditor';
 
-interface DataSourceDataDialogProps {
+interface DataSetDataDialogProps {
   opened: boolean;
   onClose: () => void;
-  dataSourceId: number | null;
+  dataSetId: number | null;
   title?: string;
 }
 
-export const DataSourceDataDialog: React.FC<DataSourceDataDialogProps> = ({
+export const DataSetDataDialog: React.FC<DataSetDataDialogProps> = ({
   opened,
   onClose,
-  dataSourceId,
+  dataSetId,
   title = 'Data Source Data'
 }) => {
-  const { data, loading, error, refetch } = useQuery<{ dataSource: DataSource }>(GET_DATASOURCE, {
-    variables: { id: dataSourceId },
-    skip: !opened || !dataSourceId,
+  const { data, loading, error, refetch } = useQuery<{ dataSource: DataSet }>(GET_DATASOURCE, {
+    variables: { id: dataSetId },
+    skip: !opened || !dataSetId,
     fetchPolicy: 'network-only'
   });
 
-  const [updateDataSourceGraphData] = useMutation(UPDATE_DATASOURCE_GRAPH_DATA);
+  const [updateDataSetGraphData] = useMutation(UPDATE_DATASOURCE_GRAPH_DATA);
 
   const getGraphData = (): GraphData | null => {
     if (!data?.dataSource) return null;
@@ -73,7 +73,7 @@ export const DataSourceDataDialog: React.FC<DataSourceDataDialogProps> = ({
   };
 
   const handleSave = async (graphData: GraphData) => {
-    if (!dataSourceId) return;
+    if (!dataSetId) return;
 
     try {
       // Convert GraphData back to the format expected by the backend
@@ -83,9 +83,9 @@ export const DataSourceDataDialog: React.FC<DataSourceDataDialogProps> = ({
         layers: graphData.layers
       });
 
-      await updateDataSourceGraphData({
+      await updateDataSetGraphData({
         variables: {
-          id: dataSourceId,
+          id: dataSetId,
           graphJson
         }
       });
@@ -95,7 +95,7 @@ export const DataSourceDataDialog: React.FC<DataSourceDataDialogProps> = ({
 
       console.log('Datasource data saved successfully');
     } catch (error) {
-      console.error('Failed to save datasource data:', error);
+      console.error('Failed to save dataset data:', error);
       throw error;
     }
   };
@@ -111,7 +111,7 @@ export const DataSourceDataDialog: React.FC<DataSourceDataDialogProps> = ({
             {loading && (
               <Stack align="center" className="py-12">
                 <Spinner size="lg" />
-                <p className="text-sm text-muted-foreground">Loading datasource data...</p>
+                <p className="text-sm text-muted-foreground">Loading dataset data...</p>
               </Stack>
             )}
 
@@ -130,7 +130,7 @@ export const DataSourceDataDialog: React.FC<DataSourceDataDialogProps> = ({
                   <Alert variant="destructive">
                     <IconAlertCircle className="h-4 w-4" />
                     <AlertTitle>Invalid Data</AlertTitle>
-                    <AlertDescription>Failed to parse datasource graph JSON data</AlertDescription>
+                    <AlertDescription>Failed to parse dataset graph JSON data</AlertDescription>
                   </Alert>
                 );
               }

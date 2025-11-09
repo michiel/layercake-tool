@@ -2,15 +2,15 @@ use async_graphql::*;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::app_context::DataSourceSummary;
-use crate::database::entities::data_sources;
+use crate::app_context::DataSetSummary;
+use crate::database::entities::data_sets;
 
 // Data Source Node Configuration
 #[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
-#[graphql(input_name = "DataSourceNodeConfigInput")]
-pub struct DataSourceNodeConfig {
-    #[graphql(name = "dataSourceId")]
-    pub data_source_id: Option<i32>, // Reference to DataSource entity (new)
+#[graphql(input_name = "DataSetNodeConfigInput")]
+pub struct DataSetNodeConfig {
+    #[graphql(name = "dataSetId")]
+    pub data_set_id: Option<i32>, // Reference to DataSet entity (new)
     pub display_mode: Option<String>, // 'summary' | 'detailed' | 'preview'
 
     // Legacy fields (for backward compatibility)
@@ -36,7 +36,7 @@ pub enum InputDataType {
 
 // Data Source Reference for dropdown selection
 #[derive(SimpleObject, Clone, Debug, Serialize, Deserialize)]
-pub struct DataSourceReference {
+pub struct DataSetReference {
     pub id: i32,
     pub name: String,
     pub description: Option<String>,
@@ -44,8 +44,8 @@ pub struct DataSourceReference {
     pub created_at: DateTime<Utc>,
 }
 
-impl From<data_sources::Model> for DataSourceReference {
-    fn from(model: data_sources::Model) -> Self {
+impl From<data_sets::Model> for DataSetReference {
+    fn from(model: data_sets::Model) -> Self {
         Self {
             id: model.id,
             name: model.name,
@@ -56,8 +56,8 @@ impl From<data_sources::Model> for DataSourceReference {
     }
 }
 
-impl From<DataSourceSummary> for DataSourceReference {
-    fn from(summary: DataSourceSummary) -> Self {
+impl From<DataSetSummary> for DataSetReference {
+    fn from(summary: DataSetSummary) -> Self {
         Self {
             id: summary.id,
             name: summary.name,
@@ -170,7 +170,7 @@ pub struct GraphConfig {
 // Union type for all node configurations
 #[derive(Union, Clone, Debug, Serialize, Deserialize)]
 pub enum NodeConfig {
-    DataSource(DataSourceNodeConfig),
+    DataSet(DataSetNodeConfig),
     Graph(GraphNodeConfig),
     Transform(super::transforms::TransformNodeConfig),
     Filter(super::filter::FilterNodeConfig),

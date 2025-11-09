@@ -1,6 +1,6 @@
 use async_graphql::*;
 
-use super::{DataSourceDataType, FileFormat};
+use super::{DataSetDataType, FileFormat};
 
 #[derive(SimpleObject)]
 #[graphql(complex)]
@@ -84,7 +84,7 @@ pub struct CreateLibrarySourceInput {
     #[graphql(name = "fileFormat")]
     pub file_format: FileFormat,
     #[graphql(name = "dataType")]
-    pub data_type: DataSourceDataType,
+    pub data_type: DataSetDataType,
 }
 
 #[derive(InputObject)]

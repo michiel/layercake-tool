@@ -19,8 +19,8 @@ export const GET_PLAN_DAG = gql`
           description
         }
         config
-        datasourceExecution {
-          dataSourceId
+        datasetExecution {
+          dataSetId
           filename
           status
           processedAt
@@ -317,8 +317,8 @@ export const NODE_EXECUTION_STATUS_SUBSCRIPTION = gql`
       projectId
       nodeId
       nodeType
-      datasourceExecution {
-        dataSourceId
+      datasetExecution {
+        dataSetId
         filename
         status
         processedAt

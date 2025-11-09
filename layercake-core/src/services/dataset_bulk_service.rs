@@ -5,14 +5,14 @@ use sea_orm::{DatabaseConnection, EntityTrait};
 use spreadsheet_ods::{Sheet, Value, WorkBook};
 
 use crate::database::entities::common_types::{DataType, FileFormat};
-use crate::database::entities::data_sources;
-use crate::services::data_source_service::DataSourceService;
+use crate::database::entities::data_sets;
+use crate::services::data_set_service::DataSetService;
 
-pub struct DataSourceBulkService {
+pub struct DataSetBulkService {
     db: DatabaseConnection,
 }
 
-impl DataSourceBulkService {
+impl DataSetBulkService {
     pub fn new(db: DatabaseConnection) -> Self {
         Self { db }
     }
@@ -132,25 +132,25 @@ impl DataSourceBulkService {
         Ok(rows)
     }
 
-    /// Export datasources to XLSX format
-    /// Each datasource becomes a separate sheet named with its name containing CSV data
-    pub async fn export_to_xlsx(&self, datasource_ids: &[i32]) -> Result<Vec<u8>> {
+    /// Export datasets to XLSX format
+    /// Each dataset becomes a separate sheet named with its name containing CSV data
+    pub async fn export_to_xlsx(&self, dataset_ids: &[i32]) -> Result<Vec<u8>> {
         let mut workbook = Workbook::new();
 
-        // Fetch all requested datasources
-        let datasources = data_sources::Entity::find()
+        // Fetch all requested datasets
+        let datasets = data_sets::Entity::find()
             .all(&self.db)
             .await
-            .context("Failed to fetch datasources")?
+            .context("Failed to fetch datasets")?
             .into_iter()
-            .filter(|ds| datasource_ids.contains(&ds.id))
+            .filter(|ds| dataset_ids.contains(&ds.id))
             .collect::<Vec<_>>();
 
-        tracing::info!("Exporting {} datasources to XLSX", datasources.len());
+        tracing::info!("Exporting {} datasets to XLSX", datasets.len());
 
         // Check for duplicate names
         let mut name_counts = std::collections::HashMap::new();
-        for ds in &datasources {
+        for ds in &datasets {
             *name_counts.entry(&ds.name).or_insert(0) += 1;
         }
         let duplicates: Vec<&String> = name_counts
@@ -161,7 +161,7 @@ impl DataSourceBulkService {
 
         if !duplicates.is_empty() {
             return Err(anyhow::anyhow!(
-                "Cannot export: duplicate datasource names found: {}",
+                "Cannot export: duplicate dataset names found: {}",
                 duplicates
                     .iter()
                     .map(|s| s.as_str())
@@ -170,21 +170,21 @@ impl DataSourceBulkService {
             ));
         }
 
-        for datasource in datasources {
-            // Create a sheet named with the datasource name
-            let sheet_name = datasource.name.clone();
+        for dataset in datasets {
+            // Create a sheet named with the dataset name
+            let sheet_name = dataset.name.clone();
             let worksheet = workbook.add_worksheet();
             worksheet.set_name(&sheet_name)?;
 
             tracing::info!(
-                "Exporting datasource {} ({}) to sheet {}",
-                datasource.id,
-                datasource.name,
+                "Exporting dataset {} ({}) to sheet {}",
+                dataset.id,
+                dataset.name,
                 sheet_name
             );
 
             // Convert graph_json to CSV rows
-            match Self::graph_json_to_csv_rows(&datasource.graph_json, &datasource.data_type) {
+            match Self::graph_json_to_csv_rows(&dataset.graph_json, &dataset.data_type) {
                 Ok(rows) => {
                     // Write rows to sheet
                     for (row_idx, row_data) in rows.iter().enumerate() {
@@ -201,8 +201,8 @@ impl DataSourceBulkService {
                 }
                 Err(e) => {
                     tracing::warn!(
-                        "Failed to convert datasource {} to CSV: {}",
-                        datasource.id,
+                        "Failed to convert dataset {} to CSV: {}",
+                        dataset.id,
                         e
                     );
                     // Write error message to sheet
@@ -216,25 +216,25 @@ impl DataSourceBulkService {
         workbook.save_to_buffer().context("Failed to generate XLSX")
     }
 
-    /// Export datasources to ODS format
-    /// Each datasource becomes a separate sheet named with its name containing CSV data
-    pub async fn export_to_ods(&self, datasource_ids: &[i32]) -> Result<Vec<u8>> {
+    /// Export datasets to ODS format
+    /// Each dataset becomes a separate sheet named with its name containing CSV data
+    pub async fn export_to_ods(&self, dataset_ids: &[i32]) -> Result<Vec<u8>> {
         let mut workbook = WorkBook::new(locale!("en_US"));
 
-        // Fetch all requested datasources
-        let datasources = data_sources::Entity::find()
+        // Fetch all requested datasets
+        let datasets = data_sets::Entity::find()
             .all(&self.db)
             .await
-            .context("Failed to fetch datasources")?
+            .context("Failed to fetch datasets")?
             .into_iter()
-            .filter(|ds| datasource_ids.contains(&ds.id))
+            .filter(|ds| dataset_ids.contains(&ds.id))
             .collect::<Vec<_>>();
 
-        tracing::info!("Exporting {} datasources to ODS", datasources.len());
+        tracing::info!("Exporting {} datasets to ODS", datasets.len());
 
         // Check for duplicate names
         let mut name_counts = std::collections::HashMap::new();
-        for ds in &datasources {
+        for ds in &datasets {
             *name_counts.entry(&ds.name).or_insert(0) += 1;
         }
         let duplicates: Vec<&String> = name_counts
@@ -245,7 +245,7 @@ impl DataSourceBulkService {
 
         if !duplicates.is_empty() {
             return Err(anyhow::anyhow!(
-                "Cannot export: duplicate datasource names found: {}",
+                "Cannot export: duplicate dataset names found: {}",
                 duplicates
                     .iter()
                     .map(|s| s.as_str())
@@ -254,20 +254,20 @@ impl DataSourceBulkService {
             ));
         }
 
-        for datasource in datasources {
-            // Create a sheet named with the datasource name
-            let sheet_name = datasource.name.clone();
+        for dataset in datasets {
+            // Create a sheet named with the dataset name
+            let sheet_name = dataset.name.clone();
             let mut sheet = Sheet::new(&sheet_name);
 
             tracing::info!(
-                "Exporting datasource {} ({}) to sheet {}",
-                datasource.id,
-                datasource.name,
+                "Exporting dataset {} ({}) to sheet {}",
+                dataset.id,
+                dataset.name,
                 sheet_name
             );
 
             // Convert graph_json to CSV rows
-            match Self::graph_json_to_csv_rows(&datasource.graph_json, &datasource.data_type) {
+            match Self::graph_json_to_csv_rows(&dataset.graph_json, &dataset.data_type) {
                 Ok(rows) => {
                     // Write rows to sheet
                     for (row_idx, row_data) in rows.iter().enumerate() {
@@ -288,8 +288,8 @@ impl DataSourceBulkService {
                 }
                 Err(e) => {
                     tracing::warn!(
-                        "Failed to convert datasource {} to CSV: {}",
-                        datasource.id,
+                        "Failed to convert dataset {} to CSV: {}",
+                        dataset.id,
                         e
                     );
                     // Write error message to sheet
@@ -308,13 +308,13 @@ impl DataSourceBulkService {
         Ok(result)
     }
 
-    /// Import datasources from XLSX format
-    /// Each sheet becomes a datasource containing the tabular data from that sheet
+    /// Import datasets from XLSX format
+    /// Each sheet becomes a dataset containing the tabular data from that sheet
     pub async fn import_from_xlsx(
         &self,
         project_id: i32,
         xlsx_data: &[u8],
-    ) -> Result<DataSourceImportResult> {
+    ) -> Result<DataSetImportResult> {
         use calamine::{open_workbook_from_rs, Data, Reader, Xlsx};
         use std::io::Cursor;
 
@@ -330,7 +330,7 @@ impl DataSourceBulkService {
         let mut updated_count = 0;
         let mut imported_ids = Vec::new();
 
-        let service = DataSourceService::new(self.db.clone());
+        let service = DataSetService::new(self.db.clone());
 
         // Iterate through all sheets
         let sheet_names = workbook.sheet_names();
@@ -374,38 +374,38 @@ impl DataSourceBulkService {
                 let csv_data = Self::range_to_csv(&range)?;
                 tracing::info!("Converted sheet to {} bytes of CSV", csv_data.len());
 
-                // Try to find existing datasource by name
+                // Try to find existing dataset by name
                 use sea_orm::ColumnTrait;
                 use sea_orm::QueryFilter;
-                if let Some(existing) = data_sources::Entity::find()
-                    .filter(data_sources::Column::ProjectId.eq(project_id))
-                    .filter(data_sources::Column::Name.eq(sheet_name.clone()))
+                if let Some(existing) = data_sets::Entity::find()
+                    .filter(data_sets::Column::ProjectId.eq(project_id))
+                    .filter(data_sets::Column::Name.eq(sheet_name.clone()))
                     .one(&self.db)
                     .await?
                 {
                     tracing::info!(
-                        "Found existing datasource '{}' (id: {}) - updating",
+                        "Found existing dataset '{}' (id: {}) - updating",
                         sheet_name,
                         existing.id
                     );
 
-                    // Update the datasource with new CSV data
+                    // Update the dataset with new CSV data
                     let filename = format!("{}.csv", existing.name);
-                    let datasource = service.update_file(existing.id, filename, csv_data).await?;
+                    let dataset = service.update_file(existing.id, filename, csv_data).await?;
 
                     updated_count += 1;
-                    imported_ids.push(datasource.id);
+                    imported_ids.push(dataset.id);
                     tracing::info!(
-                        "Updated datasource: {} (id: {})",
-                        datasource.name,
-                        datasource.id
+                        "Updated dataset: {} (id: {})",
+                        dataset.name,
+                        dataset.id
                     );
                     continue;
                 }
 
-                // Create new datasource
+                // Create new dataset
                 let filename = format!("{}.csv", sheet_name);
-                let datasource = service
+                let dataset = service
                     .create_from_file(
                         project_id,
                         sheet_name.clone(),
@@ -418,29 +418,29 @@ impl DataSourceBulkService {
                     .await?;
 
                 created_count += 1;
-                imported_ids.push(datasource.id);
+                imported_ids.push(dataset.id);
                 tracing::info!(
-                    "Created datasource: {} with id: {}",
+                    "Created dataset: {} with id: {}",
                     sheet_name,
-                    datasource.id
+                    dataset.id
                 );
             }
         }
 
-        Ok(DataSourceImportResult {
+        Ok(DataSetImportResult {
             created_count,
             updated_count,
             imported_ids,
         })
     }
 
-    /// Import datasources from ODS format
-    /// Each sheet becomes a datasource containing the tabular data from that sheet
+    /// Import datasets from ODS format
+    /// Each sheet becomes a dataset containing the tabular data from that sheet
     pub async fn import_from_ods(
         &self,
         project_id: i32,
         ods_data: &[u8],
-    ) -> Result<DataSourceImportResult> {
+    ) -> Result<DataSetImportResult> {
         use calamine::{open_workbook_from_rs, Data, Ods, Reader};
         use std::io::Cursor;
 
@@ -456,7 +456,7 @@ impl DataSourceBulkService {
         let mut updated_count = 0;
         let mut imported_ids = Vec::new();
 
-        let service = DataSourceService::new(self.db.clone());
+        let service = DataSetService::new(self.db.clone());
 
         // Iterate through all sheets
         let sheet_names = workbook.sheet_names();
@@ -500,38 +500,38 @@ impl DataSourceBulkService {
                 let csv_data = Self::range_to_csv(&range)?;
                 tracing::info!("Converted sheet to {} bytes of CSV", csv_data.len());
 
-                // Try to find existing datasource by name
+                // Try to find existing dataset by name
                 use sea_orm::ColumnTrait;
                 use sea_orm::QueryFilter;
-                if let Some(existing) = data_sources::Entity::find()
-                    .filter(data_sources::Column::ProjectId.eq(project_id))
-                    .filter(data_sources::Column::Name.eq(sheet_name.clone()))
+                if let Some(existing) = data_sets::Entity::find()
+                    .filter(data_sets::Column::ProjectId.eq(project_id))
+                    .filter(data_sets::Column::Name.eq(sheet_name.clone()))
                     .one(&self.db)
                     .await?
                 {
                     tracing::info!(
-                        "Found existing datasource '{}' (id: {}) - updating",
+                        "Found existing dataset '{}' (id: {}) - updating",
                         sheet_name,
                         existing.id
                     );
 
-                    // Update the datasource with new CSV data
+                    // Update the dataset with new CSV data
                     let filename = format!("{}.csv", existing.name);
-                    let datasource = service.update_file(existing.id, filename, csv_data).await?;
+                    let dataset = service.update_file(existing.id, filename, csv_data).await?;
 
                     updated_count += 1;
-                    imported_ids.push(datasource.id);
+                    imported_ids.push(dataset.id);
                     tracing::info!(
-                        "Updated datasource: {} (id: {})",
-                        datasource.name,
-                        datasource.id
+                        "Updated dataset: {} (id: {})",
+                        dataset.name,
+                        dataset.id
                     );
                     continue;
                 }
 
-                // Create new datasource
+                // Create new dataset
                 let filename = format!("{}.csv", sheet_name);
-                let datasource = service
+                let dataset = service
                     .create_from_file(
                         project_id,
                         sheet_name.clone(),
@@ -544,16 +544,16 @@ impl DataSourceBulkService {
                     .await?;
 
                 created_count += 1;
-                imported_ids.push(datasource.id);
+                imported_ids.push(dataset.id);
                 tracing::info!(
-                    "Created datasource: {} with id: {}",
+                    "Created dataset: {} with id: {}",
                     sheet_name,
-                    datasource.id
+                    dataset.id
                 );
             }
         }
 
-        Ok(DataSourceImportResult {
+        Ok(DataSetImportResult {
             created_count,
             updated_count,
             imported_ids,
@@ -561,7 +561,7 @@ impl DataSourceBulkService {
     }
 }
 
-pub struct DataSourceImportResult {
+pub struct DataSetImportResult {
     pub created_count: i32,
     pub updated_count: i32,
     pub imported_ids: Vec<i32>,
