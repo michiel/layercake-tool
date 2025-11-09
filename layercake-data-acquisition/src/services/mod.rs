@@ -898,4 +898,9 @@ impl DataAcquisitionService {
 
         Ok(file.indexed)
     }
+
+    /// Get reference to the embedding service (for RAG use)
+    pub fn embeddings(&self) -> Option<&EmbeddingService> {
+        self.embeddings.as_ref()
+    }
 }

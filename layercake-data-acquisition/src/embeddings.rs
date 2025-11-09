@@ -97,4 +97,31 @@ impl EmbeddingService {
             })
             .collect())
     }
+
+    /// Embed a single text query (for RAG search)
+    pub async fn embed_text(&self, text: &str) -> Result<Vec<f32>> {
+        let vectors = match &self.backend {
+            EmbeddingBackend::OpenAi { client, model } => {
+                client
+                    .embedding_model(model)
+                    .embed_texts(vec![text.to_string()])
+                    .await?
+            }
+            EmbeddingBackend::Ollama { client, model } => {
+                client
+                    .embedding_model(model)
+                    .embed_texts(vec![text.to_string()])
+                    .await?
+            }
+        };
+
+        Ok(vectors
+            .into_iter()
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("No embedding returned"))?
+            .vec
+            .into_iter()
+            .map(|value| value as f32)
+            .collect())
+    }
 }
