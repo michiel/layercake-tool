@@ -140,7 +140,7 @@ export const BulkDataSetUploader: React.FC<BulkDataSetUploaderProps> = ({
     <Dialog open={opened} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>Bulk Upload Data Sources</DialogTitle>
+          <DialogTitle>Bulk Upload Data Sets</DialogTitle>
           <DialogDescription>
             Upload multiple CSV, TSV, or JSON files. File types will be automatically detected based on content.
           </DialogDescription>

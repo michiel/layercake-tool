@@ -356,13 +356,13 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
           projectName={selectedProject.name}
           projectId={selectedProject.id}
           sections={[{ title: 'Data acquisition', href: `/projects/${selectedProject.id}/datasets` }]}
-          currentPage="Data Sources"
+          currentPage="Data Sets"
           onNavigate={handleNavigate}
         />
 
         <Group justify="between" className="mb-4">
           <div>
-            <h1 className="text-3xl font-bold">Data Sources</h1>
+            <h1 className="text-3xl font-bold">Data Sets</h1>
             <p className="text-sm text-muted-foreground mt-1">
               Manage CSV, TSV, and JSON files that serve as input data for your Plan DAGs
             </p>
@@ -393,7 +393,7 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
         {dataSourcesError && (
           <Alert variant="destructive" className="mb-4">
             <IconAlertCircle className="h-4 w-4" />
-            <AlertTitle>Error Loading Data Sources</AlertTitle>
+            <AlertTitle>Error Loading Data Sets</AlertTitle>
             <AlertDescription>
               {dataSourcesError.message}
             </AlertDescription>
@@ -412,13 +412,13 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
               <Stack align="center" gap="md">
                 <IconFile size={48} className="text-muted-foreground" />
                 <div className="text-center">
-                  <h3 className="text-xl font-semibold mb-2">No Data Sources</h3>
+                  <h3 className="text-xl font-semibold mb-2">No Data Sets</h3>
                   <p className="text-muted-foreground mb-4">
-                    Upload CSV, TSV, or JSON files to create your first data source.
+                    Upload CSV, TSV, or JSON files to create your first data set.
                   </p>
                   <Button onClick={handleCreateNew}>
                     <IconPlus className="mr-2 h-4 w-4" />
-                    Create First Data Source
+                    Create First Data Set
                   </Button>
                 </div>
               </Stack>
@@ -571,7 +571,7 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
       <Dialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Data Source</DialogTitle>
+            <DialogTitle>Delete Data Set</DialogTitle>
           </DialogHeader>
           <p className="mb-4">
             Are you sure you want to delete "{selectedDataSet?.name}"?
@@ -750,9 +750,9 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
       <Dialog open={exportFormatModalOpen} onOpenChange={setExportFormatModalOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Export Data Sources</DialogTitle>
+            <DialogTitle>Export Data Sets</DialogTitle>
             <DialogDescription>
-              Select the format for exporting {selectedRows.size} data source{selectedRows.size !== 1 ? 's' : ''}:
+              Select the format for exporting {selectedRows.size} data set{selectedRows.size !== 1 ? 's' : ''}:
             </DialogDescription>
           </DialogHeader>
 

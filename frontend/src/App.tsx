@@ -177,12 +177,6 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
 
     const dataAcquisitionChildren: ProjectNavChild[] = [
       {
-        key: 'data-sources',
-        label: 'Data Sources',
-        route: `/projects/${projectId}/datasets`,
-        isActive: makeRouteMatcher(`/projects/${projectId}/datasets`),
-      },
-      {
         key: 'source-management',
         label: 'Source Management',
         route: `/projects/${projectId}/data-acquisition/source-management`,
@@ -199,6 +193,12 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
         label: 'Data Set Creation',
         route: `/projects/${projectId}/data-acquisition/datasets`,
         isActive: makeRouteMatcher(`/projects/${projectId}/data-acquisition/datasets`),
+      },
+      {
+        key: 'data-sets',
+        label: 'Data Sets',
+        route: `/projects/${projectId}/datasets`,
+        isActive: makeRouteMatcher(`/projects/${projectId}/datasets`),
       },
     ]
 

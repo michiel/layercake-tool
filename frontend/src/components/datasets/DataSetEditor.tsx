@@ -265,14 +265,14 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
       <PageContainer className="py-12">
         <Alert variant="destructive" className="mb-4">
           <IconAlertCircle className="h-4 w-4" />
-          <AlertTitle>Error Loading Data Source</AlertTitle>
+          <AlertTitle>Error Loading Data Set</AlertTitle>
           <AlertDescription>
-            {dataSourceError?.message || 'Data Source not found'}
+            {dataSourceError?.message || 'Data Set not found'}
           </AlertDescription>
         </Alert>
         <Button onClick={handleBack}>
           <IconArrowLeft className="mr-2 h-4 w-4" />
-          Back to Data Sources
+          Back to Data Sets
         </Button>
       </PageContainer>
     )
@@ -296,7 +296,7 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
         projectId={selectedProject.id}
         sections={[
           { title: 'Data acquisition', href: `/projects/${selectedProject.id}/datasets` },
-          { title: 'Data Sources', href: `/projects/${selectedProject.id}/datasets` },
+          { title: 'Data Sets', href: `/projects/${selectedProject.id}/datasets` },
         ]}
         currentPage={dataSource.name}
         onNavigate={handleNavigate}
