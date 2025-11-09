@@ -102,6 +102,12 @@ pub struct ChatSession {
     pub created_at: String,
     pub updated_at: String,
     pub last_activity_at: String,
+
+    // RAG configuration
+    pub enable_rag: bool,
+    pub rag_top_k: i32,
+    pub rag_threshold: f64,
+    pub include_citations: bool,
 }
 
 impl From<crate::database::entities::chat_sessions::Model> for ChatSession {
@@ -119,6 +125,12 @@ impl From<crate::database::entities::chat_sessions::Model> for ChatSession {
             created_at: model.created_at.to_rfc3339(),
             updated_at: model.updated_at.to_rfc3339(),
             last_activity_at: model.last_activity_at.to_rfc3339(),
+
+            // RAG configuration
+            enable_rag: model.enable_rag,
+            rag_top_k: model.rag_top_k,
+            rag_threshold: model.rag_threshold,
+            include_citations: model.include_citations,
         }
     }
 }
