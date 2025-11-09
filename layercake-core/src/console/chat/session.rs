@@ -373,12 +373,12 @@ impl ChatSession {
             #[cfg(feature = "rmcp")]
             rmcp_tools: rmcp_tools.unwrap_or_default(),
 
-            // RAG defaults (TODO: load from session when fields are added to DB)
+            // RAG configuration loaded from database
             data_acquisition,
-            rag_enabled: true,
-            rag_top_k: 5,
-            rag_threshold: 0.7,
-            include_citations: true,
+            rag_enabled: session.enable_rag,
+            rag_top_k: session.rag_top_k as usize,
+            rag_threshold: session.rag_threshold as f32,
+            include_citations: session.include_citations,
         })
     }
 

@@ -18,6 +18,12 @@ pub struct Model {
     pub created_at: ChronoDateTimeUtc,
     pub updated_at: ChronoDateTimeUtc,
     pub last_activity_at: ChronoDateTimeUtc,
+
+    // RAG configuration
+    pub enable_rag: bool,
+    pub rag_top_k: i32,
+    pub rag_threshold: f64,
+    pub include_citations: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
