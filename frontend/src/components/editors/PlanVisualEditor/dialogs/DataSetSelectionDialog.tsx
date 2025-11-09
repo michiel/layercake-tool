@@ -88,7 +88,7 @@ export const DataSetSelectionDialog: React.FC<DataSetSelectionDialogProps> = ({
     <Dialog open={opened} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>Select Data Source</DialogTitle>
+          <DialogTitle>Select Data Set</DialogTitle>
         </DialogHeader>
 
         <TooltipProvider>
@@ -109,7 +109,7 @@ export const DataSetSelectionDialog: React.FC<DataSetSelectionDialogProps> = ({
                     <IconRefresh className="h-4 w-4" />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Refresh data sources</TooltipContent>
+                <TooltipContent>Refresh data sets</TooltipContent>
               </Tooltip>
             </Group>
 
@@ -117,7 +117,7 @@ export const DataSetSelectionDialog: React.FC<DataSetSelectionDialogProps> = ({
               <Alert variant="destructive">
                 <IconAlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                  <p className="font-semibold mb-1">Error Loading Data Sources</p>
+                  <p className="font-semibold mb-1">Error Loading Data Sets</p>
                   <p className="text-sm">{dataSourcesError.message}</p>
                   <p className="text-xs mt-1 text-muted-foreground">
                     Project ID: {projectId}, Query Variables: {JSON.stringify({ projectId })}
@@ -151,11 +151,11 @@ export const DataSetSelectionDialog: React.FC<DataSetSelectionDialogProps> = ({
                   <div className="flex flex-col items-center justify-center py-12 gap-4">
                     <IconFile size={48} className="text-gray-400" />
                     <div className="text-center">
-                      <h4 className="font-semibold mb-1">No Data Sources Found</h4>
+                      <h4 className="font-semibold mb-1">No Data Sets Found</h4>
                       <p className="text-sm text-muted-foreground">
                         {searchQuery
-                          ? 'No data sources match your search criteria.'
-                          : 'Create data sources to use them in your Plan DAG.'
+                          ? 'No data sets match your search criteria.'
+                          : 'Create data sets to use them in your Plan DAG.'
                         }
                       </p>
                     </div>

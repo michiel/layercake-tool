@@ -146,14 +146,14 @@ export const DataSetNodeConfigForm: React.FC<DataSetNodeConfigFormProps> = ({
     <Stack gap="md">
       <div className="space-y-2">
         <Label htmlFor="data-source">
-          Data Source <span className="text-red-600">*</span>
+          Data Set <span className="text-red-600">*</span>
         </Label>
         <Select
           value={localConfig.dataSetId?.toString() || undefined}
           onValueChange={handleDataSetChange}
         >
           <SelectTrigger id="data-source">
-            <SelectValue placeholder="Select a data source" />
+            <SelectValue placeholder="Select a data set" />
           </SelectTrigger>
           <SelectContent className="max-h-[200px]">
             {dataSourceOptions.map((option) => (
@@ -167,13 +167,13 @@ export const DataSetNodeConfigForm: React.FC<DataSetNodeConfigFormProps> = ({
           </SelectContent>
         </Select>
         <p className="text-sm text-muted-foreground">
-          Choose an existing data source to reference in this plan
+          Choose an existing data set to reference in this plan
         </p>
       </div>
 
       {selectedDataSet && (
         <Alert>
-          <AlertTitle>Selected Data Source Details</AlertTitle>
+          <AlertTitle>Selected Data Set Details</AlertTitle>
           <AlertDescription>
             <div className="space-y-1 text-xs">
               <div>

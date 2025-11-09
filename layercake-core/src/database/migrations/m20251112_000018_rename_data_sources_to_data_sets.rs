@@ -33,64 +33,64 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // Rename column data_source_id to dataset_id in graph_nodes
+        // Rename column data_set_id to dataset_id in graph_nodes
         manager
             .alter_table(
                 Table::alter()
                     .table(GraphNodes::Table)
-                    .rename_column(GraphNodes::DataSourceId, GraphNodes::DatasetId)
+                    .rename_column(GraphNodes::DataSetId, GraphNodes::DatasetId)
                     .to_owned(),
             )
             .await?;
 
-        // Rename column data_source_id to dataset_id in graph_edges
+        // Rename column data_set_id to dataset_id in graph_edges
         manager
             .alter_table(
                 Table::alter()
                     .table(GraphEdges::Table)
-                    .rename_column(GraphEdges::DataSourceId, GraphEdges::DatasetId)
+                    .rename_column(GraphEdges::DataSetId, GraphEdges::DatasetId)
                     .to_owned(),
             )
             .await?;
 
-        // Rename column data_source_id to dataset_id in graph_layers
+        // Rename column data_set_id to dataset_id in graph_layers
         manager
             .alter_table(
                 Table::alter()
                     .table(GraphLayers::Table)
-                    .rename_column(GraphLayers::DataSourceId, GraphLayers::DatasetId)
+                    .rename_column(GraphLayers::DataSetId, GraphLayers::DatasetId)
                     .to_owned(),
             )
             .await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        // Rename column dataset_id back to data_source_id in graph_layers
+        // Rename column dataset_id back to data_set_id in graph_layers
         manager
             .alter_table(
                 Table::alter()
                     .table(GraphLayers::Table)
-                    .rename_column(GraphLayers::DatasetId, GraphLayers::DataSourceId)
+                    .rename_column(GraphLayers::DatasetId, GraphLayers::DataSetId)
                     .to_owned(),
             )
             .await?;
 
-        // Rename column dataset_id back to data_source_id in graph_edges
+        // Rename column dataset_id back to data_set_id in graph_edges
         manager
             .alter_table(
                 Table::alter()
                     .table(GraphEdges::Table)
-                    .rename_column(GraphEdges::DatasetId, GraphEdges::DataSourceId)
+                    .rename_column(GraphEdges::DatasetId, GraphEdges::DataSetId)
                     .to_owned(),
             )
             .await?;
 
-        // Rename column dataset_id back to data_source_id in graph_nodes
+        // Rename column dataset_id back to data_set_id in graph_nodes
         manager
             .alter_table(
                 Table::alter()
                     .table(GraphNodes::Table)
-                    .rename_column(GraphNodes::DatasetId, GraphNodes::DataSourceId)
+                    .rename_column(GraphNodes::DatasetId, GraphNodes::DataSetId)
                     .to_owned(),
             )
             .await?;
@@ -157,20 +157,20 @@ enum DatasetRows {
 #[derive(DeriveIden)]
 enum GraphNodes {
     Table,
-    DataSourceId,
+    DataSetId,
     DatasetId,
 }
 
 #[derive(DeriveIden)]
 enum GraphEdges {
     Table,
-    DataSourceId,
+    DataSetId,
     DatasetId,
 }
 
 #[derive(DeriveIden)]
 enum GraphLayers {
     Table,
-    DataSourceId,
+    DataSetId,
     DatasetId,
 }

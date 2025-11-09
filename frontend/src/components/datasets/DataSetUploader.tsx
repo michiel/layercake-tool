@@ -740,7 +740,7 @@ export const DataSetUploader: React.FC<DataSetUploaderProps> = ({
   const availableDataTypes = activeTab === 'empty'
     ? getAvailableDataTypes(null)
     : (selectedFile ? getAvailableDataTypes(selectedFile.format) : [])
-  const modalTitle = isLibraryMode ? 'Add Library Source' : 'New Data Source'
+  const modalTitle = isLibraryMode ? 'Add Library Source' : 'New Data Set'
 
   // Determine if submit should be disabled
   const isSubmitDisabled = () => {
@@ -755,10 +755,10 @@ export const DataSetUploader: React.FC<DataSetUploaderProps> = ({
   // Determine submit button text
   const getSubmitButtonText = () => {
     if (uploadProgress === 100) return 'Complete!'
-    if (activeTab === 'upload') return 'Upload Data Source'
-    if (activeTab === 'empty') return 'Create Data Source'
+    if (activeTab === 'upload') return 'Upload Data Set'
+    if (activeTab === 'empty') return 'Create Data Set'
     if (activeTab === 'bulk') return `Upload ${bulkFiles.length} File${bulkFiles.length !== 1 ? 's' : ''}`
-    if (activeTab === 'import') return 'Import Data Sources'
+    if (activeTab === 'import') return 'Import Data Sets'
     return 'Submit'
   }
 
