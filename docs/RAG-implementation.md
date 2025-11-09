@@ -46,13 +46,14 @@ Migration `m20251110_000016_create_data_acquisition_tables` adds:
 GraphQL types live under `graphql/types/data_acquisition.rs`.
 
 ## Frontend Entry Point
-- Added `/projects/:projectId/data-acquisition` route + sidebar link.
-- `DataAcquisitionPage` (Vite/React) provides three cards:
-  1. **Source Management** – upload files, view recent uploads, control tag defaults.
-  2. **Knowledge Base** – observe KB metrics plus rebuild/clear actions.
-  3. **Data Set Creation** – craft prompts, select tag filters, and inspect generated datasets.
+- Added dedicated data acquisition routes under `/projects/:projectId/data-acquisition/...`.
+- Individual pages cover each workflow end-to-end:
+  1. **Data Sources** – manage CSV/JSON inputs imported into the project.
+  2. **Source Management** – upload, tag, and edit metadata for ingestion files.
+  3. **Knowledge Base** – observe embedding status and trigger rebuild/clear actions.
+  4. **Data Set Creation** – craft prompts, select tag filters, and inspect generated datasets.
 
-The page relies on the new GraphQL operations and is meant as a functional placeholder until richer UX (drag-drop, progress indicators, previews) ships.
+Each page relies on the new GraphQL operations and is meant as a functional placeholder until richer UX (drag-drop, progress indicators, previews) ships.
 
 ## Follow-up Tasks
 - Add binary format parsers (PDF, DOCX, XLSX) under `ingestion::parsers`.

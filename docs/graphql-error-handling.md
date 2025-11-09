@@ -54,8 +54,9 @@ The helper function:
 ### Files Updated
 
 The following files have been updated to use this pattern:
-- `frontend/src/pages/DataAcquisitionPage.tsx`
 - `frontend/src/pages/SourceManagementPage.tsx`
+- `frontend/src/pages/KnowledgeBasePage.tsx`
+- `frontend/src/pages/DatasetCreationPage.tsx`
 
 ### Why `errorPolicy: 'all'`?
 

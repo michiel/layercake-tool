@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { Routes, Route, useNavigate, useParams, useLocation } from 'react-router-dom'
-import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconDownload, IconChevronLeft, IconChevronRight, IconFolderPlus, IconNetwork, IconBooks, IconMessageDots, IconAdjustments } from '@tabler/icons-react'
+import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconDownload, IconChevronLeft, IconChevronRight, IconFolderPlus, IconNetwork, IconBooks, IconMessageDots, IconAdjustments, IconShare } from '@tabler/icons-react'
 import { useQuery, useMutation } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import { Breadcrumbs } from './components/common/Breadcrumbs'
@@ -15,8 +15,10 @@ import { useCollaborationV2 } from './hooks/useCollaborationV2'
 import { useConnectionStatus } from './hooks/useConnectionStatus'
 import { ProjectChatPage } from './pages/ProjectChatPage'
 import { ChatLogsPage } from './pages/ChatLogsPage'
-import { DataAcquisitionPage } from './pages/DataAcquisitionPage'
 import { SourceManagementPage } from './pages/SourceManagementPage'
+import { KnowledgeBasePage } from './pages/KnowledgeBasePage'
+import { DatasetCreationPage } from './pages/DatasetCreationPage'
+import { ProjectSharingPage } from './pages/ProjectSharingPage'
 import { getOrCreateSessionId } from './utils/session'
 import { Group, Stack } from './components/layout-primitives'
 import { Button } from './components/ui/button'
@@ -34,6 +36,22 @@ import { cn } from './lib/utils'
 // Collaboration Context for providing project-level collaboration to all pages
 const CollaborationContext = React.createContext<any>(null)
 export const useCollaboration = () => React.useContext(CollaborationContext)
+
+type ProjectNavChild = {
+  key: string
+  label: string
+  route: string
+  isActive: () => boolean
+}
+
+type ProjectNavSection = {
+  key: string
+  label: string
+  icon: React.ReactNode
+  route: string
+  isActive: () => boolean
+  children?: ProjectNavChild[]
+}
 
 // Query to fetch projects
 const GET_PROJECTS = gql`
@@ -149,6 +167,113 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
     enableWebSocket: !!projectId
   })
 
+  const makeRouteMatcher = (path: string, options?: { prefix?: boolean }) => () =>
+    options?.prefix ? isActiveRoutePrefix(path) : isActiveRoute(path)
+
+  const projectNavSections = useMemo<ProjectNavSection[]>(() => {
+    if (!projectId) {
+      return []
+    }
+
+    const dataAcquisitionChildren: ProjectNavChild[] = [
+      {
+        key: 'data-sources',
+        label: 'Data Sources',
+        route: `/projects/${projectId}/datasources`,
+        isActive: makeRouteMatcher(`/projects/${projectId}/datasources`),
+      },
+      {
+        key: 'source-management',
+        label: 'Source Management',
+        route: `/projects/${projectId}/data-acquisition/source-management`,
+        isActive: makeRouteMatcher(`/projects/${projectId}/data-acquisition/source-management`),
+      },
+      {
+        key: 'knowledge-base',
+        label: 'Knowledge Base',
+        route: `/projects/${projectId}/data-acquisition/knowledge-base`,
+        isActive: makeRouteMatcher(`/projects/${projectId}/data-acquisition/knowledge-base`),
+      },
+      {
+        key: 'dataset-creation',
+        label: 'Data Set Creation',
+        route: `/projects/${projectId}/data-acquisition/datasets`,
+        isActive: makeRouteMatcher(`/projects/${projectId}/data-acquisition/datasets`),
+      },
+    ]
+
+    const graphCreationChildren: ProjectNavChild[] = [
+      {
+        key: 'plan',
+        label: 'Plan',
+        route: `/projects/${projectId}/plan`,
+        isActive: makeRouteMatcher(`/projects/${projectId}/plan`),
+      },
+      {
+        key: 'plan-nodes',
+        label: 'Plan Nodes',
+        route: `/projects/${projectId}/plan-nodes`,
+        isActive: makeRouteMatcher(`/projects/${projectId}/plan-nodes`),
+      },
+      {
+        key: 'graphs',
+        label: 'Graphs',
+        route: `/projects/${projectId}/graphs`,
+        isActive: makeRouteMatcher(`/projects/${projectId}/graphs`),
+      },
+    ]
+
+    const chatChildren: ProjectNavChild[] = [
+      {
+        key: 'chat-logs',
+        label: 'Chat Logs',
+        route: `/projects/${projectId}/chat/logs`,
+        isActive: makeRouteMatcher(`/projects/${projectId}/chat/logs`),
+      },
+    ]
+
+    return [
+      {
+        key: 'overview',
+        label: 'Project overview',
+        icon: <IconFolderPlus className="h-4 w-4" />,
+        route: `/projects/${projectId}`,
+        isActive: makeRouteMatcher(`/projects/${projectId}`),
+      },
+      {
+        key: 'data-acquisition',
+        label: 'Data acquisition',
+        icon: <IconDatabase className="h-4 w-4" />,
+        route: dataAcquisitionChildren[0].route,
+        isActive: () => dataAcquisitionChildren.some((child) => child.isActive()),
+        children: dataAcquisitionChildren,
+      },
+      {
+        key: 'graph-creation',
+        label: 'Graph creation',
+        icon: <IconGraph className="h-4 w-4" />,
+        route: graphCreationChildren[0].route,
+        isActive: () => graphCreationChildren.some((child) => child.isActive()),
+        children: graphCreationChildren,
+      },
+      {
+        key: 'sharing',
+        label: 'Sharing',
+        icon: <IconShare className="h-4 w-4" />,
+        route: `/projects/${projectId}/sharing`,
+        isActive: makeRouteMatcher(`/projects/${projectId}/sharing`),
+      },
+      {
+        key: 'chat',
+        label: 'Chat',
+        icon: <IconMessageDots className="h-4 w-4" />,
+        route: `/projects/${projectId}/chat`,
+        isActive: makeRouteMatcher(`/projects/${projectId}/chat`, { prefix: true }),
+        children: chatChildren,
+      },
+    ]
+  }, [projectId, location.pathname])
+
   return (
     <div className="flex h-screen flex-col overflow-hidden">
       {/* Top Bar */}
@@ -256,198 +381,49 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                 </Tooltip>
 
                 {/* Project-specific navigation - only show when in a project */}
-                {projectId && (
+                {projectId && projectNavSections.length > 0 && (
                   <>
                     <Separator className="my-2" />
-
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant={isActiveRoute(`/projects/${projectId}`) ? 'default' : 'ghost'}
-                          className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start'}
-                          onClick={() => navigate(`/projects/${projectId}`)}
-                        >
-                          {navCollapsed ? (
-                            <IconFolderPlus className="h-4 w-4" />
-                          ) : (
-                            <>
-                              <IconFolderPlus className="h-4 w-4 mr-2" />
-                              Project
-                            </>
-                          )}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="right">Project</TooltipContent>
-                    </Tooltip>
-
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                    <Button
-                      variant={isActiveRoutePrefix(`/projects/${projectId}/datasources`) ? 'default' : 'ghost'}
-                      className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start'}
-                      onClick={() => navigate(`/projects/${projectId}/datasources`)}
-                    >
-                          {navCollapsed ? (
-                            <IconFileDatabase className="h-4 w-4" />
-                          ) : (
-                            <>
-                              <IconFileDatabase className="h-4 w-4 mr-2" />
-                              Data Sources
-                            </>
-                          )}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="right">Data Sources</TooltipContent>
-                    </Tooltip>
-
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant={isActiveRoute(`/projects/${projectId}/data-acquisition`) ? 'default' : 'ghost'}
-                          className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start'}
-                          onClick={() => navigate(`/projects/${projectId}/data-acquisition`)}
-                        >
-                          {navCollapsed ? (
-                            <IconDatabase className="h-4 w-4" />
-                          ) : (
-                            <>
-                              <IconDatabase className="h-4 w-4 mr-2" />
-                              Data Acquisition
-                            </>
-                          )}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="right">Data Acquisition</TooltipContent>
-                    </Tooltip>
-
-                    {isActiveRoutePrefix(`/projects/${projectId}/data-acquisition`) && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant={isActiveRoute(`/projects/${projectId}/data-acquisition/source-management`) ? 'default' : 'ghost'}
-                            className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start pl-8'}
-                            onClick={() => navigate(`/projects/${projectId}/data-acquisition/source-management`)}
-                          >
-                            {navCollapsed ? (
-                              <IconFileDatabase className="h-4 w-4" />
-                            ) : (
-                              <>
-                                <IconFileDatabase className="h-4 w-4 mr-2" />
-                                Source Management
-                              </>
+                    <Stack gap="xs">
+                      {projectNavSections.map((section) => {
+                        const sectionActive = section.isActive()
+                        return (
+                          <div key={section.key}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant={sectionActive ? 'default' : 'ghost'}
+                                  className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start'}
+                                  onClick={() => navigate(section.route)}
+                                >
+                                  {section.icon}
+                                  {!navCollapsed && <span className="ml-2">{section.label}</span>}
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="right">{section.label}</TooltipContent>
+                            </Tooltip>
+                            {!navCollapsed && section.children && section.children.length > 0 && (
+                              <Stack gap="xs" className="pl-6 mt-1">
+                                {section.children.map((child) => {
+                                  const childActive = child.isActive()
+                                  return (
+                                    <Button
+                                      key={child.key}
+                                      size="sm"
+                                      variant={childActive ? 'default' : 'ghost'}
+                                      className="justify-start text-sm"
+                                      onClick={() => navigate(child.route)}
+                                    >
+                                      {child.label}
+                                    </Button>
+                                  )
+                                })}
+                              </Stack>
                             )}
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="right">Source Management</TooltipContent>
-                      </Tooltip>
-                    )}
-
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant={isActiveRoute(`/projects/${projectId}/plan`) || isActiveRoute(`/projects/${projectId}/plan-nodes`) ? 'default' : 'ghost'}
-                          className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start'}
-                          onClick={() => navigate(`/projects/${projectId}/plan`)}
-                        >
-                          {navCollapsed ? (
-                            <IconGraph className="h-4 w-4" />
-                          ) : (
-                            <>
-                              <IconGraph className="h-4 w-4 mr-2" />
-                              Plan
-                            </>
-                          )}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="right">Plan</TooltipContent>
-                    </Tooltip>
-
-                    {/* Show Plan Nodes when on Plan or Plan Nodes page */}
-                    {(isActiveRoute(`/projects/${projectId}/plan`) || isActiveRoute(`/projects/${projectId}/plan-nodes`)) && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant={isActiveRoute(`/projects/${projectId}/plan-nodes`) ? 'default' : 'ghost'}
-                            className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start pl-8'}
-                            onClick={() => navigate(`/projects/${projectId}/plan-nodes`)}
-                          >
-                            {navCollapsed ? (
-                              <IconNetwork className="h-4 w-4" />
-                            ) : (
-                              <>
-                                <IconNetwork className="h-4 w-4 mr-2" />
-                                Plan Nodes
-                              </>
-                            )}
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="right">Plan Nodes</TooltipContent>
-                      </Tooltip>
-                    )}
-
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant={isActiveRoute(`/projects/${projectId}/graphs`) ? 'default' : 'ghost'}
-                          className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start'}
-                          onClick={() => navigate(`/projects/${projectId}/graphs`)}
-                        >
-                          {navCollapsed ? (
-                            <IconDatabase className="h-4 w-4" />
-                          ) : (
-                            <>
-                              <IconDatabase className="h-4 w-4 mr-2" />
-                              Graphs
-                            </>
-                          )}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="right">Graphs</TooltipContent>
-                    </Tooltip>
-
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant={isActiveRoutePrefix(`/projects/${projectId}/chat`) ? 'default' : 'ghost'}
-                          className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start'}
-                          onClick={() => navigate(`/projects/${projectId}/chat`)}
-                        >
-                          {navCollapsed ? (
-                            <IconMessageDots className="h-4 w-4" />
-                          ) : (
-                            <>
-                              <IconMessageDots className="h-4 w-4 mr-2" />
-                              Chat
-                            </>
-                          )}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="right">Chat</TooltipContent>
-                    </Tooltip>
-
-                    {isActiveRoutePrefix(`/projects/${projectId}/chat`) && (
-                      <div className={navCollapsed ? '' : 'pl-4'}>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant={isActiveRoute(`/projects/${projectId}/chat/logs`) ? 'default' : 'ghost'}
-                              className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start'}
-                              onClick={() => navigate(`/projects/${projectId}/chat/logs`)}
-                            >
-                              {navCollapsed ? (
-                                <IconMessageDots className="h-4 w-4" />
-                              ) : (
-                                <>
-                                  <IconMessageDots className="h-4 w-4 mr-2" />
-                                  Chat logs
-                                </>
-                              )}
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent side="right">Chat logs</TooltipContent>
-                        </Tooltip>
-                      </div>
-                    )}
+                          </div>
+                        )
+                      })}
+                    </Stack>
                   </>
                 )}
               </Stack>
@@ -1423,6 +1399,7 @@ const PlanEditorPage = () => {
         <Breadcrumbs
           projectName={selectedProject.name}
           projectId={selectedProject.id}
+          sections={[{ title: 'Graph creation', href: `/projects/${selectedProject.id}/plan` }]}
           currentPage="Plan"
           onNavigate={handleNavigate}
         />
@@ -1517,14 +1494,24 @@ function App() {
               <DataSourcesPage />
             </ErrorBoundary>
           } />
-          <Route path="/projects/:projectId/data-acquisition" element={
-            <ErrorBoundary>
-              <DataAcquisitionPage />
-            </ErrorBoundary>
-          } />
           <Route path="/projects/:projectId/data-acquisition/source-management" element={
             <ErrorBoundary>
               <SourceManagementPage />
+            </ErrorBoundary>
+          } />
+          <Route path="/projects/:projectId/data-acquisition/knowledge-base" element={
+            <ErrorBoundary>
+              <KnowledgeBasePage />
+            </ErrorBoundary>
+          } />
+          <Route path="/projects/:projectId/data-acquisition/datasets" element={
+            <ErrorBoundary>
+              <DatasetCreationPage />
+            </ErrorBoundary>
+          } />
+          <Route path="/projects/:projectId/sharing" element={
+            <ErrorBoundary>
+              <ProjectSharingPage />
             </ErrorBoundary>
           } />
           <Route path="/projects/:projectId/datasources/:dataSourceId/edit" element={

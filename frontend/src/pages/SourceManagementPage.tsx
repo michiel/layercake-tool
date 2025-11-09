@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { gql } from '@apollo/client'
 import { useMutation, useQuery } from '@apollo/client/react'
 import {
@@ -9,6 +9,7 @@ import {
 } from '@tabler/icons-react'
 
 import PageContainer from '../components/layout/PageContainer'
+import { Breadcrumbs } from '../components/common/Breadcrumbs'
 import { Stack } from '../components/layout-primitives'
 import { Alert, AlertDescription } from '../components/ui/alert'
 import { Badge } from '../components/ui/badge'
@@ -70,6 +71,18 @@ const UPDATE_FILE = gql`
   }
 `
 
+const GET_PROJECTS = gql`
+  query GetProjects {
+    projects {
+      id
+      name
+      description
+      createdAt
+      updatedAt
+    }
+  }
+`
+
 type ProjectFile = {
   id: string
   filename: string
@@ -108,8 +121,16 @@ const formatDate = (value?: string | null) => {
 }
 
 export const SourceManagementPage: React.FC = () => {
+  const navigate = useNavigate()
   const { projectId } = useParams<{ projectId: string }>()
   const numericProjectId = projectId ? parseInt(projectId, 10) : NaN
+
+  const { data: projectsData, loading: projectsLoading } = useQuery<{
+    projects: Array<{ id: number; name: string }>
+  }>(GET_PROJECTS)
+  const selectedProject = projectsData?.projects.find(
+    (p: any) => p.id === numericProjectId,
+  )
 
   const [tagInput, setTagInput] = useState('')
   const [indexImmediately, setIndexImmediately] = useState(true)
@@ -219,8 +240,36 @@ export const SourceManagementPage: React.FC = () => {
     )
   }
 
+  if (projectsLoading && !selectedProject) {
+    return (
+      <PageContainer>
+        <p>Loading project…</p>
+      </PageContainer>
+    )
+  }
+
+  if (!selectedProject) {
+    return (
+      <PageContainer>
+        <h1 className="text-3xl font-bold">Project Not Found</h1>
+        <Button onClick={() => navigate('/projects')} className="mt-4">
+          Back to Projects
+        </Button>
+      </PageContainer>
+    )
+  }
+
+  const handleNavigate = (path: string) => navigate(path)
+
   return (
     <PageContainer>
+      <Breadcrumbs
+        projectName={selectedProject.name}
+        projectId={selectedProject.id}
+        sections={[{ title: 'Data acquisition', href: `/projects/${selectedProject.id}/datasources` }]}
+        currentPage="Source management"
+        onNavigate={handleNavigate}
+      />
       <Stack gap="lg">
         <Stack gap="xs">
           <h1 className="text-2xl font-bold">Source Management</h1>

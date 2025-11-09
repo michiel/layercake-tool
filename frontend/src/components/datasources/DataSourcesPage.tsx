@@ -355,6 +355,7 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
         <Breadcrumbs
           projectName={selectedProject.name}
           projectId={selectedProject.id}
+          sections={[{ title: 'Data acquisition', href: `/projects/${selectedProject.id}/datasources` }]}
           currentPage="Data Sources"
           onNavigate={handleNavigate}
         />

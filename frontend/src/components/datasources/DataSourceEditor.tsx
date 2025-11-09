@@ -294,7 +294,10 @@ export const DataSourceEditor: React.FC<DataSourceEditorProps> = () => {
       <Breadcrumbs
         projectName={selectedProject.name}
         projectId={selectedProject.id}
-        sections={[{ title: 'Data Sources', href: `/projects/${selectedProject.id}/datasources` }]}
+        sections={[
+          { title: 'Data acquisition', href: `/projects/${selectedProject.id}/datasources` },
+          { title: 'Data Sources', href: `/projects/${selectedProject.id}/datasources` },
+        ]}
         currentPage={dataSource.name}
         onNavigate={handleNavigate}
       />
