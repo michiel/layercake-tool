@@ -928,9 +928,18 @@ impl Query {
             .await
             .map_err(|e| StructuredError::service("DataAcquisitionService::list_files", e))?;
 
-        Ok(files
-            .into_iter()
-            .map(|file| crate::graphql::types::ProjectFile {
+        let mut result = Vec::new();
+        for file in files {
+            let file_id = uuid::Uuid::parse_str(&file.id.to_string())
+                .map_err(|e| StructuredError::validation("fileId", format!("Invalid UUID: {}", e)))?;
+            let indexed = context
+                .app
+                .data_acquisition_service()
+                .is_file_indexed(project_id, file_id)
+                .await
+                .unwrap_or(false);
+
+            result.push(crate::graphql::types::ProjectFile {
                 id: file.id.to_string(),
                 filename: file.filename,
                 media_type: file.media_type,
@@ -938,8 +947,11 @@ impl Query {
                 checksum: file.checksum,
                 created_at: file.created_at,
                 tags: file.tags,
-            })
-            .collect())
+                indexed,
+            });
+        }
+
+        Ok(result)
     }
 
     /// List tags optionally filtered by scope

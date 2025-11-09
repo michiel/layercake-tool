@@ -21,6 +21,7 @@ pub struct ProjectFile {
     pub checksum: String,
     pub created_at: DateTime<Utc>,
     pub tags: Vec<String>,
+    pub indexed: bool,
 }
 
 #[derive(SimpleObject, Clone)]
@@ -83,4 +84,30 @@ pub struct DatasetGenerationInput {
 #[derive(SimpleObject)]
 pub struct DatasetGenerationPayload {
     pub dataset_yaml: Option<String>,
+}
+
+#[derive(InputObject)]
+pub struct DeleteFileInput {
+    pub project_id: i32,
+    pub file_id: String,
+}
+
+#[derive(InputObject)]
+pub struct ToggleFileIndexInput {
+    pub project_id: i32,
+    pub file_id: String,
+    pub indexed: bool,
+}
+
+#[derive(InputObject)]
+pub struct GetFileContentInput {
+    pub project_id: i32,
+    pub file_id: String,
+}
+
+#[derive(SimpleObject)]
+pub struct FileContentPayload {
+    pub filename: String,
+    pub media_type: String,
+    pub content: String, // Base64 encoded
 }

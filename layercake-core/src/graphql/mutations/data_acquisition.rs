@@ -154,6 +154,13 @@ impl DataAcquisitionMutation {
                 map_data_acquisition_error("DataAcquisitionService::update_ingested_file", e)
             })?;
 
+        let indexed = context
+            .app
+            .data_acquisition_service()
+            .is_file_indexed(input.project_id, file_id)
+            .await
+            .unwrap_or(false);
+
         Ok(ProjectFile {
             id: updated.id.to_string(),
             filename: updated.filename,
@@ -162,6 +169,88 @@ impl DataAcquisitionMutation {
             checksum: updated.checksum,
             created_at: updated.created_at,
             tags: updated.tags,
+            indexed,
+        })
+    }
+
+    async fn delete_file(
+        &self,
+        ctx: &Context<'_>,
+        input: crate::graphql::types::DeleteFileInput,
+    ) -> Result<bool> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let file_id = Uuid::parse_str(&input.file_id)
+            .map_err(|e| StructuredError::validation("file_id", format!("Invalid UUID: {}", e)))?;
+
+        context
+            .app
+            .data_acquisition_service()
+            .delete_file(input.project_id, file_id)
+            .await
+            .map_err(|e| map_data_acquisition_error("DataAcquisitionService::delete_file", e))?;
+
+        Ok(true)
+    }
+
+    async fn toggle_file_index(
+        &self,
+        ctx: &Context<'_>,
+        input: crate::graphql::types::ToggleFileIndexInput,
+    ) -> Result<bool> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let file_id = Uuid::parse_str(&input.file_id)
+            .map_err(|e| StructuredError::validation("file_id", format!("Invalid UUID: {}", e)))?;
+
+        context
+            .app
+            .data_acquisition_service()
+            .toggle_file_index(input.project_id, file_id, input.indexed)
+            .await
+            .map_err(|e| {
+                map_data_acquisition_error("DataAcquisitionService::toggle_file_index", e)
+            })?;
+
+        Ok(true)
+    }
+
+    async fn get_file_content(
+        &self,
+        ctx: &Context<'_>,
+        input: crate::graphql::types::GetFileContentInput,
+    ) -> Result<crate::graphql::types::FileContentPayload> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let file_id = Uuid::parse_str(&input.file_id)
+            .map_err(|e| StructuredError::validation("file_id", format!("Invalid UUID: {}", e)))?;
+
+        let content = context
+            .app
+            .data_acquisition_service()
+            .get_file_content(input.project_id, file_id)
+            .await
+            .map_err(|e| {
+                map_data_acquisition_error("DataAcquisitionService::get_file_content", e)
+            })?;
+
+        use base64::{engine::general_purpose, Engine as _};
+        let encoded = general_purpose::STANDARD.encode(&content);
+
+        // Get file metadata for filename and media_type
+        let files = context
+            .app
+            .data_acquisition_service()
+            .list_files(input.project_id)
+            .await
+            .map_err(|e| map_data_acquisition_error("DataAcquisitionService::list_files", e))?;
+
+        let file = files
+            .into_iter()
+            .find(|f| f.id.to_string() == file_id.to_string())
+            .ok_or_else(|| StructuredError::not_found("File", file_id))?;
+
+        Ok(crate::graphql::types::FileContentPayload {
+            filename: file.filename,
+            media_type: file.media_type,
+            content: encoded,
         })
     }
 }

@@ -787,4 +787,100 @@ impl DataAcquisitionService {
             tags,
         })
     }
+
+    pub async fn delete_file(&self, project_id: i32, file_id: Uuid) -> Result<()> {
+        let file = files::Entity::find_by_id(file_id)
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| DataAcquisitionError::NotFound(format!("File {}", file_id)))?;
+
+        if file.project_id != project_id {
+            return Err(DataAcquisitionError::Validation {
+                field: "projectId".into(),
+                message: "File belongs to a different project".into(),
+            }
+            .into());
+        }
+
+        // Delete embeddings from vector store
+        kb_documents::Entity::delete_many()
+            .filter(kb_documents::Column::ProjectId.eq(project_id))
+            .filter(kb_documents::Column::FileId.eq(file_id))
+            .exec(&self.db)
+            .await?;
+
+        // Delete file tags
+        file_tags::Entity::delete_many()
+            .filter(file_tags::Column::FileId.eq(file_id))
+            .exec(&self.db)
+            .await?;
+
+        // Delete the file itself
+        files::Entity::delete_by_id(file_id)
+            .exec(&self.db)
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn toggle_file_index(&self, project_id: i32, file_id: Uuid, indexed: bool) -> Result<()> {
+        let file = files::Entity::find_by_id(file_id)
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| DataAcquisitionError::NotFound(format!("File {}", file_id)))?;
+
+        if file.project_id != project_id {
+            return Err(DataAcquisitionError::Validation {
+                field: "projectId".into(),
+                message: "File belongs to a different project".into(),
+            }
+            .into());
+        }
+
+        if indexed {
+            // Add to index
+            let parsed = self
+                .ingestion
+                .parse_bytes(&file.media_type, &file.filename, &file.blob)
+                .await?;
+            self.index_parsed_document(project_id, file_id, &parsed, None)
+                .await?;
+        } else {
+            // Remove from index
+            kb_documents::Entity::delete_many()
+                .filter(kb_documents::Column::ProjectId.eq(project_id))
+                .filter(kb_documents::Column::FileId.eq(file_id))
+                .exec(&self.db)
+                .await?;
+        }
+
+        Ok(())
+    }
+
+    pub async fn get_file_content(&self, project_id: i32, file_id: Uuid) -> Result<Vec<u8>> {
+        let file = files::Entity::find_by_id(file_id)
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| DataAcquisitionError::NotFound(format!("File {}", file_id)))?;
+
+        if file.project_id != project_id {
+            return Err(DataAcquisitionError::Validation {
+                field: "projectId".into(),
+                message: "File belongs to a different project".into(),
+            }
+            .into());
+        }
+
+        Ok(file.blob)
+    }
+
+    pub async fn is_file_indexed(&self, project_id: i32, file_id: Uuid) -> Result<bool> {
+        let count = kb_documents::Entity::find()
+            .filter(kb_documents::Column::ProjectId.eq(project_id))
+            .filter(kb_documents::Column::FileId.eq(file_id))
+            .count(&self.db)
+            .await?;
+
+        Ok(count > 0)
+    }
 }
