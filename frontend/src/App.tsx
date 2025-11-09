@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { Routes, Route, useNavigate, useParams, useLocation } from 'react-router-dom'
-import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconDownload, IconChevronLeft, IconChevronRight, IconFolderPlus, IconNetwork, IconBooks, IconMessageDots, IconAdjustments, IconShare } from '@tabler/icons-react'
+import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconDownload, IconChevronLeft, IconChevronRight, IconFolderPlus, IconNetwork, IconBooks, IconMessageDots, IconAdjustments, IconShare, IconUpload } from '@tabler/icons-react'
 import { useQuery, useMutation } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import { Breadcrumbs } from './components/common/Breadcrumbs'
@@ -22,7 +22,7 @@ import { ProjectSharingPage } from './pages/ProjectSharingPage'
 import { getOrCreateSessionId } from './utils/session'
 import { Group, Stack } from './components/layout-primitives'
 import { Button } from './components/ui/button'
-import { Card } from './components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card'
 import { Badge } from './components/ui/badge'
 import { Alert, AlertDescription } from './components/ui/alert'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './components/ui/dialog'
@@ -1217,33 +1217,9 @@ const ProjectDetailPage = () => {
     )
   }
 
-  const projectActions = [
-    {
-      title: 'Data Sources',
-      description: 'Manage CSV and JSON files that serve as input data for your Plan DAGs',
-      icon: <IconFileDatabase size={20} />,
-      onClick: () => navigate(`/projects/${projectId}/datasources`),
-    },
-    {
-      title: 'Plan',
-      description: 'Create and edit Plan DAGs with visual node-based interface',
-      icon: <IconGraph size={20} />,
-      onClick: () => navigate(`/projects/${projectId}/plan`),
-      primary: true,
-    },
-    {
-      title: 'Plan Nodes',
-      description: 'Review every node in the Plan DAG with execution status and type',
-      icon: <IconNetwork size={20} />,
-      onClick: () => navigate(`/projects/${projectId}/plan-nodes`),
-    },
-    {
-      title: 'Graphs',
-      description: 'Browse materialized graph outputs with quick access actions',
-      icon: <IconDatabase size={20} />,
-      onClick: () => navigate(`/projects/${projectId}/graphs`),
-    },
-  ]
+  const planNodeCount = planDag?.nodes?.length ?? 0
+  const planEdgeCount = planDag?.edges?.length ?? 0
+  const planVersion = planDag?.version ?? 'n/a'
 
   return (
     <PageContainer>
@@ -1273,63 +1249,222 @@ const ProjectDetailPage = () => {
         </Group>
       </Group>
 
-      <h2 className="text-2xl font-bold mb-4">Project Tools</h2>
+      <Stack gap="xl">
+        <section>
+          <Group justify="between" className="mb-4">
+            <div>
+              <h2 className="text-2xl font-bold">Data Acquisition</h2>
+              <p className="text-muted-foreground">
+                Import files, manage ingestion, and monitor the knowledge base for this project.
+              </p>
+            </div>
+            <Group gap="xs">
+              <Button variant="outline" onClick={() => navigate(`/projects/${projectId}/datasources`)}>
+                Manage sources
+              </Button>
+              <Button onClick={() => navigate(`/projects/${projectId}/data-acquisition/source-management`)}>
+                Upload files
+              </Button>
+            </Group>
+          </Group>
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card className="border">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                  <IconFileDatabase className="h-4 w-4 text-primary" />
+                  Data sources
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  View imported CSV/JSON files and connect shared library sources.
+                </p>
+                <Button variant="secondary" className="w-full" onClick={() => navigate(`/projects/${projectId}/datasources`)}>
+                  Open data sources
+                </Button>
+              </CardContent>
+            </Card>
+            <Card className="border">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                  <IconUpload className="h-4 w-4 text-primary" />
+                  Source management
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Upload new documents, edit tags, and control ingestion defaults.
+                </p>
+                <Button className="w-full" onClick={() => navigate(`/projects/${projectId}/data-acquisition/source-management`)}>
+                  Manage uploads
+                </Button>
+              </CardContent>
+            </Card>
+            <Card className="border">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                  <IconDatabase className="h-4 w-4 text-primary" />
+                  Knowledge base
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Review embedding status and rebuild the project knowledge base.
+                </p>
+                <Button variant="outline" className="w-full" onClick={() => navigate(`/projects/${projectId}/data-acquisition/knowledge-base`)}>
+                  View knowledge base
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
 
-      <TooltipProvider>
-        <Stack gap="md">
-          {projectActions.map((action) => (
-            <Card
-              key={action.title}
-              className={`border p-4 ${
-                'cursor-pointer hover:shadow-md transition-shadow'
-              }`}
-              onClick={action.onClick}
-            >
-              <Group justify="between" align="start">
-                <Group align="start" gap="md">
-                  {action.icon}
-                  <div>
-                    <h4 className="text-lg font-semibold mb-2">{action.title}</h4>
-                    <p className="text-sm text-muted-foreground">
-                      {action.description}
-                    </p>
-                  </div>
+        <section>
+          <Group justify="between" className="mb-4">
+            <div>
+              <h2 className="text-2xl font-bold">Graph Creation</h2>
+              <p className="text-muted-foreground">
+                Design, inspect, and export the Plan DAG along with all derived graphs.
+              </p>
+            </div>
+            <Group gap="xs">
+              <Button variant="outline" onClick={() => handleDownloadYAML()} disabled={!planDag}>
+                <IconDownload className="mr-2 h-4 w-4" />
+                Export plan YAML
+              </Button>
+              <Button onClick={() => navigate(`/projects/${projectId}/plan`)}>
+                Open plan editor
+              </Button>
+            </Group>
+          </Group>
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card className="border">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                  <IconGraph className="h-4 w-4 text-primary" />
+                  Plan status
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Group gap="sm">
+                  <Badge variant="secondary">Nodes: {planNodeCount}</Badge>
+                  <Badge variant="secondary">Edges: {planEdgeCount}</Badge>
                 </Group>
+                <p className="text-xs text-muted-foreground">
+                  Version: {planVersion}
+                </p>
+                <Button variant="ghost" className="w-full" onClick={() => navigate(`/projects/${projectId}/plan`)}>
+                  Edit plan
+                </Button>
+              </CardContent>
+            </Card>
+            <Card className="border">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                  <IconNetwork className="h-4 w-4 text-primary" />
+                  Plan nodes
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Review node execution status, trace dependencies, and inspect generated outputs.
+                </p>
+                <Button className="w-full" onClick={() => navigate(`/projects/${projectId}/plan-nodes`)}>
+                  View nodes
+                </Button>
+              </CardContent>
+            </Card>
+            <Card className="border">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                  <IconDatabase className="h-4 w-4 text-primary" />
+                  Graph outputs
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Browse generated graphs, download CSV exports, or open the graph editor.
+                </p>
                 <Group gap="xs">
-                  {action.title === 'Plan' && planDag && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleDownloadYAML()
-                          }}
-                        >
-                          <IconDownload className="h-5 w-5" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Download Plan DAG as YAML</TooltipContent>
-                    </Tooltip>
-                  )}
+                  <Button className="flex-1" variant="secondary" onClick={() => navigate(`/projects/${projectId}/graphs`)}>
+                    Browse graphs
+                  </Button>
                   <Button
-                    variant={action.primary ? 'default' : 'ghost'}
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      action.onClick()
+                    className="flex-1"
+                    variant="ghost"
+                    disabled={!planDag?.nodes?.length}
+                    onClick={() => {
+                      if (planDag?.nodes?.length) {
+                        navigate(`/projects/${projectId}/plan-nodes/${planDag.nodes[0].id}/edit`)
+                      }
                     }}
                   >
-                    {action.icon}
-                    <span className="ml-2">Open</span>
+                    Open editor
                   </Button>
                 </Group>
-              </Group>
+              </CardContent>
             </Card>
-          ))}
-        </Stack>
-      </TooltipProvider>
+          </div>
+        </section>
+
+        <section>
+          <Group justify="between" className="mb-4">
+            <div>
+              <h2 className="text-2xl font-bold">Chat & Collaboration</h2>
+              <p className="text-muted-foreground">
+                Collaborate with agents, review chat logs, and manage project access.
+              </p>
+            </div>
+            <Group gap="xs">
+              <Button variant="outline" onClick={() => navigate(`/projects/${projectId}/sharing`)}>
+                Manage sharing
+              </Button>
+              <Button onClick={() => navigate(`/projects/${projectId}/chat`)}>
+                Open project chat
+              </Button>
+            </Group>
+          </Group>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card className="border">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                  <IconMessageDots className="h-4 w-4 text-primary" />
+                  Project chat
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Launch the shared agent conversation scoped to this project, or inspect previous messages.
+                </p>
+                <Group gap="sm">
+                  <Button className="flex-1" onClick={() => navigate(`/projects/${projectId}/chat`)}>
+                    Join chat
+                  </Button>
+                  <Button className="flex-1" variant="ghost" onClick={() => navigate(`/projects/${projectId}/chat/logs`)}>
+                    View logs
+                  </Button>
+                </Group>
+              </CardContent>
+            </Card>
+            <Card className="border">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                  <IconShare className="h-4 w-4 text-primary" />
+                  Sharing & access
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Invite collaborators, publish read-only snapshots, and control project-level permissions.
+                </p>
+                <Button variant="secondary" className="w-full" onClick={() => navigate(`/projects/${projectId}/sharing`)}>
+                  Manage access
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+      </Stack>
     </PageContainer>
   )
 }
