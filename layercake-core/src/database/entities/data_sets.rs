@@ -3,7 +3,7 @@ use sea_orm::{ActiveValue, Set};
 use serde::{Deserialize, Serialize};
 
 // Re-export common types for backwards compatibility
-pub use super::common_types::{DataType, FileFormat};
+pub use super::common_types::{DataSetOrigin, DataType, FileFormat};
 
 /// DataSet entity for uploaded file data (CSV/TSV/JSON)
 ///
@@ -30,6 +30,7 @@ pub struct Model {
 
     pub file_format: String, // 'csv', 'tsv', 'json'
     pub data_type: String,   // 'nodes', 'edges', 'layers', 'graph'
+    pub origin: String,      // 'file_upload', 'manual_edit', 'rag_agent'
     pub filename: String,
     #[sea_orm(column_type = "Binary(BlobSize::Blob(None))")]
     pub blob: Vec<u8>,
@@ -71,6 +72,7 @@ impl ActiveModel {
 
             file_format: ActiveValue::NotSet,
             data_type: ActiveValue::NotSet,
+            origin: ActiveValue::NotSet,
             filename: ActiveValue::NotSet,
             blob: ActiveValue::NotSet,
             graph_json: Set("{}".to_string()), // Default empty JSON
@@ -111,6 +113,11 @@ impl Model {
     /// Get the data type as an enum for type safety
     pub fn get_data_type(&self) -> Option<DataType> {
         self.data_type.parse().ok()
+    }
+
+    /// Get the origin as an enum for type safety
+    pub fn get_origin(&self) -> Option<DataSetOrigin> {
+        self.origin.parse().ok()
     }
 
     /// Check if the DataSet is ready for use
@@ -172,6 +179,7 @@ mod tests {
             description: None,
             file_format: "csv".to_string(),
             data_type: "nodes".to_string(),
+            origin: "file_upload".to_string(),
             filename: "test.csv".to_string(),
             blob: vec![],
             graph_json: "{}".to_string(),
@@ -203,6 +211,7 @@ mod tests {
             description: None,
             file_format: "csv".to_string(),
             data_type: "nodes".to_string(),
+            origin: "file_upload".to_string(),
             filename: "test.csv".to_string(),
             blob: vec![],
             graph_json: "{}".to_string(),
@@ -231,6 +240,7 @@ mod tests {
             description: None,
             file_format: "csv".to_string(),
             data_type: "nodes".to_string(),
+            origin: "file_upload".to_string(),
             filename: "test.csv".to_string(),
             blob: vec![],
             graph_json: "{}".to_string(),

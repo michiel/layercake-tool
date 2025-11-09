@@ -38,7 +38,8 @@ import {
   DataSet,
   formatFileSize,
   getFileFormatDisplayName,
-  getDataTypeDisplayName
+  getDataTypeDisplayName,
+  getOriginDisplayName
 } from '../../graphql/datasets'
 
 import {
@@ -435,7 +436,7 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
                       />
                     </TableHead>
                     <TableHead>Name</TableHead>
-                    <TableHead>Format</TableHead>
+                    <TableHead>Origin</TableHead>
                     <TableHead>Data Type</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Size</TableHead>
@@ -464,7 +465,7 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
                       </TableCell>
                       <TableCell>
                         <Badge variant="secondary">
-                          {getFileFormatDisplayName(dataSource.fileFormat)}
+                          {getOriginDisplayName(dataSource.origin)}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -657,7 +658,7 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
                         />
                       </TableHead>
                       <TableHead>Name</TableHead>
-                      <TableHead>Format</TableHead>
+                      <TableHead>Origin</TableHead>
                       <TableHead>Data Type</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Processed</TableHead>

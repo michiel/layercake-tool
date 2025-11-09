@@ -350,6 +350,7 @@ impl GraphBuilder {
 
             file_format: "json".to_string(),
             data_type: "graph".to_string(),
+            origin: "manual_edit".to_string(), // Virtual data set from graph node
             filename: format!("graph_{}", graph.node_id),
             blob: vec![], // Empty blob for virtual data source
             graph_json: serde_json::to_string(&graph_json)?,

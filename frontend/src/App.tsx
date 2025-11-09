@@ -178,7 +178,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
     const dataAcquisitionChildren: ProjectNavChild[] = [
       {
         key: 'source-management',
-        label: 'Source Management',
+        label: 'Document management',
         route: `/projects/${projectId}/data-acquisition/source-management`,
         isActive: makeRouteMatcher(`/projects/${projectId}/data-acquisition/source-management`),
       },
