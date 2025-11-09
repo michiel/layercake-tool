@@ -2,19 +2,19 @@ use async_graphql::*;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 
 use crate::database::entities::{
-    data_sources, graph_edges, graph_layers, graph_nodes, graphs, library_sources, plan_dag_nodes,
+    data_sets, graph_edges, graph_layers, graph_nodes, graphs, library_sources, plan_dag_nodes,
     plans, project_collaborators, user_sessions, users,
 };
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
 use crate::graphql::types::graph::Graph;
 use crate::graphql::types::plan::Plan;
-use crate::graphql::types::plan_dag::DataSourceReference;
+use crate::graphql::types::plan_dag::DataSetReference;
 use crate::graphql::types::plan_dag::{PlanDag, PlanDagInput, ValidationResult};
 use crate::graphql::types::project::Project;
 use crate::graphql::types::sample_project::SampleProject;
 use crate::graphql::types::{
-    DataSource, DataSourcePreview, GraphEdgePreview, GraphEdit, GraphNodePreview, GraphPreview,
+    DataSet, DataSetPreview, GraphEdgePreview, GraphEdit, GraphNodePreview, GraphPreview,
     Layer, LibrarySource, ProjectCollaborator, SystemSetting, TableColumn, TableRow, User,
     UserFilter, UserSession,
 };
@@ -401,28 +401,28 @@ impl Query {
         Ok(session.map(UserSession::from))
     }
 
-    /// Get DataSource by ID
-    async fn data_source(&self, ctx: &Context<'_>, id: i32) -> Result<Option<DataSource>> {
+    /// Get DataSet by ID
+    async fn data_set(&self, ctx: &Context<'_>, id: i32) -> Result<Option<DataSet>> {
         let context = ctx.data::<GraphQLContext>()?;
         let summary = context
             .app
-            .get_data_source(id)
+            .get_data_set(id)
             .await
-            .map_err(|e| StructuredError::service("AppContext::get_data_source", e))?;
+            .map_err(|e| StructuredError::service("AppContext::get_data_set", e))?;
 
-        Ok(summary.map(DataSource::from))
+        Ok(summary.map(DataSet::from))
     }
 
-    /// Get all DataSources for a project
-    async fn data_sources(&self, ctx: &Context<'_>, project_id: i32) -> Result<Vec<DataSource>> {
+    /// Get all DataSets for a project
+    async fn data_sets(&self, ctx: &Context<'_>, project_id: i32) -> Result<Vec<DataSet>> {
         let context = ctx.data::<GraphQLContext>()?;
         let summaries = context
             .app
-            .list_data_sources(project_id)
+            .list_data_sets(project_id)
             .await
-            .map_err(|e| StructuredError::service("AppContext::list_data_sources", e))?;
+            .map_err(|e| StructuredError::service("AppContext::list_data_sets", e))?;
 
-        Ok(summaries.into_iter().map(DataSource::from).collect())
+        Ok(summaries.into_iter().map(DataSet::from).collect())
     }
 
     /// Get all library sources
@@ -463,48 +463,48 @@ impl Query {
         Ok(graph.map(Graph::from))
     }
 
-    /// Get available DataSources for selection in DAG editor
-    async fn available_data_sources(
+    /// Get available DataSets for selection in DAG editor
+    async fn available_data_sets(
         &self,
         ctx: &Context<'_>,
         project_id: i32,
-    ) -> Result<Vec<DataSourceReference>> {
+    ) -> Result<Vec<DataSetReference>> {
         let context = ctx.data::<GraphQLContext>()?;
         let summaries = context
             .app
-            .available_data_sources(project_id)
+            .available_data_sets(project_id)
             .await
-            .map_err(|e| StructuredError::service("AppContext::available_data_sources", e))?;
+            .map_err(|e| StructuredError::service("AppContext::available_data_sets", e))?;
 
         Ok(summaries
             .into_iter()
-            .map(DataSourceReference::from)
+            .map(DataSetReference::from)
             .collect())
     }
 
-    /// Generate download URL for raw DataSource file
+    /// Generate download URL for raw DataSet file
 
-    async fn download_data_source_raw(&self, ctx: &Context<'_>, id: i32) -> Result<String> {
+    async fn download_data_set_raw(&self, ctx: &Context<'_>, id: i32) -> Result<String> {
         let context = ctx.data::<GraphQLContext>()?;
-        let _data_source = data_sources::Entity::find_by_id(id)
+        let _data_set = data_sets::Entity::find_by_id(id)
             .one(&context.db)
             .await
-            .map_err(|e| StructuredError::database("data_sources::Entity::find_by_id", e))?
-            .ok_or_else(|| StructuredError::not_found("DataSource", id))?;
+            .map_err(|e| StructuredError::database("data_sets::Entity::find_by_id", e))?
+            .ok_or_else(|| StructuredError::not_found("DataSet", id))?;
 
         // Generate a temporary download URL (in a real implementation, this would be a signed URL)
         let download_url = format!("/api/data-sources/{}/download/raw", id);
         Ok(download_url)
     }
 
-    /// Generate download URL for processed DataSource JSON
-    async fn download_data_source_json(&self, ctx: &Context<'_>, id: i32) -> Result<String> {
+    /// Generate download URL for processed DataSet JSON
+    async fn download_data_set_json(&self, ctx: &Context<'_>, id: i32) -> Result<String> {
         let context = ctx.data::<GraphQLContext>()?;
-        let _data_source = data_sources::Entity::find_by_id(id)
+        let _data_set = data_sets::Entity::find_by_id(id)
             .one(&context.db)
             .await
-            .map_err(|e| StructuredError::database("data_sources::Entity::find_by_id", e))?
-            .ok_or_else(|| StructuredError::not_found("DataSource", id))?;
+            .map_err(|e| StructuredError::database("data_sets::Entity::find_by_id", e))?
+            .ok_or_else(|| StructuredError::not_found("DataSet", id))?;
 
         // Generate a temporary download URL (in a real implementation, this would be a signed URL)
         let download_url = format!("/api/data-sources/{}/download/json", id);
@@ -513,15 +513,15 @@ impl Query {
 
     // Pipeline Preview Queries
 
-    /// Get DataSource preview with table data
-    async fn datasource_preview(
+    /// Get DataSet preview with table data
+    async fn dataset_preview(
         &self,
         ctx: &Context<'_>,
         project_id: i32,
         node_id: String,
         #[graphql(default = 100)] limit: u64,
         #[graphql(default = 0)] offset: u64,
-    ) -> Result<Option<DataSourcePreview>> {
+    ) -> Result<Option<DataSetPreview>> {
         let context = ctx.data::<GraphQLContext>()?;
 
         // Find the plan_dag_node to get the config
@@ -539,35 +539,35 @@ impl Query {
             .map_err(|e| StructuredError::database("plan_dag_nodes::Entity::find_by_id", e))?
             .ok_or_else(|| StructuredError::not_found("Plan DAG node", &node_id))?;
 
-        // Parse config to get dataSourceId
+        // Parse config to get dataSetId
         let config: serde_json::Value =
             serde_json::from_str(&dag_node.config_json).map_err(|e| {
                 StructuredError::bad_request(format!("Failed to parse node config: {}", e))
             })?;
 
-        let data_source_id = config
-            .get("dataSourceId")
+        let data_set_id = config
+            .get("dataSetId")
             .and_then(|v| v.as_i64())
             .map(|v| v as i32)
             .ok_or_else(|| {
-                StructuredError::bad_request("Node config does not have dataSourceId".to_string())
+                StructuredError::bad_request("Node config does not have dataSetId".to_string())
             })?;
 
-        // Query the data_sources table
-        let data_source = data_sources::Entity::find_by_id(data_source_id)
+        // Query the data_sets table
+        let data_set = data_sets::Entity::find_by_id(data_set_id)
             .one(&context.db)
             .await
-            .map_err(|e| StructuredError::database("data_sources::Entity::find_by_id", e))?
-            .ok_or_else(|| StructuredError::not_found("DataSource", data_source_id))?;
+            .map_err(|e| StructuredError::database("data_sets::Entity::find_by_id", e))?
+            .ok_or_else(|| StructuredError::not_found("DataSet", data_set_id))?;
 
         // Parse the graph_json field
         let graph_data: serde_json::Value =
-            serde_json::from_str(&data_source.graph_json).map_err(|e| {
+            serde_json::from_str(&data_set.graph_json).map_err(|e| {
                 StructuredError::bad_request(format!("Failed to parse graph JSON: {}", e))
             })?;
 
         // Determine what to extract based on data_type
-        let (columns, rows, total_rows) = match data_source.data_type.as_str() {
+        let (columns, rows, total_rows) = match data_set.data_type.as_str() {
             "nodes" => {
                 let nodes_array = graph_data
                     .get("nodes")
@@ -657,31 +657,31 @@ impl Query {
             _ => {
                 return Err(StructuredError::bad_request(format!(
                     "Unsupported data type: {}",
-                    data_source.data_type
+                    data_set.data_type
                 )));
             }
         };
 
-        // Determine execution state based on data_source status
-        let execution_state = match data_source.status.as_str() {
+        // Determine execution state based on data_set status
+        let execution_state = match data_set.status.as_str() {
             "active" => "completed",
             "processing" => "processing",
             "error" => "error",
             _ => "not_started",
         };
 
-        Ok(Some(DataSourcePreview {
+        Ok(Some(DataSetPreview {
             node_id,
-            datasource_id: data_source.id,
-            name: data_source.name.clone(),
-            file_path: data_source.filename.clone(),
-            file_type: data_source.data_type.clone(),
+            dataset_id: data_set.id,
+            name: data_set.name.clone(),
+            file_path: data_set.filename.clone(),
+            file_type: data_set.data_type.clone(),
             total_rows,
             columns,
             rows,
-            import_date: data_source.processed_at.map(|d| d.to_rfc3339()),
+            import_date: data_set.processed_at.map(|d| d.to_rfc3339()),
             execution_state: execution_state.to_string(),
-            error_message: data_source.error_message.clone(),
+            error_message: data_set.error_message.clone(),
         }))
     }
 

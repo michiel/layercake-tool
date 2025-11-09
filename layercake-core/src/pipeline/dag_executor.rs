@@ -20,20 +20,20 @@ use crate::services::graph_service::GraphService;
 /// DAG executor that processes nodes in topological order
 pub struct DagExecutor {
     db: DatabaseConnection,
-    datasource_importer: DatasourceImporter,
+    dataset_importer: DatasourceImporter,
     graph_builder: GraphBuilder,
     merge_builder: MergeBuilder,
 }
 
 impl DagExecutor {
     pub fn new(db: DatabaseConnection) -> Self {
-        let datasource_importer = DatasourceImporter::new(db.clone());
+        let dataset_importer = DatasourceImporter::new(db.clone());
         let graph_builder = GraphBuilder::new(db.clone());
         let merge_builder = MergeBuilder::new(db.clone());
 
         Self {
             db,
-            datasource_importer,
+            dataset_importer,
             graph_builder,
             merge_builder,
         }
@@ -62,17 +62,17 @@ impl DagExecutor {
         let node_name = metadata["label"].as_str().unwrap_or("Unnamed").to_string();
 
         match node.node_type.as_str() {
-            "DataSourceNode" => {
-                // Check if this is a reference to an existing data_source (has dataSourceId)
+            "DataSetNode" => {
+                // Check if this is a reference to an existing data_set (has dataSetId)
                 // or a file import (has filePath)
-                if config["dataSourceId"].is_number() {
-                    // DataSource references existing data_sources entry - no execution needed
-                    // Data is already in data_sources.graph_json from upload
+                if config["dataSetId"].is_number() {
+                    // DataSet references existing data_sets entry - no execution needed
+                    // Data is already in data_sets.graph_json from upload
                     return Ok(());
                 } else if let Some(file_path) = config["filePath"].as_str() {
                     // Legacy path: import from file
-                    self.datasource_importer
-                        .import_datasource(
+                    self.dataset_importer
+                        .import_dataset(
                             project_id,
                             node_id.to_string(),
                             node_name,
@@ -81,12 +81,12 @@ impl DagExecutor {
                         .await?;
                 } else {
                     return Err(anyhow!(
-                        "DataSource node must have either dataSourceId or filePath in config"
+                        "DataSet node must have either dataSetId or filePath in config"
                     ));
                 }
             }
             "MergeNode" => {
-                // Get upstream node IDs (can be DataSource, Graph, or Merge nodes)
+                // Get upstream node IDs (can be DataSet, Graph, or Merge nodes)
                 let upstream_ids = self.get_upstream_nodes(node_id, edges);
 
                 // Merge data from upstream sources
@@ -121,7 +121,7 @@ impl DagExecutor {
                 // Get upstream node IDs
                 let upstream_ids = self.get_upstream_nodes(node_id, edges);
 
-                // Build graph from upstream datasources (reads from data_sources table)
+                // Build graph from upstream datasets (reads from data_sets table)
                 self.graph_builder
                     .build_graph(
                         project_id,
@@ -552,7 +552,7 @@ impl DagExecutor {
                 weight: Set(Some(node.weight as f64)),
                 is_partition: Set(node.is_partition),
                 belongs_to: Set(node.belongs_to.clone()),
-                datasource_id: Set(node.datasource),
+                dataset_id: Set(node.dataset),
                 attrs: Set(attrs),
                 comment: Set(node.comment.clone()),
                 created_at: Set(Utc::now()),
@@ -575,7 +575,7 @@ impl DagExecutor {
                 label: Set(Some(edge.label.clone())),
                 layer: Set(Some(edge.layer.clone())),
                 weight: Set(Some(edge.weight as f64)),
-                datasource_id: Set(edge.datasource),
+                dataset_id: Set(edge.dataset),
                 attrs: Set(attrs),
                 comment: Set(edge.comment.clone()),
                 created_at: Set(Utc::now()),
@@ -622,7 +622,7 @@ impl DagExecutor {
                     border_color,
                     comment: None, // Layer struct doesn't have comment field
                     properties: properties_json,
-                    datasource_id: layer.datasource,
+                    dataset_id: layer.dataset,
                 },
             );
         }
@@ -894,7 +894,7 @@ mod tests {
             plan_dag_nodes::Model {
                 id: "A".to_string(),
                 plan_id: 1,
-                node_type: "DataSource".to_string(),
+                node_type: "DataSet".to_string(),
                 position_x: 0.0,
                 position_y: 0.0,
                 source_position: None,
@@ -907,7 +907,7 @@ mod tests {
             plan_dag_nodes::Model {
                 id: "B".to_string(),
                 plan_id: 1,
-                node_type: "DataSource".to_string(),
+                node_type: "DataSet".to_string(),
                 position_x: 0.0,
                 position_y: 0.0,
                 source_position: None,
@@ -968,7 +968,7 @@ mod tests {
             plan_dag_nodes::Model {
                 id: "A".to_string(),
                 plan_id: 1,
-                node_type: "DataSource".to_string(),
+                node_type: "DataSet".to_string(),
                 position_x: 0.0,
                 position_y: 0.0,
                 source_position: None,

@@ -93,7 +93,7 @@
 
 ### Phase 4 – Data Source & Library Integration
 - [x] Extract shared upload/reprocess logic into `AppContext` so GraphQL and MCP reuse the same helpers for create/update/reprocess flows.
-- [x] Add MCP data source tools and `layercake://datasources/...` resources that return the same JSON payloads as GraphQL.
+- [x] Add MCP data source tools and `layercake://datasets/...` resources that return the same JSON payloads as GraphQL.
   - Covered by the extended parity smoke test in `layercake-core/tests/parity_smoke_test.rs`.
 - [ ] Document expected MIME types and size limits for agent uploads in the MCP and console docs.
 

@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { PlanDagNodeType, NodeMetadata } from '../../../types/plan-dag';
-import { DataSourceNodeConfigForm } from './forms/DataSourceNodeConfigForm';
+import { DataSetNodeConfigForm } from './forms/DataSetNodeConfigForm';
 import { TransformNodeConfigForm } from './forms/TransformNodeConfigForm';
 import { FilterNodeConfigForm } from './forms/FilterNodeConfigForm';
 import { MergeNodeConfigForm } from './forms/MergeNodeConfigForm';
@@ -85,7 +85,7 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
     switch (nodeType) {
       case PlanDagNodeType.DATA_SOURCE:
         return (
-          <DataSourceNodeConfigForm
+          <DataSetNodeConfigForm
             {...commonProps}
             metadata={metadata}
             setMetadata={setMetadata}

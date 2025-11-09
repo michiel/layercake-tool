@@ -120,7 +120,7 @@ export class ReactFlowAdapter {
         hasValidConfig,
 
         // Execution metadata from GET_PLAN_DAG query
-        datasourceExecution: normalizedNode.datasourceExecution,
+        datasetExecution: normalizedNode.datasetExecution,
         graphExecution: normalizedNode.graphExecution,
 
         // Original Plan DAG data for round-trip consistency
@@ -217,21 +217,21 @@ export class ReactFlowAdapter {
   private static mapNodeTypeToReactFlow(nodeType: string): string {
     const typeMap: Record<string, string> = {
       // Database format (snake_case)
-      'data_source': 'DataSourceNode',
+      'data_source': 'DataSetNode',
       'transform': 'TransformNode',
       'filter': 'FilterNode',
       'merge': 'MergeNode',
       'output': 'OutputNode',
       'graph': 'GraphNode',
       // Backend may return capitalized variants
-      'DataSource': 'DataSourceNode',
+      'DataSet': 'DataSetNode',
       'Transform': 'TransformNode',
       'Filter': 'FilterNode',
       'Merge': 'MergeNode',
       'Output': 'OutputNode',
       'Graph': 'GraphNode',
       // TypeScript enum format (PascalCase) - pass through
-      'DataSourceNode': 'DataSourceNode',
+      'DataSetNode': 'DataSetNode',
       'TransformNode': 'TransformNode',
       'FilterNode': 'FilterNode',
       'MergeNode': 'MergeNode',
@@ -241,8 +241,8 @@ export class ReactFlowAdapter {
 
     const mapped = typeMap[nodeType]
     if (!mapped) {
-      console.error(`[ReactFlowAdapter] Unknown node type: ${nodeType}, falling back to DataSourceNode`)
-      return 'DataSourceNode' // Better than 'default' which won't match NODE_TYPES
+      console.error(`[ReactFlowAdapter] Unknown node type: ${nodeType}, falling back to DataSetNode`)
+      return 'DataSetNode' // Better than 'default' which won't match NODE_TYPES
     }
     return mapped
   }
@@ -252,7 +252,7 @@ export class ReactFlowAdapter {
    */
   private static mapReactFlowTypeToNodeType(reactFlowType: string | undefined): string {
     const typeMap: Record<string, string> = {
-      'DataSourceNode': 'data_source',
+      'DataSetNode': 'data_source',
       'TransformNode': 'transform',
       'FilterNode': 'filter',
       'MergeNode': 'merge',

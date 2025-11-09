@@ -2,21 +2,21 @@ import { useQuery } from '@apollo/client/react';
 import {
   GET_DATASOURCE_PREVIEW,
   GET_GRAPH_PREVIEW,
-  GetDataSourcePreviewResponse,
-  GetDataSourcePreviewVariables,
+  GetDataSetPreviewResponse,
+  GetDataSetPreviewVariables,
   GetGraphPreviewResponse,
   GetGraphPreviewVariables,
-  DataSourcePreview,
+  DataSetPreview,
   GraphPreview,
 } from '../graphql/preview';
 
 /**
- * Hook to fetch DataSource preview with table data
+ * Hook to fetch DataSet preview with table data
  * @param projectId - The project ID
  * @param nodeId - The DAG node ID
  * @param options - Optional query options (limit, offset, skip)
  */
-export function useDataSourcePreview(
+export function useDataSetPreview(
   projectId: number,
   nodeId: string,
   options?: {
@@ -28,8 +28,8 @@ export function useDataSourcePreview(
   const { limit = 100, offset = 0, skip = false } = options || {};
 
   const { data, loading, error, refetch } = useQuery<
-    GetDataSourcePreviewResponse,
-    GetDataSourcePreviewVariables
+    GetDataSetPreviewResponse,
+    GetDataSetPreviewVariables
   >(GET_DATASOURCE_PREVIEW, {
     variables: {
       projectId,
@@ -42,7 +42,7 @@ export function useDataSourcePreview(
   });
 
   return {
-    preview: data?.datasourcePreview,
+    preview: data?.datasetPreview,
     loading,
     error,
     refetch,
@@ -88,21 +88,21 @@ export function useGraphPreview(
  * Type guard to check if preview data exists
  */
 export function hasPreviewData(
-  preview: DataSourcePreview | GraphPreview | null | undefined
-): preview is DataSourcePreview | GraphPreview {
+  preview: DataSetPreview | GraphPreview | null | undefined
+): preview is DataSetPreview | GraphPreview {
   return preview !== null && preview !== undefined;
 }
 
 /**
- * Type guard to check if preview is DataSource
+ * Type guard to check if preview is DataSet
  */
-export function isDataSourcePreview(
-  preview: DataSourcePreview | GraphPreview | null | undefined
-): preview is DataSourcePreview {
+export function isDataSetPreview(
+  preview: DataSetPreview | GraphPreview | null | undefined
+): preview is DataSetPreview {
   return (
     preview !== null &&
     preview !== undefined &&
-    'datasourceId' in preview
+    'datasetId' in preview
   );
 }
 
@@ -110,7 +110,7 @@ export function isDataSourcePreview(
  * Type guard to check if preview is Graph
  */
 export function isGraphPreview(
-  preview: DataSourcePreview | GraphPreview | null | undefined
+  preview: DataSetPreview | GraphPreview | null | undefined
 ): preview is GraphPreview {
   return (
     preview !== null &&

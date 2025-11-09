@@ -2,7 +2,7 @@ pub mod chat_credentials;
 pub mod chat_messages;
 pub mod chat_sessions;
 pub mod common_types;
-pub mod data_sources;
+pub mod data_sets;
 pub mod library_sources;
 pub mod plan_dag_edges;
 pub mod plan_dag_nodes;
@@ -16,8 +16,8 @@ pub mod users;
 // REMOVED: nodes, edges - dead code, no longer used
 
 // Pipeline entities for DAG execution
-pub mod datasource_rows;
-pub mod datasources;
+pub mod dataset_rows;
+pub mod dataset_nodes;
 pub mod execution_state;
 pub mod graph_edges;
 pub mod graph_edits;
@@ -27,3 +27,6 @@ pub mod graphs;
 
 // Re-export specific entities to avoid naming conflicts
 pub use execution_state::ExecutionState;
+
+// Backwards compatibility: dataset_nodes was previously called "datasets"
+pub use dataset_nodes as datasets;

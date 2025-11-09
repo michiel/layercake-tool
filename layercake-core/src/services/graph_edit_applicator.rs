@@ -115,7 +115,7 @@ impl GraphEditApplicator {
             belongs_to: Set(belongs_to),
             weight: Set(None),
             attrs: Set(attrs),
-            datasource_id: Set(None),
+            dataset_id: Set(None),
             comment: Set(None),
             created_at: Set(chrono::Utc::now()),
         };
@@ -287,7 +287,7 @@ impl GraphEditApplicator {
             layer: Set(layer),
             weight: Set(None),
             attrs: Set(attrs),
-            datasource_id: Set(None),
+            dataset_id: Set(None),
             comment: Set(None),
             created_at: Set(chrono::Utc::now()),
         };
@@ -435,7 +435,7 @@ impl GraphEditApplicator {
             border_color: Set(border_color),
             comment: Set(comment),
             properties: Set(properties),
-            datasource_id: Set(None),
+            dataset_id: Set(None),
         };
 
         layer.insert(&self.db).await?;

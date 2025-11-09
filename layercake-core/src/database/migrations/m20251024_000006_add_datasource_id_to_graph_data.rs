@@ -6,64 +6,64 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        // Add datasource_id to graph_nodes
+        // Add dataset_id to graph_nodes
         manager
             .alter_table(
                 Table::alter()
                     .table(GraphNodes::Table)
-                    .add_column(ColumnDef::new(GraphNodes::DataSourceId).integer())
+                    .add_column(ColumnDef::new(GraphNodes::DataSetId).integer())
                     .to_owned(),
             )
             .await?;
 
-        // Add datasource_id to graph_edges
+        // Add dataset_id to graph_edges
         manager
             .alter_table(
                 Table::alter()
                     .table(GraphEdges::Table)
-                    .add_column(ColumnDef::new(GraphEdges::DataSourceId).integer())
+                    .add_column(ColumnDef::new(GraphEdges::DataSetId).integer())
                     .to_owned(),
             )
             .await?;
 
-        // Add datasource_id to layers
+        // Add dataset_id to layers
         manager
             .alter_table(
                 Table::alter()
                     .table(Layers::Table)
-                    .add_column(ColumnDef::new(Layers::DataSourceId).integer())
+                    .add_column(ColumnDef::new(Layers::DataSetId).integer())
                     .to_owned(),
             )
             .await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        // Drop datasource_id from graph_nodes
+        // Drop dataset_id from graph_nodes
         manager
             .alter_table(
                 Table::alter()
                     .table(GraphNodes::Table)
-                    .drop_column(GraphNodes::DataSourceId)
+                    .drop_column(GraphNodes::DataSetId)
                     .to_owned(),
             )
             .await?;
 
-        // Drop datasource_id from graph_edges
+        // Drop dataset_id from graph_edges
         manager
             .alter_table(
                 Table::alter()
                     .table(GraphEdges::Table)
-                    .drop_column(GraphEdges::DataSourceId)
+                    .drop_column(GraphEdges::DataSetId)
                     .to_owned(),
             )
             .await?;
 
-        // Drop datasource_id from layers
+        // Drop dataset_id from layers
         manager
             .alter_table(
                 Table::alter()
                     .table(Layers::Table)
-                    .drop_column(Layers::DataSourceId)
+                    .drop_column(Layers::DataSetId)
                     .to_owned(),
             )
             .await
@@ -73,17 +73,17 @@ impl MigrationTrait for Migration {
 #[derive(DeriveIden)]
 enum GraphNodes {
     Table,
-    DataSourceId,
+    DataSetId,
 }
 
 #[derive(DeriveIden)]
 enum GraphEdges {
     Table,
-    DataSourceId,
+    DataSetId,
 }
 
 #[derive(DeriveIden)]
 enum Layers {
     Table,
-    DataSourceId,
+    DataSetId,
 }

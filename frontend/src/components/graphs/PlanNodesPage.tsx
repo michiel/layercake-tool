@@ -67,7 +67,7 @@ interface PlanDagNode {
     description?: string
   }
   graphExecution?: PlanDagGraphExecution
-  datasourceExecution?: PlanDagDatasourceExecution
+  datasetExecution?: PlanDagDatasourceExecution
 }
 
 interface PlanDagResponse {
@@ -232,12 +232,12 @@ export const PlanNodesPage: React.FC<PlanNodesPageProps> = () => {
       const metadata = node.metadata || {}
       const label = metadata.label || graph?.name || node.id
       const graphExecution = node.graphExecution || {}
-      const datasourceExecution = node.datasourceExecution || {}
+      const datasetExecution = node.datasetExecution || {}
       const executionState =
         graphExecution.executionState ||
-        datasourceExecution.executionState ||
+        datasetExecution.executionState ||
         graph?.executionState ||
-        datasourceExecution.status ||
+        datasetExecution.status ||
         'NOT_STARTED'
       const nodeCount =
         graphExecution.nodeCount !== undefined
@@ -251,7 +251,7 @@ export const PlanNodesPage: React.FC<PlanNodesPageProps> = () => {
       const updatedAt =
         graphExecution.computedDate ||
         graph?.updatedAt ||
-        datasourceExecution.processedAt ||
+        datasetExecution.processedAt ||
         null
 
       return {
@@ -294,7 +294,7 @@ export const PlanNodesPage: React.FC<PlanNodesPageProps> = () => {
           <div>
             <h1 className="text-3xl font-bold">Plan Nodes</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Review every plan node and track execution progress across datasources and graphs
+              Review every plan node and track execution progress across datasets and graphs
             </p>
           </div>
           <Group gap="xs">

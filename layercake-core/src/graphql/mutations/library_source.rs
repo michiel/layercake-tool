@@ -4,7 +4,7 @@ use base64::Engine;
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
 use crate::graphql::types::{
-    CreateLibrarySourceInput, DataSource, ImportLibrarySourcesInput, LibrarySource,
+    CreateLibrarySourceInput, DataSet, ImportLibrarySourcesInput, LibrarySource,
     SeedLibrarySourcesResult, UpdateLibrarySourceInput,
 };
 use crate::services::library_source_service::LibrarySourceService;
@@ -38,8 +38,8 @@ impl LibrarySourceMutation {
                 StructuredError::bad_request(format!("Failed to decode base64 file content: {}", e))
             })?;
 
-        let file_format: crate::database::entities::data_sources::FileFormat = file_format.into();
-        let data_type: crate::database::entities::data_sources::DataType = data_type.into();
+        let file_format: crate::database::entities::data_sets::FileFormat = file_format.into();
+        let data_type: crate::database::entities::data_sets::DataType = data_type.into();
 
         let model = service
             .create_from_file(
@@ -143,12 +143,12 @@ impl LibrarySourceMutation {
         Ok(LibrarySource::from(model))
     }
 
-    /// Import one or more LibrarySources into a project as project-scoped DataSources
+    /// Import one or more LibrarySources into a project as project-scoped DataSets
     async fn import_library_sources(
         &self,
         ctx: &Context<'_>,
         input: ImportLibrarySourcesInput,
-    ) -> Result<Vec<DataSource>> {
+    ) -> Result<Vec<DataSet>> {
         let context = ctx.data::<GraphQLContext>()?;
         let service = LibrarySourceService::new(context.db.clone());
 
@@ -159,7 +159,7 @@ impl LibrarySourceMutation {
                 StructuredError::service("LibrarySourceService::import_many_into_project", e)
             })?;
 
-        Ok(models.into_iter().map(DataSource::from).collect())
+        Ok(models.into_iter().map(DataSet::from).collect())
     }
 
     /// Seed the shared library with the canonical GitHub resources bundle

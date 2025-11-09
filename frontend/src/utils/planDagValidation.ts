@@ -11,7 +11,7 @@ export const validateConnection = (
   // Define valid connections based on Plan DAG flow logic
   const validConnections: Record<PlanDagNodeType, PlanDagNodeType[]> = {
     [PlanDagNodeType.DATA_SOURCE]: [
-      PlanDagNodeType.GRAPH,     // DataSources primarily connect to Graph nodes
+      PlanDagNodeType.GRAPH,     // DataSets primarily connect to Graph nodes
       PlanDagNodeType.MERGE,     // Can also merge multiple data sources
       PlanDagNodeType.TRANSFORM, // Or transform data directly
       PlanDagNodeType.FILTER,    // Or filter data directly
@@ -70,9 +70,9 @@ export const validateConnection = (
     let errorMessage = `Cannot connect ${sourceType} to ${targetType}`
 
     if (sourceType === PlanDagNodeType.DATA_SOURCE) {
-      errorMessage = `DataSource nodes can only connect to Graph, Merge, Transform, or Output nodes`
+      errorMessage = `DataSet nodes can only connect to Graph, Merge, Transform, or Output nodes`
     } else if (targetType === PlanDagNodeType.DATA_SOURCE) {
-      errorMessage = `DataSource nodes cannot receive input connections (they are source nodes)`
+      errorMessage = `DataSet nodes cannot receive input connections (they are source nodes)`
     }
 
     return {
@@ -97,10 +97,10 @@ export const validateConnection = (
  */
 export const canAcceptMultipleInputs = (nodeType: PlanDagNodeType): boolean => {
   switch (nodeType) {
-    case PlanDagNodeType.MERGE:       // MergeNodes merge multiple DataSource/Graph inputs
+    case PlanDagNodeType.MERGE:       // MergeNodes merge multiple DataSet/Graph inputs
       return true
-    case PlanDagNodeType.DATA_SOURCE: // DataSource nodes cannot have inputs
-    case PlanDagNodeType.GRAPH:       // GraphNodes can have only one input (single DataSource or Merge output)
+    case PlanDagNodeType.DATA_SOURCE: // DataSet nodes cannot have inputs
+    case PlanDagNodeType.GRAPH:       // GraphNodes can have only one input (single DataSet or Merge output)
     case PlanDagNodeType.TRANSFORM:   // TransformNodes can have only one input
     case PlanDagNodeType.FILTER:      // FilterNodes can have only one input
     case PlanDagNodeType.OUTPUT:      // OutputNodes can have only one input
@@ -115,7 +115,7 @@ export const canAcceptMultipleInputs = (nodeType: PlanDagNodeType): boolean => {
  */
 export const canHaveMultipleOutputs = (nodeType: PlanDagNodeType): boolean => {
   switch (nodeType) {
-    case PlanDagNodeType.DATA_SOURCE: // DataSource can have multiple outputs (but not to same target)
+    case PlanDagNodeType.DATA_SOURCE: // DataSet can have multiple outputs (but not to same target)
     case PlanDagNodeType.GRAPH:       // GraphNodes can have multiple outputs
     case PlanDagNodeType.TRANSFORM:   // TransformNodes can have multiple outputs (but not to same target)
     case PlanDagNodeType.FILTER:      // FilterNodes can have multiple outputs (but not to same target)
@@ -134,7 +134,7 @@ export const canHaveMultipleOutputs = (nodeType: PlanDagNodeType): boolean => {
 export const getRequiredInputCount = (nodeType: PlanDagNodeType): number => {
   switch (nodeType) {
     case PlanDagNodeType.DATA_SOURCE:
-      return 0 // DataSource nodes are pure source nodes
+      return 0 // DataSet nodes are pure source nodes
     case PlanDagNodeType.GRAPH:
       return 1 // Graph nodes can accept inputs from other nodes
     case PlanDagNodeType.TRANSFORM:
@@ -345,7 +345,7 @@ export const isNodeConfigured = (
       return true;
 
     case PlanDagNodeType.DATA_SOURCE:
-      // DataSource nodes are configured once they point at a datasource
+      // DataSet nodes are configured once they point at a dataset
       return hasValidConfig;
 
     case PlanDagNodeType.TRANSFORM:
@@ -371,7 +371,7 @@ export const isNodeConfigured = (
 
 /**
  * Validates that a node doesn't connect to the same target twice
- * (Required for DataSource and Transform nodes per spec)
+ * (Required for DataSet and Transform nodes per spec)
  */
 export const validateUniqueTargets = (
   nodeId: string,
@@ -390,7 +390,7 @@ export const validateUniqueTargets = (
 export const getMinimumRequiredInputs = (nodeType: PlanDagNodeType): number => {
   switch (nodeType) {
     case PlanDagNodeType.DATA_SOURCE:
-      return 0; // DataSource nodes don't need inputs
+      return 0; // DataSet nodes don't need inputs
     case PlanDagNodeType.GRAPH:
       return 0; // GraphNodes can be empty (will show empty preview)
     case PlanDagNodeType.TRANSFORM:

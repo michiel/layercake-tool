@@ -190,7 +190,7 @@ impl Validate for NodeRequest {
 
         // Validate that node_type is one of the allowed types
         let allowed_types = [
-            "data_source",
+            "data_set",
             "transform",
             "merge",
             "copy",
@@ -301,7 +301,7 @@ mod tests {
         let node = NodeRequest {
             id: "node-1".to_string(),
             label: "Test Node".to_string(),
-            node_type: "data_source".to_string(),
+            node_type: "data_set".to_string(),
             metadata: None,
         };
         assert!(node.validate().is_ok());
@@ -319,7 +319,7 @@ mod tests {
         let node = NodeRequest {
             id: "node@1".to_string(),
             label: "Test Node".to_string(),
-            node_type: "data_source".to_string(),
+            node_type: "data_set".to_string(),
             metadata: None,
         };
         assert!(node.validate().is_err());

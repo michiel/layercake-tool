@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
-/// Execution state for pipeline entities (datasources and graphs)
+/// Execution state for pipeline entities (datasets and graphs)
 ///
 /// This enum tracks the progress of data processing through the DAG pipeline.
-/// It is used by both datasource and graph nodes to maintain consistent
+/// It is used by both dataset and graph nodes to maintain consistent
 /// execution state across the system.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ExecutionState {

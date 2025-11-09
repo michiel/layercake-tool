@@ -17,8 +17,8 @@ pub struct Model {
 pub enum Relation {
     #[sea_orm(has_one = "super::plans::Entity")]
     Plans,
-    #[sea_orm(has_many = "super::data_sources::Entity")]
-    DataSources,
+    #[sea_orm(has_many = "super::data_sets::Entity")]
+    DataSets,
 }
 
 impl Related<super::plans::Entity> for Entity {
@@ -27,9 +27,9 @@ impl Related<super::plans::Entity> for Entity {
     }
 }
 
-impl Related<super::data_sources::Entity> for Entity {
+impl Related<super::data_sets::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::DataSources.def()
+        Relation::DataSets.def()
     }
 }
 

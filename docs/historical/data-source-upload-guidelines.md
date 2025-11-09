@@ -6,10 +6,10 @@ Layercake’s data-source pipeline now runs through the shared `AppContext`. Gra
 
 | Flow | Accepted File Types | Notes |
 | ---- | ------------------- | ----- |
-| `createDataSourceFromFile` / MCP `create_data_source_from_file` | CSV, TSV, JSON | The `file_format` field must match the file extension. Data type is inferred from the `data_type` argument. |
-| `bulkUploadDataSources` / MCP bulk upload | Base64-encoded CSV payloads (per file) | Each entry in the request is decoded and auto-detected; supply one file per data source. |
-| `importDataSources` / MCP `import_data_sources` | XLSX or ODS spreadsheets | Each sheet becomes a data source. Sheet names must be unique within the workbook. |
-| `createEmptyDataSource` | N/A | Produces an empty JSON graph placeholder (nodes/edges/layers) ready for manual editing. |
+| `createDataSetFromFile` / MCP `create_data_source_from_file` | CSV, TSV, JSON | The `file_format` field must match the file extension. Data type is inferred from the `data_type` argument. |
+| `bulkUploadDataSets` / MCP bulk upload | Base64-encoded CSV payloads (per file) | Each entry in the request is decoded and auto-detected; supply one file per data source. |
+| `importDataSets` / MCP `import_data_sources` | XLSX or ODS spreadsheets | Each sheet becomes a data source. Sheet names must be unique within the workbook. |
+| `createEmptyDataSet` | N/A | Produces an empty JSON graph placeholder (nodes/edges/layers) ready for manual editing. |
 
 ## Size Guidance
 

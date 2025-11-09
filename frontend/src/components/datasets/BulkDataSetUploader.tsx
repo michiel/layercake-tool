@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react'
 import { useMutation } from '@apollo/client/react'
 import { IconUpload, IconX, IconAlertCircle, IconCheck } from '@tabler/icons-react'
-import { BULK_UPLOAD_DATASOURCES, BulkUploadDataSourceInput } from '../../graphql/datasources'
+import { BULK_UPLOAD_DATASOURCES, BulkUploadDataSetInput } from '../../graphql/datasets'
 import { Stack, Group } from '../layout-primitives'
 import { Alert, AlertDescription } from '../ui/alert'
 import { Badge } from '../ui/badge'
@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Progress } from '../ui/progress'
 import { Spinner } from '../ui/spinner'
 
-interface BulkDataSourceUploaderProps {
+interface BulkDataSetUploaderProps {
   projectId: number
   opened: boolean
   onClose: () => void
@@ -25,7 +25,7 @@ interface FileWithData {
   errorMessage?: string
 }
 
-export const BulkDataSourceUploader: React.FC<BulkDataSourceUploaderProps> = ({
+export const BulkDataSetUploader: React.FC<BulkDataSetUploaderProps> = ({
   projectId,
   opened,
   onClose,
@@ -82,7 +82,7 @@ export const BulkDataSourceUploader: React.FC<BulkDataSourceUploaderProps> = ({
       setUploadProgress(0)
 
       // Prepare input
-      const filesInput: BulkUploadDataSourceInput[] = files.map(f => ({
+      const filesInput: BulkUploadDataSetInput[] = files.map(f => ({
         name: f.name,
         description: `Uploaded from ${f.file.name}`,
         filename: f.file.name,

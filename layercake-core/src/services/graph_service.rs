@@ -69,7 +69,7 @@ impl GraphService {
                 background_color: "FFFFFF".to_string(),
                 text_color: "000000".to_string(),
                 border_color: "000000".to_string(),
-                datasource: None,
+                dataset: None,
             })
             .collect();
 
@@ -84,7 +84,7 @@ impl GraphService {
                 belongs_to: db_node.belongs_to,
                 weight: db_node.weight.unwrap_or(1.0) as i32,
                 comment: None, // Could be extracted from attrs if needed
-                datasource: db_node.datasource_id,
+                dataset: db_node.dataset_id,
             })
             .collect();
 
@@ -99,7 +99,7 @@ impl GraphService {
                 layer: db_edge.layer.unwrap_or_else(|| "default".to_string()),
                 weight: db_edge.weight.unwrap_or(1.0) as i32,
                 comment: None,
-                datasource: db_edge.datasource_id,
+                dataset: db_edge.dataset_id,
             })
             .collect();
 
@@ -230,7 +230,7 @@ impl GraphService {
             belongs_to: Set(belongs_to),
             weight: Set(weight),
             attrs: Set(attrs),
-            datasource_id: Set(None),
+            dataset_id: Set(None),
             comment: Set(None),
             created_at: Set(now),
         };

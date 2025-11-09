@@ -20,7 +20,7 @@
 //! let msg = not_found_msg("Project", 42);
 //!
 //! // Service errors
-//! let msg = service_error_msg("DataSourceService", &err);
+//! let msg = service_error_msg("DataSetService", &err);
 //!
 //! // Validation errors
 //! let msg = validation::required_field("email");
@@ -70,8 +70,8 @@ pub fn db_error_msg(operation: &str, error: impl std::fmt::Display) -> String {
 /// ```
 /// use layercake::common::error_helpers::service_error_msg;
 ///
-/// let msg = service_error_msg("DataSourceService", "file not found");
-/// assert_eq!(msg, "Service 'DataSourceService' failed: file not found");
+/// let msg = service_error_msg("DataSetService", "file not found");
+/// assert_eq!(msg, "Service 'DataSetService' failed: file not found");
 /// ```
 pub fn service_error_msg(service: &str, error: impl std::fmt::Display) -> String {
     format!("Service '{}' failed: {}", service, error)

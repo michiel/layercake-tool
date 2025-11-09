@@ -23,7 +23,7 @@ import { Alert, AlertDescription } from '../../ui/alert'
 import { Spinner } from '../../ui/spinner'
 import { Card } from '../../ui/card'
 
-import { PlanDagNodeType, NodeConfig, NodeMetadata, DataSourceNodeConfig, ReactFlowEdge, PlanDagNode, PlanDag } from '../../../types/plan-dag'
+import { PlanDagNodeType, NodeConfig, NodeMetadata, DataSetNodeConfig, ReactFlowEdge, PlanDagNode, PlanDag } from '../../../types/plan-dag'
 import { validateConnectionWithCycleDetection, canAcceptMultipleInputs, isNodeConfigured } from '../../../utils/planDagValidation'
 import { ReactFlowAdapter } from '../../../adapters/ReactFlowAdapter'
 
@@ -114,7 +114,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     source: '',
     dataType: 'Nodes',
     outputGraphRef: ''
-  } as DataSourceNodeConfig)
+  } as DataSetNodeConfig)
   const [configNodeMetadata, setConfigNodeMetadata] = useState<NodeMetadata>({ label: '', description: '' })
   const [draggingNode, setDraggingNode] = useState<{ type: PlanDagNodeType, position: { x: number, y: number } } | null>(null);
 
@@ -135,8 +135,8 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     const node = nodesRef.current.find(n => n.id === nodeId)
     if (node) {
       console.log('Found node:', node)
-      // Use node.type which is the ReactFlow type (DataSourceNode, OutputNode, etc.)
-      // node.data.nodeType might be the backend format (DataSource, Output, etc.)
+      // Use node.type which is the ReactFlow type (DataSetNode, OutputNode, etc.)
+      // node.data.nodeType might be the backend format (DataSet, Output, etc.)
       setConfigNodeType(node.type as PlanDagNodeType || PlanDagNodeType.DATA_SOURCE)
       setConfigNodeConfig(node.data.config || {})
       setConfigNodeMetadata(node.data.metadata || { label: '', description: '' })
@@ -211,7 +211,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
   // Adapt CQRS command interface to match old mutation interface
   const mutations = {
     addNode: (node: Partial<PlanDagNode>) =>
-      cqrsService.commands.createNode({ projectId, nodeType: node.nodeType || 'DataSource', node }),
+      cqrsService.commands.createNode({ projectId, nodeType: node.nodeType || 'DataSet', node }),
     addEdge: (edge: Partial<any>) =>
       cqrsService.commands.createEdge({ projectId, edge: edge as any }),
     updateNode: (nodeId: string, updates: Partial<PlanDagNode>) => {
@@ -1184,7 +1184,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     }
 
     // Confirm before clearing
-    if (!confirm('This will reset all execution state for all nodes (graph data will be cleared, but configuration and datasources will be kept). Continue?')) {
+    if (!confirm('This will reset all execution state for all nodes (graph data will be cleared, but configuration and datasets will be kept). Continue?')) {
       return;
     }
 
@@ -1381,7 +1381,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
 
   const miniMapNodeColor = useCallback((node: Node) => {
     switch (node.data?.nodeType) {
-      case 'DataSourceNode':
+      case 'DataSetNode':
         return '#51cf66'
       case 'GraphNode':
         return '#339af0'

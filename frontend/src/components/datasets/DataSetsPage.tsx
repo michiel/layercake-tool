@@ -18,7 +18,7 @@ import {
 } from '@tabler/icons-react'
 import { useQuery as useProjectsQuery } from '@apollo/client/react'
 import { Breadcrumbs } from '../common/Breadcrumbs'
-import { DataSourceUploader } from './DataSourceUploader'
+import { DataSetUploader } from './DataSetUploader'
 import PageContainer from '../layout/PageContainer'
 import { Stack, Group } from '../layout-primitives'
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert'
@@ -35,11 +35,11 @@ import {
   DELETE_DATASOURCE,
   REPROCESS_DATASOURCE,
   EXPORT_DATASOURCES,
-  DataSource,
+  DataSet,
   formatFileSize,
   getFileFormatDisplayName,
   getDataTypeDisplayName
-} from '../../graphql/datasources'
+} from '../../graphql/datasets'
 
 import {
   GET_LIBRARY_SOURCES,
@@ -61,14 +61,14 @@ const GET_PROJECTS = gql`
   }
 `
 
-interface DataSourcesPageProps {}
+interface DataSetsPageProps {}
 
-export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
+export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
   const navigate = useNavigate()
   const { projectId } = useParams<{ projectId: string }>()
   const projectNumericId = parseInt(projectId || '0')
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
-  const [selectedDataSource, setSelectedDataSource] = useState<DataSource | null>(null)
+  const [selectedDataSet, setSelectedDataSet] = useState<DataSet | null>(null)
   const [uploaderOpen, setUploaderOpen] = useState(false)
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set())
   const [exportFormatModalOpen, setExportFormatModalOpen] = useState(false)
@@ -89,12 +89,12 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
   const projects = projectsData?.projects || []
   const selectedProject = projects.find(p => p.id === projectNumericId)
 
-  // Query for DataSources
+  // Query for DataSets
   const {
     data: dataSourcesData,
     loading: dataSourcesLoading,
     error: dataSourcesError,
-    refetch: refetchDataSources
+    refetch: refetchDataSets
   } = useQuery(GET_DATASOURCES, {
     variables: { projectId: projectNumericId },
     errorPolicy: 'all',
@@ -112,13 +112,13 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
   })
 
   // Mutations
-  const [deleteDataSource, { loading: deleteLoading }] = useMutation(DELETE_DATASOURCE)
-  const [reprocessDataSource, { loading: reprocessLoading }] = useMutation(REPROCESS_DATASOURCE)
-  const [exportDataSources] = useMutation(EXPORT_DATASOURCES)
+  const [deleteDataSet, { loading: deleteLoading }] = useMutation(DELETE_DATASOURCE)
+  const [reprocessDataSet, { loading: reprocessLoading }] = useMutation(REPROCESS_DATASOURCE)
+  const [exportDataSets] = useMutation(EXPORT_DATASOURCES)
   const [importLibrarySources, { loading: libraryImportLoading, error: libraryImportError }] =
     useMutation(IMPORT_LIBRARY_SOURCES)
 
-  const dataSources: DataSource[] = (dataSourcesData as any)?.dataSources || []
+  const dataSources: DataSet[] = (dataSourcesData as any)?.dataSources || []
   const librarySources: LibrarySource[] = (librarySourcesData as any)?.librarySources || []
 
   useEffect(() => {
@@ -139,50 +139,50 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
     setUploaderOpen(true)
   }
 
-  const handleEdit = (dataSource: DataSource) => {
-    navigate(`/projects/${projectId}/datasources/${dataSource.id}/edit`)
+  const handleEdit = (dataSource: DataSet) => {
+    navigate(`/projects/${projectId}/datasets/${dataSource.id}/edit`)
   }
 
-  const handleDelete = (dataSource: DataSource) => {
-    setSelectedDataSource(dataSource)
+  const handleDelete = (dataSource: DataSet) => {
+    setSelectedDataSet(dataSource)
     setDeleteModalOpen(true)
   }
 
   const confirmDelete = async () => {
-    if (selectedDataSource) {
+    if (selectedDataSet) {
       try {
-        await deleteDataSource({
-          variables: { id: selectedDataSource.id }
+        await deleteDataSet({
+          variables: { id: selectedDataSet.id }
         })
-        await refetchDataSources()
+        await refetchDataSets()
         setDeleteModalOpen(false)
-        setSelectedDataSource(null)
+        setSelectedDataSet(null)
       } catch (error) {
-        console.error('Failed to delete DataSource:', error)
+        console.error('Failed to delete DataSet:', error)
         // TODO: Show error notification
       }
     }
   }
 
-  const handleReprocess = async (dataSource: DataSource) => {
+  const handleReprocess = async (dataSource: DataSet) => {
     try {
-      await reprocessDataSource({
+      await reprocessDataSet({
         variables: { id: dataSource.id }
       })
-      await refetchDataSources()
+      await refetchDataSets()
       // TODO: Show success notification
     } catch (error) {
-      console.error('Failed to reprocess DataSource:', error)
+      console.error('Failed to reprocess DataSet:', error)
       // TODO: Show error notification
     }
   }
 
-  const handleDownloadRaw = (dataSource: DataSource) => {
+  const handleDownloadRaw = (dataSource: DataSet) => {
     // TODO: Implement file download via GraphQL endpoint
     console.log('Download raw file for:', dataSource.filename)
   }
 
-  const handleDownloadJson = (dataSource: DataSource) => {
+  const handleDownloadJson = (dataSource: DataSet) => {
     // Create downloadable JSON file from graphJson
     const blob = new Blob([dataSource.graphJson], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
@@ -262,7 +262,7 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
         }
       })
 
-      await refetchDataSources()
+      await refetchDataSets()
       setLibraryImportModalOpen(false)
       setSelectedLibraryRows(new Set())
       setLibrarySelectionError(null)
@@ -276,11 +276,11 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
   }
 
   const handleExport = async (format: 'xlsx' | 'ods') => {
-    const selectedDataSources = dataSources.filter(ds => selectedRows.has(ds.id))
-    console.log('Exporting datasources:', selectedDataSources.map(ds => ds.id), 'as', format)
+    const selectedDataSets = dataSources.filter(ds => selectedRows.has(ds.id))
+    console.log('Exporting datasets:', selectedDataSets.map(ds => ds.id), 'as', format)
 
     try {
-      const result = await exportDataSources({
+      const result = await exportDataSets({
         variables: {
           input: {
             projectId: projectNumericId,
@@ -290,7 +290,7 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
         }
       })
 
-      const data = (result.data as any)?.exportDataSources
+      const data = (result.data as any)?.exportDataSets
       if (data) {
         // Decode base64 to binary
         const binaryString = atob(data.fileContent)
@@ -317,15 +317,15 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
 
       setExportFormatModalOpen(false)
       setSelectedRows(new Set()) // Clear selection after successful export
-      alert(`Successfully exported ${selectedRows.size} datasource${selectedRows.size !== 1 ? 's' : ''} to ${format.toUpperCase()}`)
+      alert(`Successfully exported ${selectedRows.size} dataset${selectedRows.size !== 1 ? 's' : ''} to ${format.toUpperCase()}`)
     } catch (error) {
-      console.error('Failed to export datasources:', error)
+      console.error('Failed to export datasets:', error)
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      alert(`Failed to export datasources: ${errorMessage}`)
+      alert(`Failed to export datasets: ${errorMessage}`)
     }
   }
 
-  const getStatusIcon = (status: DataSource['status']) => {
+  const getStatusIcon = (status: DataSet['status']) => {
     switch (status) {
       case 'active':
         return <IconCheck size={14} />
@@ -355,7 +355,7 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
         <Breadcrumbs
           projectName={selectedProject.name}
           projectId={selectedProject.id}
-          sections={[{ title: 'Data acquisition', href: `/projects/${selectedProject.id}/datasources` }]}
+          sections={[{ title: 'Data acquisition', href: `/projects/${selectedProject.id}/datasets` }]}
           currentPage="Data Sources"
           onNavigate={handleNavigate}
         />
@@ -574,7 +574,7 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
             <DialogTitle>Delete Data Source</DialogTitle>
           </DialogHeader>
           <p className="mb-4">
-            Are you sure you want to delete "{selectedDataSource?.name}"?
+            Are you sure you want to delete "{selectedDataSet?.name}"?
             This action cannot be undone.
           </p>
 
@@ -735,14 +735,14 @@ export const DataSourcesPage: React.FC<DataSourcesPageProps> = () => {
         </DialogContent>
       </Dialog>
 
-      {/* DataSource Uploader Modal */}
-      <DataSourceUploader
+      {/* DataSet Uploader Modal */}
+      <DataSetUploader
         projectId={projectNumericId}
         opened={uploaderOpen}
         onClose={() => setUploaderOpen(false)}
         onSuccess={() => {
-          console.log('DataSource created')
-          refetchDataSources()
+          console.log('DataSet created')
+          refetchDataSets()
         }}
       />
 

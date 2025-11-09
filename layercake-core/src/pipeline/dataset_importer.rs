@@ -6,9 +6,9 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use crate::database::entities::ExecutionState;
-use crate::database::entities::{datasource_rows, datasources};
+use crate::database::entities::{dataset_rows, datasets};
 
-/// Service for importing data from files into datasource entities
+/// Service for importing data from files into dataset entities
 pub struct DatasourceImporter {
     db: DatabaseConnection,
 }
@@ -18,15 +18,15 @@ impl DatasourceImporter {
         Self { db }
     }
 
-    /// Import a datasource from file path
-    /// Creates datasource entity and populates datasource_rows table
-    pub async fn import_datasource(
+    /// Import a dataset from file path
+    /// Creates dataset entity and populates dataset_rows table
+    pub async fn import_dataset(
         &self,
         project_id: i32,
         node_id: String,
         name: String,
         file_path: String,
-    ) -> Result<datasources::Model> {
+    ) -> Result<datasets::Model> {
         // Detect file type from path
         let path = Path::new(&file_path);
         let extension = path
@@ -51,8 +51,8 @@ impl DatasourceImporter {
             _ => return Err(anyhow!("Unsupported file extension: {}", extension)),
         };
 
-        // Create datasource entity
-        let datasource = datasources::ActiveModel {
+        // Create dataset entity
+        let dataset = datasets::ActiveModel {
             id: Set(0),
             project_id: Set(project_id),
             node_id: Set(node_id.clone()),
@@ -60,45 +60,45 @@ impl DatasourceImporter {
             file_path: Set(file_path.clone()),
             file_type: Set(file_type.to_string()),
             execution_state: Set(ExecutionState::Processing.as_str().to_string()),
-            ..datasources::ActiveModel::new()
+            ..datasets::ActiveModel::new()
         };
 
-        let datasource = datasource.insert(&self.db).await?;
+        let dataset = dataset.insert(&self.db).await?;
 
         // Publish initial execution status (Processing)
         #[cfg(feature = "graphql")]
-        crate::graphql::execution_events::publish_datasource_status(
+        crate::graphql::execution_events::publish_dataset_status(
             &self.db,
-            datasource.project_id,
-            &datasource.node_id,
-            &datasource,
+            dataset.project_id,
+            &dataset.node_id,
+            &dataset,
         )
         .await;
 
         // Import data based on file type
         let result = match (extension.to_lowercase().as_str(), file_type) {
-            ("csv", "nodes") => self.import_csv_nodes(&datasource, &file_path, b',').await,
-            ("csv", "edges") => self.import_csv_edges(&datasource, &file_path, b',').await,
-            ("tsv", "nodes") => self.import_csv_nodes(&datasource, &file_path, b'\t').await,
-            ("tsv", "edges") => self.import_csv_edges(&datasource, &file_path, b'\t').await,
-            ("json", "graph") => self.import_json_graph(&datasource, &file_path).await,
+            ("csv", "nodes") => self.import_csv_nodes(&dataset, &file_path, b',').await,
+            ("csv", "edges") => self.import_csv_edges(&dataset, &file_path, b',').await,
+            ("tsv", "nodes") => self.import_csv_nodes(&dataset, &file_path, b'\t').await,
+            ("tsv", "edges") => self.import_csv_edges(&dataset, &file_path, b'\t').await,
+            ("json", "graph") => self.import_json_graph(&dataset, &file_path).await,
             _ => Err(anyhow!("Unsupported file type combination")),
         };
 
         match result {
             Ok((row_count, column_info)) => {
-                // Save values before moving datasource
-                let project_id = datasource.project_id;
-                let node_id = datasource.node_id.clone();
+                // Save values before moving dataset
+                let project_id = dataset.project_id;
+                let node_id = dataset.node_id.clone();
 
                 // Update to completed state
-                let mut active: datasources::ActiveModel = datasource.into();
+                let mut active: datasets::ActiveModel = dataset.into();
                 active = active.set_completed(row_count as i32, column_info);
                 let updated = active.update(&self.db).await?;
 
                 // Publish execution status change
                 #[cfg(feature = "graphql")]
-                crate::graphql::execution_events::publish_datasource_status(
+                crate::graphql::execution_events::publish_dataset_status(
                     &self.db, project_id, &node_id, &updated,
                 )
                 .await;
@@ -106,18 +106,18 @@ impl DatasourceImporter {
                 Ok(updated)
             }
             Err(e) => {
-                // Save values before moving datasource
-                let project_id = datasource.project_id;
-                let node_id = datasource.node_id.clone();
+                // Save values before moving dataset
+                let project_id = dataset.project_id;
+                let node_id = dataset.node_id.clone();
 
                 // Update to error state
-                let mut active: datasources::ActiveModel = datasource.into();
+                let mut active: datasets::ActiveModel = dataset.into();
                 active = active.set_error(e.to_string());
                 let updated = active.update(&self.db).await?;
 
                 // Publish execution status change
                 #[cfg(feature = "graphql")]
-                crate::graphql::execution_events::publish_datasource_status(
+                crate::graphql::execution_events::publish_dataset_status(
                     &self.db, project_id, &node_id, &updated,
                 )
                 .await;
@@ -130,7 +130,7 @@ impl DatasourceImporter {
     /// Import CSV nodes file
     async fn import_csv_nodes(
         &self,
-        datasource: &datasources::Model,
+        dataset: &datasets::Model,
         file_path: &str,
         delimiter: u8,
     ) -> Result<(usize, Value)> {
@@ -170,9 +170,9 @@ impl DatasourceImporter {
             }
 
             // Insert row
-            let row = datasource_rows::ActiveModel {
+            let row = dataset_rows::ActiveModel {
                 id: Set(0),
-                datasource_id: Set(datasource.id),
+                dataset_node_id: Set(dataset.id),
                 row_number: Set(row_count + 1),
                 data: Set(json!(row_data)),
                 created_at: Set(chrono::Utc::now()),
@@ -188,7 +188,7 @@ impl DatasourceImporter {
     /// Import CSV edges file
     async fn import_csv_edges(
         &self,
-        datasource: &datasources::Model,
+        dataset: &datasets::Model,
         file_path: &str,
         delimiter: u8,
     ) -> Result<(usize, Value)> {
@@ -231,9 +231,9 @@ impl DatasourceImporter {
             }
 
             // Insert row
-            let row = datasource_rows::ActiveModel {
+            let row = dataset_rows::ActiveModel {
                 id: Set(0),
-                datasource_id: Set(datasource.id),
+                dataset_node_id: Set(dataset.id),
                 row_number: Set(row_count + 1),
                 data: Set(json!(row_data)),
                 created_at: Set(chrono::Utc::now()),
@@ -247,10 +247,10 @@ impl DatasourceImporter {
     }
 
     /// Import JSON graph file
-    /// For JSON graphs, we store the full structure in datasource_rows as a single row
+    /// For JSON graphs, we store the full structure in dataset_rows as a single row
     async fn import_json_graph(
         &self,
-        datasource: &datasources::Model,
+        dataset: &datasets::Model,
         file_path: &str,
     ) -> Result<(usize, Value)> {
         let content = std::fs::read_to_string(file_path)?;
@@ -280,9 +280,9 @@ impl DatasourceImporter {
         let edge_count = obj["edges"].as_array().map(|a| a.len()).unwrap_or(0);
 
         // Store as single row with row_number = 0 (indicates full graph)
-        let row = datasource_rows::ActiveModel {
+        let row = dataset_rows::ActiveModel {
             id: Set(0),
-            datasource_id: Set(datasource.id),
+            dataset_node_id: Set(dataset.id),
             row_number: Set(0),
             data: Set(graph_data),
             created_at: Set(chrono::Utc::now()),
@@ -299,38 +299,38 @@ impl DatasourceImporter {
         Ok((node_count + edge_count, column_info))
     }
 
-    /// Get datasource by node ID
+    /// Get dataset by node ID
     #[allow(dead_code)]
     pub async fn get_by_node(
         &self,
         project_id: i32,
         node_id: &str,
-    ) -> Result<Option<datasources::Model>> {
-        use crate::database::entities::datasources::{Column, Entity};
+    ) -> Result<Option<datasets::Model>> {
+        use crate::database::entities::datasets::{Column, Entity};
         use sea_orm::{ColumnTrait, QueryFilter};
 
-        let datasource = Entity::find()
+        let dataset = Entity::find()
             .filter(Column::ProjectId.eq(project_id))
             .filter(Column::NodeId.eq(node_id))
             .one(&self.db)
             .await?;
 
-        Ok(datasource)
+        Ok(dataset)
     }
 
-    /// Get datasource rows with pagination
+    /// Get dataset rows with pagination
     #[allow(dead_code)]
     pub async fn get_rows(
         &self,
-        datasource_id: i32,
+        dataset_id: i32,
         limit: u64,
         offset: u64,
-    ) -> Result<Vec<datasource_rows::Model>> {
-        use crate::database::entities::datasource_rows::{Column, Entity};
+    ) -> Result<Vec<dataset_rows::Model>> {
+        use crate::database::entities::dataset_rows::{Column, Entity};
         use sea_orm::{ColumnTrait, QueryFilter, QueryOrder, QuerySelect};
 
         let rows = Entity::find()
-            .filter(Column::DatasourceId.eq(datasource_id))
+            .filter(Column::DatasetNodeId.eq(dataset_id))
             .order_by_asc(Column::RowNumber)
             .limit(limit)
             .offset(offset)
@@ -340,14 +340,14 @@ impl DatasourceImporter {
         Ok(rows)
     }
 
-    /// Get total row count for a datasource
+    /// Get total row count for a dataset
     #[allow(dead_code)]
-    pub async fn get_row_count(&self, datasource_id: i32) -> Result<u64> {
-        use crate::database::entities::datasource_rows::{Column, Entity};
+    pub async fn get_row_count(&self, dataset_id: i32) -> Result<u64> {
+        use crate::database::entities::dataset_rows::{Column, Entity};
         use sea_orm::{ColumnTrait, QueryFilter};
 
         let count = Entity::find()
-            .filter(Column::DatasourceId.eq(datasource_id))
+            .filter(Column::DatasetNodeId.eq(dataset_id))
             .count(&self.db)
             .await?;
 

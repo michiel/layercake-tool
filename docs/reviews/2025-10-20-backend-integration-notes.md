@@ -6,7 +6,7 @@
 
 ## Overview
 
-The subscription infrastructure for real-time execution status updates has been implemented on both backend and frontend. However, the **publish calls** to broadcast execution status changes need to be integrated into the backend wherever datasource processing or graph computation occurs.
+The subscription infrastructure for real-time execution status updates has been implemented on both backend and frontend. However, the **publish calls** to broadcast execution status changes need to be integrated into the backend wherever dataset processing or graph computation occurs.
 
 ## What Was Implemented
 
@@ -23,7 +23,7 @@ The subscription infrastructure for real-time execution status updates has been 
        pub project_id: i32,
        pub node_id: String,
        pub node_type: PlanDagNodeType,
-       pub datasource_execution: Option<DataSourceExecutionMetadata>,
+       pub dataset_execution: Option<DataSetExecutionMetadata>,
        pub graph_execution: Option<GraphExecutionMetadata>,
        pub timestamp: String,
    }
@@ -57,24 +57,24 @@ The `publish_execution_status_event()` function needs to be called whenever exec
 
 **Location:** TBD (needs investigation)
 
-When a datasource is processed and its execution state changes, publish an event:
+When a dataset is processed and its execution state changes, publish an event:
 
 ```rust
 use crate::graphql::subscriptions::publish_execution_status_event;
-use crate::graphql::types::{NodeExecutionStatusEvent, DataSourceExecutionMetadata, PlanDagNodeType};
+use crate::graphql::types::{NodeExecutionStatusEvent, DataSetExecutionMetadata, PlanDagNodeType};
 
-// After datasource execution state changes
+// After dataset execution state changes
 let event = NodeExecutionStatusEvent {
     project_id,
-    node_id: datasource_node_id.clone(),
-    node_type: PlanDagNodeType::DataSource,
-    datasource_execution: Some(DataSourceExecutionMetadata {
-        data_source_id: datasource.id,
-        filename: datasource.file_path.clone(),
-        status: datasource.status.clone(),
-        processed_at: datasource.processed_at.map(|dt| dt.to_rfc3339()),
-        execution_state: datasource.execution_state.clone(),
-        error_message: datasource.error_message.clone(),
+    node_id: dataset_node_id.clone(),
+    node_type: PlanDagNodeType::DataSet,
+    dataset_execution: Some(DataSetExecutionMetadata {
+        data_source_id: dataset.id,
+        filename: dataset.file_path.clone(),
+        status: dataset.status.clone(),
+        processed_at: dataset.processed_at.map(|dt| dt.to_rfc3339()),
+        execution_state: dataset.execution_state.clone(),
+        error_message: dataset.error_message.clone(),
     }),
     graph_execution: None,
     timestamp: chrono::Utc::now().to_rfc3339(),
@@ -84,9 +84,9 @@ publish_execution_status_event(event).await.ok(); // Fire and forget
 ```
 
 **Trigger Points:**
-- When datasource status changes to `Processing`
-- When datasource status changes to `Completed`
-- When datasource status changes to `Error`
+- When dataset status changes to `Processing`
+- When dataset status changes to `Completed`
+- When dataset status changes to `Error`
 
 ### Priority 2: Graph Computation
 
@@ -99,7 +99,7 @@ let event = NodeExecutionStatusEvent {
     project_id,
     node_id: graph_node_id.clone(),
     node_type: PlanDagNodeType::Graph,
-    datasource_execution: None,
+    dataset_execution: None,
     graph_execution: Some(GraphExecutionMetadata {
         graph_id: graph.id,
         node_count: graph.node_count,
@@ -126,7 +126,7 @@ publish_execution_status_event(event).await.ok();
 Search the codebase for where execution state is updated:
 
 ```bash
-# Find datasource execution state updates
+# Find dataset execution state updates
 grep -r "execution_state.*Set\|set_execution_state" layercake-core/src --include="*.rs"
 
 # Find graph execution state updates
@@ -134,10 +134,10 @@ grep -r "ExecutionState::" layercake-core/src --include="*.rs"
 ```
 
 Expected locations:
-- `layercake-core/src/database/entities/datasources.rs` - entity methods
+- `layercake-core/src/database/entities/datasets.rs` - entity methods
 - `layercake-core/src/database/entities/graphs.rs` - entity methods
 - `layercake-core/src/pipeline/dag_executor.rs` - execution orchestration
-- `layercake-core/src/services/data_source_service.rs` - datasource service
+- `layercake-core/src/services/data_source_service.rs` - dataset service
 - `layercake-core/src/plan_execution.rs` - plan execution
 
 ### Step 2: Add Publishing Calls
@@ -147,18 +147,18 @@ For each execution state change:
 1. **Import dependencies:**
    ```rust
    use crate::graphql::subscriptions::publish_execution_status_event;
-   use crate::graphql::types::{NodeExecutionStatusEvent, DataSourceExecutionMetadata, GraphExecutionMetadata, PlanDagNodeType};
+   use crate::graphql::types::{NodeExecutionStatusEvent, DataSetExecutionMetadata, GraphExecutionMetadata, PlanDagNodeType};
    ```
 
 2. **Get node_id mapping:**
-   - Execution occurs on datasource/graph entities
-   - Need to map from datasource_id/graph_id to Plan DAG node_id
-   - Query `plan_dag_nodes` table where config contains the datasource_id/graph_id
+   - Execution occurs on dataset/graph entities
+   - Need to map from dataset_id/graph_id to Plan DAG node_id
+   - Query `plan_dag_nodes` table where config contains the dataset_id/graph_id
 
 3. **Construct and publish event:**
    ```rust
    // Get Plan DAG node ID (example - actual query will vary)
-   let node_id = get_plan_dag_node_id_for_datasource(db, project_id, datasource_id).await?;
+   let node_id = get_plan_dag_node_id_for_dataset(db, project_id, dataset_id).await?;
 
    let event = NodeExecutionStatusEvent { /* ... */ };
 
@@ -175,13 +175,13 @@ For each execution state change:
    - Verify events are published with correct data
 
 2. **Integration Tests:**
-   - Start datasource processing
+   - Start dataset processing
    - Subscribe to execution status
    - Verify status change events received
 
 3. **Manual Testing:**
    - Open Plan DAG editor
-   - Trigger datasource processing
+   - Trigger dataset processing
    - Observe execution status badges update in real-time (without reload)
 
 ## Helper Function Template
@@ -196,23 +196,23 @@ use crate::graphql::subscriptions::publish_execution_status_event;
 use crate::graphql::types::*;
 use sea_orm::{DatabaseConnection, EntityTrait, QueryFilter, ColumnTrait};
 
-/// Publish datasource execution status change
-pub async fn publish_datasource_status(
+/// Publish dataset execution status change
+pub async fn publish_dataset_status(
     db: &DatabaseConnection,
     project_id: i32,
-    datasource: &data_sources::Model,
+    dataset: &data_sources::Model,
 ) -> anyhow::Result<()> {
-    // Find Plan DAG node containing this datasource
+    // Find Plan DAG node containing this dataset
     let node = plan_dag_nodes::Entity::find()
         .filter(plan_dag_nodes::Column::PlanId.eq(project_id))
-        .filter(plan_dag_nodes::Column::NodeType.eq("DataSourceNode"))
+        .filter(plan_dag_nodes::Column::NodeType.eq("DataSetNode"))
         .all(db)
         .await?
         .into_iter()
         .find(|n| {
             // Parse config JSON and check if dataSourceId matches
             if let Ok(config) = serde_json::from_str::<serde_json::Value>(&n.config_json) {
-                config.get("dataSourceId").and_then(|v| v.as_i64()) == Some(datasource.id as i64)
+                config.get("dataSourceId").and_then(|v| v.as_i64()) == Some(dataset.id as i64)
             } else {
                 false
             }
@@ -222,14 +222,14 @@ pub async fn publish_datasource_status(
         let event = NodeExecutionStatusEvent {
             project_id,
             node_id: node.id.clone(),
-            node_type: PlanDagNodeType::DataSource,
-            datasource_execution: Some(DataSourceExecutionMetadata {
-                data_source_id: datasource.id,
-                filename: datasource.file_path.clone(),
-                status: datasource.status.clone(),
-                processed_at: datasource.processed_at.map(|dt| dt.to_rfc3339()),
-                execution_state: datasource.execution_state.clone(),
-                error_message: datasource.error_message.clone(),
+            node_type: PlanDagNodeType::DataSet,
+            dataset_execution: Some(DataSetExecutionMetadata {
+                data_source_id: dataset.id,
+                filename: dataset.file_path.clone(),
+                status: dataset.status.clone(),
+                processed_at: dataset.processed_at.map(|dt| dt.to_rfc3339()),
+                execution_state: dataset.execution_state.clone(),
+                error_message: dataset.error_message.clone(),
             }),
             graph_execution: None,
             timestamp: chrono::Utc::now().to_rfc3339(),
@@ -259,12 +259,12 @@ pub async fn publish_graph_status(
 Then use in execution code:
 
 ```rust
-// When datasource execution state changes
-datasource.set_execution_state(ExecutionState::Processing);
-datasource.update(db).await?;
+// When dataset execution state changes
+dataset.set_execution_state(ExecutionState::Processing);
+dataset.update(db).await?;
 
 // Publish status change
-execution_events::publish_datasource_status(db, project_id, &datasource).await.ok();
+execution_events::publish_dataset_status(db, project_id, &dataset).await.ok();
 ```
 
 ## Current Status
@@ -283,9 +283,9 @@ execution_events::publish_datasource_status(db, project_id, &datasource).await.o
 
 ## Expected Behaviour After Integration
 
-1. User creates datasource node in Plan DAG editor
-2. User triggers datasource processing (via separate UI)
-3. **Without reload**, datasource node badge updates:
+1. User creates dataset node in Plan DAG editor
+2. User triggers dataset processing (via separate UI)
+3. **Without reload**, dataset node badge updates:
    - "Pending" → "Processing" (with spinner)
    - "Processing" → "Completed" (with success indicator)
    - Or "Processing" → "Error" (with error indicator)

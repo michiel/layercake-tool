@@ -3,18 +3,18 @@ use sea_orm::entity::prelude::*;
 use sea_orm::{ActiveValue, Set};
 use serde::{Deserialize, Serialize};
 
-/// Datasource entity for DAG DataSourceNode execution tracking
+/// Dataset node entity for DAG DataSetNode execution tracking
 ///
-/// This entity represents datasource nodes in the execution DAG, NOT the uploaded
-/// data files themselves (those are in the `data_sources` table). Each record tracks
-/// the execution state and metadata for a datasource node reference in the pipeline.
+/// This entity represents dataset nodes in the execution DAG, NOT the uploaded
+/// data files themselves (those are in the `data_sets` table). Each record tracks
+/// the execution state and metadata for a dataset node reference in the pipeline.
 ///
 /// Related entities:
-/// - `data_sources`: The actual uploaded file data this datasource references
-/// - `plan_dag_nodes`: The DAG node definition this datasource implements
-/// - `graphs`: Graph nodes that may consume this datasource's output
+/// - `data_sets`: The actual uploaded file data this dataset references
+/// - `plan_dag_nodes`: The DAG node definition this dataset implements
+/// - `graphs`: Graph nodes that may consume this dataset's output
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
-#[sea_orm(table_name = "datasources")]
+#[sea_orm(table_name = "dataset_nodes")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
@@ -50,8 +50,8 @@ pub enum Relation {
         to = "super::plan_dag_nodes::Column::Id"
     )]
     PlanDagNodes,
-    #[sea_orm(has_many = "super::datasource_rows::Entity")]
-    DatasourceRows,
+    #[sea_orm(has_many = "super::dataset_rows::Entity")]
+    DatasetRows,
 }
 
 impl Related<super::projects::Entity> for Entity {
@@ -66,9 +66,9 @@ impl Related<super::plan_dag_nodes::Entity> for Entity {
     }
 }
 
-impl Related<super::datasource_rows::Entity> for Entity {
+impl Related<super::dataset_rows::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::DatasourceRows.def()
+        Relation::DatasetRows.def()
     }
 }
 
@@ -129,17 +129,17 @@ impl Model {
         ExecutionState::from_str(&self.execution_state).unwrap_or(ExecutionState::NotStarted)
     }
 
-    /// Check if the datasource is ready for use
+    /// Check if the dataset is ready for use
     pub fn is_ready(&self) -> bool {
         self.get_execution_state() == ExecutionState::Completed && self.row_count.is_some()
     }
 
-    /// Check if the datasource has an error
+    /// Check if the dataset has an error
     pub fn has_error(&self) -> bool {
         self.get_execution_state() == ExecutionState::Error
     }
 
-    /// Check if the datasource is currently processing
+    /// Check if the dataset is currently processing
     pub fn is_processing(&self) -> bool {
         matches!(
             self.get_execution_state(),

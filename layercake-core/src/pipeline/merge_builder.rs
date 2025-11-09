@@ -6,7 +6,7 @@ use std::collections::{HashMap, HashSet};
 use super::layer_operations::{insert_layers_to_db, load_layers_from_db};
 use super::types::LayerData;
 use crate::database::entities::ExecutionState;
-use crate::database::entities::{data_sources, graph_edges, graph_nodes, graphs, plan_dag_nodes};
+use crate::database::entities::{data_sets, graph_edges, graph_nodes, graphs, plan_dag_nodes};
 
 /// Helper function to parse is_partition from JSON Value (handles both boolean and string)
 fn parse_is_partition(value: &Value) -> bool {
@@ -62,9 +62,9 @@ impl MergeBuilder {
         .await;
 
         // Fetch upstream data sources by reading plan_dag_nodes configs
-        let mut data_sources_list = Vec::new();
+        let mut data_sets_list = Vec::new();
         for upstream_id in &upstream_node_ids {
-            // Check if upstream is a DataSource node or a Graph/Merge node
+            // Check if upstream is a DataSet node or a Graph/Merge node
             // Note: Node IDs are globally unique, no need to filter by plan_id
             let upstream_node = plan_dag_nodes::Entity::find_by_id(upstream_id)
                 .one(&self.db)
@@ -72,15 +72,15 @@ impl MergeBuilder {
                 .ok_or_else(|| anyhow!("Upstream node not found: {}", upstream_id))?;
 
             match upstream_node.node_type.as_str() {
-                "DataSourceNode" => {
-                    // Read from data_sources table using the node we just found
-                    let data_source = self.get_data_source_from_node(&upstream_node).await?;
-                    data_sources_list.push(DataSourceOrGraph::DataSource(data_source));
+                "DataSetNode" => {
+                    // Read from data_sets table using the node we just found
+                    let data_set = self.get_data_set_from_node(&upstream_node).await?;
+                    data_sets_list.push(DataSetOrGraph::DataSet(data_set));
                 }
                 "GraphNode" | "MergeNode" => {
                     // Read from graphs table
                     let graph = self.get_upstream_graph(project_id, upstream_id).await?;
-                    data_sources_list.push(DataSourceOrGraph::Graph(graph));
+                    data_sets_list.push(DataSetOrGraph::Graph(graph));
                 }
                 _ => {
                     return Err(anyhow!(
@@ -92,7 +92,7 @@ impl MergeBuilder {
         }
 
         // Compute source hash for change detection
-        let source_hash = self.compute_source_hash(&data_sources_list)?;
+        let source_hash = self.compute_source_hash(&data_sets_list)?;
 
         // Check if recomputation is needed
         if let Some(existing_hash) = &graph.source_hash {
@@ -104,7 +104,7 @@ impl MergeBuilder {
 
         // Merge data from all sources
         let result = self
-            .merge_data_from_sources(&graph, &data_sources_list)
+            .merge_data_from_sources(&graph, &data_sets_list)
             .await;
 
         match result {
@@ -173,26 +173,26 @@ impl MergeBuilder {
         Ok(graph)
     }
 
-    /// Get data_source from a plan_dag_node
-    async fn get_data_source_from_node(
+    /// Get data_set from a plan_dag_node
+    async fn get_data_set_from_node(
         &self,
         dag_node: &plan_dag_nodes::Model,
-    ) -> Result<data_sources::Model> {
-        // Parse config to get dataSourceId
+    ) -> Result<data_sets::Model> {
+        // Parse config to get dataSetId
         let config: serde_json::Value = serde_json::from_str(&dag_node.config_json)
             .map_err(|e| anyhow!("Failed to parse node config: {}", e))?;
 
-        let data_source_id = config
-            .get("dataSourceId")
+        let data_set_id = config
+            .get("dataSetId")
             .and_then(|v| v.as_i64())
             .map(|v| v as i32)
-            .ok_or_else(|| anyhow!("Node config does not have dataSourceId: {}", dag_node.id))?;
+            .ok_or_else(|| anyhow!("Node config does not have dataSetId: {}", dag_node.id))?;
 
-        // Query the data_sources table
-        data_sources::Entity::find_by_id(data_source_id)
+        // Query the data_sets table
+        data_sets::Entity::find_by_id(data_set_id)
             .one(&self.db)
             .await?
-            .ok_or_else(|| anyhow!("DataSource not found with id {}", data_source_id))
+            .ok_or_else(|| anyhow!("DataSet not found with id {}", data_set_id))
     }
 
     /// Get upstream graph (from Graph or Merge node)
@@ -209,21 +209,21 @@ impl MergeBuilder {
     }
 
     /// Compute hash of upstream sources for change detection
-    fn compute_source_hash(&self, sources: &[DataSourceOrGraph]) -> Result<String> {
+    fn compute_source_hash(&self, sources: &[DataSetOrGraph]) -> Result<String> {
         use sha2::{Digest, Sha256};
 
         let mut hasher = Sha256::new();
 
         for source in sources {
             match source {
-                DataSourceOrGraph::DataSource(ds) => {
+                DataSetOrGraph::DataSet(ds) => {
                     hasher.update(ds.id.to_string().as_bytes());
                     hasher.update(ds.filename.as_bytes());
                     if let Some(processed_at) = &ds.processed_at {
                         hasher.update(processed_at.to_rfc3339().as_bytes());
                     }
                 }
-                DataSourceOrGraph::Graph(graph) => {
+                DataSetOrGraph::Graph(graph) => {
                     hasher.update(graph.id.to_string().as_bytes());
                     hasher.update(graph.node_id.as_bytes());
                     if let Some(computed_date) = &graph.computed_date {
@@ -237,11 +237,11 @@ impl MergeBuilder {
         Ok(hash)
     }
 
-    /// Merge data from all sources (data_sources + graphs)
+    /// Merge data from all sources (data_sets + graphs)
     async fn merge_data_from_sources(
         &self,
         graph: &graphs::Model,
-        sources: &[DataSourceOrGraph],
+        sources: &[DataSetOrGraph],
     ) -> Result<(usize, usize)> {
         // Clear existing graph data
         self.clear_graph_data(graph.id).await?;
@@ -253,8 +253,8 @@ impl MergeBuilder {
         // Process each source
         for source in sources {
             match source {
-                DataSourceOrGraph::DataSource(ds) => {
-                    // Parse graph_json from data_sources
+                DataSetOrGraph::DataSet(ds) => {
+                    // Parse graph_json from data_sets
                     let graph_data: serde_json::Value = serde_json::from_str(&ds.graph_json)
                         .map_err(|e| {
                             anyhow!("Failed to parse graph JSON for {}: {}", ds.name, e)
@@ -268,7 +268,7 @@ impl MergeBuilder {
                         &ds.data_type,
                     )?;
                 }
-                DataSourceOrGraph::Graph(upstream_graph) => {
+                DataSetOrGraph::Graph(upstream_graph) => {
                     // Read nodes and edges from graph_nodes and graph_edges tables
                     self.extract_from_graph_tables(
                         &mut all_nodes,
@@ -332,7 +332,7 @@ impl MergeBuilder {
                 weight: Set(node_data.weight),
                 is_partition: Set(node_data.is_partition),
                 belongs_to: Set(node_data.belongs_to),
-                datasource_id: Set(node_data.datasource_id),
+                dataset_id: Set(node_data.dataset_id),
                 attrs: Set(node_data.attrs),
                 comment: Set(None),
                 created_at: Set(chrono::Utc::now()),
@@ -352,7 +352,7 @@ impl MergeBuilder {
                 label: Set(edge_data.label),
                 layer: Set(edge_data.layer),
                 weight: Set(edge_data.weight),
-                datasource_id: Set(edge_data.datasource_id),
+                dataset_id: Set(edge_data.dataset_id),
                 attrs: Set(edge_data.attrs),
                 comment: Set(None),
                 created_at: Set(chrono::Utc::now()),
@@ -396,7 +396,7 @@ impl MergeBuilder {
                                 .filter(|s| !s.is_empty())
                                 .map(|s| s.to_string()),
                             attrs: Some(node_val.clone()),
-                            datasource_id: None,
+                            dataset_id: None,
                         };
 
                         all_nodes.insert(id, node);
@@ -427,7 +427,7 @@ impl MergeBuilder {
                             layer: edge_val["layer"].as_str().map(|s| s.to_string()),
                             weight: edge_val["weight"].as_f64(),
                             attrs: Some(edge_val.clone()),
-                            datasource_id: None,
+                            dataset_id: None,
                         };
 
                         all_edges.push(edge);
@@ -453,7 +453,7 @@ impl MergeBuilder {
                                 .filter(|s| !s.is_empty())
                                 .map(|s| s.to_string()),
                             attrs: Some(node_val.clone()),
-                            datasource_id: None,
+                            dataset_id: None,
                         };
 
                         all_nodes.insert(id, node);
@@ -483,7 +483,7 @@ impl MergeBuilder {
                             layer: edge_val["layer"].as_str().map(|s| s.to_string()),
                             weight: edge_val["weight"].as_f64(),
                             attrs: Some(edge_val.clone()),
-                            datasource_id: None,
+                            dataset_id: None,
                         };
 
                         all_edges.push(edge);
@@ -491,7 +491,7 @@ impl MergeBuilder {
                 }
             }
             "layers" => {
-                // Extract layers from datasource
+                // Extract layers from dataset
                 if let Some(layers_array) = graph_data.get("layers").and_then(|v| v.as_array()) {
                     for layer_val in layers_array {
                         let layer_id = layer_val["id"]
@@ -552,7 +552,7 @@ impl MergeBuilder {
                             border_color,
                             comment,
                             properties: properties_json,
-                            datasource_id: None,
+                            dataset_id: None,
                         };
 
                         all_layers.insert(layer_id, layer);
@@ -592,7 +592,7 @@ impl MergeBuilder {
                     is_partition: node.is_partition,
                     belongs_to: node.belongs_to,
                     attrs: node.attrs,
-                    datasource_id: node.datasource_id,
+                    dataset_id: node.dataset_id,
                 },
             );
         }
@@ -612,7 +612,7 @@ impl MergeBuilder {
                 layer: edge.layer,
                 weight: edge.weight,
                 attrs: edge.attrs,
-                datasource_id: edge.datasource_id,
+                dataset_id: edge.dataset_id,
             });
         }
 
@@ -661,9 +661,9 @@ impl MergeBuilder {
     }
 }
 
-/// Enum to represent either a DataSource or a Graph (for upstream sources)
-enum DataSourceOrGraph {
-    DataSource(data_sources::Model),
+/// Enum to represent either a DataSet or a Graph (for upstream sources)
+enum DataSetOrGraph {
+    DataSet(data_sets::Model),
     Graph(graphs::Model),
 }
 
@@ -675,7 +675,7 @@ struct NodeData {
     is_partition: bool,
     belongs_to: Option<String>,
     attrs: Option<serde_json::Value>,
-    datasource_id: Option<i32>,
+    dataset_id: Option<i32>,
 }
 
 /// Internal edge data structure
@@ -687,7 +687,7 @@ struct EdgeData {
     layer: Option<String>,
     weight: Option<f64>,
     attrs: Option<serde_json::Value>,
-    datasource_id: Option<i32>,
+    dataset_id: Option<i32>,
 }
 
 // LayerData now imported from super::types (was previously defined here)

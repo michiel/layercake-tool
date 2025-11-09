@@ -94,7 +94,7 @@ impl ToGraphQLError for PlanError {
 }
 
 #[cfg(feature = "graphql")]
-impl ToGraphQLError for DataSourceError {
+impl ToGraphQLError for DataSetError {
     fn to_graphql_error(&self) -> GraphQLError {
         let code = self.error_code();
         let message = self.to_string();
@@ -104,13 +104,13 @@ impl ToGraphQLError for DataSourceError {
 
             // Add additional context based on error type
             match self {
-                DataSourceError::NotFound(id) => {
-                    e.set("dataSourceId", *id);
+                DataSetError::NotFound(id) => {
+                    e.set("dataSetId", *id);
                 }
-                DataSourceError::UnsupportedFormat(format) => {
+                DataSetError::UnsupportedFormat(format) => {
                     e.set("format", format);
                 }
-                DataSourceError::FileNotFound(path) => {
+                DataSetError::FileNotFound(path) => {
                     e.set("path", path);
                 }
                 _ => {}
@@ -186,8 +186,8 @@ pub fn anyhow_to_graphql(err: &anyhow::Error) -> GraphQLError {
         return plan_err.to_graphql_error();
     }
 
-    if let Some(data_source_err) = err.downcast_ref::<DataSourceError>() {
-        return data_source_err.to_graphql_error();
+    if let Some(data_set_err) = err.downcast_ref::<DataSetError>() {
+        return data_set_err.to_graphql_error();
     }
 
     if let Some(auth_err) = err.downcast_ref::<AuthError>() {
@@ -226,7 +226,7 @@ impl<T> ResultExt<T> for Result<T, PlanError> {
 }
 
 #[cfg(feature = "graphql")]
-impl<T> ResultExt<T> for Result<T, DataSourceError> {
+impl<T> ResultExt<T> for Result<T, DataSetError> {
     fn to_graphql_result(self) -> Result<T, GraphQLError> {
         self.map_err(|e| e.to_graphql_error())
     }

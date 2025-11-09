@@ -266,7 +266,7 @@ export const SourceManagementPage: React.FC = () => {
       <Breadcrumbs
         projectName={selectedProject.name}
         projectId={selectedProject.id}
-        sections={[{ title: 'Data acquisition', href: `/projects/${selectedProject.id}/datasources` }]}
+        sections={[{ title: 'Data acquisition', href: `/projects/${selectedProject.id}/datasets` }]}
         currentPage="Source management"
         onNavigate={handleNavigate}
       />

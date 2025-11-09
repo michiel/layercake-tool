@@ -21,12 +21,12 @@ import {
   UPDATE_DATASOURCE,
   REPROCESS_DATASOURCE,
   UPDATE_DATASOURCE_GRAPH_DATA,
-  DataSource,
-  UpdateDataSourceInput,
+  DataSet,
+  UpdateDataSetInput,
   formatFileSize,
   getDataTypeDisplayName,
   getFileFormatDisplayName
-} from '../../graphql/datasources'
+} from '../../graphql/datasets'
 import { GraphSpreadsheetEditor, GraphData } from '../editors/GraphSpreadsheetEditor'
 import { Stack, Group } from '../layout-primitives'
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert'
@@ -55,9 +55,9 @@ const GET_PROJECTS = gql`
   }
 `
 
-interface DataSourceEditorProps {}
+interface DataSetEditorProps {}
 
-export const DataSourceEditor: React.FC<DataSourceEditorProps> = () => {
+export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
   const navigate = useNavigate()
   const { projectId, dataSourceId } = useParams<{ projectId: string; dataSourceId: string }>()
   const [activeTab, setActiveTab] = useState<string>('details')
@@ -77,25 +77,25 @@ export const DataSourceEditor: React.FC<DataSourceEditorProps> = () => {
   const projects = projectsData?.projects || []
   const selectedProject = projects.find(p => p.id === parseInt(projectId || '0'))
 
-  // Query for DataSource
+  // Query for DataSet
   const {
     data: dataSourceData,
     loading: dataSourceLoading,
     error: dataSourceError,
-    refetch: refetchDataSource
+    refetch: refetchDataSet
   } = useQuery(GET_DATASOURCE, {
     variables: { id: parseInt(dataSourceId || '0') },
     errorPolicy: 'all'
   })
 
   // Mutations
-  const [updateDataSource, { loading: updateLoading }] = useMutation(UPDATE_DATASOURCE)
-  const [reprocessDataSource, { loading: reprocessLoading }] = useMutation(REPROCESS_DATASOURCE)
-  const [updateDataSourceGraphData] = useMutation(UPDATE_DATASOURCE_GRAPH_DATA)
+  const [updateDataSet, { loading: updateLoading }] = useMutation(UPDATE_DATASOURCE)
+  const [reprocessDataSet, { loading: reprocessLoading }] = useMutation(REPROCESS_DATASOURCE)
+  const [updateDataSetGraphData] = useMutation(UPDATE_DATASOURCE_GRAPH_DATA)
 
-  const dataSource: DataSource | null = (dataSourceData as any)?.dataSource || null
+  const dataSource: DataSet | null = (dataSourceData as any)?.dataSource || null
 
-  // Form for editing DataSource metadata
+  // Form for editing DataSet metadata
   const form = useForm<{name: string; description: string}>({
     defaultValues: {
       name: '',
@@ -118,7 +118,7 @@ export const DataSourceEditor: React.FC<DataSourceEditorProps> = () => {
   }
 
   const handleBack = () => {
-    navigate(`/projects/${projectId}/datasources`)
+    navigate(`/projects/${projectId}/datasets`)
   }
 
   // Convert file to base64
@@ -140,7 +140,7 @@ export const DataSourceEditor: React.FC<DataSourceEditorProps> = () => {
     if (!dataSource) return
 
     try {
-      let input: UpdateDataSourceInput
+      let input: UpdateDataSetInput
 
       if (selectedFile) {
         // If updating with new file, convert to base64
@@ -159,19 +159,19 @@ export const DataSourceEditor: React.FC<DataSourceEditorProps> = () => {
         }
       }
 
-      await updateDataSource({
+      await updateDataSet({
         variables: {
           id: dataSource.id,
           input
         }
       })
 
-      await refetchDataSource()
+      await refetchDataSet()
       setSelectedFile(null)
       setFileUploadMode(false)
       // TODO: Show success notification
     } catch (error) {
-      console.error('Failed to update DataSource:', error)
+      console.error('Failed to update DataSet:', error)
       // TODO: Show error notification
     }
   }
@@ -180,13 +180,13 @@ export const DataSourceEditor: React.FC<DataSourceEditorProps> = () => {
     if (!dataSource) return
 
     try {
-      await reprocessDataSource({
+      await reprocessDataSet({
         variables: { id: dataSource.id }
       })
-      await refetchDataSource()
+      await refetchDataSet()
       // TODO: Show success notification
     } catch (error) {
-      console.error('Failed to reprocess DataSource:', error)
+      console.error('Failed to reprocess DataSet:', error)
       // TODO: Show error notification
     }
   }
@@ -222,13 +222,13 @@ export const DataSourceEditor: React.FC<DataSourceEditorProps> = () => {
     if (!dataSource) return
 
     try {
-      await updateDataSourceGraphData({
+      await updateDataSetGraphData({
         variables: {
           id: dataSource.id,
           graphJson: JSON.stringify(graphData)
         }
       })
-      await refetchDataSource()
+      await refetchDataSet()
       // TODO: Show success notification
     } catch (error) {
       console.error('Failed to save graph data:', error)
@@ -237,7 +237,7 @@ export const DataSourceEditor: React.FC<DataSourceEditorProps> = () => {
     }
   }
 
-  const getStatusIcon = (status: DataSource['status']) => {
+  const getStatusIcon = (status: DataSet['status']) => {
     switch (status) {
       case 'active':
         return <IconCheck size={16} />
@@ -295,8 +295,8 @@ export const DataSourceEditor: React.FC<DataSourceEditorProps> = () => {
         projectName={selectedProject.name}
         projectId={selectedProject.id}
         sections={[
-          { title: 'Data acquisition', href: `/projects/${selectedProject.id}/datasources` },
-          { title: 'Data Sources', href: `/projects/${selectedProject.id}/datasources` },
+          { title: 'Data acquisition', href: `/projects/${selectedProject.id}/datasets` },
+          { title: 'Data Sources', href: `/projects/${selectedProject.id}/datasets` },
         ]}
         currentPage={dataSource.name}
         onNavigate={handleNavigate}

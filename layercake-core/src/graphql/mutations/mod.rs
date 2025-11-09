@@ -11,7 +11,7 @@ mod auth;
 mod chat;
 mod collaboration;
 mod data_acquisition;
-mod data_source;
+mod data_set;
 mod graph;
 mod graph_edit;
 mod library_source;
@@ -36,7 +36,7 @@ pub struct Mutation(
     pub auth::AuthMutation,
     pub chat::ChatMutation,
     pub collaboration::CollaborationMutation,
-    pub data_source::DataSourceMutation,
+    pub data_set::DataSetMutation,
     pub data_acquisition::DataAcquisitionMutation,
     pub graph::GraphMutation,
     pub graph_edit::GraphEditMutation,

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::database::entities::plan_dag_nodes;
 
-use super::metadata::{DataSourceExecutionMetadata, GraphExecutionMetadata, NodeMetadata};
+use super::metadata::{DataSetExecutionMetadata, GraphExecutionMetadata, NodeMetadata};
 use super::position::Position;
 use super::PlanDagNodeType;
 
@@ -21,7 +21,7 @@ pub struct PlanDagNode {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     // Optional execution metadata populated by query resolver
-    pub datasource_execution: Option<DataSourceExecutionMetadata>,
+    pub dataset_execution: Option<DataSetExecutionMetadata>,
     pub graph_execution: Option<GraphExecutionMetadata>,
 }
 
@@ -68,9 +68,9 @@ impl PlanDagNode {
         self.updated_at
     }
 
-    #[graphql(name = "datasourceExecution")]
-    async fn datasource_execution(&self) -> Option<&DataSourceExecutionMetadata> {
-        self.datasource_execution.as_ref()
+    #[graphql(name = "datasetExecution")]
+    async fn dataset_execution(&self) -> Option<&DataSetExecutionMetadata> {
+        self.dataset_execution.as_ref()
     }
 
     #[graphql(name = "graphExecution")]
@@ -89,13 +89,13 @@ impl PlanDagNode {
 impl From<plan_dag_nodes::Model> for PlanDagNode {
     fn from(model: plan_dag_nodes::Model) -> Self {
         let node_type = match model.node_type.as_str() {
-            "DataSourceNode" => PlanDagNodeType::DataSource,
+            "DataSetNode" => PlanDagNodeType::DataSet,
             "GraphNode" => PlanDagNodeType::Graph,
             "TransformNode" => PlanDagNodeType::Transform,
             "FilterNode" => PlanDagNodeType::Filter,
             "MergeNode" => PlanDagNodeType::Merge,
             "OutputNode" => PlanDagNodeType::Output,
-            _ => PlanDagNodeType::DataSource, // Default fallback
+            _ => PlanDagNodeType::DataSet, // Default fallback
         };
 
         let metadata: NodeMetadata =
@@ -117,7 +117,7 @@ impl From<plan_dag_nodes::Model> for PlanDagNode {
             config: model.config_json,
             created_at: model.created_at,
             updated_at: model.updated_at,
-            datasource_execution: None,
+            dataset_execution: None,
             graph_execution: None,
         }
     }

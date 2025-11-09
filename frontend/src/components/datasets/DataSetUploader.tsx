@@ -17,16 +17,16 @@ import {
   CREATE_EMPTY_DATASOURCE,
   BULK_UPLOAD_DATASOURCES,
   IMPORT_DATASOURCES,
-  CreateDataSourceInput,
-  CreateEmptyDataSourceInput,
-  BulkUploadDataSourceInput,
+  CreateDataSetInput,
+  CreateEmptyDataSetInput,
+  BulkUploadDataSetInput,
   FileFormat,
   DataType,
   getFileFormatDisplayName,
   getDataTypeDisplayName,
   detectFileFormat,
   formatFileSize
-} from '../../graphql/datasources'
+} from '../../graphql/datasets'
 import {
   CREATE_LIBRARY_SOURCE,
   CreateLibrarySourceInput
@@ -45,7 +45,7 @@ import { Spinner } from '../ui/spinner'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { Textarea } from '../ui/textarea'
 
-interface DataSourceUploaderProps {
+interface DataSetUploaderProps {
   projectId?: number
   mode?: 'project' | 'library'
   opened: boolean
@@ -66,7 +66,7 @@ interface BulkFileWithData {
   base64: string
 }
 
-export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
+export const DataSetUploader: React.FC<DataSetUploaderProps> = ({
   projectId,
   mode = 'project',
   opened,
@@ -85,18 +85,18 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
   // State for import sheet
   const [importFile, setImportFile] = useState<File | null>(null)
 
-  const [createDataSource, { loading: createLoading, error: createError }] = useMutation(
+  const [createDataSet, { loading: createLoading, error: createError }] = useMutation(
     CREATE_DATASOURCE_FROM_FILE
   )
-  const [createEmptyDataSource, { loading: createEmptyLoading, error: createEmptyError }] = useMutation(
+  const [createEmptyDataSet, { loading: createEmptyLoading, error: createEmptyError }] = useMutation(
     CREATE_EMPTY_DATASOURCE
   )
   const [createLibrarySource, { loading: createLibraryLoading, error: createLibraryError }] =
     useMutation(CREATE_LIBRARY_SOURCE)
-  const [bulkUploadDataSources, { loading: bulkLoading, error: bulkError }] = useMutation(
+  const [bulkUploadDataSets, { loading: bulkLoading, error: bulkError }] = useMutation(
     BULK_UPLOAD_DATASOURCES
   )
-  const [importDataSources, { loading: importLoading, error: importError }] = useMutation(
+  const [importDataSets, { loading: importLoading, error: importError }] = useMutation(
     IMPORT_DATASOURCES
   )
 
@@ -119,7 +119,7 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
   // Get available data types based on file format or active tab
   const getAvailableDataTypes = (format: FileFormat | null): DataType[] => {
     if (activeTab === 'empty') {
-      // For empty datasources, all types are available
+      // For empty datasets, all types are available
       return [DataType.NODES, DataType.EDGES, DataType.LAYERS, DataType.GRAPH]
     }
 
@@ -244,7 +244,7 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
 
         if (bulkFiles.length === 0) return
 
-        const filesInput: BulkUploadDataSourceInput[] = bulkFiles.map(f => ({
+        const filesInput: BulkUploadDataSetInput[] = bulkFiles.map(f => ({
           name: f.name,
           description: `Uploaded from ${f.file.name}`,
           filename: f.file.name,
@@ -253,7 +253,7 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
 
         setUploadProgress(50)
 
-        await bulkUploadDataSources({
+        await bulkUploadDataSets({
           variables: {
             projectId,
             files: filesInput
@@ -280,7 +280,7 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
 
         setUploadProgress(50)
 
-        await importDataSources({
+        await importDataSets({
           variables: {
             input: {
               projectId,
@@ -292,12 +292,12 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
 
         setImportFile(null)
       } else if (activeTab === 'empty') {
-        // Create empty datasource
+        // Create empty dataset
         if (projectId === undefined) {
           throw new Error('projectId is required to create a project data source')
         }
 
-        const input: CreateEmptyDataSourceInput = {
+        const input: CreateEmptyDataSetInput = {
           projectId,
           name: values.name,
           description: values.description || undefined,
@@ -306,7 +306,7 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
 
         setUploadProgress(50)
 
-        await createEmptyDataSource({
+        await createEmptyDataSet({
           variables: { input }
         })
       } else {
@@ -337,7 +337,7 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
             throw new Error('projectId is required to create a project data source')
           }
 
-          const input: CreateDataSourceInput = {
+          const input: CreateDataSetInput = {
             projectId,
             name: values.name,
             description: values.description || undefined,
@@ -347,7 +347,7 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
             dataType: values.dataType as DataType
           }
 
-          await createDataSource({
+          await createDataSet({
             variables: { input }
           })
         }
@@ -573,7 +573,7 @@ export const DataSourceUploader: React.FC<DataSourceUploaderProps> = ({
             </SelectContent>
           </Select>
           <p className="text-xs text-muted-foreground">
-            Choose what type of data this datasource will contain
+            Choose what type of data this dataset will contain
           </p>
         </div>
 

@@ -279,7 +279,7 @@ impl ValidationService {
     /// Validate Plan DAG node type
     pub fn validate_plan_dag_node_type(node_type: &str) -> Result<String> {
         let valid_types = [
-            "DataSourceNode",
+            "DataSetNode",
             "GraphNode",
             "TransformNode",
             "FilterNode",
@@ -486,7 +486,7 @@ mod tests {
     #[test]
     fn test_plan_dag_node_type_validation() {
         // Valid node types
-        assert!(ValidationService::validate_plan_dag_node_type("DataSourceNode").is_ok());
+        assert!(ValidationService::validate_plan_dag_node_type("DataSetNode").is_ok());
         assert!(ValidationService::validate_plan_dag_node_type("GraphNode").is_ok());
         assert!(ValidationService::validate_plan_dag_node_type("TransformNode").is_ok());
         assert!(ValidationService::validate_plan_dag_node_type("FilterNode").is_ok());
@@ -496,7 +496,7 @@ mod tests {
         // Invalid node types
         assert!(ValidationService::validate_plan_dag_node_type("InvalidNode").is_err());
         assert!(ValidationService::validate_plan_dag_node_type("").is_err());
-        assert!(ValidationService::validate_plan_dag_node_type("dataSourceNode").is_err());
+        assert!(ValidationService::validate_plan_dag_node_type("dataSetNode").is_err());
         // Wrong case
     }
 

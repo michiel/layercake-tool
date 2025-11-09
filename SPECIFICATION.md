@@ -38,9 +38,9 @@ One LayercakeGraph has many,
 ### Layercake plans and graphs
 
  - All aspected of the layercake process from ingestion to transformation to renderings are stored as a DAG. This is the layercake plan. If an upstream node (e.g. representing ingestion of a CSV as a nodeset) changes, all downstream nodes are updated
- - Each Project has DataSources. DataSources are tables belonging to a project that are a raw import of their source (attr: blob), and contain a graph_json attribute that imports the raw attributes to the appropriate graph_json={{nodes:[], edges:[], layers:[]}} attributes
- - DataSources can be referenced as a node in the PlanDAG, and can be used as source nodes for an edge with a target node GraphNode. GraphNodes can have multiple DataSourceNodes
- - DataSources have their own data management page(s) for CRUD operations under a Project
+ - Each Project has DataSets. DataSets are tables belonging to a project that are a raw import of their source (attr: blob), and contain a graph_json attribute that imports the raw attributes to the appropriate graph_json={{nodes:[], edges:[], layers:[]}} attributes
+ - DataSets can be referenced as a node in the PlanDAG, and can be used as source nodes for an edge with a target node GraphNode. GraphNodes can have multiple DataSetNodes
+ - DataSets have their own data management page(s) for CRUD operations under a Project
  - Graph data can be imported from CSVs (the existing layercake source format), REST endpoints, SQL querie (react component name : PlanVisualEditor)
  - The layercake plan (PlanDAG) can be edited (visually using react-flow / xflow, component name PlanVisualEditor), with the inputs, graph hierarchy and exports of different graphs in the hierarchy all represented and editable from the same interface
  - Graphs (or more specifically LayercakeGraphs) can be edited using the spreadsheet editor component that has three tabs for nodes, edges, layers (react component name : GraphSpreadsheetEditor) OR using another instance of react-flow / xflow for graph editing (react component name : GraphVisualEditor)
@@ -156,12 +156,12 @@ NC
 #### DAG Plan Editor
 
  - The DAG plan editor has the following nodes
-   * DataSourceNode - this references an *existing* DataSource entity of the Project
+   * DataSetNode - this references an *existing* DataSet entity of the Project
    * GraphNode - this *creates and manages* a Graph entity of the Project
    * TransformNode - changes a Graph. Input is a GraphNode, output is a GraphNode. The configuration for the TransformNode is a list of rules that are applied in order (example: invert_graph, max_partition_width:2, max_partition_depth:3, node_label_max_length:4, edge_label_max_length:4)
-   * MergeNode - merges DataSourceNodes and/or GraphNodes. The output is a new GraphNode. The configuration for MergeNode are the merge rules (default: overwrite existing nodes/edges/layers with same ID)
+   * MergeNode - merges DataSetNodes and/or GraphNodes. The output is a new GraphNode. The configuration for MergeNode are the merge rules (default: overwrite existing nodes/edges/layers with same ID)
    * OutputNode - this triggers a specific export or visualisation (example: GraphvizDOT, CSV), input is a GraphNode
- - The DAG Plan editor has a toolbar on the top. This toolbar has draggable icons for each of the node types that can be dropped on the canvas as unconfigured nodes. Unconfigured nodes are highlighted in orange. Clicking the cog icon on an uncofigured node opens the configuration dialog, which is different for each node. A DataSource node allows you to select an existing DataSource. A TransformNode allows you to create a list of rules, each of which has their own configuration
+ - The DAG Plan editor has a toolbar on the top. This toolbar has draggable icons for each of the node types that can be dropped on the canvas as unconfigured nodes. Unconfigured nodes are highlighted in orange. Clicking the cog icon on an uncofigured node opens the configuration dialog, which is different for each node. A DataSet node allows you to select an existing DataSet. A TransformNode allows you to create a list of rules, each of which has their own configuration
  - Nodes in the DAG Plan Editor have connectors on all 4 sides. The left and top are INPUT connectors and will only connect FROM nodes that output the correct type. the right and bottom are OUTPUT connectors and will connect TO nodes that input the correct type. Visually input and output connectors are distinct. After connecting an edge to or from a top/left/bottom/right connector, that connection has to stay consistent (NOT connect to top and render as connect to left. if visually connected to top, the render has to be top as well, etc)
  - The Plan DAG can have nodes in either CONFIGURED or UNCONFIGURED state
  - Node must meet all their requirements (including node-specific configuration that passes validation, if applicable) to be in configured state, otherwise they are in unconfigured state
@@ -169,7 +169,7 @@ NC
  - Node connection rules :
    * GraphNodes can have multiple inputs (of GraphNode type) but MUST have at least one to be in configured state
    * GraphNodes can have multiple outputs (of GraphNode type)
-   * DataSourceNodes can have multiple outputs (of GraphNode type), but cannot connect to the same target twice, and MUST have at least one output connected to be in configured state
+   * DataSetNodes can have multiple outputs (of GraphNode type), but cannot connect to the same target twice, and MUST have at least one output connected to be in configured state
    * TransformNodes can have only one input (GraphNode type) and multiple outputs (GraphNode type), but cannot connect to the same target twice, and MUST have one input and one output to be in configured state
    * OutputNodes can have only one input (of GraphNode type) and MUST have one input to be in configured state
    * These node connection rules also serve as part of Plan DAG validation on the backend
@@ -190,11 +190,11 @@ NC
 
 #### Datasource management CRUD
 
- - The datasources pages shows a table of datasources
+ - The datasets pages shows a table of datasets
  - Rows in the table can be selected
  - If rows are selected, an export button activates, pressing the export button gives the option of xlxs or ods
- - Exported datasources are exported as individual sheets to xlxs or ods spreadsheet, with sheets have the id of the datasource as their label. this functionality is implemented on the backend
- - There is an import button on the datasources page, allowing upload of an xlxs or ods spreadsheet in the same format. new datasources are created when a sheet id does not have a corresponding datasource id yet, if a datasource does exist the import of that sheet is its new version
+ - Exported datasets are exported as individual sheets to xlxs or ods spreadsheet, with sheets have the id of the dataset as their label. this functionality is implemented on the backend
+ - There is an import button on the datasets page, allowing upload of an xlxs or ods spreadsheet in the same format. new datasets are created when a sheet id does not have a corresponding dataset id yet, if a dataset does exist the import of that sheet is its new version
 
 
 ### Artefacts

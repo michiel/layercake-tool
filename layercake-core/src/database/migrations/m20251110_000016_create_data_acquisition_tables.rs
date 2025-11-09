@@ -181,7 +181,7 @@ async fn create_dataset_tags_table(manager: &SchemaManager<'_>) -> Result<(), Db
                     ForeignKey::create()
                         .name("fk_dataset_tags_dataset")
                         .from(DatasetTags::Table, DatasetTags::DatasetId)
-                        .to(DataSources::Table, DataSources::Id)
+                        .to(DataSets::Table, DataSets::Id)
                         .on_delete(ForeignKeyAction::Cascade),
                 )
                 .foreign_key(
@@ -498,7 +498,7 @@ enum Projects {
 }
 
 #[derive(DeriveIden)]
-enum DataSources {
+enum DataSets {
     Table,
     Id,
 }

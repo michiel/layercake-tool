@@ -73,7 +73,7 @@ layercake-core/src/graphql/
 **Examples:**
 ```rust
 // data_source.rs - Inconsistent naming
-pub struct DataSource {
+pub struct DataSet {
     #[graphql(name = "projectId")]    // camelCase via directive
     pub project_id: i32,               // snake_case field
 
@@ -234,8 +234,8 @@ impl Mutation {
         PlanDagMutations
     }
 
-    async fn data_sources(&self) -> DataSourceMutations {
-        DataSourceMutations
+    async fn data_sources(&self) -> DataSetMutations {
+        DataSetMutations
     }
 
     async fn auth(&self) -> AuthMutations {
@@ -379,10 +379,10 @@ async fn user_by_email(&self, ctx: &Context<'_>, email: String) -> Result<Option
 ```
 
 ```rust
-// DataSource queries - separate by ID and by project
-async fn data_source(&self, ctx: &Context<'_>, id: i32) -> Result<Option<DataSource>>
-async fn data_sources(&self, ctx: &Context<'_>, project_id: i32) -> Result<Vec<DataSource>>
-async fn available_data_sources(&self, ctx: &Context<'_>, project_id: i32) -> Result<Vec<DataSourceReference>>
+// DataSet queries - separate by ID and by project
+async fn data_source(&self, ctx: &Context<'_>, id: i32) -> Result<Option<DataSet>>
+async fn data_sources(&self, ctx: &Context<'_>, project_id: i32) -> Result<Vec<DataSet>>
+async fn available_data_sources(&self, ctx: &Context<'_>, project_id: i32) -> Result<Vec<DataSetReference>>
 ```
 
 **Problems:**
@@ -748,16 +748,16 @@ lazy_static::lazy_static! {
 
 #### Issue: Inconsistent Pagination Patterns
 
-**datasource_preview Query:**
+**dataset_preview Query:**
 ```rust
-async fn datasource_preview(
+async fn dataset_preview(
     &self,
     ctx: &Context<'_>,
     project_id: i32,
     node_id: String,
     #[graphql(default = 100)] limit: u64,    // ✅ Has pagination
     #[graphql(default = 0)] offset: u64,
-) -> Result<Option<DataSourcePreview>>
+) -> Result<Option<DataSetPreview>>
 ```
 
 **graph_preview Query:**
@@ -790,13 +790,13 @@ pub struct PaginationInput {
     pub offset: u64,
 }
 
-async fn datasource_preview(
+async fn dataset_preview(
     &self,
     ctx: &Context<'_>,
     project_id: i32,
     node_id: String,
     #[graphql(default)] pagination: PaginationInput,
-) -> Result<Option<DataSourcePreview>>
+) -> Result<Option<DataSetPreview>>
 
 async fn graph_preview(
     &self,

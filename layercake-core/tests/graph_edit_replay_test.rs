@@ -93,7 +93,7 @@ async fn create_test_node(
         belongs_to: Set(None),
         weight: Set(None),
         attrs: Set(None),
-        datasource_id: Set(None),
+        dataset_id: Set(None),
         comment: Set(None),
         created_at: Set(Utc::now()),
     };

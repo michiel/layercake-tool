@@ -1,22 +1,22 @@
 import { gql } from '@apollo/client';
 import { Layer } from './graphs';
 
-// DataSource Preview Query
+// DataSet Preview Query
 export const GET_DATASOURCE_PREVIEW = gql`
-  query GetDataSourcePreview(
+  query GetDataSetPreview(
     $projectId: Int!
     $nodeId: String!
     $limit: Int
     $offset: Int
   ) {
-    datasourcePreview(
+    datasetPreview(
       projectId: $projectId
       nodeId: $nodeId
       limit: $limit
       offset: $offset
     ) {
       nodeId
-      datasourceId
+      datasetId
       name
       filePath
       fileType
@@ -93,9 +93,9 @@ export interface TableRow {
   data: Record<string, any>;
 }
 
-export interface DataSourcePreview {
+export interface DataSetPreview {
   nodeId: string;
-  datasourceId: number;
+  datasetId: number;
   name: string;
   filePath: string;
   fileType: string;
@@ -140,8 +140,8 @@ export interface GraphPreview {
   errorMessage?: string;
 }
 
-export interface GetDataSourcePreviewResponse {
-  datasourcePreview: DataSourcePreview | null;
+export interface GetDataSetPreviewResponse {
+  datasetPreview: DataSetPreview | null;
 }
 
 export interface GetGraphPreviewResponse {
@@ -150,7 +150,7 @@ export interface GetGraphPreviewResponse {
 
 // Query Variables
 
-export interface GetDataSourcePreviewVariables {
+export interface GetDataSetPreviewVariables {
   projectId: number;
   nodeId: string;
   limit?: number;
@@ -238,7 +238,7 @@ export interface PlanExecutionResult {
   outputFiles: string[];
 }
 
-// Clear Project Execution State Mutation (resets all graph data, keeps config and datasources)
+// Clear Project Execution State Mutation (resets all graph data, keeps config and datasets)
 export const CLEAR_PROJECT_EXECUTION = gql`
   mutation ClearProjectExecution($projectId: Int!) {
     clearProjectExecution(projectId: $projectId) {

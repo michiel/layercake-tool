@@ -2,22 +2,22 @@ use anyhow::{anyhow, Result};
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 
 use crate::database::entities::common_types::{DataType, FileFormat};
-use crate::database::entities::data_sources::{self};
+use crate::database::entities::data_sets::{self};
 use crate::database::entities::{plan_dag_edges, plan_dag_nodes, projects};
 use crate::services::{file_type_detection, source_processing};
 
-/// Service for managing DataSources with file processing capabilities
+/// Service for managing DataSets with file processing capabilities
 #[derive(Clone)]
-pub struct DataSourceService {
+pub struct DataSetService {
     db: DatabaseConnection,
 }
 
-impl DataSourceService {
+impl DataSetService {
     pub fn new(db: DatabaseConnection) -> Self {
         Self { db }
     }
 
-    /// DEPRECATED: Create a new DataSource from uploaded file data (old signature for compatibility)
+    /// DEPRECATED: Create a new DataSet from uploaded file data (old signature for compatibility)
     #[allow(dead_code)]
     pub async fn create_from_file_legacy(
         &self,
@@ -26,7 +26,7 @@ impl DataSourceService {
         description: Option<String>,
         filename: String,
         file_data: Vec<u8>,
-    ) -> Result<data_sources::Model> {
+    ) -> Result<data_sets::Model> {
         // Auto-detect format from filename
         let file_format = FileFormat::from_extension(&filename)
             .ok_or_else(|| anyhow!("Unsupported file extension: {}", filename))?;
@@ -59,14 +59,14 @@ impl DataSourceService {
         .await
     }
 
-    /// Create a new empty DataSource without file data
+    /// Create a new empty DataSet without file data
     pub async fn create_empty(
         &self,
         project_id: i32,
         name: String,
         description: Option<String>,
         data_type: DataType,
-    ) -> Result<data_sources::Model> {
+    ) -> Result<data_sets::Model> {
         // Validate project exists
         let _project = projects::Entity::find_by_id(project_id)
             .one(&self.db)
@@ -81,12 +81,12 @@ impl DataSourceService {
             DataType::Graph => r#"{"nodes":[],"edges":[],"layers":[]}"#,
         };
 
-        // Create DataSource record without file data
-        let data_source = data_sources::ActiveModel {
+        // Create DataSet record without file data
+        let data_set = data_sets::ActiveModel {
             project_id: Set(project_id),
             name: Set(name),
             description: Set(description),
-            file_format: Set("json".to_string()), // Use JSON as default format for empty datasources
+            file_format: Set("json".to_string()), // Use JSON as default format for empty datasets
             data_type: Set(data_type.as_ref().to_string()),
             filename: Set(format!("{}.json", chrono::Utc::now().timestamp())),
             blob: Set(Vec::new()),
@@ -94,14 +94,14 @@ impl DataSourceService {
             status: Set("active".to_string()),
             graph_json: Set(empty_graph_json.to_string()),
             processed_at: Set(Some(chrono::Utc::now())),
-            ..data_sources::ActiveModel::new()
+            ..data_sets::ActiveModel::new()
         };
 
-        let data_source = data_source.insert(&self.db).await?;
-        Ok(data_source)
+        let data_set = data_set.insert(&self.db).await?;
+        Ok(data_set)
     }
 
-    /// Create a new DataSource from uploaded file data
+    /// Create a new DataSet from uploaded file data
     pub async fn create_from_file(
         &self,
         project_id: i32,
@@ -111,7 +111,7 @@ impl DataSourceService {
         file_format: FileFormat,
         data_type: DataType,
         file_data: Vec<u8>,
-    ) -> Result<data_sources::Model> {
+    ) -> Result<data_sets::Model> {
         // Validate project exists
         let _project = projects::Entity::find_by_id(project_id)
             .one(&self.db)
@@ -138,8 +138,8 @@ impl DataSourceService {
             ));
         }
 
-        // Create initial DataSource record
-        let data_source = data_sources::ActiveModel {
+        // Create initial DataSet record
+        let data_set = data_sets::ActiveModel {
             project_id: Set(project_id),
             name: Set(name),
             description: Set(description),
@@ -151,17 +151,17 @@ impl DataSourceService {
             file_size: Set(file_data.len() as i64),
             status: Set("processing".to_string()),
             graph_json: Set("{}".to_string()),
-            ..data_sources::ActiveModel::new()
+            ..data_sets::ActiveModel::new()
         };
 
-        let data_source = data_source.insert(&self.db).await?;
+        let data_set = data_set.insert(&self.db).await?;
 
         // Process the file
-        let updated_data_source =
+        let updated_data_set =
             match source_processing::process_file(&file_format, &data_type, &file_data).await {
                 Ok(graph_json) => {
                     // Update with successful processing
-                    let mut active_model: data_sources::ActiveModel = data_source.into();
+                    let mut active_model: data_sets::ActiveModel = data_set.into();
                     active_model.graph_json = Set(graph_json);
                     active_model.status = Set("active".to_string());
                     active_model.processed_at = Set(Some(chrono::Utc::now()));
@@ -171,7 +171,7 @@ impl DataSourceService {
                 }
                 Err(e) => {
                     // Update with error
-                    let mut active_model: data_sources::ActiveModel = data_source.into();
+                    let mut active_model: data_sets::ActiveModel = data_set.into();
                     active_model.status = Set("error".to_string());
                     active_model.error_message = Set(Some(e.to_string()));
                     active_model.updated_at = Set(chrono::Utc::now());
@@ -181,26 +181,26 @@ impl DataSourceService {
                 }
             };
 
-        Ok(updated_data_source)
+        Ok(updated_data_set)
     }
 
-    /// Get DataSource by ID
-    pub async fn get_by_id(&self, id: i32) -> Result<Option<data_sources::Model>> {
-        let data_source = data_sources::Entity::find_by_id(id).one(&self.db).await?;
-        Ok(data_source)
+    /// Get DataSet by ID
+    pub async fn get_by_id(&self, id: i32) -> Result<Option<data_sets::Model>> {
+        let data_set = data_sets::Entity::find_by_id(id).one(&self.db).await?;
+        Ok(data_set)
     }
 
-    /// Get all DataSources for a project
+    /// Get all DataSets for a project
     #[allow(dead_code)]
-    pub async fn get_by_project(&self, project_id: i32) -> Result<Vec<data_sources::Model>> {
-        let data_sources = data_sources::Entity::find()
-            .filter(data_sources::Column::ProjectId.eq(project_id))
+    pub async fn get_by_project(&self, project_id: i32) -> Result<Vec<data_sets::Model>> {
+        let data_sets = data_sets::Entity::find()
+            .filter(data_sets::Column::ProjectId.eq(project_id))
             .all(&self.db)
             .await?;
-        Ok(data_sources)
+        Ok(data_sets)
     }
 
-    /// Create a new DataSource with auto-detected data type from file content
+    /// Create a new DataSet with auto-detected data type from file content
     pub async fn create_with_auto_detect(
         &self,
         project_id: i32,
@@ -208,7 +208,7 @@ impl DataSourceService {
         description: Option<String>,
         filename: String,
         file_data: Vec<u8>,
-    ) -> Result<data_sources::Model> {
+    ) -> Result<data_sets::Model> {
         // Auto-detect format from filename
         let file_format = FileFormat::from_extension(&filename)
             .ok_or_else(|| anyhow!("Unsupported file extension: {}", filename))?;
@@ -243,19 +243,19 @@ impl DataSourceService {
         .await
     }
 
-    /// Update DataSource metadata
+    /// Update DataSet metadata
     pub async fn update(
         &self,
         id: i32,
         name: Option<String>,
         description: Option<String>,
-    ) -> Result<data_sources::Model> {
-        let data_source = self
+    ) -> Result<data_sets::Model> {
+        let data_set = self
             .get_by_id(id)
             .await?
-            .ok_or_else(|| anyhow!("DataSource not found"))?;
+            .ok_or_else(|| anyhow!("DataSet not found"))?;
 
-        let mut active_model: data_sources::ActiveModel = data_source.into();
+        let mut active_model: data_sets::ActiveModel = data_set.into();
 
         if let Some(name) = name {
             active_model.name = Set(name);
@@ -269,19 +269,19 @@ impl DataSourceService {
         Ok(updated)
     }
 
-    /// Update DataSource graph data (graph_json) directly
+    /// Update DataSet graph data (graph_json) directly
     /// Updates processed_at timestamp to trigger downstream re-execution
     pub async fn update_graph_data(
         &self,
         id: i32,
         graph_json: String,
-    ) -> Result<data_sources::Model> {
-        let data_source = self
+    ) -> Result<data_sets::Model> {
+        let data_set = self
             .get_by_id(id)
             .await?
-            .ok_or_else(|| anyhow!("DataSource not found"))?;
+            .ok_or_else(|| anyhow!("DataSet not found"))?;
 
-        let mut active_model: data_sources::ActiveModel = data_source.into();
+        let mut active_model: data_sets::ActiveModel = data_set.into();
         active_model.graph_json = Set(graph_json);
         active_model.processed_at = Set(Some(chrono::Utc::now()));
         active_model.updated_at = Set(chrono::Utc::now());
@@ -290,24 +290,24 @@ impl DataSourceService {
         Ok(updated)
     }
 
-    /// Update DataSource file and reprocess
+    /// Update DataSet file and reprocess
     pub async fn update_file(
         &self,
         id: i32,
         filename: String,
         file_data: Vec<u8>,
-    ) -> Result<data_sources::Model> {
-        let data_source = self
+    ) -> Result<data_sets::Model> {
+        let data_set = self
             .get_by_id(id)
             .await?
-            .ok_or_else(|| anyhow!("DataSource not found"))?;
+            .ok_or_else(|| anyhow!("DataSet not found"))?;
 
         // Detect format from filename extension
         let file_format = FileFormat::from_extension(&filename)
             .ok_or_else(|| anyhow!("Unsupported file extension: {}", filename))?;
 
         // Get existing data type from the data source
-        let data_type = data_source
+        let data_type = data_set
             .get_data_type()
             .ok_or_else(|| anyhow!("Invalid data type in existing data source"))?;
 
@@ -321,7 +321,7 @@ impl DataSourceService {
         }
 
         // Update with new file data
-        let mut active_model: data_sources::ActiveModel = data_source.into();
+        let mut active_model: data_sets::ActiveModel = data_set.into();
         active_model.filename = Set(filename);
         active_model.blob = Set(file_data.clone());
         active_model.file_size = Set(file_data.len() as i64);
@@ -330,13 +330,13 @@ impl DataSourceService {
         active_model.error_message = Set(None);
         active_model.updated_at = Set(chrono::Utc::now());
 
-        let data_source = active_model.update(&self.db).await?;
+        let data_set = active_model.update(&self.db).await?;
 
         // Process the new file
-        let updated_data_source =
+        let updated_data_set =
             match source_processing::process_file(&file_format, &data_type, &file_data).await {
                 Ok(graph_json) => {
-                    let mut active_model: data_sources::ActiveModel = data_source.into();
+                    let mut active_model: data_sets::ActiveModel = data_set.into();
                     active_model.graph_json = Set(graph_json);
                     active_model.status = Set("active".to_string());
                     active_model.processed_at = Set(Some(chrono::Utc::now()));
@@ -345,7 +345,7 @@ impl DataSourceService {
                     active_model.update(&self.db).await?
                 }
                 Err(e) => {
-                    let mut active_model: data_sources::ActiveModel = data_source.into();
+                    let mut active_model: data_sets::ActiveModel = data_set.into();
                     active_model.status = Set("error".to_string());
                     active_model.error_message = Set(Some(e.to_string()));
                     active_model.updated_at = Set(chrono::Utc::now());
@@ -355,27 +355,27 @@ impl DataSourceService {
                 }
             };
 
-        Ok(updated_data_source)
+        Ok(updated_data_set)
     }
 
-    /// Delete DataSource and clean up related plan DAG nodes
+    /// Delete DataSet and clean up related plan DAG nodes
     pub async fn delete(&self, id: i32) -> Result<()> {
-        let data_source = self
+        let data_set = self
             .get_by_id(id)
             .await?
-            .ok_or_else(|| anyhow!("DataSource not found"))?;
+            .ok_or_else(|| anyhow!("DataSet not found"))?;
 
-        // Find and delete all plan_dag_nodes that reference this datasource
+        // Find and delete all plan_dag_nodes that reference this dataset
         let all_dag_nodes = plan_dag_nodes::Entity::find()
-            .filter(plan_dag_nodes::Column::NodeType.eq("DataSourceNode"))
+            .filter(plan_dag_nodes::Column::NodeType.eq("DataSetNode"))
             .all(&self.db)
             .await?;
 
         for dag_node in all_dag_nodes {
-            // Parse config to check if it references this datasource
+            // Parse config to check if it references this dataset
             if let Ok(config) = serde_json::from_str::<serde_json::Value>(&dag_node.config_json) {
-                if let Some(ds_id) = config.get("dataSourceId").and_then(|v| v.as_i64()) {
-                    if ds_id as i32 == data_source.id {
+                if let Some(ds_id) = config.get("dataSetId").and_then(|v| v.as_i64()) {
+                    if ds_id as i32 == data_set.id {
                         // Delete connected edges first
                         plan_dag_edges::Entity::delete_many()
                             .filter(plan_dag_edges::Column::SourceNodeId.eq(&dag_node.id))
@@ -396,46 +396,46 @@ impl DataSourceService {
             }
         }
 
-        // Delete the datasource itself
-        data_sources::Entity::delete_by_id(data_source.id)
+        // Delete the dataset itself
+        data_sets::Entity::delete_by_id(data_set.id)
             .exec(&self.db)
             .await?;
 
         Ok(())
     }
 
-    /// Reprocess existing DataSource file
-    pub async fn reprocess(&self, id: i32) -> Result<data_sources::Model> {
-        let data_source = self
+    /// Reprocess existing DataSet file
+    pub async fn reprocess(&self, id: i32) -> Result<data_sets::Model> {
+        let data_set = self
             .get_by_id(id)
             .await?
-            .ok_or_else(|| anyhow!("DataSource not found"))?;
+            .ok_or_else(|| anyhow!("DataSet not found"))?;
 
-        let file_format = data_source
+        let file_format = data_set
             .get_file_format()
             .ok_or_else(|| anyhow!("Invalid file format"))?;
-        let data_type = data_source
+        let data_type = data_set
             .get_data_type()
             .ok_or_else(|| anyhow!("Invalid data type"))?;
 
         // Set to processing status
-        let mut active_model: data_sources::ActiveModel = data_source.into();
+        let mut active_model: data_sets::ActiveModel = data_set.into();
         active_model.status = Set("processing".to_string());
         active_model.error_message = Set(None);
         active_model.updated_at = Set(chrono::Utc::now());
 
-        let data_source = active_model.update(&self.db).await?;
+        let data_set = active_model.update(&self.db).await?;
 
         // Process the file
-        let updated_data_source = match source_processing::process_file(
+        let updated_data_set = match source_processing::process_file(
             &file_format,
             &data_type,
-            &data_source.blob,
+            &data_set.blob,
         )
         .await
         {
             Ok(graph_json) => {
-                let mut active_model: data_sources::ActiveModel = data_source.into();
+                let mut active_model: data_sets::ActiveModel = data_set.into();
                 active_model.graph_json = Set(graph_json);
                 active_model.status = Set("active".to_string());
                 active_model.processed_at = Set(Some(chrono::Utc::now()));
@@ -444,7 +444,7 @@ impl DataSourceService {
                 active_model.update(&self.db).await?
             }
             Err(e) => {
-                let mut active_model: data_sources::ActiveModel = data_source.into();
+                let mut active_model: data_sets::ActiveModel = data_set.into();
                 active_model.status = Set("error".to_string());
                 active_model.error_message = Set(Some(e.to_string()));
                 active_model.updated_at = Set(chrono::Utc::now());
@@ -454,7 +454,7 @@ impl DataSourceService {
             }
         };
 
-        Ok(updated_data_source)
+        Ok(updated_data_set)
     }
 }
 

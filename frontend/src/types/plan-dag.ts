@@ -26,7 +26,7 @@ export interface EdgeMetadata {
 
 // Plan DAG Node Types
 export enum PlanDagNodeType {
-  DATA_SOURCE = 'DataSourceNode',
+  DATA_SOURCE = 'DataSetNode',
   GRAPH = 'GraphNode',
   TRANSFORM = 'TransformNode',
   FILTER = 'FilterNode',
@@ -35,8 +35,8 @@ export enum PlanDagNodeType {
 }
 
 // Data Source Node Configuration
-export interface DataSourceNodeConfig {
-  dataSourceId?: number; // Reference to DataSource entity (new)
+export interface DataSetNodeConfig {
+  dataSourceId?: number; // Reference to DataSet entity (new)
   displayMode?: 'summary' | 'detailed' | 'preview'; // Optional for backward compatibility
   // Removed: outputGraphRef - output connections handled by visual edges in DAG
 
@@ -137,15 +137,15 @@ export interface OutputNodeConfig {
 
 // Union type for all node configurations
 export type NodeConfig =
-  | DataSourceNodeConfig
+  | DataSetNodeConfig
   | GraphNodeConfig
   | TransformNodeConfig
   | FilterNodeConfig
   | MergeNodeConfig
   | OutputNodeConfig;
 
-// Execution metadata for DataSource nodes
-export interface DataSourceExecutionMetadata {
+// Execution metadata for DataSet nodes
+export interface DataSetExecutionMetadata {
   dataSourceId: number;
   filename: string;
   status: string;
@@ -173,7 +173,7 @@ export interface PlanDagNode {
   targetPosition?: string;
   metadata: NodeMetadata;
   config: NodeConfig | string; // Can be object (internal) or JSON string (from GraphQL)
-  datasourceExecution?: DataSourceExecutionMetadata;
+  datasetExecution?: DataSetExecutionMetadata;
   graphExecution?: GraphExecutionMetadata;
 }
 
@@ -238,7 +238,7 @@ export interface CSVLayerRow {
 }
 
 // File upload types
-export interface DataSourceUpload {
+export interface DataSetUpload {
   file: File;
   name: string;
   description?: string;
@@ -252,7 +252,7 @@ export interface ReactFlowNode extends PlanDagNode {
     nodeType: PlanDagNodeType;
     config: NodeConfig;
     metadata: NodeMetadata;
-    datasourceExecution?: DataSourceExecutionMetadata;
+    datasetExecution?: DataSetExecutionMetadata;
     graphExecution?: GraphExecutionMetadata;
     hasValidConfig?: boolean;
     projectId?: number;

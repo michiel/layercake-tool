@@ -3,14 +3,14 @@
 use async_graphql::*;
 use serde::{Deserialize, Serialize};
 
-use crate::app_context::DataSourceSummary;
+use crate::app_context::DataSetSummary;
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
 use crate::graphql::types::Project;
 
 #[derive(SimpleObject)]
 #[graphql(complex)]
-pub struct DataSource {
+pub struct DataSet {
     pub id: i32,
     #[graphql(name = "projectId")]
     pub project_id: i32,
@@ -38,7 +38,7 @@ pub struct DataSource {
 }
 
 #[ComplexObject]
-impl DataSource {
+impl DataSet {
     async fn project(&self, ctx: &Context<'_>) -> Result<Project> {
         let graphql_ctx = ctx
             .data::<GraphQLContext>()
@@ -86,8 +86,8 @@ impl DataSource {
     }
 }
 
-impl From<crate::database::entities::data_sources::Model> for DataSource {
-    fn from(model: crate::database::entities::data_sources::Model) -> Self {
+impl From<crate::database::entities::data_sets::Model> for DataSet {
+    fn from(model: crate::database::entities::data_sets::Model) -> Self {
         Self {
             id: model.id,
             project_id: model.project_id,
@@ -108,8 +108,8 @@ impl From<crate::database::entities::data_sources::Model> for DataSource {
     }
 }
 
-impl From<DataSourceSummary> for DataSource {
-    fn from(summary: DataSourceSummary) -> Self {
+impl From<DataSetSummary> for DataSet {
+    fn from(summary: DataSetSummary) -> Self {
         Self {
             id: summary.id,
             project_id: summary.project_id,
@@ -130,7 +130,7 @@ impl From<DataSourceSummary> for DataSource {
 }
 
 #[derive(InputObject)]
-pub struct CreateDataSourceInput {
+pub struct CreateDataSetInput {
     #[graphql(name = "projectId")]
     pub project_id: i32,
     pub name: String,
@@ -141,21 +141,21 @@ pub struct CreateDataSourceInput {
     #[graphql(name = "fileFormat")]
     pub file_format: FileFormat,
     #[graphql(name = "dataType")]
-    pub data_type: DataSourceDataType,
+    pub data_type: DataSetDataType,
 }
 
 #[derive(InputObject)]
-pub struct CreateEmptyDataSourceInput {
+pub struct CreateEmptyDataSetInput {
     #[graphql(name = "projectId")]
     pub project_id: i32,
     pub name: String,
     pub description: Option<String>,
     #[graphql(name = "dataType")]
-    pub data_type: DataSourceDataType,
+    pub data_type: DataSetDataType,
 }
 
 #[derive(InputObject)]
-pub struct UpdateDataSourceInput {
+pub struct UpdateDataSetInput {
     pub name: Option<String>,
     pub description: Option<String>,
     pub filename: Option<String>,
@@ -165,7 +165,7 @@ pub struct UpdateDataSourceInput {
 
 /// Input for bulk upload - file format and data type are auto-detected
 #[derive(InputObject)]
-pub struct BulkUploadDataSourceInput {
+pub struct BulkUploadDataSetInput {
     pub name: String,
     pub description: Option<String>,
     pub filename: String,
@@ -204,32 +204,32 @@ impl From<FileFormat> for crate::database::entities::common_types::FileFormat {
 
 // Data type enum (semantic meaning)
 #[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
-#[graphql(name = "DataSourceDataType")]
-pub enum DataSourceDataType {
+#[graphql(name = "DataSetDataType")]
+pub enum DataSetDataType {
     NODES,
     EDGES,
     LAYERS,
     GRAPH,
 }
 
-impl From<crate::database::entities::common_types::DataType> for DataSourceDataType {
+impl From<crate::database::entities::common_types::DataType> for DataSetDataType {
     fn from(db_type: crate::database::entities::common_types::DataType) -> Self {
         match db_type {
-            crate::database::entities::common_types::DataType::Nodes => DataSourceDataType::NODES,
-            crate::database::entities::common_types::DataType::Edges => DataSourceDataType::EDGES,
-            crate::database::entities::common_types::DataType::Layers => DataSourceDataType::LAYERS,
-            crate::database::entities::common_types::DataType::Graph => DataSourceDataType::GRAPH,
+            crate::database::entities::common_types::DataType::Nodes => DataSetDataType::NODES,
+            crate::database::entities::common_types::DataType::Edges => DataSetDataType::EDGES,
+            crate::database::entities::common_types::DataType::Layers => DataSetDataType::LAYERS,
+            crate::database::entities::common_types::DataType::Graph => DataSetDataType::GRAPH,
         }
     }
 }
 
-impl From<DataSourceDataType> for crate::database::entities::common_types::DataType {
-    fn from(gql_type: DataSourceDataType) -> Self {
+impl From<DataSetDataType> for crate::database::entities::common_types::DataType {
+    fn from(gql_type: DataSetDataType) -> Self {
         match gql_type {
-            DataSourceDataType::NODES => crate::database::entities::common_types::DataType::Nodes,
-            DataSourceDataType::EDGES => crate::database::entities::common_types::DataType::Edges,
-            DataSourceDataType::LAYERS => crate::database::entities::common_types::DataType::Layers,
-            DataSourceDataType::GRAPH => crate::database::entities::common_types::DataType::Graph,
+            DataSetDataType::NODES => crate::database::entities::common_types::DataType::Nodes,
+            DataSetDataType::EDGES => crate::database::entities::common_types::DataType::Edges,
+            DataSetDataType::LAYERS => crate::database::entities::common_types::DataType::Layers,
+            DataSetDataType::GRAPH => crate::database::entities::common_types::DataType::Graph,
         }
     }
 }
@@ -250,16 +250,16 @@ pub enum SpreadsheetFormat {
 }
 
 #[derive(InputObject)]
-pub struct ExportDataSourcesInput {
+pub struct ExportDataSetsInput {
     #[graphql(name = "projectId")]
     pub project_id: i32,
-    #[graphql(name = "dataSourceIds")]
-    pub data_source_ids: Vec<i32>,
+    #[graphql(name = "dataSetIds")]
+    pub data_set_ids: Vec<i32>,
     pub format: SpreadsheetFormat,
 }
 
 #[derive(SimpleObject)]
-pub struct ExportDataSourcesResult {
+pub struct ExportDataSetsResult {
     #[graphql(name = "fileContent")]
     pub file_content: String, // Base64 encoded spreadsheet file
     pub filename: String,
@@ -267,7 +267,7 @@ pub struct ExportDataSourcesResult {
 }
 
 #[derive(InputObject)]
-pub struct ImportDataSourcesInput {
+pub struct ImportDataSetsInput {
     #[graphql(name = "projectId")]
     pub project_id: i32,
     #[graphql(name = "fileContent")]
@@ -276,9 +276,9 @@ pub struct ImportDataSourcesInput {
 }
 
 #[derive(SimpleObject)]
-pub struct ImportDataSourcesResult {
-    #[graphql(name = "dataSources")]
-    pub data_sources: Vec<DataSource>,
+pub struct ImportDataSetsResult {
+    #[graphql(name = "dataSets")]
+    pub data_sets: Vec<DataSet>,
     #[graphql(name = "createdCount")]
     pub created_count: i32,
     #[graphql(name = "updatedCount")]

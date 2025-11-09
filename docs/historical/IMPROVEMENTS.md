@@ -33,7 +33,7 @@ The Layercake Rust codebase demonstrates solid engineering foundations with good
 
 ### 1.1 Service Layer Duplication (~300 lines)
 
-**Issue**: `DataSourceService` and `LibrarySourceService` share nearly identical file processing logic.
+**Issue**: `DataSetService` and `LibrarySourceService` share nearly identical file processing logic.
 
 **Files**:
 - `layercake-core/src/services/data_source_service.rs` (625 lines)
@@ -90,7 +90,7 @@ pub trait FileSourceService {
 }
 
 // Then implement for both services
-impl FileSourceService for DataSourceService { ... }
+impl FileSourceService for DataSetService { ... }
 impl FileSourceService for LibrarySourceService { ... }
 ```
 
@@ -469,7 +469,7 @@ colored = { workspace = true, optional = true }
 
 **Issue**: Spreadsheet dependencies always compiled but only used in one file.
 
-**Used only in**: `services/datasource_bulk_service.rs`
+**Used only in**: `services/dataset_bulk_service.rs`
 
 **Dependencies**:
 - `calamine` - Excel reading
@@ -807,7 +807,7 @@ src/
 //! # Examples
 //!
 //! ```no_run
-//! let service = DataSourceService::new(db);
+//! let service = DataSetService::new(db);
 //! let source = service.create(...).await?;
 //! ```
 
@@ -828,7 +828,7 @@ src/
 /// - File format is invalid
 /// - Data type incompatible with format
 /// - Processing fails
-pub async fn create_data_source(...) -> Result<DataSource> {
+pub async fn create_data_source(...) -> Result<DataSet> {
     ...
 }
 ```
@@ -874,7 +874,7 @@ pub async fn create_data_source(...) -> Result<DataSource> {
 
 - [ ] Create `file_source_trait.rs` with shared logic
 - [ ] Extract `FileFormat` and `DataType` to common module
-- [ ] Refactor `DataSourceService` to use trait
+- [ ] Refactor `DataSetService` to use trait
 - [ ] Refactor `LibrarySourceService` to use trait
 - [ ] Create entity helper utilities
 - [ ] Update tests
@@ -977,7 +977,7 @@ pub async fn create_data_source(...) -> Result<DataSource> {
 
 ### 9.2 Architectural Limitation
 
-**Pipeline Database Coupling**: The core pipeline modules (`graph_builder`, `datasource_importer`, `merge_builder`, `dag_executor`) all depend on `sea_orm::DatabaseConnection`. This prevents creating a lightweight CLI-only mode.
+**Pipeline Database Coupling**: The core pipeline modules (`graph_builder`, `dataset_importer`, `merge_builder`, `dag_executor`) all depend on `sea_orm::DatabaseConnection`. This prevents creating a lightweight CLI-only mode.
 
 **Impact**: Server dependencies are required even for simple CLI operations.
 

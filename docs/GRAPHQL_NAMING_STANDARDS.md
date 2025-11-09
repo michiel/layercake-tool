@@ -30,7 +30,7 @@ Use `#[graphql(...)]` attributes to bridge the naming gap.
 **Example**:
 ```rust
 #[derive(SimpleObject)]
-pub struct DataSource {
+pub struct DataSet {
     pub id: i32,
 
     #[graphql(name = "projectId")]
@@ -49,7 +49,7 @@ pub struct DataSource {
 
 **Result in GraphQL**:
 ```graphql
-type DataSource {
+type DataSet {
   id: Int!
   projectId: Int!
   fileName: String!
@@ -91,7 +91,7 @@ pub struct Position {
 
 ```rust
 // ✅ Good
-pub struct DataSource { }
+pub struct DataSet { }
 pub struct PlanDagNode { }
 pub struct UserSession { }
 
@@ -254,23 +254,23 @@ type Subscription {
 **Rule**: All arguments use camelCase.
 
 ```rust
-async fn datasource_preview(
+async fn dataset_preview(
     &self,
     ctx: &Context<'_>,
     #[graphql(name = "dataSourceId")] data_source_id: i32,
     offset: Option<i32>,
     limit: Option<i32>,
-) -> Result<DataSourcePreview>
+) -> Result<DataSetPreview>
 ```
 
 **GraphQL**:
 ```graphql
 type Query {
-  datasourcePreview(
+  datasetPreview(
     dataSourceId: Int!
     offset: Int
     limit: Int
-  ): DataSourcePreview!
+  ): DataSetPreview!
 }
 ```
 

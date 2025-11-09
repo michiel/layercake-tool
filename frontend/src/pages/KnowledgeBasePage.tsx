@@ -127,7 +127,7 @@ export const KnowledgeBasePage: React.FC = () => {
     return [
       {
         title: 'Data acquisition',
-        href: `/projects/${selectedProject.id}/datasources`,
+        href: `/projects/${selectedProject.id}/datasets`,
       },
     ]
   }, [selectedProject])

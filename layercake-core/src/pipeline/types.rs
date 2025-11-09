@@ -9,5 +9,5 @@ pub(crate) struct LayerData {
     pub border_color: Option<String>,
     pub comment: Option<String>,
     pub properties: Option<String>, // JSON string
-    pub datasource_id: Option<i32>,
+    pub dataset_id: Option<i32>,
 }

@@ -1,11 +1,11 @@
 use async_graphql::*;
 use serde::{Deserialize, Serialize};
 
-/// DataSource preview with table data
+/// DataSet preview with table data
 #[derive(Clone, Debug, SimpleObject)]
-pub struct DataSourcePreview {
+pub struct DataSetPreview {
     pub node_id: String,
-    pub datasource_id: i32,
+    pub dataset_id: i32,
     pub name: String,
     pub file_path: String,
     pub file_type: String,

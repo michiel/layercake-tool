@@ -9,7 +9,7 @@ export interface Layer {
   borderColor?: string;
   comment?: string;
   properties?: any;
-  datasourceId?: number;
+  datasetId?: number;
 }
 
 export interface GraphNode {
@@ -101,7 +101,7 @@ export const GET_GRAPHS = gql`
         borderColor
         comment
         properties
-        datasourceId
+        datasetId
       }
     }
   }
@@ -127,7 +127,7 @@ export const GET_GRAPH_DETAILS = gql`
         borderColor
         comment
         properties
-        datasourceId
+        datasetId
       }
       graphNodes {
         id
@@ -184,7 +184,7 @@ export const CREATE_LAYER = gql`
       borderColor
       comment
       properties
-      datasourceId
+      datasetId
     }
   }
 `

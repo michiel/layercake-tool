@@ -3,29 +3,29 @@ use base64::Engine;
 use sea_orm::{ActiveModelTrait, EntityTrait};
 
 use crate::app_context::{
-    BulkDataSourceUpload, DataSourceEmptyCreateRequest, DataSourceExportFormat,
-    DataSourceExportRequest, DataSourceFileCreateRequest, DataSourceFileReplacement,
-    DataSourceImportFormat, DataSourceImportRequest, DataSourceUpdateRequest,
+    BulkDataSetUpload, DataSetEmptyCreateRequest, DataSetExportFormat,
+    DataSetExportRequest, DataSetFileCreateRequest, DataSetFileReplacement,
+    DataSetImportFormat, DataSetImportRequest, DataSetUpdateRequest,
 };
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
 use crate::graphql::types::{
-    BulkUploadDataSourceInput, CreateDataSourceInput, CreateEmptyDataSourceInput, DataSource,
-    ExportDataSourcesInput, ExportDataSourcesResult, ImportDataSourcesInput,
-    ImportDataSourcesResult, UpdateDataSourceInput,
+    BulkUploadDataSetInput, CreateDataSetInput, CreateEmptyDataSetInput, DataSet,
+    ExportDataSetsInput, ExportDataSetsResult, ImportDataSetsInput,
+    ImportDataSetsResult, UpdateDataSetInput,
 };
 
 #[derive(Default)]
-pub struct DataSourceMutation;
+pub struct DataSetMutation;
 
 #[Object]
-impl DataSourceMutation {
-    /// Create a new DataSource from uploaded file
-    async fn create_data_source_from_file(
+impl DataSetMutation {
+    /// Create a new DataSet from uploaded file
+    async fn create_data_set_from_file(
         &self,
         ctx: &Context<'_>,
-        input: CreateDataSourceInput,
-    ) -> Result<DataSource> {
+        input: CreateDataSetInput,
+    ) -> Result<DataSet> {
         let context = ctx.data::<GraphQLContext>()?;
 
         use base64::Engine;
@@ -37,7 +37,7 @@ impl DataSourceMutation {
 
         let summary = context
             .app
-            .create_data_source_from_file(DataSourceFileCreateRequest {
+            .create_data_set_from_file(DataSetFileCreateRequest {
                 project_id: input.project_id,
                 name: input.name,
                 description: input.description,
@@ -47,39 +47,39 @@ impl DataSourceMutation {
                 file_bytes,
             })
             .await
-            .map_err(|e| StructuredError::service("AppContext::create_data_source_from_file", e))?;
+            .map_err(|e| StructuredError::service("AppContext::create_data_set_from_file", e))?;
 
-        Ok(DataSource::from(summary))
+        Ok(DataSet::from(summary))
     }
 
-    /// Create a new empty DataSource (without file upload)
-    async fn create_empty_data_source(
+    /// Create a new empty DataSet (without file upload)
+    async fn create_empty_data_set(
         &self,
         ctx: &Context<'_>,
-        input: CreateEmptyDataSourceInput,
-    ) -> Result<DataSource> {
+        input: CreateEmptyDataSetInput,
+    ) -> Result<DataSet> {
         let context = ctx.data::<GraphQLContext>()?;
         let summary = context
             .app
-            .create_empty_data_source(DataSourceEmptyCreateRequest {
+            .create_empty_data_set(DataSetEmptyCreateRequest {
                 project_id: input.project_id,
                 name: input.name,
                 description: input.description,
                 data_type: input.data_type.into(),
             })
             .await
-            .map_err(|e| StructuredError::service("AppContext::create_empty_data_source", e))?;
+            .map_err(|e| StructuredError::service("AppContext::create_empty_data_set", e))?;
 
-        Ok(DataSource::from(summary))
+        Ok(DataSet::from(summary))
     }
 
-    /// Bulk upload multiple DataSources with automatic file type detection
-    async fn bulk_upload_data_sources(
+    /// Bulk upload multiple DataSets with automatic file type detection
+    async fn bulk_upload_data_sets(
         &self,
         ctx: &Context<'_>,
         project_id: i32,
-        files: Vec<BulkUploadDataSourceInput>,
-    ) -> Result<Vec<DataSource>> {
+        files: Vec<BulkUploadDataSetInput>,
+    ) -> Result<Vec<DataSet>> {
         let context = ctx.data::<GraphQLContext>()?;
 
         use base64::Engine;
@@ -94,7 +94,7 @@ impl DataSourceMutation {
                     ))
                 })?;
 
-            uploads.push(BulkDataSourceUpload {
+            uploads.push(BulkDataSetUpload {
                 name: file_input.name,
                 description: file_input.description,
                 filename: file_input.filename,
@@ -104,20 +104,20 @@ impl DataSourceMutation {
 
         let summaries = context
             .app
-            .bulk_upload_data_sources(project_id, uploads)
+            .bulk_upload_data_sets(project_id, uploads)
             .await
-            .map_err(|e| StructuredError::service("AppContext::bulk_upload_data_sources", e))?;
+            .map_err(|e| StructuredError::service("AppContext::bulk_upload_data_sets", e))?;
 
-        Ok(summaries.into_iter().map(DataSource::from).collect())
+        Ok(summaries.into_iter().map(DataSet::from).collect())
     }
 
-    /// Update DataSource metadata
-    async fn update_data_source(
+    /// Update DataSet metadata
+    async fn update_data_set(
         &self,
         ctx: &Context<'_>,
         id: i32,
-        input: UpdateDataSourceInput,
-    ) -> Result<DataSource> {
+        input: UpdateDataSetInput,
+    ) -> Result<DataSet> {
         let context = ctx.data::<GraphQLContext>()?;
 
         use base64::Engine;
@@ -131,7 +131,7 @@ impl DataSourceMutation {
                     ))
                 })?;
 
-            Some(DataSourceFileReplacement {
+            Some(DataSetFileReplacement {
                 filename: input
                     .filename
                     .clone()
@@ -144,88 +144,88 @@ impl DataSourceMutation {
 
         let summary = context
             .app
-            .update_data_source(DataSourceUpdateRequest {
+            .update_data_set(DataSetUpdateRequest {
                 id,
                 name: input.name,
                 description: input.description,
                 new_file,
             })
             .await
-            .map_err(|e| StructuredError::service("AppContext::update_data_source", e))?;
+            .map_err(|e| StructuredError::service("AppContext::update_data_set", e))?;
 
-        Ok(DataSource::from(summary))
+        Ok(DataSet::from(summary))
     }
 
-    /// Delete DataSource
-    async fn delete_data_source(&self, ctx: &Context<'_>, id: i32) -> Result<bool> {
+    /// Delete DataSet
+    async fn delete_data_set(&self, ctx: &Context<'_>, id: i32) -> Result<bool> {
         let context = ctx.data::<GraphQLContext>()?;
         context
             .app
-            .delete_data_source(id)
+            .delete_data_set(id)
             .await
-            .map_err(|e| StructuredError::service("AppContext::delete_data_source", e))?;
+            .map_err(|e| StructuredError::service("AppContext::delete_data_set", e))?;
 
         Ok(true)
     }
 
-    /// Reprocess existing DataSource file
-    async fn reprocess_data_source(&self, ctx: &Context<'_>, id: i32) -> Result<DataSource> {
+    /// Reprocess existing DataSet file
+    async fn reprocess_data_set(&self, ctx: &Context<'_>, id: i32) -> Result<DataSet> {
         let context = ctx.data::<GraphQLContext>()?;
         let summary = context
             .app
-            .reprocess_data_source(id)
+            .reprocess_data_set(id)
             .await
-            .map_err(|e| StructuredError::service("AppContext::reprocess_data_source", e))?;
+            .map_err(|e| StructuredError::service("AppContext::reprocess_data_set", e))?;
 
-        Ok(DataSource::from(summary))
+        Ok(DataSet::from(summary))
     }
 
-    /// Update DataSource graph data directly
-    async fn update_data_source_graph_data(
+    /// Update DataSet graph data directly
+    async fn update_data_set_graph_data(
         &self,
         ctx: &Context<'_>,
         id: i32,
         graph_json: String,
-    ) -> Result<DataSource> {
+    ) -> Result<DataSet> {
         let context = ctx.data::<GraphQLContext>()?;
         let summary = context
             .app
-            .update_data_source_graph_json(id, graph_json)
+            .update_data_set_graph_json(id, graph_json)
             .await
             .map_err(|e| {
-                StructuredError::service("AppContext::update_data_source_graph_json", e)
+                StructuredError::service("AppContext::update_data_set_graph_json", e)
             })?;
 
-        Ok(DataSource::from(summary))
+        Ok(DataSet::from(summary))
     }
 
     /// Export data sources as spreadsheet (XLSX or ODS)
-    async fn export_data_sources(
+    async fn export_data_sets(
         &self,
         ctx: &Context<'_>,
-        input: ExportDataSourcesInput,
-    ) -> Result<ExportDataSourcesResult> {
+        input: ExportDataSetsInput,
+    ) -> Result<ExportDataSetsResult> {
         let context = ctx.data::<GraphQLContext>()?;
 
         let format = match input.format {
-            crate::graphql::types::SpreadsheetFormat::XLSX => DataSourceExportFormat::Xlsx,
-            crate::graphql::types::SpreadsheetFormat::ODS => DataSourceExportFormat::Ods,
+            crate::graphql::types::SpreadsheetFormat::XLSX => DataSetExportFormat::Xlsx,
+            crate::graphql::types::SpreadsheetFormat::ODS => DataSetExportFormat::Ods,
         };
 
         let exported = context
             .app
-            .export_data_sources(DataSourceExportRequest {
+            .export_data_sets(DataSetExportRequest {
                 project_id: input.project_id,
-                data_source_ids: input.data_source_ids,
+                data_set_ids: input.data_set_ids,
                 format,
             })
             .await
-            .map_err(|e| StructuredError::service("AppContext::export_data_sources", e))?;
+            .map_err(|e| StructuredError::service("AppContext::export_data_sets", e))?;
 
         use base64::{engine::general_purpose, Engine as _};
         let encoded = general_purpose::STANDARD.encode(&exported.data);
 
-        Ok(ExportDataSourcesResult {
+        Ok(ExportDataSetsResult {
             file_content: encoded,
             filename: exported.filename,
             format: exported.format.extension().to_string(),
@@ -233,11 +233,11 @@ impl DataSourceMutation {
     }
 
     /// Import data sources from spreadsheet (XLSX or ODS)
-    async fn import_data_sources(
+    async fn import_data_sets(
         &self,
         ctx: &Context<'_>,
-        input: ImportDataSourcesInput,
-    ) -> Result<ImportDataSourcesResult> {
+        input: ImportDataSetsInput,
+    ) -> Result<ImportDataSetsResult> {
         let context = ctx.data::<GraphQLContext>()?;
 
         use base64::{engine::general_purpose, Engine as _};
@@ -245,25 +245,25 @@ impl DataSourceMutation {
             .decode(&input.file_content)
             .map_err(|e| StructuredError::bad_request(format!("Invalid base64 content: {}", e)))?;
 
-        let format = DataSourceImportFormat::from_filename(&input.filename).ok_or_else(|| {
+        let format = DataSetImportFormat::from_filename(&input.filename).ok_or_else(|| {
             StructuredError::bad_request("Only XLSX and ODS formats are supported for import")
         })?;
 
         let outcome = context
             .app
-            .import_data_sources(DataSourceImportRequest {
+            .import_data_sets(DataSetImportRequest {
                 project_id: input.project_id,
                 format,
                 file_bytes,
             })
             .await
-            .map_err(|e| StructuredError::service("AppContext::import_data_sources", e))?;
+            .map_err(|e| StructuredError::service("AppContext::import_data_sets", e))?;
 
-        Ok(ImportDataSourcesResult {
-            data_sources: outcome
-                .data_sources
+        Ok(ImportDataSetsResult {
+            data_sets: outcome
+                .data_sets
                 .into_iter()
-                .map(DataSource::from)
+                .map(DataSet::from)
                 .collect(),
             created_count: outcome.created_count,
             updated_count: outcome.updated_count,

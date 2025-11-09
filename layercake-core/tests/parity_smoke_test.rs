@@ -8,7 +8,7 @@ use layercake_core::graphql::{
     chat_manager::ChatManager, context::GraphQLContext, mutations::Mutation, queries::Query,
     subscriptions::Subscription,
 };
-use layercake_core::mcp::tools::{data_sources, plans as mcp_plans, projects as mcp_projects};
+use layercake_core::mcp::tools::{data_sets, plans as mcp_plans, projects as mcp_projects};
 use layercake_core::services::system_settings_service::SystemSettingsService;
 use sea_orm::{Database, DatabaseConnection};
 use sea_orm_migration::MigratorTrait;
@@ -282,9 +282,9 @@ async fn graphql_mcp_parity_smoke_test() -> anyhow::Result<()> {
     );
 
     // --- Data source parity -------------------------------------------------
-    let create_empty_data_source_mutation = r#"
-        mutation CreateEmptyDataSource($input: CreateEmptyDataSourceInput!) {
-            createEmptyDataSource(input: $input) {
+    let create_empty_data_set_mutation = r#"
+        mutation CreateEmptyDataSet($input: CreateEmptyDataSetInput!) {
+            createEmptyDataSet(input: $input) {
                 id
                 projectId
                 name
@@ -296,7 +296,7 @@ async fn graphql_mcp_parity_smoke_test() -> anyhow::Result<()> {
         }
     "#;
 
-    let data_source_variables = Variables::from_json(json!({
+    let data_set_variables = Variables::from_json(json!({
         "input": {
             "projectId": project_id,
             "name": "GraphQL Empty Source",
@@ -305,72 +305,72 @@ async fn graphql_mcp_parity_smoke_test() -> anyhow::Result<()> {
         }
     }));
 
-    let data_source_response = schema
-        .execute(Request::new(create_empty_data_source_mutation).variables(data_source_variables))
+    let data_set_response = schema
+        .execute(Request::new(create_empty_data_set_mutation).variables(data_set_variables))
         .await;
     assert!(
-        data_source_response.errors.is_empty(),
-        "GraphQL createEmptyDataSource mutation errored: {:?}",
-        data_source_response.errors
+        data_set_response.errors.is_empty(),
+        "GraphQL createEmptyDataSet mutation errored: {:?}",
+        data_set_response.errors
     );
 
-    let data_source_json = serde_json::to_value(&data_source_response)?;
-    let gql_data_source = data_source_json["data"]["createEmptyDataSource"].clone();
+    let data_set_json = serde_json::to_value(&data_set_response)?;
+    let gql_data_set = data_set_json["data"]["createEmptyDataSet"].clone();
     assert!(
-        !gql_data_source.is_null(),
-        "createEmptyDataSource response payload missing"
+        !gql_data_set.is_null(),
+        "createEmptyDataSet response payload missing"
     );
-    let data_source_id = gql_data_source["id"]
+    let data_set_id = gql_data_set["id"]
         .as_i64()
         .expect("data source id should be an integer") as i32;
 
-    let mcp_data_source = tool_result_json(
-        data_sources::get_data_source(Some(json!({ "data_source_id": data_source_id })), &app)
+    let mcp_data_set = tool_result_json(
+        data_sets::get_data_set(Some(json!({ "data_set_id": data_set_id })), &app)
             .await?,
-    )["dataSource"]
+    )["dataSet"]
         .clone();
     assert!(
-        !mcp_data_source.is_null(),
-        "MCP get_data_source payload missing 'dataSource'"
+        !mcp_data_set.is_null(),
+        "MCP get_data_set payload missing 'dataSet'"
     );
 
-    assert_eq!(gql_data_source["id"], mcp_data_source["id"]);
-    assert_eq!(gql_data_source["projectId"], mcp_data_source["projectId"]);
-    assert_eq!(gql_data_source["dataType"], mcp_data_source["dataType"]);
-    assert_eq!(gql_data_source["status"], mcp_data_source["status"]);
+    assert_eq!(gql_data_set["id"], mcp_data_set["id"]);
+    assert_eq!(gql_data_set["projectId"], mcp_data_set["projectId"]);
+    assert_eq!(gql_data_set["dataType"], mcp_data_set["dataType"]);
+    assert_eq!(gql_data_set["status"], mcp_data_set["status"]);
     assert_eq!(
         parse_timestamp(
-            &gql_data_source["createdAt"],
+            &gql_data_set["createdAt"],
             "graphql data source createdAt"
         ),
-        parse_timestamp(&mcp_data_source["createdAt"], "mcp data source createdAt")
+        parse_timestamp(&mcp_data_set["createdAt"], "mcp data source createdAt")
     );
 
-    let updated_data_source = tool_result_json(
-        data_sources::update_data_source(
+    let updated_data_set = tool_result_json(
+        data_sets::update_data_set(
             Some(json!({
-                "data_source_id": data_source_id,
+                "data_set_id": data_set_id,
                 "name": "Updated MCP Source",
                 "description": "Name updated via MCP"
             })),
             &app,
         )
         .await?,
-    )["dataSource"]
+    )["dataSet"]
         .clone();
     assert!(
-        !updated_data_source.is_null(),
-        "MCP update_data_source payload missing 'dataSource'"
+        !updated_data_set.is_null(),
+        "MCP update_data_set payload missing 'dataSet'"
     );
-    assert_eq!(updated_data_source["name"], json!("Updated MCP Source"));
+    assert_eq!(updated_data_set["name"], json!("Updated MCP Source"));
     assert_eq!(
-        updated_data_source["description"],
+        updated_data_set["description"],
         json!("Name updated via MCP")
     );
 
-    let get_data_source_query = r#"
-        query GetDataSource($id: Int!) {
-            dataSource(id: $id) {
+    let get_data_set_query = r#"
+        query GetDataSet($id: Int!) {
+            dataSet(id: $id) {
                 id
                 projectId
                 name
@@ -384,34 +384,34 @@ async fn graphql_mcp_parity_smoke_test() -> anyhow::Result<()> {
     "#;
     let gql_ds_after = schema
         .execute(
-            Request::new(get_data_source_query).variables(Variables::from_json(json!({
-                "id": data_source_id
+            Request::new(get_data_set_query).variables(Variables::from_json(json!({
+                "id": data_set_id
             }))),
         )
         .await;
     assert!(
         gql_ds_after.errors.is_empty(),
-        "GraphQL dataSource query errored: {:?}",
+        "GraphQL dataSet query errored: {:?}",
         gql_ds_after.errors
     );
     let gql_ds_after_json = serde_json::to_value(&gql_ds_after)?;
-    let gql_data_source_after = gql_ds_after_json["data"]["dataSource"].clone();
-    assert_eq!(gql_data_source_after["name"], json!("Updated MCP Source"));
+    let gql_data_set_after = gql_ds_after_json["data"]["dataSet"].clone();
+    assert_eq!(gql_data_set_after["name"], json!("Updated MCP Source"));
     assert_eq!(
-        gql_data_source_after["description"],
+        gql_data_set_after["description"],
         json!("Name updated via MCP")
     );
 
     let mcp_list = tool_result_json(
-        data_sources::list_data_sources(Some(json!({ "project_id": project_id })), &app).await?,
+        data_sets::list_data_sets(Some(json!({ "project_id": project_id })), &app).await?,
     );
     let mcp_count = mcp_list["count"]
         .as_u64()
         .expect("count should be a number");
 
     let gql_list_query = r#"
-        query ListProjectDataSources($projectId: Int!) {
-            dataSources(projectId: $projectId) {
+        query ListProjectDataSets($projectId: Int!) {
+            dataSets(projectId: $projectId) {
                 id
             }
         }
@@ -425,11 +425,11 @@ async fn graphql_mcp_parity_smoke_test() -> anyhow::Result<()> {
         .await;
     assert!(
         gql_list.errors.is_empty(),
-        "GraphQL dataSources query errored: {:?}",
+        "GraphQL dataSets query errored: {:?}",
         gql_list.errors
     );
     let gql_list_json = serde_json::to_value(&gql_list)?;
-    let gql_list_count = gql_list_json["data"]["dataSources"]
+    let gql_list_count = gql_list_json["data"]["dataSets"]
         .as_array()
         .map(|a| a.len())
         .unwrap_or(0);

@@ -1,8 +1,8 @@
 import { gql } from '@apollo/client'
 
-// Query to fetch all DataSources for a project
+// Query to fetch all DataSets for a project
 export const GET_DATASOURCES = gql`
-  query GetDataSources($projectId: Int!) {
+  query GetDataSets($projectId: Int!) {
     dataSources(projectId: $projectId) {
       id
       projectId
@@ -22,9 +22,9 @@ export const GET_DATASOURCES = gql`
   }
 `
 
-// Query to fetch a single DataSource by ID
+// Query to fetch a single DataSet by ID
 export const GET_DATASOURCE = gql`
-  query GetDataSource($id: Int!) {
+  query GetDataSet($id: Int!) {
     dataSource(id: $id) {
       id
       projectId
@@ -44,10 +44,10 @@ export const GET_DATASOURCE = gql`
   }
 `
 
-// Mutation to create a new DataSource from uploaded file
+// Mutation to create a new DataSet from uploaded file
 export const CREATE_DATASOURCE_FROM_FILE = gql`
-  mutation CreateDataSourceFromFile($input: CreateDataSourceInput!) {
-    createDataSourceFromFile(input: $input) {
+  mutation CreateDataSetFromFile($input: CreateDataSetInput!) {
+    createDataSetFromFile(input: $input) {
       id
       projectId
       name
@@ -66,10 +66,10 @@ export const CREATE_DATASOURCE_FROM_FILE = gql`
   }
 `
 
-// Mutation to create a new empty DataSource (without file upload)
+// Mutation to create a new empty DataSet (without file upload)
 export const CREATE_EMPTY_DATASOURCE = gql`
-  mutation CreateEmptyDataSource($input: CreateEmptyDataSourceInput!) {
-    createEmptyDataSource(input: $input) {
+  mutation CreateEmptyDataSet($input: CreateEmptyDataSetInput!) {
+    createEmptyDataSet(input: $input) {
       id
       projectId
       name
@@ -88,10 +88,10 @@ export const CREATE_EMPTY_DATASOURCE = gql`
   }
 `
 
-// Mutation to bulk upload multiple DataSources with auto-detection
+// Mutation to bulk upload multiple DataSets with auto-detection
 export const BULK_UPLOAD_DATASOURCES = gql`
-  mutation BulkUploadDataSources($projectId: Int!, $files: [BulkUploadDataSourceInput!]!) {
-    bulkUploadDataSources(projectId: $projectId, files: $files) {
+  mutation BulkUploadDataSets($projectId: Int!, $files: [BulkUploadDataSetInput!]!) {
+    bulkUploadDataSets(projectId: $projectId, files: $files) {
       id
       projectId
       name
@@ -110,10 +110,10 @@ export const BULK_UPLOAD_DATASOURCES = gql`
   }
 `
 
-// Mutation to update DataSource metadata
+// Mutation to update DataSet metadata
 export const UPDATE_DATASOURCE = gql`
-  mutation UpdateDataSource($id: Int!, $input: UpdateDataSourceInput!) {
-    updateDataSource(id: $id, input: $input) {
+  mutation UpdateDataSet($id: Int!, $input: UpdateDataSetInput!) {
+    updateDataSet(id: $id, input: $input) {
       id
       projectId
       name
@@ -132,17 +132,17 @@ export const UPDATE_DATASOURCE = gql`
   }
 `
 
-// Mutation to delete a DataSource
+// Mutation to delete a DataSet
 export const DELETE_DATASOURCE = gql`
-  mutation DeleteDataSource($id: Int!) {
-    deleteDataSource(id: $id)
+  mutation DeleteDataSet($id: Int!) {
+    deleteDataSet(id: $id)
   }
 `
 
-// Mutation to reprocess an existing DataSource
+// Mutation to reprocess an existing DataSet
 export const REPROCESS_DATASOURCE = gql`
-  mutation ReprocessDataSource($id: Int!) {
-    reprocessDataSource(id: $id) {
+  mutation ReprocessDataSet($id: Int!) {
+    reprocessDataSet(id: $id) {
       id
       projectId
       name
@@ -163,8 +163,8 @@ export const REPROCESS_DATASOURCE = gql`
 
 // Mutation to update graph JSON data
 export const UPDATE_DATASOURCE_GRAPH_DATA = gql`
-  mutation UpdateDataSourceGraphData($id: Int!, $graphJson: String!) {
-    updateDataSourceGraphData(id: $id, graphJson: $graphJson) {
+  mutation UpdateDataSetGraphData($id: Int!, $graphJson: String!) {
+    updateDataSetGraphData(id: $id, graphJson: $graphJson) {
       id
       projectId
       name
@@ -183,9 +183,9 @@ export const UPDATE_DATASOURCE_GRAPH_DATA = gql`
   }
 `
 
-// Subscription for DataSource updates
+// Subscription for DataSet updates
 export const DATASOURCE_UPDATED = gql`
-  subscription DataSourceUpdated($projectId: Int!) {
+  subscription DataSetUpdated($projectId: Int!) {
     dataSourceUpdated(projectId: $projectId) {
       id
       projectId
@@ -207,8 +207,8 @@ export const DATASOURCE_UPDATED = gql`
 
 // Export data sources as spreadsheet
 export const EXPORT_DATASOURCES = gql`
-  mutation ExportDataSources($input: ExportDataSourcesInput!) {
-    exportDataSources(input: $input) {
+  mutation ExportDataSets($input: ExportDataSetsInput!) {
+    exportDataSets(input: $input) {
       fileContent
       filename
       format
@@ -218,8 +218,8 @@ export const EXPORT_DATASOURCES = gql`
 
 // Import data sources from spreadsheet
 export const IMPORT_DATASOURCES = gql`
-  mutation ImportDataSources($input: ImportDataSourcesInput!) {
-    importDataSources(input: $input) {
+  mutation ImportDataSets($input: ImportDataSetsInput!) {
+    importDataSets(input: $input) {
       dataSources {
         id
         projectId
@@ -250,7 +250,7 @@ export enum FileFormat {
 }
 
 // Data type enum (semantic meaning)
-// Note: GraphQL name is DataSourceDataType to avoid conflict with Plan DAG DataType
+// Note: GraphQL name is DataSetDataType to avoid conflict with Plan DAG DataType
 export enum DataType {
   NODES = 'NODES',
   EDGES = 'EDGES',
@@ -259,7 +259,7 @@ export enum DataType {
 }
 
 // TypeScript interfaces for the GraphQL types
-export interface DataSource {
+export interface DataSet {
   id: number
   projectId: number
   name: string
@@ -276,7 +276,7 @@ export interface DataSource {
   updatedAt: string
 }
 
-export interface CreateDataSourceInput {
+export interface CreateDataSetInput {
   projectId: number
   name: string
   description?: string
@@ -286,21 +286,21 @@ export interface CreateDataSourceInput {
   dataType: DataType
 }
 
-export interface CreateEmptyDataSourceInput {
+export interface CreateEmptyDataSetInput {
   projectId: number
   name: string
   description?: string
   dataType: DataType
 }
 
-export interface BulkUploadDataSourceInput {
+export interface BulkUploadDataSetInput {
   name: string
   description?: string
   filename: string
   fileContent: string // Base64 encoded file content
 }
 
-export interface UpdateDataSourceInput {
+export interface UpdateDataSetInput {
   name?: string
   description?: string
   filename?: string
@@ -379,7 +379,7 @@ export const isValidFormatTypeCombination = (format: FileFormat, type: DataType)
 }
 
 // Helper function to get status color for badges
-export const getStatusColor = (status: DataSource['status']): string => {
+export const getStatusColor = (status: DataSet['status']): string => {
   switch (status) {
     case 'active':
       return 'green'

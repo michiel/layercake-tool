@@ -26,7 +26,7 @@ pub struct Layer {
     pub border_color: Option<String>,
     pub comment: Option<String>,
     pub properties: Option<JSON>,
-    pub datasource_id: Option<i32>,
+    pub dataset_id: Option<i32>,
 }
 
 impl From<graph_layers::Model> for Layer {
@@ -43,7 +43,7 @@ impl From<graph_layers::Model> for Layer {
             border_color: model.border_color,
             comment: model.comment,
             properties,
-            datasource_id: model.datasource_id,
+            dataset_id: model.dataset_id,
         }
     }
 }
