@@ -249,6 +249,7 @@ impl DataAcquisitionService {
             checksum: Set(checksum.to_string()),
             created_by: Set(request.uploader_user_id),
             created_at: Set(chrono::Utc::now()),
+            indexed: Set(request.index_immediately),
         };
         record.insert(&txn).await?;
 
@@ -427,6 +428,7 @@ impl DataAcquisitionService {
                 .await?;
                 let files = files::Entity::find()
                     .filter(files::Column::ProjectId.eq(project_id))
+                    .filter(files::Column::Indexed.eq(true))
                     .order_by_desc(files::Column::CreatedAt)
                     .all(&self.db)
                     .await?;
@@ -837,6 +839,11 @@ impl DataAcquisitionService {
             .into());
         }
 
+        // Update the indexed field in the database
+        let mut active: files::ActiveModel = file.clone().into();
+        active.indexed = Set(indexed);
+        active.update(&self.db).await?;
+
         if indexed {
             // Add to index
             let parsed = self
@@ -875,12 +882,19 @@ impl DataAcquisitionService {
     }
 
     pub async fn is_file_indexed(&self, project_id: i32, file_id: Uuid) -> Result<bool> {
-        let count = kb_documents::Entity::find()
-            .filter(kb_documents::Column::ProjectId.eq(project_id))
-            .filter(kb_documents::Column::FileId.eq(file_id))
-            .count(&self.db)
-            .await?;
+        let file = files::Entity::find_by_id(file_id)
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| DataAcquisitionError::NotFound(format!("File {}", file_id)))?;
 
-        Ok(count > 0)
+        if file.project_id != project_id {
+            return Err(DataAcquisitionError::Validation {
+                field: "projectId".into(),
+                message: "File belongs to a different project".into(),
+            }
+            .into());
+        }
+
+        Ok(file.indexed)
     }
 }

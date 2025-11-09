@@ -21,6 +21,7 @@ mod m20251111_000017_add_embedding_provider_to_vector_state;
 mod m20251112_000018_rename_data_sources_to_data_sets;
 mod m20251112_000019_migrate_plan_dag_datasource_references;
 mod m20251112_000020_add_origin_to_data_sets;
+mod m20251112_000021_add_indexed_to_files;
 
 pub struct Migrator;
 
@@ -49,6 +50,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20251112_000018_rename_data_sources_to_data_sets::Migration),
             Box::new(m20251112_000019_migrate_plan_dag_datasource_references::Migration),
             Box::new(m20251112_000020_add_origin_to_data_sets::Migration),
+            Box::new(m20251112_000021_add_indexed_to_files::Migration),
         ]
     }
 }
