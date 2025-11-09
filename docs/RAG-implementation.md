@@ -45,6 +45,15 @@ Migration `m20251110_000016_create_data_acquisition_tables` adds:
 
 GraphQL types live under `graphql/types/data_acquisition.rs`.
 
+## Supported File Types
+- Plain text (`text/plain`) and Markdown files
+- CSV uploads (`text/csv`)
+- PDF documents
+- Excel spreadsheets (`.xlsx`) and OpenDocument spreadsheets (`.ods`)
+- Word documents (`.docx`)
+
+All formats are converted to chunkable text prior to embedding so they can participate in the knowledge base without additional preprocessing.
+
 ## Frontend Entry Point
 - Added dedicated data acquisition routes under `/projects/:projectId/data-acquisition/...`.
 - Individual pages cover each workflow end-to-end:
@@ -56,7 +65,6 @@ GraphQL types live under `graphql/types/data_acquisition.rs`.
 Each page relies on the new GraphQL operations and is meant as a functional placeholder until richer UX (drag-drop, progress indicators, previews) ships.
 
 ## Follow-up Tasks
-- Add binary format parsers (PDF, DOCX, XLSX) under `ingestion::parsers`.
 - Stream embeddings with chunk-level progress + job queue.
 - Persist dataset outputs back into the plan DAG via existing dataset services.
 - Extend Tauri/CLI shells to call the new service without GraphQL.
