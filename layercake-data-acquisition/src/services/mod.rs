@@ -485,6 +485,7 @@ impl DataAcquisitionService {
     pub async fn knowledge_base_status(&self, project_id: i32) -> Result<KnowledgeBaseStatus> {
         let file_count = files::Entity::find()
             .filter(files::Column::ProjectId.eq(project_id))
+            .filter(files::Column::Indexed.eq(true))
             .count(&self.db)
             .await?;
         let chunk_count = kb_documents::Entity::find()
