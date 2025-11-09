@@ -118,7 +118,7 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
   const [importLibrarySources, { loading: libraryImportLoading, error: libraryImportError }] =
     useMutation(IMPORT_LIBRARY_SOURCES)
 
-  const dataSources: DataSet[] = (dataSourcesData as any)?.dataSources || []
+  const dataSources: DataSet[] = (dataSourcesData as any)?.dataSets || []
   const librarySources: LibrarySource[] = (librarySourcesData as any)?.librarySources || []
 
   useEffect(() => {
@@ -284,7 +284,7 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
         variables: {
           input: {
             projectId: projectNumericId,
-            dataSourceIds: Array.from(selectedRows),
+            dataSetIds: Array.from(selectedRows),
             format: format.toUpperCase()
           }
         }

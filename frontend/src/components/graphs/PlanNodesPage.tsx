@@ -44,7 +44,7 @@ const GET_PROJECTS = gql`
 interface PlanNodesPageProps {}
 
 interface PlanDagDatasourceExecution {
-  dataSourceId?: number
+  dataSetId?: number
   filename?: string
   status?: string
   processedAt?: string

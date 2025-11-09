@@ -34,11 +34,11 @@ export const DataSetNode = memo((props: DataSetNodeProps) => {
 
   // Use inline execution metadata from PlanDAG query, only query if not available
   const datasetExecution = data.datasetExecution
-  const needsQuery = !datasetExecution && config.dataSourceId
+  const needsQuery = !datasetExecution && config.dataSetId
 
   // Fallback query only if inline data not available
   const { data: dataSourceData } = useQuery(GET_DATASOURCE, {
-    variables: { id: config.dataSourceId || 0 },
+    variables: { id: config.dataSetId || 0 },
     skip: !needsQuery,
     errorPolicy: 'ignore'
   })
@@ -175,7 +175,7 @@ export const DataSetNode = memo((props: DataSetNodeProps) => {
       <DataSetDataDialog
         opened={showDataDialog}
         onClose={() => setShowDataDialog(false)}
-        dataSourceId={config.dataSourceId || null}
+        dataSetId={config.dataSetId || null}
         title={`Data Source: ${data.metadata.label}`}
       />
     </>

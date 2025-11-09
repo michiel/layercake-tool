@@ -16,19 +16,19 @@ import { GraphSpreadsheetEditor, GraphData } from '../../../editors/GraphSpreads
 interface DataSetDataDialogProps {
   opened: boolean;
   onClose: () => void;
-  dataSourceId: number | null;
+  dataSetId: number | null;
   title?: string;
 }
 
 export const DataSetDataDialog: React.FC<DataSetDataDialogProps> = ({
   opened,
   onClose,
-  dataSourceId,
+  dataSetId,
   title = 'Data Source Data'
 }) => {
   const { data, loading, error, refetch } = useQuery<{ dataSource: DataSet }>(GET_DATASOURCE, {
-    variables: { id: dataSourceId },
-    skip: !opened || !dataSourceId,
+    variables: { id: dataSetId },
+    skip: !opened || !dataSetId,
     fetchPolicy: 'network-only'
   });
 
@@ -73,7 +73,7 @@ export const DataSetDataDialog: React.FC<DataSetDataDialogProps> = ({
   };
 
   const handleSave = async (graphData: GraphData) => {
-    if (!dataSourceId) return;
+    if (!dataSetId) return;
 
     try {
       // Convert GraphData back to the format expected by the backend
@@ -85,7 +85,7 @@ export const DataSetDataDialog: React.FC<DataSetDataDialogProps> = ({
 
       await updateDataSetGraphData({
         variables: {
-          id: dataSourceId,
+          id: dataSetId,
           graphJson
         }
       });

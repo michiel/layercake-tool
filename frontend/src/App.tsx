@@ -1649,7 +1649,7 @@ function App() {
               <ProjectSharingPage />
             </ErrorBoundary>
           } />
-          <Route path="/projects/:projectId/datasets/:dataSourceId/edit" element={
+          <Route path="/projects/:projectId/datasets/:dataSetId/edit" element={
             <ErrorBoundary>
               <DataSetEditor />
             </ErrorBoundary>

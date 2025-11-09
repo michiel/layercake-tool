@@ -36,7 +36,7 @@ export enum PlanDagNodeType {
 
 // Data Source Node Configuration
 export interface DataSetNodeConfig {
-  dataSourceId?: number; // Reference to DataSet entity (new)
+  dataSetId?: number; // Reference to DataSet entity (new)
   displayMode?: 'summary' | 'detailed' | 'preview'; // Optional for backward compatibility
   // Removed: outputGraphRef - output connections handled by visual edges in DAG
 
@@ -146,7 +146,7 @@ export type NodeConfig =
 
 // Execution metadata for DataSet nodes
 export interface DataSetExecutionMetadata {
-  dataSourceId: number;
+  dataSetId: number;
   filename: string;
   status: string;
   processedAt?: string;

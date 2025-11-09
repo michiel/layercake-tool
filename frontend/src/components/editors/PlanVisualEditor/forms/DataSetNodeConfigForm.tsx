@@ -32,7 +32,7 @@ interface DataSetReference {
 }
 
 interface GetAvailableDataSetsData {
-  dataSources: DataSetReference[];
+  dataSets: DataSetReference[];
 }
 
 interface DataSetNodeConfigFormProps {
@@ -72,18 +72,18 @@ export const DataSetNodeConfigForm: React.FC<DataSetNodeConfigFormProps> = ({
 
   // Validate configuration
   useEffect(() => {
-    const isValid = !!localConfig.dataSourceId;
+    const isValid = !!localConfig.dataSetId;
     setIsValid(isValid);
-  }, [localConfig.dataSourceId, setIsValid]);
+  }, [localConfig.dataSetId, setIsValid]);
 
   const handleDataSetChange = (value: string | undefined) => {
     if (value) {
-      const dataSourceId = parseInt(value, 10);
-      const newSelection = data?.dataSources?.find(ds => ds.id === dataSourceId);
+      const dataSetId = parseInt(value, 10);
+      const newSelection = data?.dataSets?.find(ds => ds.id === dataSetId);
 
       setLocalConfig(prev => ({
         ...prev,
-        dataSourceId,
+        dataSetId,
       }));
 
       if (newSelection) {
@@ -95,7 +95,7 @@ export const DataSetNodeConfigForm: React.FC<DataSetNodeConfigFormProps> = ({
     } else {
       setLocalConfig(prev => ({
         ...prev,
-        dataSourceId: undefined,
+        dataSetId: undefined,
       }));
       setMetadata(prev => ({
         ...prev,
@@ -132,14 +132,14 @@ export const DataSetNodeConfigForm: React.FC<DataSetNodeConfigFormProps> = ({
     );
   }
 
-  const dataSourceOptions = data?.dataSources?.map((ds: DataSetReference) => ({
+  const dataSourceOptions = data?.dataSets?.map((ds: DataSetReference) => ({
     value: ds.id.toString(),
     label: ds.name,
     description: ds.description || `Type: ${ds.fileFormat}/${ds.dataType}`,
   })) || [];
 
-  const selectedDataSet = data?.dataSources?.find(
-    (ds: DataSetReference) => ds.id === localConfig.dataSourceId
+  const selectedDataSet = data?.dataSets?.find(
+    (ds: DataSetReference) => ds.id === localConfig.dataSetId
   );
 
   return (
@@ -149,7 +149,7 @@ export const DataSetNodeConfigForm: React.FC<DataSetNodeConfigFormProps> = ({
           Data Source <span className="text-red-600">*</span>
         </Label>
         <Select
-          value={localConfig.dataSourceId?.toString() || undefined}
+          value={localConfig.dataSetId?.toString() || undefined}
           onValueChange={handleDataSetChange}
         >
           <SelectTrigger id="data-source">

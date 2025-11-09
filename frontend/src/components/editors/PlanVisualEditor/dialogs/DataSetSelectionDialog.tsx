@@ -57,7 +57,7 @@ export const DataSetSelectionDialog: React.FC<DataSetSelectionDialogProps> = ({
     fetchPolicy: 'cache-and-network'
   })
 
-  const dataSources: DataSet[] = (dataSourcesData as any)?.dataSources || []
+  const dataSources: DataSet[] = (dataSourcesData as any)?.dataSets || []
 
   // Filter DataSets based on search query
   const filteredDataSets = dataSources.filter(ds =>

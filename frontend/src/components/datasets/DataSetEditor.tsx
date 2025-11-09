@@ -59,7 +59,7 @@ interface DataSetEditorProps {}
 
 export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
   const navigate = useNavigate()
-  const { projectId, dataSourceId } = useParams<{ projectId: string; dataSourceId: string }>()
+  const { projectId, dataSetId } = useParams<{ projectId: string; dataSetId: string }>()
   const [activeTab, setActiveTab] = useState<string>('details')
   const [fileUploadMode, setFileUploadMode] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
@@ -84,7 +84,7 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
     error: dataSourceError,
     refetch: refetchDataSet
   } = useQuery(GET_DATASOURCE, {
-    variables: { id: parseInt(dataSourceId || '0') },
+    variables: { id: parseInt(dataSetId || '0') },
     errorPolicy: 'all'
   })
 

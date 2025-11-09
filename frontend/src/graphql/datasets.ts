@@ -3,7 +3,7 @@ import { gql } from '@apollo/client'
 // Query to fetch all DataSets for a project
 export const GET_DATASOURCES = gql`
   query GetDataSets($projectId: Int!) {
-    dataSources(projectId: $projectId) {
+    dataSets(projectId: $projectId) {
       id
       projectId
       name
@@ -25,7 +25,7 @@ export const GET_DATASOURCES = gql`
 // Query to fetch a single DataSet by ID
 export const GET_DATASOURCE = gql`
   query GetDataSet($id: Int!) {
-    dataSource(id: $id) {
+    dataSet(id: $id) {
       id
       projectId
       name
@@ -186,7 +186,7 @@ export const UPDATE_DATASOURCE_GRAPH_DATA = gql`
 // Subscription for DataSet updates
 export const DATASOURCE_UPDATED = gql`
   subscription DataSetUpdated($projectId: Int!) {
-    dataSourceUpdated(projectId: $projectId) {
+    dataSetUpdated(projectId: $projectId) {
       id
       projectId
       name
@@ -220,7 +220,7 @@ export const EXPORT_DATASOURCES = gql`
 export const IMPORT_DATASOURCES = gql`
   mutation ImportDataSets($input: ImportDataSetsInput!) {
     importDataSets(input: $input) {
-      dataSources {
+      dataSets {
         id
         projectId
         name
