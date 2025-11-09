@@ -141,12 +141,12 @@ impl Model {
 
     /// Validate that the format and type combination is valid
     pub fn validate_format_type_combination(&self) -> Result<(), String> {
-        let format = self.get_file_format().ok_or_else(|| {
-            format!("Invalid file format: {}", self.file_format)
-        })?;
-        let dtype = self.get_data_type().ok_or_else(|| {
-            format!("Invalid data type: {}", self.data_type)
-        })?;
+        let format = self
+            .get_file_format()
+            .ok_or_else(|| format!("Invalid file format: {}", self.file_format))?;
+        let dtype = self
+            .get_data_type()
+            .ok_or_else(|| format!("Invalid data type: {}", self.data_type))?;
 
         if dtype.is_compatible_with_format(&format) {
             Ok(())

@@ -267,8 +267,12 @@ impl ChatManager {
             tracing::debug!("Active sessions for subscription: {}", sessions.len());
             sessions.get(session_id).and_then(|session| {
                 let history = {
-                    let guard = session.history.lock()
-                        .map_err(|e| tracing::error!("Failed to acquire lock on session history: {}", e))
+                    let guard = session
+                        .history
+                        .lock()
+                        .map_err(|e| {
+                            tracing::error!("Failed to acquire lock on session history: {}", e)
+                        })
                         .ok()?;
                     guard.iter().cloned().collect::<Vec<_>>()
                 };

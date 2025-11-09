@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { Routes, Route, useNavigate, useParams, useLocation } from 'react-router-dom'
-import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconDownload, IconChevronLeft, IconChevronRight, IconFolderPlus, IconNetwork, IconBooks, IconMessageDots, IconAdjustments } from '@tabler/icons-react'
+import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconDownload, IconChevronLeft, IconChevronRight, IconFolderPlus, IconNetwork, IconBooks, IconMessageDots, IconAdjustments, IconShare, IconUpload } from '@tabler/icons-react'
 import { useQuery, useMutation } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import { Breadcrumbs } from './components/common/Breadcrumbs'
@@ -15,10 +15,14 @@ import { useCollaborationV2 } from './hooks/useCollaborationV2'
 import { useConnectionStatus } from './hooks/useConnectionStatus'
 import { ProjectChatPage } from './pages/ProjectChatPage'
 import { ChatLogsPage } from './pages/ChatLogsPage'
+import { SourceManagementPage } from './pages/SourceManagementPage'
+import { KnowledgeBasePage } from './pages/KnowledgeBasePage'
+import { DatasetCreationPage } from './pages/DatasetCreationPage'
+import { ProjectSharingPage } from './pages/ProjectSharingPage'
 import { getOrCreateSessionId } from './utils/session'
 import { Group, Stack } from './components/layout-primitives'
 import { Button } from './components/ui/button'
-import { Card } from './components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card'
 import { Badge } from './components/ui/badge'
 import { Alert, AlertDescription } from './components/ui/alert'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './components/ui/dialog'
@@ -32,6 +36,22 @@ import { cn } from './lib/utils'
 // Collaboration Context for providing project-level collaboration to all pages
 const CollaborationContext = React.createContext<any>(null)
 export const useCollaboration = () => React.useContext(CollaborationContext)
+
+type ProjectNavChild = {
+  key: string
+  label: string
+  route: string
+  isActive: () => boolean
+}
+
+type ProjectNavSection = {
+  key: string
+  label: string
+  icon: React.ReactNode
+  route: string
+  isActive: () => boolean
+  children?: ProjectNavChild[]
+}
 
 // Query to fetch projects
 const GET_PROJECTS = gql`
@@ -147,6 +167,113 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
     enableWebSocket: !!projectId
   })
 
+  const makeRouteMatcher = (path: string, options?: { prefix?: boolean }) => () =>
+    options?.prefix ? isActiveRoutePrefix(path) : isActiveRoute(path)
+
+  const projectNavSections = useMemo<ProjectNavSection[]>(() => {
+    if (!projectId) {
+      return []
+    }
+
+    const dataAcquisitionChildren: ProjectNavChild[] = [
+      {
+        key: 'data-sources',
+        label: 'Data Sources',
+        route: `/projects/${projectId}/datasources`,
+        isActive: makeRouteMatcher(`/projects/${projectId}/datasources`),
+      },
+      {
+        key: 'source-management',
+        label: 'Source Management',
+        route: `/projects/${projectId}/data-acquisition/source-management`,
+        isActive: makeRouteMatcher(`/projects/${projectId}/data-acquisition/source-management`),
+      },
+      {
+        key: 'knowledge-base',
+        label: 'Knowledge Base',
+        route: `/projects/${projectId}/data-acquisition/knowledge-base`,
+        isActive: makeRouteMatcher(`/projects/${projectId}/data-acquisition/knowledge-base`),
+      },
+      {
+        key: 'dataset-creation',
+        label: 'Data Set Creation',
+        route: `/projects/${projectId}/data-acquisition/datasets`,
+        isActive: makeRouteMatcher(`/projects/${projectId}/data-acquisition/datasets`),
+      },
+    ]
+
+    const graphCreationChildren: ProjectNavChild[] = [
+      {
+        key: 'plan',
+        label: 'Plan',
+        route: `/projects/${projectId}/plan`,
+        isActive: makeRouteMatcher(`/projects/${projectId}/plan`),
+      },
+      {
+        key: 'plan-nodes',
+        label: 'Plan Nodes',
+        route: `/projects/${projectId}/plan-nodes`,
+        isActive: makeRouteMatcher(`/projects/${projectId}/plan-nodes`),
+      },
+      {
+        key: 'graphs',
+        label: 'Graphs',
+        route: `/projects/${projectId}/graphs`,
+        isActive: makeRouteMatcher(`/projects/${projectId}/graphs`),
+      },
+    ]
+
+    const chatChildren: ProjectNavChild[] = [
+      {
+        key: 'chat-logs',
+        label: 'Chat Logs',
+        route: `/projects/${projectId}/chat/logs`,
+        isActive: makeRouteMatcher(`/projects/${projectId}/chat/logs`),
+      },
+    ]
+
+    return [
+      {
+        key: 'overview',
+        label: 'Project overview',
+        icon: <IconFolderPlus className="h-4 w-4" />,
+        route: `/projects/${projectId}`,
+        isActive: makeRouteMatcher(`/projects/${projectId}`),
+      },
+      {
+        key: 'data-acquisition',
+        label: 'Data acquisition',
+        icon: <IconDatabase className="h-4 w-4" />,
+        route: dataAcquisitionChildren[0].route,
+        isActive: () => dataAcquisitionChildren.some((child) => child.isActive()),
+        children: dataAcquisitionChildren,
+      },
+      {
+        key: 'graph-creation',
+        label: 'Graph creation',
+        icon: <IconGraph className="h-4 w-4" />,
+        route: graphCreationChildren[0].route,
+        isActive: () => graphCreationChildren.some((child) => child.isActive()),
+        children: graphCreationChildren,
+      },
+      {
+        key: 'sharing',
+        label: 'Sharing',
+        icon: <IconShare className="h-4 w-4" />,
+        route: `/projects/${projectId}/sharing`,
+        isActive: makeRouteMatcher(`/projects/${projectId}/sharing`),
+      },
+      {
+        key: 'chat',
+        label: 'Chat',
+        icon: <IconMessageDots className="h-4 w-4" />,
+        route: `/projects/${projectId}/chat`,
+        isActive: makeRouteMatcher(`/projects/${projectId}/chat`, { prefix: true }),
+        children: chatChildren,
+      },
+    ]
+  }, [projectId, location.pathname])
+
   return (
     <div className="flex h-screen flex-col overflow-hidden">
       {/* Top Bar */}
@@ -254,156 +381,49 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                 </Tooltip>
 
                 {/* Project-specific navigation - only show when in a project */}
-                {projectId && (
+                {projectId && projectNavSections.length > 0 && (
                   <>
                     <Separator className="my-2" />
-
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant={isActiveRoute(`/projects/${projectId}`) ? 'default' : 'ghost'}
-                          className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start'}
-                          onClick={() => navigate(`/projects/${projectId}`)}
-                        >
-                          {navCollapsed ? (
-                            <IconFolderPlus className="h-4 w-4" />
-                          ) : (
-                            <>
-                              <IconFolderPlus className="h-4 w-4 mr-2" />
-                              Project
-                            </>
-                          )}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="right">Project</TooltipContent>
-                    </Tooltip>
-
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                    <Button
-                      variant={isActiveRoutePrefix(`/projects/${projectId}/datasources`) ? 'default' : 'ghost'}
-                      className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start'}
-                      onClick={() => navigate(`/projects/${projectId}/datasources`)}
-                    >
-                          {navCollapsed ? (
-                            <IconFileDatabase className="h-4 w-4" />
-                          ) : (
-                            <>
-                              <IconFileDatabase className="h-4 w-4 mr-2" />
-                              Data Sources
-                            </>
-                          )}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="right">Data Sources</TooltipContent>
-                    </Tooltip>
-
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant={isActiveRoute(`/projects/${projectId}/plan`) || isActiveRoute(`/projects/${projectId}/plan-nodes`) ? 'default' : 'ghost'}
-                          className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start'}
-                          onClick={() => navigate(`/projects/${projectId}/plan`)}
-                        >
-                          {navCollapsed ? (
-                            <IconGraph className="h-4 w-4" />
-                          ) : (
-                            <>
-                              <IconGraph className="h-4 w-4 mr-2" />
-                              Plan
-                            </>
-                          )}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="right">Plan</TooltipContent>
-                    </Tooltip>
-
-                    {/* Show Plan Nodes when on Plan or Plan Nodes page */}
-                    {(isActiveRoute(`/projects/${projectId}/plan`) || isActiveRoute(`/projects/${projectId}/plan-nodes`)) && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant={isActiveRoute(`/projects/${projectId}/plan-nodes`) ? 'default' : 'ghost'}
-                            className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start pl-8'}
-                            onClick={() => navigate(`/projects/${projectId}/plan-nodes`)}
-                          >
-                            {navCollapsed ? (
-                              <IconNetwork className="h-4 w-4" />
-                            ) : (
-                              <>
-                                <IconNetwork className="h-4 w-4 mr-2" />
-                                Plan Nodes
-                              </>
+                    <Stack gap="xs">
+                      {projectNavSections.map((section) => {
+                        const sectionActive = section.isActive()
+                        return (
+                          <div key={section.key}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant={sectionActive ? 'default' : 'ghost'}
+                                  className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start'}
+                                  onClick={() => navigate(section.route)}
+                                >
+                                  {section.icon}
+                                  {!navCollapsed && <span className="ml-2">{section.label}</span>}
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="right">{section.label}</TooltipContent>
+                            </Tooltip>
+                            {!navCollapsed && section.children && section.children.length > 0 && (
+                              <Stack gap="xs" className="pl-6 mt-1">
+                                {section.children.map((child) => {
+                                  const childActive = child.isActive()
+                                  return (
+                                    <Button
+                                      key={child.key}
+                                      size="sm"
+                                      variant={childActive ? 'default' : 'ghost'}
+                                      className="justify-start text-sm"
+                                      onClick={() => navigate(child.route)}
+                                    >
+                                      {child.label}
+                                    </Button>
+                                  )
+                                })}
+                              </Stack>
                             )}
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="right">Plan Nodes</TooltipContent>
-                      </Tooltip>
-                    )}
-
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant={isActiveRoute(`/projects/${projectId}/graphs`) ? 'default' : 'ghost'}
-                          className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start'}
-                          onClick={() => navigate(`/projects/${projectId}/graphs`)}
-                        >
-                          {navCollapsed ? (
-                            <IconDatabase className="h-4 w-4" />
-                          ) : (
-                            <>
-                              <IconDatabase className="h-4 w-4 mr-2" />
-                              Graphs
-                            </>
-                          )}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="right">Graphs</TooltipContent>
-                    </Tooltip>
-
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant={isActiveRoutePrefix(`/projects/${projectId}/chat`) ? 'default' : 'ghost'}
-                          className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start'}
-                          onClick={() => navigate(`/projects/${projectId}/chat`)}
-                        >
-                          {navCollapsed ? (
-                            <IconMessageDots className="h-4 w-4" />
-                          ) : (
-                            <>
-                              <IconMessageDots className="h-4 w-4 mr-2" />
-                              Chat
-                            </>
-                          )}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="right">Chat</TooltipContent>
-                    </Tooltip>
-
-                    {isActiveRoutePrefix(`/projects/${projectId}/chat`) && (
-                      <div className={navCollapsed ? '' : 'pl-4'}>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant={isActiveRoute(`/projects/${projectId}/chat/logs`) ? 'default' : 'ghost'}
-                              className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start'}
-                              onClick={() => navigate(`/projects/${projectId}/chat/logs`)}
-                            >
-                              {navCollapsed ? (
-                                <IconMessageDots className="h-4 w-4" />
-                              ) : (
-                                <>
-                                  <IconMessageDots className="h-4 w-4 mr-2" />
-                                  Chat logs
-                                </>
-                              )}
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent side="right">Chat logs</TooltipContent>
-                        </Tooltip>
-                      </div>
-                    )}
+                          </div>
+                        )
+                      })}
+                    </Stack>
                   </>
                 )}
               </Stack>
@@ -1197,33 +1217,9 @@ const ProjectDetailPage = () => {
     )
   }
 
-  const projectActions = [
-    {
-      title: 'Data Sources',
-      description: 'Manage CSV and JSON files that serve as input data for your Plan DAGs',
-      icon: <IconFileDatabase size={20} />,
-      onClick: () => navigate(`/projects/${projectId}/datasources`),
-    },
-    {
-      title: 'Plan',
-      description: 'Create and edit Plan DAGs with visual node-based interface',
-      icon: <IconGraph size={20} />,
-      onClick: () => navigate(`/projects/${projectId}/plan`),
-      primary: true,
-    },
-    {
-      title: 'Plan Nodes',
-      description: 'Review every node in the Plan DAG with execution status and type',
-      icon: <IconNetwork size={20} />,
-      onClick: () => navigate(`/projects/${projectId}/plan-nodes`),
-    },
-    {
-      title: 'Graphs',
-      description: 'Browse materialized graph outputs with quick access actions',
-      icon: <IconDatabase size={20} />,
-      onClick: () => navigate(`/projects/${projectId}/graphs`),
-    },
-  ]
+  const planNodeCount = planDag?.nodes?.length ?? 0
+  const planEdgeCount = planDag?.edges?.length ?? 0
+  const planVersion = planDag?.version ?? 'n/a'
 
   return (
     <PageContainer>
@@ -1253,63 +1249,222 @@ const ProjectDetailPage = () => {
         </Group>
       </Group>
 
-      <h2 className="text-2xl font-bold mb-4">Project Tools</h2>
+      <Stack gap="xl">
+        <section>
+          <Group justify="between" className="mb-4">
+            <div>
+              <h2 className="text-2xl font-bold">Data Acquisition</h2>
+              <p className="text-muted-foreground">
+                Import files, manage ingestion, and monitor the knowledge base for this project.
+              </p>
+            </div>
+            <Group gap="xs">
+              <Button variant="outline" onClick={() => navigate(`/projects/${projectId}/datasources`)}>
+                Manage sources
+              </Button>
+              <Button onClick={() => navigate(`/projects/${projectId}/data-acquisition/source-management`)}>
+                Upload files
+              </Button>
+            </Group>
+          </Group>
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card className="border">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                  <IconFileDatabase className="h-4 w-4 text-primary" />
+                  Data sources
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  View imported CSV/JSON files and connect shared library sources.
+                </p>
+                <Button variant="secondary" className="w-full" onClick={() => navigate(`/projects/${projectId}/datasources`)}>
+                  Open data sources
+                </Button>
+              </CardContent>
+            </Card>
+            <Card className="border">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                  <IconUpload className="h-4 w-4 text-primary" />
+                  Source management
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Upload new documents, edit tags, and control ingestion defaults.
+                </p>
+                <Button className="w-full" onClick={() => navigate(`/projects/${projectId}/data-acquisition/source-management`)}>
+                  Manage uploads
+                </Button>
+              </CardContent>
+            </Card>
+            <Card className="border">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                  <IconDatabase className="h-4 w-4 text-primary" />
+                  Knowledge base
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Review embedding status and rebuild the project knowledge base.
+                </p>
+                <Button variant="outline" className="w-full" onClick={() => navigate(`/projects/${projectId}/data-acquisition/knowledge-base`)}>
+                  View knowledge base
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
 
-      <TooltipProvider>
-        <Stack gap="md">
-          {projectActions.map((action) => (
-            <Card
-              key={action.title}
-              className={`border p-4 ${
-                'cursor-pointer hover:shadow-md transition-shadow'
-              }`}
-              onClick={action.onClick}
-            >
-              <Group justify="between" align="start">
-                <Group align="start" gap="md">
-                  {action.icon}
-                  <div>
-                    <h4 className="text-lg font-semibold mb-2">{action.title}</h4>
-                    <p className="text-sm text-muted-foreground">
-                      {action.description}
-                    </p>
-                  </div>
+        <section>
+          <Group justify="between" className="mb-4">
+            <div>
+              <h2 className="text-2xl font-bold">Graph Creation</h2>
+              <p className="text-muted-foreground">
+                Design, inspect, and export the Plan DAG along with all derived graphs.
+              </p>
+            </div>
+            <Group gap="xs">
+              <Button variant="outline" onClick={() => handleDownloadYAML()} disabled={!planDag}>
+                <IconDownload className="mr-2 h-4 w-4" />
+                Export plan YAML
+              </Button>
+              <Button onClick={() => navigate(`/projects/${projectId}/plan`)}>
+                Open plan editor
+              </Button>
+            </Group>
+          </Group>
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card className="border">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                  <IconGraph className="h-4 w-4 text-primary" />
+                  Plan status
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Group gap="sm">
+                  <Badge variant="secondary">Nodes: {planNodeCount}</Badge>
+                  <Badge variant="secondary">Edges: {planEdgeCount}</Badge>
                 </Group>
+                <p className="text-xs text-muted-foreground">
+                  Version: {planVersion}
+                </p>
+                <Button variant="ghost" className="w-full" onClick={() => navigate(`/projects/${projectId}/plan`)}>
+                  Edit plan
+                </Button>
+              </CardContent>
+            </Card>
+            <Card className="border">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                  <IconNetwork className="h-4 w-4 text-primary" />
+                  Plan nodes
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Review node execution status, trace dependencies, and inspect generated outputs.
+                </p>
+                <Button className="w-full" onClick={() => navigate(`/projects/${projectId}/plan-nodes`)}>
+                  View nodes
+                </Button>
+              </CardContent>
+            </Card>
+            <Card className="border">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                  <IconDatabase className="h-4 w-4 text-primary" />
+                  Graph outputs
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Browse generated graphs, download CSV exports, or open the graph editor.
+                </p>
                 <Group gap="xs">
-                  {action.title === 'Plan' && planDag && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleDownloadYAML()
-                          }}
-                        >
-                          <IconDownload className="h-5 w-5" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Download Plan DAG as YAML</TooltipContent>
-                    </Tooltip>
-                  )}
+                  <Button className="flex-1" variant="secondary" onClick={() => navigate(`/projects/${projectId}/graphs`)}>
+                    Browse graphs
+                  </Button>
                   <Button
-                    variant={action.primary ? 'default' : 'ghost'}
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      action.onClick()
+                    className="flex-1"
+                    variant="ghost"
+                    disabled={!planDag?.nodes?.length}
+                    onClick={() => {
+                      if (planDag?.nodes?.length) {
+                        navigate(`/projects/${projectId}/plan-nodes/${planDag.nodes[0].id}/edit`)
+                      }
                     }}
                   >
-                    {action.icon}
-                    <span className="ml-2">Open</span>
+                    Open editor
                   </Button>
                 </Group>
-              </Group>
+              </CardContent>
             </Card>
-          ))}
-        </Stack>
-      </TooltipProvider>
+          </div>
+        </section>
+
+        <section>
+          <Group justify="between" className="mb-4">
+            <div>
+              <h2 className="text-2xl font-bold">Chat & Collaboration</h2>
+              <p className="text-muted-foreground">
+                Collaborate with agents, review chat logs, and manage project access.
+              </p>
+            </div>
+            <Group gap="xs">
+              <Button variant="outline" onClick={() => navigate(`/projects/${projectId}/sharing`)}>
+                Manage sharing
+              </Button>
+              <Button onClick={() => navigate(`/projects/${projectId}/chat`)}>
+                Open project chat
+              </Button>
+            </Group>
+          </Group>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card className="border">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                  <IconMessageDots className="h-4 w-4 text-primary" />
+                  Project chat
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Launch the shared agent conversation scoped to this project, or inspect previous messages.
+                </p>
+                <Group gap="sm">
+                  <Button className="flex-1" onClick={() => navigate(`/projects/${projectId}/chat`)}>
+                    Join chat
+                  </Button>
+                  <Button className="flex-1" variant="ghost" onClick={() => navigate(`/projects/${projectId}/chat/logs`)}>
+                    View logs
+                  </Button>
+                </Group>
+              </CardContent>
+            </Card>
+            <Card className="border">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                  <IconShare className="h-4 w-4 text-primary" />
+                  Sharing & access
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Invite collaborators, publish read-only snapshots, and control project-level permissions.
+                </p>
+                <Button variant="secondary" className="w-full" onClick={() => navigate(`/projects/${projectId}/sharing`)}>
+                  Manage access
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+      </Stack>
     </PageContainer>
   )
 }
@@ -1379,6 +1534,7 @@ const PlanEditorPage = () => {
         <Breadcrumbs
           projectName={selectedProject.name}
           projectId={selectedProject.id}
+          sections={[{ title: 'Graph creation', href: `/projects/${selectedProject.id}/plan` }]}
           currentPage="Plan"
           onNavigate={handleNavigate}
         />
@@ -1471,6 +1627,26 @@ function App() {
           <Route path="/projects/:projectId/datasources" element={
             <ErrorBoundary>
               <DataSourcesPage />
+            </ErrorBoundary>
+          } />
+          <Route path="/projects/:projectId/data-acquisition/source-management" element={
+            <ErrorBoundary>
+              <SourceManagementPage />
+            </ErrorBoundary>
+          } />
+          <Route path="/projects/:projectId/data-acquisition/knowledge-base" element={
+            <ErrorBoundary>
+              <KnowledgeBasePage />
+            </ErrorBoundary>
+          } />
+          <Route path="/projects/:projectId/data-acquisition/datasets" element={
+            <ErrorBoundary>
+              <DatasetCreationPage />
+            </ErrorBoundary>
+          } />
+          <Route path="/projects/:projectId/sharing" element={
+            <ErrorBoundary>
+              <ProjectSharingPage />
             </ErrorBoundary>
           } />
           <Route path="/projects/:projectId/datasources/:dataSourceId/edit" element={

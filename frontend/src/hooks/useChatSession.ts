@@ -20,6 +20,7 @@ import {
   useProviderSession,
   useChatSessionsHydrationStatus,
 } from '../state/chatSessionStore'
+import { asGraphQLSubscribable, GraphQLSubscriptionHandle } from '../utils/graphqlSubscription'
 
 interface UseChatSessionArgs {
   projectId?: number
@@ -73,7 +74,7 @@ export function useChatSession({
   const [startSession] = useMutation<{ startChatSession: StartChatSessionPayload }>(START_CHAT_SESSION)
   const [sendChat] = useMutation(SEND_CHAT_MESSAGE)
   const client = useApolloClient()
-  const subscriptionRef = useRef<{ unsubscribe: () => void } | null>(null)
+  const subscriptionRef = useRef<GraphQLSubscriptionHandle | null>(null)
   const pendingMessagesRef = useRef<string[]>([])
   const awaitingTimeoutRef = useRef<number | null>(null)
 
@@ -271,8 +272,8 @@ export function useChatSession({
       fetchPolicy: 'no-cache',
     })
 
-    subscriptionRef.current = observable.subscribe({
-      next: ({ data }) => {
+    subscriptionRef.current = asGraphQLSubscribable<{ data?: { chatEvents: ChatEventPayload } }>(observable).subscribe({
+      next: ({ data }: { data?: { chatEvents: ChatEventPayload } }) => {
         const payload = data?.chatEvents
         if (!payload) {
           return
@@ -305,7 +306,7 @@ export function useChatSession({
           }
         }
       },
-      error: (subscriptionErr) => {
+      error: (subscriptionErr: unknown) => {
         const errorMsg = getErrorMessage(subscriptionErr)
         if (DEBUG) {
           console.error('[useChatSession] Subscription error', errorMsg, subscriptionErr)

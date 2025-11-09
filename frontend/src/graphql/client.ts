@@ -1,11 +1,14 @@
-import { ApolloClient, InMemoryCache, createHttpLink, split, from } from '@apollo/client'
+import { ApolloClient, InMemoryCache, split, from } from '@apollo/client'
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions'
 import { getMainDefinition } from '@apollo/client/utilities'
 import { onError } from '@apollo/client/link/error'
 import { setContext } from '@apollo/client/link/context'
 import { createClient } from 'graphql-ws'
+import UploadHttpLink from 'apollo-upload-client/UploadHttpLink.mjs'
 import { getServerInfo, isTauriApp, waitForServer } from '../utils/tauri'
 import { getOrCreateSessionId } from '../utils/session'
+import { extractGraphQLErrorMessage } from '../utils/errorHandling'
+import { showErrorNotification } from '../utils/notifications'
 
 // Store server configuration
 let serverConfig: { url: string; secret: string; wsUrl: string } | null = null
@@ -100,23 +103,25 @@ function createApolloClient(): ApolloClient {
 
   // HTTP Link for queries and mutations with timeout using AbortController
   // Use a function to get the current endpoint (supports dynamic reconfiguration)
-  const httpLink = createHttpLink({
+  const httpLink = new UploadHttpLink({
     uri: () => {
       const { httpUrl } = getGraphQLEndpoints()
       console.log('[GraphQL HTTP] Using endpoint:', httpUrl)
       return httpUrl
     },
     credentials: 'omit',
-    fetch: (uri, options) => {
+    fetch: (uri: RequestInfo | URL, options?: RequestInit) => {
       const controller = new AbortController()
       const timeout = setTimeout(() => {
         controller.abort()
-      }, 30000) // 30 second timeout
+      }, 30000)
 
-      return fetch(uri, {
-        ...options,
+      const requestOptions: RequestInit = {
+        ...(options ?? {}),
         signal: controller.signal,
-      }).finally(() => {
+      }
+
+      return fetch(uri, requestOptions).finally(() => {
         clearTimeout(timeout)
       })
     },
@@ -175,12 +180,15 @@ function createApolloClient(): ApolloClient {
         console.error(
           `[GraphQL error]: Message: ${error.message}, Location: ${error.locations}, Path: ${error.path}`
         )
+        const message = extractGraphQLErrorMessage({ graphQLErrors: [error] })
+        showErrorNotification('GraphQL error', message)
       })
     }
 
     if (networkError) {
       console.error(`[Network error]: ${networkError}`)
-
+      const networkMessage = (networkError as any)?.message || 'Network request failed'
+      showErrorNotification('Network error', networkMessage)
       // Handle authentication errors (disabled in development)
       // if ('statusCode' in networkError && (networkError as any).statusCode === 401) {
       //   localStorage.removeItem('auth_token')

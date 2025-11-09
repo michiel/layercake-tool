@@ -116,6 +116,9 @@ rust_xlsxwriter = { workspace = true }
 spreadsheet-ods = { workspace = true }
 icu_locid = { workspace = true }
 
+# Data acquisition
+layercake-data-acquisition = { path = "../layercake-data-acquisition" }
+
 [dev-dependencies]
 # Test dependencies for E2E tests
 tokio-test = "0.4"

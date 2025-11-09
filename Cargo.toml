@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "layercake-core",
+    "layercake-core", "layercake-data-acquisition",
     "src-tauri",
 ]
 resolver = "2"
@@ -45,7 +45,7 @@ axum = { version = "0.8.4", features = ["ws"] }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["cors", "fs"] }
 sea-orm = { version = "0.12", features = ["sqlx-sqlite", "runtime-tokio-rustls", "macros"] }
-sea-orm-migration = "0.12"
+sea-orm-migration = { version = "0.12", default-features = false, features = ["runtime-tokio-rustls", "sqlx-sqlite"] }
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.0", features = ["v4"] }
 

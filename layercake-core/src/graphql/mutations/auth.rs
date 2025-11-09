@@ -5,7 +5,9 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use crate::database::entities::{user_sessions, users};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
-use crate::graphql::types::{LoginInput, LoginResponse, RegisterResponse, RegisterUserInput, UpdateUserInput, User};
+use crate::graphql::types::{
+    LoginInput, LoginResponse, RegisterResponse, RegisterUserInput, UpdateUserInput, User,
+};
 use crate::services::auth_service::AuthService;
 
 #[derive(Default)]

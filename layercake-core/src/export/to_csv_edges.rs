@@ -11,7 +11,7 @@ pub fn render(graph: &Graph, _render_config: &RenderConfig) -> Result<String, Bo
     export_to_csv_sorted(
         &graph.edges,
         &["id", "source", "target", "label", "layer", "comment"],
-        |edge| edge.id.clone(),  // Clone for sorting (small cost for consistency)
+        |edge| edge.id.clone(), // Clone for sorting (small cost for consistency)
         |edge| {
             vec![
                 edge.id.to_string(),

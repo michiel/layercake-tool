@@ -17,7 +17,10 @@ impl GraphService {
 
     /// Get database graph_layers for a graph
     #[allow(dead_code)]
-    pub async fn get_layers_for_graph(&self, graph_id: i32) -> GraphResult<Vec<graph_layers::Model>> {
+    pub async fn get_layers_for_graph(
+        &self,
+        graph_id: i32,
+    ) -> GraphResult<Vec<graph_layers::Model>> {
         let db_layers = Layers::find()
             .filter(graph_layers::Column::GraphId.eq(graph_id))
             .all(&self.db)
@@ -125,8 +128,7 @@ impl GraphService {
         graph.name = Set(name);
         graph.node_id = Set(node_id);
 
-        let graph = graph.insert(&self.db).await
-            .map_err(GraphError::Database)?;
+        let graph = graph.insert(&self.db).await.map_err(GraphError::Database)?;
 
         Ok(graph)
     }
@@ -152,7 +154,9 @@ impl GraphService {
         }
         active_model.updated_at = Set(chrono::Utc::now());
 
-        let updated = active_model.update(&self.db).await
+        let updated = active_model
+            .update(&self.db)
+            .await
             .map_err(GraphError::Database)?;
         Ok(updated)
     }
@@ -231,7 +235,9 @@ impl GraphService {
             created_at: Set(now),
         };
 
-        let inserted = active_model.insert(&self.db).await
+        let inserted = active_model
+            .insert(&self.db)
+            .await
             .map_err(GraphError::Database)?;
         Ok(inserted)
     }
@@ -299,7 +305,9 @@ impl GraphService {
             active_model.belongs_to = Set(belongs_to_value);
         }
 
-        let updated = active_model.update(&self.db).await
+        let updated = active_model
+            .update(&self.db)
+            .await
             .map_err(GraphError::Database)?;
         Ok(updated)
     }
@@ -325,12 +333,15 @@ impl GraphService {
         }
 
         if let Some(properties) = properties {
-            let properties_string = serde_json::to_string(&properties)
-                .map_err(|e| GraphError::Validation(format!("Invalid layer properties JSON: {}", e)))?;
+            let properties_string = serde_json::to_string(&properties).map_err(|e| {
+                GraphError::Validation(format!("Invalid layer properties JSON: {}", e))
+            })?;
             active_model.properties = Set(Some(properties_string));
         }
 
-        let updated = active_model.update(&self.db).await
+        let updated = active_model
+            .update(&self.db)
+            .await
             .map_err(GraphError::Database)?;
         Ok(updated)
     }

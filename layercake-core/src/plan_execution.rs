@@ -219,18 +219,10 @@ fn export_graph(graph: &Graph, profile: &ExportProfileItem) -> Result<()> {
             crate::export::to_dot_hierarchy::render(&graph, &render_config)
         }
         ExportFileType::JSON => crate::export::to_json::render(&graph, &render_config),
-        ExportFileType::CSVNodes => {
-            crate::export::to_csv_nodes::render(&graph, &render_config)
-        }
-        ExportFileType::CSVEdges => {
-            crate::export::to_csv_edges::render(&graph, &render_config)
-        }
-        ExportFileType::CSVMatrix => {
-            crate::export::to_csv_matrix::render(&graph, &render_config)
-        }
-        ExportFileType::PlantUML => {
-            crate::export::to_plantuml::render(&graph, &render_config)
-        }
+        ExportFileType::CSVNodes => crate::export::to_csv_nodes::render(&graph, &render_config),
+        ExportFileType::CSVEdges => crate::export::to_csv_edges::render(&graph, &render_config),
+        ExportFileType::CSVMatrix => crate::export::to_csv_matrix::render(&graph, &render_config),
+        ExportFileType::PlantUML => crate::export::to_plantuml::render(&graph, &render_config),
         ExportFileType::Mermaid => crate::export::to_mermaid::render(&graph, &render_config),
         ExportFileType::JSGraph => crate::export::to_jsgraph::render(&graph, &render_config),
         ExportFileType::Custom(template_config) => {

@@ -2,7 +2,6 @@
 ///
 /// This module provides generic helpers to eliminate duplication across
 /// CSV export functions.
-
 use csv::Writer;
 use std::error::Error;
 
