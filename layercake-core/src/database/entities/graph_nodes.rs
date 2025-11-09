@@ -15,7 +15,6 @@ pub struct Model {
     pub is_partition: bool,
     pub belongs_to: Option<String>,
     pub comment: Option<String>,
-    #[sea_orm(column_name = "data_set_id")]
     pub dataset_id: Option<i32>,
     #[sea_orm(column_type = "JsonBinary")]
     pub attrs: Option<serde_json::Value>,
