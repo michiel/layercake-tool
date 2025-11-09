@@ -597,20 +597,21 @@ impl RerankerService {
 
 ## Migration Path
 
-### Phase 1: Backend (Week 1)
+### Phase 1: Backend ✅ COMPLETED
 - [x] Create `rag.rs` module (completed 2025-11-10)
 - [x] Extend `ChatSession` with RAG config (completed 2025-11-10)
 - [x] Integrate RAG into conversation flow (completed 2025-11-10)
 - [x] Write unit tests for RagContextBuilder (completed 2025-11-10)
 - [x] Add `embed_text()` to EmbeddingService (completed 2025-11-10)
 - [x] Update VectorSearchResult with file metadata (completed 2025-11-10)
-- [ ] Add database migration
-- [ ] Update chat session entity
-- [ ] Persist RAG settings in database
+- [x] Add database migration (completed 2025-11-10)
+- [x] Update chat session entity (completed 2025-11-10)
+- [x] Persist RAG settings in database (completed 2025-11-10)
 
-### Phase 2: API (Week 1)
-- [ ] Update GraphQL types
-- [ ] Add RAG fields to mutations/queries
+### Phase 2: API ✅ COMPLETED
+- [x] Update GraphQL types (completed 2025-11-10)
+- [x] Add RAG fields to queries (completed 2025-11-10)
+- [ ] Add RAG fields to mutations (deferred - not critical for MVP)
 - [ ] Test with GraphQL Playground
 
 ### Phase 3: Frontend (Week 2)
@@ -628,7 +629,7 @@ impl RerankerService {
 
 ### Completed (2025-11-10)
 
-#### Core RAG Infrastructure
+#### Phase 1: Core RAG Infrastructure ✅
 - **`rag.rs` module**: Created with `RagContext`, `RagChunk`, and `RagContextBuilder`
   - Threshold filtering (0.0-1.0)
   - Token budget management (default: 4000 tokens)
@@ -640,7 +641,8 @@ impl RerankerService {
   - Added RAG configuration fields: `rag_enabled`, `rag_top_k`, `rag_threshold`, `include_citations`
   - Integrated `DataAcquisitionService` for embeddings and vector search
   - Implemented `get_rag_context()` method for retrieval
-  - Modified `build_conversation_prompt()` to include RAG context
+  - Modified `build_conversation_prompt()` to prepend RAG context to system prompt
+  - Loads RAG settings from database on session resume
   - Default settings: enabled=true, top_k=5, threshold=0.7, citations=true
 
 - **Data acquisition enhancements**:
@@ -650,15 +652,29 @@ impl RerankerService {
   - Added `Related` trait implementation for kb_documents->files
   - Public accessor for embeddings service
 
+#### Phase 2: Database & API ✅
+- **Database migration m20251112_000022**:
+  - Added columns: `enable_rag`, `rag_top_k`, `rag_threshold`, `include_citations`
+  - Default values match code defaults (true, 5, 0.7, true)
+  - SQLite-compatible rollback support
+
+- **Entity updates**:
+  - Updated `chat_sessions::Model` with RAG fields
+  - RAG configuration persisted and restored across sessions
+
+- **GraphQL API**:
+  - Added RAG fields to `ChatSession` type
+  - Fields exposed in all session queries (list, get)
+  - Frontend can now read RAG configuration
+
 ### In Progress
-- Database schema updates for persisting RAG configuration
-- GraphQL API integration
-- Frontend UI components
+- Frontend UI components for RAG settings
+- Citation display in chat messages
 
 ### Known Limitations
-- RAG settings not yet persisted in database (using defaults on session creation/resume)
-- Citations not yet displayed in frontend
-- No UI controls for RAG configuration
+- No GraphQL mutation to update RAG settings per session (uses database defaults)
+- Citations not yet displayed in frontend UI
+- No frontend controls for RAG configuration yet
 
 ## Configuration
 
