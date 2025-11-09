@@ -18,7 +18,20 @@ use strum::{AsRefStr, Display, EnumIter, EnumString};
 /// - `Ods`: OpenDocument Spreadsheet format, open alternative to Excel
 /// - `Pdf`: Portable Document Format, for read-only exports
 /// - `Xml`: Extensible Markup Language, for structured data exchange
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumString, AsRefStr, Display, EnumIter, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    EnumString,
+    AsRefStr,
+    Display,
+    EnumIter,
+    Serialize,
+    Deserialize,
+)]
 #[strum(serialize_all = "lowercase")]
 #[strum(ascii_case_insensitive)]
 pub enum FileFormat {
@@ -84,7 +97,20 @@ impl FileFormat {
 /// - `Edges`: Graph connections with id, source, target (required), plus optional attributes
 /// - `Layers`: Grouping/layering information with id and label (required)
 /// - `Graph`: Complete graph structure containing nodes, edges, and layers
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumString, AsRefStr, Display, EnumIter, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    EnumString,
+    AsRefStr,
+    Display,
+    EnumIter,
+    Serialize,
+    Deserialize,
+)]
 #[strum(serialize_all = "lowercase")]
 #[strum(ascii_case_insensitive)]
 pub enum DataType {
@@ -203,12 +229,27 @@ mod tests {
 
     #[test]
     fn test_file_format_from_extension() {
-        assert_eq!(FileFormat::from_extension("data.csv"), Some(FileFormat::Csv));
-        assert_eq!(FileFormat::from_extension("data.CSV"), Some(FileFormat::Csv));
-        assert_eq!(FileFormat::from_extension("report.xlsx"), Some(FileFormat::Xlsx));
+        assert_eq!(
+            FileFormat::from_extension("data.csv"),
+            Some(FileFormat::Csv)
+        );
+        assert_eq!(
+            FileFormat::from_extension("data.CSV"),
+            Some(FileFormat::Csv)
+        );
+        assert_eq!(
+            FileFormat::from_extension("report.xlsx"),
+            Some(FileFormat::Xlsx)
+        );
         assert_eq!(FileFormat::from_extension("doc.pdf"), Some(FileFormat::Pdf));
-        assert_eq!(FileFormat::from_extension("data.xml"), Some(FileFormat::Xml));
-        assert_eq!(FileFormat::from_extension("sheet.ods"), Some(FileFormat::Ods));
+        assert_eq!(
+            FileFormat::from_extension("data.xml"),
+            Some(FileFormat::Xml)
+        );
+        assert_eq!(
+            FileFormat::from_extension("sheet.ods"),
+            Some(FileFormat::Ods)
+        );
         assert_eq!(FileFormat::from_extension("noext"), None);
         assert_eq!(FileFormat::from_extension("unknown.xyz"), None);
     }
@@ -260,7 +301,10 @@ mod tests {
     #[test]
     fn test_data_type_expected_headers() {
         assert_eq!(DataType::Nodes.get_expected_headers(), vec!["id", "label"]);
-        assert_eq!(DataType::Edges.get_expected_headers(), vec!["id", "source", "target"]);
+        assert_eq!(
+            DataType::Edges.get_expected_headers(),
+            vec!["id", "source", "target"]
+        );
         assert_eq!(DataType::Layers.get_expected_headers(), vec!["id", "label"]);
         assert_eq!(DataType::Graph.get_expected_headers(), Vec::<&str>::new());
     }

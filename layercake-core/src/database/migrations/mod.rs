@@ -16,6 +16,8 @@ mod m20251103_000012_extend_users_table;
 mod m20251103_000013_extend_user_sessions_table;
 mod m20251105_000014_create_system_settings;
 mod m20251106_000015_fix_plan_dag_nodes_uniqueness;
+mod m20251110_000016_create_data_acquisition_tables;
+mod m20251111_000017_add_embedding_provider_to_vector_state;
 
 pub struct Migrator;
 
@@ -39,6 +41,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20251103_000013_extend_user_sessions_table::Migration),
             Box::new(m20251105_000014_create_system_settings::Migration),
             Box::new(m20251106_000015_fix_plan_dag_nodes_uniqueness::Migration),
+            Box::new(m20251110_000016_create_data_acquisition_tables::Migration),
+            Box::new(m20251111_000017_add_embedding_provider_to_vector_state::Migration),
         ]
     }
 }

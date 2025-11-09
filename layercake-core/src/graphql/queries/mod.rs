@@ -1,5 +1,5 @@
 use async_graphql::*;
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 
 use crate::database::entities::{
     data_sources, graph_edges, graph_layers, graph_nodes, graphs, library_sources, plan_dag_nodes,
@@ -21,6 +21,7 @@ use crate::graphql::types::{
 use crate::services::{
     graph_edit_service::GraphEditService, sample_project_service::SampleProjectService,
 };
+use layercake_data_acquisition::entities::tags as acquisition_tags;
 
 pub struct Query;
 
@@ -884,6 +885,89 @@ impl Query {
         Ok(agents
             .into_iter()
             .map(crate::graphql::types::McpAgent::from)
+            .collect())
+    }
+    /// Fetch per-project knowledge base status
+    async fn knowledge_base_status(
+        &self,
+        ctx: &Context<'_>,
+        project_id: i32,
+    ) -> Result<crate::graphql::types::KnowledgeBaseStatus> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let status = context
+            .app
+            .data_acquisition_service()
+            .knowledge_base_status(project_id)
+            .await
+            .map_err(|e| {
+                StructuredError::service("DataAcquisitionService::knowledge_base_status", e)
+            })?;
+
+        Ok(crate::graphql::types::KnowledgeBaseStatus {
+            project_id: status.project_id,
+            file_count: status.file_count,
+            chunk_count: status.chunk_count,
+            status: status.status,
+            last_indexed_at: status.last_indexed_at,
+            embedding_provider: status.embedding_provider,
+            embedding_model: status.embedding_model,
+        })
+    }
+
+    /// List stored files for a project
+    async fn data_acquisition_files(
+        &self,
+        ctx: &Context<'_>,
+        project_id: i32,
+    ) -> Result<Vec<crate::graphql::types::ProjectFile>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let files = context
+            .app
+            .data_acquisition_service()
+            .list_files(project_id)
+            .await
+            .map_err(|e| StructuredError::service("DataAcquisitionService::list_files", e))?;
+
+        Ok(files
+            .into_iter()
+            .map(|file| crate::graphql::types::ProjectFile {
+                id: file.id.to_string(),
+                filename: file.filename,
+                media_type: file.media_type,
+                size_bytes: file.size_bytes,
+                checksum: file.checksum,
+                created_at: file.created_at,
+                tags: file.tags,
+            })
+            .collect())
+    }
+
+    /// List tags optionally filtered by scope
+    async fn data_acquisition_tags(
+        &self,
+        ctx: &Context<'_>,
+        scope: Option<String>,
+    ) -> Result<Vec<crate::graphql::types::TagView>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let db = context.app.db();
+        let mut query =
+            acquisition_tags::Entity::find().order_by_asc(acquisition_tags::Column::Name);
+        if let Some(scope_value) = scope {
+            query = query.filter(acquisition_tags::Column::Scope.eq(scope_value));
+        }
+        let tags = query
+            .all(db)
+            .await
+            .map_err(|e| StructuredError::database("tags", e))?;
+
+        Ok(tags
+            .into_iter()
+            .map(|model| crate::graphql::types::TagView {
+                id: model.id.to_string(),
+                name: model.name,
+                scope: model.scope,
+                color: model.color,
+            })
             .collect())
     }
 }

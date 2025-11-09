@@ -29,16 +29,23 @@ impl ExportService {
         let render_config = render_config_override.unwrap_or(default_render_config);
 
         match format {
-            ExportFileType::DOT => Ok(to_dot::render(graph, &render_config)
-                .map_err(|e| anyhow::anyhow!("{}", e))?),
-            ExportFileType::GML => Ok(to_gml::render(graph, &render_config)
-                .map_err(|e| anyhow::anyhow!("{}", e))?),
-            ExportFileType::JSON => Ok(to_json::render(graph, &render_config)
-                .map_err(|e| anyhow::anyhow!("{}", e))?),
-            ExportFileType::Mermaid => Ok(to_mermaid::render(graph, &render_config)
-                .map_err(|e| anyhow::anyhow!("{}", e))?),
-            ExportFileType::PlantUML => Ok(to_plantuml::render(graph, &render_config)
-                .map_err(|e| anyhow::anyhow!("{}", e))?),
+            ExportFileType::DOT => {
+                Ok(to_dot::render(graph, &render_config).map_err(|e| anyhow::anyhow!("{}", e))?)
+            }
+            ExportFileType::GML => {
+                Ok(to_gml::render(graph, &render_config).map_err(|e| anyhow::anyhow!("{}", e))?)
+            }
+            ExportFileType::JSON => {
+                Ok(to_json::render(graph, &render_config).map_err(|e| anyhow::anyhow!("{}", e))?)
+            }
+            ExportFileType::Mermaid => {
+                Ok(to_mermaid::render(graph, &render_config)
+                    .map_err(|e| anyhow::anyhow!("{}", e))?)
+            }
+            ExportFileType::PlantUML => {
+                Ok(to_plantuml::render(graph, &render_config)
+                    .map_err(|e| anyhow::anyhow!("{}", e))?)
+            }
             ExportFileType::CSVNodes => Ok(to_csv_nodes::render(graph, &render_config)
                 .map_err(|e| anyhow::anyhow!("{}", e))?),
             ExportFileType::CSVEdges => Ok(to_csv_edges::render(graph, &render_config)

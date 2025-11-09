@@ -172,9 +172,9 @@ impl AuthError {
             | AuthError::InvalidRole(_)
             | AuthError::WeakPassword(_)
             | AuthError::InvalidResetToken => 400, // Bad Request
-            AuthError::UserAlreadyExists => 409,   // Conflict
-            AuthError::TooManyAttempts => 429,     // Too Many Requests
-            AuthError::Database(_) => 500,         // Internal Server Error
+            AuthError::UserAlreadyExists => 409, // Conflict
+            AuthError::TooManyAttempts => 429, // Too Many Requests
+            AuthError::Database(_) => 500,  // Internal Server Error
         }
     }
 

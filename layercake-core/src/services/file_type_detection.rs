@@ -12,7 +12,10 @@ pub fn detect_data_type(file_format: &FileFormat, file_data: &[u8]) -> Result<Da
         FileFormat::Tsv => detect_from_csv(file_data, b'\t'),
         FileFormat::Json => detect_from_json(file_data),
         FileFormat::Xlsx | FileFormat::Ods | FileFormat::Pdf | FileFormat::Xml => {
-            anyhow::bail!("File format {:?} is not supported for data type detection", file_format)
+            anyhow::bail!(
+                "File format {:?} is not supported for data type detection",
+                file_format
+            )
         }
     }
 }

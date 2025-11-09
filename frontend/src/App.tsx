@@ -15,6 +15,8 @@ import { useCollaborationV2 } from './hooks/useCollaborationV2'
 import { useConnectionStatus } from './hooks/useConnectionStatus'
 import { ProjectChatPage } from './pages/ProjectChatPage'
 import { ChatLogsPage } from './pages/ChatLogsPage'
+import { DataAcquisitionPage } from './pages/DataAcquisitionPage'
+import { SourceManagementPage } from './pages/SourceManagementPage'
 import { getOrCreateSessionId } from './utils/session'
 import { Group, Stack } from './components/layout-primitives'
 import { Button } from './components/ui/button'
@@ -297,6 +299,48 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                       </TooltipTrigger>
                       <TooltipContent side="right">Data Sources</TooltipContent>
                     </Tooltip>
+
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant={isActiveRoute(`/projects/${projectId}/data-acquisition`) ? 'default' : 'ghost'}
+                          className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start'}
+                          onClick={() => navigate(`/projects/${projectId}/data-acquisition`)}
+                        >
+                          {navCollapsed ? (
+                            <IconDatabase className="h-4 w-4" />
+                          ) : (
+                            <>
+                              <IconDatabase className="h-4 w-4 mr-2" />
+                              Data Acquisition
+                            </>
+                          )}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">Data Acquisition</TooltipContent>
+                    </Tooltip>
+
+                    {isActiveRoutePrefix(`/projects/${projectId}/data-acquisition`) && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant={isActiveRoute(`/projects/${projectId}/data-acquisition/source-management`) ? 'default' : 'ghost'}
+                            className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start pl-8'}
+                            onClick={() => navigate(`/projects/${projectId}/data-acquisition/source-management`)}
+                          >
+                            {navCollapsed ? (
+                              <IconFileDatabase className="h-4 w-4" />
+                            ) : (
+                              <>
+                                <IconFileDatabase className="h-4 w-4 mr-2" />
+                                Source Management
+                              </>
+                            )}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="right">Source Management</TooltipContent>
+                      </Tooltip>
+                    )}
 
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -1471,6 +1515,16 @@ function App() {
           <Route path="/projects/:projectId/datasources" element={
             <ErrorBoundary>
               <DataSourcesPage />
+            </ErrorBoundary>
+          } />
+          <Route path="/projects/:projectId/data-acquisition" element={
+            <ErrorBoundary>
+              <DataAcquisitionPage />
+            </ErrorBoundary>
+          } />
+          <Route path="/projects/:projectId/data-acquisition/source-management" element={
+            <ErrorBoundary>
+              <SourceManagementPage />
             </ErrorBoundary>
           } />
           <Route path="/projects/:projectId/datasources/:dataSourceId/edit" element={

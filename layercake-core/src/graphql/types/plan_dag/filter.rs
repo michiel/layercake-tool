@@ -590,7 +590,9 @@ mod query_filter_executor {
                 if let Some(mut values) = values {
                     if values.len() == 2 {
                         // Safe to unwrap: we just checked that values.len() == 2
-                        let right = values.pop().expect("Expected right value in BETWEEN clause");
+                        let right = values
+                            .pop()
+                            .expect("Expected right value in BETWEEN clause");
                         let left = values.pop().expect("Expected left value in BETWEEN clause");
                         Some(SqlFragment {
                             sql: format!("({expr} BETWEEN ? AND ?)", expr = expr),

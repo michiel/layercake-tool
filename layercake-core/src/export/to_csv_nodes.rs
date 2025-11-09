@@ -10,8 +10,15 @@ use super::csv_common::export_to_csv_sorted;
 pub fn render(graph: &Graph, _render_config: &RenderConfig) -> Result<String, Box<dyn Error>> {
     export_to_csv_sorted(
         &graph.nodes,
-        &["id", "label", "layer", "is_partition", "belongs_to", "comment"],
-        |node| node.id.clone(),  // Clone for sorting (small cost for consistency)
+        &[
+            "id",
+            "label",
+            "layer",
+            "is_partition",
+            "belongs_to",
+            "comment",
+        ],
+        |node| node.id.clone(), // Clone for sorting (small cost for consistency)
         |node| {
             vec![
                 node.id.to_string(),

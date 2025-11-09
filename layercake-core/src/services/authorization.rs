@@ -377,7 +377,10 @@ mod tests {
 
     #[test]
     fn test_role_from_string() {
-        assert_eq!(ProjectRole::from_str("owner").expect("Should parse owner"), ProjectRole::Owner);
+        assert_eq!(
+            ProjectRole::from_str("owner").expect("Should parse owner"),
+            ProjectRole::Owner
+        );
         assert_eq!(
             ProjectRole::from_str("EDITOR").expect("Should parse EDITOR"),
             ProjectRole::Editor

@@ -396,9 +396,10 @@ fn infer_data_type(filename: &str, file_format: &FileFormat, file_data: &[u8]) -
     match file_format {
         FileFormat::Json => Ok(DataType::Graph),
         FileFormat::Csv | FileFormat::Tsv => infer_data_type_from_headers(file_format, file_data),
-        FileFormat::Xlsx | FileFormat::Ods | FileFormat::Pdf | FileFormat::Xml => {
-            Err(anyhow!("File format {:?} is not supported for data type inference", file_format))
-        }
+        FileFormat::Xlsx | FileFormat::Ods | FileFormat::Pdf | FileFormat::Xml => Err(anyhow!(
+            "File format {:?} is not supported for data type inference",
+            file_format
+        )),
     }
 }
 
