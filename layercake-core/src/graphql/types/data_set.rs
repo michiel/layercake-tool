@@ -21,6 +21,7 @@ pub struct DataSet {
     pub file_format: String,
     #[graphql(name = "dataType")]
     pub data_type: String,
+    pub origin: String,
     pub filename: String,
     #[graphql(name = "graphJson")]
     pub graph_json: String,
@@ -96,6 +97,7 @@ impl From<crate::database::entities::data_sets::Model> for DataSet {
 
             file_format: model.file_format,
             data_type: model.data_type,
+            origin: model.origin,
             filename: model.filename,
             graph_json: model.graph_json,
             status: model.status,
@@ -117,6 +119,7 @@ impl From<DataSetSummary> for DataSet {
             description: summary.description,
             file_format: summary.file_format,
             data_type: summary.data_type,
+            origin: summary.origin,
             filename: summary.filename,
             graph_json: summary.graph_json,
             status: summary.status,

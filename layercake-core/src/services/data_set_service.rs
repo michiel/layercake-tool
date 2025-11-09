@@ -88,6 +88,7 @@ impl DataSetService {
             description: Set(description),
             file_format: Set("json".to_string()), // Use JSON as default format for empty datasets
             data_type: Set(data_type.as_ref().to_string()),
+            origin: Set("manual_edit".to_string()),
             filename: Set(format!("{}.json", chrono::Utc::now().timestamp())),
             blob: Set(Vec::new()),
             file_size: Set(0),
@@ -146,6 +147,7 @@ impl DataSetService {
 
             file_format: Set(file_format.as_ref().to_string()),
             data_type: Set(data_type.as_ref().to_string()),
+            origin: Set("file_upload".to_string()),
             filename: Set(filename),
             blob: Set(file_data.clone()),
             file_size: Set(file_data.len() as i64),

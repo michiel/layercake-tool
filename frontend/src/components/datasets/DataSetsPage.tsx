@@ -38,7 +38,8 @@ import {
   DataSet,
   formatFileSize,
   getFileFormatDisplayName,
-  getDataTypeDisplayName
+  getDataTypeDisplayName,
+  getOriginDisplayName
 } from '../../graphql/datasets'
 
 import {
@@ -356,13 +357,13 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
           projectName={selectedProject.name}
           projectId={selectedProject.id}
           sections={[{ title: 'Data acquisition', href: `/projects/${selectedProject.id}/datasets` }]}
-          currentPage="Data Sets"
+          currentPage="Data sets"
           onNavigate={handleNavigate}
         />
 
         <Group justify="between" className="mb-4">
           <div>
-            <h1 className="text-3xl font-bold">Data Sets</h1>
+            <h1 className="text-3xl font-bold">Data sets</h1>
             <p className="text-sm text-muted-foreground mt-1">
               Manage CSV, TSV, and JSON files that serve as input data for your Plan DAGs
             </p>
@@ -435,7 +436,7 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
                       />
                     </TableHead>
                     <TableHead>Name</TableHead>
-                    <TableHead>Format</TableHead>
+                    <TableHead>Origin</TableHead>
                     <TableHead>Data Type</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Size</TableHead>
@@ -464,7 +465,7 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
                       </TableCell>
                       <TableCell>
                         <Badge variant="secondary">
-                          {getFileFormatDisplayName(dataSource.fileFormat)}
+                          {getOriginDisplayName(dataSource.origin)}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -657,7 +658,7 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
                         />
                       </TableHead>
                       <TableHead>Name</TableHead>
-                      <TableHead>Format</TableHead>
+                      <TableHead>Origin</TableHead>
                       <TableHead>Data Type</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Processed</TableHead>

@@ -178,25 +178,25 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
     const dataAcquisitionChildren: ProjectNavChild[] = [
       {
         key: 'source-management',
-        label: 'Source Management',
+        label: 'Document management',
         route: `/projects/${projectId}/data-acquisition/source-management`,
         isActive: makeRouteMatcher(`/projects/${projectId}/data-acquisition/source-management`),
       },
       {
         key: 'knowledge-base',
-        label: 'Knowledge Base',
+        label: 'Knowledge base',
         route: `/projects/${projectId}/data-acquisition/knowledge-base`,
         isActive: makeRouteMatcher(`/projects/${projectId}/data-acquisition/knowledge-base`),
       },
       {
         key: 'dataset-creation',
-        label: 'Data Set Creation',
+        label: 'Data set creation',
         route: `/projects/${projectId}/data-acquisition/datasets`,
         isActive: makeRouteMatcher(`/projects/${projectId}/data-acquisition/datasets`),
       },
       {
         key: 'data-sets',
-        label: 'Data Sets',
+        label: 'Data sets',
         route: `/projects/${projectId}/datasets`,
         isActive: makeRouteMatcher(`/projects/${projectId}/datasets`),
       },
@@ -211,7 +211,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
       },
       {
         key: 'plan-nodes',
-        label: 'Plan Nodes',
+        label: 'Plan nodes',
         route: `/projects/${projectId}/plan-nodes`,
         isActive: makeRouteMatcher(`/projects/${projectId}/plan-nodes`),
       },
@@ -226,7 +226,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
     const chatChildren: ProjectNavChild[] = [
       {
         key: 'chat-logs',
-        label: 'Chat Logs',
+        label: 'Chat logs',
         route: `/projects/${projectId}/chat/logs`,
         isActive: makeRouteMatcher(`/projects/${projectId}/chat/logs`),
       },
@@ -708,7 +708,7 @@ const HomePage = () => {
           </DialogHeader>
           <Stack gap="md" className="py-4">
             <p className="text-sm text-muted-foreground">
-              Select one of the bundled samples to create a project preloaded with data sources and a starter DAG.
+              Select one of the bundled samples to create a project preloaded with data sets and a starter DAG.
             </p>
 
             <div className="space-y-2">
@@ -999,7 +999,7 @@ const ProjectsPage = () => {
           </DialogHeader>
           <Stack gap="md" className="py-4">
             <p className="text-sm text-muted-foreground">
-              Select one of the bundled samples to create a project preloaded with data sources and a starter DAG.
+              Select one of the bundled samples to create a project preloaded with data sets and a starter DAG.
             </p>
 
             {sampleProjectsError && (
@@ -1260,7 +1260,7 @@ const ProjectDetailPage = () => {
             </div>
             <Group gap="xs">
               <Button variant="outline" onClick={() => navigate(`/projects/${projectId}/datasets`)}>
-                Manage sources
+                Manage data sets
               </Button>
               <Button onClick={() => navigate(`/projects/${projectId}/data-acquisition/source-management`)}>
                 Upload files
@@ -1272,15 +1272,15 @@ const ProjectDetailPage = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base font-semibold">
                   <IconFileDatabase className="h-4 w-4 text-primary" />
-                  Data sources
+                  Data sets
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  View imported CSV/JSON files and connect shared library sources.
+                  View imported CSV/JSON files and connect shared library sets.
                 </p>
                 <Button variant="secondary" className="w-full" onClick={() => navigate(`/projects/${projectId}/datasets`)}>
-                  Open data sources
+                  Open data sets
                 </Button>
               </CardContent>
             </Card>
@@ -1288,7 +1288,7 @@ const ProjectDetailPage = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base font-semibold">
                   <IconUpload className="h-4 w-4 text-primary" />
-                  Source management
+                  Document management
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">

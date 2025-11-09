@@ -10,6 +10,7 @@ export const GET_DATASOURCES = gql`
       description
       fileFormat
       dataType
+      origin
       filename
       graphJson
       status
@@ -32,6 +33,7 @@ export const GET_DATASOURCE = gql`
       description
       fileFormat
       dataType
+      origin
       filename
       graphJson
       status
@@ -54,6 +56,7 @@ export const CREATE_DATASOURCE_FROM_FILE = gql`
       description
       fileFormat
       dataType
+      origin
       filename
       graphJson
       status
@@ -76,6 +79,7 @@ export const CREATE_EMPTY_DATASOURCE = gql`
       description
       fileFormat
       dataType
+      origin
       filename
       graphJson
       status
@@ -98,6 +102,7 @@ export const BULK_UPLOAD_DATASOURCES = gql`
       description
       fileFormat
       dataType
+      origin
       filename
       graphJson
       status
@@ -120,6 +125,7 @@ export const UPDATE_DATASOURCE = gql`
       description
       fileFormat
       dataType
+      origin
       filename
       graphJson
       status
@@ -149,6 +155,7 @@ export const REPROCESS_DATASOURCE = gql`
       description
       fileFormat
       dataType
+      origin
       filename
       graphJson
       status
@@ -171,6 +178,7 @@ export const UPDATE_DATASOURCE_GRAPH_DATA = gql`
       description
       fileFormat
       dataType
+      origin
       filename
       graphJson
       status
@@ -193,6 +201,7 @@ export const DATASOURCE_UPDATED = gql`
       description
       fileFormat
       dataType
+      origin
       filename
       graphJson
       status
@@ -266,6 +275,7 @@ export interface DataSet {
   description?: string
   fileFormat: string
   dataType: string
+  origin: string
   filename: string
   graphJson: string
   status: 'active' | 'processing' | 'error'
@@ -352,6 +362,20 @@ export const getDataTypeDisplayName = (dataType: string): string => {
     case 'GRAPH':
     case 'graph':
       return 'Graph'
+    default:
+      return 'Unknown'
+  }
+}
+
+// Helper function to get origin display name
+export const getOriginDisplayName = (origin: string): string => {
+  switch (origin) {
+    case 'file_upload':
+      return 'File upload'
+    case 'manual_edit':
+      return 'Manual edit'
+    case 'rag_agent':
+      return 'RAG Agent'
     default:
       return 'Unknown'
   }

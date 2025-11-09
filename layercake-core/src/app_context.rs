@@ -352,7 +352,7 @@ impl AppContext {
         Ok(())
     }
 
-    // ----- Data source helpers ---------------------------------------------
+    // ----- Data set helpers ---------------------------------------------
 
     pub async fn list_data_sets(&self, project_id: i32) -> Result<Vec<DataSetSummary>> {
         let data_sets = data_sets::Entity::find()
@@ -362,7 +362,7 @@ impl AppContext {
             .await
             .map_err(|e| {
                 anyhow!(
-                    "Failed to list data sources for project {}: {}",
+                    "Failed to list data sets for project {}: {}",
                     project_id,
                     e
                 )
@@ -382,7 +382,7 @@ impl AppContext {
         let data_set = data_sets::Entity::find_by_id(id)
             .one(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to load data source {}: {}", id, e))?;
+            .map_err(|e| anyhow!("Failed to load data set {}: {}", id, e))?;
 
         Ok(data_set.map(DataSetSummary::from))
     }
@@ -413,7 +413,7 @@ impl AppContext {
                 file_bytes,
             )
             .await
-            .map_err(|e| anyhow!("Failed to create data source from file: {}", e))?;
+            .map_err(|e| anyhow!("Failed to create data set from file: {}", e))?;
 
         self.attach_data_set_to_plan(project_id, &created)
             .await?;
@@ -436,7 +436,7 @@ impl AppContext {
             .data_set_service
             .create_empty(project_id, name, description, data_type)
             .await
-            .map_err(|e| anyhow!("Failed to create empty data source: {}", e))?;
+            .map_err(|e| anyhow!("Failed to create empty data set: {}", e))?;
 
         self.attach_data_set_to_plan(project_id, &created)
             .await?;
@@ -462,7 +462,7 @@ impl AppContext {
                     upload.file_bytes.clone(),
                 )
                 .await
-                .map_err(|e| anyhow!("Failed to import data source {}: {}", upload.filename, e))?;
+                .map_err(|e| anyhow!("Failed to import data set {}: {}", upload.filename, e))?;
 
             self.attach_data_set_to_plan(project_id, &created)
                 .await?;
@@ -488,14 +488,14 @@ impl AppContext {
                 .data_set_service
                 .update_file(id, file.filename, file.file_bytes)
                 .await
-                .map_err(|e| anyhow!("Failed to update data source file {}: {}", id, e))?;
+                .map_err(|e| anyhow!("Failed to update data set file {}: {}", id, e))?;
             (updated, true)
         } else {
             let updated = self
                 .data_set_service
                 .update(id, name.clone(), description.clone())
                 .await
-                .map_err(|e| anyhow!("Failed to update data source {}: {}", id, e))?;
+                .map_err(|e| anyhow!("Failed to update data set {}: {}", id, e))?;
             (updated, false)
         };
 
@@ -504,7 +504,7 @@ impl AppContext {
                 .data_set_service
                 .update(id, name, description)
                 .await
-                .map_err(|e| anyhow!("Failed to update metadata for data source {}: {}", id, e))?;
+                .map_err(|e| anyhow!("Failed to update metadata for data set {}: {}", id, e))?;
         }
 
         Ok(DataSetSummary::from(model))
@@ -519,7 +519,7 @@ impl AppContext {
             .data_set_service
             .update_graph_data(id, graph_json)
             .await
-            .map_err(|e| anyhow!("Failed to update graph data for data source {}: {}", id, e))?;
+            .map_err(|e| anyhow!("Failed to update graph data for data set {}: {}", id, e))?;
 
         Ok(DataSetSummary::from(model))
     }
@@ -529,7 +529,7 @@ impl AppContext {
             .data_set_service
             .reprocess(id)
             .await
-            .map_err(|e| anyhow!("Failed to reprocess data source {}: {}", id, e))?;
+            .map_err(|e| anyhow!("Failed to reprocess data set {}: {}", id, e))?;
 
         Ok(DataSetSummary::from(model))
     }
@@ -538,7 +538,7 @@ impl AppContext {
         self.data_set_service
             .delete(id)
             .await
-            .map_err(|e| anyhow!("Failed to delete data source {}: {}", id, e))
+            .map_err(|e| anyhow!("Failed to delete data set {}: {}", id, e))
     }
 
     pub async fn export_data_sets(
@@ -558,7 +558,7 @@ impl AppContext {
             .await
             .map_err(|e| {
                 anyhow!(
-                    "Failed to verify data sources for project {}: {}",
+                    "Failed to verify data sets for project {}: {}",
                     project_id,
                     e
                 )
@@ -566,7 +566,7 @@ impl AppContext {
 
         if matching_count != data_set_ids.len() as u64 {
             return Err(anyhow!(
-                "Export request included data sources outside project {}",
+                "Export request included data sets outside project {}",
                 project_id
             ));
         }
@@ -741,7 +741,7 @@ impl AppContext {
                                         .await
                                         .map_err(|e| {
                                             anyhow!(
-                                                "Failed to load data source {}: {}",
+                                                "Failed to load data set {}: {}",
                                                 data_set_id,
                                                 e
                                             )
@@ -1377,6 +1377,7 @@ pub struct DataSetSummary {
     pub description: Option<String>,
     pub file_format: String,
     pub data_type: String,
+    pub origin: String,
     pub filename: String,
     pub graph_json: String,
     pub status: String,
@@ -1396,6 +1397,7 @@ impl From<data_sets::Model> for DataSetSummary {
             description: model.description,
             file_format: model.file_format,
             data_type: model.data_type,
+            origin: model.origin,
             filename: model.filename,
             graph_json: model.graph_json,
             status: model.status,

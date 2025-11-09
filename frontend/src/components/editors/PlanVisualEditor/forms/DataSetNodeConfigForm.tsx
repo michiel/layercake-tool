@@ -8,10 +8,10 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-// GraphQL query for available data sources
-const GET_AVAILABLE_DATA_SOURCES = gql`
+// GraphQL query for available data sets
+const GET_AVAILABLE_DATA_SETS = gql`
   query GetAvailableDataSets($projectId: Int!) {
-    dataSources(projectId: $projectId) {
+    dataSets(projectId: $projectId) {
       id
       name
       description
@@ -57,7 +57,7 @@ export const DataSetNodeConfigForm: React.FC<DataSetNodeConfigFormProps> = ({
   });
   const lastSentConfigRef = React.useRef<DataSetNodeConfig>(localConfig);
 
-  const { data, loading, error } = useQuery<GetAvailableDataSetsData>(GET_AVAILABLE_DATA_SOURCES, {
+  const { data, loading, error } = useQuery<GetAvailableDataSetsData>(GET_AVAILABLE_DATA_SETS, {
     variables: { projectId },
     skip: !projectId,
   });

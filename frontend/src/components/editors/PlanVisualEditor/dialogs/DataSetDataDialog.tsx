@@ -24,9 +24,9 @@ export const DataSetDataDialog: React.FC<DataSetDataDialogProps> = ({
   opened,
   onClose,
   dataSetId,
-  title = 'Data Source Data'
+  title = 'Data Set Data'
 }) => {
-  const { data, loading, error, refetch } = useQuery<{ dataSource: DataSet }>(GET_DATASOURCE, {
+  const { data, loading, error, refetch } = useQuery<{ dataSet: DataSet }>(GET_DATASOURCE, {
     variables: { id: dataSetId },
     skip: !opened || !dataSetId,
     fetchPolicy: 'network-only'
@@ -35,10 +35,10 @@ export const DataSetDataDialog: React.FC<DataSetDataDialogProps> = ({
   const [updateDataSetGraphData] = useMutation(UPDATE_DATASOURCE_GRAPH_DATA);
 
   const getGraphData = (): GraphData | null => {
-    if (!data?.dataSource) return null;
+    if (!data?.dataSet) return null;
 
     try {
-      const graphJson = JSON.parse(data.dataSource.graphJson);
+      const graphJson = JSON.parse(data.dataSet.graphJson);
 
       return {
         nodes: (graphJson.nodes || []).map((node: any) => ({
@@ -118,12 +118,12 @@ export const DataSetDataDialog: React.FC<DataSetDataDialogProps> = ({
             {error && (
               <Alert variant="destructive">
                 <IconAlertCircle className="h-4 w-4" />
-                <AlertTitle>Error Loading Data Source</AlertTitle>
+                <AlertTitle>Error Loading Data Set</AlertTitle>
                 <AlertDescription>{error.message}</AlertDescription>
               </Alert>
             )}
 
-            {data?.dataSource && (() => {
+            {data?.dataSet && (() => {
               const graphData = getGraphData();
               if (!graphData) {
                 return (

@@ -267,12 +267,12 @@ export const SourceManagementPage: React.FC = () => {
         projectName={selectedProject.name}
         projectId={selectedProject.id}
         sections={[{ title: 'Data acquisition', href: `/projects/${selectedProject.id}/datasets` }]}
-        currentPage="Source management"
+        currentPage="Document management"
         onNavigate={handleNavigate}
       />
       <Stack gap="lg">
         <Stack gap="xs">
-          <h1 className="text-2xl font-bold">Source Management</h1>
+          <h1 className="text-2xl font-bold">Document management</h1>
           <p className="text-muted-foreground">
             Upload files, assign metadata and tags, and control which assets feed the project knowledge base.
           </p>

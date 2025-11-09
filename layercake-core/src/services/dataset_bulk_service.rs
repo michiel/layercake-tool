@@ -46,33 +46,42 @@ impl DataSetBulkService {
         None
     }
 
-    /// Convert calamine range to CSV string
+    /// Convert calamine range to CSV string with proper escaping and consistent column counts
     fn range_to_csv(range: &calamine::Range<calamine::Data>) -> Result<Vec<u8>> {
         use calamine::Data;
-        use std::io::Write;
 
         let mut csv_data = Vec::new();
 
-        for row_idx in 0..range.height() {
-            let mut row_values = Vec::new();
+        // Create a scope for the CSV writer to ensure it's dropped before we return csv_data
+        {
+            let mut csv_writer = csv::Writer::from_writer(&mut csv_data);
 
-            for col_idx in 0..range.width() {
-                let cell = range.get((row_idx, col_idx));
-                let value = match cell {
-                    Some(Data::String(s)) => s.clone(),
-                    Some(Data::Int(i)) => i.to_string(),
-                    Some(Data::Float(f)) => f.to_string(),
-                    Some(Data::Bool(b)) => b.to_string(),
-                    Some(Data::Empty) | None => String::new(),
-                    _ => String::new(),
-                };
-                row_values.push(value);
+            // Ensure consistent width for all rows
+            let width = range.width();
+
+            for row_idx in 0..range.height() {
+                let mut row_values = Vec::new();
+
+                // Always write exactly 'width' columns to ensure consistency
+                for col_idx in 0..width {
+                    let cell = range.get((row_idx, col_idx));
+                    let value = match cell {
+                        Some(Data::String(s)) => s.clone(),
+                        Some(Data::Int(i)) => i.to_string(),
+                        Some(Data::Float(f)) => f.to_string(),
+                        Some(Data::Bool(b)) => b.to_string(),
+                        Some(Data::Empty) | None => String::new(),
+                        _ => String::new(),
+                    };
+                    row_values.push(value);
+                }
+
+                // Write CSV row with proper escaping
+                csv_writer.write_record(&row_values)?;
             }
 
-            // Write CSV row
-            let row_str = row_values.join(",");
-            writeln!(csv_data, "{}", row_str)?;
-        }
+            csv_writer.flush()?;
+        } // csv_writer is dropped here, releasing the borrow on csv_data
 
         Ok(csv_data)
     }

@@ -44,8 +44,8 @@ export const DataSetNode = memo((props: DataSetNodeProps) => {
   })
 
   useEffect(() => {
-    if ((dataSourceData as any)?.dataSource) {
-      setDataSetInfo((dataSourceData as any).dataSource as DataSet)
+    if ((dataSourceData as any)?.dataSet) {
+      setDataSetInfo((dataSourceData as any).dataSet as DataSet)
     }
   }, [dataSourceData])
 
