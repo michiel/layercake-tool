@@ -93,7 +93,7 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
   const [reprocessDataSet, { loading: reprocessLoading }] = useMutation(REPROCESS_DATASOURCE)
   const [updateDataSetGraphData] = useMutation(UPDATE_DATASOURCE_GRAPH_DATA)
 
-  const dataSource: DataSet | null = (dataSourceData as any)?.dataSource || null
+  const dataSource: DataSet | null = (dataSourceData as any)?.dataSet || null
 
   // Form for editing DataSet metadata
   const form = useForm<{name: string; description: string}>({
