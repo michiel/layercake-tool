@@ -598,12 +598,15 @@ impl RerankerService {
 ## Migration Path
 
 ### Phase 1: Backend (Week 1)
-- [ ] Create `rag.rs` module
-- [ ] Extend `ChatSession` with RAG config
+- [x] Create `rag.rs` module (completed 2025-11-10)
+- [x] Extend `ChatSession` with RAG config (completed 2025-11-10)
+- [x] Integrate RAG into conversation flow (completed 2025-11-10)
+- [x] Write unit tests for RagContextBuilder (completed 2025-11-10)
+- [x] Add `embed_text()` to EmbeddingService (completed 2025-11-10)
+- [x] Update VectorSearchResult with file metadata (completed 2025-11-10)
 - [ ] Add database migration
 - [ ] Update chat session entity
-- [ ] Integrate RAG into `chat()` method
-- [ ] Write unit tests
+- [ ] Persist RAG settings in database
 
 ### Phase 2: API (Week 1)
 - [ ] Update GraphQL types
@@ -620,6 +623,42 @@ impl RerankerService {
 - [ ] Performance testing
 - [ ] Documentation
 - [ ] User guide for RAG features
+
+## Implementation Progress
+
+### Completed (2025-11-10)
+
+#### Core RAG Infrastructure
+- **`rag.rs` module**: Created with `RagContext`, `RagChunk`, and `RagContextBuilder`
+  - Threshold filtering (0.0-1.0)
+  - Token budget management (default: 4000 tokens)
+  - Context string formatting for LLM prompts
+  - Citation generation for source attribution
+  - Comprehensive unit tests
+
+- **ChatSession integration**:
+  - Added RAG configuration fields: `rag_enabled`, `rag_top_k`, `rag_threshold`, `include_citations`
+  - Integrated `DataAcquisitionService` for embeddings and vector search
+  - Implemented `get_rag_context()` method for retrieval
+  - Modified `build_conversation_prompt()` to include RAG context
+  - Default settings: enabled=true, top_k=5, threshold=0.7, citations=true
+
+- **Data acquisition enhancements**:
+  - Added `embed_text()` method to `EmbeddingService` for single-query embeddings
+  - Updated `VectorSearchResult` struct to include `file_id` and `filename`
+  - Modified `similarity_search()` to join with files table for metadata
+  - Added `Related` trait implementation for kb_documents->files
+  - Public accessor for embeddings service
+
+### In Progress
+- Database schema updates for persisting RAG configuration
+- GraphQL API integration
+- Frontend UI components
+
+### Known Limitations
+- RAG settings not yet persisted in database (using defaults on session creation/resume)
+- Citations not yet displayed in frontend
+- No UI controls for RAG configuration
 
 ## Configuration
 
