@@ -2,23 +2,27 @@ import '@assistant-ui/react-markdown/styles/dot.css'
 
 import { MarkdownTextPrimitive, useIsMarkdownCodeBlock } from '@assistant-ui/react-markdown'
 import remarkGfm from 'remark-gfm'
-import { memo, useState } from 'react'
+import { memo, useState, useRef } from 'react'
 import { parseMessageWithCitations } from '../../utils/citations'
 import { CitationFooter } from './CitationFooter'
 import type { Citation } from '../../utils/citations'
 
 export const MarkdownText = memo(function MarkdownText() {
   const [parsedCitations, setParsedCitations] = useState<Citation[]>([])
+  const lastProcessedTextRef = useRef<string>('')
 
   // Preprocess function to extract citations and clean content
   const preprocessMarkdown = (text: string) => {
     const { content, citations } = parseMessageWithCitations(text)
 
-    // Update citations state if found
-    if (citations.length > 0) {
-      setParsedCitations(citations)
-    } else {
-      setParsedCitations([])
+    // Only update state if the text has changed (avoid infinite render loop)
+    if (text !== lastProcessedTextRef.current) {
+      lastProcessedTextRef.current = text
+
+      // Use setTimeout to update state after render completes
+      setTimeout(() => {
+        setParsedCitations(citations)
+      }, 0)
     }
 
     return content
