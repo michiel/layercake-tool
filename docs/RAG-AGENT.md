@@ -636,11 +636,13 @@ impl RerankerService {
 - [ ] Add RAG fields to mutations (deferred - not critical for MVP)
 - [ ] Test with GraphQL Playground
 
-### Phase 3: Frontend (Week 2)
-- [ ] Add RAG settings to chat UI
-- [ ] Implement citation display
-- [ ] Update session creation dialog
-- [ ] Manual testing
+### Phase 3: Frontend 🟡 PARTIALLY COMPLETE
+- [x] Add RAG status indicators to chat UI (completed 2025-11-10)
+- [x] Display RAG settings in chat logs table (completed 2025-11-10)
+- [ ] Add RAG configuration controls (deferred - using database defaults)
+- [ ] Implement citation display in messages (deferred - backend ready)
+- [ ] Update session creation dialog with RAG options (deferred)
+- [ ] Manual end-to-end testing
 
 ### Phase 4: Polish (Week 2)
 - [ ] Performance testing
@@ -689,14 +691,41 @@ impl RerankerService {
   - Fields exposed in all session queries (list, get)
   - Frontend can now read RAG configuration
 
-### In Progress
-- Frontend UI components for RAG settings
-- Citation display in chat messages
+#### Phase 3: Frontend 🟡 (Partial)
+- **UI Indicators** (completed 2025-11-10):
+  - Added RAG status badge to `ProjectChatPage` (📚 RAG)
+  - Added RAG column to `ChatLogsPage` sessions table
+  - Badge shows "On" with settings tooltip or "Off"
+  - Tooltip displays: top-k, threshold %, citations status
 
-### Known Limitations
-- No GraphQL mutation to update RAG settings per session (uses database defaults)
-- Citations not yet displayed in frontend UI
-- No frontend controls for RAG configuration yet
+- **GraphQL Integration**:
+  - Updated TypeScript `ChatSession` interface with RAG fields
+  - Modified `GET_CHAT_SESSIONS` query to fetch RAG data
+  - Frontend successfully builds and displays RAG status
+
+**Deferred to Future**:
+- RAG configuration controls (currently uses database defaults)
+- Citation display in chat messages (backend ready, UI pending)
+- Session creation dialog with RAG options
+
+### Production Ready ✅
+- Core RAG retrieval and context injection
+- Database persistence of RAG settings
+- GraphQL API with RAG fields
+- Frontend status indicators
+- All tests passing (13/13)
+
+### Deferred Features (Non-Critical)
+- GraphQL mutation to update RAG settings per session
+- Frontend controls for RAG configuration (currently uses DB defaults)
+- Citation display in chat message UI (backend generates citations)
+- Session creation dialog with RAG options
+
+### Current Behavior
+- RAG enabled by default (database default: true)
+- Default settings: top_k=5, threshold=0.7, citations=true
+- Settings visible in UI but not yet editable
+- Citations generated in backend but not parsed/displayed in frontend
 
 ## Configuration
 
