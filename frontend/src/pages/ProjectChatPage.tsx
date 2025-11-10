@@ -1,7 +1,7 @@
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { gql } from '@apollo/client'
-import { useQuery } from '@apollo/client/react'
+import { useQuery, useMutation } from '@apollo/client/react'
 
 import { AssistantRuntimeProvider } from '@assistant-ui/react'
 import { IconMessageDots } from '@tabler/icons-react'
@@ -15,8 +15,9 @@ import { Button } from '../components/ui/button'
 import { Card, CardContent } from '../components/ui/card'
 import { Label } from '../components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
+import { Switch } from '../components/ui/switch'
 import { Spinner } from '../components/ui/spinner'
-import { CHAT_PROVIDER_OPTIONS, ChatProviderOption } from '../graphql/chat'
+import { CHAT_PROVIDER_OPTIONS, ChatProviderOption, GET_CHAT_SESSIONS, UPDATE_CHAT_SESSION_RAG, type ChatSession } from '../graphql/chat'
 import { useRegisterChatContext } from '../hooks/useRegisterChatContext'
 import { DEFAULT_CHAT_SUGGESTIONS } from '../config/chat'
 
@@ -62,6 +63,48 @@ export const ProjectChatPage = () => {
     () => (projectData as any)?.project ?? null,
     [projectData],
   )
+
+  // Fetch full session details to get RAG settings
+  const { data: sessionsData, refetch: refetchSessions } = useQuery(GET_CHAT_SESSIONS, {
+    variables: { projectId: numericProjectId, limit: 100 },
+    skip: !Number.isFinite(numericProjectId) || !session?.sessionId,
+  })
+
+  const currentSession = useMemo(() => {
+    if (!session?.sessionId || !(sessionsData as any)?.chatSessions) return null
+    return ((sessionsData as any).chatSessions as ChatSession[]).find(
+      (s) => s.session_id === session.sessionId
+    )
+  }, [session?.sessionId, sessionsData])
+
+  const [ragEnabled, setRagEnabled] = useState(currentSession?.enable_rag ?? true)
+
+  useEffect(() => {
+    if (currentSession?.enable_rag !== undefined) {
+      setRagEnabled(currentSession.enable_rag)
+    }
+  }, [currentSession])
+
+  const [updateRagMutation] = useMutation(UPDATE_CHAT_SESSION_RAG)
+
+  const handleRagToggle = async (enabled: boolean) => {
+    if (!session?.sessionId) return
+
+    setRagEnabled(enabled)
+    try {
+      await updateRagMutation({
+        variables: {
+          sessionId: session.sessionId,
+          enableRag: enabled,
+        },
+      })
+      await refetchSessions()
+    } catch (err) {
+      console.error('Failed to update RAG settings:', err)
+      // Revert on error
+      setRagEnabled(!enabled)
+    }
+  }
 
   const providerOptions = useMemo(
     () =>
@@ -144,7 +187,16 @@ export const ProjectChatPage = () => {
                 <Badge variant="secondary">Model: {session.model}</Badge>
               )}
               <Badge variant="outline">Messages: {messages.length}</Badge>
-              <Badge variant="outline" title="Knowledge Base enabled">📚 RAG</Badge>
+              {session?.sessionId && (
+                <Group gap="xs" className="items-center rounded-md border border-border px-3 py-1">
+                  <span className="text-sm">📚 Knowledge Base</span>
+                  <Switch
+                    checked={ragEnabled}
+                    onCheckedChange={handleRagToggle}
+                    disabled={loading}
+                  />
+                </Group>
+              )}
             </Group>
             <Group gap="xs">
               {loading ? (

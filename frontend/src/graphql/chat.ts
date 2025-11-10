@@ -151,3 +151,9 @@ export const DELETE_CHAT_SESSION = gql`
     deleteChatSession(sessionId: $sessionId)
   }
 `
+
+export const UPDATE_CHAT_SESSION_RAG = gql`
+  mutation UpdateChatSessionRag($sessionId: String!, $enableRag: Boolean!) {
+    updateChatSessionRag(sessionId: $sessionId, enableRag: $enableRag)
+  }
+`
