@@ -55,8 +55,20 @@ export const SystemSettingsPage: React.FC = () => {
   const validateValue = (): boolean => {
     if (!selectedSetting) return false
     if (selectedSetting.valueType === 'Integer' && value.trim() !== '') {
+      if (Number.isNaN(Number(value)) || !Number.isInteger(Number(value))) {
+        setFormError('Enter a whole number')
+        return false
+      }
+    }
+    if (selectedSetting.valueType === 'Float' && value.trim() !== '') {
       if (Number.isNaN(Number(value))) {
-        setFormError('Enter a numeric value')
+        setFormError('Enter a decimal number')
+        return false
+      }
+    }
+    if (selectedSetting.valueType === 'Boolean' && value.trim() !== '') {
+      if (value !== 'true' && value !== 'false') {
+        setFormError('Value must be "true" or "false"')
         return false
       }
     }
@@ -97,11 +109,52 @@ export const SystemSettingsPage: React.FC = () => {
             <Input
               id="setting-value"
               type="number"
-              placeholder="Enter a number"
+              step="1"
+              placeholder="Enter a whole number"
               value={value}
               onChange={(e) => setValue(e.target.value)}
               disabled={disabled}
             />
+            {selectedSetting.description && (
+              <p className="text-sm text-muted-foreground">{selectedSetting.description}</p>
+            )}
+          </div>
+        )
+      case 'Float':
+        return (
+          <div className="space-y-2">
+            <Label htmlFor="setting-value">Value</Label>
+            <Input
+              id="setting-value"
+              type="number"
+              step="0.01"
+              placeholder="Enter a decimal number"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              disabled={disabled}
+            />
+            {selectedSetting.description && (
+              <p className="text-sm text-muted-foreground">{selectedSetting.description}</p>
+            )}
+          </div>
+        )
+      case 'Boolean':
+        return (
+          <div className="space-y-2">
+            <Label htmlFor="setting-value">Value</Label>
+            <Select
+              value={value || undefined}
+              onValueChange={(val) => setValue(val ?? '')}
+              disabled={disabled}
+            >
+              <SelectTrigger id="setting-value">
+                <SelectValue placeholder="Select true or false" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="true">true</SelectItem>
+                <SelectItem value="false">false</SelectItem>
+              </SelectContent>
+            </Select>
             {selectedSetting.description && (
               <p className="text-sm text-muted-foreground">{selectedSetting.description}</p>
             )}
@@ -331,7 +384,11 @@ const formatValueType = (type: SystemSettingValueType) => {
     case 'Url':
       return 'URL'
     case 'Integer':
-      return 'Number'
+      return 'Integer'
+    case 'Float':
+      return 'Decimal'
+    case 'Boolean':
+      return 'Boolean'
     case 'Enum':
       return 'Choice'
     case 'Secret':
