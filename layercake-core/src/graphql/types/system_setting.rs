@@ -29,6 +29,8 @@ pub enum SystemSettingValueType {
     Text,
     Url,
     Integer,
+    Float,
+    Boolean,
     Enum,
     Secret,
 }
@@ -40,6 +42,8 @@ impl From<SettingValueType> for SystemSettingValueType {
             SettingValueType::Text => Self::Text,
             SettingValueType::Url => Self::Url,
             SettingValueType::Integer => Self::Integer,
+            SettingValueType::Float => Self::Float,
+            SettingValueType::Boolean => Self::Boolean,
             SettingValueType::Enum => Self::Enum,
             SettingValueType::Secret => Self::Secret,
         }

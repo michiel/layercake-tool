@@ -150,6 +150,7 @@ pub struct ChatSession {
     rag_enabled: bool,
     rag_top_k: usize,
     rag_threshold: f32,
+    rag_max_context_tokens: usize,
     include_citations: bool,
     last_rag_context: Option<super::RagContext>,
 }
@@ -281,12 +282,37 @@ impl ChatSession {
             #[cfg(feature = "rmcp")]
             rmcp_tools: rmcp_tools.unwrap_or_default(),
 
-            // RAG defaults
+            // RAG configuration from system settings
             data_acquisition,
-            rag_enabled: true,
-            rag_top_k: 5,
-            rag_threshold: 0.7,
-            include_citations: true,
+            rag_enabled: true, // Always enabled for new sessions, can be toggled per session
+            rag_top_k: settings
+                .get_setting("LAYERCAKE_RAG_DEFAULT_TOP_K")
+                .await
+                .ok()
+                .and_then(|s| s.value)
+                .and_then(|v| v.parse::<usize>().ok())
+                .unwrap_or(5),
+            rag_threshold: settings
+                .get_setting("LAYERCAKE_RAG_DEFAULT_THRESHOLD")
+                .await
+                .ok()
+                .and_then(|s| s.value)
+                .and_then(|v| v.parse::<f32>().ok())
+                .unwrap_or(0.7),
+            rag_max_context_tokens: settings
+                .get_setting("LAYERCAKE_RAG_MAX_CONTEXT_TOKENS")
+                .await
+                .ok()
+                .and_then(|s| s.value)
+                .and_then(|v| v.parse::<usize>().ok())
+                .unwrap_or(4000),
+            include_citations: settings
+                .get_setting("LAYERCAKE_RAG_ENABLE_CITATIONS")
+                .await
+                .ok()
+                .and_then(|s| s.value)
+                .and_then(|v| v.parse::<bool>().ok())
+                .unwrap_or(true),
             last_rag_context: None,
         })
     }
@@ -380,6 +406,13 @@ impl ChatSession {
             rag_enabled: session.enable_rag,
             rag_top_k: session.rag_top_k as usize,
             rag_threshold: session.rag_threshold as f32,
+            rag_max_context_tokens: settings
+                .get_setting("LAYERCAKE_RAG_MAX_CONTEXT_TOKENS")
+                .await
+                .ok()
+                .and_then(|s| s.value)
+                .and_then(|v| v.parse::<usize>().ok())
+                .unwrap_or(4000),
             include_citations: session.include_citations,
             last_rag_context: None,
         })
@@ -649,7 +682,7 @@ impl ChatSession {
         }
 
         // Build RAG context with threshold filtering
-        let rag_context = RagContextBuilder::new(self.rag_threshold, 4000)
+        let rag_context = RagContextBuilder::new(self.rag_threshold, self.rag_max_context_tokens)
             .add_results(search_results)
             .build();
 
