@@ -1,5 +1,5 @@
 export const DEFAULT_CHAT_SUGGESTIONS = [
-  'Summarize the latest project updates.',
-  'List recent tool invocations for this project.',
-  'What are the open tasks for this project?',
+  'Describe the current project for me.',
+  'Who are the decision makers in this project?',
+  'What are the tools available to an agent?',
 ]

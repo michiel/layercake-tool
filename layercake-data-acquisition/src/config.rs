@@ -17,8 +17,8 @@ pub struct DataAcquisitionConfig {
 impl Default for DataAcquisitionConfig {
     fn default() -> Self {
         Self {
-            max_chunk_chars: 2_048,
-            chunk_overlap_chars: 128,
+            max_chunk_chars: 1_024,
+            chunk_overlap_chars: 64,
             embedding_batch_size: 8,
             ingestion_timeout: Some(Duration::from_secs(300)),
         }

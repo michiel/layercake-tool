@@ -116,6 +116,29 @@ const GET_PLAN_DAG = gql`
   }
 `
 
+// Query to fetch aggregate project statistics for overview
+const GET_PROJECT_STATS = gql`
+  query GetProjectStats($projectId: Int!) {
+    projectStats(projectId: $projectId) {
+      projectId
+      documents {
+        total
+        indexed
+        notIndexed
+      }
+      knowledgeBase {
+        fileCount
+        chunkCount
+        lastIndexedAt
+      }
+      datasets {
+        total
+        byType
+      }
+    }
+  }
+`
+
 // Layout wrapper component
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate()
@@ -584,7 +607,7 @@ const HomePage = () => {
   return (
     <div className="w-full h-full">
       {/* Action buttons section */}
-      <div className="py-12 px-8 bg-gray-50 border-b">
+      <div className="py-12 px-8 bg-muted/50 border-b">
         <Group justify="center" gap="xl">
           <Button
             size="lg"
@@ -605,7 +628,8 @@ const HomePage = () => {
           <Button
             size="lg"
             onClick={handleOpenSampleModal}
-            className="min-w-[240px] h-20 text-lg bg-teal-600 hover:bg-teal-700"
+            variant="secondary"
+            className="min-w-[240px] h-20 text-lg"
           >
             <IconFolderPlus className="mr-2 h-6 w-6" />
             Import Sample Project
@@ -622,7 +646,7 @@ const HomePage = () => {
         {recentProjects.length === 0 ? (
           <Card className="max-w-[600px] mx-auto border p-6">
             <div className="flex flex-col items-center gap-4">
-              <IconGraph size={48} className="text-gray-400" />
+              <IconGraph size={48} className="text-muted-foreground" />
               <h3 className="text-xl font-bold">No Projects Yet</h3>
               <p className="text-center text-muted-foreground">
                 Create your first project to get started with Layercake.
@@ -637,7 +661,7 @@ const HomePage = () => {
                 className="cursor-pointer h-full flex flex-col border shadow-sm hover:shadow-md transition-shadow"
                 onClick={() => navigate(`/projects/${project.id}`)}
               >
-                <div className="border-b bg-gray-50 p-3">
+                <div className="border-b bg-muted/50 p-3">
                   <Group justify="between">
                     <Group gap="xs">
                       <IconGraph className="h-5 w-5" />
@@ -898,7 +922,7 @@ const ProjectsPage = () => {
       {projectsLoading && <p>Loading projects...</p>}
 
       {projectsError && (
-        <p className="text-red-600 mb-4">
+        <p className="text-destructive mb-4">
           Error loading projects: {projectsError.message}
         </p>
       )}
@@ -906,7 +930,7 @@ const ProjectsPage = () => {
       {projects.length === 0 && !projectsLoading && !projectsError && (
         <Card className="border p-6">
           <div className="flex flex-col items-center gap-4">
-            <IconGraph size={48} className="text-gray-400" />
+            <IconGraph size={48} className="text-muted-foreground" />
             <h3 className="text-xl font-bold">No Projects Yet</h3>
             <p className="text-center text-muted-foreground">
               Create your first project to start building Plan DAGs and transforming graphs.
@@ -959,7 +983,7 @@ const ProjectsPage = () => {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="text-red-600 hover:text-red-700"
+                    className="text-destructive hover:text-destructive/80"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleDeleteProject(project.id);
@@ -1069,6 +1093,8 @@ const ProjectsPage = () => {
 const ProjectDetailPage = () => {
   const navigate = useNavigate()
   const { projectId } = useParams<{ projectId: string }>()
+  const projectIdNum = parseInt(projectId || '0')
+
   const { data: projectsData, loading: projectsLoading } = useQuery<{
     projects: Array<{
       id: number
@@ -1080,13 +1106,47 @@ const ProjectDetailPage = () => {
   }>(GET_PROJECTS)
 
   const { data: planDagData } = useQuery(GET_PLAN_DAG, {
-    variables: { projectId: parseInt(projectId || '0') },
+    variables: { projectId: projectIdNum },
+    skip: !projectId,
+  })
+
+  const { data: projectStatsData } = useQuery<{
+    projectStats: {
+      projectId: number
+      documents: {
+        total: number
+        indexed: number
+        notIndexed: number
+      }
+      knowledgeBase: {
+        fileCount: number
+        chunkCount: number
+        lastIndexedAt?: string | null
+      }
+      datasets: {
+        total: number
+        byType: Record<string, number>
+      }
+    }
+  }>(GET_PROJECT_STATS, {
+    variables: { projectId: projectIdNum },
     skip: !projectId,
   })
 
   const projects = projectsData?.projects || []
-  const selectedProject = projects.find((p: any) => p.id === parseInt(projectId || '0'))
+  const selectedProject = projects.find((p: any) => p.id === projectIdNum)
   const planDag = (planDagData as any)?.planDag
+
+  // Extract stats from single query
+  const stats = projectStatsData?.projectStats
+  const totalFiles = stats?.documents.total || 0
+  const indexedFiles = stats?.documents.indexed || 0
+  const notIndexedFiles = stats?.documents.notIndexed || 0
+  const kbFileCount = stats?.knowledgeBase.fileCount || 0
+  const kbChunkCount = stats?.knowledgeBase.chunkCount || 0
+  const kbLastUpdate = stats?.knowledgeBase.lastIndexedAt
+  const totalDatasets = stats?.datasets.total || 0
+  const datasetsByType = stats?.datasets.byType || {}
 
   const handleNavigate = (route: string) => {
     navigate(route)
@@ -1235,7 +1295,7 @@ const ProjectDetailPage = () => {
           <h1 className="text-3xl font-bold">{selectedProject.name}</h1>
           <Group gap="sm" className="mt-2">
             <Badge variant="secondary">ID: {selectedProject.id}</Badge>
-            <Badge className="bg-green-100 text-green-900">Active</Badge>
+            <Badge variant="default">Active</Badge>
           </Group>
         </div>
         <Group gap="sm">
@@ -1259,60 +1319,96 @@ const ProjectDetailPage = () => {
               </p>
             </div>
             <Group gap="xs">
-              <Button variant="outline" onClick={() => navigate(`/projects/${projectId}/datasets`)}>
+              <Button variant="secondary" onClick={() => navigate(`/projects/${projectId}/datasets`)}>
                 Manage data sets
               </Button>
-              <Button onClick={() => navigate(`/projects/${projectId}/data-acquisition/source-management`)}>
+              <Button variant="secondary" onClick={() => navigate(`/projects/${projectId}/data-acquisition/source-management`)}>
                 Upload files
               </Button>
             </Group>
           </Group>
           <div className="grid gap-4 md:grid-cols-3">
-            <Card className="border">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                  <IconFileDatabase className="h-4 w-4 text-primary" />
-                  Data sets
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  View imported CSV/JSON files and connect shared library sets.
-                </p>
-                <Button variant="secondary" className="w-full" onClick={() => navigate(`/projects/${projectId}/datasets`)}>
-                  Open data sets
-                </Button>
-              </CardContent>
-            </Card>
-            <Card className="border">
-              <CardHeader>
+            <Card className="border hover:shadow-md transition-shadow">
+              <CardHeader className="cursor-pointer" onClick={() => navigate(`/projects/${projectId}/data-acquisition/source-management`)}>
                 <CardTitle className="flex items-center gap-2 text-base font-semibold">
                   <IconUpload className="h-4 w-4 text-primary" />
                   Document management
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Upload new documents, edit tags, and control ingestion defaults.
-                </p>
-                <Button className="w-full" onClick={() => navigate(`/projects/${projectId}/data-acquisition/source-management`)}>
-                  Manage uploads
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Total:</span>
+                    <Badge variant="secondary">{totalFiles}</Badge>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Indexed:</span>
+                    <Badge variant="default">{indexedFiles}</Badge>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Not indexed:</span>
+                    <Badge variant="outline">{notIndexedFiles}</Badge>
+                  </div>
+                </div>
+                <Button variant="secondary" className="w-full" onClick={() => navigate(`/projects/${projectId}/data-acquisition/source-management`)}>
+                  Manage documents
                 </Button>
               </CardContent>
             </Card>
-            <Card className="border">
-              <CardHeader>
+            <Card className="border hover:shadow-md transition-shadow">
+              <CardHeader className="cursor-pointer" onClick={() => navigate(`/projects/${projectId}/data-acquisition/knowledge-base`)}>
                 <CardTitle className="flex items-center gap-2 text-base font-semibold">
                   <IconDatabase className="h-4 w-4 text-primary" />
                   Knowledge base
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Review embedding status and rebuild the project knowledge base.
-                </p>
-                <Button variant="outline" className="w-full" onClick={() => navigate(`/projects/${projectId}/data-acquisition/knowledge-base`)}>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Files:</span>
+                    <Badge variant="secondary">{kbFileCount}</Badge>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Chunks:</span>
+                    <Badge variant="secondary">{kbChunkCount}</Badge>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Last update:</span>
+                    <span className="text-xs text-muted-foreground">
+                      {kbLastUpdate ? new Date(kbLastUpdate).toLocaleDateString() : 'Never'}
+                    </span>
+                  </div>
+                </div>
+                <Button variant="secondary" className="w-full" onClick={() => navigate(`/projects/${projectId}/data-acquisition/knowledge-base`)}>
                   View knowledge base
+                </Button>
+              </CardContent>
+            </Card>
+            <Card className="border hover:shadow-md transition-shadow">
+              <CardHeader className="cursor-pointer" onClick={() => navigate(`/projects/${projectId}/datasets`)}>
+                <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                  <IconFileDatabase className="h-4 w-4 text-primary" />
+                  Data sets
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Total:</span>
+                    <Badge variant="secondary">{totalDatasets}</Badge>
+                  </div>
+                  {Object.entries(datasetsByType).map(([type, count]) => (
+                    <div key={type} className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground capitalize">{type}:</span>
+                      <Badge variant="outline">{count}</Badge>
+                    </div>
+                  ))}
+                  {totalDatasets === 0 && (
+                    <p className="text-sm text-muted-foreground italic">No datasets yet</p>
+                  )}
+                </div>
+                <Button variant="secondary" className="w-full" onClick={() => navigate(`/projects/${projectId}/datasets`)}>
+                  Open data sets
                 </Button>
               </CardContent>
             </Card>
@@ -1328,11 +1424,11 @@ const ProjectDetailPage = () => {
               </p>
             </div>
             <Group gap="xs">
-              <Button variant="outline" onClick={() => handleDownloadYAML()} disabled={!planDag}>
+              <Button variant="secondary" onClick={() => handleDownloadYAML()} disabled={!planDag}>
                 <IconDownload className="mr-2 h-4 w-4" />
                 Export plan YAML
               </Button>
-              <Button onClick={() => navigate(`/projects/${projectId}/plan`)}>
+              <Button variant="secondary" onClick={() => navigate(`/projects/${projectId}/plan`)}>
                 Open plan editor
               </Button>
             </Group>
@@ -1353,7 +1449,7 @@ const ProjectDetailPage = () => {
                 <p className="text-xs text-muted-foreground">
                   Version: {planVersion}
                 </p>
-                <Button variant="ghost" className="w-full" onClick={() => navigate(`/projects/${projectId}/plan`)}>
+                <Button variant="secondary" className="w-full" onClick={() => navigate(`/projects/${projectId}/plan`)}>
                   Edit plan
                 </Button>
               </CardContent>
@@ -1369,7 +1465,7 @@ const ProjectDetailPage = () => {
                 <p className="text-sm text-muted-foreground">
                   Review node execution status, trace dependencies, and inspect generated outputs.
                 </p>
-                <Button className="w-full" onClick={() => navigate(`/projects/${projectId}/plan-nodes`)}>
+                <Button variant="secondary" className="w-full" onClick={() => navigate(`/projects/${projectId}/plan-nodes`)}>
                   View nodes
                 </Button>
               </CardContent>
@@ -1391,7 +1487,7 @@ const ProjectDetailPage = () => {
                   </Button>
                   <Button
                     className="flex-1"
-                    variant="ghost"
+                    variant="secondary"
                     disabled={!planDag?.nodes?.length}
                     onClick={() => {
                       if (planDag?.nodes?.length) {
@@ -1416,10 +1512,10 @@ const ProjectDetailPage = () => {
               </p>
             </div>
             <Group gap="xs">
-              <Button variant="outline" onClick={() => navigate(`/projects/${projectId}/sharing`)}>
+              <Button variant="secondary" onClick={() => navigate(`/projects/${projectId}/sharing`)}>
                 Manage sharing
               </Button>
-              <Button onClick={() => navigate(`/projects/${projectId}/chat`)}>
+              <Button variant="secondary" onClick={() => navigate(`/projects/${projectId}/chat`)}>
                 Open project chat
               </Button>
             </Group>
@@ -1437,10 +1533,10 @@ const ProjectDetailPage = () => {
                   Launch the shared agent conversation scoped to this project, or inspect previous messages.
                 </p>
                 <Group gap="sm">
-                  <Button className="flex-1" onClick={() => navigate(`/projects/${projectId}/chat`)}>
+                  <Button className="flex-1" variant="secondary" onClick={() => navigate(`/projects/${projectId}/chat`)}>
                     Join chat
                   </Button>
-                  <Button className="flex-1" variant="ghost" onClick={() => navigate(`/projects/${projectId}/chat/logs`)}>
+                  <Button className="flex-1" variant="secondary" onClick={() => navigate(`/projects/${projectId}/chat/logs`)}>
                     View logs
                   </Button>
                 </Group>
