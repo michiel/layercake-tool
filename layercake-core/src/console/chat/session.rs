@@ -616,6 +616,12 @@ impl ChatSession {
             .embeddings()
             .ok_or_else(|| anyhow!("Embeddings not configured for this project"))?;
 
+        tracing::debug!(
+            project_id = self.project_id,
+            query = query,
+            "Embedding query for RAG search"
+        );
+
         // Embed the query
         let query_embedding = embeddings.embed_text(query).await?;
 
@@ -623,6 +629,24 @@ impl ChatSession {
         let search_results = self.data_acquisition
             .search_context(self.project_id, &query_embedding, self.rag_top_k)
             .await?;
+
+        tracing::info!(
+            project_id = self.project_id,
+            raw_results_count = search_results.len(),
+            threshold = self.rag_threshold,
+            top_k = self.rag_top_k,
+            "Vector search completed"
+        );
+
+        // Log top results with scores for debugging
+        for (i, result) in search_results.iter().take(5).enumerate() {
+            tracing::debug!(
+                rank = i + 1,
+                score = result.score,
+                filename = result.filename.as_ref().unwrap_or(&"unknown".to_string()),
+                "Search result"
+            );
+        }
 
         // Build RAG context with threshold filtering
         let rag_context = RagContextBuilder::new(self.rag_threshold, 4000)
