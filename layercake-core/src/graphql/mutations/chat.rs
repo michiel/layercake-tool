@@ -239,4 +239,29 @@ impl ChatMutation {
 
         Ok(true)
     }
+
+    /// Update RAG settings for a chat session
+    async fn update_chat_session_rag(
+        &self,
+        ctx: &Context<'_>,
+        session_id: String,
+        enable_rag: bool,
+    ) -> Result<bool> {
+        use crate::services::chat_history_service::ChatHistoryService;
+        let context = ctx.data::<GraphQLContext>()?;
+        let service = ChatHistoryService::new(context.db.clone());
+
+        service
+            .update_rag_settings(&session_id, enable_rag)
+            .await
+            .map_err(|e| StructuredError::service("ChatHistoryService::update_rag_settings", e))?;
+
+        // If session is active, update the in-memory session
+        if context.chat_manager.is_session_active(&session_id).await {
+            // TODO: Update active session RAG settings
+            // For now, the user needs to restart the session for changes to take effect
+        }
+
+        Ok(true)
+    }
 }
