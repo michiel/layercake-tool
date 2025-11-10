@@ -34,10 +34,11 @@ use rmcp::{
 use crate::database::entities::users;
 use crate::mcp::security::build_user_security_context;
 use crate::services::system_settings_service::SystemSettingsService;
+use layercake_data_acquisition::services::DataAcquisitionService;
 
 use super::{
     config::{ChatConfig, ChatCredentialStore},
-    ChatProvider, McpBridge,
+    ChatProvider, McpBridge, RagContextBuilder,
 };
 
 const MAX_TOOL_ITERATIONS: usize = 5;
@@ -143,6 +144,15 @@ pub struct ChatSession {
     rmcp_client: Option<rmcp::Client<rmcp::RoleServer>>,
     #[cfg(feature = "rmcp")]
     rmcp_tools: Vec<RmcpTool>,
+
+    // RAG configuration
+    data_acquisition: Arc<DataAcquisitionService>,
+    rag_enabled: bool,
+    rag_top_k: usize,
+    rag_threshold: f32,
+    rag_max_context_tokens: usize,
+    include_citations: bool,
+    last_rag_context: Option<super::RagContext>,
 }
 
 impl ChatSession {
@@ -193,7 +203,7 @@ impl ChatSession {
         provider: ChatProvider,
         config: &ChatConfig,
     ) -> Result<Self> {
-        let credentials = ChatCredentialStore::with_settings(db.clone(), settings);
+        let credentials = ChatCredentialStore::with_settings(db.clone(), settings.clone());
         let bridge = McpBridge::new(db.clone());
         let security = build_user_security_context(
             ClientContext::default(),
@@ -201,6 +211,19 @@ impl ChatSession {
             &user.user_type,
             Some(project_id),
         );
+
+        // Initialize DataAcquisitionService for RAG
+        let embedding_provider = settings
+            .get_setting("LAYERCAKE_EMBEDDING_PROVIDER")
+            .await
+            .ok()
+            .and_then(|s| s.value);
+        let embedding_config = layercake_data_acquisition::config::EmbeddingProviderConfig::from_env();
+        let data_acquisition = Arc::new(DataAcquisitionService::new(
+            db.clone(),
+            embedding_provider,
+            embedding_config,
+        ));
 
         // Initialize rmcp client if feature is enabled
         #[cfg(feature = "rmcp")]
@@ -258,6 +281,39 @@ impl ChatSession {
             rmcp_client,
             #[cfg(feature = "rmcp")]
             rmcp_tools: rmcp_tools.unwrap_or_default(),
+
+            // RAG configuration from system settings
+            data_acquisition,
+            rag_enabled: true, // Always enabled for new sessions, can be toggled per session
+            rag_top_k: settings
+                .get_setting("LAYERCAKE_RAG_DEFAULT_TOP_K")
+                .await
+                .ok()
+                .and_then(|s| s.value)
+                .and_then(|v| v.parse::<usize>().ok())
+                .unwrap_or(5),
+            rag_threshold: settings
+                .get_setting("LAYERCAKE_RAG_DEFAULT_THRESHOLD")
+                .await
+                .ok()
+                .and_then(|s| s.value)
+                .and_then(|v| v.parse::<f32>().ok())
+                .unwrap_or(0.7),
+            rag_max_context_tokens: settings
+                .get_setting("LAYERCAKE_RAG_MAX_CONTEXT_TOKENS")
+                .await
+                .ok()
+                .and_then(|s| s.value)
+                .and_then(|v| v.parse::<usize>().ok())
+                .unwrap_or(4000),
+            include_citations: settings
+                .get_setting("LAYERCAKE_RAG_ENABLE_CITATIONS")
+                .await
+                .ok()
+                .and_then(|s| s.value)
+                .and_then(|v| v.parse::<bool>().ok())
+                .unwrap_or(true),
+            last_rag_context: None,
         })
     }
 
@@ -278,8 +334,21 @@ impl ChatSession {
             .ok_or_else(|| anyhow!("Session not found: {}", session_id))?;
 
         let provider: ChatProvider = session.provider.parse()?;
-        let credentials = ChatCredentialStore::with_settings(db.clone(), settings);
+        let credentials = ChatCredentialStore::with_settings(db.clone(), settings.clone());
         let bridge = McpBridge::new(db.clone());
+
+        // Initialize DataAcquisitionService for RAG
+        let embedding_provider = settings
+            .get_setting("LAYERCAKE_EMBEDDING_PROVIDER")
+            .await
+            .ok()
+            .and_then(|s| s.value);
+        let embedding_config = layercake_data_acquisition::config::EmbeddingProviderConfig::from_env();
+        let data_acquisition = Arc::new(DataAcquisitionService::new(
+            db.clone(),
+            embedding_provider,
+            embedding_config,
+        ));
 
         // For resumed sessions, get security context from session's user
         use crate::database::entities::users;
@@ -331,6 +400,21 @@ impl ChatSession {
             rmcp_client,
             #[cfg(feature = "rmcp")]
             rmcp_tools: rmcp_tools.unwrap_or_default(),
+
+            // RAG configuration loaded from database
+            data_acquisition,
+            rag_enabled: session.enable_rag,
+            rag_top_k: session.rag_top_k as usize,
+            rag_threshold: session.rag_threshold as f32,
+            rag_max_context_tokens: settings
+                .get_setting("LAYERCAKE_RAG_MAX_CONTEXT_TOKENS")
+                .await
+                .ok()
+                .and_then(|s| s.value)
+                .and_then(|v| v.parse::<usize>().ok())
+                .unwrap_or(4000),
+            include_citations: session.include_citations,
+            last_rag_context: None,
         })
     }
 
@@ -446,7 +530,7 @@ impl ChatSession {
             }
             turn_count += 1;
 
-            let conversation = self.build_conversation_prompt();
+            let conversation = self.build_conversation_prompt().await?;
             let response_text = self
                 .invoke_agent_with_retries(&conversation, observer)
                 .await?;
@@ -457,14 +541,27 @@ impl ChatSession {
                 continue;
             }
 
+            // Add citations if RAG was used and citations are enabled
+            let mut final_response = response_text.clone();
+            if self.include_citations {
+                if let Some(ref rag_context) = self.last_rag_context {
+                    if !rag_context.chunks.is_empty() {
+                        final_response.push_str("\n---\n**Sources:**\n");
+                        for citation in rag_context.get_citations() {
+                            final_response.push_str(&format!("- {}\n", citation));
+                        }
+                    }
+                }
+            }
+
             observer(ChatEvent::AssistantMessage {
-                text: response_text.clone(),
+                text: final_response.clone(),
             });
 
-            self.messages.push(ChatMessage::assistant(&response_text));
+            self.messages.push(ChatMessage::assistant(&final_response));
 
             if let Some(ref session_id) = self.session_id {
-                self.persist_message(session_id, "assistant", &response_text, None, None, None)
+                self.persist_message(session_id, "assistant", &final_response, None, None, None)
                     .await?;
             }
 
@@ -482,10 +579,35 @@ impl ChatSession {
         err_str.contains("/api/chat") && err_str.contains("400")
     }
 
-    fn build_conversation_prompt(&self) -> String {
+    async fn build_conversation_prompt(&mut self) -> Result<String> {
         let mut prompt = String::new();
         prompt.push_str(&self.system_prompt);
         prompt.push_str("\n\n");
+
+        // Add RAG context if enabled and we have a user message
+        if self.rag_enabled {
+            if let Some(last_user_msg) = self.messages.iter().rev().find(|m| m.role == "user") {
+                match self.get_rag_context(&last_user_msg.content).await {
+                    Ok(rag_context) if !rag_context.is_empty() => {
+                        prompt.push_str(&rag_context.to_context_string());
+                        prompt.push_str("\n\nUse the above context to answer questions when relevant. ");
+                        prompt.push_str("If the context doesn't contain relevant information, ");
+                        prompt.push_str("say so and use your general knowledge.\n\n");
+
+                        // Store RAG context for citation generation
+                        self.last_rag_context = Some(rag_context);
+                    }
+                    Ok(_) => {
+                        // No relevant context found
+                        self.last_rag_context = None;
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to retrieve RAG context: {}", e);
+                        self.last_rag_context = None;
+                    }
+                }
+            }
+        }
 
         for msg in &self.messages {
             match msg.role.as_str() {
@@ -518,7 +640,60 @@ impl ChatSession {
         }
 
         prompt.push_str("Assistant: ");
-        prompt
+        Ok(prompt)
+    }
+
+    async fn get_rag_context(&self, query: &str) -> Result<super::RagContext> {
+        // Get embeddings service from data acquisition
+        let embeddings = self.data_acquisition
+            .embeddings()
+            .ok_or_else(|| anyhow!("Embeddings not configured for this project"))?;
+
+        tracing::debug!(
+            project_id = self.project_id,
+            query = query,
+            "Embedding query for RAG search"
+        );
+
+        // Embed the query
+        let query_embedding = embeddings.embed_text(query).await?;
+
+        // Search the knowledge base
+        let search_results = self.data_acquisition
+            .search_context(self.project_id, &query_embedding, self.rag_top_k)
+            .await?;
+
+        tracing::info!(
+            project_id = self.project_id,
+            raw_results_count = search_results.len(),
+            threshold = self.rag_threshold,
+            top_k = self.rag_top_k,
+            "Vector search completed"
+        );
+
+        // Log top results with scores for debugging
+        for (i, result) in search_results.iter().take(5).enumerate() {
+            tracing::debug!(
+                rank = i + 1,
+                score = result.score,
+                filename = result.filename.as_ref().unwrap_or(&"unknown".to_string()),
+                "Search result"
+            );
+        }
+
+        // Build RAG context with threshold filtering
+        let rag_context = RagContextBuilder::new(self.rag_threshold, self.rag_max_context_tokens)
+            .add_results(search_results)
+            .build();
+
+        tracing::info!(
+            project_id = self.project_id,
+            chunks_retrieved = rag_context.chunks.len(),
+            total_tokens = rag_context.total_tokens,
+            "RAG context built"
+        );
+
+        Ok(rag_context)
     }
 
     async fn call_rig_agent(&self, prompt: &str) -> Result<String> {
@@ -693,7 +868,7 @@ impl ChatSession {
 
                 tracing::warn!("Disabling tool usage for session: {}", err);
 
-                let updated_prompt = self.build_conversation_prompt();
+                let updated_prompt = self.build_conversation_prompt().await?;
                 self.call_rig_agent(&updated_prompt).await
             }
             Err(err) => Err(err),

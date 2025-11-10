@@ -13,6 +13,7 @@ pub struct Model {
     pub checksum: String,
     pub created_by: Option<i32>,
     pub created_at: ChronoDateTimeUtc,
+    pub indexed: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

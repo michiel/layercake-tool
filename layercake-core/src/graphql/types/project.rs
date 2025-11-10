@@ -1,5 +1,6 @@
 use async_graphql::*;
 use chrono::{DateTime, Utc};
+use std::collections::HashMap;
 
 use crate::app_context::ProjectSummary;
 use crate::database::entities::projects;
@@ -55,6 +56,39 @@ impl Project {
 
         Ok(plan.map(Plan::from))
     }
+}
+
+/// Document management statistics
+#[derive(SimpleObject)]
+pub struct DocumentStats {
+    pub total: i32,
+    pub indexed: i32,
+    pub not_indexed: i32,
+}
+
+/// Knowledge base statistics
+#[derive(SimpleObject)]
+pub struct KnowledgeBaseStats {
+    pub file_count: i32,
+    pub chunk_count: i32,
+    #[graphql(name = "lastIndexedAt")]
+    pub last_indexed_at: Option<DateTime<Utc>>,
+}
+
+/// Dataset statistics by type
+#[derive(SimpleObject)]
+pub struct DatasetStats {
+    pub total: i32,
+    pub by_type: HashMap<String, i32>,
+}
+
+/// Aggregate project statistics for overview page
+#[derive(SimpleObject)]
+pub struct ProjectStats {
+    pub project_id: i32,
+    pub documents: DocumentStats,
+    pub knowledge_base: KnowledgeBaseStats,
+    pub datasets: DatasetStats,
 }
 
 #[derive(InputObject)]

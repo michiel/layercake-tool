@@ -249,6 +249,7 @@ impl DataAcquisitionService {
             checksum: Set(checksum.to_string()),
             created_by: Set(request.uploader_user_id),
             created_at: Set(chrono::Utc::now()),
+            indexed: Set(request.index_immediately),
         };
         record.insert(&txn).await?;
 
@@ -427,6 +428,7 @@ impl DataAcquisitionService {
                 .await?;
                 let files = files::Entity::find()
                     .filter(files::Column::ProjectId.eq(project_id))
+                    .filter(files::Column::Indexed.eq(true))
                     .order_by_desc(files::Column::CreatedAt)
                     .all(&self.db)
                     .await?;
@@ -483,6 +485,7 @@ impl DataAcquisitionService {
     pub async fn knowledge_base_status(&self, project_id: i32) -> Result<KnowledgeBaseStatus> {
         let file_count = files::Entity::find()
             .filter(files::Column::ProjectId.eq(project_id))
+            .filter(files::Column::Indexed.eq(true))
             .count(&self.db)
             .await?;
         let chunk_count = kb_documents::Entity::find()
@@ -786,5 +789,118 @@ impl DataAcquisitionService {
             created_at: updated.created_at,
             tags,
         })
+    }
+
+    pub async fn delete_file(&self, project_id: i32, file_id: Uuid) -> Result<()> {
+        let file = files::Entity::find_by_id(file_id)
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| DataAcquisitionError::NotFound(format!("File {}", file_id)))?;
+
+        if file.project_id != project_id {
+            return Err(DataAcquisitionError::Validation {
+                field: "projectId".into(),
+                message: "File belongs to a different project".into(),
+            }
+            .into());
+        }
+
+        // Delete embeddings from vector store
+        kb_documents::Entity::delete_many()
+            .filter(kb_documents::Column::ProjectId.eq(project_id))
+            .filter(kb_documents::Column::FileId.eq(file_id))
+            .exec(&self.db)
+            .await?;
+
+        // Delete file tags
+        file_tags::Entity::delete_many()
+            .filter(file_tags::Column::FileId.eq(file_id))
+            .exec(&self.db)
+            .await?;
+
+        // Delete the file itself
+        files::Entity::delete_by_id(file_id)
+            .exec(&self.db)
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn toggle_file_index(&self, project_id: i32, file_id: Uuid, indexed: bool) -> Result<()> {
+        let file = files::Entity::find_by_id(file_id)
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| DataAcquisitionError::NotFound(format!("File {}", file_id)))?;
+
+        if file.project_id != project_id {
+            return Err(DataAcquisitionError::Validation {
+                field: "projectId".into(),
+                message: "File belongs to a different project".into(),
+            }
+            .into());
+        }
+
+        // Update the indexed field in the database
+        let mut active: files::ActiveModel = file.clone().into();
+        active.indexed = Set(indexed);
+        active.update(&self.db).await?;
+
+        if indexed {
+            // Add to index
+            let parsed = self
+                .ingestion
+                .parse_bytes(&file.media_type, &file.filename, &file.blob)
+                .await?;
+            self.index_parsed_document(project_id, file_id, &parsed, None)
+                .await?;
+        } else {
+            // Remove from index
+            kb_documents::Entity::delete_many()
+                .filter(kb_documents::Column::ProjectId.eq(project_id))
+                .filter(kb_documents::Column::FileId.eq(file_id))
+                .exec(&self.db)
+                .await?;
+        }
+
+        Ok(())
+    }
+
+    pub async fn get_file_content(&self, project_id: i32, file_id: Uuid) -> Result<Vec<u8>> {
+        let file = files::Entity::find_by_id(file_id)
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| DataAcquisitionError::NotFound(format!("File {}", file_id)))?;
+
+        if file.project_id != project_id {
+            return Err(DataAcquisitionError::Validation {
+                field: "projectId".into(),
+                message: "File belongs to a different project".into(),
+            }
+            .into());
+        }
+
+        Ok(file.blob)
+    }
+
+    pub async fn is_file_indexed(&self, project_id: i32, file_id: Uuid) -> Result<bool> {
+        let file = files::Entity::find_by_id(file_id)
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| DataAcquisitionError::NotFound(format!("File {}", file_id)))?;
+
+        if file.project_id != project_id {
+            return Err(DataAcquisitionError::Validation {
+                field: "projectId".into(),
+                message: "File belongs to a different project".into(),
+            }
+            .into());
+        }
+
+        Ok(file.indexed)
+    }
+
+    /// Get reference to the embedding service (for RAG use)
+    pub fn embeddings(&self) -> Option<&EmbeddingService> {
+        self.embeddings.as_ref()
     }
 }

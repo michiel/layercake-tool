@@ -67,20 +67,55 @@ impl EmbeddingService {
             return Ok(Vec::new());
         }
 
+        tracing::info!(
+            provider = self.provider_name(),
+            model = self.model_name(),
+            chunk_count = chunks.len(),
+            avg_chunk_length = chunks.iter().map(|c| c.text.len()).sum::<usize>() / chunks.len(),
+            "Embedding document chunks"
+        );
+
         let vectors = match &self.backend {
             EmbeddingBackend::OpenAi { client, model } => {
                 client
                     .embedding_model(model)
                     .embed_texts(chunks.iter().map(|chunk| chunk.text.clone()))
-                    .await?
+                    .await
+                    .map_err(|e| {
+                        tracing::error!(
+                            provider = "openai",
+                            model = model,
+                            chunk_count = chunks.len(),
+                            error = %e,
+                            "Failed to embed chunks"
+                        );
+                        e
+                    })?
             }
             EmbeddingBackend::Ollama { client, model } => {
+                // Note: Ollama 0.9.x logs "cannot decode batches" warnings
+                // These are harmless llama.cpp internals - embeddings work correctly
                 client
                     .embedding_model(model)
                     .embed_texts(chunks.iter().map(|chunk| chunk.text.clone()))
-                    .await?
+                    .await
+                    .map_err(|e| {
+                        tracing::error!(
+                            provider = "ollama",
+                            model = model,
+                            chunk_count = chunks.len(),
+                            error = %e,
+                            "Failed to embed chunks"
+                        );
+                        e
+                    })?
             }
         };
+
+        tracing::info!(
+            chunk_count = chunks.len(),
+            "Successfully embedded all chunks"
+        );
 
         Ok(chunks
             .iter()
@@ -95,6 +130,61 @@ impl EmbeddingService {
                 text: chunk.text.clone(),
                 metadata: chunk.metadata.clone(),
             })
+            .collect())
+    }
+
+    /// Embed a single text query (for RAG search)
+    pub async fn embed_text(&self, text: &str) -> Result<Vec<f32>> {
+        tracing::debug!(
+            provider = self.provider_name(),
+            model = self.model_name(),
+            text_length = text.len(),
+            "Embedding single text for RAG query"
+        );
+
+        let vectors = match &self.backend {
+            EmbeddingBackend::OpenAi { client, model } => {
+                client
+                    .embedding_model(model)
+                    .embed_texts(vec![text.to_string()])
+                    .await
+                    .map_err(|e| {
+                        tracing::error!(
+                            provider = "openai",
+                            model = model,
+                            error = %e,
+                            "Failed to embed text"
+                        );
+                        e
+                    })?
+            }
+            EmbeddingBackend::Ollama { client, model } => {
+                client
+                    .embedding_model(model)
+                    .embed_texts(vec![text.to_string()])
+                    .await
+                    .map_err(|e| {
+                        tracing::error!(
+                            provider = "ollama",
+                            model = model,
+                            error = %e,
+                            text_length = text.len(),
+                            "Failed to embed text - this may be due to Ollama version or token limits"
+                        );
+                        e
+                    })?
+            }
+        };
+
+        tracing::debug!("Successfully embedded text");
+
+        Ok(vectors
+            .into_iter()
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("No embedding returned"))?
+            .vec
+            .into_iter()
+            .map(|value| value as f32)
             .collect())
     }
 }

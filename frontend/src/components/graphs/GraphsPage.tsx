@@ -30,8 +30,8 @@ import { GET_PLAN_DAG, UPDATE_PLAN_DAG_NODE } from '../../graphql/plan-dag'
 import PageContainer from '../layout/PageContainer'
 import { getExecutionStateLabel, isExecutionInProgress } from '../../graphql/preview'
 import { GraphDataDialog } from '../editors/PlanVisualEditor/dialogs/GraphDataDialog'
-import { GraphPreviewDialog } from '../visualization/GraphPreviewDialog'
-import { GraphData } from '../visualization/GraphPreview'
+import { GraphPreviewDialog } from '../visualization'
+import type { GraphData } from '../visualization/GraphPreview'
 import { useRegisterChatContext } from '../../hooks/useRegisterChatContext'
 
 const GET_PROJECTS = gql`

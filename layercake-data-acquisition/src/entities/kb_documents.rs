@@ -28,4 +28,10 @@ pub enum Relation {
     Files,
 }
 
+impl Related<super::files::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Files.def()
+    }
+}
+
 impl ActiveModelBehavior for ActiveModel {}

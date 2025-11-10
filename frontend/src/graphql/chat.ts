@@ -65,6 +65,11 @@ export interface ChatSession {
   created_at: string
   updated_at: string
   last_activity_at: string
+  // RAG configuration
+  enable_rag: boolean
+  rag_top_k: number
+  rag_threshold: number
+  include_citations: boolean
 }
 
 export interface ChatMessage {
@@ -93,6 +98,10 @@ export const GET_CHAT_SESSIONS = gql`
       created_at
       updated_at
       last_activity_at
+      enable_rag
+      rag_top_k
+      rag_threshold
+      include_citations
     }
   }
 `
@@ -140,5 +149,11 @@ export const UNARCHIVE_CHAT_SESSION = gql`
 export const DELETE_CHAT_SESSION = gql`
   mutation DeleteChatSession($sessionId: String!) {
     deleteChatSession(sessionId: $sessionId)
+  }
+`
+
+export const UPDATE_CHAT_SESSION_RAG = gql`
+  mutation UpdateChatSessionRag($sessionId: String!, $enableRag: Boolean!) {
+    updateChatSessionRag(sessionId: $sessionId, enableRag: $enableRag)
   }
 `

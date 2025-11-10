@@ -1,6 +1,6 @@
 import { gql } from '@apollo/client'
 
-export type SystemSettingValueType = 'String' | 'Text' | 'Url' | 'Integer' | 'Enum' | 'Secret'
+export type SystemSettingValueType = 'String' | 'Text' | 'Url' | 'Integer' | 'Float' | 'Boolean' | 'Enum' | 'Secret'
 
 export interface SystemSetting {
   key: string

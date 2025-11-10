@@ -4,7 +4,9 @@ import { gql } from '@apollo/client'
 import { useMutation, useQuery } from '@apollo/client/react'
 import {
   IconDatabase,
+  IconDownload,
   IconEdit,
+  IconTrash,
   IconUpload,
 } from '@tabler/icons-react'
 
@@ -36,6 +38,7 @@ const SOURCE_MANAGEMENT_QUERY = gql`
       checksum
       createdAt
       tags
+      indexed
     }
     dataAcquisitionTags(scope: $fileScope) {
       id
@@ -67,6 +70,29 @@ const UPDATE_FILE = gql`
       checksum
       createdAt
       tags
+      indexed
+    }
+  }
+`
+
+const DELETE_FILE = gql`
+  mutation DeleteFile($input: DeleteFileInput!) {
+    deleteFile(input: $input)
+  }
+`
+
+const TOGGLE_FILE_INDEX = gql`
+  mutation ToggleFileIndex($input: ToggleFileIndexInput!) {
+    toggleFileIndex(input: $input)
+  }
+`
+
+const GET_FILE_CONTENT = gql`
+  mutation GetFileContent($input: GetFileContentInput!) {
+    getFileContent(input: $input) {
+      filename
+      mediaType
+      content
     }
   }
 `
@@ -91,6 +117,7 @@ type ProjectFile = {
   checksum: string
   createdAt: string
   tags: string[]
+  indexed: boolean
 }
 
 type TagOption = {
@@ -153,6 +180,9 @@ export const SourceManagementPage: React.FC = () => {
 
   const [ingestFile, { loading: ingesting }] = useMutation(INGEST_FILE)
   const [updateFile, { loading: updating }] = useMutation(UPDATE_FILE)
+  const [deleteFile] = useMutation(DELETE_FILE)
+  const [toggleFileIndex] = useMutation(TOGGLE_FILE_INDEX)
+  const [getFileContent] = useMutation(GET_FILE_CONTENT)
 
   const files = useMemo(() => data?.dataAcquisitionFiles ?? [], [data])
   const tags = useMemo(() => data?.dataAcquisitionTags ?? [], [data])
@@ -227,6 +257,89 @@ export const SourceManagementPage: React.FC = () => {
     showSuccessNotification('File metadata updated', 'Changes saved successfully')
     await refetch()
   }, [editFilename, editTags, editingFile, numericProjectId, refetch, updateFile])
+
+  const handleDelete = useCallback(async (file: ProjectFile) => {
+    if (!Number.isFinite(numericProjectId)) return
+    if (!confirm(`Delete "${file.filename}"? This will also remove its embeddings from the knowledge base.`)) return
+
+    const result = await deleteFile({
+      variables: {
+        input: {
+          projectId: numericProjectId,
+          fileId: file.id,
+        },
+      },
+    })
+
+    if (handleMutationErrors(result, 'Failed to delete file')) {
+      return
+    }
+
+    showSuccessNotification('File deleted', `${file.filename} has been removed`)
+    await refetch()
+  }, [deleteFile, numericProjectId, refetch])
+
+  const handleDownload = useCallback(async (file: ProjectFile) => {
+    if (!Number.isFinite(numericProjectId)) return
+
+    const result = await getFileContent({
+      variables: {
+        input: {
+          projectId: numericProjectId,
+          fileId: file.id,
+        },
+      },
+    })
+
+    if (handleMutationErrors(result, 'Failed to download file')) {
+      return
+    }
+
+    const data = (result.data as any)?.getFileContent
+    if (data) {
+      // Decode base64 and create download
+      const bytes = atob(data.content)
+      const array = new Uint8Array(bytes.length)
+      for (let i = 0; i < bytes.length; i++) {
+        array[i] = bytes.charCodeAt(i)
+      }
+      const blob = new Blob([array], { type: data.mediaType })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = data.filename
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    }
+  }, [getFileContent, numericProjectId])
+
+  const handleToggleIndex = useCallback(async (file: ProjectFile, indexed: boolean) => {
+    if (!Number.isFinite(numericProjectId)) return
+
+    const result = await toggleFileIndex({
+      variables: {
+        input: {
+          projectId: numericProjectId,
+          fileId: file.id,
+          indexed,
+        },
+      },
+    })
+
+    if (handleMutationErrors(result, 'Failed to update index status')) {
+      return
+    }
+
+    showSuccessNotification(
+      indexed ? 'File indexed' : 'File removed from index',
+      indexed
+        ? `${file.filename} has been added to the knowledge base`
+        : `${file.filename} has been removed from the knowledge base`,
+    )
+    await refetch()
+  }, [numericProjectId, refetch, toggleFileIndex])
 
   if (!Number.isFinite(numericProjectId)) {
     return (
@@ -346,6 +459,7 @@ export const SourceManagementPage: React.FC = () => {
                     <TableHead>Type</TableHead>
                     <TableHead>Size</TableHead>
                     <TableHead>Tags</TableHead>
+                    <TableHead>Index</TableHead>
                     <TableHead>Uploaded</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -353,7 +467,7 @@ export const SourceManagementPage: React.FC = () => {
                 <TableBody>
                   {files.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center text-sm text-muted-foreground">
+                      <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">
                         No files uploaded yet.
                       </TableCell>
                     </TableRow>
@@ -375,17 +489,45 @@ export const SourceManagementPage: React.FC = () => {
                           ))}
                         </div>
                       </TableCell>
+                      <TableCell>
+                        <Switch
+                          checked={file.indexed}
+                          onCheckedChange={(checked) => handleToggleIndex(file, checked)}
+                          aria-label="Toggle file indexing"
+                        />
+                      </TableCell>
                       <TableCell>{formatDate(file.createdAt)}</TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => openEditDialog(file)}
-                          className="inline-flex items-center gap-1"
-                        >
-                          <IconEdit className="h-4 w-4" />
-                          Edit
-                        </Button>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => handleDownload(file)}
+                            title="Download file"
+                            aria-label="Download file"
+                          >
+                            <IconDownload className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => openEditDialog(file)}
+                            title="Edit metadata"
+                            aria-label="Edit metadata"
+                          >
+                            <IconEdit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => handleDelete(file)}
+                            title="Delete file"
+                            aria-label="Delete file"
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <IconTrash className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

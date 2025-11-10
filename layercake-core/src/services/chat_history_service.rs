@@ -255,6 +255,28 @@ impl ChatHistoryService {
 
         Ok(())
     }
+
+    /// Update RAG settings for a chat session
+    pub async fn update_rag_settings(
+        &self,
+        session_id: &str,
+        enable_rag: bool,
+    ) -> Result<()> {
+        let session = self
+            .get_session(session_id)
+            .await?
+            .ok_or_else(|| anyhow!("Chat session not found: {}", session_id))?;
+
+        let mut session_active: chat_sessions::ActiveModel = session.into();
+        session_active.enable_rag = Set(enable_rag);
+        session_active.updated_at = Set(chrono::Utc::now());
+        session_active
+            .update(&self.db)
+            .await
+            .map_err(|e| anyhow!("Failed to update RAG settings: {}", e))?;
+
+        Ok(())
+    }
 }
 
 // TODO: Fix test database setup - migrations fail with "near \"(\" syntax error"

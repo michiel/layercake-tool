@@ -1,19 +1,16 @@
 use anyhow::{Context, Result};
 use chrono::Utc;
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, Set,
-};
-use serde_json::Value;
+use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, Set};
 use uuid::Uuid;
 
 use crate::embeddings::EmbeddingChunk;
-use crate::entities::kb_documents;
+use crate::entities::{files, kb_documents};
 
 #[derive(Debug, Clone)]
 pub struct VectorSearchResult {
-    pub chunk_id: String,
-    pub text: String,
-    pub metadata: Value,
+    pub file_id: Uuid,
+    pub filename: Option<String>,
+    pub content: String,
     pub score: f32,
 }
 
@@ -66,23 +63,30 @@ impl SqliteVectorStore {
         query_embedding: &[f32],
         top_k: usize,
     ) -> Result<Vec<VectorSearchResult>> {
-        let docs = kb_documents::Entity::find()
+        // Load kb_documents with optional file join
+        let docs_with_files = kb_documents::Entity::find()
             .filter(kb_documents::Column::ProjectId.eq(project_id))
+            .find_also_related(files::Entity)
             .order_by_desc(kb_documents::Column::CreatedAt)
             .all(&self.db)
             .await
             .context("failed to load kb documents")?;
 
-        let mut scored: Vec<VectorSearchResult> = docs
+        let mut scored: Vec<VectorSearchResult> = docs_with_files
             .into_iter()
-            .filter_map(|doc| {
+            .filter_map(|(doc, file)| {
                 let embedding_bytes = doc.embedding?;
                 let embedding = Self::deserialize_embedding(&embedding_bytes).ok()?;
                 let score = cosine_similarity(query_embedding, &embedding);
+
+                // Get file_id from doc, fall back to unknown UUID if missing
+                let file_id = doc.file_id.unwrap_or_else(Uuid::nil);
+                let filename = file.map(|f| f.filename);
+
                 Some(VectorSearchResult {
-                    chunk_id: doc.chunk_id,
-                    text: doc.chunk_text,
-                    metadata: doc.metadata.unwrap_or(Value::Null),
+                    file_id,
+                    filename,
+                    content: doc.chunk_text,
                     score,
                 })
             })

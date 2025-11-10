@@ -59,6 +59,89 @@ impl Query {
         Ok(project.map(Project::from))
     }
 
+    /// Get aggregate statistics for a project (for overview page)
+    async fn project_stats(
+        &self,
+        ctx: &Context<'_>,
+        project_id: i32,
+    ) -> Result<crate::graphql::types::ProjectStats> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        // Get document stats
+        let files = context
+            .app
+            .data_acquisition_service()
+            .list_files(project_id)
+            .await
+            .map_err(|e| StructuredError::service("DataAcquisitionService::list_files", e))?;
+
+        let total_files = files.len() as i32;
+        let mut indexed_count = 0;
+
+        for file in &files {
+            let file_id = uuid::Uuid::parse_str(&file.id.to_string())
+                .map_err(|e| StructuredError::validation("fileId", format!("Invalid UUID: {}", e)))?;
+            if context
+                .app
+                .data_acquisition_service()
+                .is_file_indexed(project_id, file_id)
+                .await
+                .unwrap_or(false)
+            {
+                indexed_count += 1;
+            }
+        }
+
+        let document_stats = crate::graphql::types::DocumentStats {
+            total: total_files,
+            indexed: indexed_count,
+            not_indexed: total_files - indexed_count,
+        };
+
+        // Get knowledge base stats
+        let kb_status = context
+            .app
+            .data_acquisition_service()
+            .knowledge_base_status(project_id)
+            .await
+            .map_err(|e| {
+                StructuredError::service("DataAcquisitionService::knowledge_base_status", e)
+            })?;
+
+        let kb_stats = crate::graphql::types::KnowledgeBaseStats {
+            file_count: kb_status.file_count as i32,
+            chunk_count: kb_status.chunk_count as i32,
+            last_indexed_at: kb_status.last_indexed_at,
+        };
+
+        // Get dataset stats
+        let datasets = context
+            .app
+            .list_data_sets(project_id)
+            .await
+            .map_err(|e| StructuredError::service("AppContext::list_data_sets", e))?;
+
+        let total_datasets = datasets.len() as i32;
+        let mut by_type = std::collections::HashMap::new();
+
+        for ds in datasets {
+            let type_key = ds.data_type.to_lowercase();
+            *by_type.entry(type_key).or_insert(0) += 1;
+        }
+
+        let dataset_stats = crate::graphql::types::DatasetStats {
+            total: total_datasets,
+            by_type,
+        };
+
+        Ok(crate::graphql::types::ProjectStats {
+            project_id,
+            documents: document_stats,
+            knowledge_base: kb_stats,
+            datasets: dataset_stats,
+        })
+    }
+
     /// Get a specific plan by ID
     async fn plan(&self, ctx: &Context<'_>, id: i32) -> Result<Option<Plan>> {
         let context = ctx.data::<GraphQLContext>()?;
@@ -928,9 +1011,18 @@ impl Query {
             .await
             .map_err(|e| StructuredError::service("DataAcquisitionService::list_files", e))?;
 
-        Ok(files
-            .into_iter()
-            .map(|file| crate::graphql::types::ProjectFile {
+        let mut result = Vec::new();
+        for file in files {
+            let file_id = uuid::Uuid::parse_str(&file.id.to_string())
+                .map_err(|e| StructuredError::validation("fileId", format!("Invalid UUID: {}", e)))?;
+            let indexed = context
+                .app
+                .data_acquisition_service()
+                .is_file_indexed(project_id, file_id)
+                .await
+                .unwrap_or(false);
+
+            result.push(crate::graphql::types::ProjectFile {
                 id: file.id.to_string(),
                 filename: file.filename,
                 media_type: file.media_type,
@@ -938,8 +1030,11 @@ impl Query {
                 checksum: file.checksum,
                 created_at: file.created_at,
                 tags: file.tags,
-            })
-            .collect())
+                indexed,
+            });
+        }
+
+        Ok(result)
     }
 
     /// List tags optionally filtered by scope
