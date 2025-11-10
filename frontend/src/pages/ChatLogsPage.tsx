@@ -207,9 +207,10 @@ export const ChatLogsPage = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead style={{ width: '35%' }}>Title</TableHead>
+                    <TableHead style={{ width: '30%' }}>Title</TableHead>
                     <TableHead>Provider</TableHead>
                     <TableHead>Model</TableHead>
+                    <TableHead>RAG</TableHead>
                     <TableHead>Created</TableHead>
                     <TableHead>Last Activity</TableHead>
                     <TableHead>Archived</TableHead>
@@ -218,7 +219,7 @@ export const ChatLogsPage = () => {
                 <TableBody>
                   {loading && displaySessions.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6}>
+                      <TableCell colSpan={7}>
                         <Group justify="center">
                           <Spinner size="sm" />
                           <p className="text-sm text-muted-foreground">
@@ -229,7 +230,7 @@ export const ChatLogsPage = () => {
                     </TableRow>
                   ) : displaySessions.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6}>
+                      <TableCell colSpan={7}>
                         <p className="text-sm text-muted-foreground text-center">
                           No sessions recorded yet.
                         </p>
@@ -247,6 +248,15 @@ export const ChatLogsPage = () => {
                         </TableCell>
                         <TableCell>{session.provider}</TableCell>
                         <TableCell>{session.model_name}</TableCell>
+                        <TableCell>
+                          {session.enable_rag ? (
+                            <Badge variant="secondary" title={`Top-k: ${session.rag_top_k}, Threshold: ${(session.rag_threshold * 100).toFixed(0)}%, Citations: ${session.include_citations ? 'On' : 'Off'}`}>
+                              📚 On
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline">Off</Badge>
+                          )}
+                        </TableCell>
                         <TableCell>{new Date(session.created_at).toLocaleString()}</TableCell>
                         <TableCell>{new Date(session.last_activity_at).toLocaleString()}</TableCell>
                         <TableCell>{session.is_archived ? 'Yes' : 'No'}</TableCell>

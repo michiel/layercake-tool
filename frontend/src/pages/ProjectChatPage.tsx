@@ -144,6 +144,7 @@ export const ProjectChatPage = () => {
                 <Badge variant="secondary">Model: {session.model}</Badge>
               )}
               <Badge variant="outline">Messages: {messages.length}</Badge>
+              <Badge variant="outline" title="Knowledge Base enabled">📚 RAG</Badge>
             </Group>
             <Group gap="xs">
               {loading ? (
