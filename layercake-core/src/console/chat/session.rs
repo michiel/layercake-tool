@@ -151,6 +151,7 @@ pub struct ChatSession {
     rag_top_k: usize,
     rag_threshold: f32,
     include_citations: bool,
+    last_rag_context: Option<super::RagContext>,
 }
 
 impl ChatSession {
@@ -286,6 +287,7 @@ impl ChatSession {
             rag_top_k: 5,
             rag_threshold: 0.7,
             include_citations: true,
+            last_rag_context: None,
         })
     }
 
@@ -379,6 +381,7 @@ impl ChatSession {
             rag_top_k: session.rag_top_k as usize,
             rag_threshold: session.rag_threshold as f32,
             include_citations: session.include_citations,
+            last_rag_context: None,
         })
     }
 
@@ -505,14 +508,27 @@ impl ChatSession {
                 continue;
             }
 
+            // Add citations if RAG was used and citations are enabled
+            let mut final_response = response_text.clone();
+            if self.include_citations {
+                if let Some(ref rag_context) = self.last_rag_context {
+                    if !rag_context.chunks.is_empty() {
+                        final_response.push_str("\n---\n**Sources:**\n");
+                        for citation in rag_context.get_citations() {
+                            final_response.push_str(&format!("- {}\n", citation));
+                        }
+                    }
+                }
+            }
+
             observer(ChatEvent::AssistantMessage {
-                text: response_text.clone(),
+                text: final_response.clone(),
             });
 
-            self.messages.push(ChatMessage::assistant(&response_text));
+            self.messages.push(ChatMessage::assistant(&final_response));
 
             if let Some(ref session_id) = self.session_id {
-                self.persist_message(session_id, "assistant", &response_text, None, None, None)
+                self.persist_message(session_id, "assistant", &final_response, None, None, None)
                     .await?;
             }
 
@@ -544,10 +560,17 @@ impl ChatSession {
                         prompt.push_str("\n\nUse the above context to answer questions when relevant. ");
                         prompt.push_str("If the context doesn't contain relevant information, ");
                         prompt.push_str("say so and use your general knowledge.\n\n");
+
+                        // Store RAG context for citation generation
+                        self.last_rag_context = Some(rag_context);
                     }
-                    Ok(_) => {} // No relevant context found
+                    Ok(_) => {
+                        // No relevant context found
+                        self.last_rag_context = None;
+                    }
                     Err(e) => {
                         tracing::warn!("Failed to retrieve RAG context: {}", e);
+                        self.last_rag_context = None;
                     }
                 }
             }
