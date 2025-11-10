@@ -31,6 +31,44 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Vendor chunks
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-ui': [
+            '@radix-ui/react-accordion',
+            '@radix-ui/react-avatar',
+            '@radix-ui/react-checkbox',
+            '@radix-ui/react-dialog',
+            '@radix-ui/react-dropdown-menu',
+            '@radix-ui/react-hover-card',
+            '@radix-ui/react-label',
+            '@radix-ui/react-popover',
+            '@radix-ui/react-progress',
+            '@radix-ui/react-scroll-area',
+            '@radix-ui/react-select',
+            '@radix-ui/react-separator',
+            '@radix-ui/react-slider',
+            '@radix-ui/react-slot',
+            '@radix-ui/react-switch',
+            '@radix-ui/react-tabs',
+            '@radix-ui/react-tooltip',
+          ],
+          'vendor-apollo': ['@apollo/client', 'graphql', 'graphql-ws'],
+          'vendor-reactflow': ['reactflow'],
+          'vendor-assistant': [
+            '@assistant-ui/react',
+            '@assistant-ui/react-markdown',
+          ],
+          // Layout engine - now much smaller with dagre instead of ELK
+          'layout': ['dagre'],
+          // Heavy visualization libraries (lazy loaded)
+          // These will be code-split automatically via dynamic imports
+        },
+      },
+    },
+    chunkSizeWarningLimit: 600,
   },
   define: {
     global: 'globalThis',

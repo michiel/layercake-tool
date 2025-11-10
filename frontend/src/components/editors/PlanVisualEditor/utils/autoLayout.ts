@@ -1,7 +1,5 @@
 import { Node, Edge } from 'reactflow';
-import ELK from 'elkjs/lib/elk.bundled.js';
-
-const elk = new ELK();
+import dagre from 'dagre';
 
 export interface LayoutOptions {
   direction: 'horizontal' | 'vertical';
@@ -20,7 +18,7 @@ const DEFAULT_VERTICAL_NODE_SPACING = 120;
 const DEFAULT_VERTICAL_RANK_SPACING = 200;
 
 /**
- * Auto-layout nodes and edges using ELK (Eclipse Layout Kernel)
+ * Auto-layout nodes and edges using Dagre (lighter alternative to ELK)
  * Optimized for visual clarity with generous spacing
  * Updates edge connectors based on layout direction
  */
@@ -43,72 +41,62 @@ export async function autoLayout(
   const rankSpacing = options.rankSpacing ||
     (isHorizontal ? DEFAULT_HORIZONTAL_RANK_SPACING : DEFAULT_VERTICAL_RANK_SPACING);
 
-  // Configure ELK options for clean, readable layouts
-  const elkOptions = {
-    'elk.algorithm': 'layered',
-    'elk.direction': isHorizontal ? 'RIGHT' : 'DOWN',
+  // Create a new directed graph
+  const g = new dagre.graphlib.Graph();
 
-    // Spacing configuration
-    'elk.spacing.nodeNode': String(nodeSpacing),
-    'elk.layered.spacing.nodeNodeBetweenLayers': String(rankSpacing),
-    'elk.spacing.edgeNode': String(Math.min(nodeSpacing, rankSpacing) * 0.5),
-    'elk.spacing.edgeEdge': '30',
+  // Set graph options
+  g.setGraph({
+    rankdir: isHorizontal ? 'LR' : 'TB',
+    nodesep: nodeSpacing,
+    ranksep: rankSpacing,
+    edgesep: 30,
+    marginx: 20,
+    marginy: 20,
+  });
 
-    // Layout strategy for better visual organization
-    'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
-    'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
-    'elk.layered.cycleBreaking.strategy': 'GREEDY',
+  // Default edge label config
+  g.setDefaultEdgeLabel(() => ({}));
 
-    // Edge routing for cleaner connections
-    'elk.edgeRouting': 'ORTHOGONAL',
-    'elk.layered.unnecessaryBendpoints': 'true',
-
-    // Hierarchical layout for better organization
-    'elk.hierarchyHandling': 'INCLUDE_CHILDREN',
-
-    // Padding around the layout
-    'elk.padding': '[top=20,left=20,bottom=20,right=20]',
-  };
-
-  // Build ELK graph structure
-  const graph = {
-    id: 'root',
-    layoutOptions: elkOptions,
-    children: nodes.map((node) => ({
-      id: node.id,
+  // Add nodes to the graph
+  nodes.forEach((node) => {
+    g.setNode(node.id, {
       width: nodeWidth,
       height: nodeHeight,
-    })),
-    edges: edges.map((edge) => ({
-      id: edge.id,
-      sources: [edge.source],
-      targets: [edge.target],
-    })),
-  };
+    });
+  });
+
+  // Add edges to the graph
+  edges.forEach((edge) => {
+    g.setEdge(edge.source, edge.target);
+  });
 
   try {
     // Perform layout
-    const layoutedGraph = await elk.layout(graph);
+    dagre.layout(g);
 
     // Map layouted positions back to nodes with proper handle positions
-    const layoutedNodes = layoutedGraph.children?.map((layoutedNode) => {
-      const originalNode = nodes.find((n) => n.id === layoutedNode.id);
-      if (!originalNode) return null;
+    const layoutedNodes = nodes.map((node) => {
+      const nodeWithPosition = g.node(node.id);
+
+      if (!nodeWithPosition) {
+        return node;
+      }
 
       return {
-        ...originalNode,
+        ...node,
         position: {
-          x: layoutedNode.x ?? 0,
-          y: layoutedNode.y ?? 0,
+          // Dagre gives us the center of the node, we need top-left
+          x: nodeWithPosition.x - nodeWidth / 2,
+          y: nodeWithPosition.y - nodeHeight / 2,
         },
         sourcePosition: isHorizontal ? 'right' : 'bottom',
         targetPosition: isHorizontal ? 'left' : 'top',
       } as Node;
-    }).filter((node): node is Node => node !== null) ?? [];
+    });
 
     return { nodes: layoutedNodes, edges };
   } catch (error) {
-    console.error('ELK layout failed:', error);
+    console.error('Dagre layout failed:', error);
     // Return original nodes and edges on error
     return { nodes, edges };
   }

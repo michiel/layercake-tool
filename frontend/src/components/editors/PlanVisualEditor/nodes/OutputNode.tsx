@@ -19,8 +19,7 @@ import { isNodeConfigured } from '../../../../utils/planDagValidation'
 import { EXPORT_NODE_OUTPUT, ExportNodeOutputResult } from '../../../../graphql/export'
 import { BaseNode } from './BaseNode'
 import { showErrorNotification, showSuccessNotification } from '../../../../utils/notifications'
-import { MermaidPreviewDialog } from '../../../visualization/MermaidPreviewDialog'
-import { DotPreviewDialog } from '../../../visualization/DotPreviewDialog'
+import { MermaidPreviewDialog, DotPreviewDialog } from '../../../visualization'
 
 interface OutputNodeProps extends NodeProps {
   onEdit?: (nodeId: string) => void
