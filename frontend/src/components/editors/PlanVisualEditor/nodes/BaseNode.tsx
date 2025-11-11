@@ -40,28 +40,28 @@ const getBadgeClasses = (color: string, variant: 'filled' | 'light' | 'outline')
   const colorMap: Record<string, { filled: string; light: string; outline: string }> = {
     orange: {
       filled: 'bg-orange-600 text-white border-orange-600',
-      light: 'bg-orange-100 text-orange-800 border-orange-200',
-      outline: 'text-orange-600 border-orange-600',
+      light: 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/50 dark:text-orange-300 dark:border-orange-800',
+      outline: 'text-orange-600 border-orange-600 dark:text-orange-400 dark:border-orange-500',
     },
     red: {
       filled: 'bg-red-600 text-white border-red-600',
-      light: 'bg-red-100 text-red-800 border-red-200',
-      outline: 'text-red-600 border-red-600',
+      light: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/50 dark:text-red-300 dark:border-red-800',
+      outline: 'text-red-600 border-red-600 dark:text-red-400 dark:border-red-500',
     },
     blue: {
       filled: 'bg-blue-600 text-white border-blue-600',
-      light: 'bg-blue-100 text-blue-800 border-blue-200',
-      outline: 'text-blue-600 border-blue-600',
+      light: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/50 dark:text-blue-300 dark:border-blue-800',
+      outline: 'text-blue-600 border-blue-600 dark:text-blue-400 dark:border-blue-500',
     },
     green: {
       filled: 'bg-green-600 text-white border-green-600',
-      light: 'bg-green-100 text-green-800 border-green-200',
-      outline: 'text-green-600 border-green-600',
+      light: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/50 dark:text-green-300 dark:border-green-800',
+      outline: 'text-green-600 border-green-600 dark:text-green-400 dark:border-green-500',
     },
     gray: {
       filled: 'bg-gray-600 text-white border-gray-600',
-      light: 'bg-gray-100 text-gray-800 border-gray-200',
-      outline: 'text-gray-600 border-gray-600',
+      light: 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-700/50 dark:text-gray-300 dark:border-gray-600',
+      outline: 'text-gray-600 border-gray-600 dark:text-gray-400 dark:border-gray-500',
     },
   }
   return colorMap[color]?.[variant] || colorMap.gray[variant]
@@ -225,7 +225,7 @@ export const BaseNode = memo(({
             <Button
               size="icon"
               variant="ghost"
-              className="h-7 w-7 text-blue-600 hover:text-blue-700 hover:bg-blue-100"
+              className="h-7 w-7 text-blue-600 hover:text-blue-700 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900/50"
               data-action-icon="edit-label"
               onMouseDown={(e) => {
                 e.stopPropagation()
@@ -245,7 +245,7 @@ export const BaseNode = memo(({
             <Button
               size="icon"
               variant="ghost"
-              className="h-7 w-7 text-gray-600 hover:text-gray-700 hover:bg-gray-100"
+              className="h-7 w-7 text-gray-600 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700/50"
               data-action-icon="edit"
               onMouseDown={(e) => {
                 e.stopPropagation()
@@ -264,7 +264,7 @@ export const BaseNode = memo(({
           <Button
             size="icon"
             variant="ghost"
-            className="h-7 w-7 text-red-600 hover:text-red-700 hover:bg-red-100"
+            className="h-7 w-7 text-red-600 hover:text-red-700 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/50"
             data-action-icon="delete"
             onMouseDown={(e) => {
               e.stopPropagation()
@@ -327,7 +327,7 @@ export const BaseNode = memo(({
 
       {/* Node Content */}
       <div
-        className={`${selected ? 'shadow-md' : 'shadow-sm'} bg-white rounded-lg flex flex-col relative`}
+        className={`${selected ? 'shadow-lg' : 'shadow-sm'} bg-card text-card-foreground rounded-lg flex flex-col relative`}
         style={{
           border: `2px solid ${color}`,
           minWidth: 200,
@@ -352,7 +352,7 @@ export const BaseNode = memo(({
                     alignItems: 'center',
                     justifyContent: 'center',
                     borderRadius: '50%',
-                    background: edgeDropTargetHovered ? color : '#f8f9fa',
+                    background: edgeDropTargetHovered ? color : 'hsl(var(--background))',
                     color: edgeDropTargetHovered ? '#fff' : color,
                     border: `1px solid ${color}`,
                     boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
@@ -385,7 +385,7 @@ export const BaseNode = memo(({
                     justifyContent: 'center',
                     cursor: 'pointer',
                     borderRadius: '50%',
-                    background: edgeTriggerHovered ? color : '#f8f9fa',
+                    background: edgeTriggerHovered ? color : 'hsl(var(--background))',
                     color: edgeTriggerHovered ? '#fff' : color,
                     border: `1px solid ${color}`,
                     boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
@@ -475,7 +475,7 @@ export const BaseNode = memo(({
         {/* Bottom Section 1: Labels (narrow horizontal section) */}
         {(labelBadges !== undefined ? labelBadges !== null : !isConfigured) && (
           <div
-            className="px-4 py-2 border-t border-gray-200"
+            className="px-4 py-2 border-t border-border"
             style={{
               flex: '0 0 auto',
             }}
@@ -491,7 +491,7 @@ export const BaseNode = memo(({
           <Group
             gap="sm"
             justify="between"
-            className="border-t border-gray-200 px-4 py-2"
+            className="border-t border-border px-4 py-2"
             style={{
               flex: '0 0 auto',
               pointerEvents: 'auto',
