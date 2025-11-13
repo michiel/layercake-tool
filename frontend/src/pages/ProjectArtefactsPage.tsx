@@ -91,24 +91,25 @@ const formatRenderTarget = (value?: string): string => {
 
 const getRenderOptionLabels = (config: Record<string, any>): string[] => {
   const labels: string[] = []
+  const renderConfig = config.renderConfig || {}
 
-  // Check for contain_nodes
-  if (config.contain_nodes === true) {
+  // Check for containNodes
+  if (renderConfig.containNodes === true) {
     labels.push('contain nodes')
   }
 
   // Check for theme
-  if (config.theme === 'light') {
+  if (renderConfig.theme === 'Light') {
     labels.push('light')
-  } else if (config.theme === 'dark') {
+  } else if (renderConfig.theme === 'Dark') {
     labels.push('dark')
   }
 
   // Check for orientation
-  if (config.orientation === 'LR' || config.orientation === 'lr') {
+  if (renderConfig.orientation === 'LR') {
     labels.push('lr')
-  } else if (config.orientation === 'TD' || config.orientation === 'td') {
-    labels.push('td')
+  } else if (renderConfig.orientation === 'TB') {
+    labels.push('tb')
   }
 
   return labels
@@ -402,26 +403,26 @@ const ProjectArtefactsPage: React.FC = () => {
     return (
       <div
         key={entry.node.id}
-        className="flex items-center justify-between py-4 px-4 border-b last:border-b-0"
+        className="flex items-center py-4 px-4 border-b last:border-b-0"
         style={{ paddingLeft: `${16 + entry.depth * 24}px` }}
       >
-        <Group gap="sm" className="text-sm">
+        <Group gap="sm" className="text-sm min-w-0 flex-shrink-0">
           <IconHierarchy2 className="h-4 w-4 text-muted-foreground" />
-          <div>
-            <p className="font-medium">{label}</p>
+          <div className="min-w-0">
+            <p className="font-medium truncate">{label}</p>
             <p className="text-xs text-muted-foreground">{renderTargetLabel}</p>
           </div>
         </Group>
         {renderOptionLabels.length > 0 && (
-          <Group gap="xs" className="flex-1 justify-center">
-            {renderOptionLabels.map((label) => (
-              <span key={label} className="text-xs px-2 py-1 rounded bg-muted text-muted-foreground">
-                {label}
+          <Group gap="xs" className="flex-1 justify-center px-4">
+            {renderOptionLabels.map((optionLabel) => (
+              <span key={optionLabel} className="text-xs px-2 py-1 rounded bg-muted text-muted-foreground font-medium">
+                {optionLabel}
               </span>
             ))}
           </Group>
         )}
-        <Group gap="xs">
+        <Group gap="xs" className="ml-auto flex-shrink-0">
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
