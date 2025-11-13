@@ -361,9 +361,71 @@ impl DagExecutor {
             .await?
             .ok_or_else(|| anyhow!("Data set {} not found", data_set_id))?;
 
-        // Parse the graph_json from the data_set and convert to Graph structure
-        let graph: crate::graph::Graph = serde_json::from_str(&data_set.graph_json)
-            .with_context(|| format!("Failed to parse and deserialize graph_json for data_set {}", data_set_id))?;
+        // Parse the graph_json from the data_set
+        let graph_data: JsonValue = serde_json::from_str(&data_set.graph_json)
+            .with_context(|| format!("Failed to parse graph_json for data_set {}", data_set_id))?;
+
+        // Convert to Graph structure
+        let mut graph = crate::graph::Graph {
+            name: data_set.name.clone(),
+            nodes: Vec::new(),
+            edges: Vec::new(),
+            layers: Vec::new(),
+        };
+
+        // Extract nodes
+        if let Some(nodes_array) = graph_data.get("nodes").and_then(|v| v.as_array()) {
+            for node_val in nodes_array {
+                let node = crate::graph::Node {
+                    id: node_val["id"].as_str().unwrap_or("").to_string(),
+                    label: node_val["label"].as_str().unwrap_or("").to_string(),
+                    layer: node_val["layer"].as_str().unwrap_or("").to_string(),
+                    weight: node_val["weight"].as_i64().unwrap_or(1) as i32,
+                    is_partition: node_val["is_partition"].as_bool().unwrap_or(false),
+                    belongs_to: node_val["belongs_to"].as_str().filter(|s| !s.is_empty()).map(|s| s.to_string()),
+                    comment: node_val["comment"].as_str().map(|s| s.to_string()),
+                    dataset: None,
+                };
+                graph.nodes.push(node);
+            }
+        }
+
+        // Extract edges
+        if let Some(edges_array) = graph_data.get("edges").and_then(|v| v.as_array()) {
+            for edge_val in edges_array {
+                let edge = crate::graph::Edge {
+                    id: edge_val["id"].as_str().unwrap_or("").to_string(),
+                    source: edge_val["source"].as_str().unwrap_or("").to_string(),
+                    target: edge_val["target"].as_str().unwrap_or("").to_string(),
+                    label: edge_val["label"].as_str().unwrap_or("").to_string(),
+                    layer: edge_val["layer"].as_str().unwrap_or("").to_string(),
+                    weight: edge_val["weight"].as_i64().unwrap_or(1) as i32,
+                    comment: edge_val["comment"].as_str().map(|s| s.to_string()),
+                    dataset: None,
+                };
+                graph.edges.push(edge);
+            }
+        }
+
+        // Extract layers (note: it's "graph_layers" in JSON format from data_sets)
+        // Try both "graph_layers" and "layers" for compatibility
+        let layers_array = graph_data.get("graph_layers")
+            .or_else(|| graph_data.get("layers"))
+            .and_then(|v| v.as_array());
+
+        if let Some(layers_array) = layers_array {
+            for layer_val in layers_array {
+                let layer = crate::graph::Layer {
+                    id: layer_val["id"].as_str().unwrap_or("").to_string(),
+                    label: layer_val["label"].as_str().unwrap_or("").to_string(),
+                    background_color: layer_val["background_color"].as_str().unwrap_or("#FFFFFF").to_string(),
+                    text_color: layer_val["text_color"].as_str().unwrap_or("#000000").to_string(),
+                    border_color: layer_val["border_color"].as_str().unwrap_or("#CCCCCC").to_string(),
+                    dataset: None,
+                };
+                graph.layers.push(layer);
+            }
+        }
 
         // Create or get graph record
         let metadata = Some(json!({
