@@ -292,8 +292,8 @@ const ProjectArtefactsPage: React.FC = () => {
       return (
         <div
           key={entry.node.id}
-          className="flex items-center justify-between py-2 border-b"
-          style={{ paddingLeft: `${entry.depth * 20}px` }}
+          className="flex items-center justify-between py-4 px-4 border-b last:border-b-0"
+          style={{ paddingLeft: `${16 + entry.depth * 24}px` }}
         >
           <Group gap="sm" className="text-sm">
             <IconGraph className="h-4 w-4 text-muted-foreground" />
@@ -337,8 +337,8 @@ const ProjectArtefactsPage: React.FC = () => {
     return (
       <div
         key={entry.node.id}
-        className="flex items-center justify-between py-2 border-b"
-        style={{ paddingLeft: `${entry.depth * 20}px` }}
+        className="flex items-center justify-between py-4 px-4 border-b last:border-b-0"
+        style={{ paddingLeft: `${16 + entry.depth * 24}px` }}
       >
         <Group gap="sm" className="text-sm">
           <IconHierarchy2 className="h-4 w-4 text-muted-foreground" />
@@ -462,15 +462,17 @@ const ProjectArtefactsPage: React.FC = () => {
           </div>
         )}
         {!loading && !entries.length && (
-          <Alert>
+          <Alert className="max-w-4xl">
             <AlertTitle>No graphs detected</AlertTitle>
             <AlertDescription>Create graphs in the plan to see their artefacts here.</AlertDescription>
           </Alert>
         )}
         {!!entries.length && (
-          <Stack gap="xs" className="divide-y rounded border bg-background">
-            {entries.map(renderEntry)}
-          </Stack>
+          <div className="max-w-4xl">
+            <div className="rounded-lg border bg-background shadow-sm">
+              {entries.map(renderEntry)}
+            </div>
+          </div>
         )}
       </PageContainer>
 
