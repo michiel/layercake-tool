@@ -13,16 +13,23 @@ use std::{fmt::Write as FmtWrite, sync::Arc};
 use anyhow::{anyhow, Context, Result};
 use axum_mcp::prelude::{ClientContext, SecurityContext};
 use sea_orm::{DatabaseConnection, EntityTrait};
-use serde_json::{json, Number, Value};
+use serde_json::{json, Value};
 use tokio::io::{self, AsyncBufReadExt, BufReader};
 use tracing;
 
 use rig::client::CompletionClient;
-use rig::completion::Prompt;
+use rig::completion::{
+    message::{
+        AssistantContent, Message, Reasoning, ToolCall, ToolFunction, ToolResult,
+        ToolResultContent, UserContent,
+    },
+    Completion, Usage,
+};
 use rig::providers::gemini::completion::gemini_api_types::{
     AdditionalParameters, GenerationConfig,
 };
 use rig::providers::{anthropic, gemini, ollama, openai};
+use rig::OneOrMany;
 
 #[cfg(feature = "rmcp")]
 use rmcp::{
@@ -111,10 +118,17 @@ impl ChatMessage {
     }
 }
 
-#[derive(Debug, Clone)]
-struct ParsedToolInvocation {
-    name: String,
-    arguments: Option<serde_json::Value>,
+#[derive(Clone)]
+struct RigPromptContext {
+    preamble: String,
+    prompt: Message,
+    history: Vec<Message>,
+}
+
+#[derive(Clone)]
+struct AgentResponse {
+    choice: OneOrMany<AssistantContent>,
+    usage: Usage,
 }
 
 /// Enum to hold provider-specific rig agents
@@ -218,7 +232,8 @@ impl ChatSession {
             .await
             .ok()
             .and_then(|s| s.value);
-        let embedding_config = layercake_data_acquisition::config::EmbeddingProviderConfig::from_env();
+        let embedding_config =
+            layercake_data_acquisition::config::EmbeddingProviderConfig::from_env();
         let data_acquisition = Arc::new(DataAcquisitionService::new(
             db.clone(),
             embedding_provider,
@@ -232,23 +247,7 @@ impl ChatSession {
             .ok()
             .unzip();
 
-        #[cfg(feature = "rmcp")]
-        let tool_names: Vec<String> = rmcp_tools
-            .as_ref()
-            .map(|tools| tools.iter().map(|t| t.name.clone()).collect())
-            .unwrap_or_default();
-
-        // Fallback to bridge tools if rmcp not available
-        #[cfg(not(feature = "rmcp"))]
-        let tool_names: Vec<String> = {
-            let mcp_tools = bridge
-                .list_tools(&security)
-                .await
-                .map_err(|err| anyhow!("failed to load MCP tools: {}", err))?;
-            mcp_tools.iter().map(|t| t.name.clone()).collect()
-        };
-
-        let system_prompt = compose_system_prompt(config, project_id, &tool_names);
+        let system_prompt = compose_system_prompt(config, project_id);
 
         // Get model name from config
         let provider_config = config.provider(provider);
@@ -343,7 +342,8 @@ impl ChatSession {
             .await
             .ok()
             .and_then(|s| s.value);
-        let embedding_config = layercake_data_acquisition::config::EmbeddingProviderConfig::from_env();
+        let embedding_config =
+            layercake_data_acquisition::config::EmbeddingProviderConfig::from_env();
         let data_acquisition = Arc::new(DataAcquisitionService::new(
             db.clone(),
             embedding_provider,
@@ -530,19 +530,38 @@ impl ChatSession {
             }
             turn_count += 1;
 
-            let conversation = self.build_conversation_prompt().await?;
-            let response_text = self
-                .invoke_agent_with_retries(&conversation, observer)
+            let prompt_context = self.build_prompt_context().await?;
+            let agent_response = self
+                .invoke_agent_with_retries(prompt_context, observer)
                 .await?;
 
-            if let Some(invocation) = extract_tool_invocation(&response_text) {
-                self.handle_tool_invocation(response_text, invocation, observer)
-                    .await?;
+            tracing::debug!(
+                input_tokens = agent_response.usage.input_tokens,
+                output_tokens = agent_response.usage.output_tokens,
+                total_tokens = agent_response.usage.total_tokens,
+                "Received agent response"
+            );
+
+            let choice = agent_response.choice;
+            let tool_calls = Self::collect_tool_calls(&choice);
+
+            if !tool_calls.is_empty() {
+                self.record_tool_call_response(&choice);
+                for tool_call in tool_calls {
+                    self.handle_tool_invocation(tool_call, observer).await?;
+                }
                 continue;
             }
 
-            // Add citations if RAG was used and citations are enabled
-            let mut final_response = response_text.clone();
+            let mut final_response = Self::collect_text_segments(&choice)
+                .join("\n")
+                .trim()
+                .to_string();
+
+            if final_response.is_empty() {
+                final_response = String::new();
+            }
+
             if self.include_citations {
                 if let Some(ref rag_context) = self.last_rag_context {
                     if !rag_context.chunks.is_empty() {
@@ -579,26 +598,38 @@ impl ChatSession {
         err_str.contains("/api/chat") && err_str.contains("400")
     }
 
-    async fn build_conversation_prompt(&mut self) -> Result<String> {
-        let mut prompt = String::new();
-        prompt.push_str(&self.system_prompt);
-        prompt.push_str("\n\n");
+    async fn build_prompt_context(&mut self) -> Result<RigPromptContext> {
+        let rig_messages = self.convert_messages_to_rig()?;
+        if rig_messages.is_empty() {
+            return Err(anyhow!(
+                "Conversation is empty; cannot build prompt context for agent"
+            ));
+        }
 
-        // Add RAG context if enabled and we have a user message
+        let mut history = rig_messages;
+        let prompt = history
+            .pop()
+            .ok_or_else(|| anyhow!("Missing prompt message for rig agent"))?;
+
+        let mut preamble = self.system_prompt.clone();
+
         if self.rag_enabled {
             if let Some(last_user_msg) = self.messages.iter().rev().find(|m| m.role == "user") {
                 match self.get_rag_context(&last_user_msg.content).await {
                     Ok(rag_context) if !rag_context.is_empty() => {
-                        prompt.push_str(&rag_context.to_context_string());
-                        prompt.push_str("\n\nUse the above context to answer questions when relevant. ");
-                        prompt.push_str("If the context doesn't contain relevant information, ");
-                        prompt.push_str("say so and use your general knowledge.\n\n");
+                        if !preamble.is_empty() {
+                            preamble.push_str("\n\n");
+                        }
+                        preamble.push_str(&rag_context.to_context_string());
+                        preamble.push_str(
+                            "\n\nUse the above context to answer questions when relevant. ",
+                        );
+                        preamble.push_str("If the context doesn't contain relevant information, ");
+                        preamble.push_str("say so and use your general knowledge.");
 
-                        // Store RAG context for citation generation
                         self.last_rag_context = Some(rag_context);
                     }
                     Ok(_) => {
-                        // No relevant context found
                         self.last_rag_context = None;
                     }
                     Err(e) => {
@@ -609,43 +640,134 @@ impl ChatSession {
             }
         }
 
+        Ok(RigPromptContext {
+            preamble,
+            prompt,
+            history,
+        })
+    }
+
+    fn convert_messages_to_rig(&self) -> Result<Vec<Message>> {
+        let mut rig_messages = Vec::with_capacity(self.messages.len());
+
         for msg in &self.messages {
             match msg.role.as_str() {
                 "user" => {
-                    prompt.push_str("User: ");
-                    prompt.push_str(&msg.content);
-                    prompt.push_str("\n\n");
+                    rig_messages.push(Message::from(msg.content.clone()));
                 }
                 "assistant" => {
-                    prompt.push_str("Assistant: ");
-                    prompt.push_str(&msg.content);
-                    prompt.push_str("\n\n");
+                    let mut contents = Vec::new();
+
+                    if !msg.content.trim().is_empty() {
+                        contents.push(AssistantContent::text(msg.content.clone()));
+                    }
+
+                    if let Some(tool_calls) = &msg.tool_calls {
+                        for call in tool_calls {
+                            contents.push(AssistantContent::ToolCall(ToolCall {
+                                id: call.id.clone(),
+                                call_id: None,
+                                function: ToolFunction {
+                                    name: call.name.clone(),
+                                    arguments: call.arguments.clone(),
+                                },
+                            }));
+                        }
+                    }
+
+                    if contents.is_empty() {
+                        continue;
+                    }
+
+                    let content = OneOrMany::many(contents).unwrap_or_else(|_| {
+                        OneOrMany::one(AssistantContent::text(msg.content.clone()))
+                    });
+
+                    rig_messages.push(Message::Assistant { id: None, content });
                 }
                 "tool" => {
-                    prompt.push_str("Tool: ");
                     if let Some(results) = &msg.tool_results {
-                        let joined = results
-                            .iter()
-                            .map(|result| result.output.as_str())
-                            .collect::<Vec<_>>()
-                            .join("\n");
-                        prompt.push_str(&joined);
-                    } else {
-                        prompt.push_str(&msg.content);
+                        for result in results {
+                            let content =
+                                OneOrMany::one(ToolResultContent::text(result.output.clone()));
+                            let tool_result = ToolResult {
+                                id: result.call_id.clone(),
+                                call_id: Some(result.call_id.clone()),
+                                content,
+                            };
+                            rig_messages.push(Message::User {
+                                content: OneOrMany::one(UserContent::ToolResult(tool_result)),
+                            });
+                        }
                     }
-                    prompt.push_str("\n\n");
+                }
+                other => {
+                    tracing::warn!("Skipping unsupported role '{}' in chat history", other);
+                }
+            }
+        }
+
+        Ok(rig_messages)
+    }
+
+    fn record_tool_call_response(&mut self, choice: &OneOrMany<AssistantContent>) {
+        let text = Self::collect_text_segments(choice).join("\n");
+        let tool_call_data = Self::collect_tool_call_data(choice);
+
+        let message = if tool_call_data.is_empty() {
+            ChatMessage::assistant(text)
+        } else {
+            ChatMessage::assistant(text).with_tool_calls(tool_call_data)
+        };
+
+        self.messages.push(message);
+    }
+
+    fn collect_tool_call_data(choice: &OneOrMany<AssistantContent>) -> Vec<ToolCallData> {
+        choice
+            .iter()
+            .filter_map(|content| match content {
+                AssistantContent::ToolCall(call) => Some(ToolCallData {
+                    id: call.id.clone(),
+                    name: call.function.name.clone(),
+                    arguments: call.function.arguments.clone(),
+                }),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn collect_tool_calls(choice: &OneOrMany<AssistantContent>) -> Vec<ToolCall> {
+        choice
+            .iter()
+            .filter_map(|content| {
+                if let AssistantContent::ToolCall(call) = content {
+                    Some(call.clone())
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    fn collect_text_segments(choice: &OneOrMany<AssistantContent>) -> Vec<String> {
+        let mut segments = Vec::new();
+        for content in choice.iter() {
+            match content {
+                AssistantContent::Text(text) => segments.push(text.text.clone()),
+                AssistantContent::Reasoning(Reasoning { reasoning, .. }) => {
+                    segments.extend(reasoning.clone());
                 }
                 _ => {}
             }
         }
-
-        prompt.push_str("Assistant: ");
-        Ok(prompt)
+        segments
     }
 
     async fn get_rag_context(&self, query: &str) -> Result<super::RagContext> {
         // Get embeddings service from data acquisition
-        let embeddings = self.data_acquisition
+        let embeddings = self
+            .data_acquisition
             .embeddings()
             .ok_or_else(|| anyhow!("Embeddings not configured for this project"))?;
 
@@ -659,7 +781,8 @@ impl ChatSession {
         let query_embedding = embeddings.embed_text(query).await?;
 
         // Search the knowledge base
-        let search_results = self.data_acquisition
+        let search_results = self
+            .data_acquisition
             .search_context(self.project_id, &query_embedding, self.rag_top_k)
             .await?;
 
@@ -696,7 +819,13 @@ impl ChatSession {
         Ok(rag_context)
     }
 
-    async fn call_rig_agent(&self, prompt: &str) -> Result<String> {
+    async fn call_rig_agent(&self, context: RigPromptContext) -> Result<AgentResponse> {
+        let RigPromptContext {
+            preamble,
+            prompt,
+            history,
+        } = context;
+
         // Get API key for provider
         let api_key = if let Some(key) = self.credentials.api_key(self.provider).await? {
             key
@@ -732,22 +861,34 @@ impl ChatSession {
                     openai::Client::new(&api_key)
                 };
 
-                let builder = client.agent(model);
+                let mut builder = client.agent(model);
+                if !preamble.is_empty() {
+                    builder = builder.preamble(&preamble);
+                }
 
                 #[cfg(feature = "rmcp")]
-                if let Some(ref rmcp_client) = self.rmcp_client {
-                    if !self.rmcp_tools.is_empty() {
-                        builder = builder
-                            .rmcp_tools(self.rmcp_tools.clone(), rmcp_client.peer().to_owned());
+                if self.tool_use_enabled {
+                    if let Some(ref rmcp_client) = self.rmcp_client {
+                        if !self.rmcp_tools.is_empty() {
+                            builder = builder
+                                .rmcp_tools(self.rmcp_tools.clone(), rmcp_client.peer().to_owned());
+                        }
                     }
                 }
 
                 let agent = builder.build();
-                agent
-                    .prompt(prompt)
-                    .multi_turn(MAX_TOOL_ITERATIONS)
+                let response = agent
+                    .completion(prompt.clone(), history.clone())
                     .await
-                    .context("OpenAI API call failed")
+                    .context("OpenAI completion request failed")?
+                    .send()
+                    .await
+                    .context("OpenAI API call failed")?;
+
+                Ok(AgentResponse {
+                    choice: response.choice,
+                    usage: response.usage,
+                })
             }
 
             RigAgent::Anthropic(model) => {
@@ -757,22 +898,34 @@ impl ChatSession {
                     return Err(anyhow!("Anthropic requires API key"));
                 };
 
-                let builder = client.agent(model);
+                let mut builder = client.agent(model);
+                if !preamble.is_empty() {
+                    builder = builder.preamble(&preamble);
+                }
 
                 #[cfg(feature = "rmcp")]
-                if let Some(ref rmcp_client) = self.rmcp_client {
-                    if !self.rmcp_tools.is_empty() {
-                        builder = builder
-                            .rmcp_tools(self.rmcp_tools.clone(), rmcp_client.peer().to_owned());
+                if self.tool_use_enabled {
+                    if let Some(ref rmcp_client) = self.rmcp_client {
+                        if !self.rmcp_tools.is_empty() {
+                            builder = builder
+                                .rmcp_tools(self.rmcp_tools.clone(), rmcp_client.peer().to_owned());
+                        }
                     }
                 }
 
                 let agent = builder.build();
-                agent
-                    .prompt(prompt)
-                    .multi_turn(MAX_TOOL_ITERATIONS)
+                let response = agent
+                    .completion(prompt.clone(), history.clone())
                     .await
-                    .context("Anthropic API call failed")
+                    .context("Anthropic completion request failed")?
+                    .send()
+                    .await
+                    .context("Anthropic API call failed")?;
+
+                Ok(AgentResponse {
+                    choice: response.choice,
+                    usage: response.usage,
+                })
             }
 
             RigAgent::Gemini(model) => {
@@ -786,24 +939,36 @@ impl ChatSession {
                 let gen_cfg = GenerationConfig::default();
                 let additional_params = AdditionalParameters::default().with_config(gen_cfg);
 
-                let builder = client
+                let mut builder = client
                     .agent(model)
                     .additional_params(serde_json::to_value(additional_params)?);
+                if !preamble.is_empty() {
+                    builder = builder.preamble(&preamble);
+                }
 
                 #[cfg(feature = "rmcp")]
-                if let Some(ref rmcp_client) = self.rmcp_client {
-                    if !self.rmcp_tools.is_empty() {
-                        builder = builder
-                            .rmcp_tools(self.rmcp_tools.clone(), rmcp_client.peer().to_owned());
+                if self.tool_use_enabled {
+                    if let Some(ref rmcp_client) = self.rmcp_client {
+                        if !self.rmcp_tools.is_empty() {
+                            builder = builder
+                                .rmcp_tools(self.rmcp_tools.clone(), rmcp_client.peer().to_owned());
+                        }
                     }
                 }
 
                 let agent = builder.build();
-                agent
-                    .prompt(prompt)
-                    .multi_turn(MAX_TOOL_ITERATIONS)
+                let response = agent
+                    .completion(prompt.clone(), history.clone())
                     .await
-                    .context("Gemini API call failed")
+                    .context("Gemini completion request failed")?
+                    .send()
+                    .await
+                    .context("Gemini API call failed")?;
+
+                Ok(AgentResponse {
+                    choice: response.choice,
+                    usage: response.usage,
+                })
             }
 
             RigAgent::Ollama(model) => {
@@ -816,36 +981,48 @@ impl ChatSession {
                     ollama::Client::new()
                 };
 
-                let builder = client.agent(model);
+                let mut builder = client.agent(model);
+                if !preamble.is_empty() {
+                    builder = builder.preamble(&preamble);
+                }
 
                 #[cfg(feature = "rmcp")]
-                if let Some(ref rmcp_client) = self.rmcp_client {
-                    if !self.rmcp_tools.is_empty() {
-                        builder = builder
-                            .rmcp_tools(self.rmcp_tools.clone(), rmcp_client.peer().to_owned());
+                if self.tool_use_enabled {
+                    if let Some(ref rmcp_client) = self.rmcp_client {
+                        if !self.rmcp_tools.is_empty() {
+                            builder = builder
+                                .rmcp_tools(self.rmcp_tools.clone(), rmcp_client.peer().to_owned());
+                        }
                     }
                 }
 
                 let agent = builder.build();
-                agent
-                    .prompt(prompt)
-                    .multi_turn(MAX_TOOL_ITERATIONS)
+                let response = agent
+                    .completion(prompt, history)
                     .await
-                    .context("Ollama API call failed")
+                    .context("Ollama completion request failed")?
+                    .send()
+                    .await
+                    .context("Ollama API call failed")?;
+
+                Ok(AgentResponse {
+                    choice: response.choice,
+                    usage: response.usage,
+                })
             }
         }
     }
 
     async fn invoke_agent_with_retries<F>(
         &mut self,
-        prompt: &str,
+        context: RigPromptContext,
         observer: &mut F,
-    ) -> Result<String>
+    ) -> Result<AgentResponse>
     where
         F: FnMut(ChatEvent),
     {
-        match self.call_rig_agent(prompt).await {
-            Ok(text) => Ok(text),
+        match self.call_rig_agent(context).await {
+            Ok(response) => Ok(response),
             Err(err) if self.should_disable_tools(&err) => {
                 self.tool_use_enabled = false;
 
@@ -868,8 +1045,8 @@ impl ChatSession {
 
                 tracing::warn!("Disabling tool usage for session: {}", err);
 
-                let updated_prompt = self.build_conversation_prompt().await?;
-                self.call_rig_agent(&updated_prompt).await
+                let updated_context = self.build_prompt_context().await?;
+                self.call_rig_agent(updated_context).await
             }
             Err(err) => Err(err),
         }
@@ -877,34 +1054,28 @@ impl ChatSession {
 
     async fn handle_tool_invocation<F>(
         &mut self,
-        raw_response: String,
-        invocation: ParsedToolInvocation,
+        tool_call: ToolCall,
         observer: &mut F,
     ) -> Result<()>
     where
         F: FnMut(ChatEvent),
     {
-        let call_id = format!("tool_call_{}", self.messages.len());
-        let arguments_for_record = invocation
-            .arguments
+        let call_id = tool_call
+            .call_id
             .clone()
-            .unwrap_or(Value::Object(serde_json::Map::new()));
-
-        let tool_call = ToolCallData {
-            id: call_id.clone(),
-            name: invocation.name.clone(),
-            arguments: arguments_for_record.clone(),
+            .unwrap_or_else(|| tool_call.id.clone());
+        let function_name = tool_call.function.name.clone();
+        let execution_args = if tool_call.function.arguments.is_null() {
+            None
+        } else {
+            Some(tool_call.function.arguments.clone())
         };
 
-        self.messages
-            .push(ChatMessage::assistant(&raw_response).with_tool_calls(vec![tool_call]));
-
-        let execution_args = invocation.arguments.clone();
         let result = self
             .bridge
-            .execute_tool(&invocation.name, &self.security, execution_args.clone())
+            .execute_tool(&function_name, &self.security, execution_args.clone())
             .await
-            .with_context(|| format!("failed to execute MCP tool {}", invocation.name))?;
+            .with_context(|| format!("failed to execute MCP tool {}", function_name))?;
 
         let summary = McpBridge::summarize_tool_result(&result);
         let result_metadata = McpBridge::serialize_tool_result(&result);
@@ -926,7 +1097,7 @@ impl ChatSession {
                 session_id,
                 "tool",
                 &summary,
-                Some(invocation.name.clone()),
+                Some(function_name.clone()),
                 Some(call_id.clone()),
                 Some(metadata_payload),
             )
@@ -934,7 +1105,7 @@ impl ChatSession {
         }
 
         observer(ChatEvent::ToolInvocation {
-            name: invocation.name,
+            name: function_name,
             summary,
         });
 
@@ -973,130 +1144,15 @@ impl ChatSession {
     }
 }
 
-fn extract_tool_invocation(text: &str) -> Option<ParsedToolInvocation> {
-    const TOOL_CODE_PREFIX: &str = "```tool_code";
-    let start = text.find(TOOL_CODE_PREFIX)?;
-    let after_prefix = &text[start + TOOL_CODE_PREFIX.len()..];
-    let after_prefix = after_prefix.trim_start_matches(['\n', '\r', ' ']);
-    let end = after_prefix.find("```")?;
-    let block = after_prefix[..end].trim();
-
-    let command_line = block.lines().map(str::trim).find(|line| !line.is_empty())?;
-
-    parse_tool_command(command_line)
-}
-
-fn parse_tool_command(command: &str) -> Option<ParsedToolInvocation> {
-    let open_paren = command.find('(')?;
-    let close_paren = command.rfind(')')?;
-    if close_paren <= open_paren {
-        return None;
-    }
-
-    let mut name = command[..open_paren].trim();
-    if let Some(eq_pos) = name.rfind('=') {
-        name = name[eq_pos + 1..].trim();
-    }
-    if name.starts_with("let ") {
-        name = name.trim_start_matches("let ").trim();
-    }
-    if name.is_empty() {
-        return None;
-    }
-
-    let args_str = command[open_paren + 1..close_paren].trim();
-    let arguments = if args_str.is_empty() {
-        None
-    } else if args_str.starts_with('{') {
-        serde_json::from_str(args_str).ok()
-    } else {
-        parse_key_value_arguments(args_str)
-    };
-
-    Some(ParsedToolInvocation {
-        name: name.to_string(),
-        arguments,
-    })
-}
-
-fn parse_key_value_arguments(args_str: &str) -> Option<serde_json::Value> {
-    let mut map = serde_json::Map::new();
-    for part in args_str.split(',') {
-        let part = part.trim();
-        if part.is_empty() {
-            continue;
-        }
-        let (key, value_raw) = part.split_once('=')?;
-        let key = key.trim();
-        if key.is_empty() {
-            continue;
-        }
-
-        let value = parse_argument_value(value_raw.trim());
-        map.insert(key.to_string(), value);
-    }
-
-    Some(Value::Object(map))
-}
-
-fn parse_argument_value(raw: &str) -> Value {
-    let trimmed = raw.trim();
-    if trimmed.is_empty() {
-        return Value::Null;
-    }
-
-    if trimmed.starts_with('"') && trimmed.ends_with('"') && trimmed.len() >= 2 {
-        return Value::String(trimmed[1..trimmed.len() - 1].to_string());
-    }
-
-    if trimmed.starts_with('\'') && trimmed.ends_with('\'') && trimmed.len() >= 2 {
-        return Value::String(trimmed[1..trimmed.len() - 1].to_string());
-    }
-
-    match trimmed.to_ascii_lowercase().as_str() {
-        "true" => return Value::Bool(true),
-        "false" => return Value::Bool(false),
-        "null" => return Value::Null,
-        _ => {}
-    }
-
-    if (trimmed.starts_with('{') && trimmed.ends_with('}'))
-        || (trimmed.starts_with('[') && trimmed.ends_with(']'))
-    {
-        if let Ok(value) = serde_json::from_str(trimmed) {
-            return value;
-        }
-    }
-
-    if let Ok(int_value) = trimmed.parse::<i64>() {
-        return Value::Number(int_value.into());
-    }
-
-    if let Ok(float_value) = trimmed.parse::<f64>() {
-        if let Some(number) = Number::from_f64(float_value) {
-            return Value::Number(number);
-        }
-    }
-
-    Value::String(trimmed.to_string())
-}
-
-fn compose_system_prompt(config: &ChatConfig, project_id: i32, tool_names: &[String]) -> String {
+fn compose_system_prompt(config: &ChatConfig, project_id: i32) -> String {
     let mut prompt = String::new();
     if let Some(ref sys_prompt) = config.system_prompt {
         prompt.push_str(sys_prompt);
+        prompt.push_str("\n\n");
     }
 
-    if !tool_names.is_empty() {
-        prompt.push_str("\n\nYou have access to the following tools:\n");
-        for name in tool_names {
-            // Writing to String cannot fail
-            writeln!(&mut prompt, "- {}", name).expect("Writing to String should not fail");
-        }
-        prompt.push_str("\nUse these tools when appropriate to help answer questions.");
-    }
-
-    prompt.push_str(&format!("\n\nCurrent project ID: {}", project_id));
+    writeln!(&mut prompt, "Current project ID: {}", project_id)
+        .expect("Writing to String should not fail");
     prompt
 }
 
@@ -1114,31 +1170,9 @@ mod tests {
             mcp_server_url: "http://localhost:3000/mcp".to_string(),
         };
 
-        let prompt = compose_system_prompt(&config, 42, &[]);
+        let prompt = compose_system_prompt(&config, 42);
 
         assert!(prompt.contains("You are a helpful assistant."));
-        assert!(prompt.contains("Current project ID: 42"));
-        assert!(!prompt.contains("You have access to the following tools"));
-    }
-
-    #[test]
-    fn test_compose_system_prompt_with_tools() {
-        let config = ChatConfig {
-            default_provider: ChatProvider::Ollama,
-            request_timeout: std::time::Duration::from_secs(60),
-            system_prompt: Some("You are a helpful assistant.".to_string()),
-            providers: std::collections::HashMap::new(),
-            mcp_server_url: "http://localhost:3000/mcp".to_string(),
-        };
-
-        let tools = vec!["search".to_string(), "calculate".to_string()];
-        let prompt = compose_system_prompt(&config, 42, &tools);
-
-        assert!(prompt.contains("You are a helpful assistant."));
-        assert!(prompt.contains("You have access to the following tools:"));
-        assert!(prompt.contains("- search"));
-        assert!(prompt.contains("- calculate"));
-        assert!(prompt.contains("Use these tools when appropriate"));
         assert!(prompt.contains("Current project ID: 42"));
     }
 
@@ -1152,7 +1186,7 @@ mod tests {
             mcp_server_url: "http://localhost:3000/mcp".to_string(),
         };
 
-        let prompt = compose_system_prompt(&config, 42, &[]);
+        let prompt = compose_system_prompt(&config, 42);
 
         assert!(prompt.contains("Current project ID: 42"));
         assert!(!prompt.contains("You are a helpful assistant"));
