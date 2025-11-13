@@ -1,19 +1,21 @@
-treemap
-  root(({{graph_name}}))
+%%{init: {'theme':'base', 'themeVariables': { 'treemapLayout':'binary', 'treemapNodeBorderWidth':'1px'}}}%%
+treemap-beta
 {{#*inline "render_node"}}
-{{mindmap_indent depth}}  {{label}}{{#if (is_empty children)}} : {{treemap_value weight}}{{/if}}
-{{#unless (is_empty children)}}
+{{#if (is_empty children)}}
+{{mindmap_indent depth}}"{{label}}": {{treemap_value weight}}
+{{else}}
+{{mindmap_indent depth}}"{{label}}"
 {{#each children}}
 {{> render_node}}
 {{/each}}
-{{/unless}}
+{{/if}}
 {{/inline}}
 {{#if (is_empty hierarchy_tree_edges)}}
-  {{#each hierarchy_tree}}
+{{#each hierarchy_tree}}
 {{> render_node}}
-  {{/each}}
+{{/each}}
 {{else}}
-  {{#each hierarchy_tree_edges}}
+{{#each hierarchy_tree_edges}}
 {{> render_node}}
-  {{/each}}
+{{/each}}
 {{/if}}

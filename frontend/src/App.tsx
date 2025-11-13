@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { Routes, Route, useNavigate, useParams, useLocation } from 'react-router-dom'
-import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconDownload, IconChevronLeft, IconChevronRight, IconFolderPlus, IconNetwork, IconBooks, IconMessageDots, IconAdjustments, IconShare, IconUpload } from '@tabler/icons-react'
+import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconDownload, IconChevronLeft, IconChevronRight, IconFolderPlus, IconNetwork, IconBooks, IconMessageDots, IconAdjustments, IconShare, IconUpload, IconHierarchy2 } from '@tabler/icons-react'
 import { useQuery, useMutation } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import { Breadcrumbs } from './components/common/Breadcrumbs'
@@ -19,6 +19,7 @@ import { SourceManagementPage } from './pages/SourceManagementPage'
 import { KnowledgeBasePage } from './pages/KnowledgeBasePage'
 import { DatasetCreationPage } from './pages/DatasetCreationPage'
 import { ProjectSharingPage } from './pages/ProjectSharingPage'
+import { ProjectArtefactsPage } from './pages/ProjectArtefactsPage'
 import { getOrCreateSessionId } from './utils/session'
 import { Group, Stack } from './components/layout-primitives'
 import { Button } from './components/ui/button'
@@ -278,6 +279,13 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
         route: graphCreationChildren[0].route,
         isActive: () => graphCreationChildren.some((child) => child.isActive()),
         children: graphCreationChildren,
+      },
+      {
+        key: 'artefacts',
+        label: 'Artefacts',
+        icon: <IconHierarchy2 className="h-4 w-4" />,
+        route: `/projects/${projectId}/artefacts`,
+        isActive: makeRouteMatcher(`/projects/${projectId}/artefacts`),
       },
       {
         key: 'sharing',
@@ -1703,6 +1711,11 @@ function App() {
           <Route path="/projects/:projectId/graphs" element={
             <ErrorBoundary>
               <GraphsPage />
+            </ErrorBoundary>
+          } />
+          <Route path="/projects/:projectId/artefacts" element={
+            <ErrorBoundary>
+              <ProjectArtefactsPage />
             </ErrorBoundary>
           } />
           <Route path="/projects/:projectId/chat" element={
