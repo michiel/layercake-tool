@@ -276,7 +276,7 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
         <Breadcrumbs
           projectName={selectedProject.name}
           projectId={selectedProject.id}
-          sections={[{ title: 'Graph creation', href: `/projects/${selectedProject.id}/plan` }]}
+          sections={[{ title: 'Workbench', href: `/projects/${selectedProject.id}/plan` }]}
           currentPage="Graphs"
           onNavigate={handleNavigate}
         />

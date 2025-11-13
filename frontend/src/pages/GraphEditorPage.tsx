@@ -934,7 +934,7 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
               projectName={selectedProject.name}
               projectId={selectedProject.id}
               sections={[
-                { title: 'Graph creation', href: `/projects/${projectId}/plan` },
+                { title: 'Workbench', href: `/projects/${projectId}/plan` },
                 { title: 'Graphs', href: `/projects/${projectId}/graphs` },
               ]}
               currentPage={graph.name}

@@ -289,7 +289,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
       },
       {
         key: 'graph-creation',
-        label: 'Graph creation',
+        label: 'Workbench',
         icon: <IconGraph className="h-4 w-4" />,
         route: graphCreationChildren[0].route,
         isActive: () => graphCreationChildren.some((child) => child.isActive()),
@@ -1475,7 +1475,7 @@ const ProjectDetailPage = () => {
         <section>
           <Group justify="between" className="mb-4">
             <div>
-              <h2 className="text-2xl font-bold">Graph Creation</h2>
+              <h2 className="text-2xl font-bold">Workbench</h2>
               <p className="text-muted-foreground">
                 Design, inspect, and export the Plan DAG along with all derived graphs.
               </p>
@@ -1668,7 +1668,7 @@ const PlanEditorPage = () => {
         <Breadcrumbs
           projectName={selectedProject.name}
           projectId={selectedProject.id}
-          sections={[{ title: 'Graph creation', href: `/projects/${selectedProject.id}/plan` }]}
+          sections={[{ title: 'Workbench', href: `/projects/${selectedProject.id}/plan` }]}
           currentPage="Plan"
           onNavigate={handleNavigate}
         />
