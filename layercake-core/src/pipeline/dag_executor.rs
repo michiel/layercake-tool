@@ -180,7 +180,7 @@ impl DagExecutor {
             .ok_or_else(|| anyhow!("Upstream node {} not found", upstream_node_id))?;
 
         match upstream_node.node_type.as_str() {
-            "GraphNode" | "MergeNode" | "TransformNode" => {}
+            "GraphNode" | "MergeNode" | "TransformNode" | "DataSetNode" => {}
             other => {
                 return Err(anyhow!(
                     "TransformNode {} cannot consume from node type {} (node {})",
@@ -266,7 +266,7 @@ impl DagExecutor {
             .ok_or_else(|| anyhow!("Upstream node {} not found", upstream_node_id))?;
 
         match upstream_node.node_type.as_str() {
-            "GraphNode" | "MergeNode" | "TransformNode" | "FilterNode" => {}
+            "GraphNode" | "MergeNode" | "TransformNode" | "FilterNode" | "DataSetNode" => {}
             other => {
                 return Err(anyhow!(
                     "FilterNode {} cannot consume from node type {} (node {})",
