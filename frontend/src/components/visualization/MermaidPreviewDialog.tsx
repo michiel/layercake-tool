@@ -7,6 +7,9 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
+// Flag to track if experimental diagrams have been loaded
+let experimentalDiagramsLoaded = false
+
 type MermaidPreviewDialogProps = {
   open: boolean
   onClose: () => void
@@ -38,11 +41,25 @@ export const MermaidPreviewDialog = ({ open, onClose, diagram, title }: MermaidP
 
     const renderDiagram = async () => {
       try {
+        // Initialize mermaid with configuration
         mermaid.initialize({
           startOnLoad: false,
           securityLevel: 'loose',
           theme: theme
         })
+
+        // Ensure experimental diagrams are loaded (for treemap-beta, mindmap, etc.)
+        if (!experimentalDiagramsLoaded) {
+          try {
+            // Force mermaid to load all diagram types including experimental ones
+            await mermaid.parse(diagram)
+            experimentalDiagramsLoaded = true
+          } catch (parseErr) {
+            // If parse fails, try to continue with render anyway
+            console.warn('Mermaid parse warning:', parseErr)
+          }
+        }
+
         const { svg } = await mermaid.render(`mermaid-${renderId}`, diagram)
         if (!cancelled) {
           setRenderedSvg(svg)

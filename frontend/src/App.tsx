@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { Routes, Route, useNavigate, useParams, useLocation } from 'react-router-dom'
-import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconDownload, IconChevronLeft, IconChevronRight, IconFolderPlus, IconNetwork, IconBooks, IconMessageDots, IconAdjustments, IconShare, IconUpload, IconHierarchy2 } from '@tabler/icons-react'
+import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconDownload, IconChevronLeft, IconChevronRight, IconFolderPlus, IconNetwork, IconBooks, IconMessageDots, IconAdjustments, IconShare, IconUpload, IconHierarchy2, IconChevronDown } from '@tabler/icons-react'
 import { useQuery, useMutation } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import { Breadcrumbs } from './components/common/Breadcrumbs'
@@ -150,6 +150,22 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
 
   // Navigation collapse state
   const [navCollapsed, setNavCollapsed] = useState(false);
+
+  // Track which navigation sections are collapsed
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+
+  // Toggle section collapse state
+  const toggleSectionCollapse = (sectionKey: string) => {
+    setCollapsedSections(prev => {
+      const next = new Set(prev)
+      if (next.has(sectionKey)) {
+        next.delete(sectionKey)
+      } else {
+        next.add(sectionKey)
+      }
+      return next
+    })
+  }
 
   // Get current route info for navigation highlighting
   const isActiveRoute = (path: string) => {
@@ -305,6 +321,21 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
     ]
   }, [projectId, location.pathname])
 
+  // Initialize collapsed sections - collapse all sections by default unless they have an active child
+  React.useEffect(() => {
+    const sectionsWithChildren = projectNavSections.filter(s => s.children && s.children.length > 0)
+    const newCollapsed = new Set<string>()
+
+    sectionsWithChildren.forEach(section => {
+      const hasActiveChild = section.children!.some(child => child.isActive())
+      if (!hasActiveChild) {
+        newCollapsed.add(section.key)
+      }
+    })
+
+    setCollapsedSections(newCollapsed)
+  }, [projectId]) // Only re-run when project changes, not on every route change
+
   return (
     <div className="flex h-screen flex-col overflow-hidden">
       {/* Top Bar */}
@@ -418,24 +449,50 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                     <Stack gap="xs">
                       {projectNavSections.map((section) => {
                         const sectionActive = section.isActive()
+                        const hasChildren = section.children && section.children.length > 0
+                        const hasActiveChild = hasChildren && section.children!.some(child => child.isActive())
+                        const isExpanded = hasActiveChild || !collapsedSections.has(section.key)
+
                         return (
                           <div key={section.key}>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <Button
-                                  variant={sectionActive ? 'default' : 'ghost'}
-                                  className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start'}
-                                  onClick={() => navigate(section.route)}
-                                >
-                                  {section.icon}
-                                  {!navCollapsed && <span className="ml-2">{section.label}</span>}
-                                </Button>
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    variant={sectionActive ? 'default' : 'ghost'}
+                                    className={cn(
+                                      navCollapsed ? 'justify-center px-2' : 'justify-start',
+                                      hasChildren && !navCollapsed ? 'flex-1' : 'w-full'
+                                    )}
+                                    onClick={() => navigate(section.route)}
+                                  >
+                                    {section.icon}
+                                    {!navCollapsed && <span className="ml-2">{section.label}</span>}
+                                  </Button>
+                                  {!navCollapsed && hasChildren && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-9 w-9 shrink-0"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        toggleSectionCollapse(section.key)
+                                      }}
+                                    >
+                                      {isExpanded ? (
+                                        <IconChevronDown className="h-4 w-4" />
+                                      ) : (
+                                        <IconChevronRight className="h-4 w-4" />
+                                      )}
+                                    </Button>
+                                  )}
+                                </div>
                               </TooltipTrigger>
                               <TooltipContent side="right">{section.label}</TooltipContent>
                             </Tooltip>
-                            {!navCollapsed && section.children && section.children.length > 0 && (
+                            {!navCollapsed && hasChildren && isExpanded && (
                               <Stack gap="xs" className="pl-6 mt-1">
-                                {section.children.map((child) => {
+                                {section.children!.map((child) => {
                                   const childActive = child.isActive()
                                   return (
                                     <Button
