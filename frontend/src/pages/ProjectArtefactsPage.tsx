@@ -545,6 +545,17 @@ const ProjectArtefactsPage: React.FC = () => {
         {!!entries.length && (
           <div className="max-w-4xl mx-auto">
             <div className="rounded-lg border bg-background shadow-sm">
+              <div className="flex items-center py-3 px-4 border-b bg-muted/50 font-medium text-sm">
+                <div className="flex-shrink-0 min-w-0" style={{ width: '40%' }}>
+                  Name
+                </div>
+                <div className="flex-1 text-center">
+                  Options
+                </div>
+                <div className="flex-shrink-0 text-right" style={{ width: '180px' }}>
+                  Actions
+                </div>
+              </div>
               {entries.map((entry, index) => renderEntry(entry, index))}
             </div>
           </div>
