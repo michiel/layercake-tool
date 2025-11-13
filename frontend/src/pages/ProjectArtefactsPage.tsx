@@ -10,6 +10,8 @@ import {
   IconChartDots,
   IconNetwork,
   IconAlertCircle,
+  IconChevronDown,
+  IconChevronRight,
 } from '@tabler/icons-react'
 import { gql } from '@apollo/client'
 import { GET_PLAN_DAG } from '../graphql/plan-dag'
@@ -67,7 +69,7 @@ type PlanDagResponse = {
 
 type ArtefactEntry =
   | { type: 'graph'; node: PlanDagNode; depth: number }
-  | { type: 'artefact'; node: PlanDagNode; depth: number; config: Record<string, any> }
+  | { type: 'artefact'; node: PlanDagNode; depth: number; config: Record<string, any>; parentGraphId: string }
 
 const parseConfig = (config?: string | null): Record<string, any> => {
   if (!config) return {}
@@ -85,6 +87,31 @@ const formatRenderTarget = (value?: string): string => {
     .replace(/([A-Z])/g, ' $1')
     .replace(/^./, (c) => c.toUpperCase())
     .trim()
+}
+
+const getRenderOptionLabels = (config: Record<string, any>): string[] => {
+  const labels: string[] = []
+
+  // Check for contain_nodes
+  if (config.contain_nodes === true) {
+    labels.push('contain nodes')
+  }
+
+  // Check for theme
+  if (config.theme === 'light') {
+    labels.push('light')
+  } else if (config.theme === 'dark') {
+    labels.push('dark')
+  }
+
+  // Check for orientation
+  if (config.orientation === 'LR' || config.orientation === 'lr') {
+    labels.push('lr')
+  } else if (config.orientation === 'TD' || config.orientation === 'td') {
+    labels.push('td')
+  }
+
+  return labels
 }
 
 const ProjectArtefactsPage: React.FC = () => {
@@ -123,6 +150,19 @@ const ProjectArtefactsPage: React.FC = () => {
     null,
   )
   const [downloadingNodeId, setDownloadingNodeId] = useState<string | null>(null)
+  const [collapsedGraphs, setCollapsedGraphs] = useState<Set<string>>(new Set())
+
+  const toggleGraphCollapse = (graphId: string) => {
+    setCollapsedGraphs((prev) => {
+      const next = new Set(prev)
+      if (next.has(graphId)) {
+        next.delete(graphId)
+      } else {
+        next.add(graphId)
+      }
+      return next
+    })
+  }
 
   const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
     onCompleted: (response: any) => {
@@ -243,6 +283,7 @@ const ProjectArtefactsPage: React.FC = () => {
           node: child,
           depth: depth + 1,
           config: parseConfig(child.config),
+          parentGraphId: nodeId,
         })
       })
     }
@@ -285,17 +326,34 @@ const ProjectArtefactsPage: React.FC = () => {
     navigate(route)
   }
 
-  const renderEntry = (entry: ArtefactEntry) => {
+  const renderEntry = (entry: ArtefactEntry, index: number) => {
     if (entry.type === 'graph') {
       const label = entry.node.metadata?.label || entry.node.id
       const graphId = entry.node.graphExecution?.graphId ?? null
+      const isCollapsed = collapsedGraphs.has(entry.node.id)
+      const hasChildren = index < entries.length - 1 && entries[index + 1].type === 'artefact'
+
       return (
         <div
           key={entry.node.id}
-          className="flex items-center justify-between py-4 px-4 border-b last:border-b-0"
+          className="flex items-center justify-between py-4 px-4 border-b last:border-b-0 bg-muted/30"
           style={{ paddingLeft: `${16 + entry.depth * 24}px` }}
         >
           <Group gap="sm" className="text-sm">
+            {hasChildren && (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6 -ml-2"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  toggleGraphCollapse(entry.node.id)
+                }}
+              >
+                {isCollapsed ? <IconChevronRight size={16} /> : <IconChevronDown size={16} />}
+              </Button>
+            )}
+            {!hasChildren && <div className="w-6" />}
             <IconGraph className="h-4 w-4 text-muted-foreground" />
             <div>
               <p className="font-medium">{label}</p>
@@ -322,6 +380,11 @@ const ProjectArtefactsPage: React.FC = () => {
       )
     }
 
+    // Check if parent graph is collapsed
+    if (collapsedGraphs.has(entry.parentGraphId)) {
+      return null
+    }
+
     const label = entry.node.metadata?.label || entry.node.id
     const renderTarget = entry.config?.renderTarget
     const renderTargetLabel = formatRenderTarget(renderTarget)
@@ -329,6 +392,7 @@ const ProjectArtefactsPage: React.FC = () => {
     const isMermaidTreemap = normalizedTarget === 'mermaidtreemap'
     const supportsMermaidPreview = normalizedTarget.includes('mermaid') && !isMermaidTreemap
     const supportsDotPreview = renderTarget === 'DOT'
+    const renderOptionLabels = getRenderOptionLabels(entry.config)
 
     const isPreviewLoading = previewLoading?.nodeId === entry.node.id
     const isMermaidLoading = isPreviewLoading && previewLoading?.kind === 'mermaid'
@@ -348,6 +412,15 @@ const ProjectArtefactsPage: React.FC = () => {
             <p className="text-xs text-muted-foreground">{renderTargetLabel}</p>
           </div>
         </Group>
+        {renderOptionLabels.length > 0 && (
+          <Group gap="xs" className="flex-1 justify-center">
+            {renderOptionLabels.map((label) => (
+              <span key={label} className="text-xs px-2 py-1 rounded bg-muted text-muted-foreground">
+                {label}
+              </span>
+            ))}
+          </Group>
+        )}
         <Group gap="xs">
           <TooltipProvider>
             <Tooltip>
@@ -471,7 +544,7 @@ const ProjectArtefactsPage: React.FC = () => {
         {!!entries.length && (
           <div className="max-w-4xl">
             <div className="rounded-lg border bg-background shadow-sm">
-              {entries.map(renderEntry)}
+              {entries.map((entry, index) => renderEntry(entry, index))}
             </div>
           </div>
         )}
