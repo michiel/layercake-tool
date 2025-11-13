@@ -502,6 +502,87 @@ impl Graph {
         self.edges = edge_map.values().cloned().collect();
     }
 
+    /// Convert the implicit `belongs_to` hierarchy into explicit edges and
+    /// attach every node to a newly-created hierarchy root node.
+    pub fn generate_hierarchy(&mut self) {
+        if self.nodes.is_empty() {
+            return;
+        }
+
+        let snapshot = self.nodes.clone();
+        let snapshot_map: HashMap<String, Node> = snapshot
+            .iter()
+            .map(|node| (node.id.clone(), node.clone()))
+            .collect();
+
+        let mut existing_ids: HashSet<String> =
+            snapshot.iter().map(|node| node.id.clone()).collect();
+        let hierarchy_node_id = if !existing_ids.contains("hierarchy") {
+            "hierarchy".to_string()
+        } else {
+            let mut counter = 1usize;
+            loop {
+                let candidate = format!("hierarchy_{}", counter);
+                if !existing_ids.contains(&candidate) {
+                    break candidate;
+                }
+                counter += 1;
+            }
+        };
+
+        let hierarchy_layer_id = "hierarchy".to_string();
+        if !self.layer_exists(&hierarchy_layer_id) {
+            self.add_layer(Layer::new(
+                &hierarchy_layer_id,
+                "Hierarchy",
+                "1f2933",
+                "f8fafc",
+                "94a3b8",
+            ));
+        }
+
+        self.edges.clear();
+        let mut edge_counter = 0usize;
+
+        for node in &snapshot {
+            if let Some(parent_id) = node.belongs_to.as_ref().filter(|parent| !parent.is_empty()) {
+                if let Some(parent_node) = snapshot_map.get(parent_id) {
+                    edge_counter += 1;
+                    let edge_id = format!("hierarchy_edge_{}_{}", edge_counter, node.id);
+                    let edge_layer = parent_node.layer.clone();
+                    self.edges.push(Edge {
+                        id: edge_id,
+                        source: parent_id.clone(),
+                        target: node.id.clone(),
+                        label: String::new(),
+                        layer: edge_layer,
+                        weight: 1,
+                        comment: None,
+                        dataset: None,
+                    });
+                }
+            }
+        }
+
+        let hierarchy_node = Node {
+            id: hierarchy_node_id.clone(),
+            label: "Hierarchy".to_string(),
+            layer: hierarchy_layer_id,
+            is_partition: true,
+            belongs_to: Some(String::new()),
+            weight: 0,
+            comment: None,
+            dataset: None,
+        };
+
+        // Update existing nodes to belong to the new hierarchy node
+        for node in self.nodes.iter_mut() {
+            node.belongs_to = Some(hierarchy_node_id.clone());
+        }
+
+        self.nodes.push(hierarchy_node);
+    }
+
     /// Remove nodes that have no edges connected to them (no incoming or outgoing edges)
     pub fn remove_unconnected_nodes(&mut self) {
         use std::collections::HashSet;

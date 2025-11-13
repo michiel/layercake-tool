@@ -153,7 +153,7 @@ impl GraphTransform {
                 *graph = graph.invert_graph().map_err(|e| anyhow!(e))?;
             }
             GraphTransformKind::GenerateHierarchy => {
-                // Placeholder – hierarchy generation handled during export using GraphConfig
+                graph.generate_hierarchy();
             }
             GraphTransformKind::AggregateEdges => {
                 // Handled above
@@ -387,6 +387,7 @@ impl TransformNodeConfig {
 mod tests {
     use super::*;
     use crate::graph::{Edge, Layer, Node};
+    use std::collections::HashSet;
 
     fn sample_graph() -> Graph {
         Graph {
@@ -510,5 +511,107 @@ mod tests {
         let mut graph = sample_graph();
         let config = TransformNodeConfig { transforms: vec![] };
         assert!(config.apply_transforms(&mut graph).is_err());
+    }
+
+    #[test]
+    fn generate_hierarchy_creates_root_and_edges() {
+        let mut graph = Graph {
+            name: "HierarchyGraph".to_string(),
+            nodes: vec![
+                Node {
+                    id: "root".to_string(),
+                    label: "Root".to_string(),
+                    layer: "layer1".to_string(),
+                    is_partition: true,
+                    belongs_to: None,
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+                Node {
+                    id: "child".to_string(),
+                    label: "Child".to_string(),
+                    layer: "layer1".to_string(),
+                    is_partition: false,
+                    belongs_to: Some("root".to_string()),
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+                Node {
+                    id: "leaf".to_string(),
+                    label: "Leaf".to_string(),
+                    layer: "layer1".to_string(),
+                    is_partition: false,
+                    belongs_to: Some("child".to_string()),
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+            ],
+            edges: vec![
+                Edge {
+                    id: "old1".to_string(),
+                    source: "root".to_string(),
+                    target: "child".to_string(),
+                    label: "old".to_string(),
+                    layer: "layer1".to_string(),
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+                Edge {
+                    id: "old2".to_string(),
+                    source: "child".to_string(),
+                    target: "leaf".to_string(),
+                    label: "old".to_string(),
+                    layer: "layer1".to_string(),
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+            ],
+            layers: vec![Layer::new(
+                "layer1", "Layer 1", "ffffff", "000000", "000000",
+            )],
+        };
+
+        let transform = GraphTransform {
+            kind: GraphTransformKind::GenerateHierarchy,
+            params: GraphTransformParams::default(),
+        };
+
+        transform
+            .apply_to(&mut graph)
+            .expect("hierarchy transform should succeed");
+
+        // Identify new hierarchy node
+        let hierarchy_node = graph
+            .nodes
+            .iter()
+            .find(|node| node.id.starts_with("hierarchy"))
+            .expect("hierarchy node should exist");
+        assert!(hierarchy_node.is_partition);
+        assert_eq!(hierarchy_node.belongs_to.as_deref(), Some(""));
+
+        // All other nodes now belong to the hierarchy node
+        for node in graph.nodes.iter().filter(|n| n.id != hierarchy_node.id) {
+            assert_eq!(
+                node.belongs_to.as_deref(),
+                Some(hierarchy_node.id.as_str()),
+                "node {} should belong to hierarchy node",
+                node.id
+            );
+        }
+
+        // Edges represent the former belongs_to relationships
+        assert_eq!(graph.edges.len(), 2);
+        let edge_pairs: HashSet<(String, String)> = graph
+            .edges
+            .iter()
+            .map(|edge| (edge.source.clone(), edge.target.clone()))
+            .collect();
+        assert!(edge_pairs.contains(&("root".to_string(), "child".to_string())));
+        assert!(edge_pairs.contains(&("child".to_string(), "leaf".to_string())));
     }
 }
