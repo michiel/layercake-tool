@@ -189,14 +189,7 @@ impl Validate for NodeRequest {
         }
 
         // Validate that node_type is one of the allowed types
-        let allowed_types = [
-            "data_set",
-            "transform",
-            "merge",
-            "copy",
-            "output",
-            "graph",
-        ];
+        let allowed_types = ["data_set", "transform", "merge", "copy", "output", "graph"];
         if !allowed_types.contains(&self.node_type.as_str()) {
             return Err(ValidationError::field("node_type", "Invalid node type"));
         }

@@ -9,10 +9,8 @@ impl MigrationTrait for Migration {
         let db = manager.get_connection();
 
         // Add indexed column with default value true
-        db.execute_unprepared(
-            "ALTER TABLE files ADD COLUMN indexed BOOLEAN NOT NULL DEFAULT 1"
-        )
-        .await?;
+        db.execute_unprepared("ALTER TABLE files ADD COLUMN indexed BOOLEAN NOT NULL DEFAULT 1")
+            .await?;
 
         Ok(())
     }
@@ -36,7 +34,7 @@ impl MigrationTrait for Migration {
                 created_at TEXT NOT NULL,
                 FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
             )
-            "#
+            "#,
         )
         .await?;
 
@@ -51,7 +49,8 @@ impl MigrationTrait for Migration {
 
         db.execute_unprepared("DROP TABLE files").await?;
 
-        db.execute_unprepared("ALTER TABLE files_backup RENAME TO files").await?;
+        db.execute_unprepared("ALTER TABLE files_backup RENAME TO files")
+            .await?;
 
         Ok(())
     }

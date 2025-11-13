@@ -209,13 +209,12 @@ impl PlanDagService {
                     if let Some(data_set_id) =
                         config_value.get("dataSetId").and_then(|v| v.as_i64())
                     {
-                        if let Some(data_set) =
-                            data_sets::Entity::find_by_id(data_set_id as i32)
-                                .one(&self.db)
-                                .await
-                                .map_err(|e| {
-                                    anyhow!("Failed to load data source {}: {}", data_set_id, e)
-                                })?
+                        if let Some(data_set) = data_sets::Entity::find_by_id(data_set_id as i32)
+                            .one(&self.db)
+                            .await
+                            .map_err(|e| {
+                                anyhow!("Failed to load data source {}: {}", data_set_id, e)
+                            })?
                         {
                             let mut metadata_obj =
                                 serde_json::from_str::<Value>(&metadata_json_current)

@@ -779,15 +779,11 @@ impl ToolRegistry for LayercakeToolRegistry {
                 super::tools::data_sets::get_data_set(context.arguments, &self.app).await
             }
             "create_data_set_from_file" => {
-                super::tools::data_sets::create_data_set_from_file(
-                    context.arguments,
-                    &self.app,
-                )
-                .await
+                super::tools::data_sets::create_data_set_from_file(context.arguments, &self.app)
+                    .await
             }
             "create_empty_data_set" => {
-                super::tools::data_sets::create_empty_data_set(context.arguments, &self.app)
-                    .await
+                super::tools::data_sets::create_empty_data_set(context.arguments, &self.app).await
             }
             "update_data_set" => {
                 super::tools::data_sets::update_data_set(context.arguments, &self.app).await
@@ -796,8 +792,7 @@ impl ToolRegistry for LayercakeToolRegistry {
                 super::tools::data_sets::delete_data_set(context.arguments, &self.app).await
             }
             "reprocess_data_set" => {
-                super::tools::data_sets::reprocess_data_set(context.arguments, &self.app)
-                    .await
+                super::tools::data_sets::reprocess_data_set(context.arguments, &self.app).await
             }
             "export_data_sets" => {
                 super::tools::data_sets::export_data_sets(context.arguments, &self.app).await

@@ -819,14 +819,17 @@ impl DataAcquisitionService {
             .await?;
 
         // Delete the file itself
-        files::Entity::delete_by_id(file_id)
-            .exec(&self.db)
-            .await?;
+        files::Entity::delete_by_id(file_id).exec(&self.db).await?;
 
         Ok(())
     }
 
-    pub async fn toggle_file_index(&self, project_id: i32, file_id: Uuid, indexed: bool) -> Result<()> {
+    pub async fn toggle_file_index(
+        &self,
+        project_id: i32,
+        file_id: Uuid,
+        indexed: bool,
+    ) -> Result<()> {
         let file = files::Entity::find_by_id(file_id)
             .one(&self.db)
             .await?

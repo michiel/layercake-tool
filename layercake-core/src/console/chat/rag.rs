@@ -26,7 +26,9 @@ impl RagContext {
 
         let mut context = String::new();
         context.push_str("# Knowledge Base Context\n\n");
-        context.push_str("The following information has been retrieved from the project's knowledge base ");
+        context.push_str(
+            "The following information has been retrieved from the project's knowledge base ",
+        );
         context.push_str("to help answer the user's question:\n\n");
 
         for (i, chunk) in self.chunks.iter().enumerate() {
@@ -181,7 +183,9 @@ mod tests {
             create_test_result(0.8, &large_content),
         ];
 
-        let context = RagContextBuilder::new(0.0, 2000).add_results(results).build();
+        let context = RagContextBuilder::new(0.0, 2000)
+            .add_results(results)
+            .build();
 
         // Should only include first chunk due to token budget
         assert_eq!(context.chunks.len(), 1);

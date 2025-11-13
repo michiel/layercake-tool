@@ -257,11 +257,7 @@ impl ChatHistoryService {
     }
 
     /// Update RAG settings for a chat session
-    pub async fn update_rag_settings(
-        &self,
-        session_id: &str,
-        enable_rag: bool,
-    ) -> Result<()> {
+    pub async fn update_rag_settings(&self, session_id: &str, enable_rag: bool) -> Result<()> {
         let session = self
             .get_session(session_id)
             .await?

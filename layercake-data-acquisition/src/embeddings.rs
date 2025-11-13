@@ -76,22 +76,20 @@ impl EmbeddingService {
         );
 
         let vectors = match &self.backend {
-            EmbeddingBackend::OpenAi { client, model } => {
-                client
-                    .embedding_model(model)
-                    .embed_texts(chunks.iter().map(|chunk| chunk.text.clone()))
-                    .await
-                    .map_err(|e| {
-                        tracing::error!(
-                            provider = "openai",
-                            model = model,
-                            chunk_count = chunks.len(),
-                            error = %e,
-                            "Failed to embed chunks"
-                        );
-                        e
-                    })?
-            }
+            EmbeddingBackend::OpenAi { client, model } => client
+                .embedding_model(model)
+                .embed_texts(chunks.iter().map(|chunk| chunk.text.clone()))
+                .await
+                .map_err(|e| {
+                    tracing::error!(
+                        provider = "openai",
+                        model = model,
+                        chunk_count = chunks.len(),
+                        error = %e,
+                        "Failed to embed chunks"
+                    );
+                    e
+                })?,
             EmbeddingBackend::Ollama { client, model } => {
                 // Note: Ollama 0.9.x logs "cannot decode batches" warnings
                 // These are harmless llama.cpp internals - embeddings work correctly
@@ -143,37 +141,33 @@ impl EmbeddingService {
         );
 
         let vectors = match &self.backend {
-            EmbeddingBackend::OpenAi { client, model } => {
-                client
-                    .embedding_model(model)
-                    .embed_texts(vec![text.to_string()])
-                    .await
-                    .map_err(|e| {
-                        tracing::error!(
-                            provider = "openai",
-                            model = model,
-                            error = %e,
-                            "Failed to embed text"
-                        );
-                        e
-                    })?
-            }
-            EmbeddingBackend::Ollama { client, model } => {
-                client
-                    .embedding_model(model)
-                    .embed_texts(vec![text.to_string()])
-                    .await
-                    .map_err(|e| {
-                        tracing::error!(
-                            provider = "ollama",
-                            model = model,
-                            error = %e,
-                            text_length = text.len(),
-                            "Failed to embed text - this may be due to Ollama version or token limits"
-                        );
-                        e
-                    })?
-            }
+            EmbeddingBackend::OpenAi { client, model } => client
+                .embedding_model(model)
+                .embed_texts(vec![text.to_string()])
+                .await
+                .map_err(|e| {
+                    tracing::error!(
+                        provider = "openai",
+                        model = model,
+                        error = %e,
+                        "Failed to embed text"
+                    );
+                    e
+                })?,
+            EmbeddingBackend::Ollama { client, model } => client
+                .embedding_model(model)
+                .embed_texts(vec![text.to_string()])
+                .await
+                .map_err(|e| {
+                    tracing::error!(
+                        provider = "ollama",
+                        model = model,
+                        error = %e,
+                        text_length = text.len(),
+                        "Failed to embed text - this may be due to Ollama version or token limits"
+                    );
+                    e
+                })?,
         };
 
         tracing::debug!("Successfully embedded text");

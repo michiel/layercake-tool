@@ -1,5 +1,5 @@
-use sea_orm_migration::prelude::*;
 use sea_orm::Statement;
+use sea_orm_migration::prelude::*;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -12,7 +12,8 @@ impl MigrationTrait for Migration {
         // Add origin column with default value 'file_upload'
         db.execute(Statement::from_string(
             manager.get_database_backend(),
-            "ALTER TABLE data_sets ADD COLUMN origin TEXT NOT NULL DEFAULT 'file_upload'".to_string(),
+            "ALTER TABLE data_sets ADD COLUMN origin TEXT NOT NULL DEFAULT 'file_upload'"
+                .to_string(),
         ))
         .await?;
 
@@ -56,7 +57,8 @@ impl MigrationTrait for Migration {
                 updated_at TEXT NOT NULL,
                 FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
             )
-            "#.to_string(),
+            "#
+            .to_string(),
         ))
         .await?;
 
@@ -68,7 +70,8 @@ impl MigrationTrait for Migration {
                    status, error_message, file_size, processed_at, file_format,
                    data_type, created_at, updated_at
             FROM data_sets
-            "#.to_string(),
+            "#
+            .to_string(),
         ))
         .await?;
 

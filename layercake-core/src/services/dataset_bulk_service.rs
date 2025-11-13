@@ -209,11 +209,7 @@ impl DataSetBulkService {
                     tracing::info!("Wrote {} rows to sheet {}", rows.len(), sheet_name);
                 }
                 Err(e) => {
-                    tracing::warn!(
-                        "Failed to convert dataset {} to CSV: {}",
-                        dataset.id,
-                        e
-                    );
+                    tracing::warn!("Failed to convert dataset {} to CSV: {}", dataset.id, e);
                     // Write error message to sheet
                     worksheet.write_string(0, 0, "Error")?;
                     worksheet.write_string(0, 1, format!("Failed to export: {}", e))?;
@@ -296,11 +292,7 @@ impl DataSetBulkService {
                     tracing::info!("Wrote {} rows to sheet {}", rows.len(), sheet_name);
                 }
                 Err(e) => {
-                    tracing::warn!(
-                        "Failed to convert dataset {} to CSV: {}",
-                        dataset.id,
-                        e
-                    );
+                    tracing::warn!("Failed to convert dataset {} to CSV: {}", dataset.id, e);
                     // Write error message to sheet
                     sheet.set_value(0, 0, Value::Text("Error".to_string()));
                     sheet.set_value(0, 1, Value::Text(format!("Failed to export: {}", e)));
@@ -404,11 +396,7 @@ impl DataSetBulkService {
 
                     updated_count += 1;
                     imported_ids.push(dataset.id);
-                    tracing::info!(
-                        "Updated dataset: {} (id: {})",
-                        dataset.name,
-                        dataset.id
-                    );
+                    tracing::info!("Updated dataset: {} (id: {})", dataset.name, dataset.id);
                     continue;
                 }
 
@@ -428,11 +416,7 @@ impl DataSetBulkService {
 
                 created_count += 1;
                 imported_ids.push(dataset.id);
-                tracing::info!(
-                    "Created dataset: {} with id: {}",
-                    sheet_name,
-                    dataset.id
-                );
+                tracing::info!("Created dataset: {} with id: {}", sheet_name, dataset.id);
             }
         }
 
@@ -530,11 +514,7 @@ impl DataSetBulkService {
 
                     updated_count += 1;
                     imported_ids.push(dataset.id);
-                    tracing::info!(
-                        "Updated dataset: {} (id: {})",
-                        dataset.name,
-                        dataset.id
-                    );
+                    tracing::info!("Updated dataset: {} (id: {})", dataset.name, dataset.id);
                     continue;
                 }
 
@@ -554,11 +534,7 @@ impl DataSetBulkService {
 
                 created_count += 1;
                 imported_ids.push(dataset.id);
-                tracing::info!(
-                    "Created dataset: {} with id: {}",
-                    sheet_name,
-                    dataset.id
-                );
+                tracing::info!("Created dataset: {} with id: {}", sheet_name, dataset.id);
             }
         }
 

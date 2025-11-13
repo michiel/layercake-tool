@@ -16,8 +16,8 @@ pub mod users;
 // REMOVED: nodes, edges - dead code, no longer used
 
 // Pipeline entities for DAG execution
-pub mod dataset_rows;
 pub mod dataset_nodes;
+pub mod dataset_rows;
 pub mod execution_state;
 pub mod graph_edges;
 pub mod graph_edits;

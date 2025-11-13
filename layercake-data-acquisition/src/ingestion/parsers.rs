@@ -194,11 +194,13 @@ impl DocumentParser for DocxParser {
 }
 
 fn parse_csv(bytes: Vec<u8>) -> Result<String> {
-    let mut reader = ReaderBuilder::new()
-        .from_reader(bytes.as_slice());
+    let mut reader = ReaderBuilder::new().from_reader(bytes.as_slice());
     let mut buffer = String::new();
 
-    if let Ok(headers) = reader.headers().map_err(|err| DataAcquisitionError::Ingestion(err.into())) {
+    if let Ok(headers) = reader
+        .headers()
+        .map_err(|err| DataAcquisitionError::Ingestion(err.into()))
+    {
         buffer.push_str(&headers.iter().collect::<Vec<_>>().join(","));
         buffer.push('\n');
     }

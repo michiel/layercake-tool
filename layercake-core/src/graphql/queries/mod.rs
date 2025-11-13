@@ -14,9 +14,9 @@ use crate::graphql::types::plan_dag::{PlanDag, PlanDagInput, ValidationResult};
 use crate::graphql::types::project::Project;
 use crate::graphql::types::sample_project::SampleProject;
 use crate::graphql::types::{
-    DataSet, DataSetPreview, GraphEdgePreview, GraphEdit, GraphNodePreview, GraphPreview,
-    Layer, LibrarySource, ProjectCollaborator, SystemSetting, TableColumn, TableRow, User,
-    UserFilter, UserSession,
+    DataSet, DataSetPreview, GraphEdgePreview, GraphEdit, GraphNodePreview, GraphPreview, Layer,
+    LibrarySource, ProjectCollaborator, SystemSetting, TableColumn, TableRow, User, UserFilter,
+    UserSession,
 };
 use crate::services::{
     graph_edit_service::GraphEditService, sample_project_service::SampleProjectService,
@@ -79,8 +79,9 @@ impl Query {
         let mut indexed_count = 0;
 
         for file in &files {
-            let file_id = uuid::Uuid::parse_str(&file.id.to_string())
-                .map_err(|e| StructuredError::validation("fileId", format!("Invalid UUID: {}", e)))?;
+            let file_id = uuid::Uuid::parse_str(&file.id.to_string()).map_err(|e| {
+                StructuredError::validation("fileId", format!("Invalid UUID: {}", e))
+            })?;
             if context
                 .app
                 .data_acquisition_service()
@@ -559,10 +560,7 @@ impl Query {
             .await
             .map_err(|e| StructuredError::service("AppContext::available_data_sets", e))?;
 
-        Ok(summaries
-            .into_iter()
-            .map(DataSetReference::from)
-            .collect())
+        Ok(summaries.into_iter().map(DataSetReference::from).collect())
     }
 
     /// Generate download URL for raw DataSet file
@@ -1013,8 +1011,9 @@ impl Query {
 
         let mut result = Vec::new();
         for file in files {
-            let file_id = uuid::Uuid::parse_str(&file.id.to_string())
-                .map_err(|e| StructuredError::validation("fileId", format!("Invalid UUID: {}", e)))?;
+            let file_id = uuid::Uuid::parse_str(&file.id.to_string()).map_err(|e| {
+                StructuredError::validation("fileId", format!("Invalid UUID: {}", e))
+            })?;
             let indexed = context
                 .app
                 .data_acquisition_service()

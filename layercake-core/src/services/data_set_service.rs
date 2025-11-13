@@ -273,11 +273,7 @@ impl DataSetService {
 
     /// Update DataSet graph data (graph_json) directly
     /// Updates processed_at timestamp to trigger downstream re-execution
-    pub async fn update_graph_data(
-        &self,
-        id: i32,
-        graph_json: String,
-    ) -> Result<data_sets::Model> {
+    pub async fn update_graph_data(&self, id: i32, graph_json: String) -> Result<data_sets::Model> {
         let data_set = self
             .get_by_id(id)
             .await?
@@ -429,32 +425,27 @@ impl DataSetService {
         let data_set = active_model.update(&self.db).await?;
 
         // Process the file
-        let updated_data_set = match source_processing::process_file(
-            &file_format,
-            &data_type,
-            &data_set.blob,
-        )
-        .await
-        {
-            Ok(graph_json) => {
-                let mut active_model: data_sets::ActiveModel = data_set.into();
-                active_model.graph_json = Set(graph_json);
-                active_model.status = Set("active".to_string());
-                active_model.processed_at = Set(Some(chrono::Utc::now()));
-                active_model.updated_at = Set(chrono::Utc::now());
+        let updated_data_set =
+            match source_processing::process_file(&file_format, &data_type, &data_set.blob).await {
+                Ok(graph_json) => {
+                    let mut active_model: data_sets::ActiveModel = data_set.into();
+                    active_model.graph_json = Set(graph_json);
+                    active_model.status = Set("active".to_string());
+                    active_model.processed_at = Set(Some(chrono::Utc::now()));
+                    active_model.updated_at = Set(chrono::Utc::now());
 
-                active_model.update(&self.db).await?
-            }
-            Err(e) => {
-                let mut active_model: data_sets::ActiveModel = data_set.into();
-                active_model.status = Set("error".to_string());
-                active_model.error_message = Set(Some(e.to_string()));
-                active_model.updated_at = Set(chrono::Utc::now());
+                    active_model.update(&self.db).await?
+                }
+                Err(e) => {
+                    let mut active_model: data_sets::ActiveModel = data_set.into();
+                    active_model.status = Set("error".to_string());
+                    active_model.error_message = Set(Some(e.to_string()));
+                    active_model.updated_at = Set(chrono::Utc::now());
 
-                let _updated = active_model.update(&self.db).await?;
-                return Err(e);
-            }
-        };
+                    let _updated = active_model.update(&self.db).await?;
+                    return Err(e);
+                }
+            };
 
         Ok(updated_data_set)
     }

@@ -57,9 +57,9 @@ async fn test_streaming() -> Result<()> {
     println!("📡 Test 2: Streaming");
 
     use futures_util::StreamExt;
+    use rig::agent::MultiTurnStreamItem;
     use rig::client::CompletionClient;
     use rig::providers;
-    use rig::agent::MultiTurnStreamItem;
     use rig::streaming::{StreamedAssistantContent, StreamingPrompt};
 
     let client = providers::openai::Client::from_env();

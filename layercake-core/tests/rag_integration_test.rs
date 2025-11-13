@@ -24,7 +24,9 @@ fn build_rag_context(
             break;
         }
 
-        let source = result.filename.unwrap_or_else(|| "Unknown source".to_string());
+        let source = result
+            .filename
+            .unwrap_or_else(|| "Unknown source".to_string());
         chunks.push((result.content, result.score, source));
         total_tokens += estimated_tokens;
     }
@@ -139,7 +141,7 @@ fn test_rag_preserves_order() {
         },
         VectorSearchResult {
             file_id: Uuid::new_v4(),
-            filename: Some("third.txt".to_string(),),
+            filename: Some("third.txt".to_string()),
             content: "Third".to_string(),
             score: 0.75,
         },

@@ -493,11 +493,7 @@ impl MigrationTrait for Migration {
                             .default("processing"),
                     )
                     .col(ColumnDef::new(DataSets::ErrorMessage).string())
-                    .col(
-                        ColumnDef::new(DataSets::FileSize)
-                            .big_integer()
-                            .not_null(),
-                    )
+                    .col(ColumnDef::new(DataSets::FileSize).big_integer().not_null())
                     .col(ColumnDef::new(DataSets::ProcessedAt).timestamp())
                     .col(
                         ColumnDef::new(DataSets::FileFormat)
@@ -511,16 +507,8 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .default("nodes"),
                     )
-                    .col(
-                        ColumnDef::new(DataSets::CreatedAt)
-                            .timestamp()
-                            .not_null(),
-                    )
-                    .col(
-                        ColumnDef::new(DataSets::UpdatedAt)
-                            .timestamp()
-                            .not_null(),
-                    )
+                    .col(ColumnDef::new(DataSets::CreatedAt).timestamp().not_null())
+                    .col(ColumnDef::new(DataSets::UpdatedAt).timestamp().not_null())
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_data_sets_project_id")

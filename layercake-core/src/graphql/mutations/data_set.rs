@@ -3,16 +3,16 @@ use base64::Engine;
 use sea_orm::{ActiveModelTrait, EntityTrait};
 
 use crate::app_context::{
-    BulkDataSetUpload, DataSetEmptyCreateRequest, DataSetExportFormat,
-    DataSetExportRequest, DataSetFileCreateRequest, DataSetFileReplacement,
-    DataSetImportFormat, DataSetImportRequest, DataSetUpdateRequest,
+    BulkDataSetUpload, DataSetEmptyCreateRequest, DataSetExportFormat, DataSetExportRequest,
+    DataSetFileCreateRequest, DataSetFileReplacement, DataSetImportFormat, DataSetImportRequest,
+    DataSetUpdateRequest,
 };
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
 use crate::graphql::types::{
     BulkUploadDataSetInput, CreateDataSetInput, CreateEmptyDataSetInput, DataSet,
-    ExportDataSetsInput, ExportDataSetsResult, ImportDataSetsInput,
-    ImportDataSetsResult, UpdateDataSetInput,
+    ExportDataSetsInput, ExportDataSetsResult, ImportDataSetsInput, ImportDataSetsResult,
+    UpdateDataSetInput,
 };
 
 #[derive(Default)]
@@ -192,9 +192,7 @@ impl DataSetMutation {
             .app
             .update_data_set_graph_json(id, graph_json)
             .await
-            .map_err(|e| {
-                StructuredError::service("AppContext::update_data_set_graph_json", e)
-            })?;
+            .map_err(|e| StructuredError::service("AppContext::update_data_set_graph_json", e))?;
 
         Ok(DataSet::from(summary))
     }
@@ -260,11 +258,7 @@ impl DataSetMutation {
             .map_err(|e| StructuredError::service("AppContext::import_data_sets", e))?;
 
         Ok(ImportDataSetsResult {
-            data_sets: outcome
-                .data_sets
-                .into_iter()
-                .map(DataSet::from)
-                .collect(),
+            data_sets: outcome.data_sets.into_iter().map(DataSet::from).collect(),
             created_count: outcome.created_count,
             updated_count: outcome.updated_count,
         })

@@ -215,10 +215,7 @@ mod tests {
     #[test]
     fn test_already_exists() {
         let err = DataSetError::AlreadyExists("data-source-1".to_string());
-        assert_eq!(
-            err.to_string(),
-            "Data set 'data-source-1' already exists"
-        );
+        assert_eq!(err.to_string(), "Data set 'data-source-1' already exists");
         assert!(err.is_client_error());
         assert_eq!(err.error_code(), "CONFLICT");
     }

@@ -149,7 +149,7 @@ if [[ "$TAURI_MODE" == "true" ]]; then
     # Wait for Tauri to start
     print_status "Waiting for Tauri to compile and start..."
     TAURI_WAIT=0
-    TAURI_MAX_WAIT=120
+    TAURI_MAX_WAIT=180
     while [ $TAURI_WAIT -lt $TAURI_MAX_WAIT ]; do
         # Check if process is still alive
         if ! kill -0 $TAURI_PID 2>/dev/null; then
@@ -209,7 +209,7 @@ else
     # Wait for backend to compile and start (with progress indicator)
     print_status "Waiting for backend to compile and start..."
     BACKEND_WAIT=0
-    BACKEND_MAX_WAIT=60
+    BACKEND_MAX_WAIT=180
     while [ $BACKEND_WAIT -lt $BACKEND_MAX_WAIT ]; do
         # Check if process is still alive
         if ! kill -0 $BACKEND_PID 2>/dev/null; then

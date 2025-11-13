@@ -103,9 +103,7 @@ impl MergeBuilder {
         }
 
         // Merge data from all sources
-        let result = self
-            .merge_data_from_sources(&graph, &data_sets_list)
-            .await;
+        let result = self.merge_data_from_sources(&graph, &data_sets_list).await;
 
         match result {
             Ok((node_count, edge_count)) => {

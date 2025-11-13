@@ -801,10 +801,7 @@ impl GraphBuilder {
 
     /// Extract edges from an edges dataset
     #[allow(dead_code)]
-    async fn extract_edges_from_dataset(
-        &self,
-        dataset: &datasets::Model,
-    ) -> Result<Vec<EdgeData>> {
+    async fn extract_edges_from_dataset(&self, dataset: &datasets::Model) -> Result<Vec<EdgeData>> {
         use crate::database::entities::dataset_rows::{Column, Entity};
         use sea_orm::{ColumnTrait, QueryFilter, QueryOrder};
 

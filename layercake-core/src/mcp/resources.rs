@@ -79,10 +79,9 @@ impl LayercakeResourceRegistry {
                 uri: format!("layercake://datasets/{}", data_set_id),
             })?;
 
-        let content =
-            serde_json::to_string_pretty(&data_set).map_err(|e| McpError::Internal {
-                message: format!("Failed to serialize data source: {}", e),
-            })?;
+        let content = serde_json::to_string_pretty(&data_set).map_err(|e| McpError::Internal {
+            message: format!("Failed to serialize data source: {}", e),
+        })?;
 
         Ok(Resource {
             uri: format!("layercake://datasets/{}", data_set_id),
