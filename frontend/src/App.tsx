@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { Routes, Route, useNavigate, useParams, useLocation } from 'react-router-dom'
-import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconDownload, IconChevronLeft, IconChevronRight, IconFolderPlus, IconNetwork, IconBooks, IconMessageDots, IconAdjustments, IconShare, IconUpload, IconHierarchy2, IconChevronDown } from '@tabler/icons-react'
+import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconDownload, IconChevronLeft, IconChevronRight, IconFolderPlus, IconNetwork, IconBooks, IconMessageDots, IconAdjustments, IconUpload, IconHierarchy2, IconChevronDown } from '@tabler/icons-react'
 import { useQuery, useMutation } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import { Breadcrumbs } from './components/common/Breadcrumbs'
@@ -18,7 +18,6 @@ import { ChatLogsPage } from './pages/ChatLogsPage'
 import { SourceManagementPage } from './pages/SourceManagementPage'
 import { KnowledgeBasePage } from './pages/KnowledgeBasePage'
 import { DatasetCreationPage } from './pages/DatasetCreationPage'
-import { ProjectSharingPage } from './pages/ProjectSharingPage'
 import { ProjectArtefactsPage } from './pages/ProjectArtefactsPage'
 import { getOrCreateSessionId } from './utils/session'
 import { Group, Stack } from './components/layout-primitives'
@@ -302,13 +301,6 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
         icon: <IconHierarchy2 className="h-4 w-4" />,
         route: `/projects/${projectId}/artefacts`,
         isActive: makeRouteMatcher(`/projects/${projectId}/artefacts`),
-      },
-      {
-        key: 'sharing',
-        label: 'Sharing',
-        icon: <IconShare className="h-4 w-4" />,
-        route: `/projects/${projectId}/sharing`,
-        isActive: makeRouteMatcher(`/projects/${projectId}/sharing`),
       },
       {
         key: 'chat',
@@ -1573,13 +1565,10 @@ const ProjectDetailPage = () => {
             <div>
               <h2 className="text-2xl font-bold">Chat & Collaboration</h2>
               <p className="text-muted-foreground">
-                Collaborate with agents, review chat logs, and manage project access.
+                Collaborate with agents and review chat logs.
               </p>
             </div>
             <Group gap="xs">
-              <Button variant="secondary" onClick={() => navigate(`/projects/${projectId}/sharing`)}>
-                Manage sharing
-              </Button>
               <Button variant="secondary" onClick={() => navigate(`/projects/${projectId}/chat`)}>
                 Open project chat
               </Button>
@@ -1605,22 +1594,6 @@ const ProjectDetailPage = () => {
                     View logs
                   </Button>
                 </Group>
-              </CardContent>
-            </Card>
-            <Card className="border">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                  <IconShare className="h-4 w-4 text-primary" />
-                  Sharing & access
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Invite collaborators, publish read-only snapshots, and control project-level permissions.
-                </p>
-                <Button variant="secondary" className="w-full" onClick={() => navigate(`/projects/${projectId}/sharing`)}>
-                  Manage access
-                </Button>
               </CardContent>
             </Card>
           </div>
@@ -1808,11 +1781,6 @@ function App() {
           <Route path="/projects/:projectId/data-acquisition/datasets" element={
             <ErrorBoundary>
               <DatasetCreationPage />
-            </ErrorBoundary>
-          } />
-          <Route path="/projects/:projectId/sharing" element={
-            <ErrorBoundary>
-              <ProjectSharingPage />
             </ErrorBoundary>
           } />
           <Route path="/projects/:projectId/datasets/:dataSetId/edit" element={
