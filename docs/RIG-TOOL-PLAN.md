@@ -1,115 +1,71 @@
-# Technical Plan: Refactoring Tool Use with `rig`
+# Technical Plan: Rig-Native Tool Use with `rig`
 
-This document outlines a technical plan for refactoring the tool-use implementation in `layercake-tool` to leverage the built-in features of the `rig` crate. This will result in a more robust, reliable, and maintainable implementation that is compatible with all supported LLMs (OpenAI, Anthropic, Gemini, and Ollama).
+This document captures the steps required to replace the handwritten tool-call parsing inside `layercake-tool` with the structured tool features that ship with the `rig` crate. The target outcome is a provider-agnostic chat loop that streams `ToolCall` objects from `rig`, executes them through the MCP bridge, and persists the full call/response history for every supported provider (OpenAI, Anthropic, Gemini, and Ollama).
 
-## 1. Project Overview
+## 1. Objective
 
-The current implementation of tool use in `layercake-tool` relies on a custom and brittle approach to parsing tool invocations from the raw text response of the LLM. This approach is not ideal and does not take full advantage of the `rig` crate's built-in tooling features.
+Deliver a `ChatSession` implementation (`layercake-core/src/console/chat/session.rs`) that:
 
-This plan proposes a refactoring of the `ChatSession` implementation to use `rig`'s tooling features more effectively. This will involve passing tool definitions to the `rig` agent and handling structured tool calls from the agent's response.
+- Sends real tool definitions to every `rig` agent via `.rmcp_tools(...)`.
+- Treats agent output as `CompletionResponse` objects that can contain `AssistantContent::ToolCall`.
+- Executes each requested tool through the existing `McpBridge` and feeds `ToolResult` content back to the agent so the model can continue multi-turn reasoning without custom parsing.
 
-## 2. High-Level Plan
+## 2. Current State & Feasibility Review
 
-The refactoring will be done in the following phases:
+- Conversation state is flattened into a single string (`build_conversation_prompt`) and the agent response is treated as a plain `String`. This prevents us from accessing `ToolCall` metadata returned by `rig-core 0.23.1`.
+- Tool execution is detected by scanning for a ` ```tool_code` block (`extract_tool_invocation` / `parse_tool_command`). This is brittle, requires system-prompt hacks, and blocks provider features such as multiple tool calls in one turn.
+- `call_rig_agent` already creates provider-specific agents and even tries to call `.rmcp_tools(...)`, but the builder is immutable and the return type discards the structured `CompletionResponse`, so the MCP capabilities are never exercised.
+- `handle_tool_invocation` stores tool metadata in `ChatMessage`, yet those messages never get converted back into `rig::completion::Message::User { content: ToolResult }`, so the agent never sees the tool output it just produced.
+- Feasibility: `rig-core` exposes `CompletionResponse`, `AssistantContent`, `ToolCall`, and `UserContent::ToolResult`, and the crate already implements `.rmcp_tools` for OpenAI, Anthropic, Gemini, and Ollama. No additional dependencies are needed; the work is fully achievable inside the current workspace.
 
-1.  **Refactor `ChatSession` to use `rig`'s tool-use features.**
-2.  **Extend the solution to all supported LLMs.**
-3.  **Clean up the code by removing redundant functions.**
+## 3. Implementation Plan
 
-## 3. Detailed Technical Plan
+### Phase 1 – Return Structured Agent Output
 
-### Phase 1: Refactor `ChatSession` for `rig` Tool-Use
+1. Change `call_rig_agent` so it returns `CompletionResponse<ProviderResponse>` instead of `String`. Add a small enum or wrapper to hold the provider-specific `raw_response` so we keep type safety without sprinkling generics throughout `ChatSession`.
+2. Make the agent builder mutable for every provider and wire `.rmcp_tools(self.rmcp_tools.clone(), rmcp_client.peer().to_owned())` behind the `rmcp` feature flag. This guarantees that tools registered through the MCP server are advertised to every model.
+3. Update `invoke_agent_with_retries` to propagate the full `CompletionResponse`. When we have to fall back (e.g., Ollama rejecting tools), convert the fallback response to text using `response.choice` instead of reissuing a brand-new prompt.
+4. Capture `response.usage` for telemetry and include it in tracing so we can see token costs per turn.
 
-**File:** `layercake-core/src/console/chat/session.rs`
+### Phase 2 – Build Rig Prompts from Conversation History
 
-1.  **Update `call_rig_agent` to Pass Tool Definitions:**
-    *   Modify the `call_rig_agent` function to pass the `rmcp_tools` to the `rig` agent.
-    *   The `rig` agent builder has a `rmcp_tools` method that can be used for this purpose.
+1. Replace `build_conversation_prompt()` with `build_prompt_messages()` that converts `self.messages` into `Vec<rig::completion::Message>`. Map:
+   - `ChatMessage::user` → `Message::User { content: Text }`
+   - `ChatMessage::assistant` → `Message::Assistant { content: Text }`
+   - `ChatMessage::tool_result` → `Message::User { content: ToolResult }`
+   - Stored `tool_calls` → `Assistant` messages containing `AssistantContent::ToolCall`.
+2. Construct a `Prompt` (or leverage `Prompt::try_from(messages)`) from those messages and pass it to `agent.prompt(...)` instead of concatenating strings. Keep the existing `system_prompt`/RAG context by feeding it into `agent.preamble(...)` so instructions are sent separately from user content.
+3. Ensure that the RAG pipeline still injects citations: once the model produces final text, append citations just before emitting the assistant event, same as today.
 
-    ```rust
-    // In `call_rig_agent` function:
+### Phase 3 – Rig Tool Call Execution Loop
 
-    // For each provider (OpenAI, Anthropic, Gemini, Ollama)
-    let builder = client.agent(model);
+1. In `resolve_conversation`, inspect every `AssistantContent` returned in `response.choice`. Branch on:
+   - `AssistantContent::ToolCall(call)` → enqueue into a new `handle_tool_call` helper.
+   - `AssistantContent::Text(text)`/`Reasoning` → stream to the observer once no further tool calls are pending.
+2. Update `handle_tool_invocation` to accept `rig::completion::ToolCall`. Execute the MCP tool through `self.bridge.execute_tool`, persist the invocation metadata, and push the result into `self.messages` via `ChatMessage::tool_result`.
+3. Support multiple tool calls per turn by iterating `response.choice.into_iter()` and calling each tool sequentially before asking the agent to continue.
+4. After executing a tool, produce a `Message::User { content: ToolResult { call_id, content: Text } }` so the next prompt turn contains the tool output that the agent expects.
+5. Remove `extract_tool_invocation`, `parse_tool_command`, and `parse_key_value_arguments`; these are replaced entirely by `AssistantContent::ToolCall`.
 
-    #[cfg(feature = "rmcp")]
-    if let Some(ref rmcp_client) = self.rmcp_client {
-        if !self.rmcp_tools.is_empty() {
-            builder = builder.rmcp_tools(self.rmcp_tools.clone(), rmcp_client.peer().to_owned());
-        }
-    }
+### Phase 4 – Cleanup, UX, and Observability
 
-    let agent = builder.build();
-    ```
+1. Simplify `compose_system_prompt` so it no longer enumerates tool names—the agent already knows which tools exist through `.rmcp_tools`.
+2. Keep emitting `ChatEvent::ToolInvocation` and persist tool metadata so the frontend can render `ToolCallMessagePart` components without change.
+3. Extend tracing/metrics to log whether a turn included tool calls, how long each MCP execution took, and the per-provider token usage pulled from `CompletionResponse.usage`.
+4. Document the new behavior (`docs/`, `historical/`) and delete any instructions that asked the model to emit ` ```tool_code` snippets since that format will no longer be used.
 
-2.  **Update `resolve_conversation` to Handle Structured Tool Calls:**
-    *   The `invoke_agent_with_retries` function returns a `String`. This should be changed to return a `rig::completion::CompletionResponse`.
-    *   The `resolve_conversation` function should be updated to handle the `CompletionResponse`.
-    *   The `CompletionResponse` will contain a `tool_calls` field with a list of `rig::message::ToolCall` objects.
+## 4. Testing & Validation
 
-3.  **Update `handle_tool_invocation` to Use `rig::message::ToolCall`:**
-    *   Modify the `handle_tool_invocation` function to accept a `rig::message::ToolCall` object instead of a `ParsedToolInvocation` object.
-    *   The `ToolCall` object will contain the `name` and `arguments` of the function to be called.
+- Exercise the happy path for each provider with a tool-enabled plan (use `cargo run --bin layercake -- -p sample/kvm_control_flow_plan.yaml`).
+- Manually trigger multiple tool calls by asking for chained operations and confirm that every call persists to the database and renders in the React thread UI.
+- Simulate tool errors (return `Err` from the MCP bridge) and confirm the agent receives a structured error message before retrying.
+- Toggle RAG on/off to ensure the new prompt builder still injects context and citations.
+- Run `npm run backend:test` plus integration smoke tests to guarantee no regressions in the GraphQL chat API.
 
-    ```rust
-    // In `resolve_conversation` function, after getting the response from the agent:
-    if !response.choice.is_empty() {
-        let choice = response.choice.first();
-        if let Some(AssistantContent::ToolCall(tool_call)) = choice {
-            self.handle_tool_invocation(tool_call, observer).await?;
-            continue;
-        }
-    }
+## 5. Success Criteria
 
-    // ...
-
-    // Modify the signature of `handle_tool_invocation`
-    async fn handle_tool_invocation<F>(
-        &mut self,
-        tool_call: rig::message::ToolCall,
-        observer: &mut F,
-    ) -> Result<()>
-    where
-        F: FnMut(ChatEvent),
-    {
-        // ...
-        let execution_args = tool_call.function.arguments.clone();
-        let result = self
-            .bridge
-            .execute_tool(&tool_call.function.name, &self.security, execution_args.clone())
-            .await
-            // ...
-    }
-    ```
-
-### Phase 2: Extend the Solution to All Supported LLMs
-
-The changes in Phase 1 should be applied to all supported LLM providers:
-
-*   **OpenAI:** The `rig` crate has excellent support for OpenAI, so the changes should be straightforward.
-*   **Anthropic:** The `rig` crate supports Anthropic, and the changes should be similar to OpenAI.
-*   **Gemini:** The `rig` crate supports Gemini, and the changes should be similar to OpenAI.
-*   **Ollama:** The `rig` crate has specific support for Ollama's tooling features, so the changes should work seamlessly.
-
-### Phase 3: Code Cleanup
-
-1.  **Remove Redundant Functions:**
-    *   Remove the `extract_tool_invocation` and `parse_tool_command` functions from `session.rs`. These functions are no longer needed, as the `rig` crate handles the parsing of structured tool calls.
-
-2.  **Simplify the System Prompt:**
-    *   Modify the `compose_system_prompt` function to remove the list of tool names. The tool definitions are now passed to the `rig` agent separately, so there's no need to include them in the system prompt.
-
-## 4. Testing
-
-After implementing the changes, it's crucial to test the tool-use functionality with all supported LLMs. The tests should cover:
-
-*   **Single tool calls:** Verify that the LLM can call a single tool with the correct arguments.
-*   **Multiple tool calls:** Verify that the LLM can call multiple tools in a single turn.
-*   **Tool calls with no arguments:** Verify that the LLM can call tools that don't have any arguments.
-*   **Error handling:** Verify that the system handles errors gracefully when a tool call fails.
-
-## 5. Conclusion
-
-By following this technical plan, the developers of `layercake-tool` can create a much more robust, reliable, and maintainable tool-use implementation for their chat feature. This will improve the user experience and make it easier to support new LLM providers and tools in the future.
-
+- `ChatSession` no longer references `extract_tool_invocation` or the ` ```tool_code` convention; all tooling flows pass through `AssistantContent::ToolCall`.
+- MCP tools are registered exactly once per session and exposed to every provider via `.rmcp_tools`, confirmed through integration traces.
+- Tool invocations (name, args, result summary) show up in persisted chat history and the frontend without additional parsing logic.
+- Disabling tool use mid-session (e.g., Ollama HTTP 400) still works because `invoke_agent_with_retries` can fall back to plain completions using the same `CompletionResponse` plumbing.
 
