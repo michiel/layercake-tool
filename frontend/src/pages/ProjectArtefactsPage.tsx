@@ -537,13 +537,13 @@ const ProjectArtefactsPage: React.FC = () => {
           </div>
         )}
         {!loading && !entries.length && (
-          <Alert className="max-w-4xl">
+          <Alert className="max-w-4xl mx-auto">
             <AlertTitle>No graphs detected</AlertTitle>
             <AlertDescription>Create graphs in the plan to see their artefacts here.</AlertDescription>
           </Alert>
         )}
         {!!entries.length && (
-          <div className="max-w-4xl">
+          <div className="max-w-4xl mx-auto">
             <div className="rounded-lg border bg-background shadow-sm">
               {entries.map((entry, index) => renderEntry(entry, index))}
             </div>
