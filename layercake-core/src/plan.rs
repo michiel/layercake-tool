@@ -149,6 +149,7 @@ pub enum ExportFileType {
     CSVMatrix,
     Mermaid,
     MermaidMindmap,
+    MermaidTreemap,
     JSGraph,
     Custom(CustomExportProfile),
 }

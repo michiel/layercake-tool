@@ -1,10 +1,12 @@
-mindmap
+treemap
   root(({{graph_name}}))
 {{#*inline "render_node"}}
-{{mindmap_indent depth}}  {{label}}
+{{mindmap_indent depth}}  {{label}}{{#if (is_empty children)}} : {{treemap_value weight}}{{/if}}
+{{#unless (is_empty children)}}
 {{#each children}}
 {{> render_node}}
 {{/each}}
+{{/unless}}
 {{/inline}}
 {{#if (is_empty hierarchy_tree_edges)}}
   {{#each hierarchy_tree}}

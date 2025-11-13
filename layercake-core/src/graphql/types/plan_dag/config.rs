@@ -146,6 +146,7 @@ pub struct TreeArtefactNodeConfig {
 pub enum TreeArtefactRenderTarget {
     PlantUmlMindmap,
     MermaidMindmap,
+    MermaidTreemap,
 }
 
 #[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]

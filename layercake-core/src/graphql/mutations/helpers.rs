@@ -245,6 +245,7 @@ pub fn get_extension_for_format(format: &str) -> &str {
         "PlantUmlMindmap" => "puml",
         "Mermaid" => "mermaid",
         "MermaidMindmap" => "mmd",
+        "MermaidTreemap" => "mmd",
         _ => "txt",
     }
 }
@@ -257,7 +258,7 @@ pub fn get_mime_type_for_format(format: &str) -> String {
         "JSON" => "application/json",
         "CSV" | "CSVNodes" | "CSVEdges" => "text/csv",
         "PlantUML" | "PlantUmlMindmap" => "text/plain",
-        "Mermaid" | "MermaidMindmap" => "text/plain",
+        "Mermaid" | "MermaidMindmap" | "MermaidTreemap" => "text/plain",
         _ => "text/plain",
     }
     .to_string()
@@ -273,6 +274,7 @@ pub fn parse_export_format(format: &str) -> Result<ExportFileType> {
         "PlantUmlMindmap" => Ok(ExportFileType::PlantUmlMindmap),
         "Mermaid" => Ok(ExportFileType::Mermaid),
         "MermaidMindmap" => Ok(ExportFileType::MermaidMindmap),
+        "MermaidTreemap" => Ok(ExportFileType::MermaidTreemap),
         "CSVNodes" => Ok(ExportFileType::CSVNodes),
         "CSVEdges" => Ok(ExportFileType::CSVEdges),
         "CSV" => Ok(ExportFileType::CSVNodes), // Default CSV to nodes

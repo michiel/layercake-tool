@@ -146,7 +146,7 @@ export interface GraphArtefactNodeConfig {
 }
 
 // Tree Artefact Node Configuration
-export type TreeArtefactRenderTarget = 'PlantUmlMindmap' | 'MermaidMindmap';
+export type TreeArtefactRenderTarget = 'PlantUmlMindmap' | 'MermaidMindmap' | 'MermaidTreemap';
 
 export interface TreeArtefactNodeConfig {
   renderTarget: TreeArtefactRenderTarget;

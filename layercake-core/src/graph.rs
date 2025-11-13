@@ -183,6 +183,121 @@ impl Graph {
         tree
     }
 
+    /// Build a hierarchy tree based on edges rather than `belongs_to` metadata.
+    /// This is useful after GenerateHierarchy rewires structure into edges.
+    pub fn build_tree_from_edges(&self) -> Vec<TreeNode> {
+        use std::collections::{HashMap, HashSet};
+
+        if self.edges.is_empty() {
+            return Vec::new();
+        }
+
+        let mut children_map: HashMap<String, Vec<String>> = HashMap::new();
+        let mut has_parent: HashSet<String> = HashSet::new();
+        let mut referenced: HashSet<String> = HashSet::new();
+
+        for edge in &self.edges {
+            if self.get_node_by_id(&edge.source).is_none()
+                || self.get_node_by_id(&edge.target).is_none()
+            {
+                continue;
+            }
+            children_map
+                .entry(edge.source.clone())
+                .or_default()
+                .push(edge.target.clone());
+            has_parent.insert(edge.target.clone());
+            referenced.insert(edge.source.clone());
+            referenced.insert(edge.target.clone());
+        }
+
+        if children_map.is_empty() {
+            return Vec::new();
+        }
+
+        for child_ids in children_map.values_mut() {
+            child_ids.sort();
+            child_ids.dedup();
+        }
+
+        let hierarchy_root_ids: HashSet<String> = self
+            .nodes
+            .iter()
+            .filter(|node| {
+                node.is_partition
+                    && node.label == "Hierarchy"
+                    && node.belongs_to.as_deref() == Some("")
+            })
+            .map(|node| node.id.clone())
+            .collect();
+
+        let mut root_ids: Vec<String> = referenced
+            .into_iter()
+            .filter(|node_id| {
+                !hierarchy_root_ids.contains(node_id) && !has_parent.contains(node_id)
+            })
+            .collect();
+
+        if root_ids.is_empty() {
+            root_ids = children_map
+                .keys()
+                .filter(|node_id| !hierarchy_root_ids.contains(*node_id))
+                .cloned()
+                .collect();
+        }
+
+        root_ids.sort();
+        root_ids.dedup();
+
+        let mut visited = HashSet::new();
+        let mut result = Vec::new();
+        for root_id in root_ids {
+            if let Some(node) =
+                self.build_subtree_from_edges(&root_id, 0, &children_map, &mut visited)
+            {
+                result.push(node);
+            }
+        }
+        result
+    }
+
+    fn build_subtree_from_edges(
+        &self,
+        node_id: &str,
+        depth: i32,
+        children_map: &std::collections::HashMap<String, Vec<String>>,
+        visited: &mut std::collections::HashSet<String>,
+    ) -> Option<TreeNode> {
+        if !visited.insert(node_id.to_string()) {
+            return None;
+        }
+
+        let node = self.get_node_by_id(node_id)?;
+        let mut tree_node = TreeNode::from_node(node);
+        tree_node.depth = depth;
+
+        if tree_node.comment.is_none()
+            || tree_node.comment.as_ref().is_none_or(|s| s.is_empty())
+        {
+            tree_node.comment = Some("null".to_string());
+        }
+
+        if let Some(child_ids) = children_map.get(node_id) {
+            let mut children = Vec::new();
+            for child_id in child_ids {
+                if let Some(child_node) =
+                    self.build_subtree_from_edges(child_id, depth + 1, children_map, visited)
+                {
+                    children.push(child_node);
+                }
+            }
+            tree_node.children = children;
+        }
+
+        visited.remove(node_id);
+        Some(tree_node)
+    }
+
     pub fn remove_node(&mut self, id: String) {
         self.nodes.retain(|n| n.id != id);
     }
@@ -574,9 +689,10 @@ impl Graph {
             dataset: None,
         };
 
-        // Update existing nodes to belong to the new hierarchy node
+        // Update existing nodes to belong to the new hierarchy node and drop partition flags
         for node in self.nodes.iter_mut() {
             node.belongs_to = Some(hierarchy_node_id.clone());
+            node.is_partition = false;
         }
 
         self.nodes.push(hierarchy_node);

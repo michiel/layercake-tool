@@ -56,6 +56,9 @@ const ArtefactNodeBase = memo((props: ArtefactNodeProps) => {
   const hasValidConfig = data.hasValidConfig !== false
   const dagNodeType = kind === 'tree' ? PlanDagNodeType.TREE_ARTEFACT : PlanDagNodeType.GRAPH_ARTEFACT
   const isConfigured = isNodeConfigured(dagNodeType, props.id, edges, hasValidConfig)
+  const normalizedTarget = config.renderTarget?.toLowerCase()
+  const isMermaidMindmap = kind === 'tree' && normalizedTarget === 'mermaidmindmap'
+  const isMermaidTreemap = kind === 'tree' && normalizedTarget === 'mermaidtreemap'
 
   const projectId = data.projectId as number | undefined
 
@@ -164,46 +167,36 @@ const ArtefactNodeBase = memo((props: ArtefactNodeProps) => {
     },
   })
 
-  const handlePreview = async () => {
+  const requestPreview = async (target: 'text' | 'mermaid' | 'dot') => {
     if (!projectId || !isConfigured) return
 
-    setPreviewTarget('text')
-    setLoadingTarget('text')
-    setPreviewContent('')
+    setPreviewTarget(target)
+    setLoadingTarget(target)
+    if (target === 'mermaid') {
+      setMermaidContent('')
+    } else if (target === 'dot') {
+      setDotContent('')
+    } else {
+      setPreviewContent('')
+    }
     exportForPreview({
       variables: {
         projectId,
         nodeId: props.id,
       },
     })
+  }
+
+  const handlePreview = async () => {
+    await requestPreview('text')
   }
 
   const handleMermaidPreview = async () => {
-    if (!projectId || !isConfigured) return
-
-    setPreviewTarget('mermaid')
-    setLoadingTarget('mermaid')
-    setMermaidContent('')
-    exportForPreview({
-      variables: {
-        projectId,
-        nodeId: props.id,
-      },
-    })
+    await requestPreview('mermaid')
   }
 
   const handleDotPreview = async () => {
-    if (!projectId || !isConfigured) return
-
-    setPreviewTarget('dot')
-    setLoadingTarget('dot')
-    setDotContent('')
-    exportForPreview({
-      variables: {
-        projectId,
-        nodeId: props.id,
-      },
-    })
+    await requestPreview('dot')
   }
 
   const handleSelectAll = () => {
@@ -222,90 +215,129 @@ const ArtefactNodeBase = memo((props: ArtefactNodeProps) => {
     }
   }
 
-  const allowsMermaidPreview = config.renderTarget === 'Mermaid' || config.renderTarget === 'MermaidMindmap'
-  const allowsDotPreview = config.renderTarget === 'DOT'
+  const labelBadges = !isConfigured ? (
+    <Badge variant="outline" className="text-xs text-orange-600 border-orange-600">
+      Not Configured
+    </Badge>
+  ) : null
+
+  const displayMetadata = config.renderTarget
+    ? { ...(data.metadata ?? {}), label: config.renderTarget }
+    : data.metadata
+
+  const mermaidTooltip = isMermaidMindmap
+    ? 'Preview Mermaid mindmap'
+    : isMermaidTreemap
+      ? 'Preview Mermaid treemap'
+      : 'Preview Mermaid render'
 
   return (
     <>
       <BaseNode
         {...props}
-        onEdit={readonly ? undefined : onEdit}
-        onDelete={readonly ? undefined : onDelete}
+        nodeType={dagNodeType}
+        config={config}
+        metadata={displayMetadata}
+        onEdit={() => onEdit?.(props.id)}
+        onDelete={() => onDelete?.(props.id)}
         readonly={readonly}
+        edges={edges}
+        hasValidConfig={hasValidConfig}
+        labelBadges={labelBadges}
       >
-        <Stack gap="sm">
-          <Group gap="xs" className="flex-wrap">
-            <Badge variant="outline">
-              {config.renderTarget || (kind === 'tree' ? 'Tree Artefact' : 'Graph Artefact')}
-            </Badge>
-            {config.outputPath && (
-              <Badge variant="secondary" className="font-mono">
-                {config.outputPath}
-              </Badge>
-            )}
-          </Group>
+        <Stack gap="xs">
+          {!readonly && isConfigured && (
+            <Group justify="center" gap="xs">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-9 w-9 rounded-full"
+                      data-action-icon="preview"
+                      disabled={isTextPreviewLoading}
+                      onMouseDown={(e: React.MouseEvent) => {
+                        e.stopPropagation()
+                        e.preventDefault()
+                        handlePreview()
+                      }}
+                    >
+                      <IconEye size={12} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Preview export</TooltipContent>
+                </Tooltip>
+                {normalizedTarget?.includes('mermaid') && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-9 w-9 rounded-full text-purple-600"
+                        data-action-icon="mermaid-preview"
+                        disabled={isMermaidLoading}
+                        onMouseDown={(e: React.MouseEvent) => {
+                          e.stopPropagation()
+                          e.preventDefault()
+                          handleMermaidPreview()
+                        }}
+                      >
+                        <IconChartDots size={12} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{mermaidTooltip}</TooltipContent>
+                  </Tooltip>
+                )}
+                {kind === 'graph' && normalizedTarget === 'dot' && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-9 w-9 rounded-full text-green-600"
+                        data-action-icon="dot-preview"
+                        disabled={isDotLoading}
+                        onMouseDown={(e: React.MouseEvent) => {
+                          e.stopPropagation()
+                          e.preventDefault()
+                          handleDotPreview()
+                        }}
+                      >
+                        <IconNetwork size={12} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Preview Graphviz render</TooltipContent>
+                  </Tooltip>
+                )}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-9 w-9 rounded-full text-blue-600"
+                      data-action-icon="download"
+                      disabled={downloading}
+                      onMouseDown={(e: React.MouseEvent) => {
+                        e.stopPropagation()
+                        e.preventDefault()
+                        handleDownload()
+                      }}
+                    >
+                      <IconDownload size={12} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Download export</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </Group>
+          )}
 
-          <Group gap="xs" className="flex-wrap">
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={handlePreview}
-              disabled={previewTarget !== null || !isConfigured}
-            >
-              {isTextPreviewLoading ? 'Rendering…' : (
-                <Group gap="xs">
-                  <IconEye size={16} />
-                  <span>Preview</span>
-                </Group>
-              )}
-            </Button>
-
-            {kind === 'graph' && (
-              <>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={handleMermaidPreview}
-                  disabled={!allowsMermaidPreview || previewTarget !== null || !isConfigured}
-                >
-                  {isMermaidLoading ? 'Rendering…' : (
-                    <Group gap="xs">
-                      <IconChartDots size={16} />
-                      <span>Mermaid</span>
-                    </Group>
-                  )}
-                </Button>
-
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={handleDotPreview}
-                  disabled={!allowsDotPreview || previewTarget !== null || !isConfigured}
-                >
-                  {isDotLoading ? 'Rendering…' : (
-                    <Group gap="xs">
-                      <IconNetwork size={16} />
-                      <span>Graphviz</span>
-                    </Group>
-                  )}
-                </Button>
-              </>
-            )}
-
-            <Button
-              size="sm"
-              variant="default"
-              onClick={handleDownload}
-              disabled={downloading || !isConfigured}
-            >
-              {downloading ? 'Downloading…' : (
-                <Group gap="xs">
-                  <IconDownload size={16} />
-                  <span>Download</span>
-                </Group>
-              )}
-            </Button>
-          </Group>
+          {config.outputPath && (
+            <p className="text-xs text-muted-foreground font-mono line-clamp-1">
+              {config.outputPath}
+            </p>
+          )}
         </Stack>
       </BaseNode>
 

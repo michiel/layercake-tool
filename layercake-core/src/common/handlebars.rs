@@ -65,6 +65,15 @@ pub fn get_handlebars() -> Handlebars<'static> {
     });
     handlebars.register_helper("mindmap_indent", Box::new(mindmap_indent));
 
+    handlebars_helper!(treemap_value: |weight: i64| {
+        if weight <= 0 {
+            1
+        } else {
+            weight
+        }
+    });
+    handlebars.register_helper("treemap_value", Box::new(treemap_value));
+
     handlebars_helper!(puml_render_tree: |node: Value, layermap: Value, style_config: Value| {
         fn render_tree(
             node: Value,

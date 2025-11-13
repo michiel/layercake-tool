@@ -53,8 +53,9 @@ const getDefaultParams = (kind: GraphTransformKind): GraphTransform['params'] =>
       return { edgeLabelInsertNewlinesAt: 16 };
     case 'InvertGraph':
     case 'GenerateHierarchy':
-    case 'AggregateEdges':
       return { enabled: true };
+    case 'AggregateEdges':
+      return {};
     default:
       return {};
   }
@@ -66,9 +67,7 @@ const normalizeTransforms = (transforms: GraphTransform[]): GraphTransform[] => 
     .map(transform => {
       const params = transform.params || {};
       const needsEnabled =
-        transform.kind === 'InvertGraph' ||
-        transform.kind === 'GenerateHierarchy' ||
-        transform.kind === 'AggregateEdges';
+        transform.kind === 'InvertGraph' || transform.kind === 'GenerateHierarchy';
 
       return {
         kind: transform.kind,
@@ -92,10 +91,10 @@ const normalizeTransforms = (transforms: GraphTransform[]): GraphTransform[] => 
     deduped.push(transform);
   });
 
-  if (!aggregatorSeen) {
+  if (deduped.length === 0) {
     deduped.push({
-      kind: 'AggregateEdges',
-      params: { enabled: true },
+      kind: 'PartitionDepthLimit',
+      params: getDefaultParams('PartitionDepthLimit'),
     });
   }
 
@@ -143,15 +142,14 @@ const coerceTransformConfig = (raw: any): TransformNodeConfig => {
   }
 
   if (transforms.length === 0) {
-    transforms.push({
-      kind: 'AggregateEdges',
-      params: { enabled: true },
-    });
-  } else if (!transforms.some(t => t.kind === 'AggregateEdges')) {
-    transforms.push({
-      kind: 'AggregateEdges',
-      params: { enabled: true },
-    });
+    return {
+      transforms: [
+        {
+          kind: 'PartitionDepthLimit',
+          params: getDefaultParams('PartitionDepthLimit'),
+        },
+      ],
+    };
   }
 
   return { transforms };
@@ -451,28 +449,14 @@ export const TransformNodeConfigForm: React.FC<TransformNodeConfigFormProps> = (
         );
       case 'AggregateEdges':
         return (
-          <Stack gap="xs">
-            <div className="space-y-2">
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id={`aggregate-edges-${index}`}
-                  checked={transform.params.enabled ?? true}
-                  onCheckedChange={checked => updateTransformParam(index, 'enabled', checked)}
-                />
-                <Label htmlFor={`aggregate-edges-${index}`}>Aggregate duplicate edges</Label>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Combine edges that share the same source and target
-              </p>
-            </div>
-            <Alert>
-              <IconInfoCircle className="h-4 w-4" />
-              <AlertDescription>
-                Aggregation is applied by default to keep graphs readable. Disable to preserve duplicate
-                edges for analysis.
-              </AlertDescription>
-            </Alert>
-          </Stack>
+          <Alert>
+            <IconInfoCircle className="h-4 w-4" />
+            <AlertTitle>Aggregate duplicate edges</AlertTitle>
+            <AlertDescription>
+              Combine edges that share the same source and target. Remove this transform to keep
+              duplicate edges separate.
+            </AlertDescription>
+          </Alert>
         );
       default:
         return null;

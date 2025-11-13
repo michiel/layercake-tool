@@ -10,6 +10,7 @@ pub mod to_jsgraph;
 pub mod to_json;
 pub mod to_mermaid;
 pub mod to_mermaid_mindmap;
+pub mod to_mermaid_treemap;
 pub mod to_plantuml;
 pub mod to_plantuml_mindmap;
 
@@ -43,6 +44,7 @@ pub mod renderer {
             "hierarchy_nodes": graph.get_hierarchy_nodes(),
             "hierarchy_edges": graph.get_hierarchy_edges(),
             "hierarchy_tree": graph.build_json_tree(),
+            "hierarchy_tree_edges": graph.build_tree_from_edges(),
             "flow_nodes": graph.get_non_partition_nodes(),
             "flow_edges": graph.get_non_partition_edges(),
             "layers": graph.get_layer_map(),

@@ -230,6 +230,9 @@ fn export_graph(graph: &Graph, profile: &ExportProfileItem) -> Result<()> {
         ExportFileType::MermaidMindmap => {
             crate::export::to_mermaid_mindmap::render(&graph, &render_config)
         }
+        ExportFileType::MermaidTreemap => {
+            crate::export::to_mermaid_treemap::render(&graph, &render_config)
+        }
         ExportFileType::JSGraph => crate::export::to_jsgraph::render(&graph, &render_config),
         ExportFileType::Custom(template_config) => {
             crate::export::to_custom::render(&graph, &render_config, template_config)

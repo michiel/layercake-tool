@@ -70,16 +70,16 @@ impl GraphTransform {
         self.params.enabled.unwrap_or(true)
     }
 
-    pub fn apply_to(&self, graph: &mut Graph) -> AnyResult<bool> {
+    pub fn apply_to(&self, graph: &mut Graph) -> AnyResult<()> {
         if matches!(self.kind, GraphTransformKind::AggregateEdges) {
             if self.is_enabled() {
                 graph.aggregate_edges();
             }
-            return Ok(true);
+            return Ok(());
         }
 
         if !self.is_enabled() {
-            return Ok(false);
+            return Ok(());
         }
 
         match self.kind {
@@ -161,7 +161,7 @@ impl GraphTransform {
             }
         }
 
-        Ok(false)
+        Ok(())
     }
 }
 
@@ -180,12 +180,19 @@ pub enum GraphTransformKind {
 
 #[derive(SimpleObject, InputObject, Clone, Debug, Default, Serialize, Deserialize)]
 #[graphql(input_name = "GraphTransformParamsInput")]
+#[serde(rename_all = "camelCase")]
 pub struct GraphTransformParams {
+    #[serde(alias = "max_partition_depth")]
     pub max_partition_depth: Option<i32>,
+    #[serde(alias = "max_partition_width")]
     pub max_partition_width: Option<i32>,
+    #[serde(alias = "node_label_max_length")]
     pub node_label_max_length: Option<usize>,
+    #[serde(alias = "node_label_insert_newlines_at")]
     pub node_label_insert_newlines_at: Option<usize>,
+    #[serde(alias = "edge_label_max_length")]
     pub edge_label_max_length: Option<usize>,
+    #[serde(alias = "edge_label_insert_newlines_at")]
     pub edge_label_insert_newlines_at: Option<usize>,
     pub enabled: Option<bool>,
 }
@@ -314,16 +321,8 @@ impl TransformNodeConfig {
             ));
         }
 
-        let mut aggregate_handled = false;
         for transform in &self.transforms {
-            let handled = transform.apply_to(graph)?;
-            if handled {
-                aggregate_handled = true;
-            }
-        }
-
-        if !aggregate_handled {
-            graph.aggregate_edges();
+            transform.apply_to(graph)?;
         }
 
         Ok(())
@@ -448,7 +447,35 @@ mod tests {
     }
 
     #[test]
-    fn apply_transforms_runs_default_aggregate() {
+    fn apply_transforms_runs_aggregate_when_present() {
+        let mut graph = sample_graph();
+        let config = TransformNodeConfig {
+            transforms: vec![
+                GraphTransform {
+                    kind: GraphTransformKind::NodeLabelMaxLength,
+                    params: GraphTransformParams {
+                        node_label_max_length: Some(3),
+                        ..Default::default()
+                    },
+                },
+                GraphTransform {
+                    kind: GraphTransformKind::AggregateEdges,
+                    params: GraphTransformParams::default(),
+                },
+            ],
+        };
+
+        config
+            .apply_transforms(&mut graph)
+            .expect("transform should succeed");
+
+        assert_eq!(graph.nodes[0].label, "Alp");
+        assert_eq!(graph.edges.len(), 1);
+        assert_eq!(graph.edges[0].weight, 2);
+    }
+
+    #[test]
+    fn apply_transforms_skips_aggregate_when_not_requested() {
         let mut graph = sample_graph();
         let config = TransformNodeConfig {
             transforms: vec![GraphTransform {
@@ -464,9 +491,7 @@ mod tests {
             .apply_transforms(&mut graph)
             .expect("transform should succeed");
 
-        assert_eq!(graph.nodes[0].label, "Alp");
-        assert_eq!(graph.edges.len(), 1);
-        assert_eq!(graph.edges[0].weight, 2);
+        assert_eq!(graph.edges.len(), 2);
     }
 
     #[test]
@@ -602,6 +627,11 @@ mod tests {
                 "node {} should belong to hierarchy node",
                 node.id
             );
+            assert!(
+                !node.is_partition,
+                "node {} should no longer be marked as partition",
+                node.id
+            );
         }
 
         // Edges represent the former belongs_to relationships
@@ -613,5 +643,35 @@ mod tests {
             .collect();
         assert!(edge_pairs.contains(&("root".to_string(), "child".to_string())));
         assert!(edge_pairs.contains(&("child".to_string(), "leaf".to_string())));
+    }
+
+    #[test]
+    fn transform_params_deserialize_camel_case() {
+        let json = r#"{
+            "transforms": [
+                {
+                    "kind": "PartitionDepthLimit",
+                    "params": { "maxPartitionDepth": 3 }
+                },
+                {
+                    "kind": "NodeLabelInsertNewlines",
+                    "params": { "nodeLabelInsertNewlinesAt": 12 }
+                }
+            ]
+        }"#;
+
+        let config: TransformNodeConfig =
+            serde_json::from_str(json).expect("camelCase params should deserialize");
+
+        assert_eq!(
+            config.transforms[0].params.max_partition_depth,
+            Some(3),
+            "maxPartitionDepth should map to max_partition_depth"
+        );
+        assert_eq!(
+            config.transforms[1].params.node_label_insert_newlines_at,
+            Some(12),
+            "nodeLabelInsertNewlinesAt should map correctly"
+        );
     }
 }

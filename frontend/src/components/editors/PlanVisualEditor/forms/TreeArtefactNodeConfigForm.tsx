@@ -50,8 +50,8 @@ export const TreeArtefactNodeConfigForm: React.FC<TreeArtefactNodeConfigFormProp
         <IconInfoCircle className="h-4 w-4" />
         <AlertTitle>Tree Artefact Configuration</AlertTitle>
         <AlertDescription>
-          Produce hierarchical mindmaps using the upstream graph&apos;s partition structure. If no filename is
-          specified it will be auto-generated from the project name and file extension.
+          Produce hierarchical mindmaps or treemaps using the upstream graph&apos;s partition structure. If no
+          filename is specified it will be auto-generated from the project name and file extension.
         </AlertDescription>
       </Alert>
 
@@ -69,6 +69,7 @@ export const TreeArtefactNodeConfigForm: React.FC<TreeArtefactNodeConfigFormProp
           <SelectContent>
             <SelectItem value="PlantUmlMindmap">PlantUML Mindmap</SelectItem>
             <SelectItem value="MermaidMindmap">Mermaid Mindmap</SelectItem>
+            <SelectItem value="MermaidTreemap">Mermaid Treemap</SelectItem>
           </SelectContent>
         </Select>
       </div>
