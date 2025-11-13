@@ -1,10 +1,9 @@
 use chrono::Utc;
 use layercake as layercake_core;
-use layercake_core::database::entities::{
-    graph_edges, graph_layers, graph_nodes, graphs, plan_dag_nodes, plans, projects,
-};
+use layercake_core::database::entities::{graph_nodes, graphs, plan_dag_nodes, plans, projects};
 use layercake_core::database::migrations::Migrator;
-use layercake_core::services::{ApplyResult, GraphEditApplicator, GraphEditService};
+use layercake_core::services::graph_edit_applicator::{ApplyResult, GraphEditApplicator};
+use layercake_core::services::GraphEditService;
 use sea_orm::{
     ActiveModelTrait, ActiveValue, ColumnTrait, Database, DatabaseConnection, DbErr, EntityTrait,
     QueryFilter, Set,

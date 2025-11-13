@@ -26,7 +26,7 @@ async fn setup_test_app() -> anyhow::Result<(Arc<AppContext>, GraphQLSchema)> {
     let chat_manager = Arc::new(ChatManager::new());
     let graphql_context = GraphQLContext::new(app.clone(), system_settings, chat_manager);
 
-    let schema = Schema::build(Query, Mutation, Subscription)
+    let schema = Schema::build(Query, Mutation::default(), Subscription)
         .data(graphql_context)
         .finish();
 
@@ -325,8 +325,7 @@ async fn graphql_mcp_parity_smoke_test() -> anyhow::Result<()> {
         .expect("data source id should be an integer") as i32;
 
     let mcp_data_set = tool_result_json(
-        data_sets::get_data_set(Some(json!({ "data_set_id": data_set_id })), &app)
-            .await?,
+        data_sets::get_data_set(Some(json!({ "data_set_id": data_set_id })), &app).await?,
     )["dataSet"]
         .clone();
     assert!(
@@ -339,10 +338,7 @@ async fn graphql_mcp_parity_smoke_test() -> anyhow::Result<()> {
     assert_eq!(gql_data_set["dataType"], mcp_data_set["dataType"]);
     assert_eq!(gql_data_set["status"], mcp_data_set["status"]);
     assert_eq!(
-        parse_timestamp(
-            &gql_data_set["createdAt"],
-            "graphql data source createdAt"
-        ),
+        parse_timestamp(&gql_data_set["createdAt"], "graphql data source createdAt"),
         parse_timestamp(&mcp_data_set["createdAt"], "mcp data source createdAt")
     );
 

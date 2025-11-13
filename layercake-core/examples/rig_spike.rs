@@ -41,12 +41,9 @@ async fn test_basic_completion() -> Result<()> {
     use rig::providers;
 
     let client = providers::openai::Client::from_env();
+    let agent = client.agent(providers::openai::GPT_4O_MINI).build();
 
-    // Test model initialization
-    let model = client.completion_model(providers::openai::GPT_4O_MINI);
-
-    // Test basic prompt
-    let response = model
+    let response = agent
         .prompt("What is 2+2? Answer with just the number.")
         .await?;
 
@@ -59,20 +56,39 @@ async fn test_basic_completion() -> Result<()> {
 async fn test_streaming() -> Result<()> {
     println!("📡 Test 2: Streaming");
 
+    use futures_util::StreamExt;
     use rig::client::CompletionClient;
-    use rig::completion::Prompt;
     use rig::providers;
+    use rig::agent::MultiTurnStreamItem;
+    use rig::streaming::{StreamedAssistantContent, StreamingPrompt};
 
     let client = providers::openai::Client::from_env();
-    let model = client.completion_model(providers::openai::GPT_4O_MINI);
+    let agent = client.agent(providers::openai::GPT_4O_MINI).build();
 
-    // Test streaming - rig uses prompt() which returns full response
-    // For actual streaming, we'd use a different method
     println!("   Testing streaming API...");
 
-    let response = model.prompt("Count from 1 to 3").await?;
-    println!("   Response: {}", response);
-    println!("   ⚠️  Note: Need to investigate streaming API (may be agent-level)\n");
+    let mut stream = agent.stream_prompt("Count from 1 to 3").await;
+    let mut aggregated = String::new();
+
+    while let Some(chunk) = stream.next().await {
+        match chunk {
+            Ok(MultiTurnStreamItem::StreamItem(StreamedAssistantContent::Text(text))) => {
+                print!("{}", text.text);
+                aggregated.push_str(&text.text);
+            }
+            Ok(MultiTurnStreamItem::FinalResponse(final_response)) => {
+                println!("\n   Tokens used: {:?}", final_response.usage());
+            }
+            Ok(_) => {}
+            Err(err) => {
+                println!("   Streaming error: {err}");
+                break;
+            }
+        }
+    }
+
+    println!("   Aggregated response: {}", aggregated);
+    println!("   ✅ Streaming prompt worked\n");
 
     Ok(())
 }
@@ -152,7 +168,7 @@ async fn test_api_structure() -> Result<()> {
 
     // Document what we learn about the API
     println!("   - rig::prelude exports main types");
-    println!("   - rig::providers::{openai, anthropic, gemini, ollama}");
+    println!("   - rig::providers::{{openai, anthropic, gemini, ollama}}");
     println!("   - rig::tool::Tool trait");
     println!("   - rig::completion types");
     println!("   - Import: use `rig::` not `rig_core::`");
