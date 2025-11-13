@@ -12,7 +12,8 @@ import { DataSetNodeConfigForm } from './forms/DataSetNodeConfigForm';
 import { TransformNodeConfigForm } from './forms/TransformNodeConfigForm';
 import { FilterNodeConfigForm } from './forms/FilterNodeConfigForm';
 import { MergeNodeConfigForm } from './forms/MergeNodeConfigForm';
-import { OutputNodeConfigForm } from './forms/OutputNodeConfigForm';
+import { GraphArtefactNodeConfigForm } from './forms/GraphArtefactNodeConfigForm';
+import { TreeArtefactNodeConfigForm } from './forms/TreeArtefactNodeConfigForm';
 import { GraphNodeConfigForm } from './forms/GraphNodeConfigForm';
 
 interface NodeConfigDialogProps {
@@ -105,8 +106,10 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
         return <FilterNodeConfigForm {...commonProps} />;
       case PlanDagNodeType.MERGE:
         return <MergeNodeConfigForm {...commonProps} />;
-      case PlanDagNodeType.OUTPUT:
-        return <OutputNodeConfigForm {...commonProps} />;
+      case PlanDagNodeType.GRAPH_ARTEFACT:
+        return <GraphArtefactNodeConfigForm {...commonProps} />;
+      case PlanDagNodeType.TREE_ARTEFACT:
+        return <TreeArtefactNodeConfigForm {...commonProps} />;
       default:
         return <p className="text-destructive">Unknown node type: {nodeType}</p>;
     }
@@ -124,8 +127,10 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
         return 'Filter';
       case PlanDagNodeType.MERGE:
         return 'Merge';
-      case PlanDagNodeType.OUTPUT:
-        return 'Output';
+      case PlanDagNodeType.GRAPH_ARTEFACT:
+        return 'Graph Artefact';
+      case PlanDagNodeType.TREE_ARTEFACT:
+        return 'Tree Artefact';
       default:
         return 'Unknown';
     }

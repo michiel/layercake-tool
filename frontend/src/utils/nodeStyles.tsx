@@ -15,7 +15,7 @@ export enum OperationCategory {
   INPUT = 'INPUT',       // Data Source
   GRAPH = 'GRAPH',       // Graph operations
   OPERATION = 'OPERATION', // Transform, Filter, Merge
-  OUTPUT = 'OUTPUT',     // Output
+  OUTPUT = 'OUTPUT',     // Artefact nodes
 }
 
 /**
@@ -41,7 +41,8 @@ export const getOperationCategory = (nodeType: PlanDagNodeType): OperationCatego
     case PlanDagNodeType.FILTER:
     case PlanDagNodeType.MERGE:
       return OperationCategory.OPERATION
-    case PlanDagNodeType.OUTPUT:
+    case PlanDagNodeType.GRAPH_ARTEFACT:
+    case PlanDagNodeType.TREE_ARTEFACT:
       return OperationCategory.OUTPUT
     default:
       return OperationCategory.OPERATION
@@ -73,7 +74,8 @@ export const getNodeIcon = (nodeType: PlanDagNodeType, size: string | number = '
       return <IconFilter {...iconProps} />
     case PlanDagNodeType.MERGE:
       return <IconGitMerge {...iconProps} />
-    case PlanDagNodeType.OUTPUT:
+    case PlanDagNodeType.GRAPH_ARTEFACT:
+    case PlanDagNodeType.TREE_ARTEFACT:
       return <IconFileExport {...iconProps} />
     default:
       return <IconNetwork {...iconProps} />
@@ -95,8 +97,10 @@ export const getNodeTypeLabel = (nodeType: PlanDagNodeType): string => {
       return 'Filter'
     case PlanDagNodeType.MERGE:
       return 'Merge'
-    case PlanDagNodeType.OUTPUT:
-      return 'Output'
+    case PlanDagNodeType.GRAPH_ARTEFACT:
+      return 'Graph Artefact'
+    case PlanDagNodeType.TREE_ARTEFACT:
+      return 'Tree Artefact'
     default:
       return 'Unknown'
   }

@@ -143,10 +143,12 @@ pub enum ExportFileType {
     DOTHierarchy,
     JSON,
     PlantUML,
+    PlantUmlMindmap,
     CSVNodes,
     CSVEdges,
     CSVMatrix,
     Mermaid,
+    MermaidMindmap,
     JSGraph,
     Custom(CustomExportProfile),
 }

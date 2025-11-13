@@ -78,10 +78,16 @@ export const AdvancedToolbar: React.FC<AdvancedToolbarProps> = ({
       color: '#8b5cf6' // Violet-500
     },
     {
-      type: PlanDagNodeType.OUTPUT,
-      label: 'Output',
+      type: PlanDagNodeType.GRAPH_ARTEFACT,
+      label: 'Graph Artefact',
       icon: <IconFileExport size="0.7rem" />,
       color: '#f59e0b' // Amber-500
+    },
+    {
+      type: PlanDagNodeType.TREE_ARTEFACT,
+      label: 'Tree Artefact',
+      icon: <IconFileExport size="0.7rem" />,
+      color: '#a855f7' // Purple-500
     }
   ];
 

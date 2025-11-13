@@ -803,7 +803,9 @@ fn parse_export_format(format: &str) -> Result<ExportFileType, String> {
         "DOT" => Ok(ExportFileType::DOT),
         "GML" => Ok(ExportFileType::GML),
         "PLANTUML" | "PLANT_UML" => Ok(ExportFileType::PlantUML),
+        "PLANTUML_MINDMAP" | "PLANT_UML_MINDMAP" => Ok(ExportFileType::PlantUmlMindmap),
         "MERMAID" => Ok(ExportFileType::Mermaid),
+        "MERMAID_MINDMAP" => Ok(ExportFileType::MermaidMindmap),
         other => Err(format!("Unsupported export format: {}", other)),
     }
 }

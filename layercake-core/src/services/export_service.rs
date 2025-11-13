@@ -1,7 +1,10 @@
 use anyhow::Result;
 use sea_orm::DatabaseConnection;
 
-use crate::export::{to_csv_edges, to_csv_nodes, to_dot, to_gml, to_json, to_mermaid, to_plantuml};
+use crate::export::{
+    to_csv_edges, to_csv_nodes, to_dot, to_gml, to_json, to_mermaid, to_mermaid_mindmap,
+    to_plantuml, to_plantuml_mindmap,
+};
 use crate::graph::Graph;
 use crate::plan::{ExportFileType, Plan, RenderConfig, RenderConfigOrientation, RenderConfigTheme};
 pub struct ExportService {
@@ -46,6 +49,12 @@ impl ExportService {
                 Ok(to_plantuml::render(graph, &render_config)
                     .map_err(|e| anyhow::anyhow!("{}", e))?)
             }
+            ExportFileType::PlantUmlMindmap => {
+                Ok(to_plantuml_mindmap::render(graph, &render_config)
+                    .map_err(|e| anyhow::anyhow!("{}", e))?)
+            }
+            ExportFileType::MermaidMindmap => Ok(to_mermaid_mindmap::render(graph, &render_config)
+                .map_err(|e| anyhow::anyhow!("{}", e))?),
             ExportFileType::CSVNodes => Ok(to_csv_nodes::render(graph, &render_config)
                 .map_err(|e| anyhow::anyhow!("{}", e))?),
             ExportFileType::CSVEdges => Ok(to_csv_edges::render(graph, &render_config)

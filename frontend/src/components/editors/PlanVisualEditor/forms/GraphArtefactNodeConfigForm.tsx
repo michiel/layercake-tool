@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { IconInfoCircle } from '@tabler/icons-react';
-import { OutputNodeConfig } from '../../../../types/plan-dag';
+import { GraphArtefactNodeConfig, GraphArtefactRenderTarget } from '../../../../types/plan-dag';
 import { Stack } from '@/components/layout-primitives';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
@@ -8,14 +8,14 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 
-interface OutputNodeConfigFormProps {
-  config: OutputNodeConfig;
-  setConfig: (config: OutputNodeConfig) => void;
+interface GraphArtefactNodeConfigFormProps {
+  config: GraphArtefactNodeConfig;
+  setConfig: (config: GraphArtefactNodeConfig) => void;
   setIsValid: (isValid: boolean) => void;
   projectId: number;
 }
 
-export const OutputNodeConfigForm: React.FC<OutputNodeConfigFormProps> = ({
+export const GraphArtefactNodeConfigForm: React.FC<GraphArtefactNodeConfigFormProps> = ({
   config,
   setConfig,
   setIsValid,
@@ -29,8 +29,8 @@ export const OutputNodeConfigForm: React.FC<OutputNodeConfigFormProps> = ({
     theme: config.renderConfig?.theme ?? 'Light'
   };
 
-  const [localConfig, setLocalConfig] = useState<OutputNodeConfig>({
-    renderTarget: config.renderTarget || 'DOT',
+  const [localConfig, setLocalConfig] = useState<GraphArtefactNodeConfig>({
+    renderTarget: (config.renderTarget || 'DOT') as GraphArtefactRenderTarget,
     outputPath: config.outputPath ?? '',
     renderConfig: initialRenderConfig,
     graphConfig: config.graphConfig || {}
@@ -61,7 +61,9 @@ export const OutputNodeConfigForm: React.FC<OutputNodeConfigFormProps> = ({
         <Label htmlFor="render-target">Render Target</Label>
         <Select
           value={localConfig.renderTarget}
-          onValueChange={(value) => setLocalConfig(prev => ({ ...prev, renderTarget: value as any }))}
+          onValueChange={(value) =>
+            setLocalConfig(prev => ({ ...prev, renderTarget: value as GraphArtefactRenderTarget }))
+          }
         >
           <SelectTrigger id="render-target">
             <SelectValue placeholder="Select render target" />

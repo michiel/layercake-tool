@@ -221,21 +221,27 @@ export class ReactFlowAdapter {
       'transform': 'TransformNode',
       'filter': 'FilterNode',
       'merge': 'MergeNode',
-      'output': 'OutputNode',
+      'output': 'GraphArtefactNode',
+      'graph_artefact': 'GraphArtefactNode',
+      'tree_artefact': 'TreeArtefactNode',
       'graph': 'GraphNode',
       // Backend may return capitalized variants
       'DataSet': 'DataSetNode',
       'Transform': 'TransformNode',
       'Filter': 'FilterNode',
       'Merge': 'MergeNode',
-      'Output': 'OutputNode',
+      'Output': 'GraphArtefactNode',
+      'GraphArtefact': 'GraphArtefactNode',
+      'TreeArtefact': 'TreeArtefactNode',
       'Graph': 'GraphNode',
       // TypeScript enum format (PascalCase) - pass through
       'DataSetNode': 'DataSetNode',
       'TransformNode': 'TransformNode',
       'FilterNode': 'FilterNode',
       'MergeNode': 'MergeNode',
-      'OutputNode': 'OutputNode',
+      'OutputNode': 'GraphArtefactNode', // legacy
+      'GraphArtefactNode': 'GraphArtefactNode',
+      'TreeArtefactNode': 'TreeArtefactNode',
       'GraphNode': 'GraphNode'
     }
 
@@ -256,7 +262,9 @@ export class ReactFlowAdapter {
       'TransformNode': 'transform',
       'FilterNode': 'filter',
       'MergeNode': 'merge',
-      'OutputNode': 'output',
+      'OutputNode': 'graph_artefact',
+      'GraphArtefactNode': 'graph_artefact',
+      'TreeArtefactNode': 'tree_artefact',
       'GraphNode': 'graph'
     }
 

@@ -515,8 +515,7 @@ impl Graph {
             .map(|node| (node.id.clone(), node.clone()))
             .collect();
 
-        let mut existing_ids: HashSet<String> =
-            snapshot.iter().map(|node| node.id.clone()).collect();
+        let existing_ids: HashSet<String> = snapshot.iter().map(|node| node.id.clone()).collect();
         let hierarchy_node_id = if !existing_ids.contains("hierarchy") {
             "hierarchy".to_string()
         } else {

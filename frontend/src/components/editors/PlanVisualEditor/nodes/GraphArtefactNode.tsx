@@ -14,37 +14,27 @@ import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Stack, Group } from '@/components/layout-primitives'
 import { IconDownload, IconEye, IconCopy, IconSelect, IconChartDots, IconNetwork } from '@tabler/icons-react'
-import { PlanDagNodeType, OutputNodeConfig } from '../../../../types/plan-dag'
+import { PlanDagNodeType, GraphArtefactNodeConfig, TreeArtefactNodeConfig } from '../../../../types/plan-dag'
 import { isNodeConfigured } from '../../../../utils/planDagValidation'
 import { EXPORT_NODE_OUTPUT, ExportNodeOutputResult } from '../../../../graphql/export'
 import { BaseNode } from './BaseNode'
 import { showErrorNotification, showSuccessNotification } from '../../../../utils/notifications'
 import { MermaidPreviewDialog, DotPreviewDialog } from '../../../visualization'
 
-interface OutputNodeProps extends NodeProps {
+type ArtefactConfig = GraphArtefactNodeConfig | TreeArtefactNodeConfig
+
+interface ExtendedNodeProps extends NodeProps {
   onEdit?: (nodeId: string) => void
   onDelete?: (nodeId: string) => void
   readonly?: boolean
 }
 
-// Map render targets to file extensions (currently unused - backend generates filename)
-// const getRenderTargetExtension = (renderTarget: string): string => {
-//   const extensionMap: Record<string, string> = {
-//     'DOT': 'dot',
-//     'GraphML': 'graphml',
-//     'GML': 'gml',
-//     'JSON': 'json',
-//     'CSV': 'csv',
-//     'PNG': 'png',
-//     'SVG': 'svg',
-//     'PlantUML': 'puml',
-//     'Mermaid': 'mermaid',
-//   }
-//   return extensionMap[renderTarget] || 'txt'
-// }
+interface ArtefactNodeProps extends ExtendedNodeProps {
+  kind: 'graph' | 'tree'
+}
 
-export const OutputNode = memo((props: OutputNodeProps) => {
-  const { data, onEdit, onDelete, readonly = false } = props
+const ArtefactNodeBase = memo((props: ArtefactNodeProps) => {
+  const { data, onEdit, onDelete, readonly = false, kind } = props
   const [downloading, setDownloading] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [previewContent, setPreviewContent] = useState('')
@@ -60,22 +50,19 @@ export const OutputNode = memo((props: OutputNodeProps) => {
   const isMermaidLoading = loadingTarget === 'mermaid'
   const isDotLoading = loadingTarget === 'dot'
 
-  const config = data.config as OutputNodeConfig
+  const config = data.config as ArtefactConfig
 
-  // Check if node is configured
   const edges = data.edges || []
   const hasValidConfig = data.hasValidConfig !== false
-  const isConfigured = isNodeConfigured(PlanDagNodeType.OUTPUT, props.id, edges, hasValidConfig)
+  const dagNodeType = kind === 'tree' ? PlanDagNodeType.TREE_ARTEFACT : PlanDagNodeType.GRAPH_ARTEFACT
+  const isConfigured = isNodeConfigured(dagNodeType, props.id, edges, hasValidConfig)
 
-  // Get project ID from context
   const projectId = data.projectId as number | undefined
 
-  // Export mutation
   const [exportNodeOutput] = useMutation(EXPORT_NODE_OUTPUT, {
     onCompleted: (data: any) => {
       const result = data.exportNodeOutput as ExportNodeOutputResult
       if (result.success) {
-        // Decode base64 content and trigger download
         try {
           const binaryString = atob(result.content)
           const bytes = new Uint8Array(binaryString.length)
@@ -120,7 +107,6 @@ export const OutputNode = memo((props: OutputNodeProps) => {
     })
   }
 
-  // Preview mutation (separate from download)
   const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
     onCompleted: (data: any) => {
       const result = data.exportNodeOutput as ExportNodeOutputResult
@@ -141,21 +127,22 @@ export const OutputNode = memo((props: OutputNodeProps) => {
           console.error('Failed to decode content:', error)
           showErrorNotification('Preview Failed', 'Failed to decode export content')
           if (previewTarget === 'mermaid') {
-            setMermaidContent('')
+            setMermaidContent('Error: Failed to decode content')
           } else if (previewTarget === 'dot') {
-            setDotContent('')
+            setDotContent('Error: Failed to decode content')
           } else {
             setPreviewContent('Error: Failed to decode content')
           }
         }
       } else {
         showErrorNotification('Preview Failed', result.message)
+        const message = `Error: ${result.message}`
         if (previewTarget === 'mermaid') {
-          setMermaidContent(`Error: ${result.message}`)
+          setMermaidContent(message)
         } else if (previewTarget === 'dot') {
-          setDotContent(`Error: ${result.message}`)
+          setDotContent(message)
         } else {
-          setPreviewContent(`Error: ${result.message}`)
+          setPreviewContent(message)
         }
       }
       setLoadingTarget(null)
@@ -164,12 +151,13 @@ export const OutputNode = memo((props: OutputNodeProps) => {
     onError: (error: any) => {
       console.error('Export failed:', error.message)
       showErrorNotification('Preview Failed', error.message)
+      const message = `Error: ${error.message}`
       if (previewTarget === 'mermaid') {
-        setMermaidContent(`Error: ${error.message}`)
+        setMermaidContent(message)
       } else if (previewTarget === 'dot') {
-        setDotContent(`Error: ${error.message}`)
+        setDotContent(message)
       } else {
-        setPreviewContent(`Error: ${error.message}`)
+        setPreviewContent(message)
       }
       setLoadingTarget(null)
       setPreviewTarget(null)
@@ -219,150 +207,112 @@ export const OutputNode = memo((props: OutputNodeProps) => {
   }
 
   const handleSelectAll = () => {
-    if (textareaRef.current) {
-      textareaRef.current.select()
-    }
+    textareaRef.current?.focus()
+    textareaRef.current?.select()
   }
 
   const handleCopyToClipboard = async () => {
+    if (!previewContent) return
     try {
       await navigator.clipboard.writeText(previewContent)
-      showSuccessNotification('Copied', 'Content copied to clipboard')
+      showSuccessNotification('Copied', 'Preview copied to clipboard')
     } catch (error) {
-      console.error('Failed to copy to clipboard:', error)
-      showErrorNotification('Copy Failed', 'Failed to copy content to clipboard')
+      console.error('Failed to copy text:', error)
+      showErrorNotification('Copy Failed', 'Unable to copy preview to clipboard')
     }
   }
 
-  // Custom label badges for output node
-  const labelBadges = !isConfigured ? (
-    <Badge variant="outline" className="text-xs text-orange-600 border-orange-600">
-      Not Configured
-    </Badge>
-  ) : null
-
-  // Override metadata to use renderTarget as label if available
-  const displayMetadata = config.renderTarget
-    ? { ...data.metadata, label: config.renderTarget }
-    : data.metadata
+  const allowsMermaidPreview = config.renderTarget === 'Mermaid' || config.renderTarget === 'MermaidMindmap'
+  const allowsDotPreview = config.renderTarget === 'DOT'
 
   return (
     <>
       <BaseNode
         {...props}
-        nodeType={PlanDagNodeType.OUTPUT}
-        config={config}
-        metadata={displayMetadata}
-        onEdit={() => onEdit?.(props.id)}
-        onDelete={() => onDelete?.(props.id)}
+        onEdit={readonly ? undefined : onEdit}
+        onDelete={readonly ? undefined : onDelete}
         readonly={readonly}
-        edges={edges}
-        hasValidConfig={hasValidConfig}
-        labelBadges={labelBadges}
       >
-        <Stack gap="xs">
-          {/* Download and preview buttons */}
-          {!readonly && isConfigured && (
-            <Group justify="center" gap="xs">
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-9 w-9 rounded-full"
-                      data-action-icon="preview"
-                      disabled={isTextPreviewLoading}
-                      onMouseDown={(e: React.MouseEvent) => {
-                        e.stopPropagation()
-                        e.preventDefault()
-                        handlePreview()
-                      }}
-                    >
-                      <IconEye size={12} />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Preview export</TooltipContent>
-                </Tooltip>
-                {config.renderTarget === 'Mermaid' && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-9 w-9 rounded-full text-purple-600"
-                        data-action-icon="mermaid"
-                        disabled={isMermaidLoading}
-                        onMouseDown={(e: React.MouseEvent) => {
-                          e.stopPropagation()
-                          e.preventDefault()
-                          handleMermaidPreview()
-                        }}
-                      >
-                        <IconChartDots size={12} />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Render Mermaid preview</TooltipContent>
-                  </Tooltip>
-                )}
-                {config.renderTarget === 'DOT' && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-9 w-9 rounded-full text-green-600"
-                        data-action-icon="dot"
-                        disabled={isDotLoading}
-                        onMouseDown={(e: React.MouseEvent) => {
-                          e.stopPropagation()
-                          e.preventDefault()
-                          handleDotPreview()
-                        }}
-                      >
-                        <IconNetwork size={12} />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Render Graphviz preview</TooltipContent>
-                  </Tooltip>
-                )}
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-9 w-9 rounded-full text-blue-600"
-                      data-action-icon="download"
-                      disabled={downloading}
-                      onMouseDown={(e: React.MouseEvent) => {
-                        e.stopPropagation()
-                        e.preventDefault()
-                        handleDownload()
-                      }}
-                    >
-                      <IconDownload size={12} />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Download export</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </Group>
-          )}
+        <Stack gap="sm">
+          <Group gap="xs" className="flex-wrap">
+            <Badge variant="outline">
+              {config.renderTarget || (kind === 'tree' ? 'Tree Artefact' : 'Graph Artefact')}
+            </Badge>
+            {config.outputPath && (
+              <Badge variant="secondary" className="font-mono">
+                {config.outputPath}
+              </Badge>
+            )}
+          </Group>
 
-          {/* Output metadata */}
-          {config.outputPath && (
-            <p className="text-xs text-muted-foreground font-mono line-clamp-1">
-              {config.outputPath}
-            </p>
-          )}
+          <Group gap="xs" className="flex-wrap">
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={handlePreview}
+              disabled={previewTarget !== null || !isConfigured}
+            >
+              {isTextPreviewLoading ? 'Rendering…' : (
+                <Group gap="xs">
+                  <IconEye size={16} />
+                  <span>Preview</span>
+                </Group>
+              )}
+            </Button>
+
+            {kind === 'graph' && (
+              <>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={handleMermaidPreview}
+                  disabled={!allowsMermaidPreview || previewTarget !== null || !isConfigured}
+                >
+                  {isMermaidLoading ? 'Rendering…' : (
+                    <Group gap="xs">
+                      <IconChartDots size={16} />
+                      <span>Mermaid</span>
+                    </Group>
+                  )}
+                </Button>
+
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={handleDotPreview}
+                  disabled={!allowsDotPreview || previewTarget !== null || !isConfigured}
+                >
+                  {isDotLoading ? 'Rendering…' : (
+                    <Group gap="xs">
+                      <IconNetwork size={16} />
+                      <span>Graphviz</span>
+                    </Group>
+                  )}
+                </Button>
+              </>
+            )}
+
+            <Button
+              size="sm"
+              variant="default"
+              onClick={handleDownload}
+              disabled={downloading || !isConfigured}
+            >
+              {downloading ? 'Downloading…' : (
+                <Group gap="xs">
+                  <IconDownload size={16} />
+                  <span>Download</span>
+                </Group>
+              )}
+            </Button>
+          </Group>
         </Stack>
       </BaseNode>
 
-      {/* Preview Dialog - Rendered outside BaseNode to avoid ReactFlow node clipping */}
       <Dialog open={previewOpen} onOpenChange={(open) => !open && setPreviewOpen(false)}>
         <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>Export Preview: {config.renderTarget || 'Output'}</DialogTitle>
+            <DialogTitle>Export Preview: {config.renderTarget || 'Artefact'}</DialogTitle>
           </DialogHeader>
           <div className="flex-1 overflow-hidden">
             <Stack gap="md">
@@ -397,24 +347,32 @@ export const OutputNode = memo((props: OutputNodeProps) => {
               </ScrollArea>
             </Stack>
           </div>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
 
       <MermaidPreviewDialog
         open={mermaidOpen}
         onClose={() => setMermaidOpen(false)}
         diagram={mermaidContent}
-        title={`Mermaid Preview: ${data.metadata?.label || config.renderTarget || 'Output'}`}
+        title={`Mermaid Preview: ${data.metadata?.label || config.renderTarget || 'Artefact'}`}
       />
 
       <DotPreviewDialog
         open={dotOpen}
         onClose={() => setDotOpen(false)}
         diagram={dotContent}
-        title={`Graphviz Preview: ${data.metadata?.label || config.renderTarget || 'Output'}`}
+        title={`Graphviz Preview: ${data.metadata?.label || config.renderTarget || 'Artefact'}`}
       />
     </>
   )
 })
 
-OutputNode.displayName = 'OutputNode'
+ArtefactNodeBase.displayName = 'ArtefactNodeBase'
+
+export const GraphArtefactNode = memo((props: ExtendedNodeProps) => (
+  <ArtefactNodeBase {...props} kind="graph" />
+))
+
+export const TreeArtefactNode = memo((props: ExtendedNodeProps) => (
+  <ArtefactNodeBase {...props} kind="tree" />
+))

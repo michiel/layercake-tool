@@ -132,7 +132,7 @@ impl DagExecutor {
                     )
                     .await?;
             }
-            "OutputNode" => {
+            "GraphArtefactNode" | "TreeArtefactNode" => {
                 // Output nodes deliver exports on demand; no proactive execution required
                 return Ok(());
             }
@@ -696,12 +696,14 @@ impl DagExecutor {
         all_affected.extend(affected);
 
         // Filter nodes to only affected ones that require automatic execution.
-        // Skip downstream OutputNodes since they are executed on-demand for previews/exports.
+        // Skip downstream ArtefactNodes since they are executed on-demand for previews/exports.
         let affected_nodes: Vec<_> = nodes
             .iter()
             .filter(|n| {
                 all_affected.contains(&n.id)
-                    && (n.id == changed_node_id || n.node_type != "OutputNode")
+                    && (n.id == changed_node_id
+                        || (n.node_type != "GraphArtefactNode"
+                            && n.node_type != "TreeArtefactNode"))
             })
             .cloned()
             .collect();

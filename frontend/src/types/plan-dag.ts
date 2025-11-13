@@ -31,7 +31,8 @@ export enum PlanDagNodeType {
   TRANSFORM = 'TransformNode',
   FILTER = 'FilterNode',
   MERGE = 'MergeNode',
-  OUTPUT = 'OutputNode'
+  GRAPH_ARTEFACT = 'GraphArtefactNode',
+  TREE_ARTEFACT = 'TreeArtefactNode',
 }
 
 // Data Source Node Configuration
@@ -112,10 +113,43 @@ export interface MergeNodeConfig {
   conflictResolution: 'PreferFirst' | 'PreferLast' | 'Manual';
 }
 
-// Output Node Configuration
-export interface OutputNodeConfig {
-  // Removed: sourceGraphRef - source comes from incoming edge connection
-  renderTarget: 'DOT' | 'GML' | 'JSON' | 'PlantUML' | 'CSVNodes' | 'CSVEdges' | 'Mermaid' | 'Custom';
+// Graph Artefact Node Configuration
+export type GraphArtefactRenderTarget =
+  | 'DOT'
+  | 'GML'
+  | 'JSON'
+  | 'PlantUML'
+  | 'CSVNodes'
+  | 'CSVEdges'
+  | 'Mermaid'
+  | 'Custom';
+
+export interface GraphArtefactNodeConfig {
+  renderTarget: GraphArtefactRenderTarget;
+  outputPath: string;
+  renderConfig?: {
+    containNodes?: boolean;
+    orientation?: 'LR' | 'TB';
+    useDefaultStyling?: boolean;
+    theme?: 'Light' | 'Dark';
+  };
+    graphConfig?: {
+    generateHierarchy?: boolean;
+    maxPartitionDepth?: number | null;
+    maxPartitionWidth?: number | null;
+    invertGraph?: boolean;
+    nodeLabelMaxLength?: number;
+    nodeLabelInsertNewlinesAt?: number;
+    edgeLabelMaxLength?: number;
+    edgeLabelInsertNewlinesAt?: number;
+  };
+}
+
+// Tree Artefact Node Configuration
+export type TreeArtefactRenderTarget = 'PlantUmlMindmap' | 'MermaidMindmap';
+
+export interface TreeArtefactNodeConfig {
+  renderTarget: TreeArtefactRenderTarget;
   outputPath: string;
   renderConfig?: {
     containNodes?: boolean;
@@ -142,7 +176,8 @@ export type NodeConfig =
   | TransformNodeConfig
   | FilterNodeConfig
   | MergeNodeConfig
-  | OutputNodeConfig;
+  | GraphArtefactNodeConfig
+  | TreeArtefactNodeConfig;
 
 // Execution metadata for DataSet nodes
 export interface DataSetExecutionMetadata {

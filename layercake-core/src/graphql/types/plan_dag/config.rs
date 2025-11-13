@@ -109,19 +109,19 @@ pub enum ConflictResolution {
     Manual,
 }
 
-// Output Node Configuration
+// Graph Artefact Node Configuration
 #[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
-#[graphql(input_name = "OutputNodeConfigInput")]
-pub struct OutputNodeConfig {
+#[graphql(input_name = "GraphArtefactNodeConfigInput")]
+pub struct GraphArtefactNodeConfig {
     // Removed: source_graph_ref - source comes from incoming edge connection
-    pub render_target: RenderTarget,
+    pub render_target: GraphArtefactRenderTarget,
     pub output_path: String,
     pub render_config: Option<RenderConfig>,
     pub graph_config: Option<GraphConfig>,
 }
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
-pub enum RenderTarget {
+pub enum GraphArtefactRenderTarget {
     Dot,
     Gml,
     Json,
@@ -130,6 +130,22 @@ pub enum RenderTarget {
     CsvEdges,
     Mermaid,
     Custom,
+}
+
+// Tree Artefact Node Configuration
+#[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
+#[graphql(input_name = "TreeArtefactNodeConfigInput")]
+pub struct TreeArtefactNodeConfig {
+    pub render_target: TreeArtefactRenderTarget,
+    pub output_path: String,
+    pub render_config: Option<RenderConfig>,
+    pub graph_config: Option<GraphConfig>,
+}
+
+#[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
+pub enum TreeArtefactRenderTarget {
+    PlantUmlMindmap,
+    MermaidMindmap,
 }
 
 #[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
@@ -175,5 +191,6 @@ pub enum NodeConfig {
     Transform(super::transforms::TransformNodeConfig),
     Filter(super::filter::FilterNodeConfig),
     Merge(MergeNodeConfig),
-    Output(OutputNodeConfig),
+    GraphArtefact(GraphArtefactNodeConfig),
+    TreeArtefact(TreeArtefactNodeConfig),
 }

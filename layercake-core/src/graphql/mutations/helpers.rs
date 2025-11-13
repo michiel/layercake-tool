@@ -21,7 +21,8 @@ pub fn generate_node_id_from_ids(
         PlanDagNodeType::Transform => "transform",
         PlanDagNodeType::Filter => "filter",
         PlanDagNodeType::Merge => "merge",
-        PlanDagNodeType::Output => "output",
+        PlanDagNodeType::GraphArtefact => "graphartefact",
+        PlanDagNodeType::TreeArtefact => "treeartefact",
     };
 
     // Generate a globally unique ID using UUID to prevent collisions across projects/plans
@@ -40,10 +41,19 @@ pub fn generate_edge_id(_source: &str, _target: &str) -> String {
     format!("edge_{}", short_uuid)
 }
 
-/// Stored output node configuration
+/// Stored graph artefact node configuration
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct StoredOutputNodeConfig {
+pub struct StoredGraphArtefactNodeConfig {
+    pub render_target: Option<String>,
+    pub output_path: Option<String>,
+    pub render_config: Option<StoredRenderConfig>,
+}
+
+/// Stored tree artefact node configuration (currently shares the same fields)
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StoredTreeArtefactNodeConfig {
     pub render_target: Option<String>,
     pub output_path: Option<String>,
     pub render_config: Option<StoredRenderConfig>,
@@ -232,7 +242,9 @@ pub fn get_extension_for_format(format: &str) -> &str {
         "CSVNodes" => "csv",
         "CSVEdges" => "csv",
         "PlantUML" => "puml",
+        "PlantUmlMindmap" => "puml",
         "Mermaid" => "mermaid",
+        "MermaidMindmap" => "mmd",
         _ => "txt",
     }
 }
@@ -244,8 +256,8 @@ pub fn get_mime_type_for_format(format: &str) -> String {
         "GML" => "text/plain",
         "JSON" => "application/json",
         "CSV" | "CSVNodes" | "CSVEdges" => "text/csv",
-        "PlantUML" => "text/plain",
-        "Mermaid" => "text/plain",
+        "PlantUML" | "PlantUmlMindmap" => "text/plain",
+        "Mermaid" | "MermaidMindmap" => "text/plain",
         _ => "text/plain",
     }
     .to_string()
@@ -258,7 +270,9 @@ pub fn parse_export_format(format: &str) -> Result<ExportFileType> {
         "GML" => Ok(ExportFileType::GML),
         "JSON" => Ok(ExportFileType::JSON),
         "PlantUML" => Ok(ExportFileType::PlantUML),
+        "PlantUmlMindmap" => Ok(ExportFileType::PlantUmlMindmap),
         "Mermaid" => Ok(ExportFileType::Mermaid),
+        "MermaidMindmap" => Ok(ExportFileType::MermaidMindmap),
         "CSVNodes" => Ok(ExportFileType::CSVNodes),
         "CSVEdges" => Ok(ExportFileType::CSVEdges),
         "CSV" => Ok(ExportFileType::CSVNodes), // Default CSV to nodes

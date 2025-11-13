@@ -53,6 +53,18 @@ pub fn get_handlebars() -> Handlebars<'static> {
     });
     handlebars.register_helper("is_empty", Box::new(is_empty));
 
+    handlebars_helper!(mindmap_prefix: |depth: i64| {
+        let depth = if depth < 0 { 0 } else { depth };
+        "*".repeat((depth + 2) as usize)
+    });
+    handlebars.register_helper("mindmap_prefix", Box::new(mindmap_prefix));
+
+    handlebars_helper!(mindmap_indent: |depth: i64| {
+        let depth = if depth < 0 { 0 } else { depth };
+        "  ".repeat((depth + 1) as usize)
+    });
+    handlebars.register_helper("mindmap_indent", Box::new(mindmap_indent));
+
     handlebars_helper!(puml_render_tree: |node: Value, layermap: Value, style_config: Value| {
         fn render_tree(
             node: Value,

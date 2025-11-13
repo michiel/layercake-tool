@@ -7,6 +7,14 @@ This document outlines the implementation plan for modernizing the artefact-gene
 2. Support tree/mindmap exports via a new TreeArtefactNode that can render both PlantUML Mindmap and Mermaid Mindmap outputs.
 3. Preserve the current export/download/preview workflow so both artefact nodes use the same command execution, templates, and Handlebars rendering pipeline.
 
+## Progress Tracker
+- [x] Type & schema renaming (GraphArtefactNode)
+- [x] Extract shared artefact behaviour
+- [x] Rebrand existing node to GraphArtefactNode
+- [x] Add TreeArtefactNode (TreeMap artefact)
+- [x] Frontend UX updates
+- [ ] QA + docs
+
 ## Work Breakdown
 
 ### 1. Type & Schema Renaming (GraphArtefactNode)

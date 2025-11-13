@@ -42,8 +42,12 @@ pub enum PlanDagNodeType {
     Filter,
     #[graphql(name = "MergeNode")]
     Merge,
-    #[graphql(name = "OutputNode")]
-    Output,
+    #[graphql(name = "GraphArtefactNode")]
+    #[serde(rename = "GraphArtefactNode", alias = "OutputNode", alias = "Output")]
+    GraphArtefact,
+    #[graphql(name = "TreeArtefactNode")]
+    #[serde(rename = "TreeArtefactNode")]
+    TreeArtefact,
 }
 
 // Complete Plan DAG Structure

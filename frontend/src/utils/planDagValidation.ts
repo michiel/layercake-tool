@@ -15,19 +15,23 @@ export const validateConnection = (
       PlanDagNodeType.MERGE,     // Can also merge multiple data sources
       PlanDagNodeType.TRANSFORM, // Or transform data directly
       PlanDagNodeType.FILTER,    // Or filter data directly
-      PlanDagNodeType.OUTPUT,    // Or output directly
+      PlanDagNodeType.GRAPH_ARTEFACT,
+      PlanDagNodeType.TREE_ARTEFACT,
     ],
     [PlanDagNodeType.GRAPH]: [
       PlanDagNodeType.GRAPH,       // Graphs can connect to other graphs
       PlanDagNodeType.TRANSFORM,
       PlanDagNodeType.FILTER,
-      PlanDagNodeType.OUTPUT,
+      PlanDagNodeType.MERGE,
+      PlanDagNodeType.GRAPH_ARTEFACT,
+      PlanDagNodeType.TREE_ARTEFACT,
     ],
     [PlanDagNodeType.TRANSFORM]: [
       PlanDagNodeType.GRAPH,       // Transforms can connect to graphs
       PlanDagNodeType.MERGE,
       PlanDagNodeType.FILTER,
-      PlanDagNodeType.OUTPUT,
+      PlanDagNodeType.GRAPH_ARTEFACT,
+      PlanDagNodeType.TREE_ARTEFACT,
       PlanDagNodeType.TRANSFORM, // Allow chaining transforms
     ],
     [PlanDagNodeType.FILTER]: [
@@ -35,16 +39,19 @@ export const validateConnection = (
       PlanDagNodeType.MERGE,
       PlanDagNodeType.TRANSFORM,
       PlanDagNodeType.FILTER,      // Allow chaining filters
-      PlanDagNodeType.OUTPUT,
+      PlanDagNodeType.GRAPH_ARTEFACT,
+      PlanDagNodeType.TREE_ARTEFACT,
     ],
     [PlanDagNodeType.MERGE]: [
       PlanDagNodeType.GRAPH,       // Merges can connect to graphs
       PlanDagNodeType.TRANSFORM,
       PlanDagNodeType.FILTER,
       PlanDagNodeType.MERGE,       // Merges can chain to other merges
-      PlanDagNodeType.OUTPUT,
+      PlanDagNodeType.GRAPH_ARTEFACT,
+      PlanDagNodeType.TREE_ARTEFACT,
     ],
-    [PlanDagNodeType.OUTPUT]: [], // Output nodes have no outgoing connections
+    [PlanDagNodeType.GRAPH_ARTEFACT]: [],
+    [PlanDagNodeType.TREE_ARTEFACT]: [],
   }
 
   const allowedTargets = validConnections[sourceType] || []
@@ -70,7 +77,7 @@ export const validateConnection = (
     let errorMessage = `Cannot connect ${sourceType} to ${targetType}`
 
     if (sourceType === PlanDagNodeType.DATA_SOURCE) {
-      errorMessage = `DataSet nodes can only connect to Graph, Merge, Transform, or Output nodes`
+      errorMessage = `DataSet nodes can only connect to Graph, Merge, Transform, Filter, or Artefact nodes`
     } else if (targetType === PlanDagNodeType.DATA_SOURCE) {
       errorMessage = `DataSet nodes cannot receive input connections (they are source nodes)`
     }
@@ -103,7 +110,8 @@ export const canAcceptMultipleInputs = (nodeType: PlanDagNodeType): boolean => {
     case PlanDagNodeType.GRAPH:       // GraphNodes can have only one input (single DataSet or Merge output)
     case PlanDagNodeType.TRANSFORM:   // TransformNodes can have only one input
     case PlanDagNodeType.FILTER:      // FilterNodes can have only one input
-    case PlanDagNodeType.OUTPUT:      // OutputNodes can have only one input
+    case PlanDagNodeType.GRAPH_ARTEFACT: // Artefact nodes can have only one input
+    case PlanDagNodeType.TREE_ARTEFACT:
       return false
     default:
       return false
@@ -121,7 +129,8 @@ export const canHaveMultipleOutputs = (nodeType: PlanDagNodeType): boolean => {
     case PlanDagNodeType.FILTER:      // FilterNodes can have multiple outputs (but not to same target)
     case PlanDagNodeType.MERGE:       // MergeNodes output graph data and can connect to multiple targets
       return true
-    case PlanDagNodeType.OUTPUT:      // OutputNodes have no outputs
+    case PlanDagNodeType.GRAPH_ARTEFACT:
+    case PlanDagNodeType.TREE_ARTEFACT:
       return false
     default:
       return false
@@ -139,7 +148,8 @@ export const getRequiredInputCount = (nodeType: PlanDagNodeType): number => {
       return 1 // Graph nodes can accept inputs from other nodes
     case PlanDagNodeType.TRANSFORM:
     case PlanDagNodeType.FILTER:
-    case PlanDagNodeType.OUTPUT:
+    case PlanDagNodeType.GRAPH_ARTEFACT:
+    case PlanDagNodeType.TREE_ARTEFACT:
       return 1 // These require exactly one input
     case PlanDagNodeType.MERGE:
       return 2 // Merge requires at least two inputs
@@ -165,8 +175,10 @@ export const getNodeTypeColor = (nodeType: PlanDagNodeType): string => {
     case PlanDagNodeType.FILTER:
     case PlanDagNodeType.MERGE:
       return '#8b5cf6' // Violet-500
-    case PlanDagNodeType.OUTPUT:
+    case PlanDagNodeType.GRAPH_ARTEFACT:
       return '#f59e0b' // Amber-500
+    case PlanDagNodeType.TREE_ARTEFACT:
+      return '#845ef7' // Purple
     default:
       return '#868e96' // Gray
   }
@@ -187,7 +199,8 @@ export const getNodeTypeIcon = (nodeType: PlanDagNodeType): string => {
       return 'filter'
     case PlanDagNodeType.MERGE:
       return 'merge'
-    case PlanDagNodeType.OUTPUT:
+    case PlanDagNodeType.GRAPH_ARTEFACT:
+    case PlanDagNodeType.TREE_ARTEFACT:
       return 'export'
     default:
       return 'box'
@@ -356,8 +369,9 @@ export const isNodeConfigured = (
       // FilterNodes MUST have one input and one output to be configured
       return inputEdges.length === 1 && outputEdges.length >= 1;
 
-    case PlanDagNodeType.OUTPUT:
-      // OutputNodes MUST have one input to be configured
+    case PlanDagNodeType.GRAPH_ARTEFACT:
+    case PlanDagNodeType.TREE_ARTEFACT:
+      // Artefact nodes MUST have one input to be configured
       return inputEdges.length === 1;
 
     case PlanDagNodeType.MERGE:
@@ -395,7 +409,8 @@ export const getMinimumRequiredInputs = (nodeType: PlanDagNodeType): number => {
       return 0; // GraphNodes can be empty (will show empty preview)
     case PlanDagNodeType.TRANSFORM:
     case PlanDagNodeType.FILTER:
-    case PlanDagNodeType.OUTPUT:
+    case PlanDagNodeType.GRAPH_ARTEFACT:
+    case PlanDagNodeType.TREE_ARTEFACT:
       return 1; // These need exactly one input
     case PlanDagNodeType.MERGE:
       return 2; // Merge needs at least two inputs
@@ -416,8 +431,9 @@ export const getMinimumRequiredOutputs = (nodeType: PlanDagNodeType): number => 
     case PlanDagNodeType.GRAPH:
     case PlanDagNodeType.MERGE:
       return 0; // These can exist without outputs (terminal nodes)
-    case PlanDagNodeType.OUTPUT:
-      return 0; // Output nodes have no outputs
+    case PlanDagNodeType.GRAPH_ARTEFACT:
+    case PlanDagNodeType.TREE_ARTEFACT:
+      return 0; // Artefact nodes have no outputs
     default:
       return 0;
   }

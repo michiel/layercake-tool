@@ -9,7 +9,9 @@ pub mod to_gml;
 pub mod to_jsgraph;
 pub mod to_json;
 pub mod to_mermaid;
+pub mod to_mermaid_mindmap;
 pub mod to_plantuml;
+pub mod to_plantuml_mindmap;
 
 /// Common rendering function used by all exporters
 /// This helps eliminate duplication across export modules

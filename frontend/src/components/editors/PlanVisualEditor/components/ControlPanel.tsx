@@ -88,10 +88,16 @@ export const ControlPanel = ({
       color: '#ffd43b'
     },
     {
-      type: PlanDagNodeType.OUTPUT,
-      label: 'Output',
+      type: PlanDagNodeType.GRAPH_ARTEFACT,
+      label: 'Graph Artefact',
       icon: <IconFileExport size="0.7rem" />,
       color: '#ff6b6b'
+    },
+    {
+      type: PlanDagNodeType.TREE_ARTEFACT,
+      label: 'Tree Artefact',
+      icon: <IconFileExport size="0.7rem" />,
+      color: '#845ef7'
     }
   ];
 

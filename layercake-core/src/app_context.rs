@@ -27,8 +27,8 @@ use crate::services::graph_edit_service::{
 };
 use crate::services::plan_dag_service::PlanDagNodePositionUpdate;
 use crate::services::{
-    data_set_service::DataSetService, dataset_bulk_service::DataSetBulkService,
-    ExportService, GraphService, ImportService, PlanDagService,
+    data_set_service::DataSetService, dataset_bulk_service::DataSetBulkService, ExportService,
+    GraphService, ImportService, PlanDagService,
 };
 use layercake_data_acquisition::{
     config::EmbeddingProviderConfig, services::DataAcquisitionService,
@@ -360,18 +360,9 @@ impl AppContext {
             .order_by_asc(data_sets::Column::Name)
             .all(&self.db)
             .await
-            .map_err(|e| {
-                anyhow!(
-                    "Failed to list data sets for project {}: {}",
-                    project_id,
-                    e
-                )
-            })?;
+            .map_err(|e| anyhow!("Failed to list data sets for project {}: {}", project_id, e))?;
 
-        Ok(data_sets
-            .into_iter()
-            .map(DataSetSummary::from)
-            .collect())
+        Ok(data_sets.into_iter().map(DataSetSummary::from).collect())
     }
 
     pub async fn available_data_sets(&self, project_id: i32) -> Result<Vec<DataSetSummary>> {
@@ -415,8 +406,7 @@ impl AppContext {
             .await
             .map_err(|e| anyhow!("Failed to create data set from file: {}", e))?;
 
-        self.attach_data_set_to_plan(project_id, &created)
-            .await?;
+        self.attach_data_set_to_plan(project_id, &created).await?;
 
         Ok(DataSetSummary::from(created))
     }
@@ -438,8 +428,7 @@ impl AppContext {
             .await
             .map_err(|e| anyhow!("Failed to create empty data set: {}", e))?;
 
-        self.attach_data_set_to_plan(project_id, &created)
-            .await?;
+        self.attach_data_set_to_plan(project_id, &created).await?;
 
         Ok(DataSetSummary::from(created))
     }
@@ -464,18 +453,14 @@ impl AppContext {
                 .await
                 .map_err(|e| anyhow!("Failed to import data set {}: {}", upload.filename, e))?;
 
-            self.attach_data_set_to_plan(project_id, &created)
-                .await?;
+            self.attach_data_set_to_plan(project_id, &created).await?;
             results.push(DataSetSummary::from(created));
         }
 
         Ok(results)
     }
 
-    pub async fn update_data_set(
-        &self,
-        request: DataSetUpdateRequest,
-    ) -> Result<DataSetSummary> {
+    pub async fn update_data_set(&self, request: DataSetUpdateRequest) -> Result<DataSetSummary> {
         let DataSetUpdateRequest {
             id,
             name,
@@ -735,17 +720,12 @@ impl AppContext {
                                 .and_then(|v| v.as_i64())
                                 .map(|v| v as i32)
                             {
-                                if let Some(data_set) =
-                                    data_sets::Entity::find_by_id(data_set_id)
-                                        .one(&self.db)
-                                        .await
-                                        .map_err(|e| {
-                                            anyhow!(
-                                                "Failed to load data set {}: {}",
-                                                data_set_id,
-                                                e
-                                            )
-                                        })?
+                                if let Some(data_set) = data_sets::Entity::find_by_id(data_set_id)
+                                    .one(&self.db)
+                                    .await
+                                    .map_err(|e| {
+                                        anyhow!("Failed to load data set {}: {}", data_set_id, e)
+                                    })?
                                 {
                                     let execution_state = match data_set.status.as_str() {
                                         "active" => "completed",
@@ -755,17 +735,14 @@ impl AppContext {
                                     }
                                     .to_string();
 
-                                    nodes[idx].dataset_execution =
-                                        Some(DataSetExecutionMetadata {
-                                            data_set_id: data_set.id,
-                                            filename: data_set.filename.clone(),
-                                            status: data_set.status.clone(),
-                                            processed_at: data_set
-                                                .processed_at
-                                                .map(|d| d.to_rfc3339()),
-                                            execution_state,
-                                            error_message: data_set.error_message.clone(),
-                                        });
+                                    nodes[idx].dataset_execution = Some(DataSetExecutionMetadata {
+                                        data_set_id: data_set.id,
+                                        filename: data_set.filename.clone(),
+                                        status: data_set.status.clone(),
+                                        processed_at: data_set.processed_at.map(|d| d.to_rfc3339()),
+                                        execution_state,
+                                        error_message: data_set.error_message.clone(),
+                                    });
                                 }
                             }
                         }
@@ -1581,7 +1558,8 @@ fn node_type_prefix(node_type: &PlanDagNodeType) -> &'static str {
         PlanDagNodeType::Transform => "transform",
         PlanDagNodeType::Filter => "filter",
         PlanDagNodeType::Merge => "merge",
-        PlanDagNodeType::Output => "output",
+        PlanDagNodeType::GraphArtefact => "graphartefact",
+        PlanDagNodeType::TreeArtefact => "treeartefact",
     }
 }
 
@@ -1592,7 +1570,8 @@ fn node_type_storage_name(node_type: &PlanDagNodeType) -> &'static str {
         PlanDagNodeType::Transform => "TransformNode",
         PlanDagNodeType::Filter => "FilterNode",
         PlanDagNodeType::Merge => "MergeNode",
-        PlanDagNodeType::Output => "OutputNode",
+        PlanDagNodeType::GraphArtefact => "GraphArtefactNode",
+        PlanDagNodeType::TreeArtefact => "TreeArtefactNode",
     }
 }
 

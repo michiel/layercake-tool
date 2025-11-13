@@ -3,7 +3,7 @@ import { GraphNode } from './nodes/GraphNode'
 import { TransformNode } from './nodes/TransformNode'
 import { FilterNode } from './nodes/FilterNode'
 import { MergeNode } from './nodes/MergeNode'
-import { OutputNode } from './nodes/OutputNode'
+import { GraphArtefactNode, TreeArtefactNode } from './nodes/GraphArtefactNode'
 
 /**
  * Stable nodeTypes mapping for ReactFlow
@@ -15,5 +15,6 @@ export const NODE_TYPES = {
   TransformNode: TransformNode,
   FilterNode: FilterNode,
   MergeNode: MergeNode,
-  OutputNode: OutputNode,
+  GraphArtefactNode: GraphArtefactNode,
+  TreeArtefactNode: TreeArtefactNode,
 } as const

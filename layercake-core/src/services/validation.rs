@@ -284,10 +284,17 @@ impl ValidationService {
             "TransformNode",
             "FilterNode",
             "MergeNode",
-            "OutputNode",
+            "GraphArtefactNode",
+            "TreeArtefactNode",
         ];
 
-        if !valid_types.contains(&node_type) {
+        let normalized = if node_type == "OutputNode" {
+            "GraphArtefactNode"
+        } else {
+            node_type
+        };
+
+        if !valid_types.contains(&normalized) {
             return Err(anyhow!(
                 "Invalid node type '{}'. Must be one of: {}",
                 node_type,
@@ -295,7 +302,7 @@ impl ValidationService {
             ));
         }
 
-        Ok(node_type.to_string())
+        Ok(normalized.to_string())
     }
 
     /// Validate Plan DAG node position
@@ -491,7 +498,9 @@ mod tests {
         assert!(ValidationService::validate_plan_dag_node_type("TransformNode").is_ok());
         assert!(ValidationService::validate_plan_dag_node_type("FilterNode").is_ok());
         assert!(ValidationService::validate_plan_dag_node_type("MergeNode").is_ok());
-        assert!(ValidationService::validate_plan_dag_node_type("OutputNode").is_ok());
+        assert!(ValidationService::validate_plan_dag_node_type("GraphArtefactNode").is_ok());
+        assert!(ValidationService::validate_plan_dag_node_type("TreeArtefactNode").is_ok());
+        assert!(ValidationService::validate_plan_dag_node_type("OutputNode").is_ok()); // legacy alias
 
         // Invalid node types
         assert!(ValidationService::validate_plan_dag_node_type("InvalidNode").is_err());

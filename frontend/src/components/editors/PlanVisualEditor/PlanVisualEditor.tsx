@@ -135,7 +135,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
     const node = nodesRef.current.find(n => n.id === nodeId)
     if (node) {
       console.log('Found node:', node)
-      // Use node.type which is the ReactFlow type (DataSetNode, OutputNode, etc.)
+      // Use node.type which is the ReactFlow type (DataSetNode, GraphArtefactNode, etc.)
       // node.data.nodeType might be the backend format (DataSet, Output, etc.)
       setConfigNodeType(node.type as PlanDagNodeType || PlanDagNodeType.DATA_SOURCE)
       setConfigNodeConfig(node.data.config || {})
@@ -888,7 +888,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
             onDelete: () => handleNodeDelete(backendNodeId),
             readonly: false,
             edges: edges, // Required by nodes that check edge configuration
-            projectId: projectId // Required by OutputNode for export mutations
+            projectId: projectId // Required by artefact nodes for export mutations
           }
         };
 
@@ -1389,8 +1389,10 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
         return '#ff8cc8'
       case 'MergeNode':
         return '#ffd43b'
-      case 'OutputNode':
+      case 'GraphArtefactNode':
         return '#ff6b6b'
+      case 'TreeArtefactNode':
+        return '#845ef7'
       default:
         return '#868e96'
     }

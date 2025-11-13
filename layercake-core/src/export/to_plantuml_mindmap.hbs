@@ -1,0 +1,12 @@
+@startmindmap
+* {{graph_name}}
+{{#*inline "render_node"}}
+{{mindmap_prefix depth}} {{label}}
+{{#each children}}
+{{> render_node}}
+{{/each}}
+{{/inline}}
+{{#each hierarchy_tree}}
+{{> render_node}}
+{{/each}}
+@endmindmap

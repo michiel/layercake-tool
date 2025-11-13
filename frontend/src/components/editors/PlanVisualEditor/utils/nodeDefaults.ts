@@ -62,9 +62,21 @@ export const getDefaultNodeConfig = (type: PlanDagNodeType): NodeConfig => {
         conflictResolution: 'PreferFirst'
       };
 
-    case PlanDagNodeType.OUTPUT:
+    case PlanDagNodeType.GRAPH_ARTEFACT:
       return {
         renderTarget: 'DOT',
+        outputPath: '',
+        renderConfig: {
+          containNodes: true,
+          orientation: 'TB',
+          useDefaultStyling: true,
+          theme: 'Light'
+        },
+        graphConfig: {}
+      };
+    case PlanDagNodeType.TREE_ARTEFACT:
+      return {
+        renderTarget: 'PlantUmlMindmap',
         outputPath: '',
         renderConfig: {
           containNodes: true,
@@ -87,7 +99,8 @@ export const getDefaultNodeMetadata = (type: PlanDagNodeType): NodeMetadata => {
     [PlanDagNodeType.TRANSFORM]: 'Transform',
     [PlanDagNodeType.FILTER]: 'Filter',
     [PlanDagNodeType.MERGE]: 'Merge',
-    [PlanDagNodeType.OUTPUT]: 'Output'
+    [PlanDagNodeType.GRAPH_ARTEFACT]: 'Graph Artefact',
+    [PlanDagNodeType.TREE_ARTEFACT]: 'Tree Artefact'
   };
 
   return {
@@ -102,5 +115,6 @@ export const getNodeColors = () => ({
   [PlanDagNodeType.TRANSFORM]: '#ff8cc8',
   [PlanDagNodeType.FILTER]: '#a78bfa',
   [PlanDagNodeType.MERGE]: '#ffd43b',
-  [PlanDagNodeType.OUTPUT]: '#ff6b6b'
+  [PlanDagNodeType.GRAPH_ARTEFACT]: '#ff6b6b',
+  [PlanDagNodeType.TREE_ARTEFACT]: '#845ef7'
 });

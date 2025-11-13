@@ -92,11 +92,17 @@ export const NodeToolbar: React.FC<NodeToolbarProps> = ({ onNodeDragStart, onNod
       color: '#ffd43b'
     },
     {
-      type: PlanDagNodeType.OUTPUT,
-      label: 'Output',
+      type: PlanDagNodeType.GRAPH_ARTEFACT,
+      label: 'Graph Artefact',
       icon: <IconFileExport size="1.2rem" />,
       color: '#ff6b6b'
-    }
+    },
+    {
+      type: PlanDagNodeType.TREE_ARTEFACT,
+      label: 'Tree Artefact',
+      icon: <IconFileExport size="1.2rem" />,
+      color: '#845ef7'
+    },
   ];
 
   return (

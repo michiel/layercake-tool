@@ -6,7 +6,7 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use super::helpers::{
     generate_edge_id, generate_node_id_from_ids, get_extension_for_format,
     get_mime_type_for_format, parse_export_format, ExecutionActionResult, ExportNodeOutputResult,
-    StoredOutputNodeConfig,
+    StoredGraphArtefactNodeConfig, StoredTreeArtefactNodeConfig,
 };
 use crate::database::entities::{
     datasets, graphs, plan_dag_edges, plan_dag_nodes, plans, projects, ExecutionState,
@@ -65,7 +65,8 @@ impl PlanDagMutation {
                 crate::graphql::types::PlanDagNodeType::Transform => "TransformNode",
                 crate::graphql::types::PlanDagNodeType::Filter => "FilterNode",
                 crate::graphql::types::PlanDagNodeType::Merge => "MergeNode",
-                crate::graphql::types::PlanDagNodeType::Output => "OutputNode",
+                crate::graphql::types::PlanDagNodeType::GraphArtefact => "GraphArtefactNode",
+                crate::graphql::types::PlanDagNodeType::TreeArtefact => "TreeArtefactNode",
             };
 
             let metadata_json = serde_json::to_string(&node.metadata)?;
@@ -151,8 +152,8 @@ impl PlanDagMutation {
             .map_err(|e| StructuredError::database("plans::Entity::find (ProjectId)", e))?
             .ok_or_else(|| StructuredError::not_found("Plan for project", project_id))?;
 
-        // Get the output node
-        let output_node = plan_dag_nodes::Entity::find()
+        // Get the artefact node
+        let artefact_node = plan_dag_nodes::Entity::find()
             .filter(
                 plan_dag_nodes::Column::PlanId
                     .eq(plan.id)
@@ -161,23 +162,49 @@ impl PlanDagMutation {
             .one(&context.db)
             .await
             .map_err(|e| {
-                StructuredError::database("plan_dag_nodes::Entity::find (output node)", e)
+                StructuredError::database("plan_dag_nodes::Entity::find (artefact node)", e)
             })?
-            .ok_or_else(|| StructuredError::not_found("Output node", &node_id))?;
+            .ok_or_else(|| StructuredError::not_found("Artefact node", &node_id))?;
 
-        // Parse node config to get renderTarget/outputPath/renderConfig overrides
-        let stored_config: StoredOutputNodeConfig = serde_json::from_str(&output_node.config_json)
-            .map_err(|e| {
-                StructuredError::bad_request(format!("Failed to parse node config: {}", e))
-            })?;
-
-        let render_config_override = stored_config
-            .render_config
-            .map(|rc| rc.into_render_config());
-        let render_target = stored_config
-            .render_target
-            .unwrap_or_else(|| "GML".to_string());
-        let output_path = stored_config.output_path;
+        let node_type = artefact_node.node_type.clone();
+        let (render_target, output_path, render_config_override) = match node_type.as_str() {
+            "TreeArtefactNode" | "TreeArtefact" => {
+                let stored_config: StoredTreeArtefactNodeConfig =
+                    serde_json::from_str(&artefact_node.config_json).map_err(|e| {
+                        StructuredError::bad_request(format!(
+                            "Failed to parse tree artefact config: {}",
+                            e
+                        ))
+                    })?;
+                (
+                    stored_config
+                        .render_target
+                        .unwrap_or_else(|| "PlantUmlMindmap".to_string()),
+                    stored_config.output_path,
+                    stored_config
+                        .render_config
+                        .map(|rc| rc.into_render_config()),
+                )
+            }
+            _ => {
+                let stored_config: StoredGraphArtefactNodeConfig =
+                    serde_json::from_str(&artefact_node.config_json).map_err(|e| {
+                        StructuredError::bad_request(format!(
+                            "Failed to parse graph artefact config: {}",
+                            e
+                        ))
+                    })?;
+                (
+                    stored_config
+                        .render_target
+                        .unwrap_or_else(|| "GML".to_string()),
+                    stored_config.output_path,
+                    stored_config
+                        .render_config
+                        .map(|rc| rc.into_render_config()),
+                )
+            }
+        };
 
         // Get project name for default filename
         let project = projects::Entity::find_by_id(project_id)
@@ -190,7 +217,7 @@ impl PlanDagMutation {
         let extension = get_extension_for_format(render_target.as_str());
         let filename = output_path.unwrap_or_else(|| format!("{}.{}", project.name, extension));
 
-        // Find the upstream GraphNode connected to this OutputNode
+        // Find the upstream GraphNode connected to this artefact node
         let edges = plan_dag_edges::Entity::find()
             .filter(plan_dag_edges::Column::PlanId.eq(plan.id))
             .all(&context.db)
@@ -201,7 +228,7 @@ impl PlanDagMutation {
             .iter()
             .find(|e| e.target_node_id == node_id)
             .map(|e| e.source_node_id.clone())
-            .ok_or_else(|| StructuredError::not_found("Upstream graph", "output node"))?;
+            .ok_or_else(|| StructuredError::not_found("Upstream graph", "artefact node"))?;
 
         // Get all nodes and edges for DAG execution
         let all_nodes = plan_dag_nodes::Entity::find()

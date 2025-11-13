@@ -94,7 +94,8 @@ impl From<plan_dag_nodes::Model> for PlanDagNode {
             "TransformNode" => PlanDagNodeType::Transform,
             "FilterNode" => PlanDagNodeType::Filter,
             "MergeNode" => PlanDagNodeType::Merge,
-            "OutputNode" => PlanDagNodeType::Output,
+            "GraphArtefactNode" | "OutputNode" | "Output" => PlanDagNodeType::GraphArtefact,
+            "TreeArtefactNode" => PlanDagNodeType::TreeArtefact,
             _ => PlanDagNodeType::DataSet, // Default fallback
         };
 
