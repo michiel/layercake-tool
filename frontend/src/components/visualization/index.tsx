@@ -2,26 +2,27 @@ import { lazy, Suspense, ComponentType } from 'react';
 import { Spinner } from '../ui/spinner';
 
 // Lazy load heavy visualization components to reduce initial bundle size
+// Use absolute imports with @ alias to ensure consistent module resolution across platforms
 const MermaidPreviewDialogLazy = lazy(() =>
-  import('./MermaidPreviewDialog').then((module) => ({
+  import('@/components/visualization/MermaidPreviewDialog').then((module) => ({
     default: module.MermaidPreviewDialog,
   }))
 );
 
 const DotPreviewDialogLazy = lazy(() =>
-  import('./DotPreviewDialog').then((module) => ({
+  import('@/components/visualization/DotPreviewDialog').then((module) => ({
     default: module.DotPreviewDialog,
   }))
 );
 
 const GraphPreviewDialogLazy = lazy(() =>
-  import('./GraphPreviewDialog').then((module) => ({
+  import('@/components/visualization/GraphPreviewDialog').then((module) => ({
     default: module.GraphPreviewDialog,
   }))
 );
 
 const DataPreviewDialogLazy = lazy(() =>
-  import('./DataPreviewDialog').then((module) => ({
+  import('@/components/visualization/DataPreviewDialog').then((module) => ({
     default: module.DataPreviewDialog,
   }))
 );
