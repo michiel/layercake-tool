@@ -5,6 +5,12 @@ title Reference Model
 
 top to bottom direction
 
+skinparam backgroundColor #ffffff
+skinparam defaultFontColor #1f2933
+skinparam ArrowColor #2B303A
+skinparam RectangleBorderColor #555555
+skinparam defaultFontName Lato
+skinparam shadowing false
 <style>
     .drone {
         BackgroundColor #002a41;

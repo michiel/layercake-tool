@@ -5,6 +5,12 @@ title Reference Model
 
 left to right direction
 
+skinparam backgroundColor #ffffff
+skinparam defaultFontColor #1f2933
+skinparam ArrowColor #2B303A
+skinparam RectangleBorderColor #555555
+skinparam defaultFontName Lato
+skinparam shadowing false
 <style>
     .drone {
         BackgroundColor #002a41;
@@ -28,46 +34,46 @@ left to right direction
     }
 </style>
 
-  rectangle "Drone" as drone_01 <<drone>>
-  rectangle "Drone" as drone_02 <<drone>>
-  rectangle "Drone" as drone_03 <<drone>>
-  rectangle "Drone" as drone_04 <<drone>>
-  rectangle "Drone" as drone_05 <<drone>>
-  rectangle "Drone" as drone_06 <<drone>>
-  rectangle "Drone" as drone_07 <<drone>>
-  rectangle "Drone" as drone_08 <<drone>>
-  rectangle "Drone" as drone_09 <<drone>>
-  rectangle "Drone" as drone_10 <<drone>>
-  rectangle "Drone" as drone_11 <<drone>>
-  rectangle "Drone" as drone_12 <<drone>>
-  rectangle "Drone" as drone_13 <<drone>>
-  rectangle "Drone" as drone_14 <<drone>>
-  rectangle "Drone" as drone_15 <<drone>>
-  rectangle "Drone" as drone_16 <<drone>>
-  rectangle "Drone" as drone_17 <<drone>>
-  rectangle "Drone" as drone_18 <<drone>>
-  rectangle "Drone" as drone_19 <<drone>>
-  rectangle "Drone" as drone_20 <<drone>>
-  rectangle "Drone" as drone_21 <<drone>>
-  rectangle "Drone" as drone_22 <<drone>>
-  rectangle "Drone" as drone_23 <<drone>>
-  rectangle "Drone" as drone_24 <<drone>>
-  rectangle "Drone" as drone_25 <<drone>>
-  rectangle "Drone" as drone_26 <<drone>>
-  rectangle "Drone" as drone_27 <<drone>>
-  rectangle "Drone" as drone_28 <<drone>>
-  rectangle "Drone" as drone_29 <<drone>>
-  rectangle "Drone" as drone_30 <<drone>>
-  rectangle "Drone" as drone_31 <<drone>>
-  rectangle "Drone" as drone_32 <<drone>>
-  rectangle "Drone" as drone_33 <<drone>>
-  rectangle "Drone" as drone_34 <<drone>>
-  rectangle "Drone" as drone_35 <<drone>>
-  rectangle "Drone" as drone_36 <<drone>>
-  rectangle "Drone" as drone_37 <<drone>>
-  rectangle "Drone" as drone_38 <<drone>>
-  rectangle "Drone" as drone_39 <<drone>>
-  rectangle "Drone" as drone_40 <<drone>>
+  rectangle "Drone" as drone_01
+  rectangle "Drone" as drone_02
+  rectangle "Drone" as drone_03
+  rectangle "Drone" as drone_04
+  rectangle "Drone" as drone_05
+  rectangle "Drone" as drone_06
+  rectangle "Drone" as drone_07
+  rectangle "Drone" as drone_08
+  rectangle "Drone" as drone_09
+  rectangle "Drone" as drone_10
+  rectangle "Drone" as drone_11
+  rectangle "Drone" as drone_12
+  rectangle "Drone" as drone_13
+  rectangle "Drone" as drone_14
+  rectangle "Drone" as drone_15
+  rectangle "Drone" as drone_16
+  rectangle "Drone" as drone_17
+  rectangle "Drone" as drone_18
+  rectangle "Drone" as drone_19
+  rectangle "Drone" as drone_20
+  rectangle "Drone" as drone_21
+  rectangle "Drone" as drone_22
+  rectangle "Drone" as drone_23
+  rectangle "Drone" as drone_24
+  rectangle "Drone" as drone_25
+  rectangle "Drone" as drone_26
+  rectangle "Drone" as drone_27
+  rectangle "Drone" as drone_28
+  rectangle "Drone" as drone_29
+  rectangle "Drone" as drone_30
+  rectangle "Drone" as drone_31
+  rectangle "Drone" as drone_32
+  rectangle "Drone" as drone_33
+  rectangle "Drone" as drone_34
+  rectangle "Drone" as drone_35
+  rectangle "Drone" as drone_36
+  rectangle "Drone" as drone_37
+  rectangle "Drone" as drone_38
+  rectangle "Drone" as drone_39
+  rectangle "Drone" as drone_40
 
  drone_03 --> drone_09 : "link"
  drone_03 --> drone_31 : "link"

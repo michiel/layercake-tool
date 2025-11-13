@@ -1,7 +1,6 @@
 digraph G {
     // layout="dot"; // circo, dot, fdp, neato, osage, sfdp, twopi
     label="Inverted Reference Model";
-    labelloc="t";
     rankdir="TB";
     splines=true;
     overlap=false;
@@ -9,11 +8,13 @@ digraph G {
     // sep="+50,50"; // increase this to make the graph more spread out
     nodesep="0.3";
     ranksep="1.3";
-    fontname="Lato";
-    node [ shape="plaintext" style="filled, rounded" fontsize=12]
+    labelloc="t";
+    bgcolor="#ffffff";
+    fontcolor="#1f2933";
+    node [ shape="box" style="rounded,filled" fontsize=12 fontname="Lato" fillcolor="#f7f7f8" fontcolor="#0f172a" color="#1f2933" penwidth=1.2 ]
     edge [ fontname="Lato" color="#2B303A" fontsize=8]
 
-  node [style="filled, dashed" fillcolor="#222222" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
+  node [style="filled,rounded" fillcolor="#222222" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
             n_drone_03_drone_09_24[label="link"];
             n_drone_03_drone_31_48[label="link"];
             n_drone_04_drone_35_38[label="link"];
@@ -65,69 +66,16 @@ digraph G {
             n_drone_40_drone_33_47[label="link"];
             n_drone_40_drone_38_9[label="link"];
     }
-  node [style="filled, dashed" fillcolor="#002a41" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
+  node [style="filled,rounded" fillcolor="#002a41" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
     }
-  node [style="filled, dashed" fillcolor="#224558" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
+  node [style="filled,rounded" fillcolor="#224558" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
     }
-  node [style="filled, dashed" fillcolor="#426070" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
+  node [style="filled,rounded" fillcolor="#426070" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
     }
-  node [style="filled, dashed" fillcolor="#222222" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
+  node [style="filled,rounded" fillcolor="#222222" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
     }
-  node [style="filled, dashed" fillcolor="#8194a0" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
+  node [style="filled,rounded" fillcolor="#8194a0" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
     }
-
-node [style="filled, rounded" fillcolor="#dddddd" fontcolor="#000000"];
-
-    n_drone_03_drone_09_24[label="link"];
-    n_drone_03_drone_31_48[label="link"];
-    n_drone_04_drone_35_38[label="link"];
-    n_drone_05_drone_17_39[label="link"];
-    n_drone_05_drone_28_11[label="link"];
-    n_drone_05_drone_30_30[label="link"];
-    n_drone_06_drone_02_19[label="link"];
-    n_drone_06_drone_03_6[label="link"];
-    n_drone_06_drone_35_16[label="link"];
-    n_drone_09_drone_02_33[label="link"];
-    n_drone_09_drone_10_12[label="link"];
-    n_drone_10_drone_38_44[label="link"];
-    n_drone_11_drone_09_49[label="link"];
-    n_drone_13_drone_24_4[label="link"];
-    n_drone_14_drone_39_29[label="link"];
-    n_drone_15_drone_07_17[label="link"];
-    n_drone_15_drone_23_14[label="link"];
-    n_drone_17_drone_10_26[label="link"];
-    n_drone_17_drone_24_7[label="link"];
-    n_drone_18_drone_17_1[label="link"];
-    n_drone_18_drone_21_45[label="link"];
-    n_drone_18_drone_22_2[label="link"];
-    n_drone_19_drone_15_41[label="link"];
-    n_drone_23_drone_15_43[label="link"];
-    n_drone_23_drone_25_3[label="link"];
-    n_drone_25_drone_24_36[label="link"];
-    n_drone_26_drone_13_28[label="link"];
-    n_drone_26_drone_13_8[label="link"];
-    n_drone_26_drone_21_32[label="link"];
-    n_drone_26_drone_21_5[label="link"];
-    n_drone_26_drone_32_10[label="link"];
-    n_drone_27_drone_06_34[label="link"];
-    n_drone_28_drone_40_42[label="link"];
-    n_drone_29_drone_23_22[label="link"];
-    n_drone_29_drone_26_25[label="link"];
-    n_drone_30_drone_25_37[label="link"];
-    n_drone_31_drone_12_35[label="link"];
-    n_drone_31_drone_33_21[label="link"];
-    n_drone_32_drone_02_20[label="link"];
-    n_drone_32_drone_33_40[label="link"];
-    n_drone_35_drone_30_15[label="link"];
-    n_drone_36_drone_19_23[label="link"];
-    n_drone_37_drone_02_46[label="link"];
-    n_drone_37_drone_12_13[label="link"];
-    n_drone_38_drone_16_0[label="link"];
-    n_drone_38_drone_36_31[label="link"];
-    n_drone_40_drone_19_18[label="link"];
-    n_drone_40_drone_19_27[label="link"];
-    n_drone_40_drone_33_47[label="link"];
-    n_drone_40_drone_38_9[label="link"];
 
       n_drone_03_drone_09_24 -> n_drone_03_drone_31_48;
       n_drone_03_drone_09_24 -> n_drone_09_drone_02_33;
@@ -235,4 +183,3 @@ node [style="filled, rounded" fillcolor="#dddddd" fontcolor="#000000"];
       n_drone_40_drone_38_9 -> n_drone_40_drone_19_27;
       n_drone_40_drone_38_9 -> n_drone_40_drone_33_47;
 }
-
