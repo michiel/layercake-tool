@@ -66,9 +66,16 @@ impl DagExecutor {
                 // Check if this is a reference to an existing data_set (has dataSetId)
                 // or a file import (has filePath)
                 if config["dataSetId"].is_number() {
-                    // DataSet references existing data_sets entry - no execution needed
-                    // Data is already in data_sets.graph_json from upload
-                    return Ok(());
+                    // DataSet references existing data_sets entry
+                    // Create a graph entry from the data_set's graph_json
+                    self.execute_dataset_reference_node(
+                        project_id,
+                        plan_id,
+                        node_id,
+                        &node_name,
+                        &config,
+                    )
+                    .await?;
                 } else if let Some(file_path) = config["filePath"].as_str() {
                     // Legacy path: import from file
                     self.dataset_importer
@@ -329,6 +336,101 @@ impl DagExecutor {
             &graph,
         )
         .await
+    }
+
+    async fn execute_dataset_reference_node(
+        &self,
+        project_id: i32,
+        _plan_id: i32,
+        node_id: &str,
+        node_name: &str,
+        config: &JsonValue,
+    ) -> Result<()> {
+        use crate::database::entities::data_sets::{Column as DataSetColumn, Entity as DataSetEntity};
+
+        // Get the referenced data_set
+        let data_set_id = config["dataSetId"]
+            .as_i64()
+            .ok_or_else(|| anyhow!("dataSetId not found in config"))?
+            as i32;
+
+        let data_set = DataSetEntity::find()
+            .filter(DataSetColumn::Id.eq(data_set_id))
+            .filter(DataSetColumn::ProjectId.eq(project_id))
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| anyhow!("Data set {} not found", data_set_id))?;
+
+        // Parse the graph_json from the data_set and convert to Graph structure
+        let graph: crate::graph::Graph = serde_json::from_str(&data_set.graph_json)
+            .with_context(|| format!("Failed to parse and deserialize graph_json for data_set {}", data_set_id))?;
+
+        // Create or get graph record
+        let metadata = Some(json!({
+            "dataSetId": data_set_id,
+            "dataSetName": data_set.name,
+        }));
+
+        let mut graph_record = self
+            .get_or_create_graph_record(project_id, node_id, node_name, metadata.clone())
+            .await?;
+
+        // Compute hash based on data_set content
+        let dataset_hash = format!("{:x}", Sha256::digest(data_set.graph_json.as_bytes()));
+
+        // Check if we need to recompute
+        if graph_record.source_hash.as_deref() == Some(&dataset_hash) {
+            // Already up to date
+            return Ok(());
+        }
+
+        // Set to processing state
+        let mut active: GraphActiveModel = graph_record.clone().into();
+        active = active.set_state(ExecutionState::Processing);
+        graph_record = active.update(&self.db).await?;
+
+        // Publish execution status change
+        #[cfg(feature = "graphql")]
+        crate::graphql::execution_events::publish_graph_status(
+            &self.db,
+            project_id,
+            node_id,
+            &graph_record,
+        )
+        .await;
+
+        // Persist graph contents to graph_nodes, graph_edges, and layers tables
+        self.persist_graph_contents(graph_record.id, &graph).await?;
+
+        // Update to completed state
+        let mut active: GraphActiveModel = graph_record.into();
+        active = active.set_completed(
+            dataset_hash,
+            graph.nodes.len() as i32,
+            graph.edges.len() as i32,
+        );
+        let graph_record = active.update(&self.db).await?;
+
+        // Publish completion status
+        #[cfg(feature = "graphql")]
+        crate::graphql::execution_events::publish_graph_status(
+            &self.db,
+            project_id,
+            node_id,
+            &graph_record,
+        )
+        .await;
+
+        info!(
+            "DataSetNode {} materialized from data_set {} with nodes:{}, edges:{}, layers:{}",
+            node_id,
+            data_set_id,
+            graph.nodes.len(),
+            graph.edges.len(),
+            graph.layers.len(),
+        );
+
+        Ok(())
     }
 
     async fn persist_transformed_graph(
