@@ -268,7 +268,7 @@ const ArtefactNodeBase = memo((props: ArtefactNodeProps) => {
                   </TooltipTrigger>
                   <TooltipContent>Preview export</TooltipContent>
                 </Tooltip>
-                {normalizedTarget?.includes('mermaid') && (
+                {normalizedTarget?.includes('mermaid') && !isMermaidTreemap && (
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button

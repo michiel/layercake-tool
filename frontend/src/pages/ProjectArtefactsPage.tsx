@@ -325,8 +325,9 @@ const ProjectArtefactsPage: React.FC = () => {
     const label = entry.node.metadata?.label || entry.node.id
     const renderTarget = entry.config?.renderTarget
     const renderTargetLabel = formatRenderTarget(renderTarget)
-    const supportsMermaidPreview =
-      typeof renderTarget === 'string' && renderTarget.toLowerCase().includes('mermaid')
+    const normalizedTarget = typeof renderTarget === 'string' ? renderTarget.toLowerCase() : ''
+    const isMermaidTreemap = normalizedTarget === 'mermaidtreemap'
+    const supportsMermaidPreview = normalizedTarget.includes('mermaid') && !isMermaidTreemap
     const supportsDotPreview = renderTarget === 'DOT'
 
     const isPreviewLoading = previewLoading?.nodeId === entry.node.id
