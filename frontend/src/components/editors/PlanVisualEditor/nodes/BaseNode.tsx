@@ -21,7 +21,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 interface BaseNodeProps extends NodeProps {
   nodeType: PlanDagNodeType
   config: NodeConfig
-  metadata: NodeMetadata
+  metadata?: NodeMetadata
   onEdit?: () => void
   onDelete?: () => void
   onLabelChange?: (newLabel: string) => void
@@ -69,7 +69,7 @@ const getBadgeClasses = (color: string, variant: 'filled' | 'light' | 'outline')
 
 export const BaseNode = memo(({
   nodeType,
-  metadata,
+  metadata = { label: '' },
   selected,
   onEdit,
   onDelete,
