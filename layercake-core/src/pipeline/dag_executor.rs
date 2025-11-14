@@ -30,7 +30,6 @@ pub struct DagExecutor {
     dataset_importer: DatasourceImporter,
     graph_builder: GraphBuilder,
     merge_builder: MergeBuilder,
-    prefer_in_memory: bool,
 }
 
 impl DagExecutor {
@@ -38,25 +37,17 @@ impl DagExecutor {
         let dataset_importer = DatasourceImporter::new(db.clone());
         let graph_builder = GraphBuilder::new(db.clone());
         let merge_builder = MergeBuilder::new(db.clone());
-        let prefer_in_memory = std::env::var("PIPELINE_IN_MEMORY")
-            .map(|value| matches!(value.to_lowercase().as_str(), "1" | "true" | "yes"))
-            .unwrap_or(false);
 
         Self {
             db,
             dataset_importer,
             graph_builder,
             merge_builder,
-            prefer_in_memory,
         }
     }
 
     fn maybe_context(&self) -> Option<DagExecutionContext> {
-        if self.prefer_in_memory {
-            Some(DagExecutionContext::new())
-        } else {
-            None
-        }
+        Some(DagExecutionContext::new())
     }
 
     /// Execute a single node in the DAG
@@ -166,15 +157,13 @@ impl DagExecutor {
                     )
                     .await?;
 
-                if context.is_some() {
+                if let Some(ctx) = context.as_deref_mut() {
                     let graph_service = GraphService::new(self.db.clone());
                     if let Ok(graph) = graph_service
                         .build_graph_from_dag_graph(graph_record.id)
                         .await
                     {
-                        if let Some(ctx) = context.as_deref_mut() {
-                            ctx.set_graph(node_id.to_string(), graph);
-                        }
+                        ctx.set_graph(node_id.to_string(), graph);
                     }
                 }
             }

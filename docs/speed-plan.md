@@ -14,7 +14,7 @@
    - DataSet nodes deserialize their `data_sets.graph_json` once and stash the `Graph` struct in memory.
    - Merge/Graph/Transform/Filter nodes consume the cached upstream `Graph` values instead of calling `GraphService::build_graph_from_dag_graph`.
    - Artefact/export nodes can request persistence, which converts the cached `Graph` into DB rows at the very end.
-3. Expose a feature flag (e.g., `PIPELINE_IN_MEMORY=true`) to keep the current DB-first behavior available while rolling out the new path.
+3. Make the in-memory context the default execution path so we no longer rely on the DB-first fallback once roll-out validation is done.
 
 Expected impact: A 200-node DAG would drop from thousands of queries to a handful (initial preload + final persistence), matching the requirement that “datasets should be loaded into memory and processed there.”
 
@@ -42,7 +42,7 @@ Eliminating the redundant insert path removes hundreds of queries before the DAG
 2. Add smoke tests that execute sample DAGs (100+ nodes) under both the current DB path and the in-memory path to ensure parity before removing the legacy flow.
 
 ## Progress
-- ✅ Introduced `DagExecutionContext` behind the `PIPELINE_IN_MEMORY` flag. DagExecutor entry points now create a shared context so DataSet, Merge, Graph, Transform, and Filter nodes reuse already-materialized graphs instead of querying `graph_nodes`/`graph_edges` every time. Dataset reference nodes also keep parsed `graph_json` payloads in memory for reuse.
+- ✅ The in-memory `DagExecutionContext` path is now the default (legacy DB-only fallback removed). DagExecutor entry points always create a shared context so DataSet, Merge, Graph, Transform, and Filter nodes reuse already-materialized graphs instead of querying `graph_nodes`/`graph_edges` every time. Dataset reference nodes keep parsed `graph_json` payloads in memory for reuse.
 - ⚙️ While the flag defaults to off, enabling it removes thousands of redundant queries for DAGs with hundreds of nodes without changing persisted results, establishing the framework needed for the remaining optimizations.
 - ✅ Batched all graph persistence writes. `persist_graph_contents`, `GraphBuilder`, and `MergeBuilder` now wrap node/edge deletes plus inserts in a single transaction, performing chunked `insert_many` writes (500/item batches) via the new `persist_utils` helpers and reusing `insert_layers_to_db` against the same connection. This eliminates the per-row round-trips that previously dominated DAG execution time.
 - ✅ Dataset ingestion no longer floods `dataset_rows` by default. `DatasourceImporter` skips row materialization unless `PIPELINE_PERSIST_DATASET_ROWS=true`, and when enabled it writes rows in 500-record batches. GraphBuilder/MergeBuilder also cache dataset descriptors and compute hashes over actual `graph_json`/`source_hash` content so upstream changes are detected precisely without extra queries.
@@ -50,4 +50,4 @@ Eliminating the redundant insert path removes hundreds of queries before the DAG
 ## Next Steps
 1. Expand the new `DagExecutionContext` so GraphBuilder/MergeBuilder operate directly on cached datasets/graphs (no DB hydrations) and validate the behavior with representative DAG fixtures.
 2. Add metric emission (per-node counters/timers) alongside the new spans so runs can be aggregated outside of tracing.
-3. Once the new runtime is battle-tested, remove the eager DB materialization path or keep it only for backward compatibility with legacy tooling.
+3. Add regression tests or tooling that exercise large DAGs with the in-memory pipeline to guard against future performance regressions now that the legacy path is gone.
