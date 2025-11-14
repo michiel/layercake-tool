@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Result as AnyResult};
 use async_graphql::*;
 use serde::{Deserialize, Serialize};
+use tracing::info;
 
 use crate::graph::Graph;
 

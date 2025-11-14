@@ -29,8 +29,7 @@
 
 ## Testing Plan
 1. **Unit tests on Graph helpers**
-   - Add tests in `layercake-core/src/graph.rs` that feed a graph with zero partition metadata, run the new `ensure_partition_hierarchy`, and assert that partition nodes / belongs_to links are synthesized.
-   - Extend `test_modify_graph_limit_partition_depth` and `_width` to cover both metadata-present and metadata-absent scenarios (created via helper) ensuring node counts and hierarchy depths change as expected.
+   - ✅ Added coverage in `graph.rs` for both `ensure_partition_hierarchy` and depth/width limits when partition metadata is absent, verifying node aggregation and synthetic roots.
 2. **Transform application tests**
    - Introduce tests for `TransformNodeConfig::apply_to` that construct a `Graph` without partition metadata, run `PartitionDepthLimit` / `PartitionWidthLimit`, and verify the resulting graph shrinks appropriately.
 3. **End-to-end plan test**

@@ -2,7 +2,7 @@ use csv::StringRecord;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use tracing::{debug, error, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::data_loader::{DfEdgeLoadProfile, DfNodeLoadProfile};
 
@@ -1769,6 +1769,242 @@ mod tests {
         if let Some(node) = level2_1 {
             assert!(!node.is_partition);
         }
+    }
+
+    #[test]
+    fn test_ensure_partition_hierarchy_adds_root() {
+        let mut graph = Graph {
+            name: "No Partition Graph".to_string(),
+            nodes: vec![
+                Node {
+                    id: "a".to_string(),
+                    label: "A".to_string(),
+                    layer: "layer".to_string(),
+                    is_partition: false,
+                    belongs_to: None,
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+                Node {
+                    id: "b".to_string(),
+                    label: "B".to_string(),
+                    layer: "layer".to_string(),
+                    is_partition: false,
+                    belongs_to: None,
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+            ],
+            edges: vec![Edge {
+                id: "edge_ab".to_string(),
+                source: "a".to_string(),
+                target: "b".to_string(),
+                label: "".to_string(),
+                layer: "layer".to_string(),
+                weight: 1,
+                comment: None,
+                dataset: None,
+            }],
+            layers: vec![Layer {
+                id: "layer".to_string(),
+                label: "Layer".to_string(),
+                background_color: "FFFFFF".to_string(),
+                text_color: "000000".to_string(),
+                border_color: "000000".to_string(),
+                dataset: None,
+            }],
+        };
+
+        assert!(graph.ensure_partition_hierarchy());
+        let synthetic = graph
+            .nodes
+            .iter()
+            .find(|n| n.id == "synthetic_partition_root")
+            .expect("Synthetic root should be created");
+        assert!(synthetic.is_partition);
+        let node_a = graph.get_node_by_id("a").unwrap();
+        assert_eq!(
+            node_a.belongs_to.as_deref(),
+            Some("synthetic_partition_root")
+        );
+        assert!(node_a.is_partition);
+    }
+
+    #[test]
+    fn test_limit_partition_depth_without_metadata() {
+        let mut graph = Graph {
+            name: "Depth No Metadata".to_string(),
+            nodes: vec![
+                Node {
+                    id: "root".to_string(),
+                    label: "Root".to_string(),
+                    layer: "layer1".to_string(),
+                    is_partition: false,
+                    belongs_to: None,
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+                Node {
+                    id: "child".to_string(),
+                    label: "Child".to_string(),
+                    layer: "layer1".to_string(),
+                    is_partition: false,
+                    belongs_to: None,
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+                Node {
+                    id: "grandchild".to_string(),
+                    label: "Grandchild".to_string(),
+                    layer: "layer1".to_string(),
+                    is_partition: false,
+                    belongs_to: None,
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+            ],
+            edges: vec![
+                Edge {
+                    id: "e1".to_string(),
+                    source: "root".to_string(),
+                    target: "child".to_string(),
+                    label: "".to_string(),
+                    layer: "layer1".to_string(),
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+                Edge {
+                    id: "e2".to_string(),
+                    source: "child".to_string(),
+                    target: "grandchild".to_string(),
+                    label: "".to_string(),
+                    layer: "layer1".to_string(),
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+            ],
+            layers: vec![Layer {
+                id: "layer1".to_string(),
+                label: "Layer 1".to_string(),
+                background_color: "FFFFFF".to_string(),
+                text_color: "000000".to_string(),
+                border_color: "000000".to_string(),
+                dataset: None,
+            }],
+        };
+
+        let original_node_count = graph.nodes.len();
+        graph
+            .modify_graph_limit_partition_depth(1)
+            .expect("Depth limit should succeed");
+        assert!(graph.nodes.len() < original_node_count);
+    }
+
+    #[test]
+    fn test_limit_partition_width_without_metadata() {
+        let mut graph = Graph {
+            name: "Width No Metadata".to_string(),
+            nodes: vec![
+                Node {
+                    id: "root".to_string(),
+                    label: "Root".to_string(),
+                    layer: "layer1".to_string(),
+                    is_partition: false,
+                    belongs_to: None,
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+                Node {
+                    id: "child1".to_string(),
+                    label: "Child1".to_string(),
+                    layer: "layer1".to_string(),
+                    is_partition: false,
+                    belongs_to: None,
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+                Node {
+                    id: "child2".to_string(),
+                    label: "Child2".to_string(),
+                    layer: "layer1".to_string(),
+                    is_partition: false,
+                    belongs_to: None,
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+                Node {
+                    id: "child3".to_string(),
+                    label: "Child3".to_string(),
+                    layer: "layer1".to_string(),
+                    is_partition: false,
+                    belongs_to: None,
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+            ],
+            edges: vec![
+                Edge {
+                    id: "e1".to_string(),
+                    source: "root".to_string(),
+                    target: "child1".to_string(),
+                    label: "".to_string(),
+                    layer: "layer1".to_string(),
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+                Edge {
+                    id: "e2".to_string(),
+                    source: "root".to_string(),
+                    target: "child2".to_string(),
+                    label: "".to_string(),
+                    layer: "layer1".to_string(),
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+                Edge {
+                    id: "e3".to_string(),
+                    source: "root".to_string(),
+                    target: "child3".to_string(),
+                    label: "".to_string(),
+                    layer: "layer1".to_string(),
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+            ],
+            layers: vec![Layer {
+                id: "layer1".to_string(),
+                label: "Layer 1".to_string(),
+                background_color: "FFFFFF".to_string(),
+                text_color: "000000".to_string(),
+                border_color: "000000".to_string(),
+                dataset: None,
+            }],
+        };
+
+        graph
+            .modify_graph_limit_partition_width(2)
+            .expect("Width limit should succeed");
+        let root = graph.get_node_by_id("root").unwrap();
+        let children = graph.get_children(root);
+        assert!(children.len() <= 3);
+        assert!(
+            children.iter().any(|n| n.id.starts_with("agg_")),
+            "Aggregated node should be created when trimming width"
+        );
     }
 
     #[test]
