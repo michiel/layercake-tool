@@ -69,6 +69,7 @@ impl GraphBuilder {
         // Fetch upstream sources by reading plan_dag_nodes
         // Upstream can be DataSet nodes OR Graph/Merge nodes
         let mut data_sets_list = Vec::new();
+        let mut data_set_cache = HashMap::new();
         for upstream_id in &upstream_node_ids {
             // Get the upstream node to check its type
             let upstream_node = plan_dag_nodes::Entity::find_by_id(upstream_id)
@@ -78,7 +79,9 @@ impl GraphBuilder {
 
             match upstream_node.node_type.as_str() {
                 "DataSetNode" => {
-                    let data_set = self.get_data_set_from_node(&upstream_node).await?;
+                    let data_set = self
+                        .get_data_set_from_node(&upstream_node, &mut data_set_cache)
+                        .await?;
 
                     // Check if data source is ready
                     if data_set.status != "active" {
@@ -237,6 +240,7 @@ impl GraphBuilder {
     async fn get_data_set_from_node(
         &self,
         dag_node: &plan_dag_nodes::Model,
+        cache: &mut HashMap<i32, data_sets::Model>,
     ) -> Result<data_sets::Model> {
         // Parse config to get dataSetId
         let config: serde_json::Value = serde_json::from_str(&dag_node.config_json)
@@ -248,11 +252,17 @@ impl GraphBuilder {
             .map(|v| v as i32)
             .ok_or_else(|| anyhow!("Node config does not have dataSetId: {}", dag_node.id))?;
 
-        // Query the data_sets table
-        data_sets::Entity::find_by_id(data_set_id)
+        if let Some(cached) = cache.get(&data_set_id) {
+            return Ok(cached.clone());
+        }
+
+        let data_set = data_sets::Entity::find_by_id(data_set_id)
             .one(&self.db)
             .await?
-            .ok_or_else(|| anyhow!("DataSet not found with id {}", data_set_id))
+            .ok_or_else(|| anyhow!("DataSet not found with id {}", data_set_id))?;
+
+        cache.insert(data_set_id, data_set.clone());
+        Ok(data_set)
     }
 
     /// Get upstream graph (from Graph or Merge node)
@@ -371,9 +381,9 @@ impl GraphBuilder {
         let mut hasher = Sha256::new();
 
         for ds in data_sets {
-            // Hash data source ID, filename, and processed_at timestamp
-            hasher.update(ds.id.to_string().as_bytes());
-            hasher.update(ds.filename.as_bytes());
+            hasher.update(ds.id.to_le_bytes());
+            hasher.update(ds.data_type.as_bytes());
+            hasher.update(ds.graph_json.as_bytes());
             if let Some(processed_at) = &ds.processed_at {
                 hasher.update(processed_at.to_rfc3339().as_bytes());
             }

@@ -64,6 +64,7 @@ impl MergeBuilder {
 
         // Fetch upstream data sources by reading plan_dag_nodes configs
         let mut data_sets_list = Vec::new();
+        let mut data_set_cache = HashMap::new();
         for upstream_id in &upstream_node_ids {
             // Check if upstream is a DataSet node or a Graph/Merge node
             // Note: Node IDs are globally unique, no need to filter by plan_id
@@ -75,7 +76,9 @@ impl MergeBuilder {
             match upstream_node.node_type.as_str() {
                 "DataSetNode" => {
                     // Read from data_sets table using the node we just found
-                    let data_set = self.get_data_set_from_node(&upstream_node).await?;
+                    let data_set = self
+                        .get_data_set_from_node(&upstream_node, &mut data_set_cache)
+                        .await?;
                     data_sets_list.push(DataSetOrGraph::DataSet(data_set));
                 }
                 "GraphNode" | "MergeNode" => {
@@ -176,6 +179,7 @@ impl MergeBuilder {
     async fn get_data_set_from_node(
         &self,
         dag_node: &plan_dag_nodes::Model,
+        cache: &mut HashMap<i32, data_sets::Model>,
     ) -> Result<data_sets::Model> {
         // Parse config to get dataSetId
         let config: serde_json::Value = serde_json::from_str(&dag_node.config_json)
@@ -187,11 +191,17 @@ impl MergeBuilder {
             .map(|v| v as i32)
             .ok_or_else(|| anyhow!("Node config does not have dataSetId: {}", dag_node.id))?;
 
-        // Query the data_sets table
-        data_sets::Entity::find_by_id(data_set_id)
+        if let Some(cached) = cache.get(&data_set_id) {
+            return Ok(cached.clone());
+        }
+
+        let data_set = data_sets::Entity::find_by_id(data_set_id)
             .one(&self.db)
             .await?
-            .ok_or_else(|| anyhow!("DataSet not found with id {}", data_set_id))
+            .ok_or_else(|| anyhow!("DataSet not found with id {}", data_set_id))?;
+
+        cache.insert(data_set_id, data_set.clone());
+        Ok(data_set)
     }
 
     /// Get upstream graph (from Graph or Merge node)
@@ -216,14 +226,19 @@ impl MergeBuilder {
         for source in sources {
             match source {
                 DataSetOrGraph::DataSet(ds) => {
-                    hasher.update(ds.id.to_string().as_bytes());
-                    hasher.update(ds.filename.as_bytes());
+                    hasher.update(ds.id.to_le_bytes());
+                    hasher.update(ds.data_type.as_bytes());
+                    hasher.update(ds.graph_json.as_bytes());
                     if let Some(processed_at) = &ds.processed_at {
                         hasher.update(processed_at.to_rfc3339().as_bytes());
                     }
                 }
                 DataSetOrGraph::Graph(graph) => {
-                    hasher.update(graph.id.to_string().as_bytes());
+                    hasher.update(graph.id.to_le_bytes());
+                    if let Some(hash) = &graph.source_hash {
+                        hasher.update(hash.as_bytes());
+                    }
+                    hasher.update(graph.updated_at.timestamp_micros().to_le_bytes());
                     hasher.update(graph.node_id.as_bytes());
                     if let Some(computed_date) = &graph.computed_date {
                         hasher.update(computed_date.to_rfc3339().as_bytes());

@@ -2,20 +2,29 @@ use anyhow::{anyhow, Result};
 use csv::ReaderBuilder;
 use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, PaginatorTrait, Set};
 use serde_json::{json, Value};
-use std::collections::HashMap;
-use std::path::Path;
+use std::{collections::HashMap, mem, path::Path};
 
 use crate::database::entities::ExecutionState;
 use crate::database::entities::{dataset_rows, datasets};
 
+const DATASET_ROW_BATCH_SIZE: usize = 500;
+
 /// Service for importing data from files into dataset entities
 pub struct DatasourceImporter {
     db: DatabaseConnection,
+    persist_dataset_rows: bool,
 }
 
 impl DatasourceImporter {
     pub fn new(db: DatabaseConnection) -> Self {
-        Self { db }
+        let persist_dataset_rows = std::env::var("PIPELINE_PERSIST_DATASET_ROWS")
+            .map(|value| matches!(value.to_lowercase().as_str(), "1" | "true" | "yes"))
+            .unwrap_or(false);
+
+        Self {
+            db,
+            persist_dataset_rows,
+        }
     }
 
     /// Import a dataset from file path
@@ -157,32 +166,43 @@ impl DatasourceImporter {
             }));
         }
 
-        // Parse and store rows
-        let mut row_count = 0;
+        // Parse and optionally store rows
+        let persist_rows = self.persist_dataset_rows;
+        let mut row_count = 0usize;
+        let mut batch = Vec::with_capacity(DATASET_ROW_BATCH_SIZE);
+
         for result in reader.records() {
             let record = result?;
-            let mut row_data = HashMap::new();
+            row_count += 1;
 
-            for (i, field) in record.iter().enumerate() {
-                if let Some(header) = headers.get(i) {
-                    row_data.insert(header.to_string(), json!(field));
+            if persist_rows {
+                let mut row_data = HashMap::new();
+                for (i, field) in record.iter().enumerate() {
+                    if let Some(header) = headers.get(i) {
+                        row_data.insert(header.to_string(), json!(field));
+                    }
+                }
+
+                let row = dataset_rows::ActiveModel {
+                    id: Set(0),
+                    dataset_node_id: Set(dataset.id),
+                    row_number: Set(row_count as i32),
+                    data: Set(json!(row_data)),
+                    created_at: Set(chrono::Utc::now()),
+                };
+
+                batch.push(row);
+                if batch.len() >= DATASET_ROW_BATCH_SIZE {
+                    self.flush_dataset_rows(&mut batch).await?;
                 }
             }
-
-            // Insert row
-            let row = dataset_rows::ActiveModel {
-                id: Set(0),
-                dataset_node_id: Set(dataset.id),
-                row_number: Set(row_count + 1),
-                data: Set(json!(row_data)),
-                created_at: Set(chrono::Utc::now()),
-            };
-
-            row.insert(&self.db).await?;
-            row_count += 1;
         }
 
-        Ok((row_count as usize, json!(column_info)))
+        if persist_rows {
+            self.flush_dataset_rows(&mut batch).await?;
+        }
+
+        Ok((row_count, json!(column_info)))
     }
 
     /// Import CSV edges file
@@ -218,32 +238,42 @@ impl DatasourceImporter {
             }));
         }
 
-        // Parse and store rows
-        let mut row_count = 0;
+        let persist_rows = self.persist_dataset_rows;
+        let mut row_count = 0usize;
+        let mut batch = Vec::with_capacity(DATASET_ROW_BATCH_SIZE);
+
         for result in reader.records() {
             let record = result?;
-            let mut row_data = HashMap::new();
+            row_count += 1;
 
-            for (i, field) in record.iter().enumerate() {
-                if let Some(header) = headers.get(i) {
-                    row_data.insert(header.to_string(), json!(field));
+            if persist_rows {
+                let mut row_data = HashMap::new();
+                for (i, field) in record.iter().enumerate() {
+                    if let Some(header) = headers.get(i) {
+                        row_data.insert(header.to_string(), json!(field));
+                    }
+                }
+
+                let row = dataset_rows::ActiveModel {
+                    id: Set(0),
+                    dataset_node_id: Set(dataset.id),
+                    row_number: Set(row_count as i32),
+                    data: Set(json!(row_data)),
+                    created_at: Set(chrono::Utc::now()),
+                };
+
+                batch.push(row);
+                if batch.len() >= DATASET_ROW_BATCH_SIZE {
+                    self.flush_dataset_rows(&mut batch).await?;
                 }
             }
-
-            // Insert row
-            let row = dataset_rows::ActiveModel {
-                id: Set(0),
-                dataset_node_id: Set(dataset.id),
-                row_number: Set(row_count + 1),
-                data: Set(json!(row_data)),
-                created_at: Set(chrono::Utc::now()),
-            };
-
-            row.insert(&self.db).await?;
-            row_count += 1;
         }
 
-        Ok((row_count as usize, json!(column_info)))
+        if persist_rows {
+            self.flush_dataset_rows(&mut batch).await?;
+        }
+
+        Ok((row_count, json!(column_info)))
     }
 
     /// Import JSON graph file
@@ -279,16 +309,17 @@ impl DatasourceImporter {
         let node_count = obj["nodes"].as_array().map(|a| a.len()).unwrap_or(0);
         let edge_count = obj["edges"].as_array().map(|a| a.len()).unwrap_or(0);
 
-        // Store as single row with row_number = 0 (indicates full graph)
-        let row = dataset_rows::ActiveModel {
-            id: Set(0),
-            dataset_node_id: Set(dataset.id),
-            row_number: Set(0),
-            data: Set(graph_data),
-            created_at: Set(chrono::Utc::now()),
-        };
+        if self.persist_dataset_rows {
+            let row = dataset_rows::ActiveModel {
+                id: Set(0),
+                dataset_node_id: Set(dataset.id),
+                row_number: Set(0),
+                data: Set(graph_data.clone()),
+                created_at: Set(chrono::Utc::now()),
+            };
 
-        row.insert(&self.db).await?;
+            row.insert(&self.db).await?;
+        }
 
         // Column info for JSON graphs
         let column_info = json!([
@@ -352,6 +383,18 @@ impl DatasourceImporter {
             .await?;
 
         Ok(count)
+    }
+
+    async fn flush_dataset_rows(&self, batch: &mut Vec<dataset_rows::ActiveModel>) -> Result<()> {
+        if batch.is_empty() {
+            return Ok(());
+        }
+
+        let rows = mem::take(batch);
+        dataset_rows::Entity::insert_many(rows)
+            .exec(&self.db)
+            .await?;
+        Ok(())
     }
 }
 
