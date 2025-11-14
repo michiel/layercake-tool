@@ -2,8 +2,8 @@ use async_graphql::*;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 
 use crate::database::entities::{
-    data_sets, graph_edges, graph_layers, graph_nodes, graphs, library_sources, plan_dag_nodes,
-    plans, project_collaborators, user_sessions, users,
+    data_sets, graph_edges, graph_layers, graph_nodes, graphs, plan_dag_nodes, plans,
+    project_collaborators, user_sessions, users,
 };
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
@@ -15,11 +15,12 @@ use crate::graphql::types::project::Project;
 use crate::graphql::types::sample_project::SampleProject;
 use crate::graphql::types::{
     DataSet, DataSetPreview, GraphEdgePreview, GraphEdit, GraphNodePreview, GraphPreview, Layer,
-    LibrarySource, ProjectCollaborator, SystemSetting, TableColumn, TableRow, User, UserFilter,
-    UserSession,
+    LibraryItem, LibraryItemFilterInput, ProjectCollaborator, SystemSetting, TableColumn, TableRow,
+    User, UserFilter, UserSession,
 };
 use crate::services::{
-    graph_edit_service::GraphEditService, sample_project_service::SampleProjectService,
+    graph_edit_service::GraphEditService, library_item_service::LibraryItemService,
+    library_item_service::LibraryItemFilter, sample_project_service::SampleProjectService,
 };
 use layercake_data_acquisition::entities::tags as acquisition_tags;
 
@@ -509,23 +510,43 @@ impl Query {
         Ok(summaries.into_iter().map(DataSet::from).collect())
     }
 
-    /// Get all library sources
-
-    async fn library_sources(&self, ctx: &Context<'_>) -> Result<Vec<LibrarySource>> {
+    /// Get all library items with optional filtering
+    async fn library_items(
+        &self,
+        ctx: &Context<'_>,
+        filter: Option<LibraryItemFilterInput>,
+    ) -> Result<Vec<LibraryItem>> {
         let context = ctx.data::<GraphQLContext>()?;
-        let sources = library_sources::Entity::find().all(&context.db).await?;
+        let service = LibraryItemService::new(context.db.clone());
 
-        Ok(sources.into_iter().map(LibrarySource::from).collect())
+        let params = filter
+            .map(|f| LibraryItemFilter {
+                item_types: f
+                    .types
+                    .map(|types| types.into_iter().map(|t| t.as_str().to_string()).collect()),
+                tags: f.tags,
+                search: f.search_query,
+            })
+            .unwrap_or_default();
+
+        let items = service
+            .list(params)
+            .await
+            .map_err(|e| StructuredError::service("LibraryItemService::list", e))?;
+
+        Ok(items.into_iter().map(LibraryItem::from).collect())
     }
 
-    /// Get a single library source by ID
-    async fn library_source(&self, ctx: &Context<'_>, id: i32) -> Result<Option<LibrarySource>> {
+    /// Get a single library item by ID
+    async fn library_item(&self, ctx: &Context<'_>, id: i32) -> Result<Option<LibraryItem>> {
         let context = ctx.data::<GraphQLContext>()?;
-        let source = library_sources::Entity::find_by_id(id)
-            .one(&context.db)
-            .await?;
+        let service = LibraryItemService::new(context.db.clone());
+        let item = service
+            .get(id)
+            .await
+            .map_err(|e| StructuredError::service("LibraryItemService::get", e))?;
 
-        Ok(source.map(LibrarySource::from))
+        Ok(item.map(LibraryItem::from))
     }
 
     /// Get all Graphs for a project

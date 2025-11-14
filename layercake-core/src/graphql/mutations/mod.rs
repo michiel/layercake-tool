@@ -14,7 +14,7 @@ mod data_acquisition;
 mod data_set;
 mod graph;
 mod graph_edit;
-mod library_source;
+mod library;
 mod mcp;
 mod plan;
 mod plan_dag;
@@ -40,7 +40,7 @@ pub struct Mutation(
     pub data_acquisition::DataAcquisitionMutation,
     pub graph::GraphMutation,
     pub graph_edit::GraphEditMutation,
-    pub library_source::LibrarySourceMutation,
+    pub library::LibraryMutation,
     pub mcp::McpMutation,
     pub plan::PlanMutation,
     pub plan_dag::PlanDagMutation,

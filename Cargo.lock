@@ -475,6 +475,7 @@ dependencies = [
  "matchit",
  "memchr",
  "mime",
+ "multer",
  "percent-encoding",
  "pin-project-lite",
  "serde_core",
@@ -3258,6 +3259,7 @@ dependencies = [
  "tracing-tree",
  "url",
  "uuid",
+ "zip 0.6.6",
 ]
 
 [[package]]

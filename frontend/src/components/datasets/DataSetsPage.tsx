@@ -43,10 +43,11 @@ import {
 } from '../../graphql/datasets'
 
 import {
-  GET_LIBRARY_SOURCES,
-  IMPORT_LIBRARY_SOURCES,
-  LibrarySource
-} from '../../graphql/librarySources'
+  GET_LIBRARY_ITEMS,
+  IMPORT_LIBRARY_DATASETS,
+  LibraryItem,
+  LibraryItemType
+} from '../../graphql/libraryItems'
 
 import { gql } from '@apollo/client'
 
@@ -103,12 +104,13 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
   })
 
   const {
-    data: librarySourcesData,
-    loading: librarySourcesLoading,
-    error: librarySourcesError,
-    refetch: refetchLibrarySources
-  } = useQuery(GET_LIBRARY_SOURCES, {
+    data: libraryItemsData,
+    loading: libraryItemsLoading,
+    error: libraryItemsError,
+    refetch: refetchLibraryItems
+  } = useQuery(GET_LIBRARY_ITEMS, {
     skip: !libraryImportModalOpen,
+    variables: { filter: { types: [LibraryItemType.DATASET] } },
     fetchPolicy: 'cache-and-network'
   })
 
@@ -116,11 +118,11 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
   const [deleteDataSet, { loading: deleteLoading }] = useMutation(DELETE_DATASOURCE)
   const [reprocessDataSet, { loading: reprocessLoading }] = useMutation(REPROCESS_DATASOURCE)
   const [exportDataSets] = useMutation(EXPORT_DATASOURCES)
-  const [importLibrarySources, { loading: libraryImportLoading, error: libraryImportError }] =
-    useMutation(IMPORT_LIBRARY_SOURCES)
+  const [importLibraryDatasets, { loading: libraryImportLoading, error: libraryImportError }] =
+    useMutation(IMPORT_LIBRARY_DATASETS)
 
   const dataSources: DataSet[] = (dataSourcesData as any)?.dataSets || []
-  const librarySources: LibrarySource[] = (librarySourcesData as any)?.librarySources || []
+  const libraryItems: LibraryItem[] = (libraryItemsData as any)?.libraryItems || []
 
   useEffect(() => {
     if (!libraryImportModalOpen) {
@@ -129,8 +131,8 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
       return
     }
 
-    refetchLibrarySources()
-  }, [libraryImportModalOpen, refetchLibrarySources])
+    refetchLibraryItems()
+  }, [libraryImportModalOpen, refetchLibraryItems])
 
   const handleNavigate = (route: string) => {
     navigate(route)
@@ -229,10 +231,10 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
   }
 
   const toggleLibrarySelectAll = () => {
-    if (selectedLibraryRows.size === librarySources.length) {
+    if (selectedLibraryRows.size === libraryItems.length) {
       setSelectedLibraryRows(new Set())
     } else {
-      setSelectedLibraryRows(new Set(librarySources.map(ls => ls.id)))
+      setSelectedLibraryRows(new Set(libraryItems.map(item => item.id)))
     }
   }
 
@@ -244,7 +246,7 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
 
   const handleImportFromLibrary = async () => {
     if (selectedLibraryRows.size === 0) {
-      setLibrarySelectionError('Select at least one library source to import')
+      setLibrarySelectionError('Select at least one library item to import')
       return
     }
 
@@ -254,11 +256,11 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
     }
 
     try {
-      await importLibrarySources({
+      await importLibraryDatasets({
         variables: {
           input: {
             projectId: projectNumericId,
-            librarySourceIds: Array.from(selectedLibraryRows)
+            libraryItemIds: Array.from(selectedLibraryRows)
           }
         }
       })
@@ -268,7 +270,7 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
       setSelectedLibraryRows(new Set())
       setLibrarySelectionError(null)
     } catch (err) {
-      console.error('Failed to import library sources', err)
+      console.error('Failed to import library items', err)
     }
   }
 
@@ -606,11 +608,11 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
           </DialogHeader>
 
           <Stack gap="md" className="py-4">
-            {librarySourcesError && (
+            {libraryItemsError && (
               <Alert variant="destructive">
                 <IconAlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                  {librarySourcesError.message}
+                  {libraryItemsError.message}
                 </AlertDescription>
               </Alert>
             )}
@@ -632,92 +634,76 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
                 </AlertDescription>
               </Alert>
             )}
-
-          <div className="relative">
-            {(librarySourcesLoading || libraryImportLoading) && (
-              <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 rounded-lg">
-                <Spinner className="h-8 w-8" />
-              </div>
-            )}
-            {librarySources.length === 0 && !librarySourcesLoading ? (
-              <Stack align="center" className="py-8" gap="xs">
-                <p className="font-medium">No library sources available</p>
-                <p className="text-sm text-muted-foreground text-center max-w-[360px]">
-                  Add sources from the Library page before importing them into this project.
-                </p>
-              </Stack>
-            ) : (
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[40px]">
-                        <Checkbox
-                          checked={selectedLibraryRows.size === librarySources.length && librarySources.length > 0}
-                          onCheckedChange={toggleLibrarySelectAll}
-                        />
-                      </TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Origin</TableHead>
-                      <TableHead>Data Type</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Processed</TableHead>
-                      <TableHead>Size</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {librarySources.map((source) => (
-                      <TableRow key={source.id}>
-                        <TableCell>
+            <div className="relative">
+              {(libraryItemsLoading || libraryImportLoading) && (
+                <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 rounded-lg">
+                  <Spinner className="h-8 w-8" />
+                </div>
+              )}
+              {libraryItems.length === 0 && !libraryItemsLoading ? (
+                <Stack align="center" className="py-8" gap="xs">
+                  <p className="font-medium">No library datasets available</p>
+                  <p className="text-sm text-muted-foreground text-center max-w-[360px]">
+                    Add datasets from the Library page before importing them into this project.
+                  </p>
+                </Stack>
+              ) : (
+                <div className="rounded-md border overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[40px]">
                           <Checkbox
-                            checked={selectedLibraryRows.has(source.id)}
-                            onCheckedChange={() => toggleLibraryRowSelection(source.id)}
-                            aria-label={`Select ${source.name}`}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Stack gap="xs">
-                            <p className="font-medium">{source.name}</p>
-                            {source.description && (
-                              <p className="text-sm text-muted-foreground">
-                                {source.description}
-                              </p>
-                            )}
-                          </Stack>
-                        </TableCell>
-                        <TableCell>{getFileFormatDisplayName(source.fileFormat)}</TableCell>
-                        <TableCell>{getDataTypeDisplayName(source.dataType)}</TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="secondary"
-                            className={
-                              source.status === 'active'
-                                ? 'bg-green-100 text-green-900'
-                                : source.status === 'processing'
-                                  ? 'bg-blue-100 text-blue-900'
-                                  : 'bg-red-100 text-red-900'
+                            checked={
+                              selectedLibraryRows.size === libraryItems.length &&
+                              libraryItems.length > 0
                             }
-                          >
-                            {source.status === 'processing'
-                              ? 'Processing'
-                              : source.status === 'error'
-                                ? 'Error'
-                                : 'Active'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {source.processedAt
-                            ? new Date(source.processedAt).toLocaleString()
-                            : '—'}
-                        </TableCell>
-                        <TableCell>{formatFileSize(source.fileSize)}</TableCell>
+                            onCheckedChange={toggleLibrarySelectAll}
+                          />
+                        </TableHead>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Format</TableHead>
+                        <TableHead>Data Type</TableHead>
+                        <TableHead>Updated</TableHead>
+                        <TableHead>Size</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </div>
+                    </TableHeader>
+                    <TableBody>
+                      {libraryItems.map((item) => {
+                        const metadata = item.metadata || {}
+                        const format = metadata.format || metadata.file_format || 'csv'
+                        const dataType = metadata.dataType || metadata.data_type || 'GRAPH'
+                        return (
+                          <TableRow key={item.id}>
+                            <TableCell>
+                              <Checkbox
+                                checked={selectedLibraryRows.has(item.id)}
+                                onCheckedChange={() => toggleLibraryRowSelection(item.id)}
+                                aria-label={`Select ${item.name}`}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Stack gap="xs">
+                                <p className="font-medium">{item.name}</p>
+                                {item.description && (
+                                  <p className="text-sm text-muted-foreground">{item.description}</p>
+                                )}
+                              </Stack>
+                            </TableCell>
+                            <TableCell>{getFileFormatDisplayName(format)}</TableCell>
+                            <TableCell>{getDataTypeDisplayName(dataType)}</TableCell>
+                            <TableCell>{new Date(item.updatedAt).toLocaleString()}</TableCell>
+                            <TableCell>
+                              {item.contentSize ? formatFileSize(item.contentSize) : '—'}
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </div>
 
           </Stack>
 
@@ -727,7 +713,7 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
             </Button>
             <Button
               onClick={handleImportFromLibrary}
-              disabled={librarySources.length === 0 || libraryImportLoading}
+              disabled={libraryItems.length === 0 || libraryImportLoading}
             >
               {libraryImportLoading && <Spinner className="mr-2 h-4 w-4" />}
               Import Selected ({selectedLibraryRows.size})

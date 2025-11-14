@@ -16,6 +16,30 @@ import { Spinner } from '../components/ui/spinner'
 import { Breadcrumbs } from '../components/common/Breadcrumbs'
 import { showSuccessNotification } from '../utils/notifications'
 import { handleMutationErrors } from '../utils/graphqlHelpers'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../components/ui/table'
+import {
+  GET_LIBRARY_ITEMS,
+  IMPORT_LIBRARY_DATASETS,
+  LibraryItem,
+  LibraryItemType,
+  formatFileSize,
+  getFileFormatDisplayName,
+  getDataTypeDisplayName,
+} from '../graphql/libraryItems'
 
 const GET_PROJECTS = gql`
   query GetProjects {
@@ -69,6 +93,8 @@ export const DatasetCreationPage: React.FC = () => {
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [generatedDataset, setGeneratedDataset] = useState<string | null>(null)
   const [mutationError, setMutationError] = useState<string | null>(null)
+  const [libraryPickerOpen, setLibraryPickerOpen] = useState(false)
+  const [selectedLibraryId, setSelectedLibraryId] = useState<number | null>(null)
 
   const { data: projectsData, loading: projectsLoading } = useQuery<{
     projects: Array<{ id: number; name: string }>
@@ -95,6 +121,20 @@ export const DatasetCreationPage: React.FC = () => {
     useMutation<DatasetGenerationResponse>(GENERATE_DATASET, {
       errorPolicy: 'all',
     })
+
+  const { data: libraryData, loading: libraryLoading, error: libraryError } = useQuery(
+    GET_LIBRARY_ITEMS,
+    {
+      skip: !libraryPickerOpen,
+      variables: { filter: { types: [LibraryItemType.DATASET] } },
+      fetchPolicy: 'cache-and-network',
+    },
+  )
+  const libraryItems: LibraryItem[] = (libraryData as any)?.libraryItems || []
+
+  const [importLibraryDatasets, { loading: importLibraryLoading }] = useMutation(
+    IMPORT_LIBRARY_DATASETS,
+  )
 
   const tags = useMemo(() => data?.dataAcquisitionTags ?? [], [data])
 
@@ -132,6 +172,28 @@ export const DatasetCreationPage: React.FC = () => {
       showSuccessNotification('Dataset generated', 'Review the YAML output below.')
     }
     await refetch()
+  }
+
+  const handleImportDatasetFromLibrary = async () => {
+    if (!selectedLibraryId || !Number.isFinite(numericProjectId)) {
+      return
+    }
+
+    try {
+      await importLibraryDatasets({
+        variables: {
+          input: {
+            projectId: numericProjectId,
+            libraryItemIds: [selectedLibraryId],
+          },
+        },
+      })
+      showSuccessNotification('Dataset imported', 'The library dataset was added to this project.')
+      setLibraryPickerOpen(false)
+      setSelectedLibraryId(null)
+    } catch (err) {
+      console.error('Failed to import dataset from library', err)
+    }
   }
 
   const breadcrumbSections = useMemo(() => {
@@ -191,6 +253,9 @@ export const DatasetCreationPage: React.FC = () => {
             Use Retrieval-Augmented Generation to create structured datasets from the knowledge base.
           </p>
         </Stack>
+        <Button variant="outline" className="w-fit" onClick={() => setLibraryPickerOpen(true)}>
+          Import from Library
+        </Button>
 
         {mutationError && (
           <Alert variant="destructive">
@@ -257,6 +322,93 @@ export const DatasetCreationPage: React.FC = () => {
           </CardContent>
         </Card>
       </Stack>
+
+      <Dialog
+        open={libraryPickerOpen}
+        onOpenChange={(open) => {
+          setLibraryPickerOpen(open)
+          if (!open) {
+            setSelectedLibraryId(null)
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[720px]">
+          <DialogHeader>
+            <DialogTitle>Select Library Dataset</DialogTitle>
+          </DialogHeader>
+          {libraryError && (
+            <Alert variant="destructive">
+              <AlertDescription>{libraryError.message}</AlertDescription>
+            </Alert>
+          )}
+          <div className="max-h-[360px] overflow-y-auto border rounded-md">
+            {libraryLoading ? (
+              <div className="flex items-center justify-center py-8 text-muted-foreground">
+                <Spinner className="mr-2 h-4 w-4" /> Loading library datasets…
+              </div>
+            ) : libraryItems.length === 0 ? (
+              <div className="py-8 text-center text-muted-foreground">
+                No datasets available in the shared library.
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12" />
+                    <TableHead>Name</TableHead>
+                    <TableHead>Format</TableHead>
+                    <TableHead>Data Type</TableHead>
+                    <TableHead>Size</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {libraryItems.map((item) => {
+                    const metadata = item.metadata || {}
+                    const format = metadata.format || metadata.file_format || 'csv'
+                    const dataType = metadata.dataType || metadata.data_type || 'GRAPH'
+                    return (
+                      <TableRow
+                        key={item.id}
+                        className="cursor-pointer"
+                        onClick={() => setSelectedLibraryId(item.id)}
+                      >
+                        <TableCell>
+                          <input
+                            type="radio"
+                            checked={selectedLibraryId === item.id}
+                            onChange={() => setSelectedLibraryId(item.id)}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{item.name}</div>
+                          <div className="text-sm text-muted-foreground">{item.description}</div>
+                        </TableCell>
+                        <TableCell>{getFileFormatDisplayName(format)}</TableCell>
+                        <TableCell>{getDataTypeDisplayName(dataType)}</TableCell>
+                        <TableCell>
+                          {item.contentSize ? formatFileSize(item.contentSize) : '—'}
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant='secondary' onClick={() => setLibraryPickerOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleImportDatasetFromLibrary}
+              disabled={!selectedLibraryId || importLibraryLoading}
+            >
+              {importLibraryLoading && <Spinner className="mr-2 h-4 w-4" />}
+              Import Selected
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageContainer>
   )
 }

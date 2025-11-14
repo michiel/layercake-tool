@@ -8,7 +8,7 @@ import { PlanVisualEditor } from './components/editors/PlanVisualEditor/PlanVisu
 import { ErrorBoundary } from './components/common/ErrorBoundary'
 import { DataSetsPage } from './components/datasets/DataSetsPage'
 import { DataSetEditor } from './components/datasets/DataSetEditor'
-import { LibrarySourcesPage } from './components/library/LibrarySourcesPage'
+import { LibraryPage } from './components/library/LibraryPage'
 import { CreateProjectModal } from './components/project/CreateProjectModal'
 import { TopBar } from './components/layout/TopBar'
 import { useCollaborationV2 } from './hooks/useCollaborationV2'
@@ -1725,7 +1725,7 @@ function App() {
           } />
           <Route path="/library" element={
             <ErrorBoundary>
-              <LibrarySourcesPage />
+              <LibraryPage />
             </ErrorBoundary>
           } />
           <Route path="/projects" element={

@@ -28,9 +28,10 @@ import {
   formatFileSize
 } from '../../graphql/datasets'
 import {
-  CREATE_LIBRARY_SOURCE,
-  CreateLibrarySourceInput
-} from '../../graphql/librarySources'
+  UPLOAD_LIBRARY_ITEM,
+  UploadLibraryItemInput,
+  LibraryItemType
+} from '../../graphql/libraryItems'
 import { Stack, Group } from '../layout-primitives'
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert'
 import { Badge } from '../ui/badge'
@@ -91,8 +92,8 @@ export const DataSetUploader: React.FC<DataSetUploaderProps> = ({
   const [createEmptyDataSet, { loading: createEmptyLoading, error: createEmptyError }] = useMutation(
     CREATE_EMPTY_DATASOURCE
   )
-  const [createLibrarySource, { loading: createLibraryLoading, error: createLibraryError }] =
-    useMutation(CREATE_LIBRARY_SOURCE)
+  const [uploadLibraryItem, { loading: createLibraryLoading, error: createLibraryError }] =
+    useMutation(UPLOAD_LIBRARY_ITEM)
   const [bulkUploadDataSets, { loading: bulkLoading, error: bulkError }] = useMutation(
     BULK_UPLOAD_DATASOURCES
   )
@@ -320,18 +321,18 @@ export const DataSetUploader: React.FC<DataSetUploaderProps> = ({
         setUploadProgress(50)
 
         if (isLibraryMode) {
-          const input: CreateLibrarySourceInput = {
+          const input: UploadLibraryItemInput = {
+            type: LibraryItemType.DATASET,
             name: values.name,
             description: values.description || undefined,
-            filename: selectedFile.file.name,
+            tags: [],
+            fileName: selectedFile.file.name,
             fileContent,
             fileFormat: selectedFile.format,
             dataType: values.dataType as DataType
           }
 
-          await createLibrarySource({
-            variables: { input }
-          })
+          await uploadLibraryItem({ variables: { input } })
         } else {
           if (projectId === undefined) {
             throw new Error('projectId is required to create a project data source')

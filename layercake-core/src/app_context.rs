@@ -1,3 +1,6 @@
+use std::collections::{HashMap, HashSet};
+use std::io::{Cursor, Read, Write};
+use std::str::FromStr;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
@@ -6,14 +9,17 @@ use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
     QueryOrder, Set,
 };
-use serde::Serialize;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{json, Value};
 use uuid::Uuid;
+use zip::{write::FileOptions, CompressionMethod, ZipArchive, ZipWriter};
 
 use crate::database::entities::common_types::{
-    DataType as DataSetDataType, FileFormat as DataSetFileFormat,
+    DataType, DataType as DataSetDataType, FileFormat as DataSetFileFormat,
 };
-use crate::database::entities::{data_sets, graphs, plans, projects};
+use crate::database::entities::{
+    data_sets, graphs, library_items, plan_dag_edges, plan_dag_nodes, plans, projects,
+};
 use crate::graphql::types::graph_node::GraphNode as GraphNodeDto;
 use crate::graphql::types::layer::Layer as LayerDto;
 use crate::graphql::types::plan_dag::{
@@ -29,6 +35,9 @@ use crate::services::plan_dag_service::PlanDagNodePositionUpdate;
 use crate::services::{
     data_set_service::DataSetService, dataset_bulk_service::DataSetBulkService, ExportService,
     GraphService, ImportService, PlanDagService,
+};
+use crate::services::library_item_service::{
+    LibraryItemService, ITEM_TYPE_PROJECT, ITEM_TYPE_PROJECT_TEMPLATE,
 };
 use layercake_data_acquisition::{
     config::EmbeddingProviderConfig, services::DataAcquisitionService,
@@ -709,6 +718,276 @@ impl AppContext {
             .await?;
 
         Ok(())
+    }
+
+    pub async fn export_project_as_template(
+        &self,
+        project_id: i32,
+    ) -> Result<library_items::Model> {
+        let project = projects::Entity::find_by_id(project_id)
+            .one(&self.db)
+            .await
+            .map_err(|e| anyhow!("Failed to load project {}: {}", project_id, e))?
+            .ok_or_else(|| anyhow!("Project {} not found", project_id))?;
+
+        let plan = plans::Entity::find()
+            .filter(plans::Column::ProjectId.eq(project_id))
+            .order_by_desc(plans::Column::UpdatedAt)
+            .one(&self.db)
+            .await
+            .map_err(|e| anyhow!("Failed to load plan for project {}: {}", project_id, e))?
+            .ok_or_else(|| anyhow!("Project {} has no plan to export", project_id))?;
+
+        let snapshot = self
+            .load_plan_dag(project_id)
+            .await?
+            .ok_or_else(|| anyhow!("Project {} has no DAG to export", project_id))?;
+
+        let dataset_ids: HashSet<i32> = snapshot
+            .nodes
+            .iter()
+            .filter(|node| matches!(node.node_type, PlanDagNodeType::DataSet))
+            .filter_map(|node| {
+                serde_json::from_str::<Value>(&node.config)
+                    .ok()
+                    .and_then(|config| config.get("dataSetId").and_then(|v| v.as_i64()))
+                    .map(|id| id as i32)
+            })
+            .collect();
+
+        let data_sets = if dataset_ids.is_empty() {
+            Vec::new()
+        } else {
+            data_sets::Entity::find()
+                .filter(data_sets::Column::Id.is_in(dataset_ids.clone()))
+                .all(&self.db)
+                .await
+                .map_err(|e| anyhow!("Failed to load data sets for template: {}", e))?
+        };
+
+        let dataset_records = build_dataset_template_entries(&data_sets)?;
+        let dataset_index = TemplateDatasetIndex {
+            datasets: dataset_records.clone(),
+        };
+
+        let manifest = TemplateManifest {
+            manifest_version: "1.0".to_string(),
+            template_type: ITEM_TYPE_PROJECT_TEMPLATE.to_string(),
+            created_with: format!("layercake-{}", env!("CARGO_PKG_VERSION")),
+            project_format_version: 1,
+            generated_at: chrono::Utc::now(),
+            source_project_id: project.id,
+            plan_name: plan.name.clone(),
+        };
+
+        let project_record = TemplateProjectRecord {
+            name: project.name.clone(),
+            description: project.description.clone(),
+            tags: serde_json::from_str(&project.tags).unwrap_or_default(),
+        };
+
+        let dag_bytes = serde_json::to_vec_pretty(&snapshot)
+            .map_err(|e| anyhow!("Failed to encode DAG snapshot: {}", e))?;
+        let manifest_bytes = serde_json::to_vec_pretty(&manifest)
+            .map_err(|e| anyhow!("Failed to encode template manifest: {}", e))?;
+        let project_bytes = serde_json::to_vec_pretty(&project_record)
+            .map_err(|e| anyhow!("Failed to encode project metadata: {}", e))?;
+        let dataset_index_bytes = serde_json::to_vec_pretty(&dataset_index)
+            .map_err(|e| anyhow!("Failed to encode dataset index: {}", e))?;
+        let metadata_bytes = serde_json::to_vec_pretty(&json!({
+            "layercakeProjectFormatVersion": 1
+        }))
+        .map_err(|e| anyhow!("Failed to encode metadata.json: {}", e))?;
+
+        let mut cursor = Cursor::new(Vec::new());
+        {
+            let mut zip = ZipWriter::new(&mut cursor);
+            let options =
+                FileOptions::default().compression_method(CompressionMethod::Deflated);
+
+            zip.start_file("manifest.json", options)
+                .map_err(|e| anyhow!("Failed to add manifest.json: {}", e))?;
+            zip.write_all(&manifest_bytes)
+                .map_err(|e| anyhow!("Failed to write manifest.json: {}", e))?;
+
+            zip.start_file("metadata.json", options)
+                .map_err(|e| anyhow!("Failed to add metadata.json: {}", e))?;
+            zip.write_all(&metadata_bytes)
+                .map_err(|e| anyhow!("Failed to write metadata.json: {}", e))?;
+
+            zip.start_file("project.json", options)
+                .map_err(|e| anyhow!("Failed to add project.json: {}", e))?;
+            zip.write_all(&project_bytes)
+                .map_err(|e| anyhow!("Failed to write project.json: {}", e))?;
+
+            zip.start_file("dag.json", options)
+                .map_err(|e| anyhow!("Failed to add dag.json: {}", e))?;
+            zip.write_all(&dag_bytes)
+                .map_err(|e| anyhow!("Failed to write dag.json: {}", e))?;
+
+            zip.start_file("datasets/index.json", options)
+                .map_err(|e| anyhow!("Failed to add datasets/index.json: {}", e))?;
+            zip.write_all(&dataset_index_bytes)
+                .map_err(|e| anyhow!("Failed to write datasets/index.json: {}", e))?;
+
+            for descriptor in &dataset_records {
+                if let Some(data_set) = data_sets
+                    .iter()
+                    .find(|ds| ds.id == descriptor.original_id)
+                {
+                    let csv_bytes = dataset_schema_to_csv(data_set)
+                        .map_err(|e| anyhow!("Failed to render dataset schema: {}", e))?;
+
+                    let path = format!("datasets/{}", descriptor.filename);
+                    zip.start_file(path, options)
+                        .map_err(|e| anyhow!("Failed to add dataset file: {}", e))?;
+                    zip.write_all(&csv_bytes)
+                        .map_err(|e| anyhow!("Failed to write dataset file: {}", e))?;
+                }
+            }
+
+            zip.finish()
+                .map_err(|e| anyhow!("Failed to finalize template archive: {}", e))?;
+        }
+
+        let zip_bytes = cursor.into_inner();
+        let service = LibraryItemService::new(self.db.clone());
+        let tags = serde_json::from_str(&project.tags).unwrap_or_default();
+
+        let metadata = json!({
+            "projectId": project.id,
+            "planId": plan.id,
+            "nodeCount": snapshot.nodes.len(),
+            "edgeCount": snapshot.edges.len(),
+            "datasetCount": dataset_records.len(),
+            "manifestVersion": manifest.manifest_version,
+            "projectFormatVersion": manifest.project_format_version
+        });
+
+        let item = service
+            .create_binary_item(
+                ITEM_TYPE_PROJECT_TEMPLATE.to_string(),
+                format!("{} Template", project.name),
+                project.description.clone(),
+                tags,
+                metadata,
+                Some("application/zip".to_string()),
+                zip_bytes,
+            )
+            .await
+            .map_err(|e| anyhow!("Failed to persist template: {}", e))?;
+
+        Ok(item)
+    }
+
+    pub async fn create_project_from_library(
+        &self,
+        library_item_id: i32,
+        project_name: Option<String>,
+    ) -> Result<ProjectSummary> {
+        let service = LibraryItemService::new(self.db.clone());
+        let item = service
+            .get(library_item_id)
+            .await
+            .map_err(|e| anyhow!("Failed to load library item {}: {}", library_item_id, e))?
+            .ok_or_else(|| anyhow!("Library item {} not found", library_item_id))?;
+
+        if item.item_type != ITEM_TYPE_PROJECT && item.item_type != ITEM_TYPE_PROJECT_TEMPLATE {
+            return Err(anyhow!(
+                "Library item {} is type {}, expected project or project_template",
+                library_item_id,
+                item.item_type
+            ));
+        }
+
+        let mut archive =
+            ZipArchive::new(Cursor::new(item.content_blob.clone())).map_err(|e| {
+                anyhow!(
+                    "Failed to read template archive for library item {}: {}",
+                    library_item_id,
+                    e
+                )
+            })?;
+
+        let manifest: TemplateManifest = read_template_json(&mut archive, "manifest.json")?;
+        let project_record: TemplateProjectRecord =
+            read_template_json(&mut archive, "project.json")?;
+        let dag_snapshot: PlanDagSnapshot =
+            read_template_json(&mut archive, "dag.json")?;
+        let dataset_index: TemplateDatasetIndex =
+            read_template_json(&mut archive, "datasets/index.json")?;
+
+        let tags = project_record.tags.clone();
+        let desired_name = project_name.unwrap_or(project_record.name.clone());
+        let now = Utc::now();
+
+        let project = projects::ActiveModel {
+            name: Set(desired_name.clone()),
+            description: Set(project_record.description.clone()),
+            tags: Set(serde_json::to_string(&tags).unwrap_or_else(|_| "[]".to_string())),
+            created_at: Set(now),
+            updated_at: Set(now),
+            ..Default::default()
+        }
+        .insert(&self.db)
+        .await
+        .map_err(|e| anyhow!("Failed to create project from template: {}", e))?;
+
+        let plan = self
+            .create_plan(PlanCreateRequest {
+                project_id: project.id,
+                name: if manifest.plan_name.trim().is_empty() {
+                    format!("{} Plan", desired_name)
+                } else {
+                    manifest.plan_name.clone()
+                },
+                yaml_content: "".to_string(),
+                dependencies: None,
+                status: Some("draft".to_string()),
+            })
+            .await?;
+
+        let dataset_service = DataSetService::new(self.db.clone());
+        let mut id_map = HashMap::new();
+
+        for descriptor in &dataset_index.datasets {
+            let dataset_path = format!("datasets/{}", descriptor.filename);
+            let file_bytes = {
+                let mut dataset_file = archive
+                    .by_name(&dataset_path)
+                    .map_err(|e| anyhow!("Missing dataset file {}: {}", descriptor.filename, e))?;
+                let mut bytes = Vec::new();
+                dataset_file
+                    .read_to_end(&mut bytes)
+                    .map_err(|e| anyhow!("Failed to read dataset {}: {}", descriptor.filename, e))?;
+                bytes
+            };
+            let file_format = DataSetFileFormat::from_str(&descriptor.file_format)
+                .unwrap_or(DataSetFileFormat::Csv);
+            let data_type =
+                DataType::from_str(&descriptor.data_type).unwrap_or(DataType::Graph);
+
+            let dataset = dataset_service
+                .create_from_file(
+                    project.id,
+                    descriptor.name.clone(),
+                    descriptor.description.clone(),
+                    descriptor.filename.clone(),
+                    file_format,
+                    data_type,
+                    file_bytes,
+                )
+                .await
+                .map_err(|e| anyhow!("Failed to import dataset {}: {}", descriptor.name, e))?;
+
+            id_map.insert(descriptor.original_id, dataset.id);
+        }
+
+        insert_plan_dag_from_snapshot(&self.db, plan.id, &dag_snapshot, &id_map)
+            .await
+            .map_err(|e| anyhow!("Failed to recreate plan DAG: {}", e))?;
+
+        Ok(ProjectSummary::from(project))
     }
 
     // ----- Plan DAG helpers -------------------------------------------------
@@ -1531,7 +1810,7 @@ pub struct DataSetImportOutcome {
     pub updated_count: i32,
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PlanDagSnapshot {
     pub version: String,
@@ -1661,4 +1940,210 @@ fn apply_preview_limit(content: String, format: ExportFileType, max_rows: Option
         }
         _ => content,
     }
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TemplateDatasetDescriptor {
+    pub original_id: i32,
+    pub name: String,
+    pub description: Option<String>,
+    pub filename: String,
+    pub file_format: String,
+    pub data_type: String,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TemplateDatasetIndex {
+    pub datasets: Vec<TemplateDatasetDescriptor>,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TemplateManifest {
+    pub manifest_version: String,
+    pub template_type: String,
+    pub created_with: String,
+    pub project_format_version: u32,
+    pub generated_at: DateTime<Utc>,
+    pub source_project_id: i32,
+    pub plan_name: String,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TemplateProjectRecord {
+    pub name: String,
+    pub description: Option<String>,
+    pub tags: Vec<String>,
+}
+
+fn build_dataset_template_entries(
+    data_sets: &[data_sets::Model],
+) -> Result<Vec<TemplateDatasetDescriptor>> {
+    data_sets
+        .iter()
+        .map(|data_set| {
+            Ok(TemplateDatasetDescriptor {
+                original_id: data_set.id,
+                name: data_set.name.clone(),
+                description: data_set.description.clone(),
+                filename: format!(
+                    "{}_{}.csv",
+                    sanitize_dataset_filename(&data_set.name),
+                    data_set.id
+                ),
+                file_format: "csv".to_string(),
+                data_type: data_set.data_type.clone(),
+            })
+        })
+        .collect()
+}
+
+fn dataset_schema_to_csv(data_set: &data_sets::Model) -> Result<Vec<u8>> {
+    let headers = dataset_headers_from_graph(data_set)?;
+    let mut writer = csv::Writer::from_writer(Vec::new());
+    if !headers.is_empty() {
+        writer
+            .write_record(headers)
+            .map_err(|e| anyhow!("Failed to write dataset headers: {}", e))?;
+    }
+    writer
+        .flush()
+        .map_err(|e| anyhow!("Failed to flush dataset CSV: {}", e))?;
+    writer
+        .into_inner()
+        .map_err(|e| anyhow!("Failed to finalize dataset CSV: {}", e))
+}
+
+fn dataset_headers_from_graph(data_set: &data_sets::Model) -> Result<Vec<String>> {
+    let fallback = data_set
+        .data_type
+        .parse::<DataType>()
+        .ok()
+        .map(|dt| dt.get_expected_headers().into_iter().map(|s| s.to_string()).collect())
+        .unwrap_or_else(Vec::new);
+
+    let parsed: Value = serde_json::from_str(&data_set.graph_json)
+        .map_err(|e| anyhow!("Failed to parse dataset graph_json: {}", e))?;
+    let key = match data_set.data_type.as_str() {
+        "nodes" => "nodes",
+        "edges" => "edges",
+        "layers" => "layers",
+        _ => "nodes",
+    };
+
+    if let Some(array) = parsed.get(key).and_then(|value| value.as_array()) {
+        if let Some(first) = array.first().and_then(|v| v.as_object()) {
+            let headers: Vec<String> = first.keys().cloned().collect();
+            if !headers.is_empty() {
+                return Ok(headers);
+            }
+        }
+    }
+
+    Ok(fallback)
+}
+
+fn sanitize_dataset_filename(name: &str) -> String {
+    let filtered: String = name
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() {
+                c.to_ascii_lowercase()
+            } else {
+                '_'
+            }
+        })
+        .collect();
+
+    let trimmed = filtered.trim_matches('_');
+    if trimmed.is_empty() {
+        "dataset".to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+fn read_template_json<T: DeserializeOwned>(
+    archive: &mut ZipArchive<Cursor<Vec<u8>>>,
+    path: &str,
+) -> Result<T> {
+    let mut file = archive
+        .by_name(path)
+        .map_err(|e| anyhow!("Template archive missing {}: {}", path, e))?;
+    let mut buffer = Vec::new();
+    file.read_to_end(&mut buffer)
+        .map_err(|e| anyhow!("Failed to read {}: {}", path, e))?;
+    serde_json::from_slice(&buffer)
+        .map_err(|e| anyhow!("Failed to parse {}: {}", path, e))
+}
+
+async fn insert_plan_dag_from_snapshot(
+    db: &DatabaseConnection,
+    plan_id: i32,
+    snapshot: &PlanDagSnapshot,
+    dataset_id_map: &HashMap<i32, i32>,
+) -> Result<()> {
+    let now = Utc::now();
+
+    for node in &snapshot.nodes {
+        let mut config_value: Value = serde_json::from_str(&node.config)
+            .map_err(|e| anyhow!("Invalid node config JSON: {}", e))?;
+
+        if let Some(old_id) = config_value
+            .get("dataSetId")
+            .and_then(|v| v.as_i64())
+            .map(|v| v as i32)
+        {
+            if let Some(new_id) = dataset_id_map.get(&old_id) {
+                if let Some(obj) = config_value.as_object_mut() {
+                    obj.insert("dataSetId".to_string(), json!(new_id));
+                }
+            }
+        }
+
+        let metadata_json = serde_json::to_string(&node.metadata)
+            .map_err(|e| anyhow!("Failed to encode node metadata: {}", e))?;
+        let config_json = serde_json::to_string(&config_value)
+            .map_err(|e| anyhow!("Failed to encode node config: {}", e))?;
+
+        plan_dag_nodes::ActiveModel {
+            id: Set(node.id.clone()),
+            plan_id: Set(plan_id),
+            node_type: Set(node_type_storage_name(&node.node_type).to_string()),
+            position_x: Set(node.position.x),
+            position_y: Set(node.position.y),
+            source_position: Set(node.source_position.clone()),
+            target_position: Set(node.target_position.clone()),
+            metadata_json: Set(metadata_json),
+            config_json: Set(config_json),
+            created_at: Set(now),
+            updated_at: Set(now),
+        }
+        .insert(db)
+        .await
+        .map_err(|e| anyhow!("Failed to insert plan node {}: {}", node.id, e))?;
+    }
+
+    for edge in &snapshot.edges {
+        let metadata_json = serde_json::to_string(&edge.metadata)
+            .map_err(|e| anyhow!("Failed to encode edge metadata: {}", e))?;
+
+        plan_dag_edges::ActiveModel {
+            id: Set(edge.id.clone()),
+            plan_id: Set(plan_id),
+            source_node_id: Set(edge.source.clone()),
+            target_node_id: Set(edge.target.clone()),
+            metadata_json: Set(metadata_json),
+            created_at: Set(now),
+            updated_at: Set(now),
+        }
+        .insert(db)
+        .await
+        .map_err(|e| anyhow!("Failed to insert plan edge {}: {}", edge.id, e))?;
+    }
+
+    Ok(())
 }

@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use axum::{extract::State, response::IntoResponse, routing::get, Router};
+use axum::{extract::State, response::IntoResponse, routing::{get, post}, Router};
 use sea_orm::DatabaseConnection;
 use std::sync::Arc;
 use tower::ServiceBuilder;
@@ -26,7 +26,7 @@ use async_graphql::{
 #[cfg(feature = "graphql")]
 use async_graphql_axum::{GraphQLRequest, GraphQLResponse as AxumGraphQLResponse};
 
-use super::handlers::health;
+use super::handlers::{health, library};
 use layercake_data_acquisition::{
     config::EmbeddingProviderConfig, services::DataAcquisitionService,
 };
@@ -215,7 +215,12 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
 
     let mut app = Router::new()
         // Health check endpoint
-        .route("/health", get(health::health_check));
+        .route("/health", get(health::health_check))
+        .route(
+            "/api/library/{id}/download",
+            get(library::download_library_item),
+        )
+        .route("/api/library/upload", post(library::upload_library_item));
 
     // Add GraphQL routes if feature is enabled
     #[cfg(feature = "graphql")]

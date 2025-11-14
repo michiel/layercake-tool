@@ -115,6 +115,7 @@ calamine = { workspace = true }
 rust_xlsxwriter = { workspace = true }
 spreadsheet-ods = { workspace = true }
 icu_locid = { workspace = true }
+zip = { workspace = true }
 
 # Data acquisition
 layercake-data-acquisition = { path = "../layercake-data-acquisition" }

@@ -41,7 +41,7 @@ colored = "2.0"
 tokio = { version = "1.0", features = ["full"] }
 
 # Server dependencies
-axum = { version = "0.8.4", features = ["ws"] }
+axum = { version = "0.8.4", features = ["ws", "multipart"] }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["cors", "fs"] }
 sea-orm = { version = "0.12", features = ["sqlx-sqlite", "runtime-tokio-rustls", "macros"] }
@@ -72,6 +72,7 @@ calamine = "0.26"
 rust_xlsxwriter = "0.80"
 spreadsheet-ods = "0.25"
 icu_locid = "1.5"
+zip = { version = "0.6", default-features = false, features = ["deflate"] }
 
 # Tauri dependencies
 tauri = { version = "2.0", features = ["macos-private-api"] }

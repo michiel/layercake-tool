@@ -11,7 +11,7 @@ pub mod graph_edit_applicator;
 pub mod graph_edit_service;
 pub mod graph_service;
 pub mod import_service;
-pub mod library_source_service;
+pub mod library_item_service;
 pub mod mcp_agent_service;
 pub mod plan_dag_service;
 pub mod project_service;

@@ -3,7 +3,7 @@ pub mod chat_messages;
 pub mod chat_sessions;
 pub mod common_types;
 pub mod data_sets;
-pub mod library_sources;
+pub mod library_items;
 pub mod plan_dag_edges;
 pub mod plan_dag_nodes;
 pub mod plans;

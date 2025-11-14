@@ -1,4 +1,3 @@
-use anyhow::Result;
 use layercake_data_acquisition::vector_store::VectorSearchResult;
 
 /// Context built from retrieved document chunks for RAG
