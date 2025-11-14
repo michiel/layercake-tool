@@ -8,10 +8,10 @@ mindmap
 {{/inline}}
 {{#if (is_empty hierarchy_tree_edges)}}
   {{#each hierarchy_tree}}
-{{> render_node}}
+  {{> render_node}}
   {{/each}}
 {{else}}
   {{#each hierarchy_tree_edges}}
-{{> render_node}}
+  {{> render_node}}
   {{/each}}
 {{/if}}
