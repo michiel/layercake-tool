@@ -138,10 +138,14 @@ fn apply_graph_transformations(
         let max_partition_depth = graph_config.max_partition_depth;
         info!("Reducing graph partition depth to {}", max_partition_depth);
         debug!("Graph stats {}", graph.stats());
+        let synthesized = graph.ensure_partition_hierarchy();
         match graph.modify_graph_limit_partition_depth(max_partition_depth) {
             Ok(_) => {
                 debug!("Graph partition depth limited to {}", max_partition_depth);
                 debug!("Graph stats {}", graph.stats());
+                if synthesized {
+                    info!("Synthetic partition hierarchy used because original graph lacked partition metadata");
+                }
             }
             Err(e) => {
                 error!("Failed to limit graph partition depth: {}", e);
@@ -153,10 +157,14 @@ fn apply_graph_transformations(
         let max_partition_width = graph_config.max_partition_width;
         info!("Reducing graph partition width to {}", max_partition_width);
         debug!("Graph stats {}", graph.stats());
+        let synthesized = graph.ensure_partition_hierarchy();
         match graph.modify_graph_limit_partition_width(max_partition_width) {
             Ok(_) => {
                 debug!("Graph partition width limited to {}", max_partition_width);
                 debug!("Graph stats {}", graph.stats());
+                if synthesized {
+                    info!("Synthetic partition hierarchy used because original graph lacked partition metadata");
+                }
             }
             Err(e) => {
                 error!("Failed to limit graph partition width: {}", e);

@@ -17,11 +17,7 @@
    - In `Graph::modify_graph_limit_partition_depth` / `_width`, detect when `get_root_nodes()` is empty or when an entire level lacks `is_partition` data.
    - Emit a structured warning so users know partition metadata is missing. This also helps during future debugging.
 2. **Auto-derive a partition tree when metadata is absent**
-   - Introduce a helper such as `Graph::ensure_partition_hierarchy()` that:
-     * Inspects the existing node set and edges, using `build_tree_from_edges()` / `generate_hierarchy()` logic to attach every node to a synthetic partition root when the `belongs_to` tree is empty.
-     * Marks intermediate nodes as `is_partition = true` where needed.
-   - Call this helper from both limit functions (and possibly inside `GraphTransformKind::PartitionDepthLimit` / `PartitionWidthLimit`) before trimming so the operations always have a tree to work on.
-   - Ensure the helper no-ops when real metadata already exists to avoid touching curated hierarchies.
+   - ✅ `Graph::ensure_partition_hierarchy` now synthesizes a hierarchy when no `is_partition` data exists, and both limit functions invoke it automatically. The transforms and CLI path also call the helper so users get automatic fixes plus informational logs when synthetic metadata is used.
 3. **Refine trimming algorithms after hierarchy injection**
    - Depth: verify that aggregation preserves parent-child relationships by reassigning `belongs_to` and reusing or regenerating edges so downstream nodes truly collapse into the target depth.
    - Width: when generating `agg_*` nodes, ensure IDs are unique per level and that new nodes inherit the parent’s `belongs_to`. Keep partition children untouched while only collapsing non-partition siblings beyond `max_width`.

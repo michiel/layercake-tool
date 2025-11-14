@@ -90,9 +90,13 @@ impl GraphTransform {
                 if depth <= 0 {
                     return Err(anyhow!("max_partition_depth must be greater than zero"));
                 }
+                let synthesized = graph.ensure_partition_hierarchy();
                 graph
                     .modify_graph_limit_partition_depth(depth)
                     .map_err(|e| anyhow!(e))?;
+                if synthesized {
+                    info!("PartitionDepthLimit synthesized hierarchy because no partitions were defined in the source graph");
+                }
             }
             GraphTransformKind::PartitionWidthLimit => {
                 let width = self.params.max_partition_width.ok_or_else(|| {
@@ -101,9 +105,13 @@ impl GraphTransform {
                 if width <= 0 {
                     return Err(anyhow!("max_partition_width must be greater than zero"));
                 }
+                let synthesized = graph.ensure_partition_hierarchy();
                 graph
                     .modify_graph_limit_partition_width(width)
                     .map_err(|e| anyhow!(e))?;
+                if synthesized {
+                    info!("PartitionWidthLimit synthesized hierarchy because no partitions were defined in the source graph");
+                }
             }
             GraphTransformKind::NodeLabelMaxLength => {
                 let length = self.params.node_label_max_length.ok_or_else(|| {
