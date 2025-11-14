@@ -36,13 +36,13 @@ impl Query {
     }
 
     /// Get all projects
-    async fn projects(&self, ctx: &Context<'_>) -> Result<Vec<Project>> {
+    async fn projects(&self, ctx: &Context<'_>, tags: Option<Vec<String>>) -> Result<Vec<Project>> {
         let context = ctx.data::<GraphQLContext>()?;
         let projects = context
             .app
-            .list_projects()
+            .list_projects_filtered(tags)
             .await
-            .map_err(|e| StructuredError::service("AppContext::list_projects", e))?;
+            .map_err(|e| StructuredError::service("AppContext::list_projects_filtered", e))?;
 
         Ok(projects.into_iter().map(Project::from).collect())
     }

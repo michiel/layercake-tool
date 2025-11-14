@@ -145,6 +145,31 @@ impl AppContext {
         Ok(projects.into_iter().map(ProjectSummary::from).collect())
     }
 
+    pub async fn list_projects_filtered(&self, tags: Option<Vec<String>>) -> Result<Vec<ProjectSummary>> {
+        let projects = projects::Entity::find()
+            .order_by_desc(projects::Column::UpdatedAt)
+            .all(&self.db)
+            .await
+            .map_err(|e| anyhow!("Failed to list projects: {}", e))?;
+
+        // If tags filter is provided, filter projects by tags
+        let filtered_projects = if let Some(filter_tags) = tags {
+            if filter_tags.is_empty() {
+                projects
+            } else {
+                projects.into_iter().filter(|project| {
+                    let project_tags: Vec<String> = serde_json::from_str(&project.tags).unwrap_or_default();
+                    // Check if any filter tag matches any project tag
+                    filter_tags.iter().any(|filter_tag| project_tags.contains(filter_tag))
+                }).collect()
+            }
+        } else {
+            projects
+        };
+
+        Ok(filtered_projects.into_iter().map(ProjectSummary::from).collect())
+    }
+
     pub async fn get_project(&self, id: i32) -> Result<Option<ProjectSummary>> {
         let project = projects::Entity::find_by_id(id)
             .one(&self.db)
@@ -158,11 +183,15 @@ impl AppContext {
         &self,
         name: String,
         description: Option<String>,
+        tags: Option<Vec<String>>,
     ) -> Result<ProjectSummary> {
         let now = Utc::now();
+        let tags_json = serde_json::to_string(&tags.unwrap_or_default())
+            .unwrap_or_else(|_| "[]".to_string());
         let project = projects::ActiveModel {
             name: Set(name),
             description: Set(description),
+            tags: Set(tags_json),
             created_at: Set(now),
             updated_at: Set(now),
             ..Default::default()
@@ -189,6 +218,11 @@ impl AppContext {
         }
         if update.description_is_set {
             active.description = Set(update.description);
+        }
+        if let Some(tags) = update.tags {
+            let tags_json = serde_json::to_string(&tags)
+                .unwrap_or_else(|_| "[]".to_string());
+            active.tags = Set(tags_json);
         }
         active.updated_at = Set(Utc::now());
 
@@ -1256,16 +1290,19 @@ pub struct ProjectSummary {
     pub id: i32,
     pub name: String,
     pub description: Option<String>,
+    pub tags: Vec<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
 
 impl From<projects::Model> for ProjectSummary {
     fn from(model: projects::Model) -> Self {
+        let tags = serde_json::from_str::<Vec<String>>(&model.tags).unwrap_or_default();
         Self {
             id: model.id,
             name: model.name,
             description: model.description,
+            tags,
             created_at: model.created_at,
             updated_at: model.updated_at,
         }
@@ -1277,6 +1314,7 @@ pub struct ProjectUpdate {
     pub name: Option<String>,
     pub description: Option<String>,
     pub description_is_set: bool,
+    pub tags: Option<Vec<String>>,
 }
 
 impl ProjectUpdate {
@@ -1284,11 +1322,13 @@ impl ProjectUpdate {
         name: Option<String>,
         description: Option<String>,
         description_is_set: bool,
+        tags: Option<Vec<String>>,
     ) -> Self {
         Self {
             name,
             description,
             description_is_set,
+            tags,
         }
     }
 }

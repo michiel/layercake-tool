@@ -14,6 +14,7 @@ pub struct Project {
     pub id: i32,
     pub name: String,
     pub description: Option<String>,
+    pub tags: Vec<String>,
     #[graphql(name = "createdAt")]
     pub created_at: DateTime<Utc>,
     #[graphql(name = "updatedAt")]
@@ -22,10 +23,12 @@ pub struct Project {
 
 impl From<projects::Model> for Project {
     fn from(model: projects::Model) -> Self {
+        let tags = serde_json::from_str::<Vec<String>>(&model.tags).unwrap_or_default();
         Self {
             id: model.id,
             name: model.name,
             description: model.description,
+            tags,
             created_at: model.created_at,
             updated_at: model.updated_at,
         }
@@ -38,6 +41,7 @@ impl From<ProjectSummary> for Project {
             id: summary.id,
             name: summary.name,
             description: summary.description,
+            tags: summary.tags,
             created_at: summary.created_at,
             updated_at: summary.updated_at,
         }
@@ -95,10 +99,12 @@ pub struct ProjectStats {
 pub struct CreateProjectInput {
     pub name: String,
     pub description: Option<String>,
+    pub tags: Option<Vec<String>>,
 }
 
 #[derive(InputObject)]
 pub struct UpdateProjectInput {
     pub name: String,
     pub description: Option<String>,
+    pub tags: Option<Vec<String>>,
 }

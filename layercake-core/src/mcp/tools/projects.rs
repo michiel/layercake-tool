@@ -102,7 +102,7 @@ pub async fn create_project(
         .map(|s| s.to_string());
 
     let project = app
-        .create_project(name, description)
+        .create_project(name, description, None)
         .await
         .map_err(|e| McpError::Internal {
             message: format!("Failed to create project: {}", e),
@@ -139,7 +139,7 @@ pub async fn update_project(
         });
     }
 
-    let update = ProjectUpdate::new(name, description, description_is_set);
+    let update = ProjectUpdate::new(name, description, description_is_set, None);
     let project = app
         .update_project(project_id, update)
         .await

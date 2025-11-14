@@ -20,7 +20,7 @@ impl ProjectMutation {
         let context = ctx.data::<GraphQLContext>()?;
         let project = context
             .app
-            .create_project(input.name, input.description)
+            .create_project(input.name, input.description, input.tags)
             .await
             .map_err(|e| StructuredError::service("AppContext::create_project", e))?;
 
@@ -54,7 +54,7 @@ impl ProjectMutation {
         input: UpdateProjectInput,
     ) -> Result<Project> {
         let context = ctx.data::<GraphQLContext>()?;
-        let update = ProjectUpdate::new(Some(input.name), input.description, true);
+        let update = ProjectUpdate::new(Some(input.name), input.description, true, input.tags);
         let project = context
             .app
             .update_project(id, update)
