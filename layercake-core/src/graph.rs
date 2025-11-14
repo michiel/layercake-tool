@@ -373,6 +373,7 @@ impl Graph {
     }
 
     pub fn modify_graph_limit_partition_depth(&mut self, depth: i32) -> Result<(), String> {
+        let mut synthesized = false;
         fn trim_node(
             node_id: &String,
             graph: &mut Graph,
@@ -453,17 +454,30 @@ impl Graph {
             Ok(())
         }
 
-        // Collect root nodes first to avoid borrowing issues
-        let root_node_ids: Vec<String> = self
-            .get_root_nodes()
-            .iter()
-            .map(|node| node.id.clone())
-            .collect();
+        let root_node_ids: Vec<String> = {
+            let mut roots: Vec<String> = self
+                .get_root_nodes()
+                .iter()
+                .map(|node| node.id.clone())
+                .collect();
+            if roots.is_empty() {
+                synthesized = self.ensure_partition_hierarchy();
+                roots = self
+                    .get_root_nodes()
+                    .iter()
+                    .map(|node| node.id.clone())
+                    .collect();
+            }
+            roots
+        };
 
         for node_id in &root_node_ids {
             trim_node(node_id, self, 0, depth)?;
         }
 
+        if synthesized {
+            info!("Synthetic partition hierarchy used for depth limiting");
+        }
         Ok(())
     }
 
@@ -582,17 +596,31 @@ impl Graph {
             Ok(())
         }
 
-        // Collect root nodes first to avoid borrowing issues
-        let root_node_ids: Vec<String> = self
-            .get_root_nodes()
-            .iter()
-            .map(|node| node.id.clone())
-            .collect();
+        let mut synthesized = false;
+        let root_node_ids: Vec<String> = {
+            let mut roots: Vec<String> = self
+                .get_root_nodes()
+                .iter()
+                .map(|node| node.id.clone())
+                .collect();
+            if roots.is_empty() {
+                synthesized = self.ensure_partition_hierarchy();
+                roots = self
+                    .get_root_nodes()
+                    .iter()
+                    .map(|node| node.id.clone())
+                    .collect();
+            }
+            roots
+        };
 
         for node_id in &root_node_ids {
             trim_node(node_id, self, max_width)?;
         }
 
+        if synthesized {
+            info!("Synthetic partition hierarchy used for width limiting");
+        }
         Ok(())
     }
 
@@ -694,6 +722,48 @@ impl Graph {
         }
 
         self.nodes.push(hierarchy_node);
+    }
+
+    /// Ensure the graph has partition metadata. When none exists, synthesize a
+    /// shallow hierarchy rooted at a synthetic partition node so downstream
+    /// transforms (depth/width limits) can operate.
+    pub fn ensure_partition_hierarchy(&mut self) -> bool {
+        if self.nodes.iter().any(|n| n.is_partition) {
+            return false;
+        }
+
+        let mut child_counts: HashMap<String, usize> = HashMap::new();
+        for edge in &self.edges {
+            *child_counts.entry(edge.source.clone()).or_insert(0) += 1;
+        }
+
+        for node in &mut self.nodes {
+            if child_counts.contains_key(&node.id) {
+                node.is_partition = true;
+            }
+        }
+
+        let root_id = "synthetic_partition_root".to_string();
+        if !self.nodes.iter().any(|n| n.id == root_id) {
+            self.nodes.push(Node {
+                id: root_id.clone(),
+                label: "Synthetic Root".to_string(),
+                layer: "aggregated".to_string(),
+                is_partition: true,
+                belongs_to: None,
+                weight: 0,
+                comment: Some("auto-generated".to_string()),
+                dataset: None,
+            });
+        }
+
+        for node in &mut self.nodes {
+            if node.belongs_to.is_none() {
+                node.belongs_to = Some(root_id.clone());
+            }
+        }
+
+        true
     }
 
     /// Remove nodes that have no edges connected to them (no incoming or outgoing edges)
