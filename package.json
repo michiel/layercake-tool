@@ -1,6 +1,6 @@
 {
   "name": "layercake-tool",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Interactive graph transformation and visualization tool",
   "private": true,
   "scripts": {

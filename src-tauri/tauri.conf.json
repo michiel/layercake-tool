@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2.0.json",
   "productName": "Layercake",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "identifier": "com.layercake.app",
   "build": {
     "beforeDevCommand": "node ./scripts/run-frontend.js dev -- --host 127.0.0.1 --port 5173",
