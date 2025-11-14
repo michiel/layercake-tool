@@ -88,6 +88,15 @@ export const EXPORT_PROJECT_AS_TEMPLATE = gql`
   }
 `
 
+export const EXPORT_PROJECT_ARCHIVE = gql`
+  mutation ExportProjectArchive($projectId: Int!) {
+    exportProjectArchive(projectId: $projectId) {
+      filename
+      fileContent
+    }
+  }
+`
+
 export const CREATE_PROJECT_FROM_LIBRARY = gql`
   mutation CreateProjectFromLibrary($libraryItemId: Int!, $name: String) {
     createProjectFromLibrary(libraryItemId: $libraryItemId, name: $name) {
@@ -141,6 +150,11 @@ export interface SeedLibraryItemsResult {
   createdCount: number
   skippedCount: number
   failedFiles: string[]
+}
+
+export interface ExportProjectArchivePayload {
+  filename: string
+  fileContent: string
 }
 
 export {

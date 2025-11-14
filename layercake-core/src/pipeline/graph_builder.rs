@@ -393,6 +393,7 @@ impl GraphBuilder {
 
         let mut all_nodes = HashMap::new();
         let mut all_edges = Vec::new();
+        let mut used_edge_ids = HashSet::new();
         let mut all_layers = HashMap::new(); // layer_id -> layer data
 
         // Process each data source
@@ -447,7 +448,7 @@ impl GraphBuilder {
                                 .to_string();
 
                             let edge = EdgeData {
-                                id,
+                                id: allocate_edge_id(&id, Some(ds.id), &mut used_edge_ids),
                                 source,
                                 target,
                                 label: edge_val["label"].as_str().map(|s| s.to_string()),
@@ -503,7 +504,7 @@ impl GraphBuilder {
                                 .to_string();
 
                             let edge = EdgeData {
-                                id,
+                                id: allocate_edge_id(&id, Some(ds.id), &mut used_edge_ids),
                                 source,
                                 target,
                                 label: edge_val["label"].as_str().map(|s| s.to_string()),
@@ -974,6 +975,29 @@ struct EdgeData {
     weight: Option<f64>,
     attrs: Option<Value>,
     dataset_id: Option<i32>,
+}
+
+fn allocate_edge_id(
+    original_id: &str,
+    dataset_id: Option<i32>,
+    used_ids: &mut HashSet<String>,
+) -> String {
+    let mut candidate = original_id.to_string();
+    if used_ids.insert(candidate.clone()) {
+        return candidate;
+    }
+
+    let prefix = dataset_id
+        .map(|id| format!("ds{}:", id))
+        .unwrap_or_else(|| "edge:".to_string());
+    let mut counter = 1;
+    loop {
+        candidate = format!("{}{}#{}", prefix, original_id, counter);
+        if used_ids.insert(candidate.clone()) {
+            return candidate;
+        }
+        counter += 1;
+    }
 }
 
 // LayerData now imported from super::types (was previously defined here)

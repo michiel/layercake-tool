@@ -42,6 +42,13 @@ pub struct LibraryItem {
     pub updated_at: chrono::DateTime<chrono::Utc>,
 }
 
+#[derive(SimpleObject)]
+pub struct ExportProjectArchivePayload {
+    pub filename: String,
+    #[graphql(name = "fileContent")]
+    pub file_content: String,
+}
+
 impl From<library_items::Model> for LibraryItem {
     fn from(model: library_items::Model) -> Self {
         let tags: Vec<String> = serde_json::from_str(&model.tags).unwrap_or_default();

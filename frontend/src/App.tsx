@@ -26,13 +26,17 @@ import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card'
 import { Badge } from './components/ui/badge'
 import { Alert, AlertDescription } from './components/ui/alert'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './components/ui/dialog'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from './components/ui/tooltip'
 import { Separator } from './components/ui/separator'
+import { Spinner } from './components/ui/spinner'
 import { ChatProvider } from './components/chat/ChatProvider'
 import { useRegisterChatContext } from './hooks/useRegisterChatContext'
 import { cn } from './lib/utils'
 import { useTagsFilter } from './hooks/useTagsFilter'
+import { EXPORT_PROJECT_ARCHIVE, EXPORT_PROJECT_AS_TEMPLATE } from './graphql/libraryItems'
+import { showErrorNotification, showSuccessNotification } from './utils/notifications'
 
 // Collaboration Context for providing project-level collaboration to all pages
 const CollaborationContext = React.createContext<any>(null)
@@ -1209,6 +1213,13 @@ const ProjectDetailPage = () => {
   const selectedProject = projects.find((p: any) => p.id === projectIdNum)
   const planDag = (planDagData as any)?.planDag
 
+  const [exportDialogOpen, setExportDialogOpen] = useState(false)
+  const [activeExportTab, setActiveExportTab] = useState<'archive' | 'template'>('archive')
+  const [exportProjectArchiveMutation, { loading: exportArchiveLoading }] = useMutation(EXPORT_PROJECT_ARCHIVE)
+  const [exportProjectAsTemplateMutation, { loading: exportTemplateLoading }] = useMutation(
+    EXPORT_PROJECT_AS_TEMPLATE
+  )
+
   // Extract stats from single query
   const stats = projectStatsData?.projectStats
   const totalFiles = stats?.documents.total || 0
@@ -1328,6 +1339,56 @@ const ProjectDetailPage = () => {
     return yaml
   }
 
+  const handleExportArchive = async () => {
+    if (!Number.isFinite(projectIdNum)) {
+      return
+    }
+    try {
+      const { data } = await exportProjectArchiveMutation({
+        variables: { projectId: projectIdNum },
+      })
+      const payload = (data as any)?.exportProjectArchive
+      if (!payload) {
+        throw new Error('Archive payload missing')
+      }
+      const binary = atob(payload.fileContent)
+      const bytes = new Uint8Array(binary.length)
+      for (let i = 0; i < binary.length; i += 1) {
+        bytes[i] = binary.charCodeAt(i)
+      }
+      const blob = new Blob([bytes], { type: 'application/zip' })
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = payload.filename || `${selectedProject?.name ?? 'project'}.zip`
+      document.body.appendChild(anchor)
+      anchor.click()
+      document.body.removeChild(anchor)
+      URL.revokeObjectURL(url)
+      showSuccessNotification('Project exported', 'Download started.')
+      setExportDialogOpen(false)
+    } catch (error: any) {
+      console.error('Failed to export project archive', error)
+      showErrorNotification('Export failed', error?.message || 'Unable to export project.')
+    }
+  }
+
+  const handleExportTemplate = async () => {
+    if (!Number.isFinite(projectIdNum)) {
+      return
+    }
+    try {
+      await exportProjectAsTemplateMutation({
+        variables: { projectId: projectIdNum },
+      })
+      showSuccessNotification('Template created', 'Find it in the Library under Templates.')
+      setExportDialogOpen(false)
+    } catch (error: any) {
+      console.error('Failed to export project as template', error)
+      showErrorNotification('Template export failed', error?.message || 'Unable to export template.')
+    }
+  }
+
   // Show loading state while projects are being fetched
   if (projectsLoading) {
     return (
@@ -1371,6 +1432,10 @@ const ProjectDetailPage = () => {
           </Group>
         </div>
         <Group gap="sm">
+          <Button variant="outline" onClick={() => setExportDialogOpen(true)}>
+            <IconDownload className="mr-2 h-4 w-4" />
+            Export Project
+          </Button>
           <Button
             variant="outline"
             onClick={() => navigate(`/projects/${selectedProject.id}/edit`)}
@@ -1614,6 +1679,39 @@ const ProjectDetailPage = () => {
           </div>
         </section>
       </Stack>
+
+      <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>Export Project</DialogTitle>
+          </DialogHeader>
+          <Tabs value={activeExportTab} onValueChange={(value) => setActiveExportTab(value as 'archive' | 'template')}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="archive">Export</TabsTrigger>
+              <TabsTrigger value="template">Template</TabsTrigger>
+            </TabsList>
+            <TabsContent value="archive" className="mt-4 space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Download a ZIP archive containing this project&apos;s DAG and full dataset contents.
+              </p>
+              <Button onClick={handleExportArchive} disabled={exportArchiveLoading}>
+                {exportArchiveLoading && <Spinner className="mr-2 h-4 w-4" />}
+                Download project (.zip)
+              </Button>
+            </TabsContent>
+            <TabsContent value="template" className="mt-4 space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Publish this project as a reusable template in the shared library (datasets are stripped to
+                headers only).
+              </p>
+              <Button onClick={handleExportTemplate} disabled={exportTemplateLoading}>
+                {exportTemplateLoading && <Spinner className="mr-2 h-4 w-4" />}
+                Export to Library
+              </Button>
+            </TabsContent>
+          </Tabs>
+        </DialogContent>
+      </Dialog>
     </PageContainer>
   )
 }

@@ -19,8 +19,8 @@ use crate::graphql::types::{
     User, UserFilter, UserSession,
 };
 use crate::services::{
-    graph_edit_service::GraphEditService, library_item_service::LibraryItemService,
-    library_item_service::LibraryItemFilter, sample_project_service::SampleProjectService,
+    graph_edit_service::GraphEditService, library_item_service::LibraryItemFilter,
+    library_item_service::LibraryItemService, sample_project_service::SampleProjectService,
 };
 use layercake_data_acquisition::entities::tags as acquisition_tags;
 

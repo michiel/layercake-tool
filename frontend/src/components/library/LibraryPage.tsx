@@ -211,92 +211,96 @@ export const LibraryPage: React.FC = () => {
           </p>
         </Stack>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Filters</CardTitle>
-            <CardDescription>Search and narrow down library items.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Stack gap="md">
-              <Group gap="sm" wrap>
-                {typeFilters.map((filter) => (
-                  <Button
-                    key={filter.label}
-                    variant={activeType === filter.value ? 'default' : 'outline'}
-                    onClick={() => setActiveType(filter.value)}
-                  >
-                    {filter.label}
-                  </Button>
-                ))}
-              </Group>
-              <Group gap="sm" wrap>
-                <div className="flex-1 min-w-[240px]">
-                  <Label className="text-xs uppercase text-muted-foreground flex items-center gap-1">
-                    <IconSearch className="h-4 w-4" />
-                    Search
-                  </Label>
-                  <Input
-                    placeholder="Name or description…"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                </div>
-                <div className="flex-1 min-w-[240px]">
-                  <Label className="text-xs uppercase text-muted-foreground flex items-center gap-1">
-                    <IconFilter className="h-4 w-4" />
-                    Tags
-                  </Label>
-                  <Input
-                    placeholder="Comma separated tags"
-                    value={tagQuery}
-                    onChange={(e) => setTagQuery(e.target.value)}
-                  />
-                </div>
-              </Group>
-            </Stack>
-          </CardContent>
-        </Card>
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Filters</CardTitle>
+              <CardDescription>Search and narrow down library items.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Stack gap="md">
+                <Group gap="sm" wrap>
+                  {typeFilters.map((filter) => (
+                    <Button
+                      key={filter.label}
+                      variant={activeType === filter.value ? 'default' : 'outline'}
+                      onClick={() => setActiveType(filter.value)}
+                    >
+                      {filter.label}
+                    </Button>
+                  ))}
+                </Group>
+                <Group gap="sm" wrap>
+                  <div className="flex-1 min-w-[240px]">
+                    <Label className="text-xs uppercase text-muted-foreground flex items-center gap-1">
+                      <IconSearch className="h-4 w-4" />
+                      Search
+                    </Label>
+                    <Input
+                      placeholder="Name or description…"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex-1 min-w-[240px]">
+                    <Label className="text-xs uppercase text-muted-foreground flex items-center gap-1">
+                      <IconFilter className="h-4 w-4" />
+                      Tags
+                    </Label>
+                    <Input
+                      placeholder="Comma separated tags"
+                      value={tagQuery}
+                      onChange={(e) => setTagQuery(e.target.value)}
+                    />
+                  </div>
+                </Group>
+              </Stack>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Manage</CardTitle>
-            <CardDescription>Upload new assets and sync bundled samples.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Group gap="sm" wrap>
-              <Button onClick={() => setDatasetUploaderOpen(true)}>
-                <IconDatabase className="mr-2 h-4 w-4" />
-                Upload Dataset
-              </Button>
-              <label className="inline-flex items-center gap-2">
-                <input
-                  type="file"
-                  accept=".zip"
-                  className="hidden"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0]
-                    if (file) {
-                      handleTemplateUpload(file)
-                      event.target.value = ''
-                    }
-                  }}
-                />
-                <Button variant="outline" disabled={templateUploading || uploadMutationLoading}>
-                  {(templateUploading || uploadMutationLoading) && (
-                    <Spinner className="mr-2 h-4 w-4" />
-                  )}
-                  <IconUpload className="mr-2 h-4 w-4" />
-                  Upload Template (ZIP)
+          <Card>
+            <CardHeader>
+              <CardTitle>Manage</CardTitle>
+              <CardDescription>Upload new assets and sync bundled samples.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Stack gap="md">
+                <Group gap="sm" wrap>
+                  <Button onClick={() => setDatasetUploaderOpen(true)}>
+                    <IconDatabase className="mr-2 h-4 w-4" />
+                    Upload Dataset
+                  </Button>
+                  <label className="inline-flex items-center gap-2">
+                    <input
+                      type="file"
+                      accept=".zip"
+                      className="hidden"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0]
+                        if (file) {
+                          handleTemplateUpload(file)
+                          event.target.value = ''
+                        }
+                      }}
+                    />
+                    <Button variant="outline" disabled={templateUploading || uploadMutationLoading}>
+                      {(templateUploading || uploadMutationLoading) && (
+                        <Spinner className="mr-2 h-4 w-4" />
+                      )}
+                      <IconUpload className="mr-2 h-4 w-4" />
+                      Upload Template (ZIP)
+                    </Button>
+                  </label>
+                </Group>
+                <Button variant="secondary" onClick={handleSeed} disabled={seedLoading}>
+                  {seedLoading && <Spinner className="mr-2 h-4 w-4" />}
+                  <IconSparkles className="mr-2 h-4 w-4" />
+                  Seed Samples
                 </Button>
-              </label>
-              <Button variant="secondary" onClick={handleSeed} disabled={seedLoading}>
-                {seedLoading && <Spinner className="mr-2 h-4 w-4" />}
-                <IconSparkles className="mr-2 h-4 w-4" />
-                Seed Samples
-              </Button>
-            </Group>
-          </CardContent>
-        </Card>
+              </Stack>
+            </CardContent>
+          </Card>
+        </div>
 
         {error && (
           <Alert variant="destructive">

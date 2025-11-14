@@ -19,11 +19,7 @@ impl MigrationTrait for Migration {
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(
-                        ColumnDef::new(LibraryItems::ItemType)
-                            .string()
-                            .not_null(),
-                    )
+                    .col(ColumnDef::new(LibraryItems::ItemType).string().not_null())
                     .col(ColumnDef::new(LibraryItems::Name).string().not_null())
                     .col(ColumnDef::new(LibraryItems::Description).string())
                     .col(
@@ -70,10 +66,7 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        if manager
-            .has_table(LibrarySources::Table.to_string())
-            .await?
-        {
+        if manager.has_table(LibrarySources::Table.to_string()).await? {
             manager
                 .get_connection()
                 .execute(Statement::from_string(
@@ -115,11 +108,7 @@ impl MigrationTrait for Migration {
                 .await?;
 
             manager
-                .drop_table(
-                    Table::drop()
-                        .table(LibrarySources::Table)
-                        .to_owned(),
-                )
+                .drop_table(Table::drop().table(LibrarySources::Table).to_owned())
                 .await?;
         }
 
@@ -127,10 +116,7 @@ impl MigrationTrait for Migration {
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        if !manager
-            .has_table(LibrarySources::Table.to_string())
-            .await?
-        {
+        if !manager.has_table(LibrarySources::Table.to_string()).await? {
             manager
                 .create_table(
                     Table::create()

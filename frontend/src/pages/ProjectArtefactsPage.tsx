@@ -155,19 +155,19 @@ const ProjectArtefactsPage: React.FC = () => {
   )
   const [downloadingNodeId, setDownloadingNodeId] = useState<string | null>(null)
   const [collapsedGraphs, setCollapsedGraphs] = useState<Set<string>>(new Set())
-  const [editNodeDialog, setEditNodeDialog] = useState<{
-    open: boolean
-    nodeId: string | null
-    nodeType: PlanDagNodeType | null
-    config: any
-    metadata: any
-  }>({
-    open: false,
-    nodeId: null,
-    nodeType: null,
-    config: null,
-    metadata: null,
-  })
+const [editNodeDialog, setEditNodeDialog] = useState<{
+  open: boolean
+  nodeId: string | null
+  nodeType: PlanDagNodeType | null
+  config: any
+  metadata: any
+}>({
+  open: false,
+  nodeId: null,
+  nodeType: null,
+  config: null,
+  metadata: null,
+})
 
   const toggleGraphCollapse = (graphId: string) => {
     setCollapsedGraphs((prev) => {
@@ -181,11 +181,11 @@ const ProjectArtefactsPage: React.FC = () => {
     })
   }
 
-  const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
-    onCompleted: (response: any) => {
-      const result = response.exportNodeOutput
-      const target = previewLoading?.kind ?? 'text'
-      const nodeId = previewLoading?.nodeId
+const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
+  onCompleted: (response: any) => {
+    const result = response.exportNodeOutput
+    const target = previewLoading?.kind ?? 'text'
+    const nodeId = previewLoading?.nodeId
       if (result?.success) {
         try {
           const decoded = atob(result.content)
@@ -210,8 +210,8 @@ const ProjectArtefactsPage: React.FC = () => {
       console.error('Preview failed:', err)
       showErrorNotification('Preview Failed', err.message)
       setPreviewLoading(null)
-    },
-  })
+  },
+})
 
   const [exportNodeOutput] = useMutation(EXPORT_NODE_OUTPUT, {
     onCompleted: (response: any) => {
@@ -349,6 +349,7 @@ const ProjectArtefactsPage: React.FC = () => {
       variables: { projectId: numericProjectId, nodeId },
     })
   }
+
 
   const handleNavigate = (route: string) => {
     navigate(route)
