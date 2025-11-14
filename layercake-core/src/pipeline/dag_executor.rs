@@ -12,6 +12,7 @@ use crate::database::entities::{graph_edges, graph_nodes, graphs, plan_dag_nodes
 use crate::graphql::types::plan_dag::{
     FilterEvaluationContext, FilterNodeConfig, TransformNodeConfig,
 };
+use crate::pipeline::dag_context::DagExecutionContext;
 use crate::pipeline::layer_operations::insert_layers_to_db;
 use crate::pipeline::types::LayerData;
 use crate::pipeline::{DatasourceImporter, GraphBuilder, MergeBuilder};
@@ -23,6 +24,7 @@ pub struct DagExecutor {
     dataset_importer: DatasourceImporter,
     graph_builder: GraphBuilder,
     merge_builder: MergeBuilder,
+    prefer_in_memory: bool,
 }
 
 impl DagExecutor {
@@ -30,12 +32,24 @@ impl DagExecutor {
         let dataset_importer = DatasourceImporter::new(db.clone());
         let graph_builder = GraphBuilder::new(db.clone());
         let merge_builder = MergeBuilder::new(db.clone());
+        let prefer_in_memory = std::env::var("PIPELINE_IN_MEMORY")
+            .map(|value| matches!(value.to_lowercase().as_str(), "1" | "true" | "yes"))
+            .unwrap_or(false);
 
         Self {
             db,
             dataset_importer,
             graph_builder,
             merge_builder,
+            prefer_in_memory,
+        }
+    }
+
+    fn maybe_context(&self) -> Option<DagExecutionContext> {
+        if self.prefer_in_memory {
+            Some(DagExecutionContext::new())
+        } else {
+            None
         }
     }
 
@@ -48,6 +62,7 @@ impl DagExecutor {
         node_id: &str,
         nodes: &[plan_dag_nodes::Model],
         edges: &[(String, String)], // (source, target) pairs
+        mut context: Option<&mut DagExecutionContext>,
     ) -> Result<()> {
         // Find the node
         let node = nodes
@@ -69,7 +84,12 @@ impl DagExecutor {
                     // DataSet references existing data_sets entry
                     // Create a graph entry from the data_set's graph_json
                     self.execute_dataset_reference_node(
-                        project_id, plan_id, node_id, &node_name, &config,
+                        project_id,
+                        plan_id,
+                        node_id,
+                        &node_name,
+                        &config,
+                        context.as_deref_mut(),
                     )
                     .await?;
                 } else if let Some(file_path) = config["filePath"].as_str() {
@@ -119,13 +139,18 @@ impl DagExecutor {
                     graph.edges.len(),
                     graph.layers.len()
                 );
+
+                if let Some(ctx) = context.as_deref_mut() {
+                    ctx.set_graph(node_id.to_string(), graph.clone());
+                }
             }
             "GraphNode" => {
                 // Get upstream node IDs
                 let upstream_ids = self.get_upstream_nodes(node_id, edges);
 
                 // Build graph from upstream datasets (reads from data_sets table)
-                self.graph_builder
+                let graph_record = self
+                    .graph_builder
                     .build_graph(
                         project_id,
                         plan_id,
@@ -134,18 +159,46 @@ impl DagExecutor {
                         upstream_ids,
                     )
                     .await?;
+
+                if context.is_some() {
+                    let graph_service = GraphService::new(self.db.clone());
+                    if let Ok(graph) = graph_service
+                        .build_graph_from_dag_graph(graph_record.id)
+                        .await
+                    {
+                        if let Some(ctx) = context.as_deref_mut() {
+                            ctx.set_graph(node_id.to_string(), graph);
+                        }
+                    }
+                }
             }
             "GraphArtefactNode" | "TreeArtefactNode" => {
                 // Output nodes deliver exports on demand; no proactive execution required
                 return Ok(());
             }
             "TransformNode" => {
-                self.execute_transform_node(project_id, node_id, &node_name, node, nodes, edges)
-                    .await?;
+                self.execute_transform_node(
+                    project_id,
+                    node_id,
+                    &node_name,
+                    node,
+                    nodes,
+                    edges,
+                    context.as_deref_mut(),
+                )
+                .await?;
             }
             "FilterNode" => {
-                self.execute_filter_node(project_id, node_id, &node_name, node, nodes, edges)
-                    .await?;
+                self.execute_filter_node(
+                    project_id,
+                    node_id,
+                    &node_name,
+                    node,
+                    nodes,
+                    edges,
+                    context.as_deref_mut(),
+                )
+                .await?;
             }
             _ => {
                 return Err(anyhow!("Unknown node type: {}", node.node_type));
@@ -163,6 +216,7 @@ impl DagExecutor {
         node: &plan_dag_nodes::Model,
         nodes: &[plan_dag_nodes::Model],
         edges: &[(String, String)],
+        mut context: Option<&mut DagExecutionContext>,
     ) -> Result<()> {
         let config: TransformNodeConfig = serde_json::from_str(&node.config_json)
             .with_context(|| format!("Failed to parse transform config for node {}", node_id))?;
@@ -206,16 +260,30 @@ impl DagExecutor {
                 )
             })?;
 
-        let graph_service = GraphService::new(self.db.clone());
-        let mut graph = graph_service
-            .build_graph_from_dag_graph(upstream_graph.id)
-            .await
-            .with_context(|| {
-                format!(
-                    "Failed to materialize graph for upstream node {}",
-                    upstream_node_id
-                )
-            })?;
+        let cached_graph = context
+            .as_deref_mut()
+            .and_then(|ctx| ctx.graph(upstream_node_id));
+
+        let graph = match cached_graph {
+            Some(graph) => graph,
+            None => {
+                let graph_service = GraphService::new(self.db.clone());
+                let graph = graph_service
+                    .build_graph_from_dag_graph(upstream_graph.id)
+                    .await
+                    .with_context(|| {
+                        format!(
+                            "Failed to materialize graph for upstream node {}",
+                            upstream_node_id
+                        )
+                    })?;
+
+                if let Some(ctx) = context.as_deref_mut() {
+                    ctx.set_graph(upstream_node_id.clone(), graph.clone());
+                }
+                graph
+            }
+        };
 
         config
             .apply_transforms(&mut graph)
@@ -238,7 +306,13 @@ impl DagExecutor {
             &upstream_graph,
             &graph,
         )
-        .await
+        .await?;
+
+        if let Some(ctx) = context.as_deref_mut() {
+            ctx.set_graph(node_id.to_string(), graph);
+        }
+
+        Ok(())
     }
 
     async fn execute_filter_node(
@@ -249,6 +323,7 @@ impl DagExecutor {
         node: &plan_dag_nodes::Model,
         nodes: &[plan_dag_nodes::Model],
         edges: &[(String, String)],
+        mut context: Option<&mut DagExecutionContext>,
     ) -> Result<()> {
         let config: FilterNodeConfig = serde_json::from_str(&node.config_json)
             .with_context(|| format!("Failed to parse filter config for node {}", node_id))?;
@@ -292,16 +367,30 @@ impl DagExecutor {
                 )
             })?;
 
-        let graph_service = GraphService::new(self.db.clone());
-        let mut graph = graph_service
-            .build_graph_from_dag_graph(upstream_graph.id)
-            .await
-            .with_context(|| {
-                format!(
-                    "Failed to materialize graph for upstream node {}",
-                    upstream_node_id
-                )
-            })?;
+        let cached_graph = context
+            .as_deref_mut()
+            .and_then(|ctx| ctx.graph(upstream_node_id));
+
+        let mut graph = match cached_graph {
+            Some(graph) => graph,
+            None => {
+                let graph_service = GraphService::new(self.db.clone());
+                let graph = graph_service
+                    .build_graph_from_dag_graph(upstream_graph.id)
+                    .await
+                    .with_context(|| {
+                        format!(
+                            "Failed to materialize graph for upstream node {}",
+                            upstream_node_id
+                        )
+                    })?;
+
+                if let Some(ctx) = context.as_deref_mut() {
+                    ctx.set_graph(upstream_node_id.clone(), graph.clone());
+                }
+                graph
+            }
+        };
 
         config
             .apply_filters(
@@ -331,7 +420,13 @@ impl DagExecutor {
             &upstream_graph,
             &graph,
         )
-        .await
+        .await?;
+
+        if let Some(ctx) = context.as_deref_mut() {
+            ctx.set_graph(node_id.to_string(), graph);
+        }
+
+        Ok(())
     }
 
     async fn execute_dataset_reference_node(
@@ -341,6 +436,7 @@ impl DagExecutor {
         node_id: &str,
         node_name: &str,
         config: &JsonValue,
+        mut context: Option<&mut DagExecutionContext>,
     ) -> Result<()> {
         use crate::database::entities::data_sets::{
             Column as DataSetColumn, Entity as DataSetEntity,
@@ -359,84 +455,101 @@ impl DagExecutor {
             .await?
             .ok_or_else(|| anyhow!("Data set {} not found", data_set_id))?;
 
-        // Parse the graph_json from the data_set
-        let graph_data: JsonValue = serde_json::from_str(&data_set.graph_json)
-            .with_context(|| format!("Failed to parse graph_json for data_set {}", data_set_id))?;
+        let cached_graph = context
+            .as_deref_mut()
+            .and_then(|ctx| ctx.dataset_graph(data_set_id));
 
-        // Convert to Graph structure
-        let mut graph = crate::graph::Graph {
-            name: data_set.name.clone(),
-            nodes: Vec::new(),
-            edges: Vec::new(),
-            layers: Vec::new(),
+        let mut graph = match cached_graph {
+            Some(graph) => graph,
+            None => {
+                // Parse the graph_json from the data_set
+                let graph_data: JsonValue = serde_json::from_str(&data_set.graph_json)
+                    .with_context(|| {
+                        format!("Failed to parse graph_json for data_set {}", data_set_id)
+                    })?;
+
+                // Convert to Graph structure
+                let mut graph = crate::graph::Graph {
+                    name: data_set.name.clone(),
+                    nodes: Vec::new(),
+                    edges: Vec::new(),
+                    layers: Vec::new(),
+                };
+
+                // Extract nodes
+                if let Some(nodes_array) = graph_data.get("nodes").and_then(|v| v.as_array()) {
+                    for node_val in nodes_array {
+                        let node = crate::graph::Node {
+                            id: node_val["id"].as_str().unwrap_or("").to_string(),
+                            label: node_val["label"].as_str().unwrap_or("").to_string(),
+                            layer: node_val["layer"].as_str().unwrap_or("").to_string(),
+                            weight: node_val["weight"].as_i64().unwrap_or(1) as i32,
+                            is_partition: node_val["is_partition"].as_bool().unwrap_or(false),
+                            belongs_to: node_val["belongs_to"]
+                                .as_str()
+                                .filter(|s| !s.is_empty())
+                                .map(|s| s.to_string()),
+                            comment: node_val["comment"].as_str().map(|s| s.to_string()),
+                            dataset: None,
+                        };
+                        graph.nodes.push(node);
+                    }
+                }
+
+                // Extract edges
+                if let Some(edges_array) = graph_data.get("edges").and_then(|v| v.as_array()) {
+                    for edge_val in edges_array {
+                        let edge = crate::graph::Edge {
+                            id: edge_val["id"].as_str().unwrap_or("").to_string(),
+                            source: edge_val["source"].as_str().unwrap_or("").to_string(),
+                            target: edge_val["target"].as_str().unwrap_or("").to_string(),
+                            label: edge_val["label"].as_str().unwrap_or("").to_string(),
+                            layer: edge_val["layer"].as_str().unwrap_or("").to_string(),
+                            weight: edge_val["weight"].as_i64().unwrap_or(1) as i32,
+                            comment: edge_val["comment"].as_str().map(|s| s.to_string()),
+                            dataset: None,
+                        };
+                        graph.edges.push(edge);
+                    }
+                }
+
+                // Extract layers (note: it's "graph_layers" in JSON format from data_sets)
+                // Try both "graph_layers" and "layers" for compatibility
+                let layers_array = graph_data
+                    .get("graph_layers")
+                    .or_else(|| graph_data.get("layers"))
+                    .and_then(|v| v.as_array());
+
+                if let Some(layers_array) = layers_array {
+                    for layer_val in layers_array {
+                        let layer = crate::graph::Layer {
+                            id: layer_val["id"].as_str().unwrap_or("").to_string(),
+                            label: layer_val["label"].as_str().unwrap_or("").to_string(),
+                            background_color: layer_val["background_color"]
+                                .as_str()
+                                .unwrap_or("#FFFFFF")
+                                .to_string(),
+                            text_color: layer_val["text_color"]
+                                .as_str()
+                                .unwrap_or("#000000")
+                                .to_string(),
+                            border_color: layer_val["border_color"]
+                                .as_str()
+                                .unwrap_or("#CCCCCC")
+                                .to_string(),
+                            dataset: None,
+                        };
+                        graph.layers.push(layer);
+                    }
+                }
+
+                if let Some(ctx) = context.as_deref_mut() {
+                    ctx.set_dataset_graph(data_set_id, graph.clone());
+                }
+
+                graph
+            }
         };
-
-        // Extract nodes
-        if let Some(nodes_array) = graph_data.get("nodes").and_then(|v| v.as_array()) {
-            for node_val in nodes_array {
-                let node = crate::graph::Node {
-                    id: node_val["id"].as_str().unwrap_or("").to_string(),
-                    label: node_val["label"].as_str().unwrap_or("").to_string(),
-                    layer: node_val["layer"].as_str().unwrap_or("").to_string(),
-                    weight: node_val["weight"].as_i64().unwrap_or(1) as i32,
-                    is_partition: node_val["is_partition"].as_bool().unwrap_or(false),
-                    belongs_to: node_val["belongs_to"]
-                        .as_str()
-                        .filter(|s| !s.is_empty())
-                        .map(|s| s.to_string()),
-                    comment: node_val["comment"].as_str().map(|s| s.to_string()),
-                    dataset: None,
-                };
-                graph.nodes.push(node);
-            }
-        }
-
-        // Extract edges
-        if let Some(edges_array) = graph_data.get("edges").and_then(|v| v.as_array()) {
-            for edge_val in edges_array {
-                let edge = crate::graph::Edge {
-                    id: edge_val["id"].as_str().unwrap_or("").to_string(),
-                    source: edge_val["source"].as_str().unwrap_or("").to_string(),
-                    target: edge_val["target"].as_str().unwrap_or("").to_string(),
-                    label: edge_val["label"].as_str().unwrap_or("").to_string(),
-                    layer: edge_val["layer"].as_str().unwrap_or("").to_string(),
-                    weight: edge_val["weight"].as_i64().unwrap_or(1) as i32,
-                    comment: edge_val["comment"].as_str().map(|s| s.to_string()),
-                    dataset: None,
-                };
-                graph.edges.push(edge);
-            }
-        }
-
-        // Extract layers (note: it's "graph_layers" in JSON format from data_sets)
-        // Try both "graph_layers" and "layers" for compatibility
-        let layers_array = graph_data
-            .get("graph_layers")
-            .or_else(|| graph_data.get("layers"))
-            .and_then(|v| v.as_array());
-
-        if let Some(layers_array) = layers_array {
-            for layer_val in layers_array {
-                let layer = crate::graph::Layer {
-                    id: layer_val["id"].as_str().unwrap_or("").to_string(),
-                    label: layer_val["label"].as_str().unwrap_or("").to_string(),
-                    background_color: layer_val["background_color"]
-                        .as_str()
-                        .unwrap_or("#FFFFFF")
-                        .to_string(),
-                    text_color: layer_val["text_color"]
-                        .as_str()
-                        .unwrap_or("#000000")
-                        .to_string(),
-                    border_color: layer_val["border_color"]
-                        .as_str()
-                        .unwrap_or("#CCCCCC")
-                        .to_string(),
-                    dataset: None,
-                };
-                graph.layers.push(layer);
-            }
-        }
 
         // Create or get graph record
         let metadata = Some(json!({
@@ -454,6 +567,9 @@ impl DagExecutor {
         // Check if we need to recompute
         if graph_record.source_hash.as_deref() == Some(&dataset_hash) {
             // Already up to date
+            if let Some(ctx) = context.as_deref_mut() {
+                ctx.set_graph(node_id.to_string(), graph);
+            }
             return Ok(());
         }
 
@@ -502,6 +618,10 @@ impl DagExecutor {
             graph.edges.len(),
             graph.layers.len(),
         );
+
+        if let Some(ctx) = context.as_deref_mut() {
+            ctx.set_graph(node_id.to_string(), graph);
+        }
 
         Ok(())
     }
@@ -843,11 +963,19 @@ impl DagExecutor {
     ) -> Result<()> {
         // Perform topological sort
         let sorted_nodes = self.topological_sort(nodes, edges)?;
+        let mut context = self.maybe_context();
 
         // Execute nodes in order
         for node_id in sorted_nodes {
-            self.execute_node(project_id, plan_id, &node_id, nodes, edges)
-                .await?;
+            self.execute_node(
+                project_id,
+                plan_id,
+                &node_id,
+                nodes,
+                edges,
+                context.as_mut().map(|ctx| ctx),
+            )
+            .await?;
         }
 
         Ok(())
@@ -885,10 +1013,18 @@ impl DagExecutor {
 
         // Execute in topological order
         let sorted = self.topological_sort(&affected_nodes, edges)?;
+        let mut context = self.maybe_context();
 
         for node_id in sorted {
-            self.execute_node(project_id, plan_id, &node_id, nodes, edges)
-                .await?;
+            self.execute_node(
+                project_id,
+                plan_id,
+                &node_id,
+                nodes,
+                edges,
+                context.as_mut().map(|ctx| ctx),
+            )
+            .await?;
         }
 
         Ok(())
@@ -1014,10 +1150,18 @@ impl DagExecutor {
 
         // Execute in topological order
         let sorted = self.topological_sort(&nodes_to_execute, edges)?;
+        let mut context = self.maybe_context();
 
         for node_id in sorted {
-            self.execute_node(project_id, plan_id, &node_id, nodes, edges)
-                .await?;
+            self.execute_node(
+                project_id,
+                plan_id,
+                &node_id,
+                nodes,
+                edges,
+                context.as_mut().map(|ctx| ctx),
+            )
+            .await?;
         }
 
         Ok(())
