@@ -1,6 +1,8 @@
 use anyhow::{anyhow, Context, Result};
-use chrono::Utc;
-use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set,
+    TransactionTrait,
+};
 use serde_json::{json, Map as JsonMap, Value as JsonValue};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -8,12 +10,16 @@ use tracing::info;
 
 use crate::database::entities::graphs::ActiveModel as GraphActiveModel;
 use crate::database::entities::graphs::{Column as GraphColumn, Entity as GraphEntity};
-use crate::database::entities::{graph_edges, graph_nodes, graphs, plan_dag_nodes, ExecutionState};
+use crate::database::entities::{graphs, plan_dag_nodes, ExecutionState};
 use crate::graphql::types::plan_dag::{
     FilterEvaluationContext, FilterNodeConfig, TransformNodeConfig,
 };
 use crate::pipeline::dag_context::DagExecutionContext;
 use crate::pipeline::layer_operations::insert_layers_to_db;
+use crate::pipeline::persist_utils::{
+    clear_graph_storage, edge_to_active_model, insert_edge_batches, insert_node_batches,
+    node_to_active_model,
+};
 use crate::pipeline::types::LayerData;
 use crate::pipeline::{DatasourceImporter, GraphBuilder, MergeBuilder};
 use crate::services::graph_service::GraphService;
@@ -264,7 +270,7 @@ impl DagExecutor {
             .as_deref_mut()
             .and_then(|ctx| ctx.graph(upstream_node_id));
 
-        let graph = match cached_graph {
+        let mut graph = match cached_graph {
             Some(graph) => graph,
             None => {
                 let graph_service = GraphService::new(self.db.clone());
@@ -831,53 +837,22 @@ impl DagExecutor {
         graph_id: i32,
         graph: &crate::graph::Graph,
     ) -> Result<()> {
-        self.clear_graph_data(graph_id).await?;
+        let txn = self.db.begin().await?;
+        clear_graph_storage(&txn, graph_id).await?;
 
-        for node in &graph.nodes {
-            let attrs = node
-                .comment
-                .as_ref()
-                .map(|comment| json!({ "comment": comment }));
+        let node_models: Vec<_> = graph
+            .nodes
+            .iter()
+            .map(|node| node_to_active_model(graph_id, node))
+            .collect();
+        insert_node_batches(&txn, node_models).await?;
 
-            let model = graph_nodes::ActiveModel {
-                id: Set(node.id.clone()),
-                graph_id: Set(graph_id),
-                label: Set(Some(node.label.clone())),
-                layer: Set(Some(node.layer.clone())),
-                weight: Set(Some(node.weight as f64)),
-                is_partition: Set(node.is_partition),
-                belongs_to: Set(node.belongs_to.clone()),
-                dataset_id: Set(node.dataset),
-                attrs: Set(attrs),
-                comment: Set(node.comment.clone()),
-                created_at: Set(Utc::now()),
-            };
-
-            model.insert(&self.db).await?;
-        }
-
-        for edge in &graph.edges {
-            let attrs = edge
-                .comment
-                .as_ref()
-                .map(|comment| json!({ "comment": comment }));
-
-            let model = graph_edges::ActiveModel {
-                id: Set(edge.id.clone()),
-                graph_id: Set(graph_id),
-                source: Set(edge.source.clone()),
-                target: Set(edge.target.clone()),
-                label: Set(Some(edge.label.clone())),
-                layer: Set(Some(edge.layer.clone())),
-                weight: Set(Some(edge.weight as f64)),
-                dataset_id: Set(edge.dataset),
-                attrs: Set(attrs),
-                comment: Set(edge.comment.clone()),
-                created_at: Set(Utc::now()),
-            };
-
-            model.insert(&self.db).await?;
-        }
+        let edge_models: Vec<_> = graph
+            .edges
+            .iter()
+            .map(|edge| edge_to_active_model(graph_id, edge))
+            .collect();
+        insert_edge_batches(&txn, edge_models).await?;
 
         let mut layer_map = HashMap::new();
         for layer in &graph.layers {
@@ -922,33 +897,8 @@ impl DagExecutor {
             );
         }
 
-        insert_layers_to_db(&self.db, graph_id, layer_map).await?;
-
-        Ok(())
-    }
-
-    async fn clear_graph_data(&self, graph_id: i32) -> Result<()> {
-        use crate::database::entities::graph_edges::{Column as EdgeColumn, Entity as EdgeEntity};
-        use crate::database::entities::graph_layers::{
-            Column as LayerColumn, Entity as LayerEntity,
-        };
-        use crate::database::entities::graph_nodes::{Column as NodeColumn, Entity as NodeEntity};
-
-        EdgeEntity::delete_many()
-            .filter(EdgeColumn::GraphId.eq(graph_id))
-            .exec(&self.db)
-            .await?;
-
-        NodeEntity::delete_many()
-            .filter(NodeColumn::GraphId.eq(graph_id))
-            .exec(&self.db)
-            .await?;
-
-        LayerEntity::delete_many()
-            .filter(LayerColumn::GraphId.eq(graph_id))
-            .exec(&self.db)
-            .await?;
-
+        insert_layers_to_db(&txn, graph_id, layer_map).await?;
+        txn.commit().await?;
         Ok(())
     }
 
@@ -1205,6 +1155,7 @@ impl DagExecutor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::Utc;
 
     #[test]
     fn test_topological_sort() {
@@ -1222,8 +1173,8 @@ mod tests {
                 target_position: None,
                 metadata_json: "{}".to_string(),
                 config_json: "{}".to_string(),
-                created_at: chrono::Utc::now(),
-                updated_at: chrono::Utc::now(),
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
             },
             plan_dag_nodes::Model {
                 id: "B".to_string(),
@@ -1235,8 +1186,8 @@ mod tests {
                 target_position: None,
                 metadata_json: "{}".to_string(),
                 config_json: "{}".to_string(),
-                created_at: chrono::Utc::now(),
-                updated_at: chrono::Utc::now(),
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
             },
             plan_dag_nodes::Model {
                 id: "C".to_string(),
@@ -1248,8 +1199,8 @@ mod tests {
                 target_position: None,
                 metadata_json: "{}".to_string(),
                 config_json: "{}".to_string(),
-                created_at: chrono::Utc::now(),
-                updated_at: chrono::Utc::now(),
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
             },
         ];
 
@@ -1296,8 +1247,8 @@ mod tests {
                 target_position: None,
                 metadata_json: "{}".to_string(),
                 config_json: "{}".to_string(),
-                created_at: chrono::Utc::now(),
-                updated_at: chrono::Utc::now(),
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
             },
             plan_dag_nodes::Model {
                 id: "B".to_string(),
@@ -1309,8 +1260,8 @@ mod tests {
                 target_position: None,
                 metadata_json: "{}".to_string(),
                 config_json: "{}".to_string(),
-                created_at: chrono::Utc::now(),
-                updated_at: chrono::Utc::now(),
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
             },
             plan_dag_nodes::Model {
                 id: "C".to_string(),
@@ -1322,8 +1273,8 @@ mod tests {
                 target_position: None,
                 metadata_json: "{}".to_string(),
                 config_json: "{}".to_string(),
-                created_at: chrono::Utc::now(),
-                updated_at: chrono::Utc::now(),
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
             },
         ];
 

@@ -1,9 +1,10 @@
 use anyhow::{anyhow, Result};
-use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, Set};
+use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, Set, TransactionTrait};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 
 use super::layer_operations::{insert_layers_to_db, load_layers_from_db};
+use super::persist_utils::{clear_graph_storage, insert_edge_batches, insert_node_batches};
 use super::types::LayerData;
 use crate::database::entities::ExecutionState;
 use crate::database::entities::{data_sets, graph_edges, graph_nodes, graphs, plan_dag_nodes};
@@ -241,8 +242,8 @@ impl MergeBuilder {
         graph: &graphs::Model,
         sources: &[DataSetOrGraph],
     ) -> Result<(usize, usize)> {
-        // Clear existing graph data
-        self.clear_graph_data(graph.id).await?;
+        let txn = self.db.begin().await?;
+        clear_graph_storage(&txn, graph.id).await?;
 
         let mut all_nodes = HashMap::new();
         let mut all_edges = Vec::new();
@@ -329,8 +330,9 @@ impl MergeBuilder {
         }
 
         // Insert nodes
-        for (id, node_data) in all_nodes {
-            let node = graph_nodes::ActiveModel {
+        let node_models: Vec<_> = all_nodes
+            .into_iter()
+            .map(|(id, node_data)| graph_nodes::ActiveModel {
                 id: Set(id),
                 graph_id: Set(graph.id),
                 label: Set(node_data.label),
@@ -342,15 +344,15 @@ impl MergeBuilder {
                 attrs: Set(node_data.attrs),
                 comment: Set(None),
                 created_at: Set(chrono::Utc::now()),
-            };
-
-            node.insert(&self.db).await?;
-        }
+            })
+            .collect();
+        insert_node_batches(&txn, node_models).await?;
 
         // Insert edges
         let edge_count = all_edges.len();
-        for edge_data in all_edges {
-            let edge = graph_edges::ActiveModel {
+        let edge_models: Vec<_> = all_edges
+            .into_iter()
+            .map(|edge_data| graph_edges::ActiveModel {
                 id: Set(edge_data.id),
                 graph_id: Set(graph.id),
                 source: Set(edge_data.source),
@@ -362,13 +364,13 @@ impl MergeBuilder {
                 attrs: Set(edge_data.attrs),
                 comment: Set(None),
                 created_at: Set(chrono::Utc::now()),
-            };
-
-            edge.insert(&self.db).await?;
-        }
+            })
+            .collect();
+        insert_edge_batches(&txn, edge_models).await?;
 
         // Insert layers using shared function
-        insert_layers_to_db(&self.db, graph.id, all_layers).await?;
+        insert_layers_to_db(&txn, graph.id, all_layers).await?;
+        txn.commit().await?;
 
         let node_count = node_ids.len();
         Ok((node_count, edge_count))
@@ -650,36 +652,6 @@ impl MergeBuilder {
         all_layers.extend(loaded_layers);
         Ok(())
     }
-
-    /// Clear existing graph data
-    async fn clear_graph_data(&self, graph_id: i32) -> Result<()> {
-        use crate::database::entities::graph_edges::{Column as EdgeColumn, Entity as EdgeEntity};
-        use crate::database::entities::graph_layers::{
-            Column as LayerColumn, Entity as LayerEntity,
-        };
-        use crate::database::entities::graph_nodes::{Column as NodeColumn, Entity as NodeEntity};
-        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
-
-        // Delete edges
-        EdgeEntity::delete_many()
-            .filter(EdgeColumn::GraphId.eq(graph_id))
-            .exec(&self.db)
-            .await?;
-
-        // Delete nodes
-        NodeEntity::delete_many()
-            .filter(NodeColumn::GraphId.eq(graph_id))
-            .exec(&self.db)
-            .await?;
-
-        // Delete layers
-        LayerEntity::delete_many()
-            .filter(LayerColumn::GraphId.eq(graph_id))
-            .exec(&self.db)
-            .await?;
-
-        Ok(())
-    }
 }
 
 /// Enum to represent either a DataSet or a Graph (for upstream sources)
@@ -716,7 +688,7 @@ fn allocate_edge_id_with_scope(
     scope_hint: Option<&str>,
     used_ids: &mut HashSet<String>,
 ) -> String {
-    let mut candidate = if original_id.is_empty() {
+    let candidate = if original_id.is_empty() {
         scope_hint
             .map(|scope| format!("{scope}:edge"))
             .unwrap_or_else(|| "edge".to_string())

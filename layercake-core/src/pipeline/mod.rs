@@ -4,6 +4,7 @@ mod dataset_importer;
 mod graph_builder;
 mod layer_operations;
 mod merge_builder;
+mod persist_utils;
 mod types;
 
 pub use dag_context::DagExecutionContext;

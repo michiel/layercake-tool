@@ -1,5 +1,5 @@
 use anyhow::Result;
-use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
+use sea_orm::{ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Set};
 use std::collections::HashMap;
 
 use super::types::LayerData;
@@ -17,11 +17,14 @@ use crate::database::entities::graph_layers;
 ///
 /// # Returns
 /// * `Result<()>` - Success or database error
-pub async fn insert_layers_to_db(
-    db: &DatabaseConnection,
+pub async fn insert_layers_to_db<C>(
+    db: &C,
     graph_id: i32,
     all_layers: HashMap<String, LayerData>,
-) -> Result<()> {
+) -> Result<()>
+where
+    C: ConnectionTrait,
+{
     for (layer_id, layer_data) in all_layers {
         let layer = graph_layers::ActiveModel {
             graph_id: Set(graph_id),
@@ -53,10 +56,10 @@ pub async fn insert_layers_to_db(
 ///
 /// # Returns
 /// * `Result<HashMap<String, LayerData>>` - HashMap of layer_id -> LayerData
-pub async fn load_layers_from_db(
-    db: &DatabaseConnection,
-    graph_id: i32,
-) -> Result<HashMap<String, LayerData>> {
+pub async fn load_layers_from_db<C>(db: &C, graph_id: i32) -> Result<HashMap<String, LayerData>>
+where
+    C: ConnectionTrait,
+{
     let db_layers = graph_layers::Entity::find()
         .filter(graph_layers::Column::GraphId.eq(graph_id))
         .all(db)
