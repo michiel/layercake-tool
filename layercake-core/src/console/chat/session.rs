@@ -8,11 +8,14 @@
 //! - Uses rmcp for direct MCP integration (no conversion layer)
 //! - Maintains same session persistence and observer pattern
 
-use std::{fmt::Write as FmtWrite, sync::Arc};
+use std::{collections::BTreeMap, fmt::Write as FmtWrite, sync::Arc};
 
 use anyhow::{anyhow, Context, Result};
 use axum_mcp::prelude::{ClientContext, SecurityContext};
-use sea_orm::{DatabaseConnection, EntityTrait};
+use chrono::{DateTime, Utc};
+use sea_orm::{
+    ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
+};
 use serde_json::{json, Value};
 use tokio::io::{self, AsyncBufReadExt, BufReader};
 use tracing;
@@ -38,7 +41,7 @@ use rmcp::{
     ServiceExt,
 };
 
-use crate::database::entities::users;
+use crate::database::entities::{data_sets, graphs, plan_dag_edges, plan_dag_nodes, plans, projects, users};
 use crate::mcp::security::build_user_security_context;
 use crate::services::system_settings_service::SystemSettingsService;
 use layercake_data_acquisition::services::DataAcquisitionService;
@@ -247,7 +250,8 @@ impl ChatSession {
             .ok()
             .unzip();
 
-        let system_prompt = compose_system_prompt(config, project_id);
+        let project_context = load_agent_project_context(&db, project_id).await?;
+        let system_prompt = compose_system_prompt(config, &project_context);
 
         // Get model name from config
         let provider_config = config.provider(provider);
@@ -351,7 +355,6 @@ impl ChatSession {
         ));
 
         // For resumed sessions, get security context from session's user
-        use crate::database::entities::users;
         let user = users::Entity::find_by_id(session.user_id)
             .one(&db)
             .await?
@@ -378,6 +381,9 @@ impl ChatSession {
             .ok()
             .unzip();
 
+        let project_context = load_agent_project_context(&db, session.project_id).await?;
+        let system_prompt = compose_system_prompt(config, &project_context);
+
         // Load message history (currently empty - could be extended to load from DB)
         let messages = Vec::new();
 
@@ -388,7 +394,7 @@ impl ChatSession {
             user_id: session.user_id,
             provider,
             model_name: session.model_name,
-            system_prompt: session.system_prompt.unwrap_or_default(),
+            system_prompt,
             messages,
             bridge,
             security,
@@ -1144,21 +1150,283 @@ impl ChatSession {
     }
 }
 
-fn compose_system_prompt(config: &ChatConfig, project_id: i32) -> String {
+#[derive(Debug)]
+struct AgentProjectContext {
+    project_id: i32,
+    project_name: String,
+    project_description: Option<String>,
+    project_tags: Vec<String>,
+    plan_name: Option<String>,
+    plan_node_count: Option<u64>,
+    plan_edge_count: Option<u64>,
+    plan_updated_at: Option<DateTime<Utc>>,
+    dataset_total: usize,
+    dataset_by_type: BTreeMap<String, usize>,
+    graph_total: usize,
+    graph_state_counts: BTreeMap<String, usize>,
+    last_graph_update: Option<DateTime<Utc>>,
+}
+
+impl AgentProjectContext {
+    fn plan_summary(&self) -> String {
+        match (
+            self.plan_name.as_ref(),
+            self.plan_node_count,
+            self.plan_edge_count,
+        ) {
+            (Some(name), Some(nodes), Some(edges)) => {
+                let updated = self
+                    .plan_updated_at
+                    .map(|ts| ts.to_rfc3339())
+                    .unwrap_or_else(|| "unknown update time".to_string());
+                format!("{name} ({nodes} nodes / {edges} edges, last updated {updated})")
+            }
+            (Some(name), _, _) => format!("{name} exists but no DAG statistics are available yet."),
+            _ => "No plan has been defined for this project yet.".to_string(),
+        }
+    }
+
+    fn dataset_summary(&self) -> String {
+        if self.dataset_total == 0 {
+            return "No datasets have been added yet.".to_string();
+        }
+
+        let breakdown = if self.dataset_by_type.is_empty() {
+            "no type metadata recorded".to_string()
+        } else {
+            self.dataset_by_type
+                .iter()
+                .map(|(kind, count)| format!("{count} {kind}"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+
+        format!("{} datasets ({})", self.dataset_total, breakdown)
+    }
+
+    fn graph_summary(&self) -> String {
+        if self.graph_total == 0 {
+            return "No graphs have been executed yet.".to_string();
+        }
+
+        let breakdown = if self.graph_state_counts.is_empty() {
+            "no execution state data recorded".to_string()
+        } else {
+            self.graph_state_counts
+                .iter()
+                .map(|(state, count)| {
+                    let label = state.replace('_', " ").to_lowercase();
+                    format!("{count} {label}")
+                })
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+
+        let recency = self
+            .last_graph_update
+            .map(|ts| format!("last updated {}", ts.to_rfc3339()))
+            .unwrap_or_else(|| "latest run time unknown".to_string());
+
+        format!("{} graphs ({}) — {}", self.graph_total, breakdown, recency)
+    }
+}
+
+async fn load_agent_project_context(
+    db: &DatabaseConnection,
+    project_id: i32,
+) -> Result<AgentProjectContext> {
+    let project = projects::Entity::find_by_id(project_id)
+        .one(db)
+        .await
+        .map_err(|e| anyhow!("Failed to load project {}: {}", project_id, e))?
+        .ok_or_else(|| anyhow!("Project {} not found", project_id))?;
+
+    let project_tags: Vec<String> = serde_json::from_str(&project.tags).unwrap_or_default();
+
+    let plan = plans::Entity::find()
+        .filter(plans::Column::ProjectId.eq(project_id))
+        .order_by_desc(plans::Column::UpdatedAt)
+        .one(db)
+        .await
+        .map_err(|e| anyhow!("Failed to load plan for project {}: {}", project_id, e))?;
+
+    let (plan_name, plan_node_count, plan_edge_count, plan_updated_at) = if let Some(plan) = plan {
+        let node_count = plan_dag_nodes::Entity::find()
+            .filter(plan_dag_nodes::Column::PlanId.eq(plan.id))
+            .count(db)
+            .await
+            .map_err(|e| anyhow!("Failed to count plan nodes for project {}: {}", project_id, e))?;
+
+        let edge_count = plan_dag_edges::Entity::find()
+            .filter(plan_dag_edges::Column::PlanId.eq(plan.id))
+            .count(db)
+            .await
+            .map_err(|e| anyhow!("Failed to count plan edges for project {}: {}", project_id, e))?;
+
+        (
+            Some(plan.name),
+            Some(node_count),
+            Some(edge_count),
+            Some(plan.updated_at),
+        )
+    } else {
+        (None, None, None, None)
+    };
+
+    let datasets = data_sets::Entity::find()
+        .filter(data_sets::Column::ProjectId.eq(project_id))
+        .all(db)
+        .await
+        .map_err(|e| anyhow!("Failed to load datasets for project {}: {}", project_id, e))?;
+
+    let dataset_total = datasets.len();
+    let mut dataset_by_type: BTreeMap<String, usize> = BTreeMap::new();
+    for ds in datasets {
+        let key = ds.data_type.to_lowercase();
+        *dataset_by_type.entry(key).or_insert(0) += 1;
+    }
+
+    let graphs = graphs::Entity::find()
+        .filter(graphs::Column::ProjectId.eq(project_id))
+        .all(db)
+        .await
+        .map_err(|e| anyhow!("Failed to load graphs for project {}: {}", project_id, e))?;
+
+    let graph_total = graphs.len();
+    let mut graph_state_counts: BTreeMap<String, usize> = BTreeMap::new();
+    let mut last_graph_update: Option<DateTime<Utc>> = None;
+    for graph in graphs {
+        *graph_state_counts
+            .entry(graph.execution_state.clone())
+            .or_insert(0) += 1;
+        last_graph_update = match last_graph_update {
+            Some(current) if current > graph.updated_at => Some(current),
+            _ => Some(graph.updated_at),
+        };
+    }
+
+    Ok(AgentProjectContext {
+        project_id,
+        project_name: project.name,
+        project_description: project.description,
+        project_tags,
+        plan_name,
+        plan_node_count,
+        plan_edge_count,
+        plan_updated_at,
+        dataset_total,
+        dataset_by_type,
+        graph_total,
+        graph_state_counts,
+        last_graph_update,
+    })
+}
+
+fn compose_system_prompt(config: &ChatConfig, context: &AgentProjectContext) -> String {
     let mut prompt = String::new();
     if let Some(ref sys_prompt) = config.system_prompt {
         prompt.push_str(sys_prompt);
         prompt.push_str("\n\n");
     }
 
-    writeln!(&mut prompt, "Current project ID: {}", project_id)
+    writeln!(
+        &mut prompt,
+        "You are a senior Layercake engineer assisting with project {} ({}).",
+        context.project_id, context.project_name
+    )
+    .expect("Writing to String should not fail");
+
+    if let Some(description) = &context.project_description {
+        if !description.trim().is_empty() {
+            writeln!(&mut prompt, "Project description: {}", description.trim())
+                .expect("Writing to String should not fail");
+        }
+    }
+
+    if !context.project_tags.is_empty() {
+        writeln!(
+            &mut prompt,
+            "Tags: {}",
+            context.project_tags.join(", ")
+        )
         .expect("Writing to String should not fail");
+    }
+
+    writeln!(
+        &mut prompt,
+        "Plan status: {}",
+        context.plan_summary()
+    )
+    .expect("Writing to String should not fail");
+    writeln!(
+        &mut prompt,
+        "Datasets: {}",
+        context.dataset_summary()
+    )
+    .expect("Writing to String should not fail");
+    writeln!(
+        &mut prompt,
+        "Graphs: {}",
+        context.graph_summary()
+    )
+    .expect("Writing to String should not fail");
+
+    prompt.push_str(
+        "\nPlan DAG model:\n\
+- Nodes: DataSetNode (ingest existing datasets), GraphNode (build graphs from upstream datasets/graphs), MergeNode (combine upstream graphs), TransformNode/FilterNode (post-process graphs), GraphArtefactNode/TreeArtefactNode (export/visualise outputs), Chat nodes, etc.\n\
+- DagExecutor resolves dependencies, executes nodes, and triggers downstream recomputation when upstream data changes.\n\
+- Graph materialisation persists to graph_nodes, graph_edges, and graph_layers with dataset provenance.\n\n",
+    );
+
+    prompt.push_str(
+        "Graph construction & artefacts:\n\
+- GraphBuilder builds graphs from datasets, ensuring consistent node/edge IDs.\n\
+- MergeBuilder merges upstream graphs/datasets and deduplicates edges before storage.\n\
+- Artefact nodes emit previews (Mermaid, DOT, ZIP archives) and support publishing to the shared library.\n\
+- Library items can store datasets, full projects, or reusable templates for future work.\n\n",
+    );
+
+    prompt.push_str(
+        "Instructions:\n\
+1. Always ground responses in the Layercake DAG/graph architecture above.\n\
+2. When planning changes, describe which subsystems (plan DAG, datasets, graphs, artefacts, collaboration) are affected and why.\n\
+3. When execution steps are required, detail node execution order and downstream graph impact.\n\
+4. Prefer Rig/MCP tool usage for repository inspection, file edits, or running evaluations; describe the tool intent before calling it.\n\
+5. Keep answers scoped to the current project unless the user explicitly switches context.\n",
+    );
+
     prompt
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn sample_context() -> AgentProjectContext {
+        let mut dataset_by_type = BTreeMap::new();
+        dataset_by_type.insert("nodes".to_string(), 1);
+        dataset_by_type.insert("edges".to_string(), 2);
+
+        let mut graph_state_counts = BTreeMap::new();
+        graph_state_counts.insert("completed".to_string(), 1);
+        graph_state_counts.insert("processing".to_string(), 1);
+
+        AgentProjectContext {
+            project_id: 42,
+            project_name: "Test Project".to_string(),
+            project_description: Some("Exploratory build".to_string()),
+            project_tags: vec!["alpha".to_string(), "beta".to_string()],
+            plan_name: Some("Main Plan".to_string()),
+            plan_node_count: Some(12),
+            plan_edge_count: Some(11),
+            plan_updated_at: Some(Utc::now()),
+            dataset_total: 3,
+            dataset_by_type,
+            graph_total: 2,
+            graph_state_counts,
+            last_graph_update: Some(Utc::now()),
+        }
+    }
 
     #[test]
     fn test_compose_system_prompt_no_tools() {
@@ -1170,10 +1438,12 @@ mod tests {
             mcp_server_url: "http://localhost:3000/mcp".to_string(),
         };
 
-        let prompt = compose_system_prompt(&config, 42);
+        let prompt = compose_system_prompt(&config, &sample_context());
 
         assert!(prompt.contains("You are a helpful assistant."));
-        assert!(prompt.contains("Current project ID: 42"));
+        assert!(prompt.contains("Test Project"));
+        assert!(prompt.contains("Plan status"));
+        assert!(prompt.contains("Datasets"));
     }
 
     #[test]
@@ -1186,10 +1456,10 @@ mod tests {
             mcp_server_url: "http://localhost:3000/mcp".to_string(),
         };
 
-        let prompt = compose_system_prompt(&config, 42);
+        let prompt = compose_system_prompt(&config, &sample_context());
 
-        assert!(prompt.contains("Current project ID: 42"));
-        assert!(!prompt.contains("You are a helpful assistant"));
+        assert!(prompt.contains("Test Project"));
+        assert!(prompt.contains("Plan DAG model"));
     }
 
     #[test]
