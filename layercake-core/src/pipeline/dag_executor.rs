@@ -6,7 +6,7 @@ use sea_orm::{
 use serde_json::{json, Map as JsonMap, Value as JsonValue};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet, VecDeque};
-use tracing::info;
+use tracing::{debug_span, info, Instrument};
 
 use crate::database::entities::graphs::ActiveModel as GraphActiveModel;
 use crate::database::entities::graphs::{Column as GraphColumn, Entity as GraphEntity};
@@ -917,6 +917,12 @@ impl DagExecutor {
 
         // Execute nodes in order
         for node_id in sorted_nodes {
+            let span = debug_span!(
+                "dag_execute_node",
+                project_id,
+                plan_id,
+                node_id = node_id.as_str()
+            );
             self.execute_node(
                 project_id,
                 plan_id,
@@ -925,6 +931,7 @@ impl DagExecutor {
                 edges,
                 context.as_mut().map(|ctx| ctx),
             )
+            .instrument(span)
             .await?;
         }
 
@@ -966,6 +973,13 @@ impl DagExecutor {
         let mut context = self.maybe_context();
 
         for node_id in sorted {
+            let span = debug_span!(
+                "dag_execute_affected_node",
+                project_id,
+                plan_id,
+                node_id = node_id.as_str(),
+                changed_node = changed_node_id
+            );
             self.execute_node(
                 project_id,
                 plan_id,
@@ -974,6 +988,7 @@ impl DagExecutor {
                 edges,
                 context.as_mut().map(|ctx| ctx),
             )
+            .instrument(span)
             .await?;
         }
 
@@ -1103,6 +1118,13 @@ impl DagExecutor {
         let mut context = self.maybe_context();
 
         for node_id in sorted {
+            let span = debug_span!(
+                "dag_execute_target_node",
+                project_id,
+                plan_id,
+                target_node = target_node_id,
+                node_id = node_id.as_str()
+            );
             self.execute_node(
                 project_id,
                 plan_id,
@@ -1111,6 +1133,7 @@ impl DagExecutor {
                 edges,
                 context.as_mut().map(|ctx| ctx),
             )
+            .instrument(span)
             .await?;
         }
 

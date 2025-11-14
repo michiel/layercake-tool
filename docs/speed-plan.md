@@ -49,5 +49,5 @@ Eliminating the redundant insert path removes hundreds of queries before the DAG
 
 ## Next Steps
 1. Expand the new `DagExecutionContext` so GraphBuilder/MergeBuilder operate directly on cached datasets/graphs (no DB hydrations) and validate the behavior with representative DAG fixtures.
-2. Add tracing spans + metrics around DAG execution so future regressions are visible.
+2. Add metric emission (per-node counters/timers) alongside the new spans so runs can be aggregated outside of tracing.
 3. Once the new runtime is battle-tested, remove the eager DB materialization path or keep it only for backward compatibility with legacy tooling.
