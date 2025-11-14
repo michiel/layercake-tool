@@ -18,6 +18,7 @@ const GET_PROJECT = gql`
       id
       name
       description
+      tags
       createdAt
       updatedAt
     }
@@ -30,6 +31,7 @@ const UPDATE_PROJECT = gql`
       id
       name
       description
+      tags
       updatedAt
     }
   }
@@ -53,6 +55,7 @@ export const EditProjectPage = () => {
 
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [tags, setTags] = useState('')
   const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
 
@@ -60,6 +63,7 @@ export const EditProjectPage = () => {
     if (project) {
       setName(project.name ?? '')
       setDescription(project.description ?? '')
+      setTags((project.tags ?? []).join(', '))
     }
   }, [project])
 
@@ -75,12 +79,18 @@ export const EditProjectPage = () => {
     if (!project) return
 
     try {
+      const tagsArray = tags
+        .split(',')
+        .map((t) => t.trim())
+        .filter((t) => t.length > 0)
+
       await updateProject({
         variables: {
           id: project.id,
           input: {
             name: name.trim(),
             description: description.trim() || null,
+            tags: tagsArray.length > 0 ? tagsArray : [],
           },
         },
       })
@@ -164,6 +174,18 @@ export const EditProjectPage = () => {
                 onChange={(event) => setDescription(event.target.value)}
                 placeholder="Describe the goal of this project, key datasets, or any context collaborators should know."
               />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Tags</label>
+              <Input
+                value={tags}
+                onChange={(event) => setTags(event.target.value)}
+                placeholder="e.g., client-work, analysis, prototype (comma-separated)"
+              />
+              <p className="text-xs text-muted-foreground">
+                Separate multiple tags with commas. Tags help filter and organize projects.
+              </p>
             </div>
 
             <div className="flex items-center justify-between pt-4">

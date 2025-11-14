@@ -33,6 +33,7 @@ const CREATE_PROJECT = gql`
       id
       name
       description
+      tags
       createdAt
       updatedAt
     }
@@ -45,6 +46,7 @@ const GET_PROJECTS = gql`
       id
       name
       description
+      tags
       createdAt
       updatedAt
     }
@@ -60,6 +62,7 @@ const createProjectSchema = z.object({
     .max(100, 'Project name must be less than 100 characters')
     .transform((val) => val.trim()),
   description: z.string().transform((val) => val.trim()).optional(),
+  tags: z.string().transform((val) => val.trim()).optional(),
 })
 
 type CreateProjectFormValues = z.infer<typeof createProjectSchema>
@@ -101,16 +104,22 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
     defaultValues: {
       name: '',
       description: '',
+      tags: '',
     },
   })
 
   const handleSubmit = async (values: CreateProjectFormValues) => {
     try {
+      const tagsArray = values.tags
+        ? values.tags.split(',').map((t) => t.trim()).filter((t) => t.length > 0)
+        : []
+
       const { data } = await createProject({
         variables: {
           input: {
             name: values.name,
-            description: values.description || null
+            description: values.description || null,
+            tags: tagsArray.length > 0 ? tagsArray : null
           }
         }
       })
@@ -200,6 +209,24 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
                       <Textarea
                         placeholder="Optional project description"
                         rows={3}
+                        {...field}
+                        disabled={loading}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="tags"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tags</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="e.g., client-work, analysis, prototype (comma-separated)"
                         {...field}
                         disabled={loading}
                       />
