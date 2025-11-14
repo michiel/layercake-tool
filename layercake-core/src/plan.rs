@@ -144,6 +144,7 @@ pub enum ExportFileType {
     JSON,
     PlantUML,
     PlantUmlMindmap,
+    PlantUmlWbs,
     CSVNodes,
     CSVEdges,
     CSVMatrix,

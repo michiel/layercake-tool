@@ -804,6 +804,7 @@ fn parse_export_format(format: &str) -> Result<ExportFileType, String> {
         "GML" => Ok(ExportFileType::GML),
         "PLANTUML" | "PLANT_UML" => Ok(ExportFileType::PlantUML),
         "PLANTUML_MINDMAP" | "PLANT_UML_MINDMAP" => Ok(ExportFileType::PlantUmlMindmap),
+        "PLANTUML_WBS" | "PLANT_UML_WBS" => Ok(ExportFileType::PlantUmlWbs),
         "MERMAID" => Ok(ExportFileType::Mermaid),
         "MERMAID_MINDMAP" => Ok(ExportFileType::MermaidMindmap),
         "MERMAID_TREEMAP" => Ok(ExportFileType::MermaidTreemap),

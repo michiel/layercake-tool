@@ -68,6 +68,7 @@ export const TreeArtefactNodeConfigForm: React.FC<TreeArtefactNodeConfigFormProp
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="PlantUmlMindmap">PlantUML Mindmap</SelectItem>
+            <SelectItem value="PlantUmlWbs">PlantUML WBS</SelectItem>
             <SelectItem value="MermaidMindmap">Mermaid Mindmap</SelectItem>
             <SelectItem value="MermaidTreemap">Mermaid Treemap</SelectItem>
           </SelectContent>

@@ -3,7 +3,7 @@ use sea_orm::DatabaseConnection;
 
 use crate::export::{
     to_csv_edges, to_csv_nodes, to_dot, to_gml, to_json, to_mermaid, to_mermaid_mindmap,
-    to_mermaid_treemap, to_plantuml, to_plantuml_mindmap,
+    to_mermaid_treemap, to_plantuml, to_plantuml_mindmap, to_plantuml_wbs,
 };
 use crate::graph::Graph;
 use crate::plan::{ExportFileType, Plan, RenderConfig, RenderConfigOrientation, RenderConfigTheme};
@@ -51,6 +51,10 @@ impl ExportService {
             }
             ExportFileType::PlantUmlMindmap => {
                 Ok(to_plantuml_mindmap::render(graph, &render_config)
+                    .map_err(|e| anyhow::anyhow!("{}", e))?)
+            }
+            ExportFileType::PlantUmlWbs => {
+                Ok(to_plantuml_wbs::render(graph, &render_config)
                     .map_err(|e| anyhow::anyhow!("{}", e))?)
             }
             ExportFileType::MermaidMindmap => Ok(

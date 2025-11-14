@@ -226,6 +226,9 @@ fn export_graph(graph: &Graph, profile: &ExportProfileItem) -> Result<()> {
         ExportFileType::PlantUmlMindmap => {
             crate::export::to_plantuml_mindmap::render(&graph, &render_config)
         }
+        ExportFileType::PlantUmlWbs => {
+            crate::export::to_plantuml_wbs::render(&graph, &render_config)
+        }
         ExportFileType::Mermaid => crate::export::to_mermaid::render(&graph, &render_config),
         ExportFileType::MermaidMindmap => {
             crate::export::to_mermaid_mindmap::render(&graph, &render_config)

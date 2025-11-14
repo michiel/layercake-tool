@@ -1,0 +1,18 @@
+@startwbs
+* {{graph_name}}
+{{#*inline "render_node"}}
+{{mindmap_prefix depth}} {{label}}
+{{#each children}}
+{{> render_node}}
+{{/each}}
+{{/inline}}
+{{#if (is_empty hierarchy_tree_edges)}}
+{{#each hierarchy_tree}}
+{{> render_node}}
+{{/each}}
+{{else}}
+{{#each hierarchy_tree_edges}}
+{{> render_node}}
+{{/each}}
+{{/if}}
+@endwbs

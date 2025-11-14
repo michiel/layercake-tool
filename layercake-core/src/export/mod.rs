@@ -13,6 +13,7 @@ pub mod to_mermaid_mindmap;
 pub mod to_mermaid_treemap;
 pub mod to_plantuml;
 pub mod to_plantuml_mindmap;
+pub mod to_plantuml_wbs;
 
 /// Common rendering function used by all exporters
 /// This helps eliminate duplication across export modules
