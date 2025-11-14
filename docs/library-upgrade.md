@@ -27,8 +27,9 @@ Upgrade the library system from a dataset-only repository to a multi-type resour
 - ✅ **Stage 1** (data model + migration) implemented: `library_items` table with SeaORM entity, migration copying existing datasets, GraphQL schema updated, REST upload/download endpoints added.
 - ⏳ **Stage 2** (sample project migration) pending – hardcoded bundles still active until export utility is wired into seeding.
 - ✅ **Stage 3/4** core backend flow: export project → template ZIP, create project from library templates, GraphQL mutations and UI wiring in place. Additional polishing (partial exports, validation telemetry) still TBD.
-- ✅ **Stage 5** first pass at refreshed library UI: filters, search, unified cards, dataset/template uploads, REST download integration.
+- ✅ **Stage 5** first pass at refreshed library UI: filters, search, unified cards, dataset/template uploads, REST download integration. Filters and manage controls now sit side-by-side on desktop layouts, keeping the results grid visible without extra scrolling.
 - ✅ **Stage 6** dataset creation page now supports importing datasets directly from the library.
+- 🔄 **Stage 7** export polish in progress – the project overview now owns the export dialog with separate “Export” and “Export as template” tabs so users don’t have to hunt through Artefacts to publish or download bundles.
 
 ---
 

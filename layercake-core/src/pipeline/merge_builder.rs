@@ -247,6 +247,7 @@ impl MergeBuilder {
         let mut all_nodes = HashMap::new();
         let mut all_edges = Vec::new();
         let mut all_layers = HashMap::new(); // layer_id -> layer data
+        let mut used_edge_ids = HashSet::new();
 
         // Process each source
         for source in sources {
@@ -258,20 +259,27 @@ impl MergeBuilder {
                             anyhow!("Failed to parse graph JSON for {}: {}", ds.name, e)
                         })?;
 
+                    let scope_label = format!("ds{}", ds.id);
                     self.extract_from_json(
                         &mut all_nodes,
                         &mut all_edges,
                         &mut all_layers,
                         &graph_data,
                         &ds.data_type,
+                        Some(ds.id),
+                        Some(scope_label.as_str()),
+                        &mut used_edge_ids,
                     )?;
                 }
                 DataSetOrGraph::Graph(upstream_graph) => {
                     // Read nodes and edges from graph_nodes and graph_edges tables
+                    let scope_label = format!("graph{}", upstream_graph.id);
                     self.extract_from_graph_tables(
                         &mut all_nodes,
                         &mut all_edges,
                         upstream_graph.id,
+                        Some(scope_label.as_str()),
+                        &mut used_edge_ids,
                     )
                     .await?;
                     // Also read layers from the upstream graph
@@ -374,6 +382,9 @@ impl MergeBuilder {
         all_layers: &mut HashMap<String, LayerData>,
         graph_data: &serde_json::Value,
         data_type: &str,
+        dataset_id: Option<i32>,
+        edge_scope_hint: Option<&str>,
+        used_edge_ids: &mut HashSet<String>,
     ) -> Result<()> {
         match data_type {
             "nodes" => {
@@ -394,7 +405,7 @@ impl MergeBuilder {
                                 .filter(|s| !s.is_empty())
                                 .map(|s| s.to_string()),
                             attrs: Some(node_val.clone()),
-                            dataset_id: None,
+                            dataset_id,
                         };
 
                         all_nodes.insert(id, node);
@@ -404,7 +415,7 @@ impl MergeBuilder {
             "edges" => {
                 if let Some(edges_array) = graph_data.get("edges").and_then(|v| v.as_array()) {
                     for edge_val in edges_array {
-                        let id = edge_val["id"]
+                        let raw_id = edge_val["id"]
                             .as_str()
                             .ok_or_else(|| anyhow!("Edge missing 'id' field"))?
                             .to_string();
@@ -417,6 +428,8 @@ impl MergeBuilder {
                             .ok_or_else(|| anyhow!("Edge missing 'target' field"))?
                             .to_string();
 
+                        let id = allocate_edge_id_with_scope(&raw_id, edge_scope_hint, used_edge_ids);
+
                         let edge = EdgeData {
                             id,
                             source,
@@ -425,7 +438,7 @@ impl MergeBuilder {
                             layer: edge_val["layer"].as_str().map(|s| s.to_string()),
                             weight: edge_val["weight"].as_f64(),
                             attrs: Some(edge_val.clone()),
-                            dataset_id: None,
+                            dataset_id,
                         };
 
                         all_edges.push(edge);
@@ -451,7 +464,7 @@ impl MergeBuilder {
                                 .filter(|s| !s.is_empty())
                                 .map(|s| s.to_string()),
                             attrs: Some(node_val.clone()),
-                            dataset_id: None,
+                            dataset_id,
                         };
 
                         all_nodes.insert(id, node);
@@ -460,7 +473,7 @@ impl MergeBuilder {
 
                 if let Some(edges_array) = graph_data.get("edges").and_then(|v| v.as_array()) {
                     for edge_val in edges_array {
-                        let id = edge_val["id"]
+                        let raw_id = edge_val["id"]
                             .as_str()
                             .ok_or_else(|| anyhow!("Edge missing 'id' field"))?
                             .to_string();
@@ -473,6 +486,9 @@ impl MergeBuilder {
                             .ok_or_else(|| anyhow!("Edge missing 'target' field"))?
                             .to_string();
 
+                        let id =
+                            allocate_edge_id_with_scope(&raw_id, edge_scope_hint, used_edge_ids);
+
                         let edge = EdgeData {
                             id,
                             source,
@@ -481,7 +497,7 @@ impl MergeBuilder {
                             layer: edge_val["layer"].as_str().map(|s| s.to_string()),
                             weight: edge_val["weight"].as_f64(),
                             attrs: Some(edge_val.clone()),
-                            dataset_id: None,
+                            dataset_id,
                         };
 
                         all_edges.push(edge);
@@ -550,7 +566,7 @@ impl MergeBuilder {
                             border_color,
                             comment,
                             properties: properties_json,
-                            dataset_id: None,
+                            dataset_id,
                         };
 
                         all_layers.insert(layer_id, layer);
@@ -571,6 +587,8 @@ impl MergeBuilder {
         all_nodes: &mut HashMap<String, NodeData>,
         all_edges: &mut Vec<EdgeData>,
         graph_id: i32,
+        edge_scope_hint: Option<&str>,
+        used_edge_ids: &mut HashSet<String>,
     ) -> Result<()> {
         use sea_orm::{ColumnTrait, QueryFilter};
 
@@ -602,8 +620,14 @@ impl MergeBuilder {
             .await?;
 
         for edge in edges {
+            let dataset_scope = edge.dataset_id.map(|id| format!("ds{}", id));
+            let scoped_hint = dataset_scope
+                .as_deref()
+                .or(edge_scope_hint);
+            let id = allocate_edge_id_with_scope(&edge.id, scoped_hint, used_edge_ids);
+
             all_edges.push(EdgeData {
-                id: edge.id,
+                id,
                 source: edge.source,
                 target: edge.target,
                 label: edge.label,
@@ -686,6 +710,37 @@ struct EdgeData {
     weight: Option<f64>,
     attrs: Option<serde_json::Value>,
     dataset_id: Option<i32>,
+}
+
+fn allocate_edge_id_with_scope(
+    original_id: &str,
+    scope_hint: Option<&str>,
+    used_ids: &mut HashSet<String>,
+) -> String {
+    let mut candidate = if original_id.is_empty() {
+        scope_hint
+            .map(|scope| format!("{scope}:edge"))
+            .unwrap_or_else(|| "edge".to_string())
+    } else {
+        original_id.to_string()
+    };
+
+    if used_ids.insert(candidate.clone()) {
+        return candidate;
+    }
+
+    let prefix = scope_hint
+        .map(|scope| format!("{scope}:"))
+        .unwrap_or_else(|| "edge:".to_string());
+
+    let mut counter = 1;
+    loop {
+        let attempt = format!("{}{}#{}", prefix, original_id, counter);
+        if used_ids.insert(attempt.clone()) {
+            return attempt;
+        }
+        counter += 1;
+    }
 }
 
 // LayerData now imported from super::types (was previously defined here)

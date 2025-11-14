@@ -220,6 +220,22 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
       return []
     }
 
+    const createSection = ({
+      matchOptions,
+      ...section
+    }: Omit<ProjectNavSection, 'isActive'> & { matchOptions?: { prefix?: boolean } }) => {
+      const matcher = makeRouteMatcher(section.route, matchOptions)
+      return {
+        ...section,
+        isActive: () => {
+          if (section.children?.some(child => child.isActive())) {
+            return false
+          }
+          return matcher()
+        },
+      }
+    }
+
     const dataAcquisitionChildren: ProjectNavChild[] = [
       {
         key: 'source-management',
@@ -278,46 +294,57 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
     ]
 
     return [
-      {
+      createSection({
         key: 'overview',
         label: 'Project overview',
         icon: <IconFolderPlus className="h-4 w-4" />,
         route: `/projects/${projectId}`,
-        isActive: makeRouteMatcher(`/projects/${projectId}`),
-      },
-      {
+      }),
+      createSection({
         key: 'data-acquisition',
         label: 'Data acquisition',
         icon: <IconDatabase className="h-4 w-4" />,
         route: dataAcquisitionChildren[0].route,
-        isActive: () => dataAcquisitionChildren.some((child) => child.isActive()),
         children: dataAcquisitionChildren,
-      },
-      {
+      }),
+      createSection({
         key: 'graph-creation',
         label: 'Workbench',
         icon: <IconGraph className="h-4 w-4" />,
         route: graphCreationChildren[0].route,
-        isActive: () => graphCreationChildren.some((child) => child.isActive()),
         children: graphCreationChildren,
-      },
-      {
+      }),
+      createSection({
         key: 'artefacts',
         label: 'Artefacts',
         icon: <IconHierarchy2 className="h-4 w-4" />,
         route: `/projects/${projectId}/artefacts`,
-        isActive: makeRouteMatcher(`/projects/${projectId}/artefacts`),
-      },
-      {
+      }),
+      createSection({
         key: 'chat',
         label: 'Chat',
         icon: <IconMessageDots className="h-4 w-4" />,
         route: `/projects/${projectId}/chat`,
-        isActive: makeRouteMatcher(`/projects/${projectId}/chat`, { prefix: true }),
+        matchOptions: { prefix: true },
         children: chatChildren,
-      },
+      }),
     ]
   }, [projectId, location.pathname])
+
+  const activeProjectNavKey = useMemo(() => {
+    for (const section of projectNavSections) {
+      const activeChild = section.children?.find(child => child.isActive())
+      if (activeChild) {
+        return `${section.key}:${activeChild.key}`
+      }
+      if (section.isActive()) {
+        return section.key
+      }
+    }
+    return undefined
+  }, [projectNavSections])
+
+  const projectsButtonActive = location.pathname.startsWith('/projects') && !activeProjectNavKey
 
   // Initialize collapsed sections - collapse all sections by default unless they have an active child
   React.useEffect(() => {
@@ -423,7 +450,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
-                      variant={isActiveRoutePrefix('/projects') ? 'default' : 'ghost'}
+                      variant={projectsButtonActive ? 'default' : 'ghost'}
                       className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start'}
                       onClick={() => navigate('/projects')}
                     >
@@ -450,6 +477,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                         const hasChildren = section.children && section.children.length > 0
                         const hasActiveChild = hasChildren && section.children!.some(child => child.isActive())
                         const isExpanded = hasActiveChild || !collapsedSections.has(section.key)
+                        const highlightChild = !sectionActive && hasActiveChild
 
                         return (
                           <div key={section.key}>
@@ -460,8 +488,10 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                                     variant={sectionActive ? 'default' : 'ghost'}
                                     className={cn(
                                       navCollapsed ? 'justify-center px-2' : 'justify-start',
-                                      hasChildren && !navCollapsed ? 'flex-1' : 'w-full'
+                                      hasChildren && !navCollapsed ? 'flex-1' : 'w-full',
+                                      highlightChild ? 'text-primary' : undefined
                                     )}
+                                    aria-current={sectionActive || hasActiveChild ? 'page' : undefined}
                                     onClick={() => navigate(section.route)}
                                   >
                                     {section.icon}
@@ -497,6 +527,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                                       key={child.key}
                                       size="sm"
                                       variant={childActive ? 'default' : 'ghost'}
+                                      aria-current={childActive ? 'page' : undefined}
                                       className="justify-start text-sm"
                                       onClick={() => navigate(child.route)}
                                     >
@@ -1688,7 +1719,7 @@ const ProjectDetailPage = () => {
           <Tabs value={activeExportTab} onValueChange={(value) => setActiveExportTab(value as 'archive' | 'template')}>
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="archive">Export</TabsTrigger>
-              <TabsTrigger value="template">Template</TabsTrigger>
+              <TabsTrigger value="template">Export as template</TabsTrigger>
             </TabsList>
             <TabsContent value="archive" className="mt-4 space-y-3">
               <p className="text-sm text-muted-foreground">
@@ -1706,7 +1737,7 @@ const ProjectDetailPage = () => {
               </p>
               <Button onClick={handleExportTemplate} disabled={exportTemplateLoading}>
                 {exportTemplateLoading && <Spinner className="mr-2 h-4 w-4" />}
-                Export to Library
+                Export as template
               </Button>
             </TabsContent>
           </Tabs>

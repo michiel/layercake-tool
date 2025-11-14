@@ -211,8 +211,8 @@ export const LibraryPage: React.FC = () => {
           </p>
         </Stack>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card>
+        <div className="flex flex-col gap-4 lg:flex-row">
+          <Card className="flex-1">
             <CardHeader>
               <CardTitle>Filters</CardTitle>
               <CardDescription>Search and narrow down library items.</CardDescription>
@@ -258,7 +258,7 @@ export const LibraryPage: React.FC = () => {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="flex-1 lg:w-[360px] lg:flex-none">
             <CardHeader>
               <CardTitle>Manage</CardTitle>
               <CardDescription>Upload new assets and sync bundled samples.</CardDescription>
