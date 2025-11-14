@@ -11,12 +11,13 @@ left to right direction
 top to bottom direction
 {{/if}}
 
-{{#if config.use_default_styling}}
-{{#if (stringeq config.theme "Dark")}}
+{{#if (stringeq config.built_in_styles "dark")}}
 skinparam backgroundColor #1e1e1e
 skinparam defaultFontColor #f5f5f5
 skinparam ArrowColor #dfe3ec
 skinparam RectangleBorderColor #777777
+{{else if (stringeq config.built_in_styles "none")}}
+skinparam shadowing false
 {{else}}
 skinparam backgroundColor #ffffff
 skinparam defaultFontColor #1f2933
@@ -25,6 +26,8 @@ skinparam RectangleBorderColor #555555
 {{/if}}
 skinparam defaultFontName Lato
 skinparam shadowing false
+
+{{#if config.apply_layers}}
 <style>
 {{#each layers as |layer|}}
     .{{layer.id}} {
@@ -42,7 +45,7 @@ skinparam shadowing false
     {{/each}}
 {{else}}
     {{#each flow_nodes as |node|}}
-  rectangle "{{node.label}}" as {{node.id}}{{#if config.use_default_styling}} <<{{node.layer}}>>{{/if}}
+  rectangle "{{node.label}}" as {{node.id}}{{#if config.apply_layers}} <<{{node.layer}}>>{{/if}}
     {{/each}}
 {{/if}}
 

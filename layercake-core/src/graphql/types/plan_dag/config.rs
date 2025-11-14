@@ -155,8 +155,8 @@ pub enum TreeArtefactRenderTarget {
 pub struct RenderConfig {
     pub contain_nodes: Option<bool>,
     pub orientation: Option<Orientation>,
-    pub use_default_styling: Option<bool>,
-    pub theme: Option<RenderTheme>,
+    pub apply_layers: Option<bool>,
+    pub built_in_styles: Option<RenderBuiltinStyle>,
 }
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
@@ -166,8 +166,12 @@ pub enum Orientation {
 }
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
-pub enum RenderTheme {
+pub enum RenderBuiltinStyle {
+    #[graphql(name = "NONE")]
+    None,
+    #[graphql(name = "LIGHT")]
     Light,
+    #[graphql(name = "DARK")]
     Dark,
 }
 

@@ -69,8 +69,8 @@ export const getDefaultNodeConfig = (type: PlanDagNodeType): NodeConfig => {
         renderConfig: {
           containNodes: true,
           orientation: 'TB',
-          useDefaultStyling: false,
-          theme: 'Light'
+          applyLayers: true,
+          builtInStyles: 'light'
         },
         graphConfig: {}
       };
@@ -81,8 +81,8 @@ export const getDefaultNodeConfig = (type: PlanDagNodeType): NodeConfig => {
         renderConfig: {
           containNodes: true,
           orientation: 'TB',
-          useDefaultStyling: false,
-          theme: 'Light'
+          applyLayers: true,
+          builtInStyles: 'light'
         },
         graphConfig: {}
       };

@@ -130,8 +130,8 @@ export interface GraphArtefactNodeConfig {
   renderConfig?: {
     containNodes?: boolean;
     orientation?: 'LR' | 'TB';
-    useDefaultStyling?: boolean;
-    theme?: 'Light' | 'Dark';
+    applyLayers?: boolean;
+    builtInStyles?: 'none' | 'light' | 'dark';
   };
     graphConfig?: {
     generateHierarchy?: boolean;
@@ -154,8 +154,8 @@ export interface TreeArtefactNodeConfig {
   renderConfig?: {
     containNodes?: boolean;
     orientation?: 'LR' | 'TB';
-    useDefaultStyling?: boolean;
-    theme?: 'Light' | 'Dark';
+    applyLayers?: boolean;
+    builtInStyles?: 'none' | 'light' | 'dark';
   };
   graphConfig?: {
     generateHierarchy?: boolean;

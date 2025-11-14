@@ -15,7 +15,7 @@ use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
 use crate::graphql::types::plan_dag::{PlanDag, PlanDagEdge, PlanDagInput, PlanDagNode};
 use crate::pipeline::DagExecutor;
-use crate::plan::{RenderConfig, RenderConfigOrientation, RenderConfigTheme};
+use crate::plan::{RenderConfig, RenderConfigBuiltInStyle, RenderConfigOrientation};
 
 #[derive(Default)]
 pub struct PlanDagMutation;
@@ -24,8 +24,8 @@ fn default_artefact_render_config() -> RenderConfig {
     RenderConfig {
         contain_nodes: true,
         orientation: RenderConfigOrientation::TB,
-        use_default_styling: false,
-        theme: RenderConfigTheme::Light,
+        apply_layers: true,
+        built_in_styles: RenderConfigBuiltInStyle::Light,
     }
 }
 

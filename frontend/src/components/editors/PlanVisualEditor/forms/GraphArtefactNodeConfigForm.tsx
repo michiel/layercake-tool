@@ -21,12 +21,21 @@ export const GraphArtefactNodeConfigForm: React.FC<GraphArtefactNodeConfigFormPr
   setIsValid,
   projectId: _projectId,
 }) => {
+  const legacyUseDefaultStyling = (config.renderConfig as any)?.useDefaultStyling;
+  const legacyTheme = (config.renderConfig as any)?.theme;
+
   const initialRenderConfig = {
     ...config.renderConfig,
     containNodes: config.renderConfig?.containNodes ?? true,
     orientation: config.renderConfig?.orientation ?? 'TB',
-    useDefaultStyling: config.renderConfig?.useDefaultStyling ?? false,
-    theme: config.renderConfig?.theme ?? 'Light'
+    applyLayers: config.renderConfig?.applyLayers ?? legacyUseDefaultStyling ?? true,
+    builtInStyles:
+      config.renderConfig?.builtInStyles ||
+      (legacyUseDefaultStyling === false
+        ? 'none'
+        : legacyTheme === 'Dark'
+        ? 'dark'
+        : 'light'),
   };
 
   const [localConfig, setLocalConfig] = useState<GraphArtefactNodeConfig>({
@@ -106,42 +115,45 @@ export const GraphArtefactNodeConfigForm: React.FC<GraphArtefactNodeConfigFormPr
         <Label htmlFor="contain-nodes">Contain Nodes</Label>
       </div>
 
-      <div className="flex flex-col space-y-2">
+      <div className="space-y-4">
         <div className="flex items-center space-x-2">
           <Switch
-            id="use-default-styling"
-          checked={localConfig.renderConfig?.useDefaultStyling ?? false}
+            id="apply-layer-colors"
+            checked={localConfig.renderConfig?.applyLayers ?? true}
             onCheckedChange={(checked) => setLocalConfig(prev => ({
               ...prev,
-              renderConfig: { ...(prev.renderConfig ?? {}), useDefaultStyling: checked }
+              renderConfig: { ...(prev.renderConfig ?? {}), applyLayers: checked }
             }))}
           />
           <div>
-            <Label htmlFor="use-default-styling">Use Default Styling</Label>
+            <Label htmlFor="apply-layer-colors">Apply Layer Colors</Label>
             <p className="text-sm text-muted-foreground">
-              Apply Layercake&apos;s built-in colors and layout accents in supported exports.
+              When enabled, nodes and edges inherit the palette defined for each layer.
             </p>
           </div>
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="theme">Default Styling Theme</Label>
+          <Label htmlFor="built-in-style">Built-in Theme</Label>
           <Select
-            value={localConfig.renderConfig?.theme || 'Light'}
+            value={localConfig.renderConfig?.builtInStyles || 'light'}
             onValueChange={(value) => setLocalConfig(prev => ({
               ...prev,
-              renderConfig: { ...(prev.renderConfig ?? {}), theme: value as 'Light' | 'Dark' }
+              renderConfig: { ...(prev.renderConfig ?? {}), builtInStyles: value as 'none' | 'light' | 'dark' }
             }))}
-            disabled={!(localConfig.renderConfig?.useDefaultStyling ?? false)}
           >
-            <SelectTrigger id="theme">
+            <SelectTrigger id="built-in-style">
               <SelectValue placeholder="Select theme" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="Light">Light</SelectItem>
-              <SelectItem value="Dark">Dark</SelectItem>
+              <SelectItem value="none">None (engine defaults)</SelectItem>
+              <SelectItem value="light">Light</SelectItem>
+              <SelectItem value="dark">Dark</SelectItem>
             </SelectContent>
           </Select>
+          <p className="text-sm text-muted-foreground">
+            Built-in styles set global background/font defaults before layer colors are applied.
+          </p>
         </div>
       </div>
 

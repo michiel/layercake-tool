@@ -86,7 +86,7 @@ pub fn get_handlebars() -> Handlebars<'static> {
             node: Value,
             layermap: &serde_json::Map<String, Value>,
             acc: i32,
-            use_default_styling: bool,
+            apply_layers: bool,
         ) -> String {
             if let Value::Object(map) = node {
                 let id = map.get("id").and_then(|v| v.as_str()).unwrap_or("no-id");
@@ -97,7 +97,7 @@ pub fn get_handlebars() -> Handlebars<'static> {
 
                 let indent = " ".repeat((acc * 2) as usize);
 
-                let mut result = if use_default_styling {
+                let mut result = if apply_layers {
                     format!("{}rectangle \"{}\" as {} <<{}>> ", indent, label, id, layer)
                 } else {
                     format!("{}rectangle \"{}\" as {} ", indent, label, id)
@@ -105,7 +105,7 @@ pub fn get_handlebars() -> Handlebars<'static> {
                 if !children.is_empty() {
                     result += "{\n";
                     let children_rendered: Vec<String> = children.iter().map(|child| {
-                        render_tree(child.clone(), layermap, acc + 1, use_default_styling)
+                        render_tree(child.clone(), layermap, acc + 1, apply_layers)
                     }).collect();
                     result += &children_rendered.join("");
                     result += &format!("{}}}\n", indent);
@@ -132,12 +132,12 @@ pub fn get_handlebars() -> Handlebars<'static> {
             _ => serde_json::Map::new(),
         };
 
-        let use_default_styling = style_map
-            .get("use_default_styling")
+        let apply_layers = style_map
+            .get("apply_layers")
             .and_then(|v| v.as_bool())
             .unwrap_or(true);
 
-        render_tree(node, &layermap, 0, use_default_styling)
+        render_tree(node, &layermap, 0, apply_layers)
     });
     handlebars.register_helper("puml_render_tree", Box::new(puml_render_tree));
 
@@ -175,10 +175,11 @@ pub fn get_handlebars() -> Handlebars<'static> {
     handlebars.register_helper("mermaid_render_tree", Box::new(mermaid_render_tree));
 
     handlebars_helper!(dot_render_tree: |node: Value, layermap: Value, style_config: Value| {
-        fn theme_palette(theme: &str) -> (&'static str, &'static str, &'static str, &'static str) {
-            match theme {
-                "Dark" => ("#1e1e1e", "#f5f5f5", "#444444", "#888888"),
-                _ => ("#dddddd", "#000000", "#cccccc", "#444444"),
+        fn theme_palette(style: &str) -> (&'static str, &'static str, &'static str, &'static str) {
+            match style.to_lowercase().as_str() {
+                "dark" => ("#1e1e1e", "#f5f5f5", "#444444", "#888888"),
+                "none" => ("#ffffff", "#000000", "#cccccc", "#444444"),
+                _ => ("#f7f7f8", "#0f172a", "#1f2933", "#cccccc"),
             }
         }
 
@@ -186,8 +187,8 @@ pub fn get_handlebars() -> Handlebars<'static> {
             node: Value,
             layermap: &serde_json::Map<String, Value>,
             acc: i32,
-            use_default_styling: bool,
-            theme: &str,
+            apply_layers: bool,
+            built_in_style: &str,
         ) -> String {
             if let Value::Object(map) = node {
                 let id = map.get("id").and_then(|v| v.as_str()).unwrap_or("no-id");
@@ -200,13 +201,13 @@ pub fn get_handlebars() -> Handlebars<'static> {
                 let mut result = String::new();
 
                 let (default_fill, default_font, default_border, default_container_border) =
-                    theme_palette(theme);
+                    theme_palette(built_in_style);
 
                 if !children.is_empty() {
                     result += &format!("{}subgraph cluster_{} {{\n", indent, id);
                     result += &format!("{}  label=\"{}\"\n", indent, label);
 
-                    if use_default_styling {
+                    if apply_layers {
                         let mut fillcolor = default_fill.trim_start_matches('#').to_string();
                         let mut bordercolor =
                             default_container_border.trim_start_matches('#').to_string();
@@ -237,17 +238,11 @@ pub fn get_handlebars() -> Handlebars<'static> {
                     }
 
                     let children_rendered: Vec<String> = children.iter().map(|child| {
-                        render_tree(
-                            child.clone(),
-                            layermap,
-                            acc + 1,
-                            use_default_styling,
-                            theme,
-                        )
+                        render_tree(child.clone(), layermap, acc + 1, apply_layers, built_in_style)
                     }).collect();
                     result += &children_rendered.join("");
                     result += &format!("{}  }}\n", indent);
-                } else if use_default_styling {
+                } else if apply_layers {
                     let mut fillcolor = default_fill.trim_start_matches('#').to_string();
                     let mut fontcolor = default_font.trim_start_matches('#').to_string();
                     let mut bordercolor = default_border.trim_start_matches('#').to_string();
@@ -276,7 +271,7 @@ pub fn get_handlebars() -> Handlebars<'static> {
                     );
                 } else {
                     result += &format!(
-                        "{}{} [label=\"{}\", layer=\"{}\"];\n",
+                        "{}{} [label=\"{}\", layer=\"{}\", style=\"rounded\"];\n",
                         indent, id, label, layer
                     );
                 }
@@ -301,21 +296,21 @@ pub fn get_handlebars() -> Handlebars<'static> {
             _ => serde_json::Map::new(),
         };
 
-        let use_default_styling = style_map
-            .get("use_default_styling")
+        let apply_layers = style_map
+            .get("apply_layers")
             .and_then(|v| v.as_bool())
             .unwrap_or(true);
-        let theme = style_map
-            .get("theme")
+        let built_in_style = style_map
+            .get("built_in_styles")
             .and_then(|v| v.as_str())
-            .unwrap_or("Light");
+            .unwrap_or("light");
 
         render_tree(
             node,
             &layermap,
             0,
-            use_default_styling,
-            theme,
+            apply_layers,
+            built_in_style,
         )
     });
     handlebars.register_helper("dot_render_tree", Box::new(dot_render_tree));

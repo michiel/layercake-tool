@@ -6,7 +6,9 @@ use crate::export::{
     to_mermaid_treemap, to_plantuml, to_plantuml_mindmap, to_plantuml_wbs,
 };
 use crate::graph::Graph;
-use crate::plan::{ExportFileType, Plan, RenderConfig, RenderConfigOrientation, RenderConfigTheme};
+use crate::plan::{
+    ExportFileType, Plan, RenderConfig, RenderConfigBuiltInStyle, RenderConfigOrientation,
+};
 pub struct ExportService {
     _db: DatabaseConnection,
 }
@@ -26,8 +28,8 @@ impl ExportService {
         let default_render_config = RenderConfig {
             contain_nodes: true,
             orientation: RenderConfigOrientation::TB,
-            use_default_styling: true,
-            theme: RenderConfigTheme::Light,
+            apply_layers: true,
+            built_in_styles: RenderConfigBuiltInStyle::Light,
         };
         let render_config = render_config_override.unwrap_or(default_render_config);
 
@@ -53,18 +55,12 @@ impl ExportService {
                 Ok(to_plantuml_mindmap::render(graph, &render_config)
                     .map_err(|e| anyhow::anyhow!("{}", e))?)
             }
-            ExportFileType::PlantUmlWbs => {
-                Ok(to_plantuml_wbs::render(graph, &render_config)
-                    .map_err(|e| anyhow::anyhow!("{}", e))?)
-            }
-            ExportFileType::MermaidMindmap => Ok(
-                to_mermaid_mindmap::render(graph, &render_config)
-                    .map_err(|e| anyhow::anyhow!("{}", e))?
-            ),
-            ExportFileType::MermaidTreemap => Ok(
-                to_mermaid_treemap::render(graph, &render_config)
-                    .map_err(|e| anyhow::anyhow!("{}", e))?
-            ),
+            ExportFileType::PlantUmlWbs => Ok(to_plantuml_wbs::render(graph, &render_config)
+                .map_err(|e| anyhow::anyhow!("{}", e))?),
+            ExportFileType::MermaidMindmap => Ok(to_mermaid_mindmap::render(graph, &render_config)
+                .map_err(|e| anyhow::anyhow!("{}", e))?),
+            ExportFileType::MermaidTreemap => Ok(to_mermaid_treemap::render(graph, &render_config)
+                .map_err(|e| anyhow::anyhow!("{}", e))?),
             ExportFileType::CSVNodes => Ok(to_csv_nodes::render(graph, &render_config)
                 .map_err(|e| anyhow::anyhow!("{}", e))?),
             ExportFileType::CSVEdges => Ok(to_csv_edges::render(graph, &render_config)

@@ -114,14 +114,28 @@ pub struct ExportProfileGraphConfig {
 pub struct ExportProfileRenderConfig {
     pub contain_nodes: Option<bool>,
     pub orientation: Option<RenderConfigOrientation>,
-    pub use_default_styling: Option<bool>,
-    pub theme: Option<RenderConfigTheme>,
+    pub apply_layers: Option<bool>,
+    pub built_in_styles: Option<RenderConfigBuiltInStyle>,
+    #[serde(rename = "use_default_styling")]
+    pub legacy_use_default_styling: Option<bool>,
+    #[serde(rename = "theme")]
+    pub legacy_theme: Option<RenderConfigTheme>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Copy)]
 pub enum RenderConfigOrientation {
     LR,
     TB,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Copy, PartialEq, Eq)]
+pub enum RenderConfigBuiltInStyle {
+    #[serde(rename = "none")]
+    None,
+    #[serde(rename = "light")]
+    Light,
+    #[serde(rename = "dark")]
+    Dark,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Copy)]
@@ -160,8 +174,10 @@ impl Default for ExportProfileRenderConfig {
         Self {
             contain_nodes: Some(true),
             orientation: Some(RenderConfigOrientation::TB),
-            use_default_styling: Some(true),
-            theme: Some(RenderConfigTheme::Light),
+            apply_layers: Some(true),
+            built_in_styles: Some(RenderConfigBuiltInStyle::Light),
+            legacy_use_default_styling: Some(true),
+            legacy_theme: Some(RenderConfigTheme::Light),
         }
     }
 }
@@ -170,8 +186,8 @@ impl Default for ExportProfileRenderConfig {
 pub struct RenderConfig {
     pub contain_nodes: bool,
     pub orientation: RenderConfigOrientation,
-    pub use_default_styling: bool,
-    pub theme: RenderConfigTheme,
+    pub apply_layers: bool,
+    pub built_in_styles: RenderConfigBuiltInStyle,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Copy)]
@@ -235,14 +251,34 @@ impl ExportProfileItem {
             .orientation
             .unwrap_or(RenderConfigOrientation::TB);
         let contain_nodes = render_config.contain_nodes.unwrap_or(true);
-        let use_default_styling = render_config.use_default_styling.unwrap_or(true);
-        let theme = render_config.theme.unwrap_or(RenderConfigTheme::Light);
+        let apply_layers = render_config
+            .apply_layers
+            .or_else(|| render_config.legacy_use_default_styling.map(|_| true))
+            .unwrap_or(true);
+
+        let built_in_styles = render_config
+            .built_in_styles
+            .or_else(|| {
+                match (
+                    render_config.legacy_use_default_styling,
+                    render_config.legacy_theme,
+                ) {
+                    (Some(false), _) => Some(RenderConfigBuiltInStyle::None),
+                    (Some(true), Some(RenderConfigTheme::Dark)) => {
+                        Some(RenderConfigBuiltInStyle::Dark)
+                    }
+                    (Some(true), _) => Some(RenderConfigBuiltInStyle::Light),
+                    (None, Some(RenderConfigTheme::Dark)) => Some(RenderConfigBuiltInStyle::Dark),
+                    (None, _) => None,
+                }
+            })
+            .unwrap_or(RenderConfigBuiltInStyle::Light);
 
         RenderConfig {
             contain_nodes,
             orientation,
-            use_default_styling,
-            theme,
+            apply_layers,
+            built_in_styles,
         }
     }
 }

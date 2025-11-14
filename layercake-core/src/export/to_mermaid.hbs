@@ -5,6 +5,14 @@
 ---
 flowchart {{config.orientation}}
 
+{{#if (stringeq config.built_in_styles "dark")}}
+classDef default fill:#2b2b2b,color:#f5f5f5,stroke:#777777;
+{{else if (stringeq config.built_in_styles "none")}}
+%% no built-in theme applied
+{{else}}
+classDef default fill:#f7f7f8,color:#0f172a,stroke:#1f2933;
+{{/if}}
+
 {{#if config.contain_nodes}}
   {{#each hierarchy_tree as |rootnode|}}
 {{{mermaid_render_tree rootnode}}}
@@ -13,6 +21,15 @@ flowchart {{config.orientation}}
   {{#each flow_nodes as |node|}}
  {{node.id}}["{{node.label}}"]
   {{/each}}
+{{/if}}
+
+{{#if config.apply_layers}}
+{{#each layers as |layer|}}
+classDef {{layer.id}} fill:#{{layer.background_color}},color:#{{layer.text_color}},stroke:#{{layer.border_color}};
+{{/each}}
+{{#each flow_nodes as |node|}}
+class {{node.id}} {{node.layer}};
+{{/each}}
 {{/if}}
 
 {{#each flow_edges as |edge|}}

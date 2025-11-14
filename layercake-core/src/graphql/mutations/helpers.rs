@@ -6,7 +6,10 @@ use uuid::Uuid;
 
 use crate::database::entities::{project_collaborators, user_sessions, users};
 use crate::graphql::errors::StructuredError;
-use crate::plan::{ExportFileType, RenderConfig, RenderConfigOrientation, RenderConfigTheme};
+use crate::plan::{
+    ExportFileType, RenderConfig, RenderConfigBuiltInStyle, RenderConfigOrientation,
+    RenderConfigTheme,
+};
 
 /// Generate a unique node ID based on node type
 pub fn generate_node_id_from_ids(
@@ -65,6 +68,8 @@ pub struct StoredTreeArtefactNodeConfig {
 pub struct StoredRenderConfig {
     pub contain_nodes: Option<bool>,
     pub orientation: Option<String>,
+    pub apply_layers: Option<bool>,
+    pub built_in_styles: Option<String>,
     pub use_default_styling: Option<bool>,
     pub theme: Option<String>,
 }
@@ -78,12 +83,34 @@ impl StoredRenderConfig {
                 .as_deref()
                 .map(parse_orientation)
                 .unwrap_or(RenderConfigOrientation::TB),
-            use_default_styling: self.use_default_styling.unwrap_or(true),
-            theme: self
-                .theme
+            apply_layers: self
+                .apply_layers
+                .or_else(|| self.use_default_styling.map(|_| true))
+                .unwrap_or(true),
+            built_in_styles: self
+                .built_in_styles
                 .as_deref()
-                .map(parse_theme)
-                .unwrap_or(RenderConfigTheme::Light),
+                .map(parse_builtin_style)
+                .or_else(|| match (self.use_default_styling, self.theme.as_deref()) {
+                    (Some(false), _) => Some(RenderConfigBuiltInStyle::None),
+                    (Some(true), Some(theme)) => {
+                        if matches!(parse_theme(theme), RenderConfigTheme::Dark) {
+                            Some(RenderConfigBuiltInStyle::Dark)
+                        } else {
+                            Some(RenderConfigBuiltInStyle::Light)
+                        }
+                    }
+                    (Some(true), None) => Some(RenderConfigBuiltInStyle::Light),
+                    (None, Some(theme)) => {
+                        if matches!(parse_theme(theme), RenderConfigTheme::Dark) {
+                            Some(RenderConfigBuiltInStyle::Dark)
+                        } else {
+                            Some(RenderConfigBuiltInStyle::Light)
+                        }
+                    }
+                    (None, _) => None,
+                })
+                .unwrap_or(RenderConfigBuiltInStyle::Light),
         }
     }
 }
@@ -101,6 +128,14 @@ pub fn parse_theme(value: &str) -> RenderConfigTheme {
     match value {
         "DARK" | "dark" | "Dark" => RenderConfigTheme::Dark,
         _ => RenderConfigTheme::Light,
+    }
+}
+
+pub fn parse_builtin_style(value: &str) -> RenderConfigBuiltInStyle {
+    match value {
+        "none" | "NONE" | "None" => RenderConfigBuiltInStyle::None,
+        "dark" | "DARK" | "Dark" => RenderConfigBuiltInStyle::Dark,
+        _ => RenderConfigBuiltInStyle::Light,
     }
 }
 
