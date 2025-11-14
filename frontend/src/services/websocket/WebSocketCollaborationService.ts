@@ -20,6 +20,9 @@ export class WebSocketCollaborationService {
   private heartbeatTimer: number | null = null;
   private messageQueue: QueuedMessage[] = [];
   private isIntentionalDisconnect = false;
+  private lastJoinData: JoinSessionData | null = null;
+  private hasJoinedThisConnection = false;
+  private lastRequestedDocument: DocumentSwitchData | null = null;
 
   // Event handlers
   private onConnectionStateChange: (state: ConnectionState) => void = () => {};
@@ -82,6 +85,7 @@ export class WebSocketCollaborationService {
     this.isIntentionalDisconnect = true;
     this.clearReconnectTimer();
     this.clearHeartbeatTimer();
+    this.hasJoinedThisConnection = false;
 
     if (this.ws) {
       // Only close if WebSocket is in a state that allows closing
@@ -100,25 +104,9 @@ export class WebSocketCollaborationService {
     this.connect();
   }
 
-  // Message sending
-  sendMessage(message: ClientMessage): boolean {
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      try {
-        this.ws.send(JSON.stringify(message));
-        return true;
-      } catch (error) {
-        this.queueMessage(message);
-        return false;
-      }
-    } else {
-      this.queueMessage(message);
-      return false;
-    }
-  }
-
   // High-level actions
   joinSession(data: JoinSessionData): void {
-    this.sendMessage({ type: 'join_session', data });
+    this.sendJoinSession(data);
   }
 
   updateCursorPosition(data: Omit<CursorUpdateData, 'timestamp'>): void {
@@ -133,7 +121,10 @@ export class WebSocketCollaborationService {
   }
 
   switchDocument(data: DocumentSwitchData): void {
-    this.sendMessage({ type: 'switch_document', data });
+    this.lastRequestedDocument = data;
+    if (this.hasJoinedThisConnection) {
+      this.sendMessage({ type: 'switch_document', data });
+    }
   }
 
   leaveSession(documentId?: string): void {
@@ -173,7 +164,10 @@ export class WebSocketCollaborationService {
       // WebSocket connected successfully
       this.setConnectionState(ConnectionState.CONNECTED);
       this.reconnectAttempts = 0;
+      this.hasJoinedThisConnection = false;
       this.startHeartbeat();
+      // Always re-send join session first when reconnecting
+      this.sendJoinSession();
       this.flushMessageQueue();
     };
 
@@ -284,14 +278,18 @@ export class WebSocketCollaborationService {
     }
   }
 
-  private queueMessage(message: ClientMessage): void {
+  private queueMessage(message: ClientMessage, priority: 'normal' | 'high' = 'normal'): void {
     const queuedMessage: QueuedMessage = {
       message,
       timestamp: Date.now(),
       retries: 0
     };
 
-    this.messageQueue.push(queuedMessage);
+    if (priority === 'high') {
+      this.messageQueue = [queuedMessage, ...this.messageQueue];
+    } else {
+      this.messageQueue.push(queuedMessage);
+    }
 
     // Limit queue size
     const maxSize = this.config.messageQueueSize || 100;
@@ -310,6 +308,13 @@ export class WebSocketCollaborationService {
         continue;
       }
 
+      if (
+        queuedMessage.message.type === 'join_session' &&
+        this.hasJoinedThisConnection
+      ) {
+        continue; // Skip duplicate join messages after successful join
+      }
+
       if (!this.sendMessage(queuedMessage.message)) {
         // If sending fails, re-queue the message
         queuedMessage.retries++;
@@ -317,6 +322,64 @@ export class WebSocketCollaborationService {
           this.queueMessage(queuedMessage.message);
         }
       }
+    }
+  }
+
+  private sendJoinSession(data?: JoinSessionData): void {
+    if (data) {
+      this.lastJoinData = data;
+    }
+
+    if (!this.lastJoinData) {
+      return;
+    }
+
+    const message: ClientMessage = { type: 'join_session', data: this.lastJoinData };
+
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      try {
+        this.ws.send(JSON.stringify(message));
+        this.hasJoinedThisConnection = true;
+        this.flushPendingDocumentSwitch();
+        this.flushMessageQueue();
+      } catch (error) {
+        this.hasJoinedThisConnection = false;
+        this.queueMessage(message, 'high');
+      }
+    } else {
+      this.hasJoinedThisConnection = false;
+      this.queueMessage(message, 'high');
+    }
+  }
+
+  private flushPendingDocumentSwitch(): void {
+    if (!this.hasJoinedThisConnection || !this.lastRequestedDocument) {
+      return;
+    }
+
+    this.sendMessage({ type: 'switch_document', data: this.lastRequestedDocument });
+  }
+
+  private sendMessage(message: ClientMessage): boolean {
+    if (
+      message.type !== 'join_session' &&
+      !this.hasJoinedThisConnection
+    ) {
+      this.queueMessage(message);
+      return false;
+    }
+
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      try {
+        this.ws.send(JSON.stringify(message));
+        return true;
+      } catch (error) {
+        this.queueMessage(message);
+        return false;
+      }
+    } else {
+      this.queueMessage(message);
+      return false;
     }
   }
 

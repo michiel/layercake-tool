@@ -25,7 +25,7 @@ export const GraphArtefactNodeConfigForm: React.FC<GraphArtefactNodeConfigFormPr
     ...config.renderConfig,
     containNodes: config.renderConfig?.containNodes ?? true,
     orientation: config.renderConfig?.orientation ?? 'TB',
-    useDefaultStyling: config.renderConfig?.useDefaultStyling ?? true,
+    useDefaultStyling: config.renderConfig?.useDefaultStyling ?? false,
     theme: config.renderConfig?.theme ?? 'Light'
   };
 
@@ -110,7 +110,7 @@ export const GraphArtefactNodeConfigForm: React.FC<GraphArtefactNodeConfigFormPr
         <div className="flex items-center space-x-2">
           <Switch
             id="use-default-styling"
-            checked={localConfig.renderConfig?.useDefaultStyling ?? true}
+          checked={localConfig.renderConfig?.useDefaultStyling ?? false}
             onCheckedChange={(checked) => setLocalConfig(prev => ({
               ...prev,
               renderConfig: { ...(prev.renderConfig ?? {}), useDefaultStyling: checked }
@@ -132,7 +132,7 @@ export const GraphArtefactNodeConfigForm: React.FC<GraphArtefactNodeConfigFormPr
               ...prev,
               renderConfig: { ...(prev.renderConfig ?? {}), theme: value as 'Light' | 'Dark' }
             }))}
-            disabled={!(localConfig.renderConfig?.useDefaultStyling ?? true)}
+            disabled={!(localConfig.renderConfig?.useDefaultStyling ?? false)}
           >
             <SelectTrigger id="theme">
               <SelectValue placeholder="Select theme" />

@@ -15,9 +15,19 @@ use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
 use crate::graphql::types::plan_dag::{PlanDag, PlanDagEdge, PlanDagInput, PlanDagNode};
 use crate::pipeline::DagExecutor;
+use crate::plan::{RenderConfig, RenderConfigOrientation, RenderConfigTheme};
 
 #[derive(Default)]
 pub struct PlanDagMutation;
+
+fn default_artefact_render_config() -> RenderConfig {
+    RenderConfig {
+        contain_nodes: true,
+        orientation: RenderConfigOrientation::TB,
+        use_default_styling: false,
+        theme: RenderConfigTheme::Light,
+    }
+}
 
 #[Object]
 impl PlanDagMutation {
@@ -181,9 +191,12 @@ impl PlanDagMutation {
                         .render_target
                         .unwrap_or_else(|| "PlantUmlMindmap".to_string()),
                     stored_config.output_path,
-                    stored_config
-                        .render_config
-                        .map(|rc| rc.into_render_config()),
+                    Some(
+                        stored_config
+                            .render_config
+                            .map(|rc| rc.into_render_config())
+                            .unwrap_or_else(default_artefact_render_config),
+                    ),
                 )
             }
             _ => {
@@ -199,9 +212,12 @@ impl PlanDagMutation {
                         .render_target
                         .unwrap_or_else(|| "GML".to_string()),
                     stored_config.output_path,
-                    stored_config
-                        .render_config
-                        .map(|rc| rc.into_render_config()),
+                    Some(
+                        stored_config
+                            .render_config
+                            .map(|rc| rc.into_render_config())
+                            .unwrap_or_else(default_artefact_render_config),
+                    ),
                 )
             }
         };
