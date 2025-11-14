@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { useMutation } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import { useForm } from 'react-hook-form'
@@ -71,12 +71,14 @@ interface CreateProjectModalProps {
   opened: boolean
   onClose: () => void
   onSuccess: (project: { id: number; name: string; description?: string }) => void
+  defaultTags?: string[]
 }
 
 export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   opened,
   onClose,
-  onSuccess
+  onSuccess,
+  defaultTags = []
 }) => {
   const [createProject, { loading }] = useMutation<{
     createProject: {
@@ -107,6 +109,17 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
       tags: '',
     },
   })
+
+  // Update form when modal opens with default tags
+  useEffect(() => {
+    if (opened) {
+      form.reset({
+        name: '',
+        description: '',
+        tags: defaultTags.join(', '),
+      })
+    }
+  }, [opened, defaultTags, form])
 
   const handleSubmit = async (values: CreateProjectFormValues) => {
     try {

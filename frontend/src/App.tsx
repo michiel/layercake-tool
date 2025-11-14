@@ -788,6 +788,7 @@ const HomePage = () => {
         opened={createModalOpened}
         onClose={() => setCreateModalOpened(false)}
         onSuccess={handleProjectCreated}
+        defaultTags={activeTags}
       />
 
       <Dialog open={sampleModalOpened} onOpenChange={(open) => !open && handleSampleModalClose()}>
@@ -856,6 +857,7 @@ const HomePage = () => {
 // Projects list page component
 const ProjectsPage = () => {
   const navigate = useNavigate()
+  const { activeTags } = useTagsFilter()
   const [createModalOpened, setCreateModalOpened] = useState(false)
   const [sampleModalOpened, setSampleModalOpened] = useState(false)
   const [selectedSampleKey, setSelectedSampleKey] = useState<string | null>(null)
@@ -866,10 +868,14 @@ const ProjectsPage = () => {
       id: number
       name: string
       description: string
+      tags: string[]
       createdAt: string
       updatedAt: string
     }>
   }>(GET_PROJECTS, {
+    variables: {
+      tags: activeTags.length > 0 ? activeTags : null
+    },
     errorPolicy: 'all',
   })
 
@@ -1062,7 +1068,7 @@ const ProjectsPage = () => {
                     size="sm"
                     onClick={(e) => {
                       e.stopPropagation()
-                      handleProjectSelect(project.id)
+                      navigate(`/projects/${project.id}/edit`)
                     }}
                   >
                     <IconSettings className="mr-2 h-3.5 w-3.5" />
@@ -1079,6 +1085,7 @@ const ProjectsPage = () => {
         opened={createModalOpened}
         onClose={() => setCreateModalOpened(false)}
         onSuccess={handleProjectCreated}
+        defaultTags={activeTags}
       />
 
       <Dialog open={sampleModalOpened} onOpenChange={(open) => !open && handleSampleModalClose()}>
