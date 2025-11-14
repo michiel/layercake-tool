@@ -1,7 +1,7 @@
 mindmap
   root(("{{graph_name}}"))
 {{#*inline "render_node"}}
-{{mindmap_indent depth}}  "{{label}}"
+{{mindmap_indent depth}}{{sanitize_id id}}["{{label}}"]
 {{#each children}}
 {{> render_node}}
 {{/each}}

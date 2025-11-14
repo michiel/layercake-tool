@@ -74,6 +74,13 @@ pub fn get_handlebars() -> Handlebars<'static> {
     });
     handlebars.register_helper("treemap_value", Box::new(treemap_value));
 
+    handlebars_helper!(sanitize_id: |id: String| {
+        id.chars()
+            .map(|c| if c.is_alphanumeric() || c == '_' { c } else { '_' })
+            .collect::<String>()
+    });
+    handlebars.register_helper("sanitize_id", Box::new(sanitize_id));
+
     handlebars_helper!(puml_render_tree: |node: Value, layermap: Value, style_config: Value| {
         fn render_tree(
             node: Value,
