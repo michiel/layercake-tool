@@ -32,6 +32,7 @@ import { Separator } from './components/ui/separator'
 import { ChatProvider } from './components/chat/ChatProvider'
 import { useRegisterChatContext } from './hooks/useRegisterChatContext'
 import { cn } from './lib/utils'
+import { useTagsFilter } from './hooks/useTagsFilter'
 
 // Collaboration Context for providing project-level collaboration to all pages
 const CollaborationContext = React.createContext<any>(null)
@@ -55,11 +56,12 @@ type ProjectNavSection = {
 
 // Query to fetch projects
 const GET_PROJECTS = gql`
-  query GetProjects {
-    projects {
+  query GetProjects($tags: [String!]) {
+    projects(tags: $tags) {
       id
       name
       description
+      tags
       createdAt
       updatedAt
     }
@@ -570,6 +572,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
 // Home page component
 const HomePage = () => {
   const navigate = useNavigate()
+  const { activeTags } = useTagsFilter()
   const [createModalOpened, setCreateModalOpened] = useState(false)
   const [sampleModalOpened, setSampleModalOpened] = useState(false)
   const [selectedSampleKey, setSelectedSampleKey] = useState<string | null>(null)
@@ -580,10 +583,15 @@ const HomePage = () => {
       id: number
       name: string
       description: string
+      tags: string[]
       createdAt: string
       updatedAt: string
     }>
-  }>(GET_PROJECTS)
+  }>(GET_PROJECTS, {
+    variables: {
+      tags: activeTags.length > 0 ? activeTags : null
+    }
+  })
 
   const { data: sampleProjectsData, loading: sampleProjectsLoading } = useQuery<{
     sampleProjects: Array<{

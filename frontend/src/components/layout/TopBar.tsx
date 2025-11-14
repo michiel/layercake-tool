@@ -1,11 +1,14 @@
-import React from 'react';
-import { IconSun, IconMoon, IconWifi, IconWifiOff, IconGraph, IconLoader, IconRefresh } from '@tabler/icons-react';
+import React, { useState } from 'react';
+import { IconSun, IconMoon, IconWifi, IconWifiOff, IconGraph, IconLoader, IconRefresh, IconX, IconTag } from '@tabler/icons-react';
 import { useApolloClient } from '@apollo/client/react';
 import { useTheme } from 'next-themes';
 import { Group } from '@/components/layout-primitives';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import { UserPresenceIndicator } from '../collaboration/UserPresenceIndicator';
 import { ConnectionState } from '../../types/websocket';
+import { useTagsFilter } from '../../hooks/useTagsFilter';
 
 interface TopBarProps {
   projectId?: number;
@@ -24,9 +27,28 @@ export const TopBar: React.FC<TopBarProps> = ({
 }) => {
   const { theme, setTheme } = useTheme();
   const apolloClient = useApolloClient();
+  const { activeTags, setActiveTags, clearTags } = useTagsFilter();
+  const [tagsInput, setTagsInput] = useState('');
   const isDark = theme === 'dark';
   const isOnline = connectionState === ConnectionState.CONNECTED;
   const isConnecting = connectionState === ConnectionState.CONNECTING;
+
+  const handleTagsKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && tagsInput.trim()) {
+      const newTags = tagsInput
+        .split(',')
+        .map((t) => t.trim())
+        .filter((t) => t.length > 0);
+      if (newTags.length > 0) {
+        setActiveTags([...new Set([...activeTags, ...newTags])]);
+        setTagsInput('');
+      }
+    }
+  };
+
+  const removeTag = (tagToRemove: string) => {
+    setActiveTags(activeTags.filter((tag) => tag !== tagToRemove));
+  };
 
   const handleClearCache = () => {
     // Clear Apollo cache
@@ -53,6 +75,46 @@ export const TopBar: React.FC<TopBarProps> = ({
       <Group gap="sm" className="cursor-pointer" onClick={onNavigateHome}>
         <IconGraph size={28} />
         <h1 className="text-2xl font-bold">Layercake</h1>
+      </Group>
+
+      {/* Center - Tags filter */}
+      <Group gap="sm" className="flex-1 max-w-lg mx-4">
+        <div className="flex items-center gap-2 w-full">
+          <IconTag size={16} className="text-muted-foreground" />
+          <Input
+            placeholder="Filter by tags (press Enter)"
+            value={tagsInput}
+            onChange={(e) => setTagsInput(e.target.value)}
+            onKeyDown={handleTagsKeyDown}
+            className="h-8"
+          />
+          {activeTags.length > 0 && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={clearTags}
+              title="Clear all tags"
+              className="h-8 w-8"
+            >
+              <IconX size={16} />
+            </Button>
+          )}
+        </div>
+        {activeTags.length > 0 && (
+          <Group gap="xs" className="flex-wrap">
+            {activeTags.map((tag) => (
+              <Badge key={tag} variant="secondary" className="gap-1">
+                {tag}
+                <button
+                  onClick={() => removeTag(tag)}
+                  className="ml-1 hover:text-destructive"
+                >
+                  <IconX size={12} />
+                </button>
+              </Badge>
+            ))}
+          </Group>
+        )}
       </Group>
 
       {/* Right side - Controls */}

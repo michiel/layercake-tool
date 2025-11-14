@@ -9,6 +9,7 @@ import { Toaster } from '@/components/ui/sonner'
 import { Spinner } from '@/components/ui/spinner'
 import { Stack } from '@/components/layout-primitives'
 import { ThemeProvider } from '@/components/theme/theme-provider'
+import { TagsFilterProvider } from '@/hooks/useTagsFilter'
 
 // Tailwind CSS
 import './index.css'
@@ -75,7 +76,9 @@ if (isTauriApp()) {
             <Toaster />
             <BrowserRouter>
               <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
-                <App />
+                <TagsFilterProvider>
+                  <App />
+                </TagsFilterProvider>
               </ThemeProvider>
             </BrowserRouter>
           </ApolloProvider>
@@ -111,7 +114,9 @@ if (isTauriApp()) {
         <Toaster />
         <BrowserRouter>
           <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
-            <App />
+            <TagsFilterProvider>
+              <App />
+            </TagsFilterProvider>
           </ThemeProvider>
         </BrowserRouter>
       </ApolloProvider>
