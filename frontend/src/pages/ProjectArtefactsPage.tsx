@@ -12,9 +12,10 @@ import {
   IconAlertCircle,
   IconChevronDown,
   IconChevronRight,
+  IconSettings,
 } from '@tabler/icons-react'
 import { gql } from '@apollo/client'
-import { GET_PLAN_DAG } from '../graphql/plan-dag'
+import { GET_PLAN_DAG, UPDATE_PLAN_DAG_NODE } from '../graphql/plan-dag'
 import { EXPORT_NODE_OUTPUT } from '../graphql/export'
 import { Stack, Group } from '../components/layout-primitives'
 import PageContainer from '../components/layout/PageContainer'
@@ -32,8 +33,10 @@ import {
 import { Textarea } from '../components/ui/textarea'
 import { ScrollArea } from '../components/ui/scroll-area'
 import { GraphDataDialog } from '../components/editors/PlanVisualEditor/dialogs/GraphDataDialog'
+import { NodeConfigDialog } from '../components/editors/PlanVisualEditor/NodeConfigDialog'
 import { MermaidPreviewDialog, DotPreviewDialog } from '../components/visualization'
 import { showErrorNotification, showSuccessNotification } from '../utils/notifications'
+import { PlanDagNodeType } from '../types/plan-dag'
 
 const GET_PROJECTS = gql`
   query GetProjects {
@@ -152,6 +155,19 @@ const ProjectArtefactsPage: React.FC = () => {
   )
   const [downloadingNodeId, setDownloadingNodeId] = useState<string | null>(null)
   const [collapsedGraphs, setCollapsedGraphs] = useState<Set<string>>(new Set())
+  const [editNodeDialog, setEditNodeDialog] = useState<{
+    open: boolean
+    nodeId: string | null
+    nodeType: PlanDagNodeType | null
+    config: any
+    metadata: any
+  }>({
+    open: false,
+    nodeId: null,
+    nodeType: null,
+    config: null,
+    metadata: null,
+  })
 
   const toggleGraphCollapse = (graphId: string) => {
     setCollapsedGraphs((prev) => {
@@ -230,6 +246,17 @@ const ProjectArtefactsPage: React.FC = () => {
       console.error('Download failed:', error)
       showErrorNotification('Download Failed', error.message)
       setDownloadingNodeId(null)
+    },
+  })
+
+  const [updatePlanDagNode] = useMutation(UPDATE_PLAN_DAG_NODE, {
+    refetchQueries: [{ query: GET_PLAN_DAG, variables: { projectId: numericProjectId } }],
+    onCompleted: () => {
+      showSuccessNotification('Node Updated', 'Artefact node configuration saved')
+    },
+    onError: (error) => {
+      console.error('Update failed:', error)
+      showErrorNotification('Update Failed', error.message)
     },
   })
 
@@ -325,6 +352,31 @@ const ProjectArtefactsPage: React.FC = () => {
 
   const handleNavigate = (route: string) => {
     navigate(route)
+  }
+
+  const handleEditNode = (nodeId: string, nodeType: string, config: any, metadata: any) => {
+    const dagNodeType =
+      nodeType === 'GraphArtefactNode' ? PlanDagNodeType.GRAPH_ARTEFACT : PlanDagNodeType.TREE_ARTEFACT
+    setEditNodeDialog({
+      open: true,
+      nodeId,
+      nodeType: dagNodeType,
+      config: parseConfig(config),
+      metadata: metadata || {},
+    })
+  }
+
+  const handleSaveNode = async (nodeId: string, config: any, metadata: any) => {
+    await updatePlanDagNode({
+      variables: {
+        projectId: numericProjectId,
+        nodeId,
+        updates: {
+          config: JSON.stringify(config),
+          metadata,
+        },
+      },
+    })
   }
 
   const renderEntry = (entry: ArtefactEntry, index: number) => {
@@ -484,6 +536,19 @@ const ProjectArtefactsPage: React.FC = () => {
               </TooltipTrigger>
               <TooltipContent>Download artefact</TooltipContent>
             </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8"
+                  onClick={() => handleEditNode(entry.node.id, entry.node.nodeType, entry.node.config, entry.node.metadata)}
+                >
+                  <IconSettings size={16} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Edit properties</TooltipContent>
+            </Tooltip>
           </TooltipProvider>
         </Group>
       </div>
@@ -596,6 +661,19 @@ const ProjectArtefactsPage: React.FC = () => {
         title={dotPreview.title}
         onClose={() => setDotPreview({ open: false, content: '', title: '' })}
       />
+
+      {editNodeDialog.nodeId && editNodeDialog.nodeType && (
+        <NodeConfigDialog
+          opened={editNodeDialog.open}
+          onClose={() => setEditNodeDialog({ open: false, nodeId: null, nodeType: null, config: null, metadata: null })}
+          nodeType={editNodeDialog.nodeType}
+          projectId={numericProjectId}
+          onSave={handleSaveNode}
+          nodeId={editNodeDialog.nodeId}
+          config={editNodeDialog.config}
+          metadata={editNodeDialog.metadata}
+        />
+      )}
     </>
   )
 }
