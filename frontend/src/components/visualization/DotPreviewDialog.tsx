@@ -252,3 +252,5 @@ export const DotPreviewDialog = ({ open, onClose, diagram, title }: DotPreviewDi
     </Dialog>
   )
 }
+
+export default DotPreviewDialog

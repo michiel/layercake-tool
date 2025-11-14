@@ -262,3 +262,5 @@ export const MermaidPreviewDialog = ({ open, onClose, diagram, title }: MermaidP
     </Dialog>
   )
 }
+
+export default MermaidPreviewDialog

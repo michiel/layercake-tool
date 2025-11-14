@@ -37,3 +37,5 @@ export const DataPreviewDialog = ({
     </Dialog>
   );
 };
+
+export default DataPreviewDialog

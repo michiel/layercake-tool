@@ -153,3 +153,5 @@ export const GraphPreviewDialog = ({ opened, onClose, data, title, loading = fal
     </Dialog>
   );
 };
+
+export default GraphPreviewDialog
