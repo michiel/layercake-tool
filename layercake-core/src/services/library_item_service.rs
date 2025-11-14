@@ -61,7 +61,8 @@ impl LibraryItemService {
     }
 
     pub async fn list(&self, filter: LibraryItemFilter) -> Result<Vec<library_items::Model>> {
-        let mut query = library_items::Entity::find().order_by_desc(library_items::Column::UpdatedAt);
+        let mut query =
+            library_items::Entity::find().order_by_desc(library_items::Column::UpdatedAt);
 
         if let Some(types) = filter.item_types.filter(|v| !v.is_empty()) {
             query = query.filter(library_items::Column::ItemType.is_in(types));
@@ -111,21 +112,24 @@ impl LibraryItemService {
         let tags_json = serde_json::to_string(&tags).unwrap_or_else(|_| "[]".to_string());
         let now = Utc::now();
 
-        let model = library_items::ActiveModel {
-            item_type: Set(ITEM_TYPE_DATASET.to_string()),
-            name: Set(name),
-            description: Set(description),
-            tags: Set(tags_json),
-            metadata: Set(serde_json::to_string(&metadata)?),
-            content_blob: Set(bytes.clone()),
-            content_size: Set(Some(bytes.len() as i64)),
-            content_type: Set(content_type.or_else(|| Some(self.detect_content_type(&file_format)))),
-            created_at: Set(now),
-            updated_at: Set(now),
-            ..library_items::ActiveModel::new()
-        }
-        .insert(&self.db)
-        .await?;
+        let model =
+            library_items::ActiveModel {
+                item_type: Set(ITEM_TYPE_DATASET.to_string()),
+                name: Set(name),
+                description: Set(description),
+                tags: Set(tags_json),
+                metadata: Set(serde_json::to_string(&metadata)?),
+                content_blob: Set(bytes.clone()),
+                content_size: Set(Some(bytes.len() as i64)),
+                content_type: Set(
+                    content_type.or_else(|| Some(self.detect_content_type(&file_format)))
+                ),
+                created_at: Set(now),
+                updated_at: Set(now),
+                ..library_items::ActiveModel::new()
+            }
+            .insert(&self.db)
+            .await?;
 
         Ok(model)
     }
@@ -277,10 +281,9 @@ impl LibraryItemService {
         }
 
         let metadata = serde_json::from_str::<DatasetMetadata>(&item.metadata).unwrap_or_default();
-        let file_format = metadata
-            .format
-            .parse::<FileFormat>()
-            .unwrap_or_else(|_| FileFormat::from_extension(&metadata.filename).unwrap_or(FileFormat::Csv));
+        let file_format = metadata.format.parse::<FileFormat>().unwrap_or_else(|_| {
+            FileFormat::from_extension(&metadata.filename).unwrap_or(FileFormat::Csv)
+        });
         let data_type = metadata
             .data_type
             .parse::<DataType>()
@@ -291,12 +294,8 @@ impl LibraryItemService {
             metadata.filename.clone()
         };
 
-        let processed = source_processing::process_file(
-            &file_format,
-            &data_type,
-            &item.content_blob,
-        )
-        .await?;
+        let processed =
+            source_processing::process_file(&file_format, &data_type, &item.content_blob).await?;
 
         let now = Utc::now();
         let dataset = data_sets::ActiveModel {
@@ -416,7 +415,11 @@ impl TryFrom<&library_items::Model> for DatasetMetadata {
     }
 }
 
-pub fn infer_data_type(filename: &str, file_format: &FileFormat, file_data: &[u8]) -> Result<DataType> {
+pub fn infer_data_type(
+    filename: &str,
+    file_format: &FileFormat,
+    file_data: &[u8],
+) -> Result<DataType> {
     if let Some(dtype) = infer_data_type_from_filename(filename) {
         if dtype.is_compatible_with_format(file_format) {
             return Ok(dtype);

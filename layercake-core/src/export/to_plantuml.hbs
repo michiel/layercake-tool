@@ -16,13 +16,15 @@ skinparam backgroundColor #1e1e1e
 skinparam defaultFontColor #f5f5f5
 skinparam ArrowColor #dfe3ec
 skinparam RectangleBorderColor #777777
-{{else if (stringeq config.built_in_styles "none")}}
-skinparam shadowing false
 {{else}}
+    {{#if (stringeq config.built_in_styles "none")}}
+skinparam shadowing false
+    {{else}}
 skinparam backgroundColor #ffffff
 skinparam defaultFontColor #1f2933
 skinparam ArrowColor #2B303A
 skinparam RectangleBorderColor #555555
+    {{/if}}
 {{/if}}
 skinparam defaultFontName Lato
 skinparam shadowing false

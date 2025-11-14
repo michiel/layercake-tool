@@ -41,7 +41,9 @@ use rmcp::{
     ServiceExt,
 };
 
-use crate::database::entities::{data_sets, graphs, plan_dag_edges, plan_dag_nodes, plans, projects, users};
+use crate::database::entities::{
+    data_sets, graphs, plan_dag_edges, plan_dag_nodes, plans, projects, users,
+};
 use crate::mcp::security::build_user_security_context;
 use crate::services::system_settings_service::SystemSettingsService;
 use layercake_data_acquisition::services::DataAcquisitionService;
@@ -1255,13 +1257,25 @@ async fn load_agent_project_context(
             .filter(plan_dag_nodes::Column::PlanId.eq(plan.id))
             .count(db)
             .await
-            .map_err(|e| anyhow!("Failed to count plan nodes for project {}: {}", project_id, e))?;
+            .map_err(|e| {
+                anyhow!(
+                    "Failed to count plan nodes for project {}: {}",
+                    project_id,
+                    e
+                )
+            })?;
 
         let edge_count = plan_dag_edges::Entity::find()
             .filter(plan_dag_edges::Column::PlanId.eq(plan.id))
             .count(db)
             .await
-            .map_err(|e| anyhow!("Failed to count plan edges for project {}: {}", project_id, e))?;
+            .map_err(|e| {
+                anyhow!(
+                    "Failed to count plan edges for project {}: {}",
+                    project_id,
+                    e
+                )
+            })?;
 
         (
             Some(plan.name),
@@ -1344,32 +1358,16 @@ fn compose_system_prompt(config: &ChatConfig, context: &AgentProjectContext) -> 
     }
 
     if !context.project_tags.is_empty() {
-        writeln!(
-            &mut prompt,
-            "Tags: {}",
-            context.project_tags.join(", ")
-        )
-        .expect("Writing to String should not fail");
+        writeln!(&mut prompt, "Tags: {}", context.project_tags.join(", "))
+            .expect("Writing to String should not fail");
     }
 
-    writeln!(
-        &mut prompt,
-        "Plan status: {}",
-        context.plan_summary()
-    )
-    .expect("Writing to String should not fail");
-    writeln!(
-        &mut prompt,
-        "Datasets: {}",
-        context.dataset_summary()
-    )
-    .expect("Writing to String should not fail");
-    writeln!(
-        &mut prompt,
-        "Graphs: {}",
-        context.graph_summary()
-    )
-    .expect("Writing to String should not fail");
+    writeln!(&mut prompt, "Plan status: {}", context.plan_summary())
+        .expect("Writing to String should not fail");
+    writeln!(&mut prompt, "Datasets: {}", context.dataset_summary())
+        .expect("Writing to String should not fail");
+    writeln!(&mut prompt, "Graphs: {}", context.graph_summary())
+        .expect("Writing to String should not fail");
 
     prompt.push_str(
         "\nPlan DAG model:\n\

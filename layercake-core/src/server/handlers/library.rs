@@ -124,8 +124,7 @@ pub async fn upload_library_item(
         }
     }
 
-    let item_type =
-        item_type.ok_or(StatusCode::BAD_REQUEST)?;
+    let item_type = item_type.ok_or(StatusCode::BAD_REQUEST)?;
     let name = name.ok_or(StatusCode::BAD_REQUEST)?;
     let file_name = file_name.ok_or(StatusCode::BAD_REQUEST)?;
     let file_bytes = file_bytes.ok_or(StatusCode::BAD_REQUEST)?;
@@ -171,7 +170,10 @@ pub async fn upload_library_item(
     }
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    Ok((StatusCode::CREATED, Json(serde_json::json!({ "id": result.id }))))
+    Ok((
+        StatusCode::CREATED,
+        Json(serde_json::json!({ "id": result.id })),
+    ))
 }
 
 fn sanitize_filename(input: &str) -> String {

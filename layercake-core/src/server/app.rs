@@ -1,5 +1,10 @@
 use anyhow::{anyhow, Result};
-use axum::{extract::State, response::IntoResponse, routing::{get, post}, Router};
+use axum::{
+    extract::State,
+    response::IntoResponse,
+    routing::{get, post},
+    Router,
+};
 use sea_orm::DatabaseConnection;
 use std::sync::Arc;
 use tower::ServiceBuilder;

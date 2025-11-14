@@ -69,11 +69,7 @@ impl DagExecutor {
                     // DataSet references existing data_sets entry
                     // Create a graph entry from the data_set's graph_json
                     self.execute_dataset_reference_node(
-                        project_id,
-                        plan_id,
-                        node_id,
-                        &node_name,
-                        &config,
+                        project_id, plan_id, node_id, &node_name, &config,
                     )
                     .await?;
                 } else if let Some(file_path) = config["filePath"].as_str() {
@@ -346,7 +342,9 @@ impl DagExecutor {
         node_name: &str,
         config: &JsonValue,
     ) -> Result<()> {
-        use crate::database::entities::data_sets::{Column as DataSetColumn, Entity as DataSetEntity};
+        use crate::database::entities::data_sets::{
+            Column as DataSetColumn, Entity as DataSetEntity,
+        };
 
         // Get the referenced data_set
         let data_set_id = config["dataSetId"]
@@ -382,7 +380,10 @@ impl DagExecutor {
                     layer: node_val["layer"].as_str().unwrap_or("").to_string(),
                     weight: node_val["weight"].as_i64().unwrap_or(1) as i32,
                     is_partition: node_val["is_partition"].as_bool().unwrap_or(false),
-                    belongs_to: node_val["belongs_to"].as_str().filter(|s| !s.is_empty()).map(|s| s.to_string()),
+                    belongs_to: node_val["belongs_to"]
+                        .as_str()
+                        .filter(|s| !s.is_empty())
+                        .map(|s| s.to_string()),
                     comment: node_val["comment"].as_str().map(|s| s.to_string()),
                     dataset: None,
                 };
@@ -409,7 +410,8 @@ impl DagExecutor {
 
         // Extract layers (note: it's "graph_layers" in JSON format from data_sets)
         // Try both "graph_layers" and "layers" for compatibility
-        let layers_array = graph_data.get("graph_layers")
+        let layers_array = graph_data
+            .get("graph_layers")
             .or_else(|| graph_data.get("layers"))
             .and_then(|v| v.as_array());
 
@@ -418,9 +420,18 @@ impl DagExecutor {
                 let layer = crate::graph::Layer {
                     id: layer_val["id"].as_str().unwrap_or("").to_string(),
                     label: layer_val["label"].as_str().unwrap_or("").to_string(),
-                    background_color: layer_val["background_color"].as_str().unwrap_or("#FFFFFF").to_string(),
-                    text_color: layer_val["text_color"].as_str().unwrap_or("#000000").to_string(),
-                    border_color: layer_val["border_color"].as_str().unwrap_or("#CCCCCC").to_string(),
+                    background_color: layer_val["background_color"]
+                        .as_str()
+                        .unwrap_or("#FFFFFF")
+                        .to_string(),
+                    text_color: layer_val["text_color"]
+                        .as_str()
+                        .unwrap_or("#000000")
+                        .to_string(),
+                    border_color: layer_val["border_color"]
+                        .as_str()
+                        .unwrap_or("#CCCCCC")
+                        .to_string(),
                     dataset: None,
                 };
                 graph.layers.push(layer);

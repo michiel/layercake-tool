@@ -16,14 +16,16 @@ digraph G {
     fontcolor="#f5f5f5";
     node [ shape="plaintext" style="filled, rounded" fontsize=12 fontname="Lato" fillcolor="#2b2b2b" fontcolor="#f5f5f5" color="#666666" ]
     edge [ fontname="Lato" color="#dfe3ec" fontsize=8]
-    {{else if (stringeq config.built_in_styles "none")}}
-    node [ shape="box" fontsize=11 ]
-    edge [ fontsize=8 ]
     {{else}}
-    bgcolor="#ffffff";
-    fontcolor="#1f2933";
-    node [ shape="box" style="rounded,filled" fontsize=12 fontname="Lato" fillcolor="#f7f7f8" fontcolor="#0f172a" color="#1f2933" penwidth=1.2 ]
-    edge [ fontname="Lato" color="#2B303A" fontsize=8]
+        {{#if (stringeq config.built_in_styles "none")}}
+        node [ shape="box" fontsize=11 ]
+        edge [ fontsize=8 ]
+        {{else}}
+        bgcolor="#ffffff";
+        fontcolor="#1f2933";
+        node [ shape="box" style="rounded,filled" fontsize=12 fontname="Lato" fillcolor="#f7f7f8" fontcolor="#0f172a" color="#1f2933" penwidth=1.2 ]
+        edge [ fontname="Lato" color="#2B303A" fontsize=8]
+        {{/if}}
     {{/if}}
     {{#if (eq config.orientation "LR")}}
     node [ width=1.5, fixedsize=false ]

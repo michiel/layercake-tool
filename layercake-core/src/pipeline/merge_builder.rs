@@ -428,7 +428,8 @@ impl MergeBuilder {
                             .ok_or_else(|| anyhow!("Edge missing 'target' field"))?
                             .to_string();
 
-                        let id = allocate_edge_id_with_scope(&raw_id, edge_scope_hint, used_edge_ids);
+                        let id =
+                            allocate_edge_id_with_scope(&raw_id, edge_scope_hint, used_edge_ids);
 
                         let edge = EdgeData {
                             id,
@@ -621,9 +622,7 @@ impl MergeBuilder {
 
         for edge in edges {
             let dataset_scope = edge.dataset_id.map(|id| format!("ds{}", id));
-            let scoped_hint = dataset_scope
-                .as_deref()
-                .or(edge_scope_hint);
+            let scoped_hint = dataset_scope.as_deref().or(edge_scope_hint);
             let id = allocate_edge_id_with_scope(&edge.id, scoped_hint, used_edge_ids);
 
             all_edges.push(EdgeData {

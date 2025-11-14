@@ -7,10 +7,12 @@ flowchart {{config.orientation}}
 
 {{#if (stringeq config.built_in_styles "dark")}}
 classDef default fill:#2b2b2b,color:#f5f5f5,stroke:#777777;
-{{else if (stringeq config.built_in_styles "none")}}
-%% no built-in theme applied
 {{else}}
+  {{#if (stringeq config.built_in_styles "none")}}
+%% no built-in theme applied
+  {{else}}
 classDef default fill:#f7f7f8,color:#0f172a,stroke:#1f2933;
+  {{/if}}
 {{/if}}
 
 {{#if config.contain_nodes}}

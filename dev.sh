@@ -35,7 +35,7 @@ FRONTEND_PORT=1422
 BACKEND_DIR="."
 FRONTEND_DIR="frontend"
 TAURI_DIR="src-tauri"
-LOG_LEVEL="${LOG_LEVEL:-debug}"
+LOG_LEVEL="${LOG_LEVEL:-info}"
 
 # Function to print colored output
 print_status() {

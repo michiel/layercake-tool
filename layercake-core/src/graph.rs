@@ -276,9 +276,7 @@ impl Graph {
         let mut tree_node = TreeNode::from_node(node);
         tree_node.depth = depth;
 
-        if tree_node.comment.is_none()
-            || tree_node.comment.as_ref().is_none_or(|s| s.is_empty())
-        {
+        if tree_node.comment.is_none() || tree_node.comment.as_ref().is_none_or(|s| s.is_empty()) {
             tree_node.comment = Some("null".to_string());
         }
 
