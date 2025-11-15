@@ -141,8 +141,13 @@ pub fn get_handlebars() -> Handlebars<'static> {
     });
     handlebars.register_helper("puml_render_tree", Box::new(puml_render_tree));
 
-    handlebars_helper!(mermaid_render_tree: |node: Value| {
-        fn render_tree(node: Value, acc: i32) -> String {
+    handlebars_helper!(mermaid_render_tree: |node: Value, layermap: Value, style_config: Value| {
+        fn render_tree(
+            node: Value,
+            _layermap: &serde_json::Map<String, Value>,
+            acc: i32,
+            _apply_layers: bool,
+        ) -> String {
             if let Value::Object(map) = node {
                 let id = map.get("id").and_then(|v| v.as_str()).unwrap_or("no-id");
                 let label = map.get("label").and_then(|v| v.as_str()).unwrap_or("Unnamed");
@@ -155,7 +160,7 @@ pub fn get_handlebars() -> Handlebars<'static> {
                 if !children.is_empty() {
                     result += &format!("{}subgraph \"{}\"\n", indent, label);
                     let children_rendered: Vec<String> = children.iter().map(|child| {
-                        render_tree(child.clone(), acc + 1)
+                        render_tree(child.clone(), _layermap, acc + 1, _apply_layers)
                     }).collect();
                     result += &children_rendered.join("");
                     result += &format!("{}end\n", indent);
@@ -170,7 +175,25 @@ pub fn get_handlebars() -> Handlebars<'static> {
             }
         }
 
-        render_tree(node, 0)
+        let layermap = match layermap {
+            serde_json::Value::Object(map) => map,
+            _ => {
+                error!("Expected layer map object, got: {:?}", layermap);
+                serde_json::Map::new()
+            }
+        };
+
+        let style_map = match style_config {
+            serde_json::Value::Object(map) => map,
+            _ => serde_json::Map::new(),
+        };
+
+        let apply_layers = style_map
+            .get("apply_layers")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true);
+
+        render_tree(node, &layermap, 0, apply_layers)
     });
     handlebars.register_helper("mermaid_render_tree", Box::new(mermaid_render_tree));
 
