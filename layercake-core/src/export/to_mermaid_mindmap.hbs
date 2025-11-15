@@ -1,8 +1,6 @@
 ---
-{{#if graph_name}}
- title: {{graph_name}}
-{{/if}}
-{{#with config.target_options.mermaid as |mm|}}
+{{#if graph_name}}title: {{graph_name}}
+{{/if}}{{#with config.target_options.mermaid as |mm|}}
 config:
   look: {{mm.look}}
   displayMode: {{mm.display}}
