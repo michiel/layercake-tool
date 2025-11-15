@@ -3235,8 +3235,8 @@ dependencies = [
  "once_cell",
  "regex",
  "reqwest",
- "rig-core",
- "rmcp",
+ "rig-core 0.24.0",
+ "rmcp 0.8.5",
  "rust_xlsxwriter",
  "sea-orm",
  "sea-orm-migration",
@@ -3275,7 +3275,7 @@ dependencies = [
  "indexmap 2.11.4",
  "pdf-extract",
  "quick-xml 0.31.0",
- "rig-core",
+ "rig-core 0.23.1",
  "sea-orm",
  "sea-orm-migration",
  "serde",
@@ -5271,7 +5271,37 @@ dependencies = [
  "ordered-float 5.1.0",
  "pin-project-lite",
  "reqwest",
- "rmcp",
+ "rmcp 0.6.4",
+ "schemars 1.0.4",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+ "tokio",
+ "tracing",
+ "tracing-futures",
+ "url",
+]
+
+[[package]]
+name = "rig-core"
+version = "0.24.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "112bd2e51d1fadd16509be2b3d45bfa197725787627f6addcaffe57294f64e18"
+dependencies = [
+ "as-any",
+ "async-stream",
+ "base64 0.22.1",
+ "bytes",
+ "eventsource-stream",
+ "futures",
+ "futures-timer",
+ "glob",
+ "http",
+ "mime_guess",
+ "ordered-float 5.1.0",
+ "pin-project-lite",
+ "reqwest",
+ "rmcp 0.8.5",
  "schemars 1.0.4",
  "serde",
  "serde_json",
@@ -5334,11 +5364,33 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "futures",
+ "paste",
+ "pin-project-lite",
+ "rmcp-macros 0.6.4",
+ "schemars 1.0.4",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+ "tokio",
+ "tokio-stream",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
+name = "rmcp"
+version = "0.8.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e5947688160b56fb6c827e3c20a72c90392a1d7e9dec74749197aa1780ac42ca"
+dependencies = [
+ "base64 0.22.1",
+ "chrono",
+ "futures",
  "http",
  "paste",
  "pin-project-lite",
  "reqwest",
- "rmcp-macros",
+ "rmcp-macros 0.8.5",
  "schemars 1.0.4",
  "serde",
  "serde_json",
@@ -5355,6 +5407,19 @@ name = "rmcp-macros"
 version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1827cd98dab34cade0513243c6fe0351f0f0b2c9d6825460bcf45b42804bdda0"
+dependencies = [
+ "darling 0.21.3",
+ "proc-macro2",
+ "quote",
+ "serde_json",
+ "syn 2.0.106",
+]
+
+[[package]]
+name = "rmcp-macros"
+version = "0.8.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "01263441d3f8635c628e33856c468b96ebbce1af2d3699ea712ca71432d4ee7a"
 dependencies = [
  "darling 0.21.3",
  "proc-macro2",
