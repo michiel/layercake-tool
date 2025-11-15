@@ -214,6 +214,7 @@ pub enum GraphvizLayout {
 pub struct MermaidRenderOptions {
     pub look: Option<MermaidLook>,
     pub display: Option<MermaidDisplay>,
+    pub theme: Option<MermaidTheme>,
 }
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
@@ -234,6 +235,22 @@ pub enum MermaidDisplay {
     #[graphql(name = "COMPACT")]
     #[serde(rename = "compact")]
     Compact,
+}
+
+#[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
+pub enum MermaidTheme {
+    #[graphql(name = "DEFAULT")]
+    #[serde(rename = "default")]
+    Default,
+    #[graphql(name = "DARK")]
+    #[serde(rename = "dark")]
+    Dark,
+    #[graphql(name = "NEUTRAL")]
+    #[serde(rename = "neutral")]
+    Neutral,
+    #[graphql(name = "BASE")]
+    #[serde(rename = "base")]
+    Base,
 }
 
 #[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]

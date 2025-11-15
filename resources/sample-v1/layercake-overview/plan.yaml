@@ -17,3 +17,27 @@ export:
       exporter: "Mermaid"
     - filename: "out/layercake-project.dot"
       exporter: "DOT"
+    - filename: "out/layercake-mindmap-default.mmd"
+      exporter: "MermaidMindmap"
+      render_config:
+        target_options:
+          mermaid:
+            theme: "default"
+            look: "default"
+            display: "full"
+    - filename: "out/layercake-mindmap-dark.mmd"
+      exporter: "MermaidMindmap"
+      render_config:
+        target_options:
+          mermaid:
+            theme: "dark"
+            look: "default"
+            display: "full"
+    - filename: "out/layercake-mindmap-neutral.mmd"
+      exporter: "MermaidMindmap"
+      render_config:
+        target_options:
+          mermaid:
+            theme: "neutral"
+            look: "default"
+            display: "full"

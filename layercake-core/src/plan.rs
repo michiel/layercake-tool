@@ -237,6 +237,7 @@ pub enum GraphvizLayout {
 pub struct MermaidRenderOptions {
     pub look: MermaidLook,
     pub display: MermaidDisplay,
+    pub theme: MermaidTheme,
 }
 
 impl Default for MermaidRenderOptions {
@@ -244,6 +245,7 @@ impl Default for MermaidRenderOptions {
         Self {
             look: MermaidLook::Default,
             display: MermaidDisplay::Full,
+            theme: MermaidTheme::Default,
         }
     }
 }
@@ -254,6 +256,18 @@ pub enum MermaidLook {
     Default,
     #[serde(rename = "handDrawn")]
     HandDrawn,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Copy, PartialEq, Eq)]
+pub enum MermaidTheme {
+    #[serde(rename = "default")]
+    Default,
+    #[serde(rename = "dark")]
+    Dark,
+    #[serde(rename = "neutral")]
+    Neutral,
+    #[serde(rename = "base")]
+    Base,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Copy, PartialEq, Eq)]

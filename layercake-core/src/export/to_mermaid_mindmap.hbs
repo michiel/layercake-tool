@@ -2,6 +2,7 @@
 {{#if graph_name}}title: {{graph_name}}
 {{/if}}{{#with config.target_options.mermaid as |mm|}}
 config:
+  theme: {{mm.theme}}
   look: {{mm.look}}
   displayMode: {{mm.display}}
 {{/with}}
