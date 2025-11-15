@@ -1286,8 +1286,8 @@ impl Layer {
             id: get_stripped_value(record, 0, "layer")?,
             label: get_stripped_value(record, 1, "label")?,
             background_color: get_stripped_value(record, 2, "background")?,
-            text_color: get_stripped_value(record, 3, "text_color")?,
-            border_color: get_stripped_value(record, 4, "border_color")?,
+            border_color: get_stripped_value(record, 3, "border_color")?,
+            text_color: get_stripped_value(record, 4, "text_color")?,
             dataset: None,
         })
     }
