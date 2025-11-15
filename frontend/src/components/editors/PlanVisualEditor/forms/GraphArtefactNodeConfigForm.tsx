@@ -1,6 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { IconInfoCircle } from '@tabler/icons-react';
-import { GraphArtefactNodeConfig, GraphArtefactRenderTarget } from '../../../../types/plan-dag';
+import {
+  GraphArtefactNodeConfig,
+  GraphArtefactRenderTarget,
+  DEFAULT_GRAPHVIZ_OPTIONS,
+  DEFAULT_MERMAID_OPTIONS,
+} from '../../../../types/plan-dag';
 import { Stack } from '@/components/layout-primitives';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
@@ -36,6 +41,16 @@ export const GraphArtefactNodeConfigForm: React.FC<GraphArtefactNodeConfigFormPr
         : legacyTheme === 'Dark'
         ? 'dark'
         : 'light'),
+    targetOptions: {
+      graphviz: {
+        ...DEFAULT_GRAPHVIZ_OPTIONS,
+        ...(config.renderConfig?.targetOptions?.graphviz ?? {}),
+      },
+      mermaid: {
+        ...DEFAULT_MERMAID_OPTIONS,
+        ...(config.renderConfig?.targetOptions?.mermaid ?? {}),
+      },
+    },
   };
 
   const [localConfig, setLocalConfig] = useState<GraphArtefactNodeConfig>({
@@ -54,6 +69,47 @@ export const GraphArtefactNodeConfigForm: React.FC<GraphArtefactNodeConfigFormPr
     // Always valid as long as renderTarget is set
     setIsValid(!!localConfig.renderTarget);
   }, [localConfig, setIsValid]);
+
+  const graphvizOptions = {
+    ...DEFAULT_GRAPHVIZ_OPTIONS,
+    ...(localConfig.renderConfig?.targetOptions?.graphviz ?? {}),
+  };
+  const mermaidOptions = {
+    ...DEFAULT_MERMAID_OPTIONS,
+    ...(localConfig.renderConfig?.targetOptions?.mermaid ?? {}),
+  };
+
+  const updateGraphvizOptions = (updates: Partial<typeof graphvizOptions>) => {
+    setLocalConfig(prev => ({
+      ...prev,
+      renderConfig: {
+        ...(prev.renderConfig ?? {}),
+        targetOptions: {
+          ...(prev.renderConfig?.targetOptions ?? {}),
+          graphviz: {
+            ...(prev.renderConfig?.targetOptions?.graphviz ?? DEFAULT_GRAPHVIZ_OPTIONS),
+            ...updates,
+          },
+        },
+      },
+    }));
+  };
+
+  const updateMermaidOptions = (updates: Partial<typeof mermaidOptions>) => {
+    setLocalConfig(prev => ({
+      ...prev,
+      renderConfig: {
+        ...(prev.renderConfig ?? {}),
+        targetOptions: {
+          ...(prev.renderConfig?.targetOptions ?? {}),
+          mermaid: {
+            ...(prev.renderConfig?.targetOptions?.mermaid ?? DEFAULT_MERMAID_OPTIONS),
+            ...updates,
+          },
+        },
+      },
+    }));
+  };
 
   return (
     <Stack gap="md">
@@ -175,6 +231,125 @@ export const GraphArtefactNodeConfigForm: React.FC<GraphArtefactNodeConfigFormPr
           </SelectContent>
         </Select>
       </div>
+
+      {localConfig.renderTarget === 'DOT' && (
+        <div className="space-y-4 border-t pt-4">
+          <div>
+            <Label>Graphviz Options</Label>
+            <p className="text-sm text-muted-foreground">
+              Configure layout and spacing for DOT exports. These settings map directly to Graphviz attributes.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="graphviz-layout">Layout</Label>
+            <Select
+              value={graphvizOptions.layout}
+              onValueChange={(value) => updateGraphvizOptions({ layout: value as typeof graphvizOptions.layout })}
+            >
+              <SelectTrigger id="graphviz-layout">
+                <SelectValue placeholder="Select layout" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="dot">Dot</SelectItem>
+                <SelectItem value="neato">Neato</SelectItem>
+                <SelectItem value="fdp">Fdp</SelectItem>
+                <SelectItem value="circo">Circo</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="graphviz-splines"
+              checked={graphvizOptions.splines}
+              onCheckedChange={(checked) => updateGraphvizOptions({ splines: checked })}
+            />
+            <Label htmlFor="graphviz-splines">Use Splines</Label>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="graphviz-overlap"
+              checked={graphvizOptions.overlap}
+              onCheckedChange={(checked) => updateGraphvizOptions({ overlap: checked })}
+            />
+            <Label htmlFor="graphviz-overlap">Allow Overlap</Label>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="graphviz-nodesep">Node Separation</Label>
+              <Input
+                id="graphviz-nodesep"
+                type="number"
+                step="0.1"
+                value={graphvizOptions.nodesep ?? DEFAULT_GRAPHVIZ_OPTIONS.nodesep}
+                onChange={(event) =>
+                  updateGraphvizOptions({
+                    nodesep: parseFloat(event.currentTarget.value) || DEFAULT_GRAPHVIZ_OPTIONS.nodesep,
+                  })
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="graphviz-ranksep">Rank Separation</Label>
+              <Input
+                id="graphviz-ranksep"
+                type="number"
+                step="0.1"
+                value={graphvizOptions.ranksep ?? DEFAULT_GRAPHVIZ_OPTIONS.ranksep}
+                onChange={(event) =>
+                  updateGraphvizOptions({
+                    ranksep: parseFloat(event.currentTarget.value) || DEFAULT_GRAPHVIZ_OPTIONS.ranksep,
+                  })
+                }
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {localConfig.renderTarget === 'Mermaid' && (
+        <div className="space-y-4 border-t pt-4">
+          <div>
+            <Label>Mermaid Options</Label>
+            <p className="text-sm text-muted-foreground">
+              Control Mermaid&apos;s look (default vs. hand drawn) and layout density.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="mermaid-look">Look</Label>
+            <Select
+              value={mermaidOptions.look}
+              onValueChange={(value) => updateMermaidOptions({ look: value as typeof mermaidOptions.look })}
+            >
+              <SelectTrigger id="mermaid-look">
+                <SelectValue placeholder="Select look" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="default">Default</SelectItem>
+                <SelectItem value="handDrawn">Hand Drawn</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="mermaid-display">Display</Label>
+            <Select
+              value={mermaidOptions.display}
+              onValueChange={(value) => updateMermaidOptions({ display: value as typeof mermaidOptions.display })}
+            >
+              <SelectTrigger id="mermaid-display">
+                <SelectValue placeholder="Select display mode" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="full">Full</SelectItem>
+                <SelectItem value="compact">Compact</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      )}
     </Stack>
   );
 };

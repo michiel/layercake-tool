@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { IconInfoCircle } from '@tabler/icons-react';
-import { TreeArtefactNodeConfig, TreeArtefactRenderTarget } from '../../../../types/plan-dag';
+import {
+  TreeArtefactNodeConfig,
+  TreeArtefactRenderTarget,
+  DEFAULT_MERMAID_OPTIONS,
+} from '../../../../types/plan-dag';
 import { Stack } from '@/components/layout-primitives';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
@@ -36,6 +40,13 @@ export const TreeArtefactNodeConfigForm: React.FC<TreeArtefactNodeConfigFormProp
         : legacyTheme === 'Dark'
         ? 'dark'
         : 'light'),
+    targetOptions: {
+      graphviz: config.renderConfig?.targetOptions?.graphviz,
+      mermaid: {
+        ...DEFAULT_MERMAID_OPTIONS,
+        ...(config.renderConfig?.targetOptions?.mermaid ?? {}),
+      },
+    },
   };
 
   const [localConfig, setLocalConfig] = useState<TreeArtefactNodeConfig>({
@@ -52,6 +63,31 @@ export const TreeArtefactNodeConfigForm: React.FC<TreeArtefactNodeConfigFormProp
   useEffect(() => {
     setIsValid(!!localConfig.renderTarget);
   }, [localConfig, setIsValid]);
+
+  const mermaidOptions = {
+    ...DEFAULT_MERMAID_OPTIONS,
+    ...(localConfig.renderConfig?.targetOptions?.mermaid ?? {}),
+  };
+
+  const updateMermaidOptions = (updates: Partial<typeof mermaidOptions>) => {
+    setLocalConfig(prev => ({
+      ...prev,
+      renderConfig: {
+        ...(prev.renderConfig ?? {}),
+        targetOptions: {
+          ...(prev.renderConfig?.targetOptions ?? {}),
+          mermaid: {
+            ...(prev.renderConfig?.targetOptions?.mermaid ?? DEFAULT_MERMAID_OPTIONS),
+            ...updates,
+          },
+        },
+      },
+    }));
+  };
+
+  const isMermaidTarget =
+    localConfig.renderTarget === 'MermaidMindmap' ||
+    localConfig.renderTarget === 'MermaidTreemap';
 
   return (
     <Stack gap="md">
@@ -150,6 +186,47 @@ export const TreeArtefactNodeConfigForm: React.FC<TreeArtefactNodeConfigFormProp
           </p>
         </div>
       </div>
+
+      {isMermaidTarget && (
+        <div className="space-y-4 border-t pt-4">
+          <div>
+            <Label>Mermaid Options</Label>
+            <p className="text-sm text-muted-foreground">
+              Adjust Mermaid&apos;s rendering style for mindmap/treemap exports.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="tree-mermaid-look">Look</Label>
+            <Select
+              value={mermaidOptions.look}
+              onValueChange={(value) => updateMermaidOptions({ look: value as typeof mermaidOptions.look })}
+            >
+              <SelectTrigger id="tree-mermaid-look">
+                <SelectValue placeholder="Select look" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="default">Default</SelectItem>
+                <SelectItem value="handDrawn">Hand Drawn</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="tree-mermaid-display">Display</Label>
+            <Select
+              value={mermaidOptions.display}
+              onValueChange={(value) => updateMermaidOptions({ display: value as typeof mermaidOptions.display })}
+            >
+              <SelectTrigger id="tree-mermaid-display">
+                <SelectValue placeholder="Select display" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="full">Full</SelectItem>
+                <SelectItem value="compact">Compact</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      )}
     </Stack>
   );
 };

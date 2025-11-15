@@ -132,6 +132,7 @@ export interface GraphArtefactNodeConfig {
     orientation?: 'LR' | 'TB';
     applyLayers?: boolean;
     builtInStyles?: 'none' | 'light' | 'dark';
+    targetOptions?: RenderTargetOptions;
   };
     graphConfig?: {
     generateHierarchy?: boolean;
@@ -156,6 +157,7 @@ export interface TreeArtefactNodeConfig {
     orientation?: 'LR' | 'TB';
     applyLayers?: boolean;
     builtInStyles?: 'none' | 'light' | 'dark';
+    targetOptions?: RenderTargetOptions;
   };
   graphConfig?: {
     generateHierarchy?: boolean;
@@ -178,6 +180,37 @@ export type NodeConfig =
   | MergeNodeConfig
   | GraphArtefactNodeConfig
   | TreeArtefactNodeConfig;
+
+export interface RenderTargetOptions {
+  graphviz?: GraphvizRenderOptions;
+  mermaid?: MermaidRenderOptions;
+}
+
+export interface GraphvizRenderOptions {
+  layout?: 'dot' | 'neato' | 'fdp' | 'circo';
+  overlap?: boolean;
+  splines?: boolean;
+  nodesep?: number;
+  ranksep?: number;
+}
+
+export interface MermaidRenderOptions {
+  look?: 'default' | 'handDrawn';
+  display?: 'full' | 'compact';
+}
+
+export const DEFAULT_GRAPHVIZ_OPTIONS: GraphvizRenderOptions = {
+  layout: 'dot',
+  overlap: false,
+  splines: true,
+  nodesep: 0.5,
+  ranksep: 0.5,
+};
+
+export const DEFAULT_MERMAID_OPTIONS: MermaidRenderOptions = {
+  look: 'default',
+  display: 'full',
+};
 
 // Execution metadata for DataSet nodes
 export interface DataSetExecutionMetadata {

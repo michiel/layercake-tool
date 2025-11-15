@@ -1,4 +1,10 @@
-import { PlanDagNodeType, NodeConfig, NodeMetadata } from '../../../../types/plan-dag';
+import {
+  PlanDagNodeType,
+  NodeConfig,
+  NodeMetadata,
+  DEFAULT_GRAPHVIZ_OPTIONS,
+  DEFAULT_MERMAID_OPTIONS,
+} from '../../../../types/plan-dag';
 
 export const generateNodeId = (type: PlanDagNodeType, existingNodeIds: string[] = []): string => {
   const typePrefix = type.toLowerCase().replace('_', '');
@@ -70,7 +76,11 @@ export const getDefaultNodeConfig = (type: PlanDagNodeType): NodeConfig => {
           containNodes: true,
           orientation: 'TB',
           applyLayers: true,
-          builtInStyles: 'light'
+          builtInStyles: 'light',
+          targetOptions: {
+            graphviz: { ...DEFAULT_GRAPHVIZ_OPTIONS },
+            mermaid: { ...DEFAULT_MERMAID_OPTIONS },
+          },
         },
         graphConfig: {}
       };
@@ -82,7 +92,11 @@ export const getDefaultNodeConfig = (type: PlanDagNodeType): NodeConfig => {
           containNodes: true,
           orientation: 'TB',
           applyLayers: true,
-          builtInStyles: 'light'
+          builtInStyles: 'light',
+          targetOptions: {
+            graphviz: { ...DEFAULT_GRAPHVIZ_OPTIONS },
+            mermaid: { ...DEFAULT_MERMAID_OPTIONS },
+          },
         },
         graphConfig: {}
       };
