@@ -21,28 +21,44 @@
 
 **Impact:** Fixed layer data structure for templates, but colors still incorrect due to Bug #2.
 
-### Bug #2: Layer CSV Column Mapping
+### Bug #2: Hardcoded Layer Colors in build_graph_from_dag_graph (ACTUAL ROOT CAUSE)
 
-**Issue:** After fixing Bug #1, layer colors were still wrong. Background colors appeared as white (#FFFFFF) and border colors appeared as text colors.
+**Issue:** After fixing Bug #1 (IndexMap serialization), layer colors were STILL wrong in all exports. All backgrounds appeared white (#FFFFFF) and all borders appeared black (#000000), despite the database containing correct colors.
 
-**Root Cause:** `Layer::from_row()` was reading `text_color` and `border_color` from swapped CSV columns.
+**Root Cause:** `GraphService::build_graph_from_dag_graph()` was creating dummy `Layer` objects with **hardcoded default colors** instead of reading actual layer data from the `graph_layers` database table.
 
-**Incorrect Mapping:**
-- Column 3 → `border_color` (but CSV has TEXT COLOR in column 3)
-- Column 4 → `text_color` (but CSV has BORDER COLOR in column 4)
-
-**Correct CSV Format:**
+**Broken Code (lines 64-74):**
+```rust
+// Create default graph_layers
+let graph_layers: Vec<Layer> = unique_layers
+    .into_iter()
+    .map(|layer_id| Layer {
+        id: layer_id.clone(),
+        label: layer_id,
+        background_color: "FFFFFF".to_string(),  // ← HARDCODED WHITE!
+        text_color: "000000".to_string(),         // ← HARDCODED BLACK!
+        border_color: "000000".to_string(),       // ← HARDCODED BLACK!
+        dataset: None,
+    })
+    .collect();
 ```
-ID, LABEL, BACKGROUND COLOR, TEXT COLOR, BORDER COLOR
-0,  1,     2,                3,          4
-```
 
-**Fix Commit:** `e9153b06` - Correct Layer CSV column mapping for text_color and border_color
+**Why This Was Hard to Detect:**
+- Database query showed correct colors ✓
+- Graph Preview showed correct colors ✓ (uses different code path)
+- Templates were structured correctly ✓
+- IndexMap→Vec fix was correct ✓
+- **But exports always used hardcoded dummy layers!**
+
+**Fix Commit:** `0333cca8` - Load actual layer data from database instead of hardcoded defaults
 
 **Solution:**
-- Swap column indices: `text_color` from column 3, `border_color` from column 4
+- Query `graph_layers` table for layers matching `graph_id`
+- Map database models to Graph `Layer` structs with actual colors
+- Use database values for `background_color`, `text_color`, `border_color`
+- Only fall back to defaults if database values are NULL
 
-**Impact:** Layer colors (background, text, border) now display correctly in all handlebars exports.
+**Impact:** Layer colors now correctly display in ALL handlebars exports (DOT, Mermaid, PlantUML, etc.).
 
 ---
 
