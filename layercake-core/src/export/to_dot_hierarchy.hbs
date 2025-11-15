@@ -18,6 +18,7 @@ digraph G {
     {{/if}}
     edge [ fontname="Lato" color="#2B303A" fontsize=8]
 
+{{#if config.apply_layers}}
   {{#each layers as |layer|}}
   node [style="filled, dashed" fillcolor="#{{layer.background_color}}" fontcolor="#{{layer.text_color}}" penwidth=1 color="#{{layer.border_color}}"]; {
     {{#each ../hierarchy_nodes as |node|}}
@@ -27,12 +28,15 @@ digraph G {
     {{/each}}
     }
   {{/each}}
-
-node [style="filled, rounded" fillcolor="#dddddd" fontcolor="#000000"];
+{{else}}
+  {{#each hierarchy_nodes as |node|}}
+    {{node.id}}[label="{{node.label}}"];
+  {{/each}}
+{{/if}}
 
   {{#each hierarchy_edges as |edge|}}
     {{#if (exists edge.label)}}
-      {{edge.source}} -> {{edge.target}} [label="{{edge.label}}" {{#each layer in ../layers}} {{#if (eq edge.layer layer.id)}} fontcolor="#{{layer.background_color}}" {{/if}} {{/each}}];
+      {{edge.source}} -> {{edge.target}} [label="{{edge.label}}"{{#if ../config.apply_layers}}{{#each ../layers as |layer|}}{{#if (eq edge.layer layer.id)}} fontcolor="#{{layer.background_color}}"{{/if}}{{/each}}{{/if}}];
     {{else}}
       {{edge.source}} -> {{edge.target}};
     {{/if}}
