@@ -1,11 +1,31 @@
 # Layer Styling Implementation Review
 
 **Date:** 2025-11-15
-**Status:** Investigation Complete
+**Status:** ✅ Complete - Critical Bug Fixed
+
+## Critical Bug Fix (Added Post-Implementation)
+
+**Issue:** Layer colors were not being applied to ANY handlebars export targets, despite working correctly in graph previews.
+
+**Root Cause:** `IndexMap<String, Layer>` serializes to JSON object `{"layer1": {...}, "layer2": {...}}`, but handlebars `{{#each layers}}` expects an array `[{...}, {...}]`. Templates were iterating over an empty object instead of the layer array.
+
+**Fix Commit:** `e79df794` - Convert layers from IndexMap to Vec for handlebars iteration
+
+**Solution:**
+- Convert `layer_map.values()` to `layers_array` (Vec) in `create_standard_context()`
+- Provide both `layers` (Vec for iteration) and `layer_map` (IndexMap for ID lookups)
+- Update all templates to use `layer_map` parameter for tree rendering helpers
+- Update PlantUML mindmap/WBS to use `layer_map` with `layer_bg_color` helper
+
+**Impact:** Layer colors now correctly apply to all handlebars export targets (DOT, Mermaid, PlantUML, etc.).
+
+---
 
 ## Executive Summary
 
 This review investigates why layer styling is not consistently applied across handlebars templates when the `apply_layers` render option is set. The investigation reveals significant gaps in layer styling implementation across multiple export formats, particularly in hierarchy rendering modes and specialised visualisation types (mindmaps, treemaps, WBS).
+
+**Note:** During implementation, a critical bug was discovered (see above) that prevented ALL layer styling from working. This has been fixed.
 
 ## Background
 
