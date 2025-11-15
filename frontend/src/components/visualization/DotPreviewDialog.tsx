@@ -3,7 +3,7 @@ import { graphviz } from 'd3-graphviz'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { IconAlertCircle, IconZoomIn, IconZoomOut, IconZoomScan, IconDownload, IconMaximize, IconMinimize } from '@tabler/icons-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { ScrollArea } from '@/components/ui/scroll-area'
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -19,6 +19,7 @@ export const DotPreviewDialog = ({ open, onClose, diagram, title }: DotPreviewDi
   const [zoom, setZoom] = useState(1)
   const [isRendering, setIsRendering] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [svgDimensions, setSvgDimensions] = useState<{ width: number; height: number } | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const graphvizRef = useRef<any>(null)
   const renderId = useId().replace(/[^a-zA-Z0-9_-]/g, '')
@@ -28,6 +29,7 @@ export const DotPreviewDialog = ({ open, onClose, diagram, title }: DotPreviewDi
       setError(null)
       setZoom(1)
       setIsFullscreen(false)
+      setSvgDimensions(null)
       return
     }
 
@@ -60,6 +62,16 @@ export const DotPreviewDialog = ({ open, onClose, diagram, title }: DotPreviewDi
             if (!cancelled) {
               setError(null)
               setIsRendering(false)
+
+              // Capture SVG dimensions for proper scrolling
+              const svgElement = element.querySelector('svg')
+              if (svgElement) {
+                const bbox = svgElement.getBBox()
+                setSvgDimensions({
+                  width: bbox.width || svgElement.clientWidth,
+                  height: bbox.height || svgElement.clientHeight
+                })
+              }
             }
           })
           .renderDot(diagram)
@@ -225,28 +237,45 @@ export const DotPreviewDialog = ({ open, onClose, diagram, title }: DotPreviewDi
           </div>
         </div>
 
-        <ScrollArea className="flex-1 w-full border rounded-lg bg-muted/40 p-4">
+        <ScrollArea className="flex-1 w-full border rounded-lg bg-muted/40">
           {error ? (
-            <Alert variant="destructive">
-              <IconAlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
+            <div className="p-4">
+              <Alert variant="destructive">
+                <IconAlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            </div>
           ) : (
-            <div
-              id={`graphviz-${renderId}`}
-              ref={containerRef}
-              className="graphviz-preview w-full flex items-center justify-center"
-              style={{
-                transform: `scale(${zoom})`,
-                transformOrigin: 'center center',
-                transition: 'transform 0.2s ease-out',
-                minHeight: '400px',
-              }}
-            />
+            <div className="p-4">
+              <div
+                style={{
+                  display: 'inline-block',
+                  width: svgDimensions ? `${svgDimensions.width * zoom}px` : '100%',
+                  height: svgDimensions ? `${svgDimensions.height * zoom}px` : '400px',
+                  minWidth: '100%',
+                  minHeight: '400px',
+                }}
+              >
+                <div
+                  id={`graphviz-${renderId}`}
+                  ref={containerRef}
+                  className="graphviz-preview"
+                  style={{
+                    transform: `scale(${zoom})`,
+                    transformOrigin: 'top left',
+                    transition: 'transform 0.2s ease-out',
+                  }}
+                />
+              </div>
+            </div>
           )}
           {isRendering && !error && (
-            <p className="text-sm text-muted-foreground">Rendering diagram…</p>
+            <div className="p-4">
+              <p className="text-sm text-muted-foreground">Rendering diagram…</p>
+            </div>
           )}
+          <ScrollBar orientation="horizontal" />
+          <ScrollBar orientation="vertical" />
         </ScrollArea>
       </DialogContent>
     </Dialog>
