@@ -157,6 +157,7 @@ pub struct RenderConfig {
     pub orientation: Option<Orientation>,
     pub apply_layers: Option<bool>,
     pub built_in_styles: Option<RenderBuiltinStyle>,
+    pub target_options: Option<RenderTargetOptions>,
 }
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
@@ -173,6 +174,66 @@ pub enum RenderBuiltinStyle {
     Light,
     #[graphql(name = "DARK")]
     Dark,
+}
+
+#[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
+#[graphql(input_name = "RenderTargetOptionsInput")]
+pub struct RenderTargetOptions {
+    pub graphviz: Option<GraphvizRenderOptions>,
+    pub mermaid: Option<MermaidRenderOptions>,
+}
+
+#[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
+#[graphql(input_name = "GraphvizRenderOptionsInput")]
+pub struct GraphvizRenderOptions {
+    pub layout: Option<GraphvizLayout>,
+    pub overlap: Option<bool>,
+    pub splines: Option<bool>,
+    pub nodesep: Option<f32>,
+    pub ranksep: Option<f32>,
+}
+
+#[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
+pub enum GraphvizLayout {
+    #[graphql(name = "DOT")]
+    #[serde(rename = "dot")]
+    Dot,
+    #[graphql(name = "NEATO")]
+    #[serde(rename = "neato")]
+    Neato,
+    #[graphql(name = "FDP")]
+    #[serde(rename = "fdp")]
+    Fdp,
+    #[graphql(name = "CIRCO")]
+    #[serde(rename = "circo")]
+    Circo,
+}
+
+#[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
+#[graphql(input_name = "MermaidRenderOptionsInput")]
+pub struct MermaidRenderOptions {
+    pub look: Option<MermaidLook>,
+    pub display: Option<MermaidDisplay>,
+}
+
+#[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
+pub enum MermaidLook {
+    #[graphql(name = "DEFAULT")]
+    #[serde(rename = "default")]
+    Default,
+    #[graphql(name = "HAND_DRAWN")]
+    #[serde(rename = "handDrawn")]
+    HandDrawn,
+}
+
+#[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
+pub enum MermaidDisplay {
+    #[graphql(name = "FULL")]
+    #[serde(rename = "full")]
+    Full,
+    #[graphql(name = "COMPACT")]
+    #[serde(rename = "compact")]
+    Compact,
 }
 
 #[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]

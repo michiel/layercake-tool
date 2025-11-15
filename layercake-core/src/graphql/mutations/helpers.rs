@@ -7,8 +7,9 @@ use uuid::Uuid;
 use crate::database::entities::{project_collaborators, user_sessions, users};
 use crate::graphql::errors::StructuredError;
 use crate::plan::{
-    ExportFileType, RenderConfig, RenderConfigBuiltInStyle, RenderConfigOrientation,
-    RenderConfigTheme,
+    ExportFileType, GraphvizLayout, GraphvizRenderOptions, MermaidDisplay, MermaidLook,
+    MermaidRenderOptions, RenderConfig, RenderConfigBuiltInStyle, RenderConfigOrientation,
+    RenderConfigTheme, RenderTargetOptions,
 };
 
 /// Generate a unique node ID based on node type
@@ -70,6 +71,7 @@ pub struct StoredRenderConfig {
     pub orientation: Option<String>,
     pub apply_layers: Option<bool>,
     pub built_in_styles: Option<String>,
+    pub target_options: Option<StoredRenderTargetOptions>,
     pub use_default_styling: Option<bool>,
     pub theme: Option<String>,
 }
@@ -111,7 +113,79 @@ impl StoredRenderConfig {
                     (None, _) => None,
                 })
                 .unwrap_or(RenderConfigBuiltInStyle::Light),
+            target_options: self
+                .target_options
+                .map(|options| options.into_render_target_options())
+                .unwrap_or_default(),
         }
+    }
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StoredRenderTargetOptions {
+    pub graphviz: Option<StoredGraphvizRenderOptions>,
+    pub mermaid: Option<StoredMermaidRenderOptions>,
+}
+
+impl StoredRenderTargetOptions {
+    pub fn into_render_target_options(self) -> RenderTargetOptions {
+        RenderTargetOptions {
+            graphviz: self.graphviz.map(|opts| opts.into_graphviz_options()),
+            mermaid: self.mermaid.map(|opts| opts.into_mermaid_options()),
+        }
+    }
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StoredGraphvizRenderOptions {
+    pub layout: Option<String>,
+    pub overlap: Option<bool>,
+    pub splines: Option<bool>,
+    pub nodesep: Option<f32>,
+    pub ranksep: Option<f32>,
+}
+
+impl StoredGraphvizRenderOptions {
+    pub fn into_graphviz_options(self) -> GraphvizRenderOptions {
+        let mut options = GraphvizRenderOptions::default();
+        if let Some(layout) = self.layout.as_deref() {
+            options.layout = parse_graphviz_layout(layout);
+        }
+        if let Some(overlap) = self.overlap {
+            options.overlap = overlap;
+        }
+        if let Some(splines) = self.splines {
+            options.splines = splines;
+        }
+        if let Some(nodesep) = self.nodesep {
+            options.nodesep = nodesep;
+        }
+        if let Some(ranksep) = self.ranksep {
+            options.ranksep = ranksep;
+        }
+        options
+    }
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StoredMermaidRenderOptions {
+    pub look: Option<String>,
+    pub display: Option<String>,
+}
+
+impl StoredMermaidRenderOptions {
+    pub fn into_mermaid_options(self) -> MermaidRenderOptions {
+        let mut options = MermaidRenderOptions::default();
+        if let Some(look) = self.look.as_deref() {
+            options.look = parse_mermaid_look(look);
+        }
+        if let Some(display) = self.display.as_deref() {
+            options.display = parse_mermaid_display(display);
+        }
+        options
     }
 }
 
@@ -136,6 +210,29 @@ pub fn parse_builtin_style(value: &str) -> RenderConfigBuiltInStyle {
         "none" | "NONE" | "None" => RenderConfigBuiltInStyle::None,
         "dark" | "DARK" | "Dark" => RenderConfigBuiltInStyle::Dark,
         _ => RenderConfigBuiltInStyle::Light,
+    }
+}
+
+pub fn parse_graphviz_layout(value: &str) -> GraphvizLayout {
+    match value {
+        "neato" | "NEATO" => GraphvizLayout::Neato,
+        "fdp" | "FDP" => GraphvizLayout::Fdp,
+        "circo" | "CIRCO" => GraphvizLayout::Circo,
+        _ => GraphvizLayout::Dot,
+    }
+}
+
+pub fn parse_mermaid_look(value: &str) -> MermaidLook {
+    match value {
+        "handDrawn" | "HAND_DRAWN" | "HANDDRAWN" => MermaidLook::HandDrawn,
+        _ => MermaidLook::Default,
+    }
+}
+
+pub fn parse_mermaid_display(value: &str) -> MermaidDisplay {
+    match value {
+        "compact" | "COMPACT" => MermaidDisplay::Compact,
+        _ => MermaidDisplay::Full,
     }
 }
 

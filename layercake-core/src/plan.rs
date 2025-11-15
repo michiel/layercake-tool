@@ -110,12 +110,13 @@ pub struct ExportProfileGraphConfig {
     pub edge_label_insert_newlines_at: Option<usize>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Copy)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ExportProfileRenderConfig {
     pub contain_nodes: Option<bool>,
     pub orientation: Option<RenderConfigOrientation>,
     pub apply_layers: Option<bool>,
     pub built_in_styles: Option<RenderConfigBuiltInStyle>,
+    pub target_options: Option<RenderTargetOptions>,
     #[serde(rename = "use_default_styling")]
     pub legacy_use_default_styling: Option<bool>,
     #[serde(rename = "theme")]
@@ -176,18 +177,91 @@ impl Default for ExportProfileRenderConfig {
             orientation: Some(RenderConfigOrientation::TB),
             apply_layers: Some(true),
             built_in_styles: Some(RenderConfigBuiltInStyle::Light),
+            target_options: Some(RenderTargetOptions::default()),
             legacy_use_default_styling: Some(true),
             legacy_theme: Some(RenderConfigTheme::Light),
         }
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Copy)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RenderConfig {
     pub contain_nodes: bool,
     pub orientation: RenderConfigOrientation,
     pub apply_layers: bool,
     pub built_in_styles: RenderConfigBuiltInStyle,
+    #[serde(default)]
+    pub target_options: RenderTargetOptions,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct RenderTargetOptions {
+    pub graphviz: Option<GraphvizRenderOptions>,
+    pub mermaid: Option<MermaidRenderOptions>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct GraphvizRenderOptions {
+    pub layout: GraphvizLayout,
+    pub overlap: bool,
+    pub splines: bool,
+    pub nodesep: f32,
+    pub ranksep: f32,
+}
+
+impl Default for GraphvizRenderOptions {
+    fn default() -> Self {
+        Self {
+            layout: GraphvizLayout::Dot,
+            overlap: false,
+            splines: true,
+            nodesep: 0.5,
+            ranksep: 0.5,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Copy, PartialEq, Eq)]
+pub enum GraphvizLayout {
+    #[serde(rename = "dot")]
+    Dot,
+    #[serde(rename = "neato")]
+    Neato,
+    #[serde(rename = "fdp")]
+    Fdp,
+    #[serde(rename = "circo")]
+    Circo,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct MermaidRenderOptions {
+    pub look: MermaidLook,
+    pub display: MermaidDisplay,
+}
+
+impl Default for MermaidRenderOptions {
+    fn default() -> Self {
+        Self {
+            look: MermaidLook::Default,
+            display: MermaidDisplay::Full,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Copy, PartialEq, Eq)]
+pub enum MermaidLook {
+    #[serde(rename = "default")]
+    Default,
+    #[serde(rename = "handDrawn")]
+    HandDrawn,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Copy, PartialEq, Eq)]
+pub enum MermaidDisplay {
+    #[serde(rename = "full")]
+    Full,
+    #[serde(rename = "compact")]
+    Compact,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Copy)]
@@ -246,7 +320,7 @@ impl ExportProfileItem {
         }
     }
     pub fn get_render_config(&self) -> RenderConfig {
-        let render_config = self.render_config.unwrap_or_default();
+        let render_config = self.render_config.clone().unwrap_or_default();
         let orientation = render_config
             .orientation
             .unwrap_or(RenderConfigOrientation::TB);
@@ -273,12 +347,16 @@ impl ExportProfileItem {
                 }
             })
             .unwrap_or(RenderConfigBuiltInStyle::Light);
+        let target_options = render_config
+            .target_options
+            .unwrap_or_else(RenderTargetOptions::default);
 
         RenderConfig {
             contain_nodes,
             orientation,
             apply_layers,
             built_in_styles,
+            target_options,
         }
     }
 }

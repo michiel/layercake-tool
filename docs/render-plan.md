@@ -64,3 +64,6 @@
 1. Back-fill existing node configs by treating `target_options` as `null` (renderers fallback to defaults).
 2. Update docs + tooltips so users understand the new per-target controls.
 3. After the feature stabilizes, consider extending other render targets (PlantUML, CSV exporters) with their own option sets.
+
+## Progress
+- ✅ Backend/schema support: Added strongly typed render-target option structs, GraphQL fields, and stored-config parsing so templates receive `config.target_options`. Frontend/UI + template wiring still pending.
