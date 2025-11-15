@@ -357,5 +357,22 @@ pub fn get_handlebars() -> Handlebars<'static> {
     });
     handlebars.register_helper("puml_link_color", Box::new(puml_link));
 
+    handlebars_helper!(layer_bg_color: |layermap: Value, layer_id: String| {
+        if let Value::Object(map) = layermap {
+            if let Some(layer_obj) = map.get(&layer_id) {
+                if let Some(bg_color) = layer_obj.get("background_color").and_then(|v| v.as_str()) {
+                    bg_color.to_string()
+                } else {
+                    String::new()
+                }
+            } else {
+                String::new()
+            }
+        } else {
+            String::new()
+        }
+    });
+    handlebars.register_helper("layer_bg_color", Box::new(layer_bg_color));
+
     handlebars
 }
