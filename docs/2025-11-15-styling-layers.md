@@ -695,6 +695,57 @@ handlebars_helper!(layer_bg_color: |layermap: Value, layer_id: String| {
 - **Treemap:** May be possible using `classDef` and `:::class` syntax, but requires further investigation given beta status. Recommend waiting for feature stabilisation.
 - **Both:** Consider adding layer information as node annotations or recommending alternative formats when layer-styled hierarchies are required.
 
+### 🐛 Critical Bug Fixes Discovered During Implementation
+
+After completing the feature work above, user testing revealed that layer colors were **not appearing in any exports** despite working correctly in Graph Preview. This led to discovery of two critical bugs:
+
+#### Bug Fix #1: IndexMap Serialization (Commit `e79df794`)
+
+**Discovery:** Templates were receiving empty layer data because `IndexMap<String, Layer>` serializes to JSON object, not array.
+
+**Fix:**
+- Modified `create_standard_context()` to convert `layer_map.values()` to `layers_array` (Vec)
+- Provided both `layers` (array for iteration) and `layer_map` (object for lookups)
+- Updated 8 templates to use `layer_map` for tree rendering helpers
+
+**Status:** ✅ Fixed template data structure, but colors still wrong → Bug #2
+
+#### Bug Fix #2: Hardcoded Dummy Layers (Commit `0333cca8`) - **ACTUAL ROOT CAUSE**
+
+**Discovery:** After Bug #1 fix, exports **still** showed white/black defaults. Investigation revealed `GraphService::build_graph_from_dag_graph()` was creating dummy `Layer` objects with hardcoded colors instead of reading from database.
+
+**The Smoking Gun:**
+```rust
+// BROKEN CODE - Always returned white/black
+let graph_layers: Vec<Layer> = unique_layers
+    .map(|layer_id| Layer {
+        background_color: "FFFFFF".to_string(),  // ← HARDCODED!
+        text_color: "000000".to_string(),
+        border_color: "000000".to_string(),
+        ...
+    })
+```
+
+**Why This Was Deceptive:**
+- Database contained correct colors ✓
+- Graph Preview showed correct colors ✓ (different code path)
+- Templates were correct ✓
+- IndexMap→Vec fix was correct ✓
+- **But exports ignored database and used dummy layers!**
+
+**Fix:**
+- Query `graph_layers` table for actual layer data
+- Map database `background_color`, `text_color`, `border_color` to Layer structs
+- Only use defaults if database values are NULL
+
+**Status:** ✅ **RESOLVED** - Layer colors now display correctly in all exports
+
+#### Bug Investigation #2a: CSV Column Mapping (Commits `e9153b06`, `c0aa7b34`)
+
+**Red Herring:** Initially suspected CSV columns were swapped. Investigation revealed project uses format `layer,label,background,border,text` (border before text). Original code was correct. Changes reverted in `c0aa7b34`.
+
+**Lesson:** Always verify assumptions against actual data format.
+
 ### 📋 Remaining Tasks
 
 The following tasks remain from the original recommendations:
@@ -716,47 +767,98 @@ The following tasks remain from the original recommendations:
 
 ### Summary of Implementation
 
-**Commits:** 4 commits implementing fixes and features
+**Total Commits:** 10 commits (4 features + 6 bug fixes)
+
+**Feature Implementation (Commits 1-4):**
 - `0f20ded8` - Mermaid helper consistency
 - `45185f72` - DOT hierarchy conditional logic
 - `eea1068d` - PlantUML mindmap/WBS layer styling
 - `bedf5e94` - Custom template examples
 
-**Files Modified:** 7 files
-- `layercake-core/src/common/handlebars.rs` - Added `layer_bg_color` helper, updated `mermaid_render_tree` signature
-- `layercake-core/src/export/to_mermaid.hbs` - Pass parameters to helper
+**Critical Bug Fixes (Commits 5-10):**
+- `e79df794` - IndexMap→Vec serialization fix (Bug #1)
+- `94c1394c` - Documentation of Bug #1
+- `e9153b06` - CSV column investigation (red herring)
+- `c0aa7b34` - Revert CSV changes
+- `0333cca8` - Load database layers (Bug #2 - **ACTUAL FIX**)
+- `dd93d7ad` - Documentation of Bug #2
+
+**Files Modified:** 9 files
+- `layercake-core/src/export/mod.rs` - Fixed layer serialization
+- `layercake-core/src/services/graph_service.rs` - Load database layers
+- `layercake-core/src/common/handlebars.rs` - Added `layer_bg_color` helper, updated tree helpers
+- `layercake-core/src/export/to_mermaid.hbs` - Use layer_map
+- `layercake-core/src/export/to_dot.hbs` - Use layer_map
 - `layercake-core/src/export/to_dot_hierarchy.hbs` - Add conditional logic
+- `layercake-core/src/export/to_plantuml.hbs` - Use layer_map
 - `layercake-core/src/export/to_plantuml_mindmap.hbs` - Apply layer colours
 - `layercake-core/src/export/to_plantuml_wbs.hbs` - Apply layer colours
-- `resources/sample-v1/kvm_control_flow/custom.hbs` - Add conditional
-- `resources/sample-v1/layercake-overview/custom.hbs` - Add conditional
+- `resources/sample-v1/kvm_control_flow/custom.hbs` - Best practices
+- `resources/sample-v1/layercake-overview/custom.hbs` - Best practices
 
-**Impact:** All Priority 1 and Priority 2 recommendations completed. Layer styling now works consistently across DOT, PlantUML (including mindmap/WBS), and Mermaid formats (flat and hierarchy modes). Custom templates demonstrate best practices. Mermaid mindmap/treemap limitations documented.
+**Impact:** All Priority 1 and Priority 2 recommendations completed. Layer styling now works correctly across DOT, PlantUML (including mindmap/WBS), and Mermaid formats. Critical bugs preventing any layer colors from displaying have been identified and fixed.
 
 ## Conclusion
 
-Layer styling in Layercake Tool has been significantly improved. Previously identified critical gaps have been addressed, and feature completeness has been achieved for all major export formats.
+This review documents the complete journey of implementing and debugging layer styling in Layercake Tool, from initial feature gaps to discovering and fixing critical bugs that prevented layer colors from working at all.
 
-**Updated Status (Post-Implementation):**
-1. ✅ Flat mode layer styling works well for DOT, PlantUML, and Mermaid
-2. ✅ Hierarchy mode layer styling now works for PlantUML, DOT, **and Mermaid**
-3. ✅ PlantUML Mindmap/WBS formats now support layer styling
-4. ✅ DOT hierarchy template now correctly respects `apply_layers` flag
-5. ✅ Custom template examples now follow best practices
-6. ℹ️ Mermaid Mindmap/Treemap have upstream limitations (documented)
+### Implementation Journey
 
-**Remaining Limitations:**
+**Phase 1: Feature Implementation** (Commits 1-4)
+- Standardised tree rendering helper signatures
+- Added conditional logic for `apply_layers` flag
+- Implemented PlantUML mindmap/WBS layer styling
+- Updated custom template examples
+- **Status:** Features implemented correctly, but user testing revealed NO colors appearing
+
+**Phase 2: Bug Investigation and Fixes** (Commits 5-10)
+- **Bug #1 (e79df794):** Fixed IndexMap→Vec serialization preventing template iteration
+- **Bug #2 (0333cca8):** Fixed hardcoded dummy layers ignoring database - **ACTUAL ROOT CAUSE**
+- **Investigation (e9153b06, c0aa7b34):** Explored CSV column mapping (red herring, reverted)
+- **Outcome:** Both template data structure AND data source needed fixing
+
+### Final Status
+
+**✅ Fully Working:**
+1. Flat mode layer styling for DOT, PlantUML, and Mermaid
+2. Hierarchy mode layer styling for PlantUML, DOT, and Mermaid
+3. PlantUML Mindmap/WBS layer styling
+4. DOT hierarchy respects `apply_layers` flag
+5. Custom templates demonstrate best practices
+6. Layer colors load from database and display correctly in exports
+
+**ℹ️ Documented Limitations:**
 - Mermaid mindmap lacks per-node colour assignment (upstream limitation)
-- Mermaid treemap is beta and may support layer styling via `classDef` (requires further investigation)
-- Test coverage for `apply_layers: false` scenarios needs to be added
+- Mermaid treemap is beta (may support `classDef` in future)
 
-**Completed Actions:**
-1. ✅ Fixed Mermaid hierarchy rendering (Priority 1) - `0f20ded8`
-2. ✅ Fixed DOT hierarchy conditional logic (Priority 1) - `45185f72`
-3. ✅ Added layer support to PlantUML mindmap/WBS (Priority 2) - `eea1068d`
-4. ✅ Researched Mermaid mindmap/treemap capabilities (Priority 3) - Documented
-5. ✅ Updated custom template examples (Priority 2) - `bedf5e94`
+**📊 Remaining Work:**
+- Add test coverage for `apply_layers: false` scenarios
+- Extract repeated template blocks into partials
+- Review JSGraph data structure
 
-**Impact:** Users now experience consistent layer styling behaviour across all major export formats (DOT, PlantUML, Mermaid). The `apply_layers` configuration option works as designed. Custom templates provide clear examples for template authors. Known limitations are documented.
+### Key Learnings
 
-The implementation successfully fulfills the design intent of the `apply_layers` configuration option, providing consistent, predictable layer styling across all supported export formats.
+**Why Bugs Were Hard to Find:**
+1. **Bug #1 (Serialization):** Templates received objects instead of arrays - invisible without inspecting JSON
+2. **Bug #2 (Hardcoded Layers):** Database contained correct data, Graph Preview worked, but export pipeline used dummy layers - multiple code paths masked the issue
+3. **Deceptive Symptoms:** Everything *looked* correct (database, preview, templates) but exports failed - required tracing entire data flow
+
+**Technical Debt Identified:**
+- `build_graph_from_dag_graph()` was creating dummy data instead of querying database
+- Different code paths for Graph Preview vs exports (should be unified)
+- No validation that layer data reaches templates
+
+### Impact
+
+**Users now have:**
+- ✅ Consistent layer colors across ALL handlebars exports (DOT, Mermaid, PlantUML, etc.)
+- ✅ Proper `apply_layers` configuration control
+- ✅ Layer styling in hierarchy modes (clusters, subgraphs)
+- ✅ Layer styling in specialised formats (mindmaps, WBS)
+- ✅ Clear template examples for custom exports
+
+**Commits:** 10 total (4 features + 6 bug fixes)
+**Files Modified:** 9 core files + 2 sample templates
+**Lines Changed:** ~150 lines across templates, helpers, and services
+
+The implementation successfully fulfills the design intent of the `apply_layers` configuration option. Layer styling now works correctly across all supported export formats, with database-driven colors properly flowing through the export pipeline to handlebars templates.
