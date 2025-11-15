@@ -74,6 +74,9 @@ spreadsheet-ods = "0.25"
 icu_locid = "1.5"
 zip = { version = "0.6", default-features = false, features = ["deflate"] }
 
+# Agent integration dependencies
+rig = { version = "0.24.0", package = "rig-core", features = ["rmcp"] }
+
 # Tauri dependencies
 tauri = { version = "2.0", features = ["macos-private-api"] }
 tauri-build = { version = "2.0", features = [] }

@@ -20,13 +20,16 @@ use serde_json::{json, Value};
 use tokio::io::{self, AsyncBufReadExt, BufReader};
 use tracing;
 
-use rig::client::CompletionClient;
-use rig::completion::{
-    message::{
-        AssistantContent, Message, Reasoning, ToolCall, ToolFunction, ToolResult,
-        ToolResultContent, UserContent,
+use rig::{
+    agent::{Agent, AgentBuilder},
+    client::CompletionClient,
+    completion::{
+        message::{
+            AssistantContent, Message, Reasoning, ToolCall, ToolFunction, ToolResult,
+            ToolResultContent, UserContent,
+        },
+        Completion, CompletionModel, Usage,
     },
-    Completion, Usage,
 };
 use rig::providers::gemini::completion::gemini_api_types::{
     AdditionalParameters, GenerationConfig,
@@ -37,6 +40,7 @@ use rig::OneOrMany;
 #[cfg(feature = "rmcp")]
 use rmcp::{
     model::{ClientCapabilities, ClientInfo, Implementation, Tool as RmcpTool},
+    service::RunningService,
     transport::StreamableHttpClientTransport,
     ServiceExt,
 };
@@ -160,7 +164,7 @@ pub struct ChatSession {
     credentials: ChatCredentialStore,
     config: ChatConfig,
     #[cfg(feature = "rmcp")]
-    rmcp_client: Option<rmcp::Client<rmcp::RoleServer>>,
+    rmcp_client: Option<RunningService<rmcp::RoleClient, ClientInfo>>,
     #[cfg(feature = "rmcp")]
     rmcp_tools: Vec<RmcpTool>,
 
@@ -179,7 +183,7 @@ impl ChatSession {
     #[cfg(feature = "rmcp")]
     async fn init_rmcp_client(
         mcp_server_url: &str,
-    ) -> Result<(rmcp::Client<rmcp::RoleServer>, Vec<RmcpTool>)> {
+    ) -> Result<(RunningService<rmcp::RoleClient, ClientInfo>, Vec<RmcpTool>)> {
         tracing::info!("Connecting to MCP server at {}", mcp_server_url);
 
         let transport = StreamableHttpClientTransport::from_uri(mcp_server_url);
@@ -189,7 +193,10 @@ impl ChatSession {
             capabilities: ClientCapabilities::default(),
             client_info: Implementation {
                 name: "layercake-chat".to_string(),
+                title: None,
                 version: env!("CARGO_PKG_VERSION").to_string(),
+                icons: None,
+                website_url: None,
             },
         };
 
@@ -198,7 +205,7 @@ impl ChatSession {
             .await
             .context("Failed to connect to MCP server")?;
 
-        let server_info = client.peer_info();
+        let server_info = client.peer().peer_info();
         tracing::info!("Connected to MCP server: {:?}", server_info);
 
         // List available tools
@@ -424,6 +431,32 @@ impl ChatSession {
             include_citations: session.include_citations,
             last_rag_context: None,
         })
+    }
+
+    #[cfg(feature = "rmcp")]
+    fn build_rig_agent<M>(&self, builder: AgentBuilder<M>) -> Agent<M>
+    where
+        M: CompletionModel,
+    {
+        if self.tool_use_enabled {
+            if let Some(ref rmcp_client) = self.rmcp_client {
+                if !self.rmcp_tools.is_empty() {
+                    return builder
+                        .rmcp_tools(self.rmcp_tools.clone(), rmcp_client.peer().to_owned())
+                        .build();
+                }
+            }
+        }
+
+        builder.build()
+    }
+
+    #[cfg(not(feature = "rmcp"))]
+    fn build_rig_agent<M>(&self, builder: AgentBuilder<M>) -> Agent<M>
+    where
+        M: CompletionModel,
+    {
+        builder.build()
     }
 
     pub fn model_name(&self) -> &str {
@@ -874,17 +907,7 @@ impl ChatSession {
                     builder = builder.preamble(&preamble);
                 }
 
-                #[cfg(feature = "rmcp")]
-                if self.tool_use_enabled {
-                    if let Some(ref rmcp_client) = self.rmcp_client {
-                        if !self.rmcp_tools.is_empty() {
-                            builder = builder
-                                .rmcp_tools(self.rmcp_tools.clone(), rmcp_client.peer().to_owned());
-                        }
-                    }
-                }
-
-                let agent = builder.build();
+                let agent = self.build_rig_agent(builder);
                 let response = agent
                     .completion(prompt.clone(), history.clone())
                     .await
@@ -911,17 +934,7 @@ impl ChatSession {
                     builder = builder.preamble(&preamble);
                 }
 
-                #[cfg(feature = "rmcp")]
-                if self.tool_use_enabled {
-                    if let Some(ref rmcp_client) = self.rmcp_client {
-                        if !self.rmcp_tools.is_empty() {
-                            builder = builder
-                                .rmcp_tools(self.rmcp_tools.clone(), rmcp_client.peer().to_owned());
-                        }
-                    }
-                }
-
-                let agent = builder.build();
+                let agent = self.build_rig_agent(builder);
                 let response = agent
                     .completion(prompt.clone(), history.clone())
                     .await
@@ -954,17 +967,7 @@ impl ChatSession {
                     builder = builder.preamble(&preamble);
                 }
 
-                #[cfg(feature = "rmcp")]
-                if self.tool_use_enabled {
-                    if let Some(ref rmcp_client) = self.rmcp_client {
-                        if !self.rmcp_tools.is_empty() {
-                            builder = builder
-                                .rmcp_tools(self.rmcp_tools.clone(), rmcp_client.peer().to_owned());
-                        }
-                    }
-                }
-
-                let agent = builder.build();
+                let agent = self.build_rig_agent(builder);
                 let response = agent
                     .completion(prompt.clone(), history.clone())
                     .await
@@ -994,17 +997,7 @@ impl ChatSession {
                     builder = builder.preamble(&preamble);
                 }
 
-                #[cfg(feature = "rmcp")]
-                if self.tool_use_enabled {
-                    if let Some(ref rmcp_client) = self.rmcp_client {
-                        if !self.rmcp_tools.is_empty() {
-                            builder = builder
-                                .rmcp_tools(self.rmcp_tools.clone(), rmcp_client.peer().to_owned());
-                        }
-                    }
-                }
-
-                let agent = builder.build();
+                let agent = self.build_rig_agent(builder);
                 let response = agent
                     .completion(prompt, history)
                     .await

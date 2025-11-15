@@ -13,7 +13,7 @@ chrono = { workspace = true }
 csv = { workspace = true }
 futures = "0.3"
 indexmap = { workspace = true }
-rig = { version = "0.23.1", package = "rig-core", features = ["rmcp"] }
+rig = { workspace = true }
 sea-orm = { workspace = true }
 sea-orm-migration = { workspace = true }
 serde = { workspace = true }
@@ -26,4 +26,4 @@ uuid = { workspace = true }
 pdf-extract = "0.7"
 calamine = { workspace = true }
 quick-xml = "0.31"
-zip = "0.6"
+zip = { workspace = true }
