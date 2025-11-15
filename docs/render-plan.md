@@ -67,3 +67,5 @@
 
 ## Progress
 - ✅ Backend/schema support: Added strongly typed render-target option structs, GraphQL fields, and stored-config parsing so templates receive `config.target_options`. Frontend/UI + template wiring still pending.
+- ✅ Frontend config UI: Artefact dialogs now expose Graphviz/Mermaid-specific controls and serialize `renderConfig.targetOptions`.
+- ⚙️ Template consumption: DOT and Mermaid templates read `config.target_options` to emit layout/look/display directives. Additional targets can adopt the same helpers next.

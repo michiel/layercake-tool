@@ -1,3 +1,13 @@
+---
+{{#if graph_name}}
+ title: {{graph_name}}
+{{/if}}
+{{#with config.target_options.mermaid as |mm|}}
+config:
+  look: {{mm.look}}
+  displayMode: {{mm.display}}
+{{/with}}
+---
 treemap-beta
 {{#*inline "render_node"}}
 {{#if (is_empty children)}}
