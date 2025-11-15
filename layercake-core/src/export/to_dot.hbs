@@ -40,7 +40,7 @@ digraph G {
 
 {{#if config.contain_nodes}}
   {{#each hierarchy_tree as |rootnode|}}
-{{{dot_render_tree rootnode ../layers ../config}}}
+{{{dot_render_tree rootnode ../layer_map ../config}}}
   {{/each}}
 {{else}}
   {{#if config.apply_layers}}

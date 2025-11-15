@@ -43,7 +43,7 @@ skinparam shadowing false
 
 {{#if config.contain_nodes}}
     {{#each hierarchy_tree as |rootnode|}}
-{{{puml_render_tree rootnode ../layers ../config}}}
+{{{puml_render_tree rootnode ../layer_map ../config}}}
     {{/each}}
 {{else}}
     {{#each flow_nodes as |node|}}

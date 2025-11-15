@@ -39,6 +39,9 @@ pub mod renderer {
 
     /// Creates a standard context object used for most templates
     pub fn create_standard_context(graph: &Graph, render_config: &RenderConfig) -> Value {
+        let layer_map = graph.get_layer_map();
+        let layers_array: Vec<_> = layer_map.values().cloned().collect();
+
         json!({
             "graph_name": &graph.name,
             "config": render_config,
@@ -48,7 +51,8 @@ pub mod renderer {
             "hierarchy_tree_edges": graph.build_tree_from_edges(),
             "flow_nodes": graph.get_non_partition_nodes(),
             "flow_edges": graph.get_non_partition_edges(),
-            "layers": graph.get_layer_map(),
+            "layers": layers_array,
+            "layer_map": layer_map,
         })
     }
 }

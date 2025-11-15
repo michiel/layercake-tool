@@ -20,7 +20,7 @@ classDef default fill:#f7f7f8,color:#0f172a,stroke:#1f2933;
 
 {{#if config.contain_nodes}}
   {{#each hierarchy_tree as |rootnode|}}
-{{{mermaid_render_tree rootnode ../layers ../config}}}
+{{{mermaid_render_tree rootnode ../layer_map ../config}}}
   {{/each}}
 {{else}}
   {{#each flow_nodes as |node|}}

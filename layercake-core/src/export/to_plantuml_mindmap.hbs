@@ -1,7 +1,7 @@
 @startmindmap
 * {{graph_name}}
 {{#*inline "render_node"}}
-{{mindmap_prefix depth}} {{label}}{{#if @root.config.apply_layers}}{{#if layer}} [#{{layer_bg_color @root.layers layer}}]{{/if}}{{/if}}
+{{mindmap_prefix depth}} {{label}}{{#if @root.config.apply_layers}}{{#if layer}} [#{{layer_bg_color @root.layer_map layer}}]{{/if}}{{/if}}
 {{#each children}}
 {{> render_node}}
 {{/each}}
