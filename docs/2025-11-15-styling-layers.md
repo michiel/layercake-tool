@@ -3,7 +3,9 @@
 **Date:** 2025-11-15
 **Status:** ✅ Complete - Critical Bug Fixed
 
-## Critical Bug Fix (Added Post-Implementation)
+## Critical Bug Fixes (Added Post-Implementation)
+
+### Bug #1: IndexMap Serialization Issue
 
 **Issue:** Layer colors were not being applied to ANY handlebars export targets, despite working correctly in graph previews.
 
@@ -17,7 +19,30 @@
 - Update all templates to use `layer_map` parameter for tree rendering helpers
 - Update PlantUML mindmap/WBS to use `layer_map` with `layer_bg_color` helper
 
-**Impact:** Layer colors now correctly apply to all handlebars export targets (DOT, Mermaid, PlantUML, etc.).
+**Impact:** Fixed layer data structure for templates, but colors still incorrect due to Bug #2.
+
+### Bug #2: Layer CSV Column Mapping
+
+**Issue:** After fixing Bug #1, layer colors were still wrong. Background colors appeared as white (#FFFFFF) and border colors appeared as text colors.
+
+**Root Cause:** `Layer::from_row()` was reading `text_color` and `border_color` from swapped CSV columns.
+
+**Incorrect Mapping:**
+- Column 3 → `border_color` (but CSV has TEXT COLOR in column 3)
+- Column 4 → `text_color` (but CSV has BORDER COLOR in column 4)
+
+**Correct CSV Format:**
+```
+ID, LABEL, BACKGROUND COLOR, TEXT COLOR, BORDER COLOR
+0,  1,     2,                3,          4
+```
+
+**Fix Commit:** `e9153b06` - Correct Layer CSV column mapping for text_color and border_color
+
+**Solution:**
+- Swap column indices: `text_color` from column 3, `border_color` from column 4
+
+**Impact:** Layer colors (background, text, border) now display correctly in all handlebars exports.
 
 ---
 
