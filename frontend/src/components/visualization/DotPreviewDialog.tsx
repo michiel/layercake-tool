@@ -1,7 +1,7 @@
 import { useEffect, useId, useState, useRef } from 'react'
 import { graphviz } from 'd3-graphviz'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { IconAlertCircle, IconZoomIn, IconZoomOut, IconZoomScan, IconDownload, IconMaximize, IconMinimize } from '@tabler/icons-react'
+import { IconAlertCircle, IconZoomIn, IconZoomOut, IconZoomScan, IconDownload, IconMaximize, IconMinimize, IconExternalLink } from '@tabler/icons-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
@@ -156,6 +156,46 @@ export const DotPreviewDialog = ({ open, onClose, diagram, title }: DotPreviewDi
     img.src = url
   }
 
+  const handleOpenInNewWindow = () => {
+    if (!containerRef.current) return
+    const svgElement = containerRef.current.querySelector('svg')
+    if (!svgElement) return
+
+    const svgData = new XMLSerializer().serializeToString(svgElement)
+    const newWindow = window.open('', '_blank')
+    if (!newWindow) return
+
+    newWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${title || 'Graphviz Preview'}</title>
+          <style>
+            body {
+              margin: 0;
+              padding: 20px;
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              min-height: 100vh;
+              background: #f5f5f5;
+            }
+            svg {
+              max-width: 100%;
+              height: auto;
+              background: white;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            }
+          </style>
+        </head>
+        <body>
+          ${svgData}
+        </body>
+      </html>
+    `)
+    newWindow.document.close()
+  }
+
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogContent
@@ -233,6 +273,21 @@ export const DotPreviewDialog = ({ open, onClose, diagram, title }: DotPreviewDi
             >
               <IconDownload className="h-4 w-4 mr-1" />
               PNG
+            </Button>
+          </div>
+
+          <div className="h-6 w-px bg-border" />
+
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleOpenInNewWindow}
+              disabled={isRendering || !!error}
+              title="Open in new window"
+            >
+              <IconExternalLink className="h-4 w-4 mr-1" />
+              Open
             </Button>
           </div>
         </div>

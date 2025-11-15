@@ -1,7 +1,7 @@
 import { useEffect, useId, useState, useRef } from 'react'
 import mermaid from 'mermaid'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { IconAlertCircle, IconZoomIn, IconZoomOut, IconZoomScan, IconDownload, IconSun, IconMoon, IconMaximize, IconMinimize } from '@tabler/icons-react'
+import { IconAlertCircle, IconZoomIn, IconZoomOut, IconZoomScan, IconDownload, IconSun, IconMoon, IconMaximize, IconMinimize, IconExternalLink } from '@tabler/icons-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
@@ -141,6 +141,43 @@ export const MermaidPreviewDialog = ({ open, onClose, diagram, title }: MermaidP
     setTheme(prev => prev === 'default' ? 'dark' : 'default')
   }
 
+  const handleOpenInNewWindow = () => {
+    if (!renderedSvg) return
+
+    const newWindow = window.open('', '_blank')
+    if (!newWindow) return
+
+    newWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${title || 'Mermaid Preview'}</title>
+          <style>
+            body {
+              margin: 0;
+              padding: 20px;
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              min-height: 100vh;
+              background: #f5f5f5;
+            }
+            svg {
+              max-width: 100%;
+              height: auto;
+              background: white;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            }
+          </style>
+        </head>
+        <body>
+          ${renderedSvg}
+        </body>
+      </html>
+    `)
+    newWindow.document.close()
+  }
+
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogContent
@@ -218,6 +255,21 @@ export const MermaidPreviewDialog = ({ open, onClose, diagram, title }: MermaidP
             >
               <IconDownload className="h-4 w-4 mr-1" />
               PNG
+            </Button>
+          </div>
+
+          <div className="h-6 w-px bg-border" />
+
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleOpenInNewWindow}
+              disabled={!renderedSvg}
+              title="Open in new window"
+            >
+              <IconExternalLink className="h-4 w-4 mr-1" />
+              Open
             </Button>
           </div>
 
