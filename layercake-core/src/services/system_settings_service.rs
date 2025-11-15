@@ -210,7 +210,7 @@ static DESCRIPTOR_LIST: &[SettingDescriptor] = &[
     SettingDescriptor {
         key: "LAYERCAKE_OPENAI_EMBEDDING_MODEL",
         label: "OpenAI Embedding Model",
-        category: "Data Acquisition",
+        category: "OpenAI",
         description: "Model identifier used when embeddings run against OpenAI.",
         value_type: SettingValueType::String,
         allowed_values: &[],
@@ -221,7 +221,7 @@ static DESCRIPTOR_LIST: &[SettingDescriptor] = &[
     SettingDescriptor {
         key: "LAYERCAKE_OLLAMA_EMBEDDING_MODEL",
         label: "Ollama Embedding Model",
-        category: "Data Acquisition",
+        category: "Ollama",
         description: "Model identifier used when embeddings run against a local Ollama server.",
         value_type: SettingValueType::String,
         allowed_values: &[],

@@ -11,6 +11,7 @@ import {
 import { showErrorNotification, showSuccessNotification } from '../utils/notifications'
 import PageContainer from '../components/layout/PageContainer'
 import { Stack, Group } from '../components/layout-primitives'
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../components/ui/accordion'
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
@@ -30,15 +31,33 @@ export const SystemSettingsPage: React.FC = () => {
   const [value, setValue] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
 
-  const settings = useMemo(() => {
-    if (!data?.systemSettings) return []
-    return [...data.systemSettings].sort((a, b) => {
-      if (a.category === b.category) {
-        return a.label.localeCompare(b.label)
+  const settingsByCategory = useMemo(() => {
+    if (!data?.systemSettings) return new Map<string, SystemSetting[]>()
+
+    const grouped = new Map<string, SystemSetting[]>()
+    for (const setting of data.systemSettings) {
+      const category = setting.category
+      if (!grouped.has(category)) {
+        grouped.set(category, [])
       }
-      return a.category.localeCompare(b.category)
-    })
+      grouped.get(category)!.push(setting)
+    }
+
+    // Sort settings within each category
+    for (const settings of grouped.values()) {
+      settings.sort((a, b) => a.label.localeCompare(b.label))
+    }
+
+    return grouped
   }, [data])
+
+  const providerCategories = ['OpenAI', 'Anthropic', 'Google Gemini', 'Ollama']
+  const topLevelCategories = [
+    { key: 'providers', label: 'Providers', categories: providerCategories },
+    { key: 'chat', label: 'Chat', categories: ['Chat'] },
+    { key: 'data-acquisition', label: 'Data Acquisition', categories: ['Data Acquisition'] },
+    { key: 'rag', label: 'RAG', categories: ['RAG'] },
+  ]
 
   const openEditor = (setting: SystemSetting) => {
     setSelectedSetting(setting)
@@ -95,6 +114,68 @@ export const SystemSettingsPage: React.FC = () => {
     } catch (mutationError) {
       showErrorNotification('Failed to update setting', (mutationError as Error).message)
     }
+  }
+
+  const renderSettingsTable = (settings: SystemSetting[]) => {
+    if (settings.length === 0) return null
+
+    return (
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Setting</TableHead>
+            <TableHead>Value</TableHead>
+            <TableHead>Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {settings.map((setting) => (
+            <TableRow key={setting.key}>
+              <TableCell>
+                <div className="font-semibold">{setting.label}</div>
+                <div className="text-xs text-muted-foreground">
+                  {setting.key}
+                </div>
+                {setting.isSecret && (
+                  <Badge variant="secondary" className="mt-1">
+                    Secret
+                  </Badge>
+                )}
+              </TableCell>
+              <TableCell>
+                <div>
+                  {setting.isSecret
+                    ? '••••••'
+                    : setting.value && setting.value.trim() !== ''
+                      ? setting.value
+                      : 'Not set'}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {formatValueType(setting.valueType)}
+                </div>
+              </TableCell>
+              <TableCell>
+                <Group gap="xs">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => openEditor(setting)}
+                    disabled={setting.isReadOnly}
+                  >
+                    Edit
+                  </Button>
+                  {setting.isReadOnly && (
+                    <Badge variant="outline">
+                      Read-only
+                    </Badge>
+                  )}
+                </Group>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    )
   }
 
   const renderValueEditor = () => {
@@ -267,74 +348,51 @@ export const SystemSettingsPage: React.FC = () => {
                 ))}
               </Stack>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Setting</TableHead>
-                    <TableHead>Value</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {settings.map((setting) => (
-                    <TableRow key={setting.key}>
-                      <TableCell>
-                        <div className="font-semibold">{setting.label}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {setting.key}
-                        </div>
-                        {setting.isSecret && (
-                          <Badge variant="secondary" className="mt-1">
-                            Secret
-                          </Badge>
+              <Accordion type="multiple" className="w-full">
+                {topLevelCategories.map((topLevel) => {
+                  const hasSettings = topLevel.categories.some((cat) => settingsByCategory.has(cat))
+                  if (!hasSettings) return null
+
+                  return (
+                    <AccordionItem key={topLevel.key} value={topLevel.key}>
+                      <AccordionTrigger className="text-lg font-semibold">
+                        {topLevel.label}
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        {topLevel.key === 'providers' ? (
+                          <Accordion type="multiple" className="w-full pl-4">
+                            {providerCategories.map((provider) => {
+                              const providerSettings = settingsByCategory.get(provider)
+                              if (!providerSettings || providerSettings.length === 0) return null
+
+                              return (
+                                <AccordionItem key={provider} value={provider}>
+                                  <AccordionTrigger className="text-base">
+                                    {provider}
+                                  </AccordionTrigger>
+                                  <AccordionContent>
+                                    {renderSettingsTable(providerSettings)}
+                                  </AccordionContent>
+                                </AccordionItem>
+                              )
+                            })}
+                          </Accordion>
+                        ) : (
+                          topLevel.categories.map((category) => {
+                            const categorySettings = settingsByCategory.get(category)
+                            if (!categorySettings || categorySettings.length === 0) return null
+                            return (
+                              <div key={category}>
+                                {renderSettingsTable(categorySettings)}
+                              </div>
+                            )
+                          })
                         )}
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          {setting.isSecret
-                            ? '••••••'
-                            : setting.value && setting.value.trim() !== ''
-                              ? setting.value
-                              : 'Not set'}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {formatValueType(setting.valueType)}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge>
-                          {setting.category}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Group gap="xs">
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => openEditor(setting)}
-                            disabled={setting.isReadOnly}
-                          >
-                            Edit
-                          </Button>
-                          {setting.isReadOnly && (
-                            <Badge variant="outline">
-                              Read-only
-                            </Badge>
-                          )}
-                        </Group>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {settings.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-center text-muted-foreground">
-                        No settings available.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
+                      </AccordionContent>
+                    </AccordionItem>
+                  )
+                })}
+              </Accordion>
             )}
           </CardContent>
         </Card>
