@@ -15,7 +15,6 @@ import { useCollaborationV2 } from './hooks/useCollaborationV2'
 import { useConnectionStatus } from './hooks/useConnectionStatus'
 import { ProjectChatPage } from './pages/ProjectChatPage'
 import { ChatLogsPage } from './pages/ChatLogsPage'
-import { SourceManagementPage } from './pages/SourceManagementPage'
 import { KnowledgeBasePage } from './pages/KnowledgeBasePage'
 import { DatasetCreationPage } from './pages/DatasetCreationPage'
 import { ProjectArtefactsPage } from './pages/ProjectArtefactsPage'
@@ -238,12 +237,6 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
     }
 
     const dataAcquisitionChildren: ProjectNavChild[] = [
-      {
-        key: 'source-management',
-        label: 'Document management',
-        route: `/projects/${projectId}/data-acquisition/source-management`,
-        isActive: makeRouteMatcher(`/projects/${projectId}/data-acquisition/source-management`),
-      },
       {
         key: 'knowledge-base',
         label: 'Knowledge base',
@@ -1535,44 +1528,17 @@ const ProjectDetailPage = () => {
               <Button variant="secondary" onClick={() => navigate(`/projects/${projectId}/datasets`)}>
                 Manage data sets
               </Button>
-              <Button variant="secondary" onClick={() => navigate(`/projects/${projectId}/data-acquisition/source-management`)}>
-                Upload files
+              <Button variant="secondary" onClick={() => navigate(`/projects/${projectId}/data-acquisition/knowledge-base`)}>
+                Manage documents
               </Button>
             </Group>
           </Group>
           <div className="grid gap-4 md:grid-cols-3">
             <Card className="border hover:shadow-md transition-shadow">
-              <CardHeader className="cursor-pointer" onClick={() => navigate(`/projects/${projectId}/data-acquisition/source-management`)}>
-                <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                  <IconUpload className="h-4 w-4 text-primary" />
-                  Document management
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Total:</span>
-                    <Badge variant="secondary">{totalFiles}</Badge>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Indexed:</span>
-                    <Badge variant="default">{indexedFiles}</Badge>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Not indexed:</span>
-                    <Badge variant="outline">{notIndexedFiles}</Badge>
-                  </div>
-                </div>
-                <Button variant="secondary" className="w-full" onClick={() => navigate(`/projects/${projectId}/data-acquisition/source-management`)}>
-                  Manage documents
-                </Button>
-              </CardContent>
-            </Card>
-            <Card className="border hover:shadow-md transition-shadow">
               <CardHeader className="cursor-pointer" onClick={() => navigate(`/projects/${projectId}/data-acquisition/knowledge-base`)}>
                 <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                  <IconDatabase className="h-4 w-4 text-primary" />
-                  Knowledge base
+                  <IconUpload className="h-4 w-4 text-primary" />
+                  Document management & knowledge base
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -1586,6 +1552,18 @@ const ProjectDetailPage = () => {
                     <Badge variant="secondary">{kbChunkCount}</Badge>
                   </div>
                   <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Documents uploaded:</span>
+                    <Badge variant="secondary">{totalFiles}</Badge>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Indexed:</span>
+                    <Badge variant="secondary">{indexedFiles}</Badge>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Not indexed:</span>
+                    <Badge variant="secondary">{notIndexedFiles}</Badge>
+                  </div>
+                  <div className="flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">Last update:</span>
                     <span className="text-xs text-muted-foreground">
                       {kbLastUpdate ? new Date(kbLastUpdate).toLocaleDateString() : 'Never'}
@@ -1593,7 +1571,7 @@ const ProjectDetailPage = () => {
                   </div>
                 </div>
                 <Button variant="secondary" className="w-full" onClick={() => navigate(`/projects/${projectId}/data-acquisition/knowledge-base`)}>
-                  View knowledge base
+                  View knowledge base & manage documents
                 </Button>
               </CardContent>
             </Card>
@@ -1970,11 +1948,6 @@ function App() {
           <Route path="/projects/:projectId/datasets" element={
             <ErrorBoundary>
               <DataSetsPage />
-            </ErrorBoundary>
-          } />
-          <Route path="/projects/:projectId/data-acquisition/source-management" element={
-            <ErrorBoundary>
-              <SourceManagementPage />
             </ErrorBoundary>
           } />
           <Route path="/projects/:projectId/data-acquisition/knowledge-base" element={
