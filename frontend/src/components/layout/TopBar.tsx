@@ -37,7 +37,7 @@ export const TopBar: React.FC<TopBarProps> = ({
     if (e.key === 'Enter' && tagsInput.trim()) {
       const newTags = tagsInput
         .split(',')
-        .map((t) => t.trim())
+        .map((t) => t.trim().toLowerCase())
         .filter((t) => t.length > 0);
       if (newTags.length > 0) {
         setActiveTags([...new Set([...activeTags, ...newTags])]);
@@ -47,7 +47,8 @@ export const TopBar: React.FC<TopBarProps> = ({
   };
 
   const removeTag = (tagToRemove: string) => {
-    setActiveTags(activeTags.filter((tag) => tag !== tagToRemove));
+    const normalized = tagToRemove.toLowerCase();
+    setActiveTags(activeTags.filter((tag) => tag !== normalized));
   };
 
   const handleClearCache = () => {
