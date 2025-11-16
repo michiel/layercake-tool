@@ -132,17 +132,17 @@ export const DataSetNode = memo((props: DataSetNodeProps) => {
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-9 w-9 rounded-full text-teal-600"
-                    data-action-icon="data"
-                    onMouseDown={(e: React.MouseEvent) => {
-                      e.stopPropagation()
-                      e.preventDefault()
-                      setShowDataDialog(true)
-                    }}
-                  >
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-9 w-9 rounded-full text-teal-600"
+                  data-action-icon="data"
+                  onClick={(e: React.MouseEvent) => {
+                    e.stopPropagation()
+                    e.preventDefault()
+                    setShowDataDialog(true)
+                  }}
+                >
                     <IconTable size={12} />
                   </Button>
                 </TooltipTrigger>

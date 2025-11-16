@@ -266,6 +266,12 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
 
     const graphCreationChildren: ProjectNavChild[] = [
       {
+        key: 'workbench',
+        label: 'Workbench overview',
+        route: `/projects/${projectId}/workbench`,
+        isActive: makeRouteMatcher(`/projects/${projectId}/workbench`),
+      },
+      {
         key: 'plan',
         label: 'Plan',
         route: `/projects/${projectId}/plan`,
@@ -312,7 +318,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
         key: 'graph-creation',
         label: 'Workbench',
         icon: <IconGraph className="h-4 w-4" />,
-        route: graphCreationChildren[0].route,
+        route: `/projects/${projectId}/workbench`,
         children: graphCreationChildren,
       }),
       createSection({
@@ -1893,6 +1899,7 @@ import { DatabaseSettings } from './components/settings/DatabaseSettings'
 import { SystemSettingsPage } from './pages/SystemSettingsPage'
 import PageContainer from './components/layout/PageContainer'
 import { EditProjectPage } from './pages/EditProjectPage'
+import { WorkbenchPage } from './pages/WorkbenchPage'
 
 // Main App component with routing
 function App() {
@@ -1929,6 +1936,11 @@ function App() {
           <Route path="/projects/:projectId/plan" element={
             <ErrorBoundary>
               <PlanEditorPage />
+            </ErrorBoundary>
+          } />
+          <Route path="/projects/:projectId/workbench" element={
+            <ErrorBoundary>
+              <WorkbenchPage />
             </ErrorBoundary>
           } />
           <Route path="/projects/:projectId/plan-nodes" element={

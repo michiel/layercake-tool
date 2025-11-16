@@ -257,7 +257,7 @@ const ArtefactNodeBase = memo((props: ArtefactNodeProps) => {
                       className="h-9 w-9 rounded-full"
                       data-action-icon="preview"
                       disabled={isTextPreviewLoading}
-                      onMouseDown={(e: React.MouseEvent) => {
+                      onClick={(e: React.MouseEvent) => {
                         e.stopPropagation()
                         e.preventDefault()
                         handlePreview()
@@ -277,7 +277,7 @@ const ArtefactNodeBase = memo((props: ArtefactNodeProps) => {
                         className="h-9 w-9 rounded-full text-purple-600"
                         data-action-icon="mermaid-preview"
                         disabled={isMermaidLoading}
-                        onMouseDown={(e: React.MouseEvent) => {
+                        onClick={(e: React.MouseEvent) => {
                           e.stopPropagation()
                           e.preventDefault()
                           handleMermaidPreview()
@@ -298,7 +298,7 @@ const ArtefactNodeBase = memo((props: ArtefactNodeProps) => {
                         className="h-9 w-9 rounded-full text-green-600"
                         data-action-icon="dot-preview"
                         disabled={isDotLoading}
-                        onMouseDown={(e: React.MouseEvent) => {
+                        onClick={(e: React.MouseEvent) => {
                           e.stopPropagation()
                           e.preventDefault()
                           handleDotPreview()
@@ -318,7 +318,7 @@ const ArtefactNodeBase = memo((props: ArtefactNodeProps) => {
                       className="h-9 w-9 rounded-full text-blue-600"
                       data-action-icon="download"
                       disabled={downloading}
-                      onMouseDown={(e: React.MouseEvent) => {
+                      onClick={(e: React.MouseEvent) => {
                         e.stopPropagation()
                         e.preventDefault()
                         handleDownload()

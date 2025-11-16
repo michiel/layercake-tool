@@ -209,16 +209,16 @@ export const GraphNode = memo((props: GraphNodeProps) => {
           <TooltipTrigger asChild>
             <Button
               size="sm"
-              variant="default"
-              className="h-7 w-7 p-0 bg-green-600 hover:bg-green-700"
-              data-action-icon="execute"
-              disabled={executing}
-              onMouseDown={(e: React.MouseEvent) => {
-                e.stopPropagation()
-                e.preventDefault()
-                handleExecute()
-              }}
-            >
+            variant="default"
+            className="h-7 w-7 p-0 bg-green-600 hover:bg-green-700"
+            data-action-icon="execute"
+            disabled={executing}
+            onClick={(e: React.MouseEvent) => {
+              e.stopPropagation()
+              e.preventDefault()
+              handleExecute()
+            }}
+          >
               <IconPlayerPlayFilled size={13} />
             </Button>
           </TooltipTrigger>
@@ -232,7 +232,7 @@ export const GraphNode = memo((props: GraphNodeProps) => {
             variant="ghost"
             className="h-7 w-7 p-0"
             data-action-icon="edit"
-            onMouseDown={(e: React.MouseEvent) => {
+            onClick={(e: React.MouseEvent) => {
               e.stopPropagation()
               e.preventDefault()
               onEdit?.(props.id)
@@ -250,7 +250,7 @@ export const GraphNode = memo((props: GraphNodeProps) => {
             variant="ghost"
             className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
             data-action-icon="delete"
-            onMouseDown={(e: React.MouseEvent) => {
+            onClick={(e: React.MouseEvent) => {
               e.stopPropagation()
               e.preventDefault()
               onDelete?.(props.id)
