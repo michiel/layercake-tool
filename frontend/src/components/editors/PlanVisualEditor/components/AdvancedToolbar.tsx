@@ -106,7 +106,7 @@ export const AdvancedToolbar: React.FC<AdvancedToolbarProps> = ({
         <Group gap="xs">
           {/* Node Palette */}
           <Group gap="xs">
-            <p className="text-xs font-medium text-gray-600">Nodes:</p>
+            {/* <p className="text-xs font-medium text-gray-600">Nodes:</p> */}
             {nodeTypes.map((nodeType) => (
               <Tooltip key={nodeType.type}>
                 <TooltipTrigger asChild>
@@ -131,7 +131,7 @@ export const AdvancedToolbar: React.FC<AdvancedToolbarProps> = ({
 
           {/* Auto-Layout Operations */}
           <Separator orientation="vertical" className="h-6" />
-          <p className="text-xs text-muted-foreground">Auto-layout:</p>
+          {/* <p className="text-xs text-muted-foreground">Auto-layout:</p> */}
           <Group gap="xs">
             <Tooltip>
               <TooltipTrigger asChild>
