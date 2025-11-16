@@ -1053,34 +1053,49 @@ impl AppContext {
         let dataset_service = DataSetService::new(self.db.clone());
         let mut id_map = HashMap::new();
 
+        let is_template = item.item_type == ITEM_TYPE_PROJECT_TEMPLATE;
+
         for descriptor in &dataset_index.datasets {
-            let dataset_path = format!("datasets/{}", descriptor.filename);
-            let file_bytes = {
-                let mut dataset_file = archive
-                    .by_name(&dataset_path)
-                    .map_err(|e| anyhow!("Missing dataset file {}: {}", descriptor.filename, e))?;
-                let mut bytes = Vec::new();
-                dataset_file.read_to_end(&mut bytes).map_err(|e| {
-                    anyhow!("Failed to read dataset {}: {}", descriptor.filename, e)
-                })?;
-                bytes
-            };
-            let file_format = DataSetFileFormat::from_str(&descriptor.file_format)
-                .unwrap_or(DataSetFileFormat::Csv);
             let data_type = DataType::from_str(&descriptor.data_type).unwrap_or(DataType::Graph);
 
-            let dataset = dataset_service
-                .create_from_file(
-                    project.id,
-                    descriptor.name.clone(),
-                    descriptor.description.clone(),
-                    descriptor.filename.clone(),
-                    file_format,
-                    data_type,
-                    file_bytes,
-                )
-                .await
-                .map_err(|e| anyhow!("Failed to import dataset {}: {}", descriptor.name, e))?;
+            let dataset = if is_template {
+                // Templates should not carry data rows forward; create empty datasets using the schema metadata.
+                dataset_service
+                    .create_empty(
+                        project.id,
+                        descriptor.name.clone(),
+                        descriptor.description.clone(),
+                        data_type,
+                    )
+                    .await
+            } else {
+                let dataset_path = format!("datasets/{}", descriptor.filename);
+                let file_bytes = {
+                    let mut dataset_file = archive.by_name(&dataset_path).map_err(|e| {
+                        anyhow!("Missing dataset file {}: {}", descriptor.filename, e)
+                    })?;
+                    let mut bytes = Vec::new();
+                    dataset_file.read_to_end(&mut bytes).map_err(|e| {
+                        anyhow!("Failed to read dataset {}: {}", descriptor.filename, e)
+                    })?;
+                    bytes
+                };
+                let file_format = DataSetFileFormat::from_str(&descriptor.file_format)
+                    .unwrap_or(DataSetFileFormat::Csv);
+
+                dataset_service
+                    .create_from_file(
+                        project.id,
+                        descriptor.name.clone(),
+                        descriptor.description.clone(),
+                        descriptor.filename.clone(),
+                        file_format,
+                        data_type,
+                        file_bytes,
+                    )
+                    .await
+            }
+            .map_err(|e| anyhow!("Failed to import dataset {}: {}", descriptor.name, e))?;
 
             id_map.insert(descriptor.original_id, dataset.id);
         }
