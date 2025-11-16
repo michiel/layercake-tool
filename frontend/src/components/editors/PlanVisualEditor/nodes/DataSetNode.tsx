@@ -137,7 +137,7 @@ export const DataSetNode = memo((props: DataSetNodeProps) => {
                   variant="ghost"
                   className="h-9 w-9 rounded-full text-teal-600"
                   data-action-icon="data"
-                  onClick={(e: React.MouseEvent) => {
+                  onMouseDown={(e: React.MouseEvent) => {
                     e.stopPropagation()
                     e.preventDefault()
                     setShowDataDialog(true)

@@ -216,11 +216,12 @@ export const BaseNode = memo(({
     setIsEditingLabel(false)
   }
 
-  const handleButtonClick = (event: ReactMouseEvent, callback?: () => void) => {
-    event.stopPropagation();
-    event.preventDefault();
-    callback?.();
-  };
+const handleButtonClick = (event: ReactMouseEvent, callback?: () => void) => {
+  event.stopPropagation()
+  event.preventDefault()
+  if (event.button !== 0) return
+  callback?.()
+}
 
   // Default tool buttons if not provided
   const defaultToolButtons = !readonly && (
@@ -233,7 +234,7 @@ export const BaseNode = memo(({
               variant="ghost"
               className="h-7 w-7 text-blue-600 hover:text-blue-700 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900/50"
               data-action-icon="edit-label"
-              onClick={(e) => handleButtonClick(e, () => setIsEditingLabel(true))}
+              onMouseDown={(e) => handleButtonClick(e, () => setIsEditingLabel(true))}
             >
               <IconSettings size={13} />
             </Button>
@@ -249,7 +250,7 @@ export const BaseNode = memo(({
               variant="ghost"
               className="h-7 w-7 text-gray-600 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700/50"
               data-action-icon="edit"
-              onClick={(e) => handleButtonClick(e, onEdit)}
+              onMouseDown={(e) => handleButtonClick(e, onEdit)}
             >
               <IconSettings size={13} />
             </Button>
@@ -262,10 +263,10 @@ export const BaseNode = memo(({
           <Button
             size="icon"
             variant="ghost"
-              className="h-7 w-7 text-red-600 hover:text-red-700 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/50"
-              data-action-icon="delete"
-              onClick={(e) => handleButtonClick(e, onDelete)}
-            >
+            className="h-7 w-7 text-red-600 hover:text-red-700 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/50"
+            data-action-icon="delete"
+            onMouseDown={(e) => handleButtonClick(e, onDelete)}
+          >
               <IconTrash size={13} />
             </Button>
           </TooltipTrigger>
