@@ -22,7 +22,7 @@ const FRIENDLY_NAMES: Record<string, string> = {
   EdgeLabelMaxLength: 'Truncate edge labels',
   EdgeLabelInsertNewlines: 'Wrap edge labels',
   InvertGraph: 'Invert graph',
-  GenerateHierarchy: 'Generate hierarchy',
+  GenerateHierarchy: 'Hierarchy to flow',
   AggregateEdges: 'Aggregate edges',
 }
 

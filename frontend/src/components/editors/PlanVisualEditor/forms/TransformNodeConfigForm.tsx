@@ -33,7 +33,7 @@ const TRANSFORM_OPTIONS: { value: GraphTransformKind; label: string }[] = [
   { value: 'EdgeLabelMaxLength', label: 'Truncate Edge Labels' },
   { value: 'EdgeLabelInsertNewlines', label: 'Wrap Edge Labels' },
   { value: 'InvertGraph', label: 'Invert Graph' },
-  { value: 'GenerateHierarchy', label: 'Generate Hierarchy Metadata' },
+  { value: 'GenerateHierarchy', label: 'Hierarchy to flow' },
   { value: 'AggregateEdges', label: 'Aggregate Duplicate Edges' },
 ];
 
