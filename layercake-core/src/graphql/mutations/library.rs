@@ -6,7 +6,7 @@ use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
 use crate::graphql::types::{
     DataSet, ExportProjectArchivePayload, LibraryItem, LibraryItemType, Project,
-    UploadLibraryItemInput,
+    UpdateLibraryItemInput, UploadLibraryItemInput,
 };
 use crate::services::library_item_service::{
     LibraryItemService, SeedLibraryResult, ITEM_TYPE_DATASET, ITEM_TYPE_PROJECT,
@@ -130,6 +130,24 @@ impl LibraryMutation {
             .map_err(|e| StructuredError::service("LibraryItemService::delete", e))?;
 
         Ok(true)
+    }
+
+    /// Update a library item's basic metadata (name, description, tags)
+    async fn update_library_item(
+        &self,
+        ctx: &Context<'_>,
+        id: i32,
+        input: UpdateLibraryItemInput,
+    ) -> Result<LibraryItem> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let service = LibraryItemService::new(context.db.clone());
+
+        let updated = service
+            .update_fields(id, input.name, input.description, input.tags)
+            .await
+            .map_err(|e| StructuredError::service("LibraryItemService::update_fields", e))?;
+
+        Ok(LibraryItem::from(updated))
     }
 
     /// Import one or more dataset-type library items into a project

@@ -95,6 +95,36 @@ impl LibraryItemService {
         Ok(item)
     }
 
+    pub async fn update_fields(
+        &self,
+        id: i32,
+        name: Option<String>,
+        description: Option<String>,
+        tags: Option<Vec<String>>,
+    ) -> Result<library_items::Model> {
+        let model = library_items::Entity::find_by_id(id)
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| anyhow!("Library item {} not found", id))?;
+
+        let mut active: library_items::ActiveModel = model.into();
+
+        if let Some(n) = name {
+            active.name = Set(n);
+        }
+        if description.is_some() {
+            active.description = Set(description);
+        }
+        if let Some(tags_vec) = tags {
+            let tags_json = serde_json::to_string(&tags_vec).unwrap_or_else(|_| "[]".to_string());
+            active.tags = Set(tags_json);
+        }
+        active.updated_at = Set(Utc::now());
+
+        let updated = active.update(&self.db).await?;
+        Ok(updated)
+    }
+
     pub async fn create_dataset_item(
         &self,
         name: String,

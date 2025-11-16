@@ -41,6 +41,7 @@ import {
   CREATE_PROJECT_FROM_LIBRARY,
   SEED_LIBRARY_ITEMS,
   UPLOAD_LIBRARY_ITEM,
+  UPDATE_LIBRARY_ITEM,
   LibraryItem,
   LibraryItemType,
   UploadLibraryItemInput,
@@ -76,6 +77,9 @@ export const LibraryPage: React.FC = () => {
   const [templateUploading, setTemplateUploading] = useState(false)
   const [projectModalItem, setProjectModalItem] = useState<LibraryItem | null>(null)
   const [newProjectName, setNewProjectName] = useState('')
+  const [editItem, setEditItem] = useState<LibraryItem | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editTags, setEditTags] = useState('')
 
   const filterVariables = useMemo(() => {
     const tags = tagQuery
@@ -105,6 +109,7 @@ export const LibraryPage: React.FC = () => {
   )
   const [seedLibraryItems, { loading: seedLoading }] = useMutation(SEED_LIBRARY_ITEMS)
   const [uploadLibraryItem, { loading: uploadMutationLoading }] = useMutation(UPLOAD_LIBRARY_ITEM)
+  const [updateLibraryItem, { loading: updateLibraryItemLoading }] = useMutation(UPDATE_LIBRARY_ITEM)
 
   const handleDownload = (item: LibraryItem) => {
     window.open(`/api/library/${item.id}/download`, '_blank')
@@ -165,6 +170,12 @@ export const LibraryPage: React.FC = () => {
   const openProjectModal = (item: LibraryItem) => {
     setProjectModalItem(item)
     setNewProjectName(`${item.name} Copy`)
+  }
+
+  const openEditModal = (item: LibraryItem) => {
+    setEditItem(item)
+    setEditName(item.name)
+    setEditTags(item.tags.join(', '))
   }
 
   const handleCreateProject = async () => {
@@ -375,6 +386,9 @@ export const LibraryPage: React.FC = () => {
                             <DropdownMenuItem onClick={() => handleDownload(item)}>
                               <IconDownload className="mr-2 h-4 w-4" /> Download
                             </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => openEditModal(item)}>
+                              <IconSparkles className="mr-2 h-4 w-4" /> Edit
+                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               className="text-red-600"
@@ -425,6 +439,65 @@ export const LibraryPage: React.FC = () => {
             <Button onClick={handleCreateProject} disabled={createProjectLoading}>
               {createProjectLoading && <Spinner className="mr-2 h-4 w-4" />}
               Create Project
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editItem} onOpenChange={(open) => !open && setEditItem(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Library Item</DialogTitle>
+          </DialogHeader>
+          <Stack gap="sm">
+            <Label htmlFor="editName">Name</Label>
+            <Input
+              id="editName"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              placeholder="Item name"
+            />
+            <Label htmlFor="editTags">Tags</Label>
+            <Input
+              id="editTags"
+              value={editTags}
+              onChange={(e) => setEditTags(e.target.value)}
+              placeholder="Comma separated tags"
+            />
+          </Stack>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setEditItem(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!editItem) return
+                try {
+                  const tags = editTags
+                    .split(',')
+                    .map((t) => t.trim())
+                    .filter(Boolean)
+                  await updateLibraryItem({
+                    variables: {
+                      id: editItem.id,
+                      input: {
+                        name: editName.trim(),
+                        tags,
+                      },
+                    },
+                  })
+                  showSuccessNotification('Item updated', 'Library item saved.')
+                  setEditItem(null)
+                  await refetch()
+                } catch (err: any) {
+                  console.error(err)
+                  showErrorNotification('Failed to update item', err?.message || 'Unknown error')
+                }
+              }}
+              disabled={updateLibraryItemLoading}
+            >
+              {updateLibraryItemLoading && <Spinner className="mr-2 h-4 w-4" />}
+              Save
             </Button>
           </DialogFooter>
         </DialogContent>

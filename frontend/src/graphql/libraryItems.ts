@@ -39,6 +39,19 @@ export const DELETE_LIBRARY_ITEM = gql`
   }
 `
 
+export const UPDATE_LIBRARY_ITEM = gql`
+  mutation UpdateLibraryItem($id: Int!, $input: UpdateLibraryItemInput!) {
+    updateLibraryItem(id: $id, input: $input) {
+      id
+      type
+      name
+      description
+      tags
+      updatedAt
+    }
+  }
+`
+
 export const IMPORT_LIBRARY_DATASETS = gql`
   mutation ImportLibraryDatasets($input: ImportLibraryDatasetsInput!) {
     importLibraryDatasets(input: $input) {

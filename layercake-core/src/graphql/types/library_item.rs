@@ -100,3 +100,10 @@ pub struct UploadLibraryItemInput {
     #[graphql(name = "contentType")]
     pub content_type: Option<String>,
 }
+
+#[derive(InputObject, Default)]
+pub struct UpdateLibraryItemInput {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub tags: Option<Vec<String>>,
+}
