@@ -612,9 +612,18 @@ impl Graph {
                 }
 
                 let agg_node_id = graph.generate_aggregate_node_id(&node.id);
+                let parent_label = if !node.label.is_empty() {
+                    node.label.clone()
+                } else {
+                    node.id.clone()
+                };
                 let agg_node = Node {
                     id: agg_node_id.clone(),
-                    label: format!("{} nodes (aggregated)", aggregated_children.len()),
+                    label: format!(
+                        "{} - {} nodes (aggregated)",
+                        parent_label,
+                        aggregated_children.len()
+                    ),
                     layer: "aggregated".to_string(),
                     is_partition: false,
                     belongs_to: Some(node.id.clone()),

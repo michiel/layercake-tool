@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useQuery } from '@apollo/client/react'
+import { useQuery, useMutation } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import { Breadcrumbs } from '@/components/common/Breadcrumbs'
 import PageContainer from '@/components/layout/PageContainer'
@@ -9,8 +9,9 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
-import { GET_PLAN_DAG } from '@/graphql/plan-dag'
-import { IconGraph, IconLayout2, IconDatabase, IconArrowRight, IconNetwork } from '@tabler/icons-react'
+import { GET_PLAN_DAG, VALIDATE_AND_MIGRATE_PLAN_DAG } from '@/graphql/plan-dag'
+import { IconGraph, IconLayout2, IconDatabase, IconArrowRight, IconNetwork, IconAdjustments } from '@tabler/icons-react'
+import { showErrorNotification, showSuccessNotification } from '@/utils/notifications'
 
 const GET_PROJECTS = gql`
   query GetProjectsForWorkbench {
@@ -44,6 +45,45 @@ export const WorkbenchPage = () => {
   const planNodeCount = planDag?.nodes?.length || 0
   const planEdgeCount = planDag?.edges?.length || 0
   const datasetNodeCount = planDag?.nodes?.filter((n: any) => n.nodeType === 'DataSetNode').length || 0
+
+  const [validatePlanDagMutation, { loading: validatePlanDagLoading }] = useMutation(
+    VALIDATE_AND_MIGRATE_PLAN_DAG
+  )
+
+  const handleValidateAndMigratePlan = async () => {
+    if (!Number.isFinite(projectIdNum)) {
+      return
+    }
+    try {
+      const { data } = await validatePlanDagMutation({
+        variables: { projectId: projectIdNum },
+      })
+      const result = (data as any)?.validateAndMigratePlanDag
+      const migratedCount = result?.updatedNodes?.length || 0
+      const warningCount = result?.warnings?.length || 0
+      const errors: string[] = result?.errors || []
+
+      if (errors.length > 0) {
+        showErrorNotification(
+          'Plan DAG validation failed',
+          `Found ${errors.length} error(s). First: ${errors[0]}`
+        )
+        console.error('Plan DAG validation errors', errors)
+        return
+      }
+
+      showSuccessNotification(
+        'Plan DAG validated',
+        `Migrated ${migratedCount} legacy node(s). Warnings: ${warningCount}.`
+      )
+    } catch (error: any) {
+      console.error('Failed to validate/migrate plan DAG', error)
+      showErrorNotification(
+        'Plan validation failed',
+        error?.message || 'Unable to validate or migrate the plan DAG.'
+      )
+    }
+  }
 
   const loading = projectsLoading || planDagLoading
 
@@ -85,6 +125,15 @@ export const WorkbenchPage = () => {
           <p className="text-muted-foreground">Overview of your plan and graph build tools.</p>
         </div>
         <Group gap="sm">
+          <Button
+            variant="secondary"
+            onClick={handleValidateAndMigratePlan}
+            disabled={validatePlanDagLoading}
+          >
+            {validatePlanDagLoading && <Spinner className="mr-2 h-4 w-4" />}
+            <IconAdjustments className="mr-2 h-4 w-4" />
+            Validate &amp; migrate plan
+          </Button>
           <Button variant="secondary" onClick={() => navigate(`/projects/${project.id}/plan`)}>
             <IconGraph className="mr-2 h-4 w-4" />
             Open plan editor

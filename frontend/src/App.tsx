@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { Routes, Route, useNavigate, useParams, useLocation } from 'react-router-dom'
-import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconDownload, IconChevronLeft, IconChevronRight, IconFolderPlus, IconNetwork, IconBooks, IconMessageDots, IconAdjustments, IconUpload, IconHierarchy2, IconChevronDown } from '@tabler/icons-react'
+import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconDownload, IconChevronLeft, IconChevronRight, IconFolderPlus, IconBooks, IconMessageDots, IconAdjustments, IconHierarchy2, IconChevronDown } from '@tabler/icons-react'
 import { useQuery, useMutation } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import { Breadcrumbs } from './components/common/Breadcrumbs'
@@ -1250,12 +1250,6 @@ const ProjectDetailPage = () => {
 
   // Extract stats from single query
   const stats = projectStatsData?.projectStats
-  const totalFiles = stats?.documents.total || 0
-  const indexedFiles = stats?.documents.indexed || 0
-  const notIndexedFiles = stats?.documents.notIndexed || 0
-  const kbFileCount = stats?.knowledgeBase.fileCount || 0
-  const kbChunkCount = stats?.knowledgeBase.chunkCount || 0
-  const kbLastUpdate = stats?.knowledgeBase.lastIndexedAt
   const totalDatasets = stats?.datasets.total || 0
   const datasetsByType = stats?.datasets.byType || {}
 
@@ -1519,62 +1513,29 @@ const ProjectDetailPage = () => {
         <section>
           <Group justify="between" className="mb-4">
             <div>
-              <h2 className="text-2xl font-bold">Data Acquisition</h2>
+              <h2 className="text-2xl font-bold">Project overview</h2>
               <p className="text-muted-foreground">
-                Import files, manage ingestion, and monitor the knowledge base for this project.
+                Quick access to data, plan, and artefacts for this project.
               </p>
             </div>
             <Group gap="xs">
-              <Button variant="secondary" onClick={() => navigate(`/projects/${projectId}/datasets`)}>
-                Manage data sets
+              <Button
+                variant="secondary"
+                onClick={handleValidateAndMigratePlan}
+                disabled={validatePlanDagLoading}
+              >
+                {validatePlanDagLoading && <Spinner className="mr-2 h-4 w-4" />}
+                <IconAdjustments className="mr-2 h-4 w-4" />
+                Validate &amp; migrate plan
               </Button>
-              <Button variant="secondary" onClick={() => navigate(`/projects/${projectId}/data-acquisition/knowledge-base`)}>
-                Manage documents
+              <Button variant="secondary" onClick={() => handleDownloadYAML()} disabled={!planDag}>
+                <IconDownload className="mr-2 h-4 w-4" />
+                Export plan YAML
               </Button>
             </Group>
           </Group>
+
           <div className="grid gap-4 md:grid-cols-3">
-            <Card className="border hover:shadow-md transition-shadow">
-              <CardHeader className="cursor-pointer" onClick={() => navigate(`/projects/${projectId}/data-acquisition/knowledge-base`)}>
-                <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                  <IconUpload className="h-4 w-4 text-primary" />
-                  Document management & knowledge base
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Files:</span>
-                    <Badge variant="secondary">{kbFileCount}</Badge>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Chunks:</span>
-                    <Badge variant="secondary">{kbChunkCount}</Badge>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Documents uploaded:</span>
-                    <Badge variant="secondary">{totalFiles}</Badge>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Indexed:</span>
-                    <Badge variant="secondary">{indexedFiles}</Badge>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Not indexed:</span>
-                    <Badge variant="secondary">{notIndexedFiles}</Badge>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Last update:</span>
-                    <span className="text-xs text-muted-foreground">
-                      {kbLastUpdate ? new Date(kbLastUpdate).toLocaleDateString() : 'Never'}
-                    </span>
-                  </div>
-                </div>
-                <Button variant="secondary" className="w-full" onClick={() => navigate(`/projects/${projectId}/data-acquisition/knowledge-base`)}>
-                  View knowledge base & manage documents
-                </Button>
-              </CardContent>
-            </Card>
             <Card className="border hover:shadow-md transition-shadow">
               <CardHeader className="cursor-pointer" onClick={() => navigate(`/projects/${projectId}/datasets`)}>
                 <CardTitle className="flex items-center gap-2 text-base font-semibold">
@@ -1599,46 +1560,16 @@ const ProjectDetailPage = () => {
                   )}
                 </div>
                 <Button variant="secondary" className="w-full" onClick={() => navigate(`/projects/${projectId}/datasets`)}>
-                  Open data sets
+                  Manage data sets
                 </Button>
               </CardContent>
             </Card>
-          </div>
-        </section>
 
-        <section>
-          <Group justify="between" className="mb-4">
-            <div>
-              <h2 className="text-2xl font-bold">Workbench</h2>
-              <p className="text-muted-foreground">
-                Design, inspect, and export the Plan DAG along with all derived graphs.
-              </p>
-            </div>
-            <Group gap="xs">
-              <Button
-                variant="secondary"
-                onClick={handleValidateAndMigratePlan}
-                disabled={validatePlanDagLoading}
-              >
-                {validatePlanDagLoading && <Spinner className="mr-2 h-4 w-4" />}
-                <IconAdjustments className="mr-2 h-4 w-4" />
-                Validate &amp; migrate plan
-              </Button>
-              <Button variant="secondary" onClick={() => handleDownloadYAML()} disabled={!planDag}>
-                <IconDownload className="mr-2 h-4 w-4" />
-                Export plan YAML
-              </Button>
-              <Button variant="secondary" onClick={() => navigate(`/projects/${projectId}/plan`)}>
-                Open plan editor
-              </Button>
-            </Group>
-          </Group>
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card className="border">
+            <Card className="border hover:shadow-md transition-shadow">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base font-semibold">
                   <IconGraph className="h-4 w-4 text-primary" />
-                  Plan status
+                  Plan summary
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -1649,41 +1580,36 @@ const ProjectDetailPage = () => {
                 <p className="text-xs text-muted-foreground">
                   Version: {planVersion}
                 </p>
-                <Button variant="secondary" className="w-full" onClick={() => navigate(`/projects/${projectId}/plan`)}>
-                  Edit plan
-                </Button>
+                <Group gap="xs">
+                  <Button variant="secondary" className="flex-1" onClick={() => navigate(`/projects/${projectId}/plan`)}>
+                    Open plan
+                  </Button>
+                  <Button variant="secondary" className="flex-1" onClick={() => navigate(`/projects/${projectId}/plan-nodes`)}>
+                    Plan nodes
+                  </Button>
+                </Group>
               </CardContent>
             </Card>
-            <Card className="border">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                  <IconNetwork className="h-4 w-4 text-primary" />
-                  Plan nodes
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Review node execution status, trace dependencies, and inspect generated outputs.
-                </p>
-                <Button variant="secondary" className="w-full" onClick={() => navigate(`/projects/${projectId}/plan-nodes`)}>
-                  View nodes
-                </Button>
-              </CardContent>
-            </Card>
-            <Card className="border">
+
+            <Card className="border hover:shadow-md transition-shadow">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base font-semibold">
                   <IconDatabase className="h-4 w-4 text-primary" />
-                  Graph outputs
+                  Artefacts
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Browse generated graphs, download CSV exports, or open the graph editor.
-                </p>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Artefact nodes:</span>
+                    <Badge variant="secondary">
+                      {planDag?.nodes?.filter((n: any) => ['GraphArtefactNode', 'TreeArtefactNode', 'GraphArtefact', 'TreeArtefact'].includes(n.nodeType)).length ?? 0}
+                    </Badge>
+                  </div>
+                </div>
                 <Group gap="xs">
-                  <Button className="flex-1" variant="secondary" onClick={() => navigate(`/projects/${projectId}/graphs`)}>
-                    Browse graphs
+                  <Button className="flex-1" variant="secondary" onClick={() => navigate(`/projects/${projectId}/artefacts`)}>
+                    View artefacts
                   </Button>
                   <Button
                     className="flex-1"
@@ -1691,50 +1617,11 @@ const ProjectDetailPage = () => {
                     disabled={!planDag?.nodes?.length}
                     onClick={() => {
                       if (planDag?.nodes?.length) {
-                        navigate(`/projects/${projectId}/plan-nodes/${planDag.nodes[0].id}/edit`)
+                        navigate(`/projects/${projectId}/graphs`)
                       }
                     }}
                   >
-                    Open editor
-                  </Button>
-                </Group>
-              </CardContent>
-            </Card>
-          </div>
-        </section>
-
-        <section>
-          <Group justify="between" className="mb-4">
-            <div>
-              <h2 className="text-2xl font-bold">Chat & Collaboration</h2>
-              <p className="text-muted-foreground">
-                Collaborate with agents and review chat logs.
-              </p>
-            </div>
-            <Group gap="xs">
-              <Button variant="secondary" onClick={() => navigate(`/projects/${projectId}/chat`)}>
-                Open project chat
-              </Button>
-            </Group>
-          </Group>
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card className="border">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                  <IconMessageDots className="h-4 w-4 text-primary" />
-                  Project chat
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Launch the shared agent conversation scoped to this project, or inspect previous messages.
-                </p>
-                <Group gap="sm">
-                  <Button className="flex-1" variant="secondary" onClick={() => navigate(`/projects/${projectId}/chat`)}>
-                    Join chat
-                  </Button>
-                  <Button className="flex-1" variant="secondary" onClick={() => navigate(`/projects/${projectId}/chat/logs`)}>
-                    View logs
+                    Generated graphs
                   </Button>
                 </Group>
               </CardContent>
