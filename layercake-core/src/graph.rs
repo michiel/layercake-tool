@@ -38,6 +38,17 @@ impl Graph {
         }
     }
 
+    fn generate_aggregate_node_id(&self, parent_id: &str) -> String {
+        let mut counter = 1;
+        loop {
+            let candidate = format!("agg_{}_{}", parent_id, counter);
+            if self.get_node_by_id(&candidate).is_none() {
+                return candidate;
+            }
+            counter += 1;
+        }
+    }
+
     pub fn get_root_nodes(&self) -> Vec<&Node> {
         let mut nodes: Vec<&Node> = self
             .nodes
@@ -515,16 +526,6 @@ impl Graph {
                 partition_child_node_ids.len()
             );
 
-            if partition_child_node_ids.len() as i32 > max_width {
-                warn!(
-                    "Partition children count for node {} is {} and exceeds max_width {} for non-partition nodes. This might not be the intended behavior",
-                    node.id,
-                    partition_child_node_ids.len(),
-                    max_width
-                );
-                return Ok(());
-            }
-
             // Recursively process partition children first
             for child_id in &partition_child_node_ids {
                 debug!("Processing partition child: {} / {}", node.id, child_id);
@@ -534,7 +535,21 @@ impl Graph {
             if non_partition_child_node_ids.len() as i32 > max_width {
                 debug!("\tChopping time in node: {}", node.id);
 
-                let agg_node_id = format!("agg_{}", node.id.clone());
+                let retain_count = if max_width > 1 {
+                    (max_width - 1) as usize
+                } else {
+                    0
+                }
+                .min(non_partition_child_node_ids.len());
+                let aggregate_ids: Vec<String> = non_partition_child_node_ids
+                    .iter()
+                    .skip(retain_count)
+                    .cloned()
+                    .collect();
+
+                if aggregate_ids.is_empty() {
+                    return Ok(());
+                }
 
                 // Make sure there is an aggregated layer
                 if !graph.layer_exists("aggregated") {
@@ -548,46 +563,76 @@ impl Graph {
                     ));
                 }
 
-                let mut agg_node = {
-                    Node {
-                        id: agg_node_id.clone(),
-                        label: format!("{} nodes (aggregated)", non_partition_child_node_ids.len()),
-                        layer: "aggregated".to_string(),
-                        is_partition: false,
-                        belongs_to: Some(node.id),
-                        weight: 0,
-                        comment: node.comment.clone(),
-                        dataset: None,
-                    }
-                };
-
-                let children: Vec<Node> = non_partition_child_node_ids
+                let aggregated_children: Vec<Node> = aggregate_ids
                     .iter()
                     .filter_map(|id| graph.get_node_by_id(id).cloned())
                     .collect();
 
-                // Remove children beyond max_width
-                let mut new_edges = graph.edges.clone();
+                if aggregated_children.is_empty() {
+                    return Ok(());
+                }
 
-                for child in children.iter() {
-                    // Aggregate weights
-                    agg_node.weight += child.weight;
-                    // Process edges without duplicating them
-                    for edge in &mut new_edges {
-                        if edge.source == child.id {
-                            edge.source = agg_node.id.clone();
-                        }
-                        if edge.target == child.id {
-                            edge.target = agg_node.id.clone();
-                        };
+                let agg_node_id = graph.generate_aggregate_node_id(&node.id);
+                let agg_node = Node {
+                    id: agg_node_id.clone(),
+                    label: format!("{} nodes (aggregated)", aggregated_children.len()),
+                    layer: "aggregated".to_string(),
+                    is_partition: false,
+                    belongs_to: Some(node.id.clone()),
+                    weight: aggregated_children.iter().map(|child| child.weight).sum(),
+                    comment: node.comment.clone(),
+                    dataset: None,
+                };
+
+                // aggregate edges
+                let aggregated_child_ids: HashSet<String> =
+                    aggregate_ids.iter().cloned().collect();
+                let mut untouched_edges = Vec::new();
+                let mut aggregated_edge_map: HashMap<
+                    (String, String, String, String, Option<i32>),
+                    Edge,
+                > = HashMap::new();
+
+                for edge in graph.edges.iter() {
+                    let mut new_edge = edge.clone();
+                    let source_replaced = aggregated_child_ids.contains(&edge.source);
+                    let target_replaced = aggregated_child_ids.contains(&edge.target);
+
+                    if source_replaced {
+                        new_edge.source = agg_node.id.clone();
+                    }
+                    if target_replaced {
+                        new_edge.target = agg_node.id.clone();
+                    }
+
+                    if new_edge.source == new_edge.target {
+                        continue;
+                    }
+
+                    if source_replaced || target_replaced {
+                        let key = (
+                            new_edge.source.clone(),
+                            new_edge.target.clone(),
+                            new_edge.layer.clone(),
+                            new_edge.label.clone(),
+                            new_edge.dataset,
+                        );
+
+                        aggregated_edge_map
+                            .entry(key)
+                            .and_modify(|existing| existing.weight += new_edge.weight)
+                            .or_insert(new_edge);
+                    } else {
+                        untouched_edges.push(new_edge);
                     }
                 }
 
-                graph.set_node(agg_node);
-                graph.edges = new_edges;
+                untouched_edges.extend(aggregated_edge_map.into_values());
+                graph.edges = untouched_edges;
 
-                // Remove child nodes after edge updates
-                for node_id in non_partition_child_node_ids {
+                graph.set_node(agg_node);
+
+                for node_id in aggregate_ids {
                     debug!("\tRemoving node: {}", node_id);
                     graph.remove_node(node_id);
                 }
@@ -1651,19 +1696,61 @@ mod tests {
         let root1_after = graph.get_node_by_id("root1").unwrap();
         let root1_children_after = graph.get_children(root1_after);
 
-        // Should have fewer children now (reduced due to aggregation)
-        assert!(root1_children_after.len() < 4);
+        // Final width should match the limit (1 retained + 1 aggregate)
+        assert_eq!(root1_children_after.len(), 2);
+
+        // First child should remain visible
+        assert!(root1_children_after.iter().any(|n| n.id == "child1"));
 
         // Check if we have an aggregated node
-        let has_agg_node = root1_children_after
+        let agg_node = root1_children_after
             .iter()
-            .any(|n| n.id.starts_with("agg_") && n.layer == "aggregated");
-        assert!(has_agg_node);
+            .find(|n| n.id.starts_with("agg_root1"))
+            .expect("aggregate node missing");
+        assert_eq!(agg_node.layer, "aggregated");
+        assert_eq!(agg_node.weight, 3); // child2 + child3 + child4
 
         // The second root should still have its normal children
         let root2_after = graph.get_node_by_id("root2").unwrap();
         let root2_children_after = graph.get_children(root2_after);
         assert_eq!(root2_children_after.len(), 2); // Should still have 2 children
+
+        // Aggregated edges should collapse duplicates
+        let mut edge_lookup: HashMap<(&str, &str), (&str, i32)> = HashMap::new();
+        for edge in &graph.edges {
+            edge_lookup.insert((edge.source.as_str(), edge.target.as_str()), (edge.id.as_str(), edge.weight));
+        }
+
+        let agg_edge = edge_lookup
+            .get(&("child1", agg_node.id.as_str()))
+            .expect("expected edge from retained node to aggregate");
+        assert_eq!(agg_edge.1, 2); // e1 + e3
+
+        let agg_to_child5 = edge_lookup
+            .get(&(agg_node.id.as_str(), "child5"))
+            .expect("expected edge from aggregate to downstream node");
+        assert_eq!(agg_to_child5.1, 1);
+
+        // Ensure no self-loop edges remain
+        assert!(!graph.edges.iter().any(|e| e.source == e.target));
+    }
+
+    #[test]
+    fn test_partition_width_single_slot() {
+        let mut graph = create_complex_test_graph();
+        graph.modify_graph_limit_partition_width(1).unwrap();
+
+        let root1 = graph.get_node_by_id("root1").unwrap();
+        let children = graph.get_children(root1);
+        assert_eq!(children.len(), 1);
+        let agg = &children[0];
+        assert!(agg.id.starts_with("agg_root1"));
+        assert_eq!(agg.weight, 4);
+
+        // Every original root1 child should now be gone
+        for id in ["child1", "child2", "child3", "child4"] {
+            assert!(graph.get_node_by_id(id).is_none());
+        }
     }
 
     #[test]
