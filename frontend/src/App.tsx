@@ -266,12 +266,6 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
 
     const graphCreationChildren: ProjectNavChild[] = [
       {
-        key: 'workbench',
-        label: 'Workbench overview',
-        route: `/projects/${projectId}/workbench`,
-        isActive: makeRouteMatcher(`/projects/${projectId}/workbench`),
-      },
-      {
         key: 'plan',
         label: 'Plan',
         route: `/projects/${projectId}/plan`,
