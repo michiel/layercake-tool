@@ -34,6 +34,7 @@ export const GET_PLAN_DAG = gql`
           executionState
           computedDate
           errorMessage
+          annotations
         }
       }
       edges {
@@ -332,6 +333,7 @@ export const NODE_EXECUTION_STATUS_SUBSCRIPTION = gql`
         executionState
         computedDate
         errorMessage
+        annotations
       }
       timestamp
     }

@@ -2,7 +2,7 @@ use async_graphql::*;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 
 use crate::database::entities::{
-    data_sets, graph_edges, graph_layers, graph_nodes, graphs, plan_dag_nodes, plans,
+    data_sets, graph_edges, graph_layers, graph_nodes, graphs, plan_dag_edges, plan_dag_nodes, plans,
     project_collaborators, user_sessions, users,
 };
 use crate::graphql::context::GraphQLContext;
@@ -835,10 +835,45 @@ impl Query {
 
         let layer_previews: Vec<Layer> = db_layers.into_iter().map(Layer::from).collect();
 
+        let mut visited = std::collections::HashSet::new();
+        let mut stack = vec![node_id.clone()];
+        let mut annotation_history = Vec::new();
+
+        while let Some(current) = stack.pop() {
+            if !visited.insert(current.clone()) {
+                continue;
+            }
+
+            if let Some(graph) = graphs::Entity::find()
+                .filter(graphs::Column::NodeId.eq(&current))
+                .one(&context.db)
+                .await?
+            {
+                if let Some(text) = graph.annotations {
+                    annotation_history.push(text);
+                }
+            }
+
+            let upstream = plan_dag_edges::Entity::find()
+                .filter(plan_dag_edges::Column::TargetNodeId.eq(&current))
+                .all(&context.db)
+                .await?;
+
+            for edge in upstream {
+                stack.push(edge.source_node_id);
+            }
+        }
+        let annotations = if annotation_history.is_empty() {
+            None
+        } else {
+            Some(annotation_history.join("\n\n"))
+        };
+
         Ok(Some(GraphPreview {
             node_id,
             graph_id: graph.id,
             name: graph.name,
+            annotations,
             nodes: node_previews,
             edges: edge_previews,
             layers: layer_previews,

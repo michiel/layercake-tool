@@ -44,6 +44,7 @@ export const GET_GRAPH_PREVIEW = gql`
       nodeId
       graphId
       name
+      annotations
       nodes {
         id
         label
@@ -130,6 +131,7 @@ export interface GraphPreview {
   nodeId: string;
   graphId: number;
   name: string;
+  annotations?: string | null;
   nodes: GraphNodePreview[];
   edges: GraphEdgePreview[];
   layers: Layer[];

@@ -12,7 +12,8 @@ import {
   IconClock,
   IconX,
   IconChartDots,
-  IconTable
+  IconTable,
+  IconFileText
 } from '@tabler/icons-react'
 import { Stack, Group } from '../layout-primitives'
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert'
@@ -20,6 +21,8 @@ import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { Card, CardContent } from '../ui/card'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { Spinner } from '../ui/spinner'
@@ -117,6 +120,11 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
   const [previewGraphId, setPreviewGraphId] = useState<number | null>(null)
   const [previewTitle, setPreviewTitle] = useState<string>('Graph Preview')
   const [dataDialogGraphId, setDataDialogGraphId] = useState<number | null>(null)
+  const [annotationDialog, setAnnotationDialog] = useState<{ open: boolean; text: string; title: string }>({
+    open: false,
+    text: '',
+    title: 'Graph annotations'
+  })
 
   const { data: projectsData } = useQuery<{ projects: Array<{ id: number; name: string }> }>(GET_PROJECTS)
   const selectedProject = projectsData?.projects.find((p: { id: number; name: string }) => p.id === parseInt(projectId || '0'))
@@ -420,6 +428,20 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
                           <Button
                             size="sm"
                             variant="secondary"
+                            onClick={() =>
+                              setAnnotationDialog({
+                                open: true,
+                                text: graph.annotations || '',
+                                title: `Annotations: ${graph.name}`
+                              })
+                            }
+                          >
+                            <IconFileText className="mr-1.5 h-3.5 w-3.5" />
+                            Annotations
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="secondary"
                             onClick={() => handleEdit(graph)}
                           >
                             <IconEdit className="mr-1.5 h-3.5 w-3.5" />
@@ -512,6 +534,42 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
         loading={previewLoading}
         error={previewError?.message ?? null}
       />
+
+      <Dialog
+        open={annotationDialog.open}
+        onOpenChange={(open) =>
+          setAnnotationDialog((prev) => ({ ...prev, open }))
+        }
+      >
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>{annotationDialog.title}</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto">
+            {annotationDialog.text ? (
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                className="prose prose-sm dark:prose-invert"
+                components={{
+                  pre: ({ className, ...props }) => (
+                    <pre className={`overflow-x-auto rounded-lg bg-slate-900 p-4 text-white ${className ?? ''}`} {...props} />
+                  ),
+                  code: ({ className, ...props }) => (
+                    <code
+                      className={`rounded bg-muted px-1 py-0.5 font-mono text-sm ${className ?? ''}`}
+                      {...props}
+                    />
+                  ),
+                }}
+              >
+                {annotationDialog.text}
+              </ReactMarkdown>
+            ) : (
+              <p className="text-sm text-muted-foreground">No annotations available.</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

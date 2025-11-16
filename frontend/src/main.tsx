@@ -42,6 +42,10 @@ if (isTauriApp()) {
       // Clear all caches on Tauri startup to ensure fresh state
       console.log('[Tauri] Clearing all caches on startup')
 
+      // Preserve theme before clearing storage
+      const themeKey = 'layercake-theme'
+      const savedTheme = typeof localStorage !== 'undefined' ? localStorage.getItem(themeKey) : null
+
       // Clear browser caches
       if ('caches' in window) {
         try {
@@ -56,6 +60,10 @@ if (isTauriApp()) {
       // Clear local storage
       try {
         localStorage.clear()
+        if (savedTheme) {
+          localStorage.setItem(themeKey, savedTheme)
+          console.log('[Tauri] Restored theme preference')
+        }
         console.log('[Tauri] Cleared localStorage')
       } catch (error) {
         console.warn('[Tauri] Failed to clear localStorage:', error)
@@ -75,7 +83,12 @@ if (isTauriApp()) {
           <ApolloProvider client={apolloClient}>
             <Toaster />
             <BrowserRouter>
-              <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+              <ThemeProvider
+                attribute="class"
+                defaultTheme="light"
+                enableSystem={false}
+                storageKey="layercake-theme"
+              >
                 <TagsFilterProvider>
                   <App />
                 </TagsFilterProvider>
@@ -113,7 +126,12 @@ if (isTauriApp()) {
       <ApolloProvider client={apolloClient}>
         <Toaster />
         <BrowserRouter>
-          <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="light"
+            enableSystem={false}
+            storageKey="layercake-theme"
+          >
             <TagsFilterProvider>
               <App />
             </TagsFilterProvider>

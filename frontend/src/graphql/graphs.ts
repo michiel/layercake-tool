@@ -41,6 +41,7 @@ export interface Graph {
   edgeCount: number
   createdAt: string
   updatedAt: string
+  annotations?: string | null
   hasPendingEdits?: boolean
   lastEditSequence?: number
   lastReplayAt?: string
@@ -92,6 +93,7 @@ export const GET_GRAPHS = gql`
       edgeCount
       createdAt
       updatedAt
+      annotations
       layers {
         id
         layerId
@@ -118,6 +120,7 @@ export const GET_GRAPH_DETAILS = gql`
       edgeCount
       createdAt
       updatedAt
+      annotations
       layers {
         id
         layerId

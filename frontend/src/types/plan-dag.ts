@@ -230,6 +230,7 @@ export interface GraphExecutionMetadata {
   executionState: string;
   computedDate?: string;
   errorMessage?: string;
+  annotations?: string | null;
 }
 
 // Plan DAG Node Structure

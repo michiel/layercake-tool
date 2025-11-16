@@ -38,6 +38,7 @@ pub struct GraphPreview {
     pub node_id: String,
     pub graph_id: i32,
     pub name: String,
+    pub annotations: Option<String>,
     pub nodes: Vec<GraphNodePreview>,
     pub edges: Vec<GraphEdgePreview>,
     pub layers: Vec<crate::graphql::types::layer::Layer>,

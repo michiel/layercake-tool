@@ -12,6 +12,17 @@ pub struct Graph {
     pub nodes: Vec<Node>,
     pub edges: Vec<Edge>,
     pub layers: Vec<Layer>,
+    pub annotations: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct PartitionWidthAggregation {
+    pub parent_id: String,
+    pub parent_label: String,
+    pub aggregate_node_id: String,
+    pub aggregate_node_label: String,
+    pub aggregated_nodes: Vec<(String, String)>,
+    pub retained_count: usize,
 }
 
 impl Graph {
@@ -35,6 +46,26 @@ impl Graph {
     pub fn add_layer(&mut self, layer: Layer) {
         if !self.layers.iter().any(|l| l.id == layer.id) {
             self.layers.push(layer);
+        }
+    }
+
+    pub fn append_annotation(&mut self, annotation: impl AsRef<str>) {
+        let text = annotation.as_ref().trim();
+        if text.is_empty() {
+            return;
+        }
+
+        match &mut self.annotations {
+            Some(existing) if !existing.is_empty() => {
+                existing.push_str("\n\n");
+                existing.push_str(text);
+            }
+            Some(existing) => {
+                existing.push_str(text);
+            }
+            None => {
+                self.annotations = Some(text.to_string());
+            }
         }
     }
 
@@ -492,8 +523,16 @@ impl Graph {
         Ok(())
     }
 
-    pub fn modify_graph_limit_partition_width(&mut self, max_width: i32) -> Result<(), String> {
-        fn trim_node(node_id: &String, graph: &mut Graph, max_width: i32) -> Result<(), String> {
+    pub fn modify_graph_limit_partition_width(
+        &mut self,
+        max_width: i32,
+    ) -> Result<Vec<PartitionWidthAggregation>, String> {
+        fn trim_node(
+            node_id: &String,
+            graph: &mut Graph,
+            max_width: i32,
+            summaries: &mut Vec<PartitionWidthAggregation>,
+        ) -> Result<(), String> {
             let node = {
                 let node = graph
                     .get_node_by_id(node_id)
@@ -529,7 +568,7 @@ impl Graph {
             // Recursively process partition children first
             for child_id in &partition_child_node_ids {
                 debug!("Processing partition child: {} / {}", node.id, child_id);
-                trim_node(child_id, graph, max_width)?;
+                trim_node(child_id, graph, max_width, summaries)?;
             }
 
             if non_partition_child_node_ids.len() as i32 > max_width {
@@ -630,12 +669,24 @@ impl Graph {
                 untouched_edges.extend(aggregated_edge_map.into_values());
                 graph.edges = untouched_edges;
 
-                graph.set_node(agg_node);
+                graph.set_node(agg_node.clone());
 
                 for node_id in aggregate_ids {
                     debug!("\tRemoving node: {}", node_id);
                     graph.remove_node(node_id);
                 }
+
+                summaries.push(PartitionWidthAggregation {
+                    parent_id: node.id.clone(),
+                    parent_label: node.label.clone(),
+                    aggregate_node_id: agg_node.id.clone(),
+                    aggregate_node_label: agg_node.label.clone(),
+                    aggregated_nodes: aggregated_children
+                        .into_iter()
+                        .map(|child| (child.id, child.label))
+                        .collect(),
+                    retained_count: retain_count,
+                });
             }
             debug!("Updated graph stats: {}", graph.stats());
             Ok(())
@@ -659,14 +710,15 @@ impl Graph {
             roots
         };
 
+        let mut summaries = Vec::new();
         for node_id in &root_node_ids {
-            trim_node(node_id, self, max_width)?;
+            trim_node(node_id, self, max_width, &mut summaries)?;
         }
 
         if synthesized {
             info!("Synthetic partition hierarchy used for width limiting");
         }
-        Ok(())
+        Ok(summaries)
     }
 
     // Aggregate duplicate edges
@@ -865,6 +917,7 @@ impl Graph {
             nodes: Vec::new(),
             edges: Vec::new(),
             layers: self.layers.clone(),
+            annotations: self.annotations.clone(),
         };
 
         // Map to store new nodes created for each edge
@@ -1400,6 +1453,7 @@ mod tests {
                 border_color: "000000".to_string(),
                 dataset: None,
             }],
+            annotations: None,
         }
     }
 
@@ -1570,6 +1624,7 @@ mod tests {
                     dataset: None,
                 },
             ],
+            annotations: None,
         }
     }
 
@@ -1690,7 +1745,7 @@ mod tests {
         assert_eq!(root1_children.len(), 4); // Initially has 4 children
 
         // Apply partition width limit of 2
-        graph.modify_graph_limit_partition_width(2).unwrap();
+        let summary = graph.modify_graph_limit_partition_width(2).unwrap();
 
         // Verify after transformation
         let root1_after = graph.get_node_by_id("root1").unwrap();
@@ -1698,6 +1753,10 @@ mod tests {
 
         // Final width should match the limit (1 retained + 1 aggregate)
         assert_eq!(root1_children_after.len(), 2);
+
+        assert_eq!(summary.len(), 1);
+        assert_eq!(summary[0].aggregated_nodes.len(), 3);
+        assert_eq!(summary[0].retained_count, 1);
 
         // First child should remain visible
         assert!(root1_children_after.iter().any(|n| n.id == "child1"));
@@ -1738,7 +1797,7 @@ mod tests {
     #[test]
     fn test_partition_width_single_slot() {
         let mut graph = create_complex_test_graph();
-        graph.modify_graph_limit_partition_width(1).unwrap();
+        let summary = graph.modify_graph_limit_partition_width(1).unwrap();
 
         let root1 = graph.get_node_by_id("root1").unwrap();
         let children = graph.get_children(root1);
@@ -1746,6 +1805,8 @@ mod tests {
         let agg = &children[0];
         assert!(agg.id.starts_with("agg_root1"));
         assert_eq!(agg.weight, 4);
+        assert_eq!(summary.len(), 1);
+        assert_eq!(summary[0].aggregated_nodes.len(), 4);
 
         // Every original root1 child should now be gone
         for id in ["child1", "child2", "child3", "child4"] {
@@ -1832,6 +1893,7 @@ mod tests {
                 border_color: "000000".to_string(),
                 dataset: None,
             }],
+            annotations: None,
         };
 
         // Verify initial depth
@@ -1902,6 +1964,7 @@ mod tests {
                 border_color: "000000".to_string(),
                 dataset: None,
             }],
+            annotations: None,
         };
 
         assert!(graph.ensure_partition_hierarchy());
@@ -1985,6 +2048,7 @@ mod tests {
                 border_color: "000000".to_string(),
                 dataset: None,
             }],
+            annotations: None,
         };
 
         let original_node_count = graph.nodes.len();
@@ -2080,6 +2144,7 @@ mod tests {
                 border_color: "000000".to_string(),
                 dataset: None,
             }],
+            annotations: None,
         };
 
         graph
@@ -2162,6 +2227,7 @@ mod tests {
                 border_color: "000000".to_string(),
                 dataset: None,
             }],
+            annotations: None,
         };
 
         // Verify initial state
@@ -2244,6 +2310,7 @@ mod tests {
                 border_color: "000000".to_string(),
                 dataset: None,
             }],
+            annotations: None,
         };
 
         // This should fail verification due to partition to non-partition edge
@@ -2289,6 +2356,7 @@ mod tests {
                 border_color: "000000".to_string(),
                 dataset: None,
             }],
+            annotations: None,
         };
 
         // This should fail verification due to missing node

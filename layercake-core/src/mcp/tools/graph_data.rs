@@ -417,6 +417,7 @@ async fn ensure_graph(project_id: i32, db: &DatabaseConnection) -> Result<graphs
     graph_active.edge_count = Set(0);
     graph_active.error_message = Set(None);
     graph_active.metadata = Set(None);
+    graph_active.annotations = Set(None);
     graph_active.last_edit_sequence = Set(0);
     graph_active.has_pending_edits = Set(false);
     graph_active.last_replay_at = Set(None);

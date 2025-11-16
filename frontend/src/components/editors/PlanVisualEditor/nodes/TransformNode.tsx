@@ -1,9 +1,16 @@
-import { memo, useMemo } from 'react'
+import { memo, useMemo, useState } from 'react'
 import { NodeProps } from 'reactflow'
 import { Stack } from '@/components/layout-primitives'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { IconFileText } from '@tabler/icons-react'
 import { BaseNode } from './BaseNode'
 import { PlanDagNodeType, GraphTransform } from '../../../../types/plan-dag'
 import { usePlanDagCQRSMutations } from '../../../../hooks/usePlanDagCQRSMutations'
+import { useGraphPreview } from '../../../../hooks/usePreview'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 type TransformConfig = { transforms?: GraphTransform[] }
 
@@ -69,10 +76,14 @@ interface TransformNodeProps extends NodeProps {
 
 export const TransformNode = memo((props: TransformNodeProps) => {
   const { data, onEdit, onDelete } = props
+  const [showAnnotations, setShowAnnotations] = useState(false)
 
   // Get project ID from context
   const projectId = data.projectId as number | undefined
   const { updateNode } = usePlanDagCQRSMutations({ projectId: projectId || 0 })
+  const { preview: graphPreview, loading: previewLoading } = useGraphPreview(projectId || 0, props.id, {
+    skip: !showAnnotations,
+  })
 
   const parsedConfig = useMemo(() => parseConfig(data.config), [data.config])
   const transformSummary = useMemo(() => {
@@ -97,27 +108,74 @@ export const TransformNode = memo((props: TransformNodeProps) => {
     }
   }
 
+  const annotationText = graphPreview?.annotations || null
+
   return (
-    <BaseNode
-      {...props}
-      nodeType={PlanDagNodeType.TRANSFORM}
-      config={data.config}
-      metadata={data.metadata}
-      onEdit={() => onEdit?.(props.id)}
-      onDelete={() => onDelete?.(props.id)}
-      onLabelChange={handleLabelChange}
-      readonly={data.readonly}
-      edges={data.edges}
-      hasValidConfig={data.hasValidConfig}
-      editableLabel={false}
-      children={
-        <Stack gap="xs">
-          <p className="text-xs text-muted-foreground">
-            {transformSummary}
-          </p>
-        </Stack>
-      }
-    />
+    <>
+      <BaseNode
+        {...props}
+        nodeType={PlanDagNodeType.TRANSFORM}
+        config={data.config}
+        metadata={data.metadata}
+        onEdit={() => onEdit?.(props.id)}
+        onDelete={() => onDelete?.(props.id)}
+        onLabelChange={handleLabelChange}
+        readonly={data.readonly}
+        edges={data.edges}
+        hasValidConfig={data.hasValidConfig}
+        editableLabel={false}
+        footerContent={
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 w-7 p-0 text-indigo-600"
+                  data-action-icon="annotations"
+                  onClick={(e: React.MouseEvent) => {
+                    e.stopPropagation()
+                    e.preventDefault()
+                    setShowAnnotations(true)
+                  }}
+                >
+                  <IconFileText size={13} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>View annotations</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        }
+        children={
+          <Stack gap="xs">
+            <p className="text-xs text-muted-foreground">
+              {transformSummary}
+            </p>
+          </Stack>
+        }
+      />
+      <Dialog open={showAnnotations} onOpenChange={(open) => !open && setShowAnnotations(false)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Graph annotations</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto">
+            {previewLoading ? (
+              <p className="text-sm text-muted-foreground">Loading annotations…</p>
+            ) : annotationText ? (
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                className="prose prose-sm dark:prose-invert"
+              >
+                {annotationText}
+              </ReactMarkdown>
+            ) : (
+              <p className="text-sm text-muted-foreground">No annotations available yet.</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 })
 

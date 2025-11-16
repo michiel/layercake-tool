@@ -57,6 +57,7 @@ pub struct GraphExecutionMetadata {
     pub computed_date: Option<String>,
     #[graphql(name = "errorMessage")]
     pub error_message: Option<String>,
+    pub annotations: Option<String>,
 }
 
 // Node execution status change event for subscriptions

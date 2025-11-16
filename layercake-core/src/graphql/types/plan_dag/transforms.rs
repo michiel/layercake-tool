@@ -71,19 +71,29 @@ impl GraphTransform {
         self.params.enabled.unwrap_or(true)
     }
 
-    pub fn apply_to(&self, graph: &mut Graph) -> AnyResult<()> {
+    pub fn apply_to(&self, graph: &mut Graph) -> AnyResult<Option<String>> {
         if matches!(self.kind, GraphTransformKind::AggregateEdges) {
             if self.is_enabled() {
+                let before = graph.edges.len();
                 graph.aggregate_edges();
+                let msg = format!(
+                    "### Transform: Aggregate Edges\n- Before: {} edges\n- After: {} edges",
+                    before,
+                    graph.edges.len()
+                );
+                return Ok(Some(msg));
             }
-            return Ok(());
+            return Ok(None);
         }
 
         if !self.is_enabled() {
-            return Ok(());
+            return Ok(None);
         }
 
-        match self.kind {
+        let before_nodes = graph.nodes.len();
+        let before_edges = graph.edges.len();
+
+        let annotation = match self.kind {
             GraphTransformKind::PartitionDepthLimit => {
                 let depth = self.params.max_partition_depth.ok_or_else(|| {
                     anyhow!("PartitionDepthLimit transform requires max_partition_depth")
@@ -98,6 +108,12 @@ impl GraphTransform {
                 if synthesized {
                     info!("PartitionDepthLimit synthesized hierarchy because no partitions were defined in the source graph");
                 }
+                Some(format!(
+                    "### Transform: Partition Depth Limit\n- Max depth: {}\n- Nodes after: {}\n- Edges after: {}",
+                    depth,
+                    graph.nodes.len(),
+                    graph.edges.len()
+                ))
             }
             GraphTransformKind::PartitionWidthLimit => {
                 let width = self.params.max_partition_width.ok_or_else(|| {
@@ -107,12 +123,56 @@ impl GraphTransform {
                     return Err(anyhow!("max_partition_width must be greater than zero"));
                 }
                 let synthesized = graph.ensure_partition_hierarchy();
-                graph
+                let summary = graph
                     .modify_graph_limit_partition_width(width)
                     .map_err(|e| anyhow!(e))?;
                 if synthesized {
                     info!("PartitionWidthLimit synthesized hierarchy because no partitions were defined in the source graph");
                 }
+
+                let annotation = if summary.is_empty() {
+                    format!(
+                        "### Transform: Partition Width Limit\n- Max width: {}\n- No aggregation necessary",
+                        width
+                    )
+                } else {
+                    let mut table = String::from("| Parent | Retained | Aggregated | New aggregate |\n| --- | --- | --- | --- |\n");
+                    let mut details = String::new();
+                    for entry in &summary {
+                        table.push_str(&format!(
+                            "| {} ({}) | {} | {} | {} ({}) |\n",
+                            entry.parent_id,
+                            entry.parent_label,
+                            entry.retained_count,
+                            entry.aggregated_nodes.len(),
+                            entry.aggregate_node_id,
+                            entry.aggregate_node_label
+                        ));
+
+                        let aggregated_list = entry
+                            .aggregated_nodes
+                            .iter()
+                            .map(|(id, label)| format!("{}:{}", id, label))
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        details.push_str(&format!(
+                            "- **{} ({})** aggregated: {}\n",
+                            entry.aggregate_node_id,
+                            entry.aggregate_node_label,
+                            aggregated_list
+                        ));
+                    }
+
+                    format!(
+                        "### Transform: Partition Width Limit\n- Max width: {}\n- Parents aggregated: {}\n\n{}\n\n#### Aggregated nodes\n{}",
+                        width,
+                        summary.len(),
+                        table,
+                        details
+                    )
+                };
+
+                Some(annotation)
             }
             GraphTransformKind::NodeLabelMaxLength => {
                 let length = self.params.node_label_max_length.ok_or_else(|| {
@@ -122,6 +182,11 @@ impl GraphTransform {
                     return Err(anyhow!("node_label_max_length must be greater than zero"));
                 }
                 graph.truncate_node_labels(length);
+                Some(format!(
+                    "### Transform: Node Label Max Length\n- Max length: {}\n- Nodes after: {}",
+                    length,
+                    graph.nodes.len()
+                ))
             }
             GraphTransformKind::NodeLabelInsertNewlines => {
                 let wrap_at = self.params.node_label_insert_newlines_at.ok_or_else(|| {
@@ -135,6 +200,11 @@ impl GraphTransform {
                     ));
                 }
                 graph.insert_newlines_in_node_labels(wrap_at);
+                Some(format!(
+                    "### Transform: Node Label Insert Newlines\n- Wrap column: {}\n- Nodes after: {}",
+                    wrap_at,
+                    graph.nodes.len()
+                ))
             }
             GraphTransformKind::EdgeLabelMaxLength => {
                 let length = self.params.edge_label_max_length.ok_or_else(|| {
@@ -144,6 +214,11 @@ impl GraphTransform {
                     return Err(anyhow!("edge_label_max_length must be greater than zero"));
                 }
                 graph.truncate_edge_labels(length);
+                Some(format!(
+                    "### Transform: Edge Label Max Length\n- Max length: {}\n- Edges after: {}",
+                    length,
+                    graph.edges.len()
+                ))
             }
             GraphTransformKind::EdgeLabelInsertNewlines => {
                 let wrap_at = self.params.edge_label_insert_newlines_at.ok_or_else(|| {
@@ -157,20 +232,36 @@ impl GraphTransform {
                     ));
                 }
                 graph.insert_newlines_in_edge_labels(wrap_at);
+                Some(format!(
+                    "### Transform: Edge Label Insert Newlines\n- Wrap column: {}\n- Edges after: {}",
+                    wrap_at,
+                    graph.edges.len()
+                ))
             }
             GraphTransformKind::InvertGraph => {
                 *graph = graph.invert_graph().map_err(|e| anyhow!(e))?;
+                Some(format!(
+                    "### Transform: Invert Graph\n- Nodes before: {}\n- Edges before: {}\n- Nodes after: {}\n- Edges after: {}",
+                    before_nodes,
+                    before_edges,
+                    graph.nodes.len(),
+                    graph.edges.len()
+                ))
             }
             GraphTransformKind::GenerateHierarchy => {
                 graph.generate_hierarchy();
+                Some(format!(
+                    "### Transform: Generate Hierarchy\n- Nodes after: {}\n- Edges after: {}",
+                    graph.nodes.len(),
+                    graph.edges.len()
+                ))
             }
             GraphTransformKind::AggregateEdges => {
-                // Handled above
                 unreachable!("AggregateEdges should have been handled earlier");
             }
-        }
+        };
 
-        Ok(())
+        Ok(annotation)
     }
 }
 
@@ -331,7 +422,9 @@ impl TransformNodeConfig {
         }
 
         for transform in &self.transforms {
-            transform.apply_to(graph)?;
+            if let Some(annotation) = transform.apply_to(graph)? {
+                graph.append_annotation(annotation);
+            }
         }
 
         Ok(())
@@ -452,6 +545,7 @@ mod tests {
                 border_color: "000000".to_string(),
                 dataset: None,
             }],
+            annotations: None,
         }
     }
 
@@ -608,6 +702,7 @@ mod tests {
             layers: vec![Layer::new(
                 "layer1", "Layer 1", "ffffff", "000000", "000000",
             )],
+            annotations: None,
         };
 
         let transform = GraphTransform {

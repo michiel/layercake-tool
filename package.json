@@ -30,5 +30,9 @@
     "collaboration"
   ],
   "author": "Layercake Contributors",
-  "license": "MIT OR Apache-2.0"
+  "license": "MIT OR Apache-2.0",
+  "dependencies": {
+    "@assistant-ui/react-markdown": "^0.3.6",
+    "remark-gfm": "^4.0.0"
+  }
 }

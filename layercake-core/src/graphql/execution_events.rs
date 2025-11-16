@@ -73,6 +73,7 @@ pub async fn publish_graph_status(
             execution_state: graph.execution_state.clone(),
             computed_date: graph.computed_date.map(|dt| dt.to_rfc3339()),
             error_message: graph.error_message.clone(),
+            annotations: graph.annotations.clone(),
         }),
         timestamp: chrono::Utc::now().to_rfc3339(),
     };

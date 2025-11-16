@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Spinner } from '@/components/ui/spinner'
 import { Group } from '@/components/layout-primitives'
-import { IconSettings, IconTrash, IconPlayerPlayFilled, IconChartDots, IconTable, IconExternalLink } from '@tabler/icons-react'
+import { IconSettings, IconTrash, IconPlayerPlayFilled, IconChartDots, IconTable, IconExternalLink, IconFileText } from '@tabler/icons-react'
 import { useMutation } from '@apollo/client/react'
 import { PlanDagNodeType, GraphNodeConfig } from '../../../../types/plan-dag'
 import { isNodeConfigured } from '../../../../utils/planDagValidation'
@@ -19,6 +19,9 @@ import { BaseNode } from './BaseNode'
 import { usePlanDagCQRSMutations } from '../../../../hooks/usePlanDagCQRSMutations'
 import { showErrorNotification, showSuccessNotification } from '../../../../utils/notifications'
 import { UPDATE_GRAPH } from '../../../../graphql/graphs'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 interface GraphNodeProps extends NodeProps {
   onEdit?: (nodeId: string) => void
@@ -30,6 +33,7 @@ export const GraphNode = memo((props: GraphNodeProps) => {
   const { data, onEdit, onDelete, readonly = false } = props
   const [showPreview, setShowPreview] = useState(false)
   const [showDataDialog, setShowDataDialog] = useState(false)
+  const [showAnnotations, setShowAnnotations] = useState(false)
   const navigate = useNavigate()
 
   // Get project ID from context
@@ -78,11 +82,10 @@ export const GraphNode = memo((props: GraphNodeProps) => {
   const graphId = graphExecution?.graphId || null
 
   // Query pipeline graph preview (only for visualization dialog)
-  const { preview: graphPreview } = useGraphPreview(
-    projectId || 0,
-    props.id,
-    { skip: !showPreview || !projectId }
-  )
+  const shouldFetchPreview = !!projectId && (showPreview || showAnnotations)
+  const { preview: graphPreview } = useGraphPreview(projectId || 0, props.id, {
+    skip: !shouldFetchPreview,
+  })
 
   // Fallback query for execution state if not available inline
   const { preview: executionPreview, refetch: refetchExecutionState } = useGraphPreview(
@@ -91,6 +94,11 @@ export const GraphNode = memo((props: GraphNodeProps) => {
     { skip: !needsExecutionQuery }
   )
   const resolvedGraphId = graphId || executionPreview?.graphId || null
+  const annotationText =
+    graphPreview?.annotations ||
+    executionPreview?.annotations ||
+    graphExecution?.annotations ||
+    null
 
   // Execute node mutation
   const [executeNode, { loading: executing }] = useMutation(EXECUTE_NODE, {
@@ -337,6 +345,25 @@ export const GraphNode = memo((props: GraphNodeProps) => {
                   <Button
                     size="icon"
                     variant="ghost"
+                    className="h-9 w-9 rounded-full text-indigo-600"
+                    data-action-icon="annotations"
+                    onClick={(e: React.MouseEvent) => {
+                      e.stopPropagation()
+                      e.preventDefault()
+                      // Open regardless; dialog will show an empty message if missing
+                      setShowAnnotations(true)
+                    }}
+                  >
+                    <IconFileText size={12} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>View annotations</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
                     className="h-9 w-9 rounded-full text-teal-600"
                     data-action-icon="data"
                     onMouseDown={(e: React.MouseEvent) => {
@@ -390,6 +417,37 @@ export const GraphNode = memo((props: GraphNodeProps) => {
         graphId={resolvedGraphId}
         title={`Graph Data: ${data.metadata.label}`}
       />
+
+      <Dialog open={showAnnotations} onOpenChange={(open) => !open && setShowAnnotations(false)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Graph annotations</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto">
+            {annotationText ? (
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                className="prose prose-sm dark:prose-invert"
+                components={{
+                  pre: ({ className, ...props }) => (
+                    <pre className={`overflow-x-auto rounded-lg bg-slate-900 p-4 text-white ${className ?? ''}`} {...props} />
+                  ),
+                  code: ({ className, ...props }) => (
+                    <code
+                      className={`rounded bg-muted px-1 py-0.5 font-mono text-sm ${className ?? ''}`}
+                      {...props}
+                    />
+                  ),
+                }}
+              >
+                {annotationText}
+              </ReactMarkdown>
+            ) : (
+              <p className="text-sm text-muted-foreground">No annotations available yet.</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   )
 })

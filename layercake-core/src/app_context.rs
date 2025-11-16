@@ -1183,6 +1183,7 @@ impl AppContext {
                                 execution_state: graph.execution_state.clone(),
                                 computed_date: graph.computed_date.map(|d| d.to_rfc3339()),
                                 error_message: graph.error_message.clone(),
+                                annotations: graph.annotations.clone(),
                             });
                         }
                     }

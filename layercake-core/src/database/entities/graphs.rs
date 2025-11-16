@@ -32,6 +32,8 @@ pub struct Model {
     pub error_message: Option<String>,
     #[sea_orm(column_type = "JsonBinary")]
     pub metadata: Option<serde_json::Value>,
+    #[sea_orm(column_type = "Text")]
+    pub annotations: Option<String>,
     pub last_edit_sequence: i32,
     pub has_pending_edits: bool,
     pub last_replay_at: Option<ChronoDateTimeUtc>,
@@ -115,6 +117,7 @@ impl ActiveModel {
             edge_count: Set(0),
             error_message: ActiveValue::NotSet,
             metadata: ActiveValue::NotSet,
+            annotations: ActiveValue::NotSet,
             last_edit_sequence: Set(0),
             has_pending_edits: Set(false),
             last_replay_at: ActiveValue::NotSet,

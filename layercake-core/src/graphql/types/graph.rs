@@ -23,6 +23,7 @@ pub struct Graph {
     pub edge_count: i32,
     pub error_message: Option<String>,
     pub metadata: Option<serde_json::Value>,
+    pub annotations: Option<String>,
     #[graphql(name = "createdAt")]
     pub created_at: chrono::DateTime<chrono::Utc>,
     #[graphql(name = "updatedAt")]
@@ -94,6 +95,7 @@ impl From<crate::database::entities::graphs::Model> for Graph {
             edge_count: model.edge_count,
             error_message: model.error_message,
             metadata: model.metadata,
+            annotations: model.annotations,
             created_at: model.created_at,
             updated_at: model.updated_at,
         }

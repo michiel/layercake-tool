@@ -469,6 +469,7 @@ impl DagExecutor {
                     nodes: Vec::new(),
                     edges: Vec::new(),
                     layers: Vec::new(),
+                    annotations: None,
                 };
 
                 // Extract nodes
@@ -641,7 +642,9 @@ impl DagExecutor {
 
         let transform_hash = self.compute_transform_hash(node_id, upstream_graph, config)?;
 
-        if graph_record.source_hash.as_deref() == Some(&transform_hash) {
+        let annotations_changed = graph_record.annotations != graph.annotations;
+        let hash_matches = graph_record.source_hash.as_deref() == Some(&transform_hash);
+        if hash_matches && !annotations_changed {
             return Ok(());
         }
 
@@ -663,6 +666,7 @@ impl DagExecutor {
 
         let mut active: GraphActiveModel = graph_record.into();
         active.metadata = Set(metadata);
+        active.annotations = Set(graph.annotations.clone());
         active = active.set_completed(
             transform_hash,
             graph.nodes.len() as i32,
@@ -722,6 +726,7 @@ impl DagExecutor {
 
         let mut active: GraphActiveModel = graph_record.into();
         active.metadata = Set(metadata);
+        active.annotations = Set(graph.annotations.clone());
         active = active.set_completed(
             filter_hash,
             graph.nodes.len() as i32,

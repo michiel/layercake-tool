@@ -108,6 +108,7 @@ impl GraphService {
             nodes: graph_nodes,
             edges: graph_edges,
             layers: graph_layers,
+            annotations: graph_meta.annotations,
         })
     }
 
