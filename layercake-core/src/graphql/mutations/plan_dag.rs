@@ -13,7 +13,9 @@ use crate::database::entities::{
 };
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
-use crate::graphql::types::plan_dag::{PlanDag, PlanDagEdge, PlanDagInput, PlanDagNode};
+use crate::graphql::types::plan_dag::{
+    PlanDag, PlanDagEdge, PlanDagInput, PlanDagMigrationDetail, PlanDagMigrationResult, PlanDagNode,
+};
 use crate::pipeline::DagExecutor;
 use crate::plan::{
     RenderConfig, RenderConfigBuiltInStyle, RenderConfigOrientation, RenderTargetOptions,
@@ -145,6 +147,38 @@ impl PlanDagMutation {
             edges,
             metadata: plan_dag.metadata,
         }))
+    }
+
+    /// Validate and migrate legacy plan DAG items (e.g., OutputNode -> GraphArtefactNode).
+    async fn validate_and_migrate_plan_dag(
+        &self,
+        ctx: &Context<'_>,
+        project_id: i32,
+    ) -> Result<PlanDagMigrationResult> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let outcome = context
+            .plan_dag_service
+            .validate_and_migrate_legacy_nodes(project_id)
+            .await
+            .map_err(|e| {
+                StructuredError::service("PlanDagService::validate_and_migrate_legacy_nodes", e)
+            })?;
+
+        Ok(PlanDagMigrationResult {
+            checked_nodes: outcome.checked_nodes as i32,
+            updated_nodes: outcome
+                .migrated_nodes
+                .into_iter()
+                .map(|detail| PlanDagMigrationDetail {
+                    node_id: detail.node_id,
+                    from_type: detail.from_type,
+                    to_type: detail.to_type,
+                    note: detail.note,
+                })
+                .collect(),
+            warnings: outcome.warnings,
+            errors: outcome.errors,
+        })
     }
 
     /// Export a node's output (graph export to various formats)

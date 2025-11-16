@@ -20,6 +20,11 @@ use serde_json::{json, Value};
 use tokio::io::{self, AsyncBufReadExt, BufReader};
 use tracing;
 
+use rig::providers::gemini::completion::gemini_api_types::{
+    AdditionalParameters, GenerationConfig,
+};
+use rig::providers::{anthropic, gemini, ollama, openai};
+use rig::OneOrMany;
 use rig::{
     agent::{Agent, AgentBuilder},
     client::CompletionClient,
@@ -31,11 +36,6 @@ use rig::{
         Completion, CompletionModel, Usage,
     },
 };
-use rig::providers::gemini::completion::gemini_api_types::{
-    AdditionalParameters, GenerationConfig,
-};
-use rig::providers::{anthropic, gemini, ollama, openai};
-use rig::OneOrMany;
 
 #[cfg(feature = "rmcp")]
 use rmcp::{

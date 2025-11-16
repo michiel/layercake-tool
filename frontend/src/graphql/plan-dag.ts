@@ -223,6 +223,22 @@ export const BATCH_MOVE_PLAN_DAG_NODES = gql`
   }
 `
 
+export const VALIDATE_AND_MIGRATE_PLAN_DAG = gql`
+  mutation ValidateAndMigratePlanDag($projectId: Int!) {
+    validateAndMigratePlanDag(projectId: $projectId) {
+      checkedNodes
+      updatedNodes {
+        nodeId
+        fromType
+        toType
+        note
+      }
+      warnings
+      errors
+    }
+  }
+`
+
 // Plan DAG Subscriptions for real-time collaboration
 export const PLAN_DAG_CHANGED_SUBSCRIPTION = gql`
   subscription PlanDagChanged($projectId: Int!) {

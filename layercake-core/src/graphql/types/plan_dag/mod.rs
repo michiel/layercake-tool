@@ -68,6 +68,27 @@ pub struct PlanDagInput {
     pub metadata: PlanDagMetadata,
 }
 
+#[derive(SimpleObject, Clone, Debug)]
+pub struct PlanDagMigrationDetail {
+    #[graphql(name = "nodeId")]
+    pub node_id: String,
+    #[graphql(name = "fromType")]
+    pub from_type: String,
+    #[graphql(name = "toType")]
+    pub to_type: String,
+    pub note: Option<String>,
+}
+
+#[derive(SimpleObject, Clone, Debug)]
+pub struct PlanDagMigrationResult {
+    #[graphql(name = "checkedNodes")]
+    pub checked_nodes: i32,
+    #[graphql(name = "updatedNodes")]
+    pub updated_nodes: Vec<PlanDagMigrationDetail>,
+    pub warnings: Vec<String>,
+    pub errors: Vec<String>,
+}
+
 impl From<PlanDagSnapshot> for PlanDag {
     fn from(snapshot: PlanDagSnapshot) -> Self {
         Self {

@@ -157,9 +157,7 @@ impl GraphTransform {
                             .join(", ");
                         details.push_str(&format!(
                             "- **{} ({})** aggregated: {}\n",
-                            entry.aggregate_node_id,
-                            entry.aggregate_node_label,
-                            aggregated_list
+                            entry.aggregate_node_id, entry.aggregate_node_label, aggregated_list
                         ));
                     }
 

@@ -2,8 +2,8 @@ use async_graphql::*;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 
 use crate::database::entities::{
-    data_sets, graph_edges, graph_layers, graph_nodes, graphs, plan_dag_edges, plan_dag_nodes, plans,
-    project_collaborators, user_sessions, users,
+    data_sets, graph_edges, graph_layers, graph_nodes, graphs, plan_dag_edges, plan_dag_nodes,
+    plans, project_collaborators, user_sessions, users,
 };
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;

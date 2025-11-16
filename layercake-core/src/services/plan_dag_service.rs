@@ -17,6 +17,22 @@ pub struct PlanDagService {
     db: DatabaseConnection,
 }
 
+#[derive(Debug, Clone)]
+pub struct PlanDagMigrationDetail {
+    pub node_id: String,
+    pub from_type: String,
+    pub to_type: String,
+    pub note: Option<String>,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct PlanDagMigrationOutcome {
+    pub checked_nodes: usize,
+    pub migrated_nodes: Vec<PlanDagMigrationDetail>,
+    pub warnings: Vec<String>,
+    pub errors: Vec<String>,
+}
+
 #[derive(Clone)]
 pub struct PlanDagNodePositionUpdate {
     pub node_id: String,
@@ -666,6 +682,90 @@ impl PlanDagService {
         }
 
         Ok(updated_nodes)
+    }
+
+    /// Validate and migrate legacy plan DAG node types for a project.
+    /// Currently normalises legacy OutputNode/artefact aliases to GraphArtefactNode and tree artefact aliases.
+    pub async fn validate_and_migrate_legacy_nodes(
+        &self,
+        project_id: i32,
+    ) -> Result<PlanDagMigrationOutcome> {
+        let plan = self.get_or_create_plan(project_id).await?;
+
+        let nodes = plan_dag_nodes::Entity::find()
+            .filter(plan_dag_nodes::Column::PlanId.eq(plan.id))
+            .all(&self.db)
+            .await
+            .map_err(|e| anyhow!("Failed to load plan DAG nodes: {}", e))?;
+
+        let mut outcome = PlanDagMigrationOutcome {
+            checked_nodes: nodes.len(),
+            ..Default::default()
+        };
+
+        let mut updated_any = false;
+
+        for node in nodes {
+            let original_type = node.node_type.clone();
+            let (normalized_type, note) = normalize_legacy_node_type(&original_type);
+            let validated_type =
+                match ValidationService::validate_plan_dag_node_type(&normalized_type) {
+                    Ok(valid) => valid,
+                    Err(err) => {
+                        outcome.errors.push(format!(
+                            "Node {} has invalid type '{}': {}",
+                            node.id, original_type, err
+                        ));
+                        continue;
+                    }
+                };
+
+            if validated_type != original_type {
+                let mut active: plan_dag_nodes::ActiveModel = node.clone().into();
+                active.node_type = Set(validated_type.clone());
+                active.updated_at = Set(Utc::now());
+                active
+                    .update(&self.db)
+                    .await
+                    .map_err(|e| anyhow!("Failed to migrate node {}: {}", node.id, e))?;
+
+                outcome.migrated_nodes.push(PlanDagMigrationDetail {
+                    node_id: node.id.clone(),
+                    from_type: original_type,
+                    to_type: validated_type.clone(),
+                    note: note.or_else(|| Some("Normalized legacy node type".to_string())),
+                });
+                updated_any = true;
+            }
+        }
+
+        if updated_any {
+            plan_dag_delta::increment_plan_version(&self.db, plan.id)
+                .await
+                .map_err(|e| anyhow!("Failed to increment plan version after migration: {}", e))?;
+        }
+
+        Ok(outcome)
+    }
+}
+
+fn normalize_legacy_node_type(node_type: &str) -> (String, Option<String>) {
+    match node_type {
+        "OutputNode" | "Output" => (
+            "GraphArtefactNode".to_string(),
+            Some("Renamed legacy Output node to GraphArtefactNode".to_string()),
+        ),
+        "GraphArtefactNode" => ("GraphArtefactNode".to_string(), None),
+        "GraphArtefact" | "GraphArtifact" | "GraphArtifactNode" => (
+            "GraphArtefactNode".to_string(),
+            Some("Normalized artefact node naming".to_string()),
+        ),
+        "TreeArtefactNode" => ("TreeArtefactNode".to_string(), None),
+        "TreeArtefact" | "TreeArtifact" => (
+            "TreeArtefactNode".to_string(),
+            Some("Normalized tree artefact node naming".to_string()),
+        ),
+        other => (other.to_string(), None),
     }
 }
 

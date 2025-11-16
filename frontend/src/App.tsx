@@ -36,6 +36,7 @@ import { useRegisterChatContext } from './hooks/useRegisterChatContext'
 import { cn } from './lib/utils'
 import { useTagsFilter } from './hooks/useTagsFilter'
 import { EXPORT_PROJECT_ARCHIVE, EXPORT_PROJECT_AS_TEMPLATE } from './graphql/libraryItems'
+import { VALIDATE_AND_MIGRATE_PLAN_DAG } from './graphql/plan-dag'
 import { showErrorNotification, showSuccessNotification } from './utils/notifications'
 
 // Collaboration Context for providing project-level collaboration to all pages
@@ -1212,7 +1213,7 @@ const ProjectDetailPage = () => {
     }>
   }>(GET_PROJECTS)
 
-  const { data: planDagData } = useQuery(GET_PLAN_DAG, {
+  const { data: planDagData, refetch: refetchPlanDag } = useQuery(GET_PLAN_DAG, {
     variables: { projectId: projectIdNum },
     skip: !projectId,
   })
@@ -1249,6 +1250,9 @@ const ProjectDetailPage = () => {
   const [exportProjectArchiveMutation, { loading: exportArchiveLoading }] = useMutation(EXPORT_PROJECT_ARCHIVE)
   const [exportProjectAsTemplateMutation, { loading: exportTemplateLoading }] = useMutation(
     EXPORT_PROJECT_AS_TEMPLATE
+  )
+  const [validatePlanDagMutation, { loading: validatePlanDagLoading }] = useMutation(
+    VALIDATE_AND_MIGRATE_PLAN_DAG
   )
 
   // Extract stats from single query
@@ -1290,6 +1294,47 @@ const ProjectDetailPage = () => {
     URL.revokeObjectURL(url)
 
     console.log(`Downloaded Plan DAG as ${filename}`)
+  }
+
+  const handleValidateAndMigratePlan = async () => {
+    if (!Number.isFinite(projectIdNum)) {
+      return
+    }
+    try {
+      const { data } = await validatePlanDagMutation({
+        variables: { projectId: projectIdNum },
+      })
+      const result = (data as any)?.validateAndMigratePlanDag
+      const migratedCount = result?.updatedNodes?.length || 0
+      const warningCount = result?.warnings?.length || 0
+      const errors: string[] = result?.errors || []
+
+      if (errors.length > 0) {
+        showErrorNotification(
+          'Plan DAG validation failed',
+          `Found ${errors.length} error(s). First: ${errors[0]}`
+        )
+        console.error('Plan DAG validation errors', errors)
+        return
+      }
+
+      showSuccessNotification(
+        'Plan DAG validated',
+        `Migrated ${migratedCount} legacy node(s). Warnings: ${warningCount}.`
+      )
+      if (typeof refetchPlanDag === 'function') {
+        refetchPlanDag()
+      }
+      if (warningCount > 0) {
+        console.warn('Plan DAG validation warnings', result?.warnings)
+      }
+    } catch (error: any) {
+      console.error('Failed to validate/migrate plan DAG', error)
+      showErrorNotification(
+        'Plan validation failed',
+        error?.message || 'Unable to validate or migrate the plan DAG.'
+      )
+    }
   }
 
   // Simple YAML converter
@@ -1592,6 +1637,15 @@ const ProjectDetailPage = () => {
               </p>
             </div>
             <Group gap="xs">
+              <Button
+                variant="secondary"
+                onClick={handleValidateAndMigratePlan}
+                disabled={validatePlanDagLoading}
+              >
+                {validatePlanDagLoading && <Spinner className="mr-2 h-4 w-4" />}
+                <IconAdjustments className="mr-2 h-4 w-4" />
+                Validate &amp; migrate plan
+              </Button>
               <Button variant="secondary" onClick={() => handleDownloadYAML()} disabled={!planDag}>
                 <IconDownload className="mr-2 h-4 w-4" />
                 Export plan YAML

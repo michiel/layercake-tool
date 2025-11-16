@@ -66,9 +66,13 @@ impl GraphService {
             .map(|db_layer| Layer {
                 id: db_layer.layer_id,
                 label: db_layer.name,
-                background_color: db_layer.background_color.unwrap_or_else(|| "FFFFFF".to_string()),
+                background_color: db_layer
+                    .background_color
+                    .unwrap_or_else(|| "FFFFFF".to_string()),
                 text_color: db_layer.text_color.unwrap_or_else(|| "000000".to_string()),
-                border_color: db_layer.border_color.unwrap_or_else(|| "000000".to_string()),
+                border_color: db_layer
+                    .border_color
+                    .unwrap_or_else(|| "000000".to_string()),
                 dataset: db_layer.dataset_id,
             })
             .collect();

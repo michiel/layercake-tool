@@ -167,7 +167,7 @@ impl DagExecutor {
                     }
                 }
             }
-            "GraphArtefactNode" | "TreeArtefactNode" => {
+            "GraphArtefactNode" | "TreeArtefactNode" | "OutputNode" | "Output" => {
                 // Output nodes deliver exports on demand; no proactive execution required
                 return Ok(());
             }

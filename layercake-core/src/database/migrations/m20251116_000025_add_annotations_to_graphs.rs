@@ -10,11 +10,7 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(Graphs::Table)
-                    .add_column_if_not_exists(
-                        ColumnDef::new(Graphs::Annotations)
-                            .text()
-                            .null(),
-                    )
+                    .add_column_if_not_exists(ColumnDef::new(Graphs::Annotations).text().null())
                     .to_owned(),
             )
             .await

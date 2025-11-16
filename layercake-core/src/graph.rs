@@ -624,8 +624,7 @@ impl Graph {
                 };
 
                 // aggregate edges
-                let aggregated_child_ids: HashSet<String> =
-                    aggregate_ids.iter().cloned().collect();
+                let aggregated_child_ids: HashSet<String> = aggregate_ids.iter().cloned().collect();
                 let mut untouched_edges = Vec::new();
                 let mut aggregated_edge_map: HashMap<
                     (String, String, String, String, Option<i32>),
@@ -1777,7 +1776,10 @@ mod tests {
         // Aggregated edges should collapse duplicates
         let mut edge_lookup: HashMap<(&str, &str), (&str, i32)> = HashMap::new();
         for edge in &graph.edges {
-            edge_lookup.insert((edge.source.as_str(), edge.target.as_str()), (edge.id.as_str(), edge.weight));
+            edge_lookup.insert(
+                (edge.source.as_str(), edge.target.as_str()),
+                (edge.id.as_str(), edge.weight),
+            );
         }
 
         let agg_edge = edge_lookup
