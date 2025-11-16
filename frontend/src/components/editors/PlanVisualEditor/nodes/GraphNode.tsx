@@ -329,7 +329,7 @@ export const GraphNode = memo((props: GraphNodeProps) => {
                     variant="ghost"
                     className="h-9 w-9 rounded-full text-blue-600"
                     data-action-icon="preview"
-                    onMouseDown={(e: React.MouseEvent) => {
+                    onClick={(e: React.MouseEvent) => {
                       e.stopPropagation()
                       e.preventDefault()
                       setShowPreview(true)
@@ -366,7 +366,7 @@ export const GraphNode = memo((props: GraphNodeProps) => {
                     variant="ghost"
                     className="h-9 w-9 rounded-full text-teal-600"
                     data-action-icon="data"
-                    onMouseDown={(e: React.MouseEvent) => {
+                    onClick={(e: React.MouseEvent) => {
                       e.stopPropagation()
                       e.preventDefault()
                       setShowDataDialog(true)
@@ -385,7 +385,7 @@ export const GraphNode = memo((props: GraphNodeProps) => {
                       variant="ghost"
                       className="h-9 w-9 rounded-full text-purple-600"
                       data-action-icon="open-graph"
-                      onMouseDown={(e: React.MouseEvent) => {
+                      onClick={(e: React.MouseEvent) => {
                         e.stopPropagation()
                         e.preventDefault()
                         navigate(`/projects/${projectId}/plan-nodes/${resolvedGraphId}/edit`)

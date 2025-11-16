@@ -216,6 +216,12 @@ export const BaseNode = memo(({
     setIsEditingLabel(false)
   }
 
+  const handleButtonClick = (event: ReactMouseEvent, callback?: () => void) => {
+    event.stopPropagation();
+    event.preventDefault();
+    callback?.();
+  };
+
   // Default tool buttons if not provided
   const defaultToolButtons = !readonly && (
     <TooltipProvider>
@@ -227,11 +233,7 @@ export const BaseNode = memo(({
               variant="ghost"
               className="h-7 w-7 text-blue-600 hover:text-blue-700 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900/50"
               data-action-icon="edit-label"
-              onMouseDown={(e) => {
-                e.stopPropagation()
-                e.preventDefault()
-                setIsEditingLabel(true)
-              }}
+              onClick={(e) => handleButtonClick(e, () => setIsEditingLabel(true))}
             >
               <IconSettings size={13} />
             </Button>
@@ -247,11 +249,7 @@ export const BaseNode = memo(({
               variant="ghost"
               className="h-7 w-7 text-gray-600 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700/50"
               data-action-icon="edit"
-              onMouseDown={(e) => {
-                e.stopPropagation()
-                e.preventDefault()
-                onEdit?.()
-              }}
+              onClick={(e) => handleButtonClick(e, onEdit)}
             >
               <IconSettings size={13} />
             </Button>
@@ -264,18 +262,14 @@ export const BaseNode = memo(({
           <Button
             size="icon"
             variant="ghost"
-            className="h-7 w-7 text-red-600 hover:text-red-700 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/50"
-            data-action-icon="delete"
-            onMouseDown={(e) => {
-              e.stopPropagation()
-              e.preventDefault()
-              onDelete?.()
-            }}
-          >
-            <IconTrash size={13} />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Delete node</TooltipContent>
+              className="h-7 w-7 text-red-600 hover:text-red-700 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/50"
+              data-action-icon="delete"
+              onClick={(e) => handleButtonClick(e, onDelete)}
+            >
+              <IconTrash size={13} />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Delete node</TooltipContent>
       </Tooltip>
     </TooltipProvider>
   )
