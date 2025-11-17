@@ -79,20 +79,18 @@ export const ProjectLayersPage = () => {
     name: '',
     ...DEFAULT_LAYER_COLORS,
   })
+  const [datasetToggleState, setDatasetToggleState] = useState<Record<number, boolean>>({})
 
   useEffect(() => {
     setEditableLayers(projectLayers)
+    const nextState: Record<number, boolean> = {}
+    projectLayers
+      .filter((l) => l.sourceDatasetId)
+      .forEach((l) => {
+        nextState[l.sourceDatasetId as number] = nextState[l.sourceDatasetId as number] || l.enabled
+      })
+    setDatasetToggleState((prev) => ({ ...prev, ...nextState }))
   }, [projectLayers])
-
-  const datasetsEnabled = useMemo(
-    () =>
-      new Set(
-        projectLayers
-          .filter((l) => l.sourceDatasetId && l.enabled)
-          .map((l) => l.sourceDatasetId as number)
-      ),
-    [projectLayers]
-  )
 
   const handleSaveLayer = async (layer: ProjectLayerInput) => {
     try {
@@ -134,16 +132,28 @@ export const ProjectLayersPage = () => {
   }
 
   const handleToggleDataset = async (datasetId: number, enabled: boolean) => {
+    setDatasetToggleState((prev) => ({ ...prev, [datasetId]: enabled }))
     try {
       await setDatasetEnabled({
         variables: { projectId: projectIdNum, dataSetId: datasetId, enabled },
       })
       await Promise.all([refetchLayers(), refetchDatasets()])
+      // Refresh toggle map from latest projectLayers
+      const refreshed = await refetchLayers()
+      const layers: ProjectLayer[] = (refreshed.data as any)?.projectLayers ?? []
+      const nextState: Record<number, boolean> = {}
+      layers
+        .filter((l) => l.sourceDatasetId)
+        .forEach((l) => {
+          nextState[l.sourceDatasetId as number] = nextState[l.sourceDatasetId as number] || l.enabled
+        })
+      setDatasetToggleState((prev) => ({ ...prev, ...nextState }))
       showSuccessNotification(
         enabled ? 'Dataset layers enabled' : 'Dataset layers disabled',
         enabled ? 'Imported layer definitions' : 'Disabled dataset-provided layers'
       )
     } catch (error: any) {
+      setDatasetToggleState((prev) => ({ ...prev, [datasetId]: !enabled }))
       showErrorNotification('Failed to toggle dataset layers', error?.message || 'Unknown error')
     }
   }
@@ -228,9 +238,13 @@ export const ProjectLayersPage = () => {
               {layerDatasets.length === 0 && (
                 <p className="text-sm text-muted-foreground">No layer datasets available.</p>
               )}
-              <Stack gap="md">
-                {layerDatasets.map((dataset: any) => {
-                  const enabled = datasetsEnabled.has(dataset.id)
+                <Stack gap="md">
+                  {layerDatasets.map((dataset: any) => {
+                  const enabled =
+                    datasetToggleState[dataset.id] ??
+                    projectLayers.some(
+                      (l) => l.sourceDatasetId === dataset.id && l.enabled
+                    )
                   return (
                     <div
                       key={dataset.id}
