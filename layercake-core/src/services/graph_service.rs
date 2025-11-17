@@ -77,35 +77,78 @@ impl GraphService {
             })
             .collect();
 
+        // Track data quality issues for logging
+        let mut nodes_missing_label = 0;
+        let mut edges_missing_layer = 0;
+
         // Convert to Graph Node structs
         let graph_nodes: Vec<Node> = db_graph_nodes
             .into_iter()
-            .map(|db_node| Node {
-                id: db_node.id,
-                label: db_node.label.unwrap_or_default(),
-                layer: db_node.layer.unwrap_or_else(|| "default".to_string()),
-                is_partition: db_node.is_partition,
-                belongs_to: db_node.belongs_to,
-                weight: db_node.weight.unwrap_or(1.0) as i32,
-                comment: None, // Could be extracted from attrs if needed
-                dataset: db_node.dataset_id,
+            .map(|db_node| {
+                // Use node ID as label fallback for visibility
+                let label = if let Some(label) = db_node.label {
+                    label
+                } else {
+                    nodes_missing_label += 1;
+                    db_node.id.clone()
+                };
+
+                // Empty layer means inherit default styling
+                let layer = db_node.layer.unwrap_or_default();
+
+                Node {
+                    id: db_node.id,
+                    label,
+                    layer,
+                    is_partition: db_node.is_partition,
+                    belongs_to: db_node.belongs_to,
+                    weight: db_node.weight.unwrap_or(1.0) as i32,
+                    comment: None, // Could be extracted from attrs if needed
+                    dataset: db_node.dataset_id,
+                }
             })
             .collect();
 
         // Convert to Graph Edge structs
         let graph_edges: Vec<Edge> = db_graph_edges
             .into_iter()
-            .map(|db_edge| Edge {
-                id: db_edge.id.clone(),
-                source: db_edge.source,
-                target: db_edge.target,
-                label: db_edge.label.unwrap_or_default(),
-                layer: db_edge.layer.unwrap_or_else(|| "default".to_string()),
-                weight: db_edge.weight.unwrap_or(1.0) as i32,
-                comment: None,
-                dataset: db_edge.dataset_id,
+            .map(|db_edge| {
+                // Empty layer means inherit default styling
+                let layer = if let Some(layer) = db_edge.layer {
+                    layer
+                } else {
+                    edges_missing_layer += 1;
+                    String::new()
+                };
+
+                Edge {
+                    id: db_edge.id.clone(),
+                    source: db_edge.source,
+                    target: db_edge.target,
+                    label: db_edge.label.unwrap_or_default(),
+                    layer,
+                    weight: db_edge.weight.unwrap_or(1.0) as i32,
+                    comment: None,
+                    dataset: db_edge.dataset_id,
+                }
             })
             .collect();
+
+        // Log data quality warnings
+        if nodes_missing_label > 0 {
+            tracing::warn!(
+                "Graph {}: {} nodes missing label, using node ID as fallback",
+                graph_id,
+                nodes_missing_label
+            );
+        }
+        if edges_missing_layer > 0 {
+            tracing::debug!(
+                "Graph {}: {} edges have no layer (will inherit default styling)",
+                graph_id,
+                edges_missing_layer
+            );
+        }
 
         Ok(Graph {
             name: graph_meta.name,
