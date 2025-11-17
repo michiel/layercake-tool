@@ -9,6 +9,7 @@ use super::types::LayerData;
 use crate::database::entities::ExecutionState;
 use crate::database::entities::{
     data_sets, datasets, graph_edges, graph_layers, graph_nodes, graphs, plan_dag_nodes,
+    project_layers,
 };
 use crate::services::GraphEditService;
 use tracing::{info, warn};
@@ -292,8 +293,11 @@ impl GraphBuilder {
             .all(&self.db)
             .await?;
 
-        let db_layers = graph_layers::Entity::find()
-            .filter(graph_layers::Column::GraphId.eq(graph.id))
+        // Load from project-wide layers instead of per-graph layers
+        // This uses the new architecture where layers are defined at project level
+        let db_layers = project_layers::Entity::find()
+            .filter(project_layers::Column::ProjectId.eq(graph.project_id))
+            .filter(project_layers::Column::Enabled.eq(true))
             .all(&self.db)
             .await?;
 
@@ -318,37 +322,14 @@ impl GraphBuilder {
                 "attrs": e.attrs.clone()
             })).collect::<Vec<_>>(),
             "graph_layers": db_layers.iter().map(|l| {
-                let mut layer_json = serde_json::json!({
+                // Strip # prefix for template compatibility (templates add # themselves)
+                serde_json::json!({
                     "id": l.layer_id.clone(),
                     "label": l.name.clone(),
-                });
-
-                // Add color fields if present
-                if let Some(ref bg_color) = l.background_color {
-                    layer_json["background_color"] = serde_json::json!(bg_color);
-                }
-                if let Some(ref txt_color) = l.text_color {
-                    layer_json["text_color"] = serde_json::json!(txt_color);
-                }
-                if let Some(ref brd_color) = l.border_color {
-                    layer_json["border_color"] = serde_json::json!(brd_color);
-                }
-                if let Some(ref cmt) = l.comment {
-                    layer_json["comment"] = serde_json::json!(cmt);
-                }
-
-                // Parse and merge properties if present
-                if let Some(ref props_str) = l.properties {
-                    if let Ok(props) = serde_json::from_str::<serde_json::Value>(props_str) {
-                        if let Some(props_obj) = props.as_object() {
-                            for (key, value) in props_obj {
-                                layer_json[key] = value.clone();
-                            }
-                        }
-                    }
-                }
-
-                layer_json
+                    "background_color": l.background_color.trim_start_matches('#'),
+                    "text_color": l.text_color.trim_start_matches('#'),
+                    "border_color": l.border_color.trim_start_matches('#'),
+                })
             }).collect::<Vec<_>>()
         });
 

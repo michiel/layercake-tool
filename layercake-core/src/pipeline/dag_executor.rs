@@ -521,17 +521,21 @@ impl DagExecutor {
                         let layer = crate::graph::Layer {
                             id: layer_val["id"].as_str().unwrap_or("").to_string(),
                             label: layer_val["label"].as_str().unwrap_or("").to_string(),
+                            // Strip # prefix for template compatibility (templates add # themselves)
                             background_color: layer_val["background_color"]
                                 .as_str()
-                                .unwrap_or("#FFFFFF")
+                                .unwrap_or("FFFFFF")
+                                .trim_start_matches('#')
                                 .to_string(),
                             text_color: layer_val["text_color"]
                                 .as_str()
-                                .unwrap_or("#000000")
+                                .unwrap_or("000000")
+                                .trim_start_matches('#')
                                 .to_string(),
                             border_color: layer_val["border_color"]
                                 .as_str()
-                                .unwrap_or("#CCCCCC")
+                                .unwrap_or("CCCCCC")
+                                .trim_start_matches('#')
                                 .to_string(),
                             dataset: None,
                         };

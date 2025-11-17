@@ -301,7 +301,18 @@ impl GraphService {
                 .get_project_layers_palette(graph_meta.project_id)
                 .await?;
             if !palette.is_empty() {
+                // Strip # prefix for export template compatibility (templates add # themselves)
                 palette
+                    .into_iter()
+                    .map(|layer| Layer {
+                        id: layer.id,
+                        label: layer.label,
+                        background_color: layer.background_color.trim_start_matches('#').to_string(),
+                        text_color: layer.text_color.trim_start_matches('#').to_string(),
+                        border_color: layer.border_color.trim_start_matches('#').to_string(),
+                        dataset: layer.dataset,
+                    })
+                    .collect()
             } else {
                 let db_layers = Layers::find()
                     .filter(graph_layers::Column::GraphId.eq(graph_id))
@@ -309,6 +320,7 @@ impl GraphService {
                     .await
                     .map_err(GraphError::Database)?;
 
+                // Strip # prefix for export template compatibility (templates add # themselves)
                 db_layers
                     .into_iter()
                     .map(|db_layer| Layer {
@@ -316,11 +328,19 @@ impl GraphService {
                         label: db_layer.name,
                         background_color: db_layer
                             .background_color
-                            .unwrap_or_else(|| "FFFFFF".to_string()),
-                        text_color: db_layer.text_color.unwrap_or_else(|| "000000".to_string()),
+                            .unwrap_or_else(|| "FFFFFF".to_string())
+                            .trim_start_matches('#')
+                            .to_string(),
+                        text_color: db_layer
+                            .text_color
+                            .unwrap_or_else(|| "000000".to_string())
+                            .trim_start_matches('#')
+                            .to_string(),
                         border_color: db_layer
                             .border_color
-                            .unwrap_or_else(|| "000000".to_string()),
+                            .unwrap_or_else(|| "000000".to_string())
+                            .trim_start_matches('#')
+                            .to_string(),
                         dataset: db_layer.dataset_id,
                     })
                     .collect()
