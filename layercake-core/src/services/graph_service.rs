@@ -5,7 +5,9 @@ use crate::database::entities::{
 use crate::errors::{GraphError, GraphResult};
 use crate::graph::{Edge, Graph, Layer, Node};
 use sea_orm::prelude::Expr;
-use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder};
+use sea_orm::{
+    ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
+};
 use serde_json::Value;
 use std::collections::HashSet;
 
@@ -18,7 +20,129 @@ impl GraphService {
         Self { db }
     }
 
+    async fn seed_layers_from_dataset(
+        &self,
+        project_id: i32,
+        dataset_id: i32,
+        enabled: bool,
+    ) -> GraphResult<usize> {
+        use crate::database::entities::data_sets;
+
+        let data_set = data_sets::Entity::find_by_id(dataset_id)
+            .one(&self.db)
+            .await
+            .map_err(GraphError::Database)?
+            .ok_or_else(|| GraphError::Validation(format!("Dataset {} not found", dataset_id)))?;
+
+        if data_set.project_id != project_id {
+            return Ok(0);
+        }
+
+        let parsed: Value = serde_json::from_str(&data_set.graph_json).unwrap_or_default();
+        let mut updated = 0usize;
+
+        if let Some(arr) = parsed.get("layers").and_then(|v| v.as_array()) {
+            for item in arr {
+                if let Some(obj) = item.as_object() {
+                    let layer_id = obj
+                        .get("id")
+                        .or_else(|| obj.get("layer_id"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or_default()
+                        .trim()
+                        .to_string();
+                    if layer_id.is_empty() {
+                        continue;
+                    }
+                    let name = obj
+                        .get("label")
+                        .or_else(|| obj.get("name"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or(layer_id.as_str())
+                        .to_string();
+                    let background_color = obj
+                        .get("background_color")
+                        .or_else(|| obj.get("backgroundColor"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("FFFFFF")
+                        .to_string();
+                    let text_color = obj
+                        .get("text_color")
+                        .or_else(|| obj.get("textColor"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("000000")
+                        .to_string();
+                    let border_color = obj
+                        .get("border_color")
+                        .or_else(|| obj.get("borderColor"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("000000")
+                        .to_string();
+
+                    let _ = self
+                        .upsert_project_layer(
+                            project_id,
+                            layer_id,
+                            name,
+                            background_color,
+                            text_color,
+                            border_color,
+                            Some(dataset_id),
+                            enabled,
+                        )
+                        .await?;
+                    updated += 1;
+                }
+            }
+        }
+
+        if updated == 0 {
+            let now = chrono::Utc::now();
+            let result = project_layers::Entity::update_many()
+                .col_expr(project_layers::Column::Enabled, Expr::value(enabled))
+                .col_expr(project_layers::Column::UpdatedAt, Expr::value(now))
+                .filter(project_layers::Column::ProjectId.eq(project_id))
+                .filter(project_layers::Column::SourceDatasetId.eq(Some(dataset_id)))
+                .exec(&self.db)
+                .await
+                .map_err(GraphError::Database)?;
+            updated = result.rows_affected as usize;
+        }
+
+        Ok(updated)
+    }
+
+    async fn seed_project_layers_if_empty(&self, project_id: i32) -> GraphResult<()> {
+        use crate::database::entities::data_sets;
+        let existing = project_layers::Entity::find()
+            .filter(project_layers::Column::ProjectId.eq(project_id))
+            .count(&self.db)
+            .await
+            .map_err(GraphError::Database)?;
+        if existing > 0 {
+            return Ok(());
+        }
+
+        let datasets = data_sets::Entity::find()
+            .filter(data_sets::Column::ProjectId.eq(project_id))
+            .filter(data_sets::Column::DataType.eq("layers"))
+            .all(&self.db)
+            .await
+            .map_err(GraphError::Database)?;
+
+        for ds in datasets {
+            let _ = self
+                .seed_layers_from_dataset(project_id, ds.id, true)
+                .await?;
+        }
+
+        Ok(())
+    }
+
     async fn get_project_layers_palette(&self, project_id: i32) -> GraphResult<Vec<Layer>> {
+        // Ensure palette exists by seeding from layer datasets if empty
+        self.seed_project_layers_if_empty(project_id).await?;
+
         let db_layers = project_layers::Entity::find()
             .filter(project_layers::Column::ProjectId.eq(project_id))
             .filter(project_layers::Column::Enabled.eq(true))
@@ -526,94 +650,9 @@ impl GraphService {
         dataset_id: i32,
         enabled: bool,
     ) -> GraphResult<usize> {
-        use crate::database::entities::data_sets;
-        use sea_orm::Set;
-
-        let data_set = data_sets::Entity::find_by_id(dataset_id)
-            .one(&self.db)
-            .await
-            .map_err(GraphError::Database)?
-            .ok_or_else(|| GraphError::Validation(format!("Dataset {} not found", dataset_id)))?;
-
-        if data_set.project_id != project_id {
-            return Err(GraphError::Validation(format!(
-                "Dataset {} does not belong to project {}",
-                dataset_id, project_id
-            )));
-        }
-
-        let parsed: Value = serde_json::from_str(&data_set.graph_json).unwrap_or_default();
-        let mut updated = 0usize;
-
-        if let Some(arr) = parsed.get("layers").and_then(|v| v.as_array()) {
-            for item in arr {
-                if let Some(obj) = item.as_object() {
-                    let layer_id = obj
-                        .get("id")
-                        .or_else(|| obj.get("layer_id"))
-                        .and_then(|v| v.as_str())
-                        .unwrap_or_default()
-                        .trim()
-                        .to_string();
-                    if layer_id.is_empty() {
-                        continue;
-                    }
-                    let name = obj
-                        .get("label")
-                        .or_else(|| obj.get("name"))
-                        .and_then(|v| v.as_str())
-                        .unwrap_or(layer_id.as_str())
-                        .to_string();
-                    let background_color = obj
-                        .get("background_color")
-                        .or_else(|| obj.get("backgroundColor"))
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("FFFFFF")
-                        .to_string();
-                    let text_color = obj
-                        .get("text_color")
-                        .or_else(|| obj.get("textColor"))
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("000000")
-                        .to_string();
-                    let border_color = obj
-                        .get("border_color")
-                        .or_else(|| obj.get("borderColor"))
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("000000")
-                        .to_string();
-
-                    let _ = self
-                        .upsert_project_layer(
-                            project_id,
-                            layer_id,
-                            name,
-                            background_color,
-                            text_color,
-                            border_color,
-                            Some(dataset_id),
-                            enabled,
-                        )
-                        .await?;
-                    updated += 1;
-                }
-            }
-        }
-
-        // If no layers were found in payload, still flip any existing rows for this dataset
-        if updated == 0 {
-            let now = chrono::Utc::now();
-            let result = project_layers::Entity::update_many()
-                .col_expr(project_layers::Column::Enabled, Expr::value(enabled))
-                .col_expr(project_layers::Column::UpdatedAt, Expr::value(now))
-                .filter(project_layers::Column::ProjectId.eq(project_id))
-                .filter(project_layers::Column::SourceDatasetId.eq(Some(dataset_id)))
-                .exec(&self.db)
-                .await
-                .map_err(GraphError::Database)?;
-            updated = result.rows_affected as usize;
-        }
-
+        let updated = self
+            .seed_layers_from_dataset(project_id, dataset_id, enabled)
+            .await?;
         Ok(updated)
     }
 
