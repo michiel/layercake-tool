@@ -172,6 +172,15 @@ impl GraphTransform {
 
                 Some(annotation)
             }
+            GraphTransformKind::DropUnconnectedNodes => {
+                let removed = graph.drop_unconnected_nodes();
+                Some(format!(
+                    "### Transform: Drop Unconnected Nodes\n- Removed: {} nodes\n- Nodes after: {}\n- Edges after: {}",
+                    removed,
+                    graph.nodes.len(),
+                    graph.edges.len()
+                ))
+            }
             GraphTransformKind::NodeLabelMaxLength => {
                 let length = self.params.node_label_max_length.ok_or_else(|| {
                     anyhow!("NodeLabelMaxLength transform requires node_label_max_length")
@@ -254,9 +263,8 @@ impl GraphTransform {
                     graph.edges.len()
                 ))
             }
-            GraphTransformKind::AggregateEdges => {
-                unreachable!("AggregateEdges should have been handled earlier");
-            }
+            GraphTransformKind::AggregateEdges => unreachable!("AggregateEdges should have been handled earlier"),
+            GraphTransformKind::DropUnconnectedNodes => unreachable!("DropUnconnectedNodes handled above"),
         };
 
         Ok(annotation)
@@ -267,6 +275,7 @@ impl GraphTransform {
 pub enum GraphTransformKind {
     PartitionDepthLimit,
     PartitionWidthLimit,
+    DropUnconnectedNodes,
     NodeLabelMaxLength,
     NodeLabelInsertNewlines,
     EdgeLabelMaxLength,
@@ -445,6 +454,9 @@ impl TransformNodeConfig {
                     if let Some(width) = transform.params.max_partition_width {
                         config.max_partition_width = width;
                     }
+                }
+                GraphTransformKind::DropUnconnectedNodes => {
+                    config.drop_unconnected_nodes = transform.params.enabled.unwrap_or(true);
                 }
                 GraphTransformKind::NodeLabelMaxLength => {
                     if let Some(length) = transform.params.node_label_max_length {

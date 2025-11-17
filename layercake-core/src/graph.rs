@@ -376,6 +376,26 @@ impl Graph {
         });
     }
 
+    /// Remove non-partition nodes that are not referenced by any edge.
+    /// Returns the number of nodes removed.
+    pub fn drop_unconnected_nodes(&mut self) -> usize {
+        let connected_ids: HashSet<String> = self
+            .edges
+            .iter()
+            .flat_map(|e| [e.source.clone(), e.target.clone()])
+            .collect();
+
+        let original_len = self.nodes.len();
+        self.nodes
+            .retain(|n| n.is_partition || connected_ids.contains(&n.id));
+
+        let valid_ids: HashSet<String> = self.nodes.iter().map(|n| n.id.clone()).collect();
+        self.edges
+            .retain(|e| valid_ids.contains(&e.source) && valid_ids.contains(&e.target));
+
+        original_len.saturating_sub(self.nodes.len())
+    }
+
     // Helper function to insert newlines in a string at appropriate word boundaries
     fn insert_newlines_in_text(text: &str, max_length: usize) -> String {
         if text.len() <= max_length {

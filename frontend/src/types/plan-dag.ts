@@ -61,6 +61,7 @@ export interface GraphNodeConfig {
 export type GraphTransformKind =
   | 'PartitionDepthLimit'
   | 'PartitionWidthLimit'
+  | 'DropUnconnectedNodes'
   | 'NodeLabelMaxLength'
   | 'NodeLabelInsertNewlines'
   | 'EdgeLabelMaxLength'

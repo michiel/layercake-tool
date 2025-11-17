@@ -28,6 +28,7 @@ type TransformParamKey = keyof GraphTransform['params'];
 const TRANSFORM_OPTIONS: { value: GraphTransformKind; label: string }[] = [
   { value: 'PartitionDepthLimit', label: 'Limit Partition Depth' },
   { value: 'PartitionWidthLimit', label: 'Limit Partition Width' },
+  { value: 'DropUnconnectedNodes', label: 'Drop Unconnected Nodes' },
   { value: 'NodeLabelMaxLength', label: 'Truncate Node Labels' },
   { value: 'NodeLabelInsertNewlines', label: 'Wrap Node Labels' },
   { value: 'EdgeLabelMaxLength', label: 'Truncate Edge Labels' },
@@ -43,6 +44,8 @@ const getDefaultParams = (kind: GraphTransformKind): GraphTransform['params'] =>
       return { maxPartitionDepth: 2 };
     case 'PartitionWidthLimit':
       return { maxPartitionWidth: 3 };
+    case 'DropUnconnectedNodes':
+      return { enabled: true };
     case 'NodeLabelMaxLength':
       return { nodeLabelMaxLength: 32 };
     case 'NodeLabelInsertNewlines':
@@ -53,6 +56,7 @@ const getDefaultParams = (kind: GraphTransformKind): GraphTransform['params'] =>
       return { edgeLabelInsertNewlinesAt: 16 };
     case 'InvertGraph':
     case 'GenerateHierarchy':
+    case 'DropUnconnectedNodes':
       return { enabled: true };
     case 'AggregateEdges':
       return {};
@@ -171,6 +175,7 @@ const isTransformValid = (transform: GraphTransform): boolean => {
       return isPositive(transform.params.edgeLabelInsertNewlinesAt);
     case 'InvertGraph':
     case 'GenerateHierarchy':
+    case 'DropUnconnectedNodes':
     case 'AggregateEdges':
       return true;
     default:

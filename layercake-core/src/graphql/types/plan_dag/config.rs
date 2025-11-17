@@ -261,6 +261,7 @@ pub struct GraphConfig {
     pub max_partition_width: Option<i32>,
     pub invert_graph: Option<bool>,
     pub aggregate_edges: Option<bool>,
+    pub drop_unconnected_nodes: Option<bool>,
     pub node_label_max_length: Option<i32>,
     pub node_label_insert_newlines_at: Option<i32>,
     pub edge_label_max_length: Option<i32>,

@@ -104,6 +104,7 @@ pub struct ExportProfileGraphConfig {
     pub max_partition_width: Option<i32>,
     pub invert_graph: Option<bool>,
     pub aggregate_edges: Option<bool>,
+    pub drop_unconnected_nodes: Option<bool>,
     pub node_label_max_length: Option<usize>,
     pub node_label_insert_newlines_at: Option<usize>,
     pub edge_label_max_length: Option<usize>,
@@ -285,6 +286,7 @@ pub struct GraphConfig {
     pub max_partition_width: i32,
     pub invert_graph: bool,
     pub aggregate_edges: bool,
+    pub drop_unconnected_nodes: bool,
     pub node_label_max_length: usize,
     pub node_label_insert_newlines_at: usize,
     pub edge_label_max_length: usize,
@@ -299,6 +301,7 @@ impl Default for GraphConfig {
             max_partition_width: 0,
             invert_graph: false,
             aggregate_edges: true,
+            drop_unconnected_nodes: false,
             node_label_max_length: 0,
             node_label_insert_newlines_at: 0,
             edge_label_max_length: 0,
@@ -316,6 +319,7 @@ impl ExportProfileItem {
         let max_partition_width = graph_config.max_partition_width.unwrap_or(0);
         let invert_graph = graph_config.invert_graph.unwrap_or(false);
         let aggregate_edges = graph_config.aggregate_edges.unwrap_or(true);
+        let drop_unconnected_nodes = graph_config.drop_unconnected_nodes.unwrap_or(false);
         let node_label_max_length = graph_config.node_label_max_length.unwrap_or(0);
         let node_label_insert_newlines_at = graph_config.node_label_insert_newlines_at.unwrap_or(0);
         let edge_label_max_length = graph_config.edge_label_max_length.unwrap_or(0);
@@ -327,6 +331,7 @@ impl ExportProfileItem {
             max_partition_width,
             invert_graph,
             aggregate_edges,
+            drop_unconnected_nodes,
             node_label_max_length,
             node_label_insert_newlines_at,
             edge_label_max_length,
