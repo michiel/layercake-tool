@@ -448,47 +448,122 @@ export const KnowledgeBasePage: React.FC = () => {
         </Alert>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <IconUpload className="h-5 w-5 text-primary" />
-            Upload documents
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="upload-tags">Default tags (comma separated)</Label>
-              <Input
-                id="upload-tags"
-                placeholder="compliance, storage"
-                value={tagInput}
-                onChange={(event) => setTagInput(event.target.value)}
-              />
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <IconUpload className="h-5 w-5 text-primary" />
+              Upload documents
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="upload-tags">Default tags (comma separated)</Label>
+                <Input
+                  id="upload-tags"
+                  placeholder="compliance, storage"
+                  value={tagInput}
+                  onChange={(event) => setTagInput(event.target.value)}
+                />
+              </div>
+              <div className="flex items-center gap-3">
+                <Switch
+                  id="upload-index-immediately"
+                  checked={indexImmediately}
+                  onCheckedChange={setIndexImmediately}
+                />
+                <Label htmlFor="upload-index-immediately">
+                  Index immediately after upload
+                </Label>
+              </div>
             </div>
-            <div className="flex items-center gap-3">
-              <Switch
-                id="upload-index-immediately"
-                checked={indexImmediately}
-                onCheckedChange={setIndexImmediately}
-              />
-              <Label htmlFor="upload-index-immediately">
-                Index immediately after upload
-              </Label>
-            </div>
-          </div>
 
-          <Input
-            type="file"
-            accept=".txt,.md,.csv,.pdf,.docx,.xlsx,.ods,.odt"
-            onChange={handleUpload}
-            disabled={ingesting || sourceLoading}
-          />
-          <p className="text-xs text-muted-foreground">
-            Supported formats: txt, markdown, csv, pdf, odf/ods, xlsx, docx.
-          </p>
-        </CardContent>
-      </Card>
+            <Input
+              type="file"
+              accept=".txt,.md,.csv,.pdf,.docx,.xlsx,.ods,.odt"
+              onChange={handleUpload}
+              disabled={ingesting || sourceLoading}
+            />
+            <p className="text-xs text-muted-foreground">
+              Supported formats: txt, markdown, csv, pdf, odf/ods, xlsx, docx.
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <IconDatabase className="h-5 w-5 text-primary" />
+              Knowledge Base Status
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <p className="text-sm text-muted-foreground">Files</p>
+                <p className="text-2xl font-semibold">
+                  {kbStatus?.fileCount ?? 0}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Chunks</p>
+                <p className="text-2xl font-semibold">
+                  {kbStatus?.chunkCount ?? 0}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Status</p>
+                <Badge variant="secondary" className="mt-1">
+                  {kbStatus?.status ?? 'uninitialized'}
+                </Badge>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Last Indexed</p>
+                <p className="text-sm">
+                  {formatDate(kbStatus?.lastIndexedAt)}
+                </p>
+              </div>
+            </div>
+
+            <Separator className="my-2" />
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <p className="text-sm text-muted-foreground">Embedding Provider</p>
+                <p className="text-sm font-medium">
+                  {kbStatus?.embeddingProvider ?? '—'}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Embedding Model</p>
+                <p className="text-sm font-medium">
+                  {kbStatus?.embeddingModel ?? '—'}
+                </p>
+              </div>
+            </div>
+
+            <Group gap="md">
+              <Button
+                variant="default"
+                onClick={() => triggerKbCommand('REBUILD')}
+                disabled={kbMutating}
+              >
+                <IconRefresh className="mr-2 h-4 w-4" />
+                Rebuild
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => triggerKbCommand('CLEAR')}
+                disabled={kbMutating}
+              >
+                <IconTrash className="mr-2 h-4 w-4" />
+                Clear
+              </Button>
+            </Group>
+          </CardContent>
+        </Card>
+
+      </div>
 
       <Card>
         <CardHeader>
@@ -587,78 +662,6 @@ export const KnowledgeBasePage: React.FC = () => {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <IconDatabase className="h-5 w-5 text-primary" />
-            Knowledge Base Status
-          </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <p className="text-sm text-muted-foreground">Files</p>
-                <p className="text-2xl font-semibold">
-                  {kbStatus?.fileCount ?? 0}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Chunks</p>
-                <p className="text-2xl font-semibold">
-                  {kbStatus?.chunkCount ?? 0}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Status</p>
-                <Badge variant="secondary" className="mt-1">
-                  {kbStatus?.status ?? 'uninitialized'}
-                </Badge>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Last Indexed</p>
-                <p className="text-sm">
-                  {formatDate(kbStatus?.lastIndexedAt)}
-                </p>
-              </div>
-            </div>
-
-            <Separator className="my-2" />
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <p className="text-sm text-muted-foreground">Embedding Provider</p>
-                <p className="text-sm font-medium">
-                  {kbStatus?.embeddingProvider ?? '—'}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Embedding Model</p>
-                <p className="text-sm font-medium">
-                  {kbStatus?.embeddingModel ?? '—'}
-                </p>
-              </div>
-            </div>
-
-            <Group gap="md">
-              <Button
-                variant="default"
-                onClick={() => triggerKbCommand('REBUILD')}
-                disabled={kbMutating}
-              >
-                <IconRefresh className="mr-2 h-4 w-4" />
-                Rebuild
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => triggerKbCommand('CLEAR')}
-                disabled={kbMutating}
-              >
-                <IconTrash className="mr-2 h-4 w-4" />
-                Clear
-              </Button>
-            </Group>
-          </CardContent>
-        </Card>
       </Stack>
 
       <Dialog open={!!editingFile} onOpenChange={(open) => !open && setEditingFile(null)}>
