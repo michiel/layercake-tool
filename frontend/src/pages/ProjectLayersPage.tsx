@@ -43,6 +43,8 @@ export const ProjectLayersPage = () => {
   } = useQuery(GET_PROJECT_LAYERS, {
     variables: { projectId: projectIdNum },
     skip: !projectIdNum,
+    fetchPolicy: 'network-only',
+    nextFetchPolicy: 'cache-and-network',
   })
 
   const { data: datasetsData, loading: datasetsLoading, refetch: refetchDatasets } = useQuery(
@@ -108,7 +110,11 @@ export const ProjectLayersPage = () => {
           },
         },
       })
-      await refetchLayers()
+      const refreshed = await refetchLayers()
+      const refreshedLayers: ProjectLayer[] = (refreshed.data as any)?.projectLayers ?? []
+      if (refreshedLayers.length) {
+        setEditableLayers(refreshedLayers)
+      }
       showSuccessNotification('Layer saved', `Layer ${layer.layerId} updated`)
     } catch (error: any) {
       showErrorNotification('Failed to save layer', error?.message || 'Unknown error')
@@ -137,10 +143,11 @@ export const ProjectLayersPage = () => {
       await setDatasetEnabled({
         variables: { projectId: projectIdNum, dataSetId: datasetId, enabled },
       })
-      await Promise.all([refetchLayers(), refetchDatasets()])
-      // Refresh toggle map from latest projectLayers
-      const refreshed = await refetchLayers()
-      const layers: ProjectLayer[] = (refreshed.data as any)?.projectLayers ?? []
+      const [refetchedLayers] = await Promise.all([refetchLayers(), refetchDatasets()])
+      const layers: ProjectLayer[] = (refetchedLayers.data as any)?.projectLayers ?? []
+      if (layers.length) {
+        setEditableLayers(layers)
+      }
       const nextState: Record<number, boolean> = {}
       layers
         .filter((l) => l.sourceDatasetId)
