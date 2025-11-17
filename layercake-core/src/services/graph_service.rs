@@ -6,6 +6,7 @@ use crate::errors::{GraphError, GraphResult};
 use crate::graph::{Edge, Graph, Layer, Node};
 use sea_orm::prelude::Expr;
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder};
+use serde_json::Value;
 use std::collections::HashSet;
 
 pub struct GraphService {
@@ -541,27 +542,65 @@ impl GraphService {
             )));
         }
 
-        let parsed_graph: crate::graph::Graph =
-            serde_json::from_str(&data_set.graph_json).unwrap_or_default();
-        let mut updated = 0;
+        let parsed: Value = serde_json::from_str(&data_set.graph_json).unwrap_or_default();
+        let mut updated = 0usize;
 
-        for layer in parsed_graph.layers {
-            let _ = self
-                .upsert_project_layer(
-                    project_id,
-                    layer.id.clone(),
-                    layer.label.clone(),
-                    layer.background_color.clone(),
-                    layer.text_color.clone(),
-                    layer.border_color.clone(),
-                    Some(dataset_id),
-                    enabled,
-                )
-                .await?;
-            updated += 1;
+        if let Some(arr) = parsed.get("layers").and_then(|v| v.as_array()) {
+            for item in arr {
+                if let Some(obj) = item.as_object() {
+                    let layer_id = obj
+                        .get("id")
+                        .or_else(|| obj.get("layer_id"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or_default()
+                        .trim()
+                        .to_string();
+                    if layer_id.is_empty() {
+                        continue;
+                    }
+                    let name = obj
+                        .get("label")
+                        .or_else(|| obj.get("name"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or(layer_id.as_str())
+                        .to_string();
+                    let background_color = obj
+                        .get("background_color")
+                        .or_else(|| obj.get("backgroundColor"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("FFFFFF")
+                        .to_string();
+                    let text_color = obj
+                        .get("text_color")
+                        .or_else(|| obj.get("textColor"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("000000")
+                        .to_string();
+                    let border_color = obj
+                        .get("border_color")
+                        .or_else(|| obj.get("borderColor"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("000000")
+                        .to_string();
+
+                    let _ = self
+                        .upsert_project_layer(
+                            project_id,
+                            layer_id,
+                            name,
+                            background_color,
+                            text_color,
+                            border_color,
+                            Some(dataset_id),
+                            enabled,
+                        )
+                        .await?;
+                    updated += 1;
+                }
+            }
         }
 
-        // If no layers were found, still flip any existing rows for this dataset
+        // If no layers were found in payload, still flip any existing rows for this dataset
         if updated == 0 {
             let now = chrono::Utc::now();
             let result = project_layers::Entity::update_many()
