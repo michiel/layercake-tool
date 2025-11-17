@@ -29,10 +29,11 @@ pub fn get_handlebars() -> Handlebars<'static> {
     let mut handlebars = Handlebars::new();
 
     handlebars_helper!(exists: |v: Value| {
-        !v.is_null() &&
         match v {
+            serde_json::Value::Null => false,
             serde_json::Value::String(s) => {
-                !s.is_empty() && s != "null"
+                let trimmed = s.trim();
+                !trimmed.is_empty() && trimmed != "null"
             }
             _ => true,
         }
@@ -99,6 +100,7 @@ pub fn get_handlebars() -> Handlebars<'static> {
                     .and_then(|v| v.as_str())
                     .map(|s| s.trim())
                     .unwrap_or("");
+                let has_comment = !comment.is_empty() && comment != "null";
                 let empty_vec = vec![];
                 let children = map.get("children").and_then(|v| v.as_array()).unwrap_or(&empty_vec);
 
@@ -119,7 +121,7 @@ pub fn get_handlebars() -> Handlebars<'static> {
                 } else {
                     result += "\n";
                 }
-                if add_notes && !comment.is_empty() {
+                if add_notes && has_comment {
                     result += &format!(
                         "{}note {} of {} : {}\n",
                         indent, note_position, id, comment

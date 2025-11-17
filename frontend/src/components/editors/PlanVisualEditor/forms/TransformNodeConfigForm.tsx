@@ -56,7 +56,6 @@ const getDefaultParams = (kind: GraphTransformKind): GraphTransform['params'] =>
       return { edgeLabelInsertNewlinesAt: 16 };
     case 'InvertGraph':
     case 'GenerateHierarchy':
-    case 'DropUnconnectedNodes':
       return { enabled: true };
     case 'AggregateEdges':
       return {};

@@ -134,6 +134,8 @@ export interface GraphArtefactNodeConfig {
     applyLayers?: boolean;
     builtInStyles?: 'none' | 'light' | 'dark';
     targetOptions?: RenderTargetOptions;
+    addNodeCommentsAsNotes?: boolean;
+    notePosition?: 'left' | 'right' | 'top' | 'bottom';
   };
     graphConfig?: {
     generateHierarchy?: boolean;
@@ -159,6 +161,8 @@ export interface TreeArtefactNodeConfig {
     applyLayers?: boolean;
     builtInStyles?: 'none' | 'light' | 'dark';
     targetOptions?: RenderTargetOptions;
+    addNodeCommentsAsNotes?: boolean;
+    notePosition?: 'left' | 'right' | 'top' | 'bottom';
   };
   graphConfig?: {
     generateHierarchy?: boolean;

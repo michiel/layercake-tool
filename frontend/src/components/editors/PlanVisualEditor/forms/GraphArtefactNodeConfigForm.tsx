@@ -41,6 +41,8 @@ export const GraphArtefactNodeConfigForm: React.FC<GraphArtefactNodeConfigFormPr
         : legacyTheme === 'Dark'
         ? 'dark'
         : 'light'),
+    addNodeCommentsAsNotes: config.renderConfig?.addNodeCommentsAsNotes ?? false,
+    notePosition: config.renderConfig?.notePosition ?? 'left',
     targetOptions: {
       graphviz: {
         ...DEFAULT_GRAPHVIZ_OPTIONS,
@@ -231,6 +233,55 @@ export const GraphArtefactNodeConfigForm: React.FC<GraphArtefactNodeConfigFormPr
           </SelectContent>
         </Select>
       </div>
+
+      {localConfig.renderTarget === 'PlantUML' && (
+        <div className="space-y-4 border-t pt-4">
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="add-node-comments-as-notes"
+              checked={localConfig.renderConfig?.addNodeCommentsAsNotes ?? false}
+              onCheckedChange={(checked) =>
+                setLocalConfig(prev => ({
+                  ...prev,
+                  renderConfig: { ...(prev.renderConfig ?? {}), addNodeCommentsAsNotes: checked },
+                }))
+              }
+            />
+            <div>
+              <Label htmlFor="add-node-comments-as-notes">Add node comments as notes</Label>
+              <p className="text-sm text-muted-foreground">
+                When enabled, exports include node comments as PlantUML notes.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="note-position">Note position</Label>
+            <Select
+              value={localConfig.renderConfig?.notePosition || 'left'}
+              onValueChange={(value) =>
+                setLocalConfig(prev => ({
+                  ...prev,
+                  renderConfig: { ...(prev.renderConfig ?? {}), notePosition: value as any },
+                }))
+              }
+            >
+              <SelectTrigger id="note-position">
+                <SelectValue placeholder="Select note position" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="left">Left (default)</SelectItem>
+                <SelectItem value="right">Right</SelectItem>
+                <SelectItem value="top">Top</SelectItem>
+                <SelectItem value="bottom">Bottom</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-sm text-muted-foreground">
+              Position of the note relative to each node when comments are exported.
+            </p>
+          </div>
+        </div>
+      )}
 
       {localConfig.renderTarget === 'DOT' && (
         <div className="space-y-4 border-t pt-4">
