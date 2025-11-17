@@ -277,6 +277,12 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
         route: `/projects/${projectId}/graphs`,
         isActive: makeRouteMatcher(`/projects/${projectId}/graphs`),
       },
+      {
+        key: 'layers',
+        label: 'Layers',
+        route: `/projects/${projectId}/workbench/layers`,
+        isActive: makeRouteMatcher(`/projects/${projectId}/workbench/layers`),
+      },
     ]
 
     const chatChildren: ProjectNavChild[] = [

@@ -34,7 +34,7 @@ Introduce project-wide layer definitions that are independent of plan DAG assemb
   1. **Sources**: list all datasets that declare layers; toggle include/exclude; show counts and preview of layer IDs/colors.
   2. **Palette**: editable table of current project layers with color pickers and hex inputs; add/delete rows; edit labels/IDs/colors; source info displayed (manual vs dataset).
   3. **Missing**: unique layer IDs discovered in nodes/edges of datasets/graphs that are not in the project set; provide “Add selected” action to create them with default colors.
-- Persist changes via new GraphQL mutations; optimistic UI updates and error toasts.
+- Persist changes via new GraphQL mutations; optimistic UI updates and error toasts. Add Workbench navigation link to Layers and stabilize UI loading with non-disruptive overlay.
 
 ## Data Flow
 1. Import/ingest datasets → extract layer rows (if present) and store in `project_layer_sources`.

@@ -22,7 +22,6 @@ import {
   SET_LAYER_DATASET_ENABLED,
   UPSERT_PROJECT_LAYER,
 } from '@/graphql/layers'
-import { Spinner } from '@/components/ui/spinner'
 import { IconLayersIntersect } from '@tabler/icons-react'
 import { showErrorNotification, showSuccessNotification } from '@/utils/notifications'
 
@@ -174,6 +173,15 @@ export const ProjectLayersPage = () => {
 
   return (
     <PageContainer>
+      <div className="relative">
+        {loading && (
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-10">
+            <div className="h-1 w-full overflow-hidden rounded bg-muted">
+              <div className="h-full w-1/2 animate-pulse bg-primary" />
+            </div>
+          </div>
+        )}
+
       <Breadcrumbs
         projectId={projectIdNum}
         projectName={`Project ${projectIdNum}`}
@@ -201,13 +209,6 @@ export const ProjectLayersPage = () => {
           </Button>
         </Group>
       </Group>
-
-      {loading && (
-        <Group gap="sm" align="center" className="mb-4">
-          <Spinner className="h-4 w-4" />
-          <span>Loading layers…</span>
-        </Group>
-      )}
 
       <Tabs defaultValue="sources" className="space-y-4">
         <TabsList>
@@ -242,6 +243,7 @@ export const ProjectLayersPage = () => {
                       <Group gap="sm" align="center">
                         <Switch
                           checked={enabled}
+                          disabled={togglingDataset}
                           onCheckedChange={(checked) => handleToggleDataset(dataset.id, checked)}
                         />
                         <span className="text-sm text-muted-foreground">
@@ -462,6 +464,7 @@ export const ProjectLayersPage = () => {
           </Card>
         </TabsContent>
       </Tabs>
+      </div>
     </PageContainer>
   )
 }
