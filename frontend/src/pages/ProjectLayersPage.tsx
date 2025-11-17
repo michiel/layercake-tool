@@ -58,11 +58,21 @@ export const ProjectLayersPage = () => {
   const [deleteLayer] = useMutation(DELETE_PROJECT_LAYER)
   const [setDatasetEnabled, { loading: togglingDataset }] = useMutation(SET_LAYER_DATASET_ENABLED)
 
-  const projectLayers: ProjectLayer[] = (layersData as any)?.projectLayers ?? []
-  const missingLayers: string[] = (layersData as any)?.missingLayers ?? []
-  const layerDatasets =
-    (datasetsData as any)?.dataSets?.filter((ds: any) => ds.dataType?.toLowerCase() === 'layers') ??
-    []
+  const projectLayers: ProjectLayer[] = useMemo(
+    () => ((layersData as any)?.projectLayers as ProjectLayer[] | undefined) ?? [],
+    [layersData]
+  )
+  const missingLayers: string[] = useMemo(
+    () => ((layersData as any)?.missingLayers as string[] | undefined) ?? [],
+    [layersData]
+  )
+  const layerDatasets = useMemo(
+    () =>
+      ((datasetsData as any)?.dataSets as any[] | undefined)?.filter(
+        (ds: any) => ds.dataType?.toLowerCase() === 'layers'
+      ) ?? [],
+    [datasetsData]
+  )
 
   const [editableLayers, setEditableLayers] = useState<ProjectLayer[]>([])
   const [newLayer, setNewLayer] = useState<ProjectLayerInput>({
