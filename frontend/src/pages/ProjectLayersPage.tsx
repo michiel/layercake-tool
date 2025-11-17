@@ -82,16 +82,35 @@ export const ProjectLayersPage = () => {
     ...DEFAULT_LAYER_COLORS,
   })
   const [datasetToggleState, setDatasetToggleState] = useState<Record<number, boolean>>({})
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+
+  // Helper function to calculate dataset enabled state
+  // Dataset is enabled if ALL its layers are enabled, disabled if ALL are disabled
+  const calculateDatasetState = (datasetId: number, layers: ProjectLayer[]): boolean => {
+    const datasetLayers = layers.filter((l) => l.sourceDatasetId === datasetId)
+    if (datasetLayers.length === 0) return false
+    // All layers must be enabled for dataset to be considered enabled
+    return datasetLayers.every((l) => l.enabled)
+  }
+
+  // Helper to update editable layers and mark as unsaved
+  const updateEditableLayers = (updater: (prev: ProjectLayer[]) => ProjectLayer[]) => {
+    setEditableLayers(updater)
+    setHasUnsavedChanges(true)
+  }
 
   useEffect(() => {
     setEditableLayers(projectLayers)
+    setHasUnsavedChanges(false) // Reset unsaved changes when fresh data arrives
     const nextState: Record<number, boolean> = {}
-    projectLayers
-      .filter((l) => l.sourceDatasetId)
-      .forEach((l) => {
-        nextState[l.sourceDatasetId as number] = nextState[l.sourceDatasetId as number] || l.enabled
-      })
-    setDatasetToggleState((prev) => ({ ...prev, ...nextState }))
+    // Get unique dataset IDs
+    const datasetIds = new Set(
+      projectLayers.filter((l) => l.sourceDatasetId).map((l) => l.sourceDatasetId as number)
+    )
+    datasetIds.forEach((datasetId) => {
+      nextState[datasetId] = calculateDatasetState(datasetId, projectLayers)
+    })
+    setDatasetToggleState(nextState)
   }, [projectLayers])
 
   const handleSaveLayer = async (layer: ProjectLayerInput) => {
@@ -148,13 +167,15 @@ export const ProjectLayersPage = () => {
       if (layers.length) {
         setEditableLayers(layers)
       }
+      // Recalculate dataset states using the helper function
       const nextState: Record<number, boolean> = {}
-      layers
-        .filter((l) => l.sourceDatasetId)
-        .forEach((l) => {
-          nextState[l.sourceDatasetId as number] = nextState[l.sourceDatasetId as number] || l.enabled
-        })
-      setDatasetToggleState((prev) => ({ ...prev, ...nextState }))
+      const datasetIds = new Set(
+        layers.filter((l) => l.sourceDatasetId).map((l) => l.sourceDatasetId as number)
+      )
+      datasetIds.forEach((dsId) => {
+        nextState[dsId] = calculateDatasetState(dsId, layers)
+      })
+      setDatasetToggleState(nextState)
       showSuccessNotification(
         enabled ? 'Dataset layers enabled' : 'Dataset layers disabled',
         enabled ? 'Imported layer definitions' : 'Disabled dataset-provided layers'
@@ -176,9 +197,22 @@ export const ProjectLayersPage = () => {
   }
 
   const handleBulkMissing = async () => {
-    for (const id of missingLayers) {
-      // Best-effort; stop on error
-      await handleAddMissing(id)
+    const results = await Promise.allSettled(
+      missingLayers.map((id) => handleAddMissing(id))
+    )
+    const failed = results.filter((r) => r.status === 'rejected').length
+    const succeeded = results.length - failed
+
+    if (failed > 0) {
+      showErrorNotification(
+        `Added ${succeeded}/${missingLayers.length} layers`,
+        `${failed} layer(s) failed to add`
+      )
+    } else {
+      showSuccessNotification(
+        `Added all ${missingLayers.length} layers`,
+        'Missing layers have been added to the palette'
+      )
     }
   }
 
@@ -249,9 +283,7 @@ export const ProjectLayersPage = () => {
                   {layerDatasets.map((dataset: any) => {
                   const enabled =
                     datasetToggleState[dataset.id] ??
-                    projectLayers.some(
-                      (l) => l.sourceDatasetId === dataset.id && l.enabled
-                    )
+                    calculateDatasetState(dataset.id, projectLayers)
                   return (
                     <div
                       key={dataset.id}
@@ -285,6 +317,13 @@ export const ProjectLayersPage = () => {
               <CardTitle>Project palette</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {hasUnsavedChanges && (
+                <div className="rounded-md bg-yellow-50 dark:bg-yellow-900/20 p-4 border border-yellow-200 dark:border-yellow-800">
+                  <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                    You have unsaved changes. Click "Save" on individual rows to persist your edits.
+                  </p>
+                </div>
+              )}
               <div className="space-y-3">
                 <Label>Add layer</Label>
                 <div className="grid gap-3 md:grid-cols-5">
@@ -316,8 +355,11 @@ export const ProjectLayersPage = () => {
                   />
                   <Button
                     onClick={() => {
-                      if (!newLayer.layerId || !newLayer.name) {
-                        showErrorNotification('Layer ID and name are required', '')
+                      if (!newLayer.layerId?.trim() || !newLayer.name?.trim()) {
+                        showErrorNotification(
+                          'Layer ID and name are required',
+                          'Please provide non-empty values'
+                        )
                         return
                       }
                       handleSaveLayer(newLayer)
@@ -352,7 +394,7 @@ export const ProjectLayersPage = () => {
                         <Input
                           value={layer.name}
                           onChange={(e) =>
-                            setEditableLayers((prev) =>
+                            updateEditableLayers((prev) =>
                               prev.map((l) =>
                                 l.id === layer.id ? { ...l, name: e.target.value } : l
                               )
@@ -365,7 +407,7 @@ export const ProjectLayersPage = () => {
                           type="color"
                           value={layer.backgroundColor}
                           onChange={(e) =>
-                            setEditableLayers((prev) =>
+                            updateEditableLayers((prev) =>
                               prev.map((l) =>
                                 l.id === layer.id
                                   ? { ...l, backgroundColor: e.target.value }
@@ -380,7 +422,7 @@ export const ProjectLayersPage = () => {
                           type="color"
                           value={layer.textColor}
                           onChange={(e) =>
-                            setEditableLayers((prev) =>
+                            updateEditableLayers((prev) =>
                               prev.map((l) =>
                                 l.id === layer.id ? { ...l, textColor: e.target.value } : l
                               )
@@ -393,7 +435,7 @@ export const ProjectLayersPage = () => {
                           type="color"
                           value={layer.borderColor}
                           onChange={(e) =>
-                            setEditableLayers((prev) =>
+                            updateEditableLayers((prev) =>
                               prev.map((l) =>
                                 l.id === layer.id ? { ...l, borderColor: e.target.value } : l
                               )
@@ -412,7 +454,7 @@ export const ProjectLayersPage = () => {
                         <Switch
                           checked={layer.enabled}
                           onCheckedChange={(checked) =>
-                            setEditableLayers((prev) =>
+                            updateEditableLayers((prev) =>
                               prev.map((l) =>
                                 l.id === layer.id ? { ...l, enabled: checked } : l
                               )

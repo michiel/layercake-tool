@@ -20,6 +20,19 @@ impl GraphService {
         Self { db }
     }
 
+    /// Normalize color value to ensure it has # prefix for CSS compatibility
+    fn normalize_color(color: &str) -> String {
+        let trimmed = color.trim();
+        if trimmed.is_empty() {
+            return String::from("#FFFFFF");
+        }
+        if trimmed.starts_with('#') {
+            trimmed.to_string()
+        } else {
+            format!("#{}", trimmed)
+        }
+    }
+
     async fn seed_layers_from_dataset(
         &self,
         project_id: i32,
@@ -28,6 +41,13 @@ impl GraphService {
     ) -> GraphResult<usize> {
         use crate::database::entities::data_sets;
 
+        tracing::debug!(
+            "seed_layers_from_dataset: project_id={}, dataset_id={}, enabled={}",
+            project_id,
+            dataset_id,
+            enabled
+        );
+
         let data_set = data_sets::Entity::find_by_id(dataset_id)
             .one(&self.db)
             .await
@@ -35,6 +55,12 @@ impl GraphService {
             .ok_or_else(|| GraphError::Validation(format!("Dataset {} not found", dataset_id)))?;
 
         if data_set.project_id != project_id {
+            tracing::warn!(
+                "Dataset {} project_id mismatch: expected {}, got {}",
+                dataset_id,
+                project_id,
+                data_set.project_id
+            );
             return Ok(0);
         }
 
@@ -42,6 +68,11 @@ impl GraphService {
         let mut updated = 0usize;
 
         if let Some(arr) = parsed.get("layers").and_then(|v| v.as_array()) {
+            tracing::debug!(
+                "Found {} layers in dataset {} graph_json",
+                arr.len(),
+                dataset_id
+            );
             for item in arr {
                 if let Some(obj) = item.as_object() {
                     let layer_id = obj
@@ -52,6 +83,7 @@ impl GraphService {
                         .trim()
                         .to_string();
                     if layer_id.is_empty() {
+                        tracing::warn!("Skipping layer with empty id in dataset {}", dataset_id);
                         continue;
                     }
                     let name = obj
@@ -60,29 +92,36 @@ impl GraphService {
                         .and_then(|v| v.as_str())
                         .unwrap_or(layer_id.as_str())
                         .to_string();
-                    let background_color = obj
-                        .get("background_color")
-                        .or_else(|| obj.get("backgroundColor"))
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("FFFFFF")
-                        .to_string();
-                    let text_color = obj
-                        .get("text_color")
-                        .or_else(|| obj.get("textColor"))
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("000000")
-                        .to_string();
-                    let border_color = obj
-                        .get("border_color")
-                        .or_else(|| obj.get("borderColor"))
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("000000")
-                        .to_string();
+                    let background_color = Self::normalize_color(
+                        obj.get("background_color")
+                            .or_else(|| obj.get("backgroundColor"))
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("FFFFFF"),
+                    );
+                    let text_color = Self::normalize_color(
+                        obj.get("text_color")
+                            .or_else(|| obj.get("textColor"))
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("000000"),
+                    );
+                    let border_color = Self::normalize_color(
+                        obj.get("border_color")
+                            .or_else(|| obj.get("borderColor"))
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("000000"),
+                    );
+
+                    tracing::debug!(
+                        "Upserting layer '{}' from dataset {} (enabled={})",
+                        layer_id,
+                        dataset_id,
+                        enabled
+                    );
 
                     let _ = self
                         .upsert_project_layer(
                             project_id,
-                            layer_id,
+                            layer_id.clone(),
                             name,
                             background_color,
                             text_color,
@@ -94,32 +133,55 @@ impl GraphService {
                     updated += 1;
                 }
             }
+        } else {
+            tracing::warn!(
+                "No 'layers' array found in dataset {} graph_json",
+                dataset_id
+            );
         }
 
-        if updated == 0 {
-            let now = chrono::Utc::now();
-            let result = project_layers::Entity::update_many()
-                .col_expr(project_layers::Column::Enabled, Expr::value(enabled))
-                .col_expr(project_layers::Column::UpdatedAt, Expr::value(now))
-                .filter(project_layers::Column::ProjectId.eq(project_id))
-                .filter(project_layers::Column::SourceDatasetId.eq(Some(dataset_id)))
-                .exec(&self.db)
-                .await
-                .map_err(GraphError::Database)?;
-            updated = result.rows_affected as usize;
-        }
+        tracing::info!(
+            "Seeded {} layers from dataset {} for project {}",
+            updated,
+            dataset_id,
+            project_id
+        );
+
+        // Always ensure all layers from this dataset have the correct enabled state
+        // This handles cases where layers existed but their enabled state needs updating
+        let now = chrono::Utc::now();
+        let _result = project_layers::Entity::update_many()
+            .col_expr(project_layers::Column::Enabled, Expr::value(enabled))
+            .col_expr(project_layers::Column::UpdatedAt, Expr::value(now))
+            .filter(project_layers::Column::ProjectId.eq(project_id))
+            .filter(project_layers::Column::SourceDatasetId.eq(Some(dataset_id)))
+            .exec(&self.db)
+            .await
+            .map_err(GraphError::Database)?;
 
         Ok(updated)
     }
 
     async fn seed_project_layers_if_empty(&self, project_id: i32) -> GraphResult<()> {
         use crate::database::entities::data_sets;
+
+        tracing::debug!(
+            "seed_project_layers_if_empty: checking project {}",
+            project_id
+        );
+
         let existing = project_layers::Entity::find()
             .filter(project_layers::Column::ProjectId.eq(project_id))
             .count(&self.db)
             .await
             .map_err(GraphError::Database)?;
+
         if existing > 0 {
+            tracing::debug!(
+                "Project {} already has {} layers, skipping seed",
+                project_id,
+                existing
+            );
             return Ok(());
         }
 
@@ -130,11 +192,24 @@ impl GraphService {
             .await
             .map_err(GraphError::Database)?;
 
+        let dataset_count = datasets.len();
+        tracing::info!(
+            "Found {} layer datasets for project {}, seeding...",
+            dataset_count,
+            project_id
+        );
+
         for ds in datasets {
             let _ = self
                 .seed_layers_from_dataset(project_id, ds.id, true)
                 .await?;
         }
+
+        tracing::info!(
+            "Completed seeding project {} layers from {} datasets",
+            project_id,
+            dataset_count
+        );
 
         Ok(())
     }
@@ -143,6 +218,9 @@ impl GraphService {
         // Ensure palette exists by seeding from layer datasets if empty
         self.seed_project_layers_if_empty(project_id).await?;
 
+        // Query enabled layers ordered by priority:
+        // - Manual layers (source_dataset_id = NULL) first (NULLs sort first in ascending order)
+        // - Then dataset layers ordered by dataset ID and insertion time
         let db_layers = project_layers::Entity::find()
             .filter(project_layers::Column::ProjectId.eq(project_id))
             .filter(project_layers::Column::Enabled.eq(true))
@@ -152,12 +230,18 @@ impl GraphService {
             .await
             .map_err(GraphError::Database)?;
 
+        // Deduplication: When multiple sources define the same layer_id, only the first
+        // occurrence is included in the palette. Priority order is determined by the
+        // SQL ORDER BY clause above:
+        // 1. Manual layers (source_dataset_id = NULL) come before dataset layers
+        // 2. Among dataset layers, ordered by source_dataset_id then by insertion order (id)
+        // This means manual layer definitions override dataset-provided ones with the same ID.
         let mut seen = HashSet::new();
         let mut palette = Vec::new();
 
         for db_layer in db_layers {
             if seen.contains(&db_layer.layer_id) {
-                continue;
+                continue; // Skip duplicate layer_id
             }
             seen.insert(db_layer.layer_id.clone());
             palette.push(Layer {
@@ -564,6 +648,9 @@ impl GraphService {
         &self,
         project_id: i32,
     ) -> GraphResult<Vec<project_layers::Model>> {
+        // Ensure palette exists by seeding from layer datasets if empty
+        self.seed_project_layers_if_empty(project_id).await?;
+
         let layers = project_layers::Entity::find()
             .filter(project_layers::Column::ProjectId.eq(project_id))
             .order_by_asc(project_layers::Column::SourceDatasetId)
@@ -610,7 +697,7 @@ impl GraphService {
             active.update(&self.db).await.map_err(GraphError::Database)
         } else {
             let active = project_layers::ActiveModel {
-                id: Set(0),
+                id: sea_orm::ActiveValue::NotSet,
                 project_id: Set(project_id),
                 layer_id: Set(layer_id),
                 name: Set(name),
@@ -659,8 +746,14 @@ impl GraphService {
     pub async fn missing_layers(&self, project_id: i32) -> GraphResult<Vec<String>> {
         use crate::database::entities::graphs::Entity as Graphs;
 
-        let palette = self.get_project_layers_palette(project_id).await?;
-        let mut known: HashSet<String> = palette.into_iter().map(|l| l.id).collect();
+        // Get ALL project layers (enabled and disabled) to build the known set
+        // A layer is only "missing" if it doesn't exist at all, not if it's disabled
+        let all_layers = project_layers::Entity::find()
+            .filter(project_layers::Column::ProjectId.eq(project_id))
+            .all(&self.db)
+            .await
+            .map_err(GraphError::Database)?;
+        let mut known: HashSet<String> = all_layers.into_iter().map(|l| l.layer_id).collect();
 
         let graph_ids: Vec<i32> = Graphs::find()
             .filter(crate::database::entities::graphs::Column::ProjectId.eq(project_id))
