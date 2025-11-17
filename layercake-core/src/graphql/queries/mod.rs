@@ -15,8 +15,8 @@ use crate::graphql::types::project::Project;
 use crate::graphql::types::sample_project::SampleProject;
 use crate::graphql::types::{
     DataSet, DataSetPreview, GraphEdgePreview, GraphEdit, GraphNodePreview, GraphPreview, Layer,
-    LibraryItem, LibraryItemFilterInput, ProjectCollaborator, SystemSetting, TableColumn, TableRow,
-    User, UserFilter, UserSession,
+    LibraryItem, LibraryItemFilterInput, ProjectCollaborator, ProjectLayer, SystemSetting,
+    TableColumn, TableRow, User, UserFilter, UserSession,
 };
 use crate::services::{
     graph_edit_service::GraphEditService, library_item_service::LibraryItemFilter,
@@ -154,6 +154,37 @@ impl Query {
             .map_err(|e| StructuredError::service("AppContext::get_plan", e))?;
 
         Ok(plan.map(Plan::from))
+    }
+
+    /// List project-wide layers (project palette)
+    #[graphql(name = "projectLayers")]
+    async fn project_layers(
+        &self,
+        ctx: &Context<'_>,
+        project_id: i32,
+    ) -> Result<Vec<ProjectLayer>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let layers = context
+            .app
+            .graph_service()
+            .list_project_layers(project_id)
+            .await
+            .map_err(|e| StructuredError::service("GraphService::list_project_layers", e))?;
+
+        Ok(layers.into_iter().map(ProjectLayer::from).collect())
+    }
+
+    /// List layers referenced in nodes/edges that are missing from the project palette
+    #[graphql(name = "missingLayers")]
+    async fn missing_layers(&self, ctx: &Context<'_>, project_id: i32) -> Result<Vec<String>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let missing = context
+            .app
+            .graph_service()
+            .missing_layers(project_id)
+            .await
+            .map_err(|e| StructuredError::service("GraphService::missing_layers", e))?;
+        Ok(missing)
     }
 
     /// List runtime-editable system settings

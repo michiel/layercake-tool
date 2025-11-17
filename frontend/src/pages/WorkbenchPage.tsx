@@ -134,6 +134,9 @@ export const WorkbenchPage = () => {
             <IconAdjustments className="mr-2 h-4 w-4" />
             Validate &amp; migrate plan
           </Button>
+          <Button variant="secondary" onClick={() => navigate(`/projects/${project.id}/workbench/layers`)}>
+            Layers
+          </Button>
           <Button variant="secondary" onClick={() => navigate(`/projects/${project.id}/plan`)}>
             <IconGraph className="mr-2 h-4 w-4" />
             Open plan editor

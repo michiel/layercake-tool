@@ -14,6 +14,7 @@ mod data_acquisition;
 mod data_set;
 mod graph;
 mod graph_edit;
+mod layer;
 mod library;
 mod mcp;
 mod plan;
@@ -46,6 +47,7 @@ pub struct Mutation(
     pub plan_dag::PlanDagMutation,
     pub plan_dag_edges::PlanDagEdgesMutation,
     pub plan_dag_nodes::PlanDagNodesMutation,
+    pub layer::LayerMutation,
     pub project::ProjectMutation,
     pub system::SystemMutation,
 );

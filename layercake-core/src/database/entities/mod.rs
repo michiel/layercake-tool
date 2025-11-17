@@ -8,6 +8,7 @@ pub mod plan_dag_edges;
 pub mod plan_dag_nodes;
 pub mod plans;
 pub mod project_collaborators;
+pub mod project_layers;
 pub mod projects;
 pub mod system_settings;
 pub mod user_sessions;

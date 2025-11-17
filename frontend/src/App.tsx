@@ -18,6 +18,7 @@ import { ChatLogsPage } from './pages/ChatLogsPage'
 import { KnowledgeBasePage } from './pages/KnowledgeBasePage'
 import { DatasetCreationPage } from './pages/DatasetCreationPage'
 import { ProjectArtefactsPage } from './pages/ProjectArtefactsPage'
+import { ProjectLayersPage } from './pages/ProjectLayersPage'
 import { getOrCreateSessionId } from './utils/session'
 import { Group, Stack } from './components/layout-primitives'
 import { Button } from './components/ui/button'
@@ -1800,6 +1801,11 @@ function App() {
           <Route path="/projects/:projectId/workbench" element={
             <ErrorBoundary>
               <WorkbenchPage />
+            </ErrorBoundary>
+          } />
+          <Route path="/projects/:projectId/workbench/layers" element={
+            <ErrorBoundary>
+              <ProjectLayersPage />
             </ErrorBoundary>
           } />
           <Route path="/projects/:projectId/plan-nodes" element={
