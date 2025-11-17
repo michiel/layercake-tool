@@ -296,7 +296,7 @@ export const GraphNode = memo((props: GraphNodeProps) => {
   // Footer content with node/edge counts
   const footerContent = (graphExecution?.nodeCount !== undefined || config.metadata?.nodeCount !== undefined) ? (
     <p className="text-xs text-muted-foreground">
-      Nodes: {graphExecution?.nodeCount || config.metadata.nodeCount}, Edges: {graphExecution?.edgeCount || config.metadata.edgeCount || 0}
+      N:{graphExecution?.nodeCount || config.metadata.nodeCount} E:{graphExecution?.edgeCount || config.metadata.edgeCount || 0}
     </p>
   ) : null
 
