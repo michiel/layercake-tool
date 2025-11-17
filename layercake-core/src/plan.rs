@@ -122,12 +122,32 @@ pub struct ExportProfileRenderConfig {
     pub legacy_use_default_styling: Option<bool>,
     #[serde(rename = "theme")]
     pub legacy_theme: Option<RenderConfigTheme>,
+    pub add_node_comments_as_notes: Option<bool>,
+    pub note_position: Option<NotePosition>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Copy)]
 pub enum RenderConfigOrientation {
     LR,
     TB,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Copy, PartialEq, Eq)]
+pub enum NotePosition {
+    #[serde(rename = "left")]
+    Left,
+    #[serde(rename = "right")]
+    Right,
+    #[serde(rename = "top")]
+    Top,
+    #[serde(rename = "bottom")]
+    Bottom,
+}
+
+impl Default for NotePosition {
+    fn default() -> Self {
+        NotePosition::Left
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Copy, PartialEq, Eq)]
@@ -181,6 +201,8 @@ impl Default for ExportProfileRenderConfig {
             target_options: Some(RenderTargetOptions::default()),
             legacy_use_default_styling: Some(true),
             legacy_theme: Some(RenderConfigTheme::Light),
+            add_node_comments_as_notes: Some(false),
+            note_position: Some(NotePosition::Left),
         }
     }
 }
@@ -193,6 +215,10 @@ pub struct RenderConfig {
     pub built_in_styles: RenderConfigBuiltInStyle,
     #[serde(default)]
     pub target_options: RenderTargetOptions,
+    #[serde(default)]
+    pub add_node_comments_as_notes: bool,
+    #[serde(default)]
+    pub note_position: NotePosition,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -369,6 +395,8 @@ impl ExportProfileItem {
         let target_options = render_config
             .target_options
             .unwrap_or_else(RenderTargetOptions::default);
+        let add_node_comments_as_notes = render_config.add_node_comments_as_notes.unwrap_or(false);
+        let note_position = render_config.note_position.unwrap_or(NotePosition::Left);
 
         RenderConfig {
             contain_nodes,
@@ -376,6 +404,8 @@ impl ExportProfileItem {
             apply_layers,
             built_in_styles,
             target_options,
+            add_node_comments_as_notes,
+            note_position,
         }
     }
 }

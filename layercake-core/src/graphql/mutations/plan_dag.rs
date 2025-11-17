@@ -31,6 +31,8 @@ fn default_artefact_render_config() -> RenderConfig {
         apply_layers: true,
         built_in_styles: RenderConfigBuiltInStyle::Light,
         target_options: RenderTargetOptions::default(),
+        add_node_comments_as_notes: false,
+        note_position: crate::plan::NotePosition::Left,
     }
 }
 

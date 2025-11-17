@@ -74,6 +74,8 @@ pub struct StoredRenderConfig {
     pub target_options: Option<StoredRenderTargetOptions>,
     pub use_default_styling: Option<bool>,
     pub theme: Option<String>,
+    pub add_node_comments_as_notes: Option<bool>,
+    pub note_position: Option<String>,
 }
 
 impl StoredRenderConfig {
@@ -117,6 +119,12 @@ impl StoredRenderConfig {
                 .target_options
                 .map(|options| options.into_render_target_options())
                 .unwrap_or_default(),
+            add_node_comments_as_notes: self.add_node_comments_as_notes.unwrap_or(false),
+            note_position: self
+                .note_position
+                .as_deref()
+                .map(parse_note_position)
+                .unwrap_or(crate::plan::NotePosition::Left),
         }
     }
 }
@@ -210,6 +218,15 @@ pub fn parse_builtin_style(value: &str) -> RenderConfigBuiltInStyle {
         "none" | "NONE" | "None" => RenderConfigBuiltInStyle::None,
         "dark" | "DARK" | "Dark" => RenderConfigBuiltInStyle::Dark,
         _ => RenderConfigBuiltInStyle::Light,
+    }
+}
+
+pub fn parse_note_position(value: &str) -> crate::plan::NotePosition {
+    match value {
+        "right" | "RIGHT" | "Right" => crate::plan::NotePosition::Right,
+        "top" | "TOP" | "Top" => crate::plan::NotePosition::Top,
+        "bottom" | "BOTTOM" | "Bottom" => crate::plan::NotePosition::Bottom,
+        _ => crate::plan::NotePosition::Left,
     }
 }
 

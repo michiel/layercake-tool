@@ -48,6 +48,9 @@ skinparam shadowing false
 {{else}}
     {{#each flow_nodes as |node|}}
   rectangle "{{node.label}}" as {{node.id}}{{#if config.apply_layers}} <<{{node.layer}}>>{{/if}}
+  {{#if (and config.add_node_comments_as_notes (exists node.comment))}}
+  note {{config.note_position}} of {{node.id}} : {{node.comment}}
+  {{/if}}
     {{/each}}
 {{/if}}
 

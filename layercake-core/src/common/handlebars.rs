@@ -87,11 +87,18 @@ pub fn get_handlebars() -> Handlebars<'static> {
             layermap: &serde_json::Map<String, Value>,
             acc: i32,
             apply_layers: bool,
+            add_notes: bool,
+            note_position: &str,
         ) -> String {
             if let Value::Object(map) = node {
                 let id = map.get("id").and_then(|v| v.as_str()).unwrap_or("no-id");
                 let label = map.get("label").and_then(|v| v.as_str()).unwrap_or("Unnamed");
                 let layer = map.get("layer").and_then(|v| v.as_str()).unwrap_or("no-layer");
+                let comment = map
+                    .get("comment")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.trim())
+                    .unwrap_or("");
                 let empty_vec = vec![];
                 let children = map.get("children").and_then(|v| v.as_array()).unwrap_or(&empty_vec);
 
@@ -105,12 +112,18 @@ pub fn get_handlebars() -> Handlebars<'static> {
                 if !children.is_empty() {
                     result += "{\n";
                     let children_rendered: Vec<String> = children.iter().map(|child| {
-                        render_tree(child.clone(), layermap, acc + 1, apply_layers)
+                        render_tree(child.clone(), layermap, acc + 1, apply_layers, add_notes, note_position)
                     }).collect();
                     result += &children_rendered.join("");
                     result += &format!("{}}}\n", indent);
                 } else {
                     result += "\n";
+                }
+                if add_notes && !comment.is_empty() {
+                    result += &format!(
+                        "{}note {} of {} : {}\n",
+                        indent, note_position, id, comment
+                    );
                 }
                 result
             } else {
@@ -136,8 +149,24 @@ pub fn get_handlebars() -> Handlebars<'static> {
             .get("apply_layers")
             .and_then(|v| v.as_bool())
             .unwrap_or(true);
+        let add_notes = style_map
+            .get("add_node_comments_as_notes")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        let note_position = style_map
+            .get("note_position")
+            .and_then(|v| v.as_str())
+            .map(|v| v.to_lowercase())
+            .unwrap_or_else(|| "left".to_string());
 
-        render_tree(node, &layermap, 0, apply_layers)
+        render_tree(
+            node,
+            &layermap,
+            0,
+            apply_layers,
+            add_notes,
+            note_position.as_str(),
+        )
     });
     handlebars.register_helper("puml_render_tree", Box::new(puml_render_tree));
 

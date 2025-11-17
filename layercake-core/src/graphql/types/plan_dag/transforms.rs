@@ -263,8 +263,9 @@ impl GraphTransform {
                     graph.edges.len()
                 ))
             }
-            GraphTransformKind::AggregateEdges => unreachable!("AggregateEdges should have been handled earlier"),
-            GraphTransformKind::DropUnconnectedNodes => unreachable!("DropUnconnectedNodes handled above"),
+            GraphTransformKind::AggregateEdges => {
+                unreachable!("AggregateEdges should have been handled earlier")
+            }
         };
 
         Ok(annotation)

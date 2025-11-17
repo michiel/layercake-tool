@@ -7,8 +7,8 @@ use crate::export::{
 };
 use crate::graph::Graph;
 use crate::plan::{
-    ExportFileType, Plan, RenderConfig, RenderConfigBuiltInStyle, RenderConfigOrientation,
-    RenderTargetOptions,
+    ExportFileType, NotePosition, Plan, RenderConfig, RenderConfigBuiltInStyle,
+    RenderConfigOrientation, RenderTargetOptions,
 };
 pub struct ExportService {
     _db: DatabaseConnection,
@@ -32,8 +32,11 @@ impl ExportService {
             apply_layers: true,
             built_in_styles: RenderConfigBuiltInStyle::Light,
             target_options: RenderTargetOptions::default(),
+            add_node_comments_as_notes: false,
+            note_position: NotePosition::Left,
         };
         let render_config = render_config_override.unwrap_or(default_render_config);
+        let mut render_config = render_config;
 
         match format {
             ExportFileType::DOT => {

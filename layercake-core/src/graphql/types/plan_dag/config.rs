@@ -158,6 +158,24 @@ pub struct RenderConfig {
     pub apply_layers: Option<bool>,
     pub built_in_styles: Option<RenderBuiltinStyle>,
     pub target_options: Option<RenderTargetOptions>,
+    pub add_node_comments_as_notes: Option<bool>,
+    pub note_position: Option<NotePosition>,
+}
+
+#[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
+pub enum NotePosition {
+    #[graphql(name = "Left")]
+    #[serde(rename = "left")]
+    Left,
+    #[graphql(name = "Right")]
+    #[serde(rename = "right")]
+    Right,
+    #[graphql(name = "Top")]
+    #[serde(rename = "top")]
+    Top,
+    #[graphql(name = "Bottom")]
+    #[serde(rename = "bottom")]
+    Bottom,
 }
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
