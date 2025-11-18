@@ -221,10 +221,19 @@ pub struct RenderConfig {
     pub note_position: NotePosition,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RenderTargetOptions {
     pub graphviz: Option<GraphvizRenderOptions>,
     pub mermaid: Option<MermaidRenderOptions>,
+}
+
+impl Default for RenderTargetOptions {
+    fn default() -> Self {
+        Self {
+            graphviz: Some(GraphvizRenderOptions::default()),
+            mermaid: None,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -234,6 +243,8 @@ pub struct GraphvizRenderOptions {
     pub splines: bool,
     pub nodesep: f32,
     pub ranksep: f32,
+    #[serde(default)]
+    pub comment_style: GraphvizCommentStyle,
 }
 
 impl Default for GraphvizRenderOptions {
@@ -242,8 +253,9 @@ impl Default for GraphvizRenderOptions {
             layout: GraphvizLayout::Dot,
             overlap: false,
             splines: true,
-            nodesep: 0.5,
-            ranksep: 0.5,
+            nodesep: 0.3,
+            ranksep: 1.3,
+            comment_style: GraphvizCommentStyle::Label,
         }
     }
 }
@@ -258,6 +270,14 @@ pub enum GraphvizLayout {
     Fdp,
     #[serde(rename = "circo")]
     Circo,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Copy, PartialEq, Eq)]
+pub enum GraphvizCommentStyle {
+    #[serde(rename = "label")]
+    Label,
+    #[serde(rename = "tooltip")]
+    Tooltip,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -392,9 +412,12 @@ impl ExportProfileItem {
                 }
             })
             .unwrap_or(RenderConfigBuiltInStyle::Light);
-        let target_options = render_config
+        let mut target_options = render_config
             .target_options
             .unwrap_or_else(RenderTargetOptions::default);
+        if target_options.graphviz.is_none() {
+            target_options.graphviz = Some(GraphvizRenderOptions::default());
+        }
         let add_node_comments_as_notes = render_config.add_node_comments_as_notes.unwrap_or(false);
         let note_position = render_config.note_position.unwrap_or(NotePosition::Left);
 

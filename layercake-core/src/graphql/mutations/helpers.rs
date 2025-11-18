@@ -153,6 +153,7 @@ pub struct StoredGraphvizRenderOptions {
     pub splines: Option<bool>,
     pub nodesep: Option<f32>,
     pub ranksep: Option<f32>,
+    pub comment_style: Option<String>,
 }
 
 impl StoredGraphvizRenderOptions {
@@ -172,6 +173,9 @@ impl StoredGraphvizRenderOptions {
         }
         if let Some(ranksep) = self.ranksep {
             options.ranksep = ranksep;
+        }
+        if let Some(style) = self.comment_style.as_deref() {
+            options.comment_style = parse_graphviz_comment_style(style);
         }
         options
     }
@@ -236,6 +240,13 @@ pub fn parse_graphviz_layout(value: &str) -> GraphvizLayout {
         "fdp" | "FDP" => GraphvizLayout::Fdp,
         "circo" | "CIRCO" => GraphvizLayout::Circo,
         _ => GraphvizLayout::Dot,
+    }
+}
+
+pub fn parse_graphviz_comment_style(value: &str) -> crate::plan::GraphvizCommentStyle {
+    match value {
+        "tooltip" | "TOOLTIP" | "Tooltip" => crate::plan::GraphvizCommentStyle::Tooltip,
+        _ => crate::plan::GraphvizCommentStyle::Label,
     }
 }
 

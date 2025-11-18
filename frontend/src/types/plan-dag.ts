@@ -197,6 +197,7 @@ export interface GraphvizRenderOptions {
   splines?: boolean;
   nodesep?: number;
   ranksep?: number;
+   commentStyle?: 'label' | 'tooltip';
 }
 
 export interface MermaidRenderOptions {
@@ -208,8 +209,9 @@ export const DEFAULT_GRAPHVIZ_OPTIONS: GraphvizRenderOptions = {
   layout: 'dot',
   overlap: false,
   splines: true,
-  nodesep: 0.5,
-  ranksep: 0.5,
+  nodesep: 0.3,
+  ranksep: 1.3,
+  commentStyle: 'label',
 };
 
 export const DEFAULT_MERMAID_OPTIONS: MermaidRenderOptions = {

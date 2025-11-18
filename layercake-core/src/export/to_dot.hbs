@@ -48,14 +48,14 @@ digraph G {
   node [style="filled,rounded" fillcolor="#{{layer.background_color}}" fontcolor="#{{layer.text_color}}" penwidth=1 color="#{{layer.border_color}}"]; {
         {{#each ../flow_nodes as |node|}}
           {{#if (eq node.layer layer.id)}}
-              {{node.id}}[label="{{node.label}}"];
+              {{node.id}}[label="{{node.label}}"{{#if (and ../../config.add_node_comments_as_notes (exists node.comment))}}{{#if (stringeq ../../config.target_options.graphviz.comment_style "tooltip")}}, tooltip="{{node.comment}}"{{else}}, xlabel="{{node.comment}}"{{/if}}{{/if}}];
           {{/if}}
         {{/each}}
       }
     {{/each}}
   {{else}}
     {{#each flow_nodes as |node|}}
-      {{node.id}}[label="{{node.label}}", style="rounded"];
+      {{node.id}}[label="{{node.label}}", style="rounded"{{#if (and ../config.add_node_comments_as_notes (exists node.comment))}}{{#if (stringeq ../config.target_options.graphviz.comment_style "tooltip")}}, tooltip="{{node.comment}}"{{else}}, xlabel="{{node.comment}}"{{/if}}{{/if}}];
     {{/each}}
   {{/if}}
 {{/if}}

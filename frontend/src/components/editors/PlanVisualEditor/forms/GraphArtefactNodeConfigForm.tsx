@@ -285,6 +285,47 @@ export const GraphArtefactNodeConfigForm: React.FC<GraphArtefactNodeConfigFormPr
 
       {localConfig.renderTarget === 'DOT' && (
         <div className="space-y-4 border-t pt-4">
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="graphviz-add-node-comments-as-notes"
+              checked={localConfig.renderConfig?.addNodeCommentsAsNotes ?? false}
+              onCheckedChange={(checked) =>
+                setLocalConfig(prev => ({
+                  ...prev,
+                  renderConfig: { ...(prev.renderConfig ?? {}), addNodeCommentsAsNotes: checked },
+                }))
+              }
+            />
+            <div>
+              <Label htmlFor="graphviz-add-node-comments-as-notes">Add node comments as notes</Label>
+              <p className="text-sm text-muted-foreground">
+                When enabled, DOT exports include node comments as an extra label (xlabel) or tooltip attribute.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="graphviz-comment-style">Comment style</Label>
+            <Select
+              value={graphvizOptions.commentStyle ?? DEFAULT_GRAPHVIZ_OPTIONS.commentStyle}
+              onValueChange={(value) =>
+                updateGraphvizOptions({ commentStyle: value as typeof graphvizOptions.commentStyle })
+              }
+              disabled={!(localConfig.renderConfig?.addNodeCommentsAsNotes ?? false)}
+            >
+              <SelectTrigger id="graphviz-comment-style">
+                <SelectValue placeholder="Choose how comments are rendered" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="label">Label (uses xlabel)</SelectItem>
+                <SelectItem value="tooltip">Tooltip</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-sm text-muted-foreground">
+              Select whether comments appear as an outer label (xlabel) or as a tooltip on the node.
+            </p>
+          </div>
+
           <div>
             <Label>Graphviz Options</Label>
             <p className="text-sm text-muted-foreground">

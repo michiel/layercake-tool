@@ -243,11 +243,19 @@ pub fn get_handlebars() -> Handlebars<'static> {
             acc: i32,
             apply_layers: bool,
             built_in_style: &str,
+            add_notes: bool,
+            comment_style: &str,
         ) -> String {
             if let Value::Object(map) = node {
                 let id = map.get("id").and_then(|v| v.as_str()).unwrap_or("no-id");
                 let label = map.get("label").and_then(|v| v.as_str()).unwrap_or("Unnamed");
                 let layer = map.get("layer").and_then(|v| v.as_str()).unwrap_or("no-layer");
+                let comment = map
+                    .get("comment")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.trim())
+                    .unwrap_or("");
+                let has_comment = add_notes && !comment.is_empty() && comment != "null";
                 let empty_vec = vec![];
                 let children = map.get("children").and_then(|v| v.as_array()).unwrap_or(&empty_vec);
 
@@ -292,7 +300,15 @@ pub fn get_handlebars() -> Handlebars<'static> {
                     }
 
                     let children_rendered: Vec<String> = children.iter().map(|child| {
-                        render_tree(child.clone(), layermap, acc + 1, apply_layers, built_in_style)
+                        render_tree(
+                            child.clone(),
+                            layermap,
+                            acc + 1,
+                            apply_layers,
+                            built_in_style,
+                            add_notes,
+                            comment_style,
+                        )
                     }).collect();
                     result += &children_rendered.join("");
                     result += &format!("{}  }}\n", indent);
@@ -319,14 +335,32 @@ pub fn get_handlebars() -> Handlebars<'static> {
                         }
                     }
 
+                    let escaped_comment = comment.replace('"', "\\\"");
+                    let comment_attr = if has_comment {
+                        match comment_style {
+                            "tooltip" => format!(", tooltip=\"{}\"", escaped_comment),
+                            _ => format!(", xlabel=\"{}\"", escaped_comment),
+                        }
+                    } else {
+                        String::new()
+                    };
                     result += &format!(
-                        "{}{} [label=\"{}\", layer=\"{}\", style=\"filled,rounded\", fillcolor=\"#{}\", fontcolor=\"#{}\", color=\"#{}\"];\n",
-                        indent, id, label, layer, fillcolor, fontcolor, bordercolor
+                        "{}{} [label=\"{}\", layer=\"{}\", style=\"filled,rounded\", fillcolor=\"#{}\", fontcolor=\"#{}\", color=\"#{}\"{}];\n",
+                        indent, id, label, layer, fillcolor, fontcolor, bordercolor, comment_attr
                     );
                 } else {
+                    let escaped_comment = comment.replace('"', "\\\"");
+                    let comment_attr = if has_comment {
+                        match comment_style {
+                            "tooltip" => format!(", tooltip=\"{}\"", escaped_comment),
+                            _ => format!(", xlabel=\"{}\"", escaped_comment),
+                        }
+                    } else {
+                        String::new()
+                    };
                     result += &format!(
-                        "{}{} [label=\"{}\", layer=\"{}\", style=\"rounded\"];\n",
-                        indent, id, label, layer
+                        "{}{} [label=\"{}\", layer=\"{}\", style=\"rounded\"{}];\n",
+                        indent, id, label, layer, comment_attr
                     );
                 }
 
@@ -358,6 +392,16 @@ pub fn get_handlebars() -> Handlebars<'static> {
             .get("built_in_styles")
             .and_then(|v| v.as_str())
             .unwrap_or("light");
+        let add_notes = style_map
+            .get("add_node_comments_as_notes")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        let comment_style = style_map
+            .get("target_options")
+            .and_then(|v| v.get("graphviz"))
+            .and_then(|v| v.get("comment_style"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("label");
 
         render_tree(
             node,
@@ -365,6 +409,8 @@ pub fn get_handlebars() -> Handlebars<'static> {
             0,
             apply_layers,
             built_in_style,
+            add_notes,
+            comment_style,
         )
     });
     handlebars.register_helper("dot_render_tree", Box::new(dot_render_tree));

@@ -31,7 +31,10 @@ impl ExportService {
             orientation: RenderConfigOrientation::TB,
             apply_layers: true,
             built_in_styles: RenderConfigBuiltInStyle::Light,
-            target_options: RenderTargetOptions::default(),
+            target_options: RenderTargetOptions {
+                graphviz: Some(crate::plan::GraphvizRenderOptions::default()),
+                mermaid: None,
+            },
             add_node_comments_as_notes: false,
             note_position: NotePosition::Left,
         };

@@ -106,6 +106,7 @@ const ArtefactNodeBase = memo((props: ArtefactNodeProps) => {
       variables: {
         projectId,
         nodeId: props.id,
+        renderConfig: config.renderConfig,
       },
     })
   }
@@ -183,6 +184,7 @@ const ArtefactNodeBase = memo((props: ArtefactNodeProps) => {
       variables: {
         projectId,
         nodeId: props.id,
+        renderConfig: config.renderConfig,
       },
     })
   }

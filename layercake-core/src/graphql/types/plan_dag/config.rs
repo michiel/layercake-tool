@@ -209,6 +209,7 @@ pub struct GraphvizRenderOptions {
     pub splines: Option<bool>,
     pub nodesep: Option<f32>,
     pub ranksep: Option<f32>,
+    pub comment_style: Option<GraphvizCommentStyle>,
 }
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
@@ -225,6 +226,16 @@ pub enum GraphvizLayout {
     #[graphql(name = "CIRCO")]
     #[serde(rename = "circo")]
     Circo,
+}
+
+#[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
+pub enum GraphvizCommentStyle {
+    #[graphql(name = "LABEL")]
+    #[serde(rename = "label")]
+    Label,
+    #[graphql(name = "TOOLTIP")]
+    #[serde(rename = "tooltip")]
+    Tooltip,
 }
 
 #[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]

@@ -14,25 +14,164 @@ use crate::database::entities::{
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
 use crate::graphql::types::plan_dag::{
+    config::RenderConfig as GraphQLRenderConfig,
+    config::NotePosition as GraphQLNotePosition,
+    config::RenderTargetOptions as GraphQLRenderTargetOptions,
+    config::Orientation as GraphQLOrientation,
+    config::RenderBuiltinStyle as GraphQLRenderBuiltinStyle,
+    config::GraphvizCommentStyle as GraphQLGraphvizCommentStyle,
     PlanDag, PlanDagEdge, PlanDagInput, PlanDagMigrationDetail, PlanDagMigrationResult, PlanDagNode,
 };
 use crate::pipeline::DagExecutor;
 use crate::plan::{
-    RenderConfig, RenderConfigBuiltInStyle, RenderConfigOrientation, RenderTargetOptions,
+    RenderConfig as PlanRenderConfig, NotePosition as PlanNotePosition, RenderConfigBuiltInStyle,
+    RenderConfigOrientation, RenderTargetOptions, GraphvizRenderOptions, GraphvizCommentStyle,
 };
 
 #[derive(Default)]
 pub struct PlanDagMutation;
 
-fn default_artefact_render_config() -> RenderConfig {
-    RenderConfig {
+fn default_artefact_render_config() -> PlanRenderConfig {
+    PlanRenderConfig {
         contain_nodes: true,
         orientation: RenderConfigOrientation::TB,
         apply_layers: true,
         built_in_styles: RenderConfigBuiltInStyle::Light,
-        target_options: RenderTargetOptions::default(),
+        target_options: RenderTargetOptions {
+            graphviz: Some(GraphvizRenderOptions::default()),
+            mermaid: None,
+        },
         add_node_comments_as_notes: false,
-        note_position: crate::plan::NotePosition::Left,
+        note_position: PlanNotePosition::Left,
+    }
+}
+
+fn map_note_position(position: GraphQLNotePosition) -> PlanNotePosition {
+    match position {
+        GraphQLNotePosition::Right => PlanNotePosition::Right,
+        GraphQLNotePosition::Top => PlanNotePosition::Top,
+        GraphQLNotePosition::Bottom => PlanNotePosition::Bottom,
+        GraphQLNotePosition::Left => PlanNotePosition::Left,
+    }
+}
+
+/// Merge a (partial) GraphQL render config with defaults to the concrete plan RenderConfig
+fn render_config_from_graphql_input(
+    input: &GraphQLRenderConfig,
+    defaults: &PlanRenderConfig,
+) -> PlanRenderConfig {
+    fn map_orientation(value: GraphQLOrientation) -> RenderConfigOrientation {
+        match value {
+            GraphQLOrientation::Lr => RenderConfigOrientation::LR,
+            GraphQLOrientation::Tb => RenderConfigOrientation::TB,
+        }
+    }
+
+    fn map_builtin_style(value: GraphQLRenderBuiltinStyle) -> RenderConfigBuiltInStyle {
+        match value {
+            GraphQLRenderBuiltinStyle::None => RenderConfigBuiltInStyle::None,
+            GraphQLRenderBuiltinStyle::Light => RenderConfigBuiltInStyle::Light,
+            GraphQLRenderBuiltinStyle::Dark => RenderConfigBuiltInStyle::Dark,
+        }
+    }
+
+    fn map_graphviz_comment_style(value: GraphQLGraphvizCommentStyle) -> GraphvizCommentStyle {
+        match value {
+            GraphQLGraphvizCommentStyle::Tooltip => GraphvizCommentStyle::Tooltip,
+            GraphQLGraphvizCommentStyle::Label => GraphvizCommentStyle::Label,
+        }
+    }
+
+    fn map_target_options(
+        input: &GraphQLRenderTargetOptions,
+        defaults: &RenderTargetOptions,
+    ) -> RenderTargetOptions {
+        let mut opts = defaults.clone();
+        if let Some(gv) = &input.graphviz {
+            if opts.graphviz.is_none() {
+                opts.graphviz = Some(GraphvizRenderOptions::default());
+            }
+            if let Some(ref mut graphviz_opts) = opts.graphviz {
+                if let Some(layout) = gv.layout {
+                    graphviz_opts.layout = match layout {
+                        crate::graphql::types::plan_dag::config::GraphvizLayout::Neato => {
+                            crate::plan::GraphvizLayout::Neato
+                        }
+                        crate::graphql::types::plan_dag::config::GraphvizLayout::Fdp => {
+                            crate::plan::GraphvizLayout::Fdp
+                        }
+                        crate::graphql::types::plan_dag::config::GraphvizLayout::Circo => {
+                            crate::plan::GraphvizLayout::Circo
+                        }
+                        _ => crate::plan::GraphvizLayout::Dot,
+                    };
+                }
+                if let Some(overlap) = gv.overlap {
+                    graphviz_opts.overlap = overlap;
+                }
+                if let Some(splines) = gv.splines {
+                    graphviz_opts.splines = splines;
+                }
+                if let Some(nodesep) = gv.nodesep {
+                    graphviz_opts.nodesep = nodesep;
+                }
+                if let Some(ranksep) = gv.ranksep {
+                    graphviz_opts.ranksep = ranksep;
+                }
+                if let Some(style) = gv.comment_style {
+                    graphviz_opts.comment_style = map_graphviz_comment_style(style);
+                }
+            }
+        }
+        if let Some(mermaid) = &input.mermaid {
+            if opts.mermaid.is_none() {
+                opts.mermaid = Some(crate::plan::MermaidRenderOptions::default());
+            }
+            if let Some(ref mut mermaid_opts) = opts.mermaid {
+                if let Some(look) = mermaid.look {
+                    mermaid_opts.look = match look {
+                        crate::graphql::types::plan_dag::config::MermaidLook::HandDrawn => {
+                            crate::plan::MermaidLook::HandDrawn
+                        }
+                        _ => crate::plan::MermaidLook::Default,
+                    };
+                }
+                if let Some(display) = mermaid.display {
+                    mermaid_opts.display = match display {
+                        crate::graphql::types::plan_dag::config::MermaidDisplay::Compact => {
+                            crate::plan::MermaidDisplay::Compact
+                        }
+                        _ => crate::plan::MermaidDisplay::Full,
+                    };
+                }
+            }
+        }
+        opts
+    }
+
+    PlanRenderConfig {
+        contain_nodes: input.contain_nodes.unwrap_or(defaults.contain_nodes),
+        orientation: input
+            .orientation
+            .map(map_orientation)
+            .unwrap_or(defaults.orientation),
+        apply_layers: input.apply_layers.unwrap_or(defaults.apply_layers),
+        built_in_styles: input
+            .built_in_styles
+            .map(map_builtin_style)
+            .unwrap_or(defaults.built_in_styles),
+        target_options: input
+            .target_options
+            .as_ref()
+            .map(|options| map_target_options(options, &defaults.target_options))
+            .unwrap_or_else(|| defaults.target_options.clone()),
+        add_node_comments_as_notes: input
+            .add_node_comments_as_notes
+            .unwrap_or(defaults.add_node_comments_as_notes),
+        note_position: input
+            .note_position
+            .map(map_note_position)
+            .unwrap_or(defaults.note_position),
     }
 }
 
@@ -189,6 +328,7 @@ impl PlanDagMutation {
         ctx: &Context<'_>,
         project_id: i32,
         node_id: String,
+        #[graphql(name = "renderConfigOverride")] render_config_override: Option<GraphQLRenderConfig>,
         preview_rows: Option<i32>,
     ) -> Result<ExportNodeOutputResult> {
         let context = ctx.data::<GraphQLContext>()?;
@@ -216,7 +356,7 @@ impl PlanDagMutation {
             .ok_or_else(|| StructuredError::not_found("Artefact node", &node_id))?;
 
         let node_type = artefact_node.node_type.clone();
-        let (render_target, output_path, render_config_override) = match node_type.as_str() {
+        let (render_target, output_path, stored_render_config) = match node_type.as_str() {
             "TreeArtefactNode" | "TreeArtefact" => {
                 let stored_config: StoredTreeArtefactNodeConfig =
                     serde_json::from_str(&artefact_node.config_json).map_err(|e| {
@@ -230,12 +370,7 @@ impl PlanDagMutation {
                         .render_target
                         .unwrap_or_else(|| "PlantUmlMindmap".to_string()),
                     stored_config.output_path,
-                    Some(
-                        stored_config
-                            .render_config
-                            .map(|rc| rc.into_render_config())
-                            .unwrap_or_else(default_artefact_render_config),
-                    ),
+                    stored_config.render_config.map(|rc| rc.into_render_config()),
                 )
             }
             _ => {
@@ -251,12 +386,7 @@ impl PlanDagMutation {
                         .render_target
                         .unwrap_or_else(|| "GML".to_string()),
                     stored_config.output_path,
-                    Some(
-                        stored_config
-                            .render_config
-                            .map(|rc| rc.into_render_config())
-                            .unwrap_or_else(default_artefact_render_config),
-                    ),
+                    stored_config.render_config.map(|rc| rc.into_render_config()),
                 )
             }
         };
@@ -271,6 +401,16 @@ impl PlanDagMutation {
         // Generate filename
         let extension = get_extension_for_format(render_target.as_str());
         let filename = output_path.unwrap_or_else(|| format!("{}.{}", project.name, extension));
+
+        // Merge render config overrides: GraphQL input (if provided) takes priority,
+        // then stored config, then defaults.
+        let defaults = default_artefact_render_config();
+        let gql_render_config = render_config_override
+            .as_ref()
+            .map(|rc| render_config_from_graphql_input(rc, &defaults));
+        let render_config = gql_render_config
+            .or(stored_render_config)
+            .unwrap_or(defaults);
 
         // Find the upstream GraphNode connected to this artefact node
         let edges = plan_dag_edges::Entity::find()
@@ -337,7 +477,7 @@ impl PlanDagMutation {
             .preview_graph_export(
                 graph_model.id,
                 export_format,
-                render_config_override,
+                Some(render_config.clone()),
                 preview_limit,
             )
             .await

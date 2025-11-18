@@ -1,8 +1,8 @@
 import { gql } from '@apollo/client';
 
 export const EXPORT_NODE_OUTPUT = gql`
-  mutation ExportNodeOutput($projectId: Int!, $nodeId: String!) {
-    exportNodeOutput(projectId: $projectId, nodeId: $nodeId) {
+  mutation ExportNodeOutput($projectId: Int!, $nodeId: String!, $renderConfig: RenderConfigInput) {
+    exportNodeOutput(projectId: $projectId, nodeId: $nodeId, renderConfigOverride: $renderConfig) {
       success
       message
       content
