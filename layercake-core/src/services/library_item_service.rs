@@ -317,7 +317,24 @@ impl LibraryItemService {
         let data_type = metadata
             .data_type
             .parse::<DataType>()
-            .unwrap_or(DataType::Graph);
+            .unwrap_or(DataType::Nodes); // Default to Nodes instead of Graph to ensure valid CSV combination
+
+        // Validate format/type combination and adjust if needed
+        let (file_format, data_type) = if !data_type.is_compatible_with_format(&file_format) {
+            // Try to infer from the actual data if metadata is incorrect
+            match infer_data_type(&metadata.filename, &file_format, &item.content_blob) {
+                Ok(inferred_type) if inferred_type.is_compatible_with_format(&file_format) => {
+                    (file_format, inferred_type)
+                }
+                _ => {
+                    // Fallback to safe default: CSV + Nodes
+                    (FileFormat::Csv, DataType::Nodes)
+                }
+            }
+        } else {
+            (file_format, data_type)
+        };
+
         let filename = if metadata.filename.is_empty() {
             format!("{}.{}", item.name, file_format.as_ref())
         } else {
