@@ -99,6 +99,13 @@ export const ProjectLayersPage = () => {
     return datasetLayers.every((l) => l.enabled)
   }
 
+  // Helper function to get dataset name by ID
+  const getDatasetName = (datasetId: number | null | undefined): string => {
+    if (!datasetId) return 'Manual'
+    const dataset = layerDatasets.find((ds: any) => ds.id === datasetId)
+    return dataset?.name || `Dataset #${datasetId}`
+  }
+
   // Helper to update editable layers and mark as unsaved
   const updateEditableLayers = (updater: (prev: ProjectLayer[]) => ProjectLayer[]) => {
     setEditableLayers(updater)
@@ -267,13 +274,13 @@ export const ProjectLayersPage = () => {
         </Group>
       </Group>
 
-      <Tabs defaultValue="sources" className="space-y-4">
+      <Tabs defaultValue="palette" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="sources">Sources</TabsTrigger>
           <TabsTrigger value="palette">Palette</TabsTrigger>
           <TabsTrigger value="missing">
             Missing {missingLayers.length > 0 && <Badge className="ml-1">{missingLayers.length}</Badge>}
           </TabsTrigger>
+          <TabsTrigger value="sources">Sources</TabsTrigger>
         </TabsList>
 
         <TabsContent value="sources">
@@ -451,11 +458,7 @@ export const ProjectLayersPage = () => {
                         />
                       </TableCell>
                       <TableCell>
-                        {layer.sourceDatasetId ? (
-                          <Badge variant="secondary">Dataset #{layer.sourceDatasetId}</Badge>
-                        ) : (
-                          <Badge variant="secondary">Manual</Badge>
-                        )}
+                        <Badge variant="secondary">{getDatasetName(layer.sourceDatasetId)}</Badge>
                       </TableCell>
                       <TableCell>
                         <Switch
