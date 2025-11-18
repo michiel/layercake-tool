@@ -58,6 +58,8 @@ interface FileInfo {
   file: File
   name: string
   format: FileFormat | null
+  detectedFormat: FileFormat | null
+  formatOverride: boolean
   preview?: string
 }
 
@@ -152,13 +154,15 @@ export const DataSetUploader: React.FC<DataSetUploaderProps> = ({
     const file = files[0]
     if (!file) return
 
-    const format = detectFileFormat(file.name)
+    const detectedFormat = detectFileFormat(file.name)
     const preview = await generatePreview(file)
 
     const fileInfo: FileInfo = {
       file,
       name: file.name.replace(/\.[^/.]+$/, ''), // Remove extension for default name
-      format,
+      format: detectedFormat,
+      detectedFormat,
+      formatOverride: false,
       preview
     }
 
@@ -169,7 +173,7 @@ export const DataSetUploader: React.FC<DataSetUploaderProps> = ({
     form.setValue('name', fileInfo.name)
 
     // Auto-select data type if only one option (JSON -> GRAPH)
-    const availableTypes = getAvailableDataTypes(format)
+    const availableTypes = getAvailableDataTypes(detectedFormat)
     if (availableTypes.length === 1) {
       form.setValue('dataType', availableTypes[0])
     } else {
@@ -497,6 +501,45 @@ export const DataSetUploader: React.FC<DataSetUploaderProps> = ({
 
         {isValidFileFormat && (
           <>
+            <div className="space-y-2">
+              <Label htmlFor="file-format">File Format *</Label>
+              <Select
+                value={selectedFile.format || ''}
+                onValueChange={(value) => {
+                  if (!selectedFile) return
+                  const newFormat = value as FileFormat
+                  setSelectedFile({
+                    ...selectedFile,
+                    format: newFormat,
+                    formatOverride: newFormat !== selectedFile.detectedFormat
+                  })
+                  // Reset data type when format changes
+                  form.setValue('dataType', '')
+                  const newAvailableTypes = getAvailableDataTypes(newFormat)
+                  if (newAvailableTypes.length === 1) {
+                    form.setValue('dataType', newAvailableTypes[0])
+                  }
+                }}
+              >
+                <SelectTrigger id="file-format">
+                  <SelectValue placeholder="Select file format" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={FileFormat.CSV}>{getFileFormatDisplayName(FileFormat.CSV)}</SelectItem>
+                  <SelectItem value={FileFormat.TSV}>{getFileFormatDisplayName(FileFormat.TSV)}</SelectItem>
+                  <SelectItem value={FileFormat.JSON}>{getFileFormatDisplayName(FileFormat.JSON)}</SelectItem>
+                </SelectContent>
+              </Select>
+              {selectedFile.formatOverride && (
+                <Alert className="border-orange-200 bg-orange-50 text-orange-900">
+                  <IconAlertCircle className="h-4 w-4 text-orange-600" />
+                  <AlertDescription className="text-xs">
+                    Format override: Detected as {getFileFormatDisplayName(selectedFile.detectedFormat!)} but using {getFileFormatDisplayName(selectedFile.format!)}
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="data-type">Data Type *</Label>
               <Select

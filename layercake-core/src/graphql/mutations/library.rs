@@ -10,8 +10,9 @@ use crate::graphql::types::{
 };
 use crate::services::library_item_service::{
     LibraryItemService, SeedLibraryResult, ITEM_TYPE_DATASET, ITEM_TYPE_PROJECT,
-    ITEM_TYPE_PROJECT_TEMPLATE,
+    ITEM_TYPE_PROJECT_TEMPLATE, DatasetMetadata, infer_data_type,
 };
+use crate::database::entities::common_types::{DataType as EntityDataType, FileFormat as EntityFileFormat};
 
 #[derive(InputObject)]
 pub struct ImportLibraryDatasetsInput {
@@ -231,5 +232,73 @@ impl LibraryMutation {
             .map_err(|e| StructuredError::service("LibraryItemService::seed_from_repository", e))?;
 
         Ok(SeedLibraryItemsResult::from(result))
+    }
+
+    /// Re-detect data type for a library dataset by analyzing file content
+    #[graphql(name = "redetectLibraryDatasetType")]
+    async fn redetect_library_dataset_type(
+        &self,
+        ctx: &Context<'_>,
+        id: i32,
+    ) -> Result<LibraryItem> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let service = LibraryItemService::new(context.db.clone());
+
+        // Get the library item
+        let item = service
+            .get(id)
+            .await
+            .map_err(|e| StructuredError::service("LibraryItemService::get", e))?
+            .ok_or_else(|| StructuredError::not_found("Library item", &id.to_string()))?;
+
+        // Verify it's a dataset
+        if item.item_type != ITEM_TYPE_DATASET {
+            return Err(StructuredError::bad_request(format!(
+                "Cannot re-detect type for non-dataset item (type: {})",
+                item.item_type
+            ))
+            .into());
+        }
+
+        // Parse existing metadata
+        let mut metadata = serde_json::from_str::<DatasetMetadata>(&item.metadata)
+            .unwrap_or_default();
+
+        // Parse format from metadata
+        let file_format = metadata
+            .format
+            .parse::<EntityFileFormat>()
+            .or_else(|_| {
+                EntityFileFormat::from_extension(&metadata.filename)
+                    .ok_or_else(|| anyhow::anyhow!("Cannot determine file format"))
+            })
+            .map_err(|e| StructuredError::bad_request(format!("Invalid file format: {}", e)))?;
+
+        // Infer data type from content
+        let inferred_type = infer_data_type(&metadata.filename, &file_format, &item.content_blob)
+            .map_err(|e| {
+                StructuredError::bad_request(format!("Failed to infer data type: {}", e))
+            })?;
+
+        // Update metadata with new data type
+        metadata.data_type = inferred_type.as_ref().to_string();
+
+        // Update the library item metadata
+        let updated_metadata_json = serde_json::to_string(&metadata)
+            .map_err(|e| StructuredError::internal(format!("Failed to serialize metadata: {}", e)))?;
+
+        use crate::database::entities::library_items;
+        use sea_orm::{ActiveModelTrait, EntityTrait, Set};
+
+        let mut active: library_items::ActiveModel = item.into();
+        active.metadata = Set(updated_metadata_json);
+        active.updated_at = Set(chrono::Utc::now());
+
+        let updated = active
+            .update(&context.db)
+            .await
+            .map_err(|e| StructuredError::database("update library item metadata", e))?;
+
+        Ok(LibraryItem::from(updated))
     }
 }

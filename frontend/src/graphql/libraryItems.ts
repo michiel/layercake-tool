@@ -52,6 +52,20 @@ export const UPDATE_LIBRARY_ITEM = gql`
   }
 `
 
+export const REDETECT_LIBRARY_DATASET_TYPE = gql`
+  mutation RedetectLibraryDatasetType($id: Int!) {
+    redetectLibraryDatasetType(id: $id) {
+      id
+      type
+      name
+      description
+      tags
+      metadata
+      updatedAt
+    }
+  }
+`
+
 export const IMPORT_LIBRARY_DATASETS = gql`
   mutation ImportLibraryDatasets($input: ImportLibraryDatasetsInput!) {
     importLibraryDatasets(input: $input) {

@@ -44,6 +44,7 @@ import {
   SEED_LIBRARY_ITEMS,
   UPLOAD_LIBRARY_ITEM,
   UPDATE_LIBRARY_ITEM,
+  REDETECT_LIBRARY_DATASET_TYPE,
   LibraryItem,
   LibraryItemType,
   UploadLibraryItemInput,
@@ -113,6 +114,7 @@ export const LibraryPage: React.FC = () => {
   const [seedLibraryItems, { loading: seedLoading }] = useMutation(SEED_LIBRARY_ITEMS)
   const [uploadLibraryItem, { loading: uploadMutationLoading }] = useMutation(UPLOAD_LIBRARY_ITEM)
   const [updateLibraryItem, { loading: updateLibraryItemLoading }] = useMutation(UPDATE_LIBRARY_ITEM)
+  const [redetectDatasetType, { loading: redetecting }] = useMutation(REDETECT_LIBRARY_DATASET_TYPE)
 
   const handleDownload = (item: LibraryItem) => {
     window.open(`/api/library/${item.id}/download`, '_blank')
@@ -196,6 +198,25 @@ export const LibraryPage: React.FC = () => {
     } catch (err: any) {
       console.error(err)
       showErrorNotification('Failed to create project', err?.message || 'Unknown error')
+    }
+  }
+
+  const handleRedetectType = async () => {
+    if (!editItem) return
+    try {
+      const result = await redetectDatasetType({
+        variables: { id: editItem.id },
+      })
+      // Update the editItem with new metadata
+      const updatedItem = (result.data as any)?.redetectLibraryDatasetType
+      if (updatedItem) {
+        setEditItem(updatedItem)
+      }
+      showSuccessNotification('Type re-detected', 'Dataset type has been updated based on file content.')
+      await refetch()
+    } catch (err: any) {
+      console.error(err)
+      showErrorNotification('Failed to re-detect type', err?.message || 'Unknown error')
     }
   }
 
@@ -492,7 +513,19 @@ export const LibraryPage: React.FC = () => {
               <>
                 <Separator />
                 <div>
-                  <h4 className="text-sm font-semibold mb-3">Dataset Metadata</h4>
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-sm font-semibold">Dataset Metadata</h4>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleRedetectType}
+                      disabled={redetecting}
+                    >
+                      {redetecting && <Spinner className="mr-2 h-3 w-3" />}
+                      <IconSparkles className="mr-2 h-4 w-4" />
+                      Re-detect Type
+                    </Button>
+                  </div>
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div>
                       <span className="text-muted-foreground">Format:</span>
