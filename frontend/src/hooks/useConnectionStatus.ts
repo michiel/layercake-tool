@@ -56,16 +56,32 @@ export const useConnectionStatus = (props: UseConnectionStatusProps = {}) => {
     const isBackendConnected = !!data || !error
     const isWebSocketConnected = enableWebSocket && websocketConnectionState === ConnectionState.CONNECTED
 
-    // Default to connected state - if the app is running, backend is likely connected
-    let state = ConnectionState.CONNECTED
+    // Determine overall connection state based on both GraphQL and WebSocket
+    let state: ConnectionState
     let description: string
 
     if (enableWebSocket) {
-      description = isWebSocketConnected
-        ? 'Connected (GraphQL + WebSocket)'
-        : 'Connected (GraphQL only)'
+      // When WebSocket is enabled, consider both connections
+      if (websocketConnectionState === ConnectionState.DISCONNECTED) {
+        state = ConnectionState.DISCONNECTED
+        description = isBackendConnected
+          ? 'WebSocket disconnected (GraphQL connected)'
+          : 'Disconnected from backend'
+      } else if (websocketConnectionState === ConnectionState.CONNECTING) {
+        state = ConnectionState.CONNECTING
+        description = 'Connecting to WebSocket...'
+      } else if (websocketConnectionState === ConnectionState.CONNECTED) {
+        state = ConnectionState.CONNECTED
+        description = 'Connected (GraphQL + WebSocket)'
+      } else {
+        // Unknown WebSocket state, fall back to GraphQL-only
+        state = isBackendConnected ? ConnectionState.CONNECTED : ConnectionState.DISCONNECTED
+        description = isBackendConnected ? 'Connected (GraphQL only)' : 'Disconnected from backend'
+      }
     } else {
-      description = 'Connected (GraphQL)'
+      // WebSocket not enabled, only check GraphQL
+      state = isBackendConnected ? ConnectionState.CONNECTED : ConnectionState.DISCONNECTED
+      description = isBackendConnected ? 'Connected (GraphQL)' : 'Disconnected from backend'
     }
 
     return {
