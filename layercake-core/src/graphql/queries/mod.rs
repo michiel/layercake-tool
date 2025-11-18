@@ -2,8 +2,8 @@ use async_graphql::*;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 
 use crate::database::entities::{
-    data_sets, graph_edges, graph_layers, graph_nodes, graphs, plan_dag_edges, plan_dag_nodes,
-    plans, project_collaborators, user_sessions, users,
+    data_sets, graph_edges, graph_layers, graph_nodes, graphs, layer_aliases, plan_dag_edges,
+    plan_dag_nodes, plans, project_collaborators, user_sessions, users,
 };
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
@@ -15,8 +15,8 @@ use crate::graphql::types::project::Project;
 use crate::graphql::types::sample_project::SampleProject;
 use crate::graphql::types::{
     DataSet, DataSetPreview, GraphEdgePreview, GraphEdit, GraphNodePreview, GraphPreview, Layer,
-    LibraryItem, LibraryItemFilterInput, ProjectCollaborator, ProjectLayer, SystemSetting,
-    TableColumn, TableRow, User, UserFilter, UserSession,
+    LayerAlias, LibraryItem, LibraryItemFilterInput, ProjectCollaborator, ProjectLayer,
+    SystemSetting, TableColumn, TableRow, User, UserFilter, UserSession,
 };
 use crate::services::{
     graph_edit_service::GraphEditService, library_item_service::LibraryItemFilter,
@@ -185,6 +185,40 @@ impl Query {
             .await
             .map_err(|e| StructuredError::service("GraphService::missing_layers", e))?;
         Ok(missing)
+    }
+
+    /// List all layer aliases for a project
+    #[graphql(name = "listLayerAliases")]
+    async fn list_layer_aliases(
+        &self,
+        ctx: &Context<'_>,
+        project_id: i32,
+    ) -> Result<Vec<LayerAlias>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let aliases = layer_aliases::Entity::find()
+            .filter(layer_aliases::Column::ProjectId.eq(project_id))
+            .all(&context.db)
+            .await?;
+
+        Ok(aliases.into_iter().map(LayerAlias::from).collect())
+    }
+
+    /// Get layer aliases for a specific target layer
+    #[graphql(name = "getLayerAliases")]
+    async fn get_layer_aliases(
+        &self,
+        ctx: &Context<'_>,
+        project_id: i32,
+        target_layer_id: i32,
+    ) -> Result<Vec<LayerAlias>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let aliases = layer_aliases::Entity::find()
+            .filter(layer_aliases::Column::ProjectId.eq(project_id))
+            .filter(layer_aliases::Column::TargetLayerId.eq(target_layer_id))
+            .all(&context.db)
+            .await?;
+
+        Ok(aliases.into_iter().map(LayerAlias::from).collect())
     }
 
     /// List runtime-editable system settings

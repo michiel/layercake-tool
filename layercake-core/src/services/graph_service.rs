@@ -1,6 +1,7 @@
 use crate::database::entities::{
     graph_edges, graph_edges::Entity as GraphEdges, graph_layers, graph_layers::Entity as Layers,
-    graph_nodes, graph_nodes::Entity as GraphNodes, plan_dag_edges, plan_dag_nodes, project_layers,
+    graph_nodes, graph_nodes::Entity as GraphNodes, layer_aliases, plan_dag_edges, plan_dag_nodes,
+    project_layers,
 };
 use crate::errors::{GraphError, GraphResult};
 use crate::graph::{Edge, Graph, Layer, Node};
@@ -775,6 +776,17 @@ impl GraphService {
             .map_err(GraphError::Database)?;
         let mut known: HashSet<String> = all_layers.into_iter().map(|l| l.layer_id).collect();
 
+        // Also include aliased layer IDs in the known set
+        // An aliased layer is not "missing" since it resolves to an existing layer
+        let aliases = layer_aliases::Entity::find()
+            .filter(layer_aliases::Column::ProjectId.eq(project_id))
+            .all(&self.db)
+            .await
+            .map_err(GraphError::Database)?;
+        for alias in aliases {
+            known.insert(alias.alias_layer_id);
+        }
+
         let graph_ids: Vec<i32> = Graphs::find()
             .filter(crate::database::entities::graphs::Column::ProjectId.eq(project_id))
             .all(&self.db)
@@ -821,5 +833,122 @@ impl GraphService {
         let mut missing_list: Vec<String> = missing.into_iter().collect();
         missing_list.sort();
         Ok(missing_list)
+    }
+
+    /// Resolve a layer by ID, including aliases
+    /// Returns the layer with colors from the target if aliased, but using the requested layer_id
+    pub async fn resolve_layer(
+        &self,
+        project_id: i32,
+        layer_id: &str,
+    ) -> GraphResult<Option<Layer>> {
+        // 1. Try to find direct match in project_layers
+        let direct_layer = project_layers::Entity::find()
+            .filter(project_layers::Column::ProjectId.eq(project_id))
+            .filter(project_layers::Column::LayerId.eq(layer_id))
+            .one(&self.db)
+            .await
+            .map_err(GraphError::Database)?;
+
+        if let Some(layer) = direct_layer {
+            return Ok(Some(Layer {
+                id: layer.layer_id,
+                label: layer.name,
+                background_color: layer.background_color.trim_start_matches('#').to_string(),
+                text_color: layer.text_color.trim_start_matches('#').to_string(),
+                border_color: layer.border_color.trim_start_matches('#').to_string(),
+                dataset: layer.source_dataset_id,
+            }));
+        }
+
+        // 2. Check if this layer_id is aliased
+        let alias = layer_aliases::Entity::find()
+            .filter(layer_aliases::Column::ProjectId.eq(project_id))
+            .filter(layer_aliases::Column::AliasLayerId.eq(layer_id))
+            .one(&self.db)
+            .await
+            .map_err(GraphError::Database)?;
+
+        if let Some(alias_record) = alias {
+            // Get the target layer
+            let target_layer = project_layers::Entity::find_by_id(alias_record.target_layer_id)
+                .one(&self.db)
+                .await
+                .map_err(GraphError::Database)?;
+
+            if let Some(target) = target_layer {
+                // Return layer using the alias ID but with target layer's colors
+                return Ok(Some(Layer {
+                    id: layer_id.to_string(), // Use the alias ID
+                    label: target.name,
+                    background_color: target.background_color.trim_start_matches('#').to_string(),
+                    text_color: target.text_color.trim_start_matches('#').to_string(),
+                    border_color: target.border_color.trim_start_matches('#').to_string(),
+                    dataset: target.source_dataset_id,
+                }));
+            }
+        }
+
+        // 3. Layer not found and not aliased
+        Ok(None)
+    }
+
+    /// Get all layers for a project, including aliases as separate layer entries
+    /// Only returns enabled layers (or aliases pointing to enabled layers)
+    pub async fn get_all_resolved_layers(&self, project_id: i32) -> GraphResult<Vec<Layer>> {
+        let mut layers = Vec::new();
+
+        // Get all direct layers (only enabled ones)
+        let direct_layers = project_layers::Entity::find()
+            .filter(project_layers::Column::ProjectId.eq(project_id))
+            .filter(project_layers::Column::Enabled.eq(true))
+            .all(&self.db)
+            .await
+            .map_err(GraphError::Database)?;
+
+        for layer in direct_layers {
+            layers.push(Layer {
+                id: layer.layer_id.clone(),
+                label: layer.name.clone(),
+                background_color: layer.background_color.trim_start_matches('#').to_string(),
+                text_color: layer.text_color.trim_start_matches('#').to_string(),
+                border_color: layer.border_color.trim_start_matches('#').to_string(),
+                dataset: layer.source_dataset_id,
+            });
+        }
+
+        // Get all aliases and add them as separate layer entries
+        let aliases = layer_aliases::Entity::find()
+            .filter(layer_aliases::Column::ProjectId.eq(project_id))
+            .all(&self.db)
+            .await
+            .map_err(GraphError::Database)?;
+
+        for alias_record in aliases {
+            // Get the target layer
+            let target_layer = project_layers::Entity::find_by_id(alias_record.target_layer_id)
+                .one(&self.db)
+                .await
+                .map_err(GraphError::Database)?;
+
+            if let Some(target) = target_layer {
+                // Only include if the target layer is enabled
+                if target.enabled {
+                    layers.push(Layer {
+                        id: alias_record.alias_layer_id,
+                        label: target.name.clone(),
+                        background_color: target
+                            .background_color
+                            .trim_start_matches('#')
+                            .to_string(),
+                        text_color: target.text_color.trim_start_matches('#').to_string(),
+                        border_color: target.border_color.trim_start_matches('#').to_string(),
+                        dataset: target.source_dataset_id,
+                    });
+                }
+            }
+        }
+
+        Ok(layers)
     }
 }

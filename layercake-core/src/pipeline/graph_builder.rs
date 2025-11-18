@@ -293,12 +293,11 @@ impl GraphBuilder {
             .all(&self.db)
             .await?;
 
-        // Load from project-wide layers instead of per-graph layers
-        // This uses the new architecture where layers are defined at project level
-        let db_layers = project_layers::Entity::find()
-            .filter(project_layers::Column::ProjectId.eq(graph.project_id))
-            .filter(project_layers::Column::Enabled.eq(true))
-            .all(&self.db)
+        // Load from project-wide layers, including aliases
+        // This uses get_all_resolved_layers which returns both direct layers and aliases
+        let graph_service = crate::services::graph_service::GraphService::new(self.db.clone());
+        let all_layers = graph_service
+            .get_all_resolved_layers(graph.project_id)
             .await?;
 
         // Convert to graph_json format
@@ -321,14 +320,15 @@ impl GraphBuilder {
                 "weight": e.weight,
                 "attrs": e.attrs.clone()
             })).collect::<Vec<_>>(),
-            "graph_layers": db_layers.iter().map(|l| {
-                // Strip # prefix for template compatibility (templates add # themselves)
+            "graph_layers": all_layers.iter().map(|l| {
+                // Layers already have # stripped by get_all_resolved_layers
+                // (templates add # themselves)
                 serde_json::json!({
-                    "id": l.layer_id.clone(),
-                    "label": l.name.clone(),
-                    "background_color": l.background_color.trim_start_matches('#'),
-                    "text_color": l.text_color.trim_start_matches('#'),
-                    "border_color": l.border_color.trim_start_matches('#'),
+                    "id": l.id.clone(),
+                    "label": l.label.clone(),
+                    "background_color": &l.background_color,
+                    "text_color": &l.text_color,
+                    "border_color": &l.border_color,
                 })
             }).collect::<Vec<_>>()
         });

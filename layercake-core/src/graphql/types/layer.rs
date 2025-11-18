@@ -1,7 +1,7 @@
 use async_graphql::*;
-use sea_orm::EntityTrait;
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
-use crate::database::entities::{graph_layers, graphs, project_layers};
+use crate::database::entities::{graph_layers, graphs, layer_aliases, project_layers};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::graph::Graph;
 use crate::graphql::types::scalars::JSON;
@@ -61,7 +61,7 @@ impl From<graph_layers::Model> for Layer {
 }
 
 #[derive(Clone, Debug, SimpleObject)]
-#[graphql(rename_fields = "camelCase")]
+#[graphql(rename_fields = "camelCase", complex)]
 pub struct ProjectLayer {
     pub id: i32,
     pub project_id: i32,
@@ -74,6 +74,28 @@ pub struct ProjectLayer {
     pub enabled: bool,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Clone, Debug, SimpleObject)]
+#[graphql(rename_fields = "camelCase", complex)]
+pub struct LayerAlias {
+    pub id: i32,
+    pub project_id: i32,
+    pub alias_layer_id: String,
+    pub target_layer_id: i32,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl From<layer_aliases::Model> for LayerAlias {
+    fn from(model: layer_aliases::Model) -> Self {
+        Self {
+            id: model.id,
+            project_id: model.project_id,
+            alias_layer_id: model.alias_layer_id,
+            target_layer_id: model.target_layer_id,
+            created_at: model.created_at,
+        }
+    }
 }
 
 impl From<project_layers::Model> for ProjectLayer {
@@ -103,5 +125,30 @@ impl Layer {
             .await?;
 
         Ok(graph.map(Graph::from))
+    }
+}
+
+#[ComplexObject]
+impl ProjectLayer {
+    async fn aliases(&self, ctx: &Context<'_>) -> Result<Vec<LayerAlias>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let aliases = layer_aliases::Entity::find()
+            .filter(layer_aliases::Column::TargetLayerId.eq(self.id))
+            .all(&context.db)
+            .await?;
+
+        Ok(aliases.into_iter().map(LayerAlias::from).collect())
+    }
+}
+
+#[ComplexObject]
+impl LayerAlias {
+    async fn target_layer(&self, ctx: &Context<'_>) -> Result<Option<ProjectLayer>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let layer = project_layers::Entity::find_by_id(self.target_layer_id)
+            .one(&context.db)
+            .await?;
+
+        Ok(layer.map(ProjectLayer::from))
     }
 }

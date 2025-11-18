@@ -25,6 +25,7 @@ pub mod graph_edits;
 pub mod graph_layers;
 pub mod graph_nodes;
 pub mod graphs;
+pub mod layer_aliases;
 
 // Re-export specific entities to avoid naming conflicts
 pub use execution_state::ExecutionState;
