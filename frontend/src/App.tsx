@@ -493,7 +493,17 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                                       highlightChild ? 'text-primary' : undefined
                                     )}
                                     aria-current={sectionActive || hasActiveChild ? 'page' : undefined}
-                                    onClick={() => navigate(section.route)}
+                                    onClick={() => {
+                                      navigate(section.route)
+                                      // If this section has children, expand them
+                                      if (hasChildren) {
+                                        setCollapsedSections(prev => {
+                                          const next = new Set(prev)
+                                          next.delete(section.key)  // Remove from collapsed = expand
+                                          return next
+                                        })
+                                      }
+                                    }}
                                   >
                                     {section.icon}
                                     {!navCollapsed && <span className="ml-2">{section.label}</span>}
