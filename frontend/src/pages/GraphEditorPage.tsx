@@ -98,9 +98,9 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
   const [flowGroupingEnabled, setFlowGroupingEnabled] = useState(true);
   const [hierarchyViewMode, setHierarchyViewMode] = useState<HierarchyViewMode>('graph');
   const [fitViewTrigger, setFitViewTrigger] = useState(0);
-  const [nodeSpacing, setNodeSpacing] = useState(75);
-  const [rankSpacing, setRankSpacing] = useState(75);
-  const [minEdgeLength, setMinEdgeLength] = useState(50);
+  const [nodeSpacing, setNodeSpacing] = useState(40);
+  const [rankSpacing, setRankSpacing] = useState(50);
+  const [minEdgeLength, setMinEdgeLength] = useState(30);
   const reactFlowWrapperRef = useRef<HTMLDivElement>(null);
   const htmlToImagePromiseRef = useRef<Promise<any> | null>(null);
 
