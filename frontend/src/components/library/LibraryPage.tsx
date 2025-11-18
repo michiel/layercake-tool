@@ -35,6 +35,8 @@ import {
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { Spinner } from '../ui/spinner'
+import { Textarea } from '../ui/textarea'
+import { Separator } from '../ui/separator'
 import {
   GET_LIBRARY_ITEMS,
   DELETE_LIBRARY_ITEM,
@@ -79,6 +81,7 @@ export const LibraryPage: React.FC = () => {
   const [newProjectName, setNewProjectName] = useState('')
   const [editItem, setEditItem] = useState<LibraryItem | null>(null)
   const [editName, setEditName] = useState('')
+  const [editDescription, setEditDescription] = useState('')
   const [editTags, setEditTags] = useState('')
 
   const filterVariables = useMemo(() => {
@@ -175,6 +178,7 @@ export const LibraryPage: React.FC = () => {
   const openEditModal = (item: LibraryItem) => {
     setEditItem(item)
     setEditName(item.name)
+    setEditDescription(item.description || '')
     setEditTags(item.tags.join(', '))
   }
 
@@ -445,25 +449,115 @@ export const LibraryPage: React.FC = () => {
       </Dialog>
 
       <Dialog open={!!editItem} onOpenChange={(open) => !open && setEditItem(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Library Item</DialogTitle>
           </DialogHeader>
-          <Stack gap="sm">
-            <Label htmlFor="editName">Name</Label>
-            <Input
-              id="editName"
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-              placeholder="Item name"
-            />
-            <Label htmlFor="editTags">Tags</Label>
-            <Input
-              id="editTags"
-              value={editTags}
-              onChange={(e) => setEditTags(e.target.value)}
-              placeholder="Comma separated tags"
-            />
+          <Stack gap="md">
+            <div>
+              <Label htmlFor="editName">Name</Label>
+              <Input
+                id="editName"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="Item name"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="editDescription">Description</Label>
+              <Textarea
+                id="editDescription"
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                placeholder="Describe this item..."
+                rows={3}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="editTags">Tags</Label>
+              <Input
+                id="editTags"
+                value={editTags}
+                onChange={(e) => setEditTags(e.target.value)}
+                placeholder="Comma separated tags"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Separate tags with commas
+              </p>
+            </div>
+
+            {editItem && editItem.type === LibraryItemType.DATASET && (
+              <>
+                <Separator />
+                <div>
+                  <h4 className="text-sm font-semibold mb-3">Dataset Metadata</h4>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Format:</span>
+                      <div className="font-medium">
+                        {editItem.metadata?.format
+                          ? getFileFormatDisplayName(editItem.metadata.format)
+                          : 'Unknown'}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Data Type:</span>
+                      <div className="font-medium">
+                        {editItem.metadata?.dataType
+                          ? getDataTypeDisplayName(editItem.metadata.dataType)
+                          : 'Unknown'}
+                      </div>
+                    </div>
+                    {editItem.metadata?.rowCount && (
+                      <div>
+                        <span className="text-muted-foreground">Rows:</span>
+                        <div className="font-medium">
+                          {editItem.metadata.rowCount.toLocaleString()}
+                        </div>
+                      </div>
+                    )}
+                    {editItem.metadata?.columnCount && (
+                      <div>
+                        <span className="text-muted-foreground">Columns:</span>
+                        <div className="font-medium">
+                          {editItem.metadata.columnCount}
+                        </div>
+                      </div>
+                    )}
+                    {editItem.contentSize && (
+                      <div>
+                        <span className="text-muted-foreground">File Size:</span>
+                        <div className="font-medium">
+                          {formatFileSize(editItem.contentSize)}
+                        </div>
+                      </div>
+                    )}
+                    {editItem.metadata?.filename && (
+                      <div className="col-span-2">
+                        <span className="text-muted-foreground">Filename:</span>
+                        <div className="font-medium font-mono text-xs">
+                          {editItem.metadata.filename}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {editItem.metadata?.headers && editItem.metadata.headers.length > 0 && (
+                    <div className="mt-3">
+                      <span className="text-muted-foreground text-sm">Headers:</span>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {editItem.metadata.headers.map((header: string, idx: number) => (
+                          <Badge key={idx} variant="outline" className="font-mono text-xs">
+                            {header}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </Stack>
           <DialogFooter>
             <Button variant="secondary" onClick={() => setEditItem(null)}>
@@ -482,6 +576,7 @@ export const LibraryPage: React.FC = () => {
                       id: editItem.id,
                       input: {
                         name: editName.trim(),
+                        description: editDescription.trim() || null,
                         tags,
                       },
                     },
