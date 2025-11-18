@@ -27,8 +27,8 @@ const normalizeRenderConfigForGraphQL = (renderConfig?: GraphArtefactNodeConfig[
   if (!renderConfig) return undefined
 
   const mapOrientation = (value?: string) => {
-    if (value === 'LR') return 'LR'
-    if (value === 'TB') return 'TB'
+    if (value === 'LR') return 'Lr'
+    if (value === 'TB') return 'Tb'
     return undefined
   }
 
