@@ -741,15 +741,36 @@ impl GraphService {
         layer_id: String,
         source_dataset_id: Option<i32>,
     ) -> GraphResult<u64> {
-        let result = project_layers::Entity::delete_many()
+        use crate::database::entities::layer_aliases;
+
+        // Find the layer first
+        let layer = project_layers::Entity::find()
             .filter(project_layers::Column::ProjectId.eq(project_id))
-            .filter(project_layers::Column::LayerId.eq(layer_id))
+            .filter(project_layers::Column::LayerId.eq(layer_id.clone()))
             .filter(project_layers::Column::SourceDatasetId.eq(source_dataset_id))
-            .exec(&self.db)
+            .one(&self.db)
             .await
             .map_err(GraphError::Database)?;
 
-        Ok(result.rows_affected)
+        if let Some(layer_model) = layer {
+            // Delete all aliases pointing to this layer
+            layer_aliases::Entity::delete_many()
+                .filter(layer_aliases::Column::TargetLayerId.eq(layer_model.id))
+                .exec(&self.db)
+                .await
+                .map_err(GraphError::Database)?;
+
+            // Now delete the layer itself
+            let result = project_layers::Entity::delete_by_id(layer_model.id)
+                .exec(&self.db)
+                .await
+                .map_err(GraphError::Database)?;
+
+            Ok(result.rows_affected)
+        } else {
+            // Layer not found, return 0
+            Ok(0)
+        }
     }
 
     pub async fn set_layer_dataset_enabled(

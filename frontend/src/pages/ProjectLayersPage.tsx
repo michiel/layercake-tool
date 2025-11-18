@@ -106,6 +106,9 @@ export const ProjectLayersPage = () => {
     return dataset?.name || `Dataset #${datasetId}`
   }
 
+  // Filter for palette: only show enabled layers
+  const paletteLayers = editableLayers.filter((l) => l.enabled)
+
   // Helper to update editable layers and mark as unsaved
   const updateEditableLayers = (updater: (prev: ProjectLayer[]) => ProjectLayer[]) => {
     setEditableLayers(updater)
@@ -400,7 +403,7 @@ export const ProjectLayersPage = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {editableLayers.map((layer) => (
+                  {paletteLayers.map((layer) => (
                     <>
                       <TableRow key={`${layer.layerId}-${layer.sourceDatasetId ?? 'manual'}`}>
                       <TableCell className="font-mono">{layer.layerId}</TableCell>
