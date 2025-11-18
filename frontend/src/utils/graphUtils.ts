@@ -73,7 +73,89 @@ export const getLayoutedElements = async (
   );
   rootNodes.forEach(n => calculateDepth(n.id));
 
-  // Layout each subgraph separately
+  const GROUP_PADDING = 32;
+
+  // Phase 1: Calculate sizes for all groups recursively (bottom-up)
+  const groupSizes = new Map<string, { width: number; height: number }>();
+
+  const calculateGroupSize = (groupId: string): { width: number; height: number } => {
+    const children = lcGraph.graphNodes.filter(n => n.belongsTo === groupId);
+
+    if (children.length === 0) {
+      return { width: 200, height: 120 };
+    }
+
+    // First, calculate sizes for any child groups
+    children.forEach(child => {
+      if (child.isPartition) {
+        const size = calculateGroupSize(child.id);
+        groupSizes.set(child.id, size);
+      }
+    });
+
+    // Layout children to get their positions
+    const g = new dagre.graphlib.Graph();
+    g.setGraph({
+      rankdir: layoutDirection,
+      nodesep: nodeSpacing,
+      ranksep: rankSpacing,
+      edgesep: 30,
+      marginx: 0,
+      marginy: 0,
+    });
+    g.setDefaultEdgeLabel(() => ({}));
+
+    children.forEach(child => {
+      if (child.isPartition) {
+        const size = groupSizes.get(child.id) || { width: 200, height: 120 };
+        g.setNode(child.id, size);
+      } else {
+        g.setNode(child.id, { width: nodeWidth, height: nodeHeight });
+      }
+    });
+
+    // Add edges between children
+    lcGraph.graphEdges.forEach(edge => {
+      if (children.some(c => c.id === edge.source) && children.some(c => c.id === edge.target)) {
+        g.setEdge(edge.source, edge.target);
+      }
+    });
+
+    dagre.layout(g);
+
+    // Calculate bounding box
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    children.forEach(child => {
+      const pos = g.node(child.id);
+      if (pos) {
+        const childWidth = child.isPartition
+          ? (groupSizes.get(child.id)?.width || 200)
+          : nodeWidth;
+        const childHeight = child.isPartition
+          ? (groupSizes.get(child.id)?.height || 120)
+          : nodeHeight;
+        minX = Math.min(minX, pos.x - childWidth / 2);
+        minY = Math.min(minY, pos.y - childHeight / 2);
+        maxX = Math.max(maxX, pos.x + childWidth / 2);
+        maxY = Math.max(maxY, pos.y + childHeight / 2);
+      }
+    });
+
+    const width = Math.max(200, maxX - minX + GROUP_PADDING * 2);
+    const height = Math.max(120, maxY - minY + GROUP_PADDING * 2);
+
+    return { width, height };
+  };
+
+  // Calculate sizes for all root-level groups
+  rootNodes.forEach(node => {
+    if (node.isPartition && !disableSubflows) {
+      const size = calculateGroupSize(node.id);
+      groupSizes.set(node.id, size);
+    }
+  });
+
+  // Phase 2: Layout with correct sizes
   const layoutSubgraph = (nodes: GraphNode[]) => {
     const g = new dagre.graphlib.Graph({ compound: true });
 
@@ -88,22 +170,13 @@ export const getLayoutedElements = async (
 
     g.setDefaultEdgeLabel(() => ({}));
 
-    // Add nodes to dagre graph
+    // Add nodes with correct sizes
     nodes.forEach(node => {
       if (node.isPartition) {
-        // Group node - use compact minimum size
-        const minWidth = 200;
-        const minHeight = 120;
-
-        g.setNode(node.id, {
-          width: minWidth,
-          height: minHeight,
-        });
+        const size = groupSizes.get(node.id) || { width: 200, height: 120 };
+        g.setNode(node.id, size);
       } else {
-        g.setNode(node.id, {
-          width: nodeWidth,
-          height: nodeHeight,
-        });
+        g.setNode(node.id, { width: nodeWidth, height: nodeHeight });
       }
     });
 
@@ -112,23 +185,21 @@ export const getLayoutedElements = async (
       const sourceNode = nodeMap.get(edge.source);
       const targetNode = nodeMap.get(edge.target);
 
-      // Only add edge if both nodes are in this subgraph
       if (sourceNode && targetNode && nodes.some(n => n.id === edge.source) && nodes.some(n => n.id === edge.target)) {
         g.setEdge(edge.source, edge.target);
       }
     });
 
-    // Run layout
     dagre.layout(g);
 
-    // Extract positioned nodes
     return nodes.map(node => {
       const positioned = g.node(node.id);
       if (!positioned) return null;
 
       const isGroup = node.isPartition;
-      const width = isGroup ? Math.max(positioned.width || 200, 200) : nodeWidth;
-      const height = isGroup ? Math.max(positioned.height || 120, 120) : nodeHeight;
+      const size = isGroup ? groupSizes.get(node.id) : null;
+      const width = size?.width || (isGroup ? 200 : nodeWidth);
+      const height = size?.height || (isGroup ? 120 : nodeHeight);
 
       return {
         id: node.id,
@@ -214,73 +285,147 @@ export const getLayoutedElements = async (
       if (!disableSubflows) {
         const children = lcGraph.graphNodes.filter(n => n.belongsTo === node.id);
         if (children.length > 0) {
-          const positionedChildren = layoutSubgraph(children);
+          // Re-layout children to get their positions within this group
+          const g = new dagre.graphlib.Graph();
+          g.setGraph({
+            rankdir: layoutDirection,
+            nodesep: nodeSpacing,
+            ranksep: rankSpacing,
+            edgesep: 30,
+            marginx: 0,
+            marginy: 0,
+          });
+          g.setDefaultEdgeLabel(() => ({}));
 
-          // Calculate bounding box of children to size the group
-          const GROUP_PADDING = 32;
-          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-
-          positionedChildren.forEach(child => {
-            minX = Math.min(minX, child.position.x);
-            minY = Math.min(minY, child.position.y);
-            maxX = Math.max(maxX, child.position.x + child.width);
-            maxY = Math.max(maxY, child.position.y + child.height);
+          children.forEach(child => {
+            if (child.isPartition) {
+              const size = groupSizes.get(child.id) || { width: 200, height: 120 };
+              g.setNode(child.id, size);
+            } else {
+              g.setNode(child.id, { width: nodeWidth, height: nodeHeight });
+            }
           });
 
-          // Calculate required group size based on children
-          const childrenWidth = maxX - minX;
-          const childrenHeight = maxY - minY;
-          const requiredWidth = Math.max(200, childrenWidth + GROUP_PADDING * 2);
-          const requiredHeight = Math.max(120, childrenHeight + GROUP_PADDING * 2);
+          lcGraph.graphEdges.forEach(edge => {
+            if (children.some(c => c.id === edge.source) && children.some(c => c.id === edge.target)) {
+              g.setEdge(edge.source, edge.target);
+            }
+          });
 
-          // Update group node size
-          const groupNodeIndex = reactFlowNodes.findIndex(n => n.id === node.id);
-          if (groupNodeIndex >= 0) {
-            reactFlowNodes[groupNodeIndex] = {
-              ...reactFlowNodes[groupNodeIndex],
-              width: requiredWidth,
-              height: requiredHeight,
-              style: {
-                ...reactFlowNodes[groupNodeIndex].style,
-                width: requiredWidth,
-                height: requiredHeight,
-              },
-            };
-          }
+          dagre.layout(g);
+
+          // Calculate bounding box and position children
+          let minX = Infinity, minY = Infinity;
+          children.forEach(child => {
+            const pos = g.node(child.id);
+            if (pos) {
+              const childWidth = child.isPartition
+                ? (groupSizes.get(child.id)?.width || 200)
+                : nodeWidth;
+              const childHeight = child.isPartition
+                ? (groupSizes.get(child.id)?.height || 120)
+                : nodeHeight;
+              minX = Math.min(minX, pos.x - childWidth / 2);
+              minY = Math.min(minY, pos.y - childHeight / 2);
+            }
+          });
 
           // Position children with padding offset
           const offsetX = GROUP_PADDING - minX;
           const offsetY = GROUP_PADDING - minY;
 
-          positionedChildren.forEach(childPositioned => {
-            const childNode = childPositioned.graphNode;
-            const layerStyle = getLayerStyle(childNode.layer, layerMap);
+          children.forEach(child => {
+            const pos = g.node(child.id);
+            if (!pos) return;
 
-            reactFlowNodes.push({
-              id: childNode.id,
-              type: 'editable',
-              position: {
-                x: childPositioned.position.x + offsetX,
-                y: childPositioned.position.y + offsetY,
-              },
-              data: {
-                label: childNode.label || childNode.id,
-                style: {
-                  backgroundColor: layerStyle?.backgroundColor || DEFAULT_NODE_BG,
-                  border: `1px solid ${layerStyle?.borderColor || DEFAULT_NODE_BORDER}`,
-                  color: layerStyle?.textColor || DEFAULT_NODE_TEXT,
+            const childWidth = child.isPartition
+              ? (groupSizes.get(child.id)?.width || 200)
+              : nodeWidth;
+            const childHeight = child.isPartition
+              ? (groupSizes.get(child.id)?.height || 120)
+              : nodeHeight;
+
+            const childLayerStyle = getLayerStyle(child.layer, layerMap);
+
+            if (child.isPartition) {
+              // Nested group
+              const childDepth = depthMap.get(child.id) || 0;
+              const borderColor = childLayerStyle?.borderColor || DEFAULT_GROUP_BORDER;
+              const bgColor = childLayerStyle?.backgroundColor || DEFAULT_GROUP_BG;
+
+              reactFlowNodes.push({
+                id: child.id,
+                position: {
+                  x: pos.x - childWidth / 2 + offsetX,
+                  y: pos.y - childHeight / 2 + offsetY,
                 },
-              },
-              width: childPositioned.width,
-              height: childPositioned.height,
-              style: {
-                zIndex: 50,
-                backgroundColor: layerStyle?.backgroundColor || DEFAULT_NODE_BG,
-                border: `1px solid ${layerStyle?.borderColor || DEFAULT_NODE_BORDER}`,
-                color: layerStyle?.textColor || DEFAULT_NODE_TEXT,
-              },
-              parentNode: node.id,
-            });
+                data: { label: child.label || child.id },
+                type: 'group',
+                width: childWidth,
+                height: childHeight,
+                style: {
+                  width: childWidth,
+                  height: childHeight,
+                  backgroundColor: bgColor,
+                  border: `2px solid ${borderColor}`,
+                  borderRadius: '8px',
+                  zIndex: -100 + childDepth,
+                },
+                className: 'layercake-group-node',
+                parentNode: node.id,
+              });
+
+              // Add label for nested group
+              reactFlowNodes.push({
+                id: `${child.id}-label`,
+                type: 'labelNode',
+                position: { x: 10, y: 6 },
+                data: {
+                  label: child.label || child.id,
+                  style: { color: childLayerStyle?.textColor || '#666' },
+                },
+                draggable: false,
+                selectable: false,
+                connectable: false,
+                style: {
+                  background: 'transparent',
+                  border: 'none',
+                  fontSize: '11px',
+                  fontWeight: '500',
+                  color: childLayerStyle?.textColor || '#666',
+                  padding: 0,
+                  zIndex: 100,
+                },
+                parentNode: child.id,
+              });
+            } else {
+              // Regular child node
+              reactFlowNodes.push({
+                id: child.id,
+                type: 'editable',
+                position: {
+                  x: pos.x - childWidth / 2 + offsetX,
+                  y: pos.y - childHeight / 2 + offsetY,
+                },
+                data: {
+                  label: child.label || child.id,
+                  style: {
+                    backgroundColor: childLayerStyle?.backgroundColor || DEFAULT_NODE_BG,
+                    border: `1px solid ${childLayerStyle?.borderColor || DEFAULT_NODE_BORDER}`,
+                    color: childLayerStyle?.textColor || DEFAULT_NODE_TEXT,
+                  },
+                },
+                width: childWidth,
+                height: childHeight,
+                style: {
+                  zIndex: 50,
+                  backgroundColor: childLayerStyle?.backgroundColor || DEFAULT_NODE_BG,
+                  border: `1px solid ${childLayerStyle?.borderColor || DEFAULT_NODE_BORDER}`,
+                  color: childLayerStyle?.textColor || DEFAULT_NODE_TEXT,
+                },
+                parentNode: node.id,
+              });
+            }
           });
         }
       }
