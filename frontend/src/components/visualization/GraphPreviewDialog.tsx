@@ -1,5 +1,5 @@
-import { useMemo, useState, useEffect } from 'react';
-import { IconLayout2, IconHierarchy, IconAlertCircle, IconMaximize, IconMinimize } from '@tabler/icons-react';
+import { useMemo, useState, useEffect, useRef } from 'react';
+import { IconLayout2, IconHierarchy, IconAlertCircle, IconMaximize, IconMinimize, IconCopy, IconExternalLink } from '@tabler/icons-react';
 import {
   Dialog,
   DialogContent,
@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Spinner } from '@/components/ui/spinner';
 import { Stack } from '@/components/layout-primitives';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { GraphPreview, GraphData } from './GraphPreview';
 
@@ -25,6 +26,7 @@ interface GraphPreviewDialogProps {
 export const GraphPreviewDialog = ({ opened, onClose, data, title, loading = false, error }: GraphPreviewDialogProps) => {
   const [tab, setTab] = useState<string | null>('flow');
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const normalizedData = useMemo(() => {
     if (!data) return { flow: null, hierarchy: null };
@@ -80,6 +82,72 @@ export const GraphPreviewDialog = ({ opened, onClose, data, title, loading = fal
     }
   }, [opened]);
 
+  const handleCopyToClipboard = async () => {
+    if (!containerRef.current) return;
+    const canvas = containerRef.current.querySelector('canvas');
+    if (!canvas) return;
+
+    try {
+      canvas.toBlob(async (blob) => {
+        if (!blob) return;
+        try {
+          await navigator.clipboard.write([
+            new ClipboardItem({
+              'image/png': blob
+            })
+          ]);
+        } catch (err) {
+          console.error('Failed to copy image to clipboard', err);
+        }
+      });
+    } catch (err) {
+      console.error('Failed to copy to clipboard', err);
+    }
+  };
+
+  const handleOpenInNewWindow = () => {
+    if (!containerRef.current) return;
+    const canvas = containerRef.current.querySelector('canvas');
+    if (!canvas) return;
+
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const newWindow = window.open('', '_blank');
+      if (!newWindow) return;
+
+      newWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>${title || 'Graph Preview'}</title>
+            <style>
+              body {
+                margin: 0;
+                padding: 20px;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                min-height: 100vh;
+                background: #f5f5f5;
+              }
+              img {
+                max-width: 100%;
+                height: auto;
+                background: white;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+              }
+            </style>
+          </head>
+          <body>
+            <img src="${url}" alt="Graph Preview" />
+          </body>
+        </html>
+      `);
+      newWindow.document.close();
+    });
+  };
+
   return (
     <Dialog open={opened} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
@@ -100,7 +168,31 @@ export const GraphPreviewDialog = ({ opened, onClose, data, title, loading = fal
         <DialogHeader>
           <DialogTitle>{title || 'Graph Preview'}</DialogTitle>
         </DialogHeader>
-        <div className="flex-1 overflow-hidden">
+        <div className="flex items-center gap-2 pb-2 border-b">
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCopyToClipboard}
+              disabled={loading || !!error || !data}
+              title="Copy image to clipboard"
+            >
+              <IconCopy className="h-4 w-4 mr-1" />
+              Copy
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleOpenInNewWindow}
+              disabled={loading || !!error || !data}
+              title="Open in new window"
+            >
+              <IconExternalLink className="h-4 w-4 mr-1" />
+              Open
+            </Button>
+          </div>
+        </div>
+        <div ref={containerRef} className="flex-1 overflow-hidden">
           {loading ? (
             <Stack align="center" justify="center" className="h-full">
               <Spinner size="lg" />

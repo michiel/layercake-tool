@@ -1,7 +1,7 @@
 import { useEffect, useId, useState, useRef } from 'react'
 import { graphviz } from 'd3-graphviz'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { IconAlertCircle, IconZoomIn, IconZoomOut, IconZoomScan, IconDownload, IconMaximize, IconMinimize, IconExternalLink } from '@tabler/icons-react'
+import { IconAlertCircle, IconZoomIn, IconZoomOut, IconZoomScan, IconDownload, IconMaximize, IconMinimize, IconExternalLink, IconCopy } from '@tabler/icons-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
@@ -156,6 +156,47 @@ export const DotPreviewDialog = ({ open, onClose, diagram, title }: DotPreviewDi
     img.src = url
   }
 
+  const handleCopyToClipboard = async () => {
+    if (!containerRef.current) return
+    const svgElement = containerRef.current.querySelector('svg')
+    if (!svgElement) return
+
+    try {
+      const svgData = new XMLSerializer().serializeToString(svgElement)
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return
+
+      const img = new Image()
+      const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' })
+      const url = URL.createObjectURL(svgBlob)
+
+      img.onload = async () => {
+        canvas.width = img.width
+        canvas.height = img.height
+        ctx.drawImage(img, 0, 0)
+        URL.revokeObjectURL(url)
+
+        canvas.toBlob(async (blob) => {
+          if (!blob) return
+          try {
+            await navigator.clipboard.write([
+              new ClipboardItem({
+                'image/png': blob
+              })
+            ])
+          } catch (err) {
+            console.error('Failed to copy image to clipboard', err)
+          }
+        })
+      }
+
+      img.src = url
+    } catch (err) {
+      console.error('Failed to copy to clipboard', err)
+    }
+  }
+
   const handleOpenInNewWindow = () => {
     if (!containerRef.current) return
     const svgElement = containerRef.current.querySelector('svg')
@@ -279,6 +320,16 @@ export const DotPreviewDialog = ({ open, onClose, diagram, title }: DotPreviewDi
           <div className="h-6 w-px bg-border" />
 
           <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCopyToClipboard}
+              disabled={isRendering || !!error}
+              title="Copy image to clipboard"
+            >
+              <IconCopy className="h-4 w-4 mr-1" />
+              Copy
+            </Button>
             <Button
               variant="outline"
               size="sm"
