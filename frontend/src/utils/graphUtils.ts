@@ -41,8 +41,8 @@ export const getLayoutedElements = async (
   const disableSubflows = options.disableSubflows === true;
   const orientation = options.orientation ?? 'vertical';
   const layoutDirection = orientation === 'horizontal' ? 'LR' : 'TB';
-  const nodeSpacing = options.nodeSpacing ?? 75;
-  const rankSpacing = options.rankSpacing ?? 75;
+  const nodeSpacing = options.nodeSpacing ?? 40;
+  const rankSpacing = options.rankSpacing ?? 50;
 
   // Create node lookup map
   const nodeMap = new Map<string, GraphNode>();

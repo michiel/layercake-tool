@@ -68,9 +68,9 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
   hierarchyViewMode = 'graph',
   fitViewTrigger,
   wrapperRef,
-  nodeSpacing = 75,
-  rankSpacing = 75,
-  minEdgeLength = 50,
+  nodeSpacing = 40,
+  rankSpacing = 50,
+  minEdgeLength = 30,
   onNodeUpdate,
   onNodeAdd,
   onNodeDelete,
@@ -985,6 +985,8 @@ export const LayercakeGraphEditor: React.FC<LayercakeGraphEditorProps> = ({
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         fitView
+        minZoom={0.01}
+        maxZoom={4}
         attributionPosition="bottom-left"
       >
         <Controls />

@@ -9,13 +9,13 @@ export interface LayoutOptions {
   nodeHeight?: number;
 }
 
-// Default layout configuration with improved spacing
+// Default layout configuration with compact spacing
 const DEFAULT_NODE_WIDTH = 200;
 const DEFAULT_NODE_HEIGHT = 100;
-const DEFAULT_HORIZONTAL_NODE_SPACING = 150;
-const DEFAULT_HORIZONTAL_RANK_SPACING = 350;
-const DEFAULT_VERTICAL_NODE_SPACING = 120;
-const DEFAULT_VERTICAL_RANK_SPACING = 200;
+const DEFAULT_HORIZONTAL_NODE_SPACING = 80;
+const DEFAULT_HORIZONTAL_RANK_SPACING = 150;
+const DEFAULT_VERTICAL_NODE_SPACING = 60;
+const DEFAULT_VERTICAL_RANK_SPACING = 100;
 
 /**
  * Auto-layout nodes and edges using Dagre (lighter alternative to ELK)
