@@ -1,6 +1,7 @@
 import dagre from 'dagre';
 import { Node, Edge, MarkerType } from 'reactflow';
 import { Graph, GraphNode, Layer } from '../graphql/graphs';
+import { getElkLayoutedElements } from './elkLayout';
 
 // Default colors for nodes and groups
 const DEFAULT_NODE_BG = '#ffffff';
@@ -28,6 +29,7 @@ interface LayoutOptions {
   nodeSpacing?: number;
   rankSpacing?: number;
   minEdgeLength?: number;
+  useElk?: boolean;
 }
 
 // Function to convert LcGraph to React Flow elements
@@ -43,6 +45,23 @@ export const getLayoutedElements = async (
   const layoutDirection = orientation === 'horizontal' ? 'LR' : 'TB';
   const nodeSpacing = options.nodeSpacing ?? 40;
   const rankSpacing = options.rankSpacing ?? 50;
+
+  // Check if we should use ELK (explicitly requested or when there are groups)
+  const hasGroups = !disableSubflows && lcGraph.graphNodes.some(n => n.isPartition);
+  const useElk = options.useElk ?? hasGroups;
+
+  if (useElk && hasGroups) {
+    try {
+      return await getElkLayoutedElements(lcGraph, layers, nodeWidth, nodeHeight, {
+        orientation,
+        nodeSpacing,
+        rankSpacing,
+      });
+    } catch (error) {
+      console.error('ELK layout failed, falling back to Dagre:', error);
+      // Fall through to Dagre layout
+    }
+  }
 
   // Create node lookup map
   const nodeMap = new Map<string, GraphNode>();
