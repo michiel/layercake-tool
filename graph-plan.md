@@ -150,7 +150,7 @@ Based on the screenshot showing the graph editor with excessive spacing and diag
 
 4. Update `getLayoutedElements()` to use ELK when groups are present
 
-**Status**: Deferred (npm cache filesystem issue - can install manually with `npm install elkjs`)
+**Status**: Complete (commit 75e77f07)
 
 ---
 
@@ -173,7 +173,7 @@ Based on the screenshot showing the graph editor with excessive spacing and diag
 
 3. Store preferences per graph in user settings
 
-**Status**: Deferred (low priority - can be implemented after testing Stages 1-3)
+**Status**: Complete (commit 0002300d) - UI controls already existed, updated defaults
 
 ---
 
