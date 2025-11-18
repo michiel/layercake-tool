@@ -280,6 +280,12 @@ pub enum GraphvizCommentStyle {
     Tooltip,
 }
 
+impl Default for GraphvizCommentStyle {
+    fn default() -> Self {
+        GraphvizCommentStyle::Label
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MermaidRenderOptions {
     pub look: MermaidLook,
