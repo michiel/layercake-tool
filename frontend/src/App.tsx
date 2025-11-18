@@ -266,10 +266,10 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
         isActive: makeRouteMatcher(`/projects/${projectId}/plan`),
       },
       {
-        key: 'plan-nodes',
-        label: 'Plan nodes',
-        route: `/projects/${projectId}/plan-nodes`,
-        isActive: makeRouteMatcher(`/projects/${projectId}/plan-nodes`),
+        key: 'layers',
+        label: 'Layers',
+        route: `/projects/${projectId}/workbench/layers`,
+        isActive: makeRouteMatcher(`/projects/${projectId}/workbench/layers`),
       },
       {
         key: 'graphs',
@@ -278,10 +278,10 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
         isActive: makeRouteMatcher(`/projects/${projectId}/graphs`),
       },
       {
-        key: 'layers',
-        label: 'Layers',
-        route: `/projects/${projectId}/workbench/layers`,
-        isActive: makeRouteMatcher(`/projects/${projectId}/workbench/layers`),
+        key: 'plan-nodes',
+        label: 'Plan nodes',
+        route: `/projects/${projectId}/plan-nodes`,
+        isActive: makeRouteMatcher(`/projects/${projectId}/plan-nodes`),
       },
     ]
 
