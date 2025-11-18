@@ -357,7 +357,7 @@ impl MergeBuilder {
                 belongs_to: Set(node_data.belongs_to),
                 dataset_id: Set(node_data.dataset_id),
                 attrs: Set(node_data.attrs),
-                comment: Set(None),
+                comment: Set(node_data.comment),
                 created_at: Set(chrono::Utc::now()),
             })
             .collect();
@@ -377,7 +377,7 @@ impl MergeBuilder {
                 weight: Set(edge_data.weight),
                 dataset_id: Set(edge_data.dataset_id),
                 attrs: Set(edge_data.attrs),
-                comment: Set(None),
+                comment: Set(edge_data.comment),
                 created_at: Set(chrono::Utc::now()),
             })
             .collect();
@@ -421,6 +421,7 @@ impl MergeBuilder {
                                 .as_str()
                                 .filter(|s| !s.is_empty())
                                 .map(|s| s.to_string()),
+                            comment: node_val["comment"].as_str().map(|s| s.to_string()),
                             attrs: Some(node_val.clone()),
                             dataset_id,
                         };
@@ -455,6 +456,7 @@ impl MergeBuilder {
                             label: edge_val["label"].as_str().map(|s| s.to_string()),
                             layer: edge_val["layer"].as_str().map(|s| s.to_string()),
                             weight: edge_val["weight"].as_f64(),
+                            comment: edge_val["comment"].as_str().map(|s| s.to_string()),
                             attrs: Some(edge_val.clone()),
                             dataset_id,
                         };
@@ -481,6 +483,7 @@ impl MergeBuilder {
                                 .as_str()
                                 .filter(|s| !s.is_empty())
                                 .map(|s| s.to_string()),
+                            comment: node_val["comment"].as_str().map(|s| s.to_string()),
                             attrs: Some(node_val.clone()),
                             dataset_id,
                         };
@@ -514,6 +517,7 @@ impl MergeBuilder {
                             label: edge_val["label"].as_str().map(|s| s.to_string()),
                             layer: edge_val["layer"].as_str().map(|s| s.to_string()),
                             weight: edge_val["weight"].as_f64(),
+                            comment: edge_val["comment"].as_str().map(|s| s.to_string()),
                             attrs: Some(edge_val.clone()),
                             dataset_id,
                         };
@@ -625,6 +629,7 @@ impl MergeBuilder {
                     weight: node.weight,
                     is_partition: node.is_partition,
                     belongs_to: node.belongs_to,
+                    comment: node.comment,
                     attrs: node.attrs,
                     dataset_id: node.dataset_id,
                 },
@@ -649,6 +654,7 @@ impl MergeBuilder {
                 label: edge.label,
                 layer: edge.layer,
                 weight: edge.weight,
+                comment: edge.comment,
                 attrs: edge.attrs,
                 dataset_id: edge.dataset_id,
             });
@@ -682,6 +688,7 @@ struct NodeData {
     weight: Option<f64>,
     is_partition: bool,
     belongs_to: Option<String>,
+    comment: Option<String>,
     attrs: Option<serde_json::Value>,
     dataset_id: Option<i32>,
 }
@@ -694,6 +701,7 @@ struct EdgeData {
     label: Option<String>,
     layer: Option<String>,
     weight: Option<f64>,
+    comment: Option<String>,
     attrs: Option<serde_json::Value>,
     dataset_id: Option<i32>,
 }

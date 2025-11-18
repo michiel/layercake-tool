@@ -408,16 +408,17 @@ impl GraphBuilder {
 
                             let node = NodeData {
                                 label: node_val["label"].as_str().map(|s| s.to_string()),
-                                layer: node_val["layer"].as_str().map(|s| s.to_string()),
-                                weight: node_val["weight"].as_f64(),
-                                is_partition: parse_is_partition(&node_val["is_partition"]),
-                                belongs_to: node_val["belongs_to"]
-                                    .as_str()
-                                    .filter(|s| !s.is_empty())
-                                    .map(|s| s.to_string()),
-                                attrs: Some(node_val.clone()),
-                                dataset_id: Some(ds.id),
-                            };
+                            layer: node_val["layer"].as_str().map(|s| s.to_string()),
+                            weight: node_val["weight"].as_f64(),
+                            is_partition: parse_is_partition(&node_val["is_partition"]),
+                            belongs_to: node_val["belongs_to"]
+                                .as_str()
+                                .filter(|s| !s.is_empty())
+                                .map(|s| s.to_string()),
+                            comment: node_val["comment"].as_str().map(|s| s.to_string()),
+                            attrs: Some(node_val.clone()),
+                            dataset_id: Some(ds.id),
+                        };
 
                             all_nodes.insert(id, node);
                         }
@@ -443,13 +444,14 @@ impl GraphBuilder {
                             let edge = EdgeData {
                                 id: allocate_edge_id(&id, Some(ds.id), &mut used_edge_ids),
                                 source,
-                                target,
-                                label: edge_val["label"].as_str().map(|s| s.to_string()),
-                                layer: edge_val["layer"].as_str().map(|s| s.to_string()),
-                                weight: edge_val["weight"].as_f64(),
-                                attrs: Some(edge_val.clone()),
-                                dataset_id: Some(ds.id),
-                            };
+                            target,
+                            label: edge_val["label"].as_str().map(|s| s.to_string()),
+                            layer: edge_val["layer"].as_str().map(|s| s.to_string()),
+                            weight: edge_val["weight"].as_f64(),
+                            comment: edge_val["comment"].as_str().map(|s| s.to_string()),
+                            attrs: Some(edge_val.clone()),
+                            dataset_id: Some(ds.id),
+                        };
 
                             all_edges.push(edge);
                         }
@@ -473,6 +475,7 @@ impl GraphBuilder {
                                     .as_str()
                                     .filter(|s| !s.is_empty())
                                     .map(|s| s.to_string()),
+                                comment: node_val["comment"].as_str().map(|s| s.to_string()),
                                 attrs: Some(node_val.clone()),
                                 dataset_id: Some(ds.id),
                             };
@@ -503,6 +506,7 @@ impl GraphBuilder {
                                 label: edge_val["label"].as_str().map(|s| s.to_string()),
                                 layer: edge_val["layer"].as_str().map(|s| s.to_string()),
                                 weight: edge_val["weight"].as_f64(),
+                                comment: edge_val["comment"].as_str().map(|s| s.to_string()),
                                 attrs: Some(edge_val.clone()),
                                 dataset_id: Some(ds.id),
                             };
@@ -720,7 +724,7 @@ impl GraphBuilder {
                 belongs_to: Set(node_data.belongs_to),
                 dataset_id: Set(node_data.dataset_id),
                 attrs: Set(node_data.attrs),
-                comment: Set(None),
+                comment: Set(node_data.comment),
                 created_at: Set(chrono::Utc::now()),
             })
             .collect();
@@ -740,7 +744,7 @@ impl GraphBuilder {
                 weight: Set(edge_data.weight),
                 dataset_id: Set(edge_data.dataset_id),
                 attrs: Set(edge_data.attrs),
-                comment: Set(None),
+                comment: Set(edge_data.comment),
                 created_at: Set(chrono::Utc::now()),
             })
             .collect();
@@ -784,6 +788,7 @@ impl GraphBuilder {
                 weight: data["weight"].as_f64(),
                 is_partition: parse_is_partition(&data["is_partition"]),
                 belongs_to: data["belongs_to"].as_str().map(|s| s.to_string()),
+                comment: data["comment"].as_str().map(|s| s.to_string()),
                 attrs: Some(data.clone()),
                 dataset_id: Some(dataset.id),
             };
@@ -830,6 +835,7 @@ impl GraphBuilder {
                 label: data["label"].as_str().map(|s| s.to_string()),
                 layer: data["layer"].as_str().map(|s| s.to_string()),
                 weight: data["weight"].as_f64(),
+                comment: data["comment"].as_str().map(|s| s.to_string()),
                 attrs: Some(data.clone()),
                 dataset_id: Some(dataset.id),
             };
@@ -874,6 +880,7 @@ impl GraphBuilder {
                     weight: node_val["weight"].as_f64(),
                     is_partition: node_val["is_partition"].as_bool().unwrap_or(false),
                     belongs_to: node_val["belongs_to"].as_str().map(|s| s.to_string()),
+                    comment: node_val["comment"].as_str().map(|s| s.to_string()),
                     attrs: Some(node_val.clone()),
                     dataset_id: Some(dataset.id),
                 };
@@ -906,6 +913,7 @@ impl GraphBuilder {
                     label: edge_val["label"].as_str().map(|s| s.to_string()),
                     layer: edge_val["layer"].as_str().map(|s| s.to_string()),
                     weight: edge_val["weight"].as_f64(),
+                    comment: edge_val["comment"].as_str().map(|s| s.to_string()),
                     attrs: Some(edge_val.clone()),
                     dataset_id: Some(dataset.id),
                 };
@@ -925,6 +933,7 @@ struct NodeData {
     weight: Option<f64>,
     is_partition: bool,
     belongs_to: Option<String>,
+    comment: Option<String>,
     attrs: Option<Value>,
     dataset_id: Option<i32>,
 }
@@ -937,6 +946,7 @@ struct EdgeData {
     label: Option<String>,
     layer: Option<String>,
     weight: Option<f64>,
+    comment: Option<String>,
     attrs: Option<Value>,
     dataset_id: Option<i32>,
 }
