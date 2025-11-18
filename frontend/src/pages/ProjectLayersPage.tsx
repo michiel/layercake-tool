@@ -24,6 +24,8 @@ import {
 } from '@/graphql/layers'
 import { IconLayersIntersect } from '@tabler/icons-react'
 import { showErrorNotification, showSuccessNotification } from '@/utils/notifications'
+import { AliasLayerDialog } from '@/components/layers/AliasLayerDialog'
+import { ManageAliasesDialog } from '@/components/layers/ManageAliasesDialog'
 
 const DEFAULT_LAYER_COLORS = {
   backgroundColor: '#ffffff',
@@ -83,6 +85,10 @@ export const ProjectLayersPage = () => {
   })
   const [datasetToggleState, setDatasetToggleState] = useState<Record<number, boolean>>({})
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [aliasDialogOpen, setAliasDialogOpen] = useState(false)
+  const [selectedMissingLayer, setSelectedMissingLayer] = useState<string>('')
+  const [manageAliasesDialogOpen, setManageAliasesDialogOpen] = useState(false)
+  const [selectedAliasLayer, setSelectedAliasLayer] = useState<{ id: number; name: string } | null>(null)
 
   // Helper function to calculate dataset enabled state
   // Dataset is enabled if ALL its layers are enabled, disabled if ALL are disabled
@@ -388,7 +394,8 @@ export const ProjectLayersPage = () => {
                 </TableHeader>
                 <TableBody>
                   {editableLayers.map((layer) => (
-                    <TableRow key={`${layer.layerId}-${layer.sourceDatasetId ?? 'manual'}`}>
+                    <>
+                      <TableRow key={`${layer.layerId}-${layer.sourceDatasetId ?? 'manual'}`}>
                       <TableCell className="font-mono">{layer.layerId}</TableCell>
                       <TableCell>
                         <Input
@@ -486,8 +493,35 @@ export const ProjectLayersPage = () => {
                             Delete
                           </Button>
                         )}
+                        {layer.aliases && layer.aliases.length > 0 && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedAliasLayer({ id: layer.id, name: layer.name })
+                              setManageAliasesDialogOpen(true)
+                            }}
+                          >
+                            Aliases ({layer.aliases.length})
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
+                      {layer.aliases && layer.aliases.length > 0 && (
+                        <TableRow className="bg-muted/30">
+                          <TableCell colSpan={8} className="py-2 px-4">
+                            <div className="text-xs text-muted-foreground">
+                              <span className="font-semibold">Aliases:</span>{' '}
+                              {layer.aliases.map((alias) => (
+                                <Badge key={alias.id} variant="secondary" className="ml-1">
+                                  {alias.aliasLayerId}
+                                </Badge>
+                              ))}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </>
                   ))}
                 </TableBody>
               </Table>
@@ -515,9 +549,21 @@ export const ProjectLayersPage = () => {
                     {missingLayers.map((layerId) => (
                       <div key={layerId} className="flex items-center justify-between rounded border p-2">
                         <span className="font-mono">{layerId}</span>
-                        <Button size="sm" variant="secondary" onClick={() => handleAddMissing(layerId)}>
-                          Add
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedMissingLayer(layerId)
+                              setAliasDialogOpen(true)
+                            }}
+                          >
+                            Alias
+                          </Button>
+                          <Button size="sm" variant="secondary" onClick={() => handleAddMissing(layerId)}>
+                            Add to Palette
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </Stack>
@@ -527,6 +573,36 @@ export const ProjectLayersPage = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <AliasLayerDialog
+        open={aliasDialogOpen}
+        onClose={() => {
+          setAliasDialogOpen(false)
+          setSelectedMissingLayer('')
+        }}
+        projectId={projectIdNum}
+        missingLayerId={selectedMissingLayer}
+        onSuccess={() => {
+          refetchLayers()
+          showSuccessNotification(
+            'Alias created',
+            `Layer '${selectedMissingLayer}' has been aliased`
+          )
+        }}
+      />
+
+      {selectedAliasLayer && (
+        <ManageAliasesDialog
+          open={manageAliasesDialogOpen}
+          onClose={() => {
+            setManageAliasesDialogOpen(false)
+            setSelectedAliasLayer(null)
+          }}
+          projectId={projectIdNum}
+          targetLayerId={selectedAliasLayer.id}
+          layerName={selectedAliasLayer.name}
+        />
+      )}
       </div>
     </PageContainer>
   )

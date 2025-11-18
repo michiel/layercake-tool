@@ -14,6 +14,11 @@ export const GET_PROJECT_LAYERS = gql`
       enabled
       createdAt
       updatedAt
+      aliases {
+        id
+        aliasLayerId
+        targetLayerId
+      }
     }
     missingLayers(projectId: $projectId)
   }
@@ -51,6 +56,71 @@ export const SET_LAYER_DATASET_ENABLED = gql`
   }
 `
 
+export const LIST_LAYER_ALIASES = gql`
+  query ListLayerAliases($projectId: Int!) {
+    listLayerAliases(projectId: $projectId) {
+      id
+      projectId
+      aliasLayerId
+      targetLayerId
+      targetLayer {
+        id
+        layerId
+        name
+        backgroundColor
+        textColor
+        borderColor
+      }
+      createdAt
+    }
+  }
+`
+
+export const GET_LAYER_ALIASES = gql`
+  query GetLayerAliases($projectId: Int!, $targetLayerId: Int!) {
+    getLayerAliases(projectId: $projectId, targetLayerId: $targetLayerId) {
+      id
+      projectId
+      aliasLayerId
+      targetLayerId
+      createdAt
+    }
+  }
+`
+
+export const CREATE_LAYER_ALIAS = gql`
+  mutation CreateLayerAlias($projectId: Int!, $aliasLayerId: String!, $targetLayerId: Int!) {
+    createLayerAlias(
+      projectId: $projectId
+      aliasLayerId: $aliasLayerId
+      targetLayerId: $targetLayerId
+    ) {
+      id
+      aliasLayerId
+      targetLayerId
+      targetLayer {
+        id
+        name
+        backgroundColor
+        textColor
+        borderColor
+      }
+    }
+  }
+`
+
+export const REMOVE_LAYER_ALIAS = gql`
+  mutation RemoveLayerAlias($projectId: Int!, $aliasLayerId: String!) {
+    removeLayerAlias(projectId: $projectId, aliasLayerId: $aliasLayerId)
+  }
+`
+
+export const REMOVE_LAYER_ALIASES = gql`
+  mutation RemoveLayerAliases($projectId: Int!, $targetLayerId: Int!) {
+    removeLayerAliases(projectId: $projectId, targetLayerId: $targetLayerId)
+  }
+`
+
 export interface ProjectLayerInput {
   layerId: string
   name: string
@@ -71,4 +141,14 @@ export interface ProjectLayer {
   borderColor: string
   sourceDatasetId?: number | null
   enabled: boolean
+  aliases?: LayerAlias[]
+}
+
+export interface LayerAlias {
+  id: number
+  projectId: number
+  aliasLayerId: string
+  targetLayerId: number
+  targetLayer?: ProjectLayer
+  createdAt: string
 }
