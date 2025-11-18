@@ -91,9 +91,9 @@ export const getLayoutedElements = async (
     // Add nodes to dagre graph
     nodes.forEach(node => {
       if (node.isPartition) {
-        // Group node - calculate size based on children
-        const minWidth = 320;
-        const minHeight = 240;
+        // Group node - use compact minimum size
+        const minWidth = 200;
+        const minHeight = 120;
 
         g.setNode(node.id, {
           width: minWidth,
@@ -127,8 +127,8 @@ export const getLayoutedElements = async (
       if (!positioned) return null;
 
       const isGroup = node.isPartition;
-      const width = isGroup ? Math.max(positioned.width || 320, 320) : nodeWidth;
-      const height = isGroup ? Math.max(positioned.height || 240, 240) : nodeHeight;
+      const width = isGroup ? Math.max(positioned.width || 200, 200) : nodeWidth;
+      const height = isGroup ? Math.max(positioned.height || 120, 120) : nodeHeight;
 
       return {
         id: node.id,
@@ -216,6 +216,42 @@ export const getLayoutedElements = async (
         if (children.length > 0) {
           const positionedChildren = layoutSubgraph(children);
 
+          // Calculate bounding box of children to size the group
+          const GROUP_PADDING = 32;
+          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+          positionedChildren.forEach(child => {
+            minX = Math.min(minX, child.position.x);
+            minY = Math.min(minY, child.position.y);
+            maxX = Math.max(maxX, child.position.x + child.width);
+            maxY = Math.max(maxY, child.position.y + child.height);
+          });
+
+          // Calculate required group size based on children
+          const childrenWidth = maxX - minX;
+          const childrenHeight = maxY - minY;
+          const requiredWidth = Math.max(200, childrenWidth + GROUP_PADDING * 2);
+          const requiredHeight = Math.max(120, childrenHeight + GROUP_PADDING * 2);
+
+          // Update group node size
+          const groupNodeIndex = reactFlowNodes.findIndex(n => n.id === node.id);
+          if (groupNodeIndex >= 0) {
+            reactFlowNodes[groupNodeIndex] = {
+              ...reactFlowNodes[groupNodeIndex],
+              width: requiredWidth,
+              height: requiredHeight,
+              style: {
+                ...reactFlowNodes[groupNodeIndex].style,
+                width: requiredWidth,
+                height: requiredHeight,
+              },
+            };
+          }
+
+          // Position children with padding offset
+          const offsetX = GROUP_PADDING - minX;
+          const offsetY = GROUP_PADDING - minY;
+
           positionedChildren.forEach(childPositioned => {
             const childNode = childPositioned.graphNode;
             const layerStyle = getLayerStyle(childNode.layer, layerMap);
@@ -223,7 +259,10 @@ export const getLayoutedElements = async (
             reactFlowNodes.push({
               id: childNode.id,
               type: 'editable',
-              position: childPositioned.position,
+              position: {
+                x: childPositioned.position.x + offsetX,
+                y: childPositioned.position.y + offsetY,
+              },
               data: {
                 label: childNode.label || childNode.id,
                 style: {

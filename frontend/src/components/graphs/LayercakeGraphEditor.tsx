@@ -28,9 +28,9 @@ export type GraphViewMode = 'flow' | 'hierarchy';
 export type GraphOrientation = 'vertical' | 'horizontal';
 export type HierarchyViewMode = 'graph' | 'containers';
 
-const GROUP_MIN_WIDTH = 320;
-const GROUP_MIN_HEIGHT = 240;
-const GROUP_PADDING = 48;
+const GROUP_MIN_WIDTH = 200;
+const GROUP_MIN_HEIGHT = 120;
+const GROUP_PADDING = 32;
 const DEFAULT_NODE_WIDTH = 180;
 const DEFAULT_NODE_HEIGHT = 80;
 
