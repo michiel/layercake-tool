@@ -148,37 +148,15 @@ export const MermaidPreviewDialog = ({ open, onClose, diagram, title }: MermaidP
 
     try {
       const svgData = new XMLSerializer().serializeToString(svgElement)
-      const canvas = document.createElement('canvas')
-      const ctx = canvas.getContext('2d')
-      if (!ctx) return
+      const svgBlob = new Blob([svgData], { type: 'image/svg+xml' })
 
-      const img = new Image()
-      const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' })
-      const url = URL.createObjectURL(svgBlob)
-
-      img.onload = async () => {
-        canvas.width = img.width
-        canvas.height = img.height
-        ctx.drawImage(img, 0, 0)
-        URL.revokeObjectURL(url)
-
-        canvas.toBlob(async (blob) => {
-          if (!blob) return
-          try {
-            await navigator.clipboard.write([
-              new ClipboardItem({
-                'image/png': blob
-              })
-            ])
-          } catch (err) {
-            console.error('Failed to copy image to clipboard', err)
-          }
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'image/svg+xml': svgBlob
         })
-      }
-
-      img.src = url
+      ])
     } catch (err) {
-      console.error('Failed to copy to clipboard', err)
+      console.error('Failed to copy SVG to clipboard', err)
     }
   }
 
