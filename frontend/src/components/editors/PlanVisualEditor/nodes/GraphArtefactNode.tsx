@@ -23,6 +23,83 @@ import { MermaidPreviewDialog, DotPreviewDialog } from '../../../visualization'
 
 type ArtefactConfig = GraphArtefactNodeConfig | TreeArtefactNodeConfig
 
+const normalizeRenderConfigForGraphQL = (renderConfig?: GraphArtefactNodeConfig['renderConfig']) => {
+  if (!renderConfig) return undefined
+
+  const mapOrientation = (value?: string) => {
+    if (value === 'LR') return 'Lr'
+    if (value === 'TB') return 'Tb'
+    return undefined
+  }
+
+  const mapNotePosition = (value?: string) => {
+    if (!value) return undefined
+    return value.charAt(0).toUpperCase() + value.slice(1)
+  }
+
+  const mapBuiltInStyles = (value?: string) => (value ? value.toUpperCase() : undefined)
+
+  const mapGraphvizLayout = (layout?: string) => {
+    switch (layout) {
+      case 'dot':
+        return 'DOT'
+      case 'neato':
+        return 'NEATO'
+      case 'fdp':
+        return 'FDP'
+      case 'circo':
+        return 'CIRCO'
+      default:
+        return undefined
+    }
+  }
+
+  const mapMermaidLook = (look?: string) => {
+    switch (look) {
+      case 'handDrawn':
+        return 'HAND_DRAWN'
+      case 'default':
+      default:
+        return 'DEFAULT'
+    }
+  }
+
+  const mapMermaidDisplay = (display?: string) => {
+    switch (display) {
+      case 'compact':
+        return 'COMPACT'
+      case 'full':
+      default:
+        return 'FULL'
+    }
+  }
+
+  return {
+    containNodes: renderConfig.containNodes,
+    orientation: mapOrientation(renderConfig.orientation),
+    applyLayers: renderConfig.applyLayers,
+    builtInStyles: mapBuiltInStyles(renderConfig.builtInStyles),
+    targetOptions: renderConfig.targetOptions && {
+      graphviz: renderConfig.targetOptions.graphviz && {
+        layout: mapGraphvizLayout(renderConfig.targetOptions.graphviz.layout),
+        overlap: renderConfig.targetOptions.graphviz.overlap,
+        splines: renderConfig.targetOptions.graphviz.splines,
+        nodesep: renderConfig.targetOptions.graphviz.nodesep,
+        ranksep: renderConfig.targetOptions.graphviz.ranksep,
+        commentStyle: renderConfig.targetOptions.graphviz.commentStyle
+          ? renderConfig.targetOptions.graphviz.commentStyle.toUpperCase()
+          : undefined,
+      },
+      mermaid: renderConfig.targetOptions.mermaid && {
+        look: mapMermaidLook(renderConfig.targetOptions.mermaid.look),
+        display: mapMermaidDisplay(renderConfig.targetOptions.mermaid.display),
+      },
+    },
+    addNodeCommentsAsNotes: renderConfig.addNodeCommentsAsNotes,
+    notePosition: mapNotePosition(renderConfig.notePosition),
+  }
+}
+
 interface ExtendedNodeProps extends NodeProps {
   onEdit?: (nodeId: string) => void
   onDelete?: (nodeId: string) => void
@@ -106,7 +183,7 @@ const ArtefactNodeBase = memo((props: ArtefactNodeProps) => {
       variables: {
         projectId,
         nodeId: props.id,
-        renderConfig: config.renderConfig,
+        renderConfig: normalizeRenderConfigForGraphQL(config.renderConfig),
       },
     })
   }
@@ -184,7 +261,7 @@ const ArtefactNodeBase = memo((props: ArtefactNodeProps) => {
       variables: {
         projectId,
         nodeId: props.id,
-        renderConfig: config.renderConfig,
+        renderConfig: normalizeRenderConfigForGraphQL(config.renderConfig),
       },
     })
   }
