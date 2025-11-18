@@ -6,6 +6,7 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        // Create the table first
         manager
             .create_table(
                 Table::create()
@@ -39,23 +40,6 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .default(SimpleExpr::Keyword(Keyword::CurrentTimestamp)),
                     )
-                    .index(
-                        Index::create()
-                            .name("idx_layer_aliases_project")
-                            .col(LayerAliases::ProjectId),
-                    )
-                    .index(
-                        Index::create()
-                            .name("idx_layer_aliases_target")
-                            .col(LayerAliases::TargetLayerId),
-                    )
-                    .index(
-                        Index::create()
-                            .name("idx_layer_aliases_project_alias_unique")
-                            .col(LayerAliases::ProjectId)
-                            .col(LayerAliases::AliasLayerId)
-                            .unique(),
-                    )
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_layer_aliases_project")
@@ -72,7 +56,42 @@ impl MigrationTrait for Migration {
                     )
                     .to_owned(),
             )
-            .await
+            .await?;
+
+        // Create indexes separately
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_layer_aliases_project")
+                    .table(LayerAliases::Table)
+                    .col(LayerAliases::ProjectId)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_layer_aliases_target")
+                    .table(LayerAliases::Table)
+                    .col(LayerAliases::TargetLayerId)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_layer_aliases_project_alias_unique")
+                    .table(LayerAliases::Table)
+                    .col(LayerAliases::ProjectId)
+                    .col(LayerAliases::AliasLayerId)
+                    .unique()
+                    .to_owned(),
+            )
+            .await?;
+
+        Ok(())
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
