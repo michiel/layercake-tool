@@ -11,6 +11,7 @@ export interface GraphNode {
   id: string;
   label: string;
   layer?: string;
+  weight?: number;
   is_partition?: boolean;
   belongs_to?: string;
   comment?: string;
@@ -23,6 +24,7 @@ export interface GraphEdge {
   target: string;
   label?: string;
   layer?: string;
+  weight?: number;
   comment?: string;
   [key: string]: any;
 }
@@ -61,8 +63,8 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
   const [hasChanges, setHasChanges] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const nodeColumnDefs = ['id', 'label', 'layer', 'is_partition', 'belongs_to', 'comment'];
-  const edgeColumnDefs = ['id', 'source', 'target', 'label', 'layer', 'comment'];
+  const nodeColumnDefs = ['id', 'label', 'layer', 'weight', 'is_partition', 'belongs_to', 'comment'];
+  const edgeColumnDefs = ['id', 'source', 'target', 'label', 'layer', 'weight', 'comment'];
   const layerColumnDefs = ['id', 'label', 'background_color', 'text_color', 'border_color', 'comment'];
 
   const handleNodeChange = (rowIdx: number, field: string, value: string) => {
@@ -174,6 +176,7 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
         id: row.id || '',
         label: row.label || '',
         layer: row.layer,
+        weight: row.weight ? parseFloat(row.weight) : 1,
         is_partition: row.is_partition === 'true' || row.is_partition === '1',
         belongs_to: row.belongs_to,
         comment: row.comment,
@@ -208,6 +211,7 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
         target: row.target || '',
         label: row.label,
         layer: row.layer,
+        weight: row.weight ? parseFloat(row.weight) : 1,
         comment: row.comment,
         ...row
       }));
