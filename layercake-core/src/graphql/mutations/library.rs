@@ -204,6 +204,28 @@ impl LibraryMutation {
         })
     }
 
+    /// Import a project from a zip archive
+    async fn import_project_archive(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(name = "fileContent")] file_content: String,
+        name: Option<String>,
+    ) -> Result<Project> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        let archive_bytes = general_purpose::STANDARD
+            .decode(&file_content)
+            .map_err(|e| StructuredError::validation("fileContent", format!("Invalid base64 file content: {}", e)))?;
+
+        let project = context
+            .app
+            .import_project_archive(archive_bytes, name)
+            .await
+            .map_err(|e| StructuredError::service("AppContext::import_project_archive", e))?;
+
+        Ok(Project::from(project))
+    }
+
     /// Create a new project from a stored library item (project or template)
     async fn create_project_from_library(
         &self,

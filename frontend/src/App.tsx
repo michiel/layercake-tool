@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { Routes, Route, useNavigate, useParams, useLocation } from 'react-router-dom'
-import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconDownload, IconChevronLeft, IconChevronRight, IconFolderPlus, IconBooks, IconMessageDots, IconAdjustments, IconHierarchy2, IconChevronDown } from '@tabler/icons-react'
+import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconDownload, IconChevronLeft, IconChevronRight, IconFolderPlus, IconBooks, IconMessageDots, IconAdjustments, IconHierarchy2, IconChevronDown, IconUpload } from '@tabler/icons-react'
 import { useQuery, useMutation } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import { Breadcrumbs } from './components/common/Breadcrumbs'
@@ -93,6 +93,16 @@ const GET_SAMPLE_PROJECTS = gql`
 const CREATE_SAMPLE_PROJECT = gql`
   mutation CreateSampleProject($sampleKey: String!) {
     createSampleProject(sampleKey: $sampleKey) {
+      id
+      name
+      description
+    }
+  }
+`
+
+const IMPORT_PROJECT_ARCHIVE = gql`
+  mutation ImportProjectArchive($fileContent: String!, $name: String) {
+    importProjectArchive(fileContent: $fileContent, name: $name) {
       id
       name
       description
@@ -623,6 +633,7 @@ const HomePage = () => {
   const [sampleModalOpened, setSampleModalOpened] = useState(false)
   const [selectedSampleKey, setSelectedSampleKey] = useState<string | null>(null)
   const [sampleError, setSampleError] = useState<string | null>(null)
+  const fileInputRef = React.useRef<HTMLInputElement>(null)
 
   const { data: projectsData } = useQuery<{
     projects: Array<{
@@ -659,6 +670,19 @@ const HomePage = () => {
     },
     onError: (error) => {
       setSampleError(error.message)
+    },
+    refetchQueries: [{ query: GET_PROJECTS }]
+  })
+
+  const [importProjectArchive, { loading: importLoading }] = useMutation(IMPORT_PROJECT_ARCHIVE, {
+    onCompleted: (result) => {
+      const project = (result as any)?.importProjectArchive
+      if (project) {
+        navigate(`/projects/${project.id}`)
+      }
+    },
+    onError: (error) => {
+      alert(`Failed to import project: ${error.message}`)
     },
     refetchQueries: [{ query: GET_PROJECTS }]
   })
@@ -706,6 +730,36 @@ const HomePage = () => {
     }
   }
 
+  const handleImportClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    // Reset the input so the same file can be selected again
+    event.target.value = ''
+
+    try {
+      const arrayBuffer = await file.arrayBuffer()
+      const bytes = new Uint8Array(arrayBuffer)
+      let binary = ''
+      for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i])
+      }
+      const base64 = btoa(binary)
+
+      await importProjectArchive({
+        variables: {
+          fileContent: base64,
+        },
+      })
+    } catch (error) {
+      console.error('Failed to import project', error)
+    }
+  }
+
   const sampleOptions =
     sampleProjectsData?.sampleProjects?.map(sample => ({
       value: sample.key,
@@ -745,6 +799,23 @@ const HomePage = () => {
             <IconFolderPlus className="mr-2 h-6 w-6" />
             Import Sample Project
           </Button>
+          <Button
+            size="lg"
+            onClick={handleImportClick}
+            variant="secondary"
+            className="min-w-[240px] h-20 text-lg"
+            disabled={importLoading}
+          >
+            <IconUpload className="mr-2 h-6 w-6" />
+            {importLoading ? 'Importing...' : 'Import Project'}
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".zip"
+            onChange={handleFileChange}
+            style={{ display: 'none' }}
+          />
         </Group>
       </div>
 

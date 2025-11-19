@@ -986,6 +986,94 @@ impl AppContext {
         })
     }
 
+    pub async fn import_project_archive(
+        &self,
+        archive_bytes: Vec<u8>,
+        project_name: Option<String>,
+    ) -> Result<ProjectSummary> {
+        let mut archive = ZipArchive::new(Cursor::new(archive_bytes)).map_err(|e| {
+            anyhow!("Failed to read project archive: {}", e)
+        })?;
+
+        let manifest: ProjectBundleManifest = read_template_json(&mut archive, "manifest.json")?;
+        let project_record: ProjectRecord = read_template_json(&mut archive, "project.json")?;
+        let dag_snapshot: PlanDagSnapshot = read_template_json(&mut archive, "dag.json")?;
+        let dataset_index: DatasetBundleIndex =
+            read_template_json(&mut archive, "datasets/index.json")?;
+
+        let tags = project_record.tags.clone();
+        let desired_name = project_name.unwrap_or(project_record.name.clone());
+        let now = Utc::now();
+
+        let project = projects::ActiveModel {
+            name: Set(desired_name.clone()),
+            description: Set(project_record.description.clone()),
+            tags: Set(serde_json::to_string(&tags).unwrap_or_else(|_| "[]".to_string())),
+            created_at: Set(now),
+            updated_at: Set(now),
+            ..Default::default()
+        }
+        .insert(&self.db)
+        .await
+        .map_err(|e| anyhow!("Failed to create project from archive: {}", e))?;
+
+        let plan = self
+            .create_plan(PlanCreateRequest {
+                project_id: project.id,
+                name: if manifest.plan_name.trim().is_empty() {
+                    format!("{} Plan", desired_name)
+                } else {
+                    manifest.plan_name.clone()
+                },
+                yaml_content: "".to_string(),
+                dependencies: None,
+                status: Some("draft".to_string()),
+            })
+            .await?;
+
+        let dataset_service = DataSetService::new(self.db.clone());
+        let mut id_map = HashMap::new();
+
+        for descriptor in &dataset_index.datasets {
+            let data_type = DataType::from_str(&descriptor.data_type).unwrap_or(DataType::Graph);
+
+            let dataset_path = format!("datasets/{}", descriptor.filename);
+            let file_bytes = {
+                let mut dataset_file = archive.by_name(&dataset_path).map_err(|e| {
+                    anyhow!("Missing dataset file {}: {}", descriptor.filename, e)
+                })?;
+                let mut bytes = Vec::new();
+                dataset_file.read_to_end(&mut bytes).map_err(|e| {
+                    anyhow!("Failed to read dataset {}: {}", descriptor.filename, e)
+                })?;
+                bytes
+            };
+            let file_format = DataSetFileFormat::from_str(&descriptor.file_format)
+                .unwrap_or(DataSetFileFormat::Csv);
+
+            let dataset = dataset_service
+                .create_from_file(
+                    project.id,
+                    descriptor.name.clone(),
+                    descriptor.description.clone(),
+                    descriptor.filename.clone(),
+                    file_format,
+                    data_type,
+                    file_bytes,
+                )
+                .await
+                .map_err(|e| anyhow!("Failed to import dataset {}: {}", descriptor.name, e))?;
+
+            id_map.insert(descriptor.original_id, dataset.id);
+        }
+
+        insert_plan_dag_from_snapshot(&self.db, plan.id, &dag_snapshot, &id_map)
+            .await
+            .map_err(|e| anyhow!("Failed to recreate plan DAG: {}", e))?;
+
+        Ok(ProjectSummary::from(project))
+    }
+
     pub async fn create_project_from_library(
         &self,
         library_item_id: i32,
