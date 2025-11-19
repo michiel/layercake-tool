@@ -110,10 +110,13 @@ impl MergeBuilder {
         let result = self.merge_data_from_sources(&graph, &data_sets_list).await;
 
         match result {
-            Ok((node_count, edge_count)) => {
+            Ok((node_count, edge_count, annotation)) => {
                 // Update to completed state
                 let mut active: graphs::ActiveModel = graph.into();
                 active = active.set_completed(source_hash, node_count as i32, edge_count as i32);
+                if let Some(ann) = annotation {
+                    active.annotations = Set(Some(ann));
+                }
                 let updated = active.update(&self.db).await?;
 
                 // Publish execution status change
@@ -252,17 +255,19 @@ impl MergeBuilder {
     }
 
     /// Merge data from all sources (data_sets + graphs)
+    /// Returns (node_count, edge_count, optional_annotation)
     async fn merge_data_from_sources(
         &self,
         graph: &graphs::Model,
         sources: &[DataSetOrGraph],
-    ) -> Result<(usize, usize)> {
+    ) -> Result<(usize, usize, Option<String>)> {
         let txn = self.db.begin().await?;
         clear_graph_storage(&txn, graph.id).await?;
 
         let mut all_nodes = HashMap::new();
         let mut all_edges: HashMap<String, EdgeData> = HashMap::new();
         let mut all_layers = HashMap::new(); // layer_id -> layer data
+        let mut merge_stats = MergeStats::new();
 
         // Process each source
         for source in sources {
@@ -281,6 +286,7 @@ impl MergeBuilder {
                         &graph_data,
                         &ds.data_type,
                         Some(ds.id),
+                        &mut merge_stats,
                     )?;
                 }
                 DataSetOrGraph::Graph(upstream_graph) => {
@@ -289,6 +295,7 @@ impl MergeBuilder {
                         &mut all_nodes,
                         &mut all_edges,
                         upstream_graph.id,
+                        &mut merge_stats,
                     )
                     .await?;
                     // Also read layers from the upstream graph
@@ -381,7 +388,8 @@ impl MergeBuilder {
         txn.commit().await?;
 
         let node_count = node_ids.len();
-        Ok((node_count, edge_count))
+        let annotation = merge_stats.to_annotation();
+        Ok((node_count, edge_count, annotation))
     }
 
     /// Extract nodes, edges, and layers from graph_json
@@ -393,6 +401,7 @@ impl MergeBuilder {
         graph_data: &serde_json::Value,
         data_type: &str,
         dataset_id: Option<i32>,
+        merge_stats: &mut MergeStats,
     ) -> Result<()> {
         match data_type {
             "nodes" => {
@@ -417,7 +426,7 @@ impl MergeBuilder {
                             dataset_id,
                         };
 
-                        merge_node(all_nodes, id, node);
+                        merge_node(all_nodes, id, node, merge_stats);
                     }
                 }
             }
@@ -448,7 +457,7 @@ impl MergeBuilder {
                             dataset_id,
                         };
 
-                        merge_edge(all_edges, id, edge);
+                        merge_edge(all_edges, id, edge, merge_stats);
                     }
                 }
             }
@@ -475,7 +484,7 @@ impl MergeBuilder {
                             dataset_id,
                         };
 
-                        merge_node(all_nodes, id, node);
+                        merge_node(all_nodes, id, node, merge_stats);
                     }
                 }
 
@@ -505,7 +514,7 @@ impl MergeBuilder {
                             dataset_id,
                         };
 
-                        merge_edge(all_edges, id, edge);
+                        merge_edge(all_edges, id, edge, merge_stats);
                     }
                 }
             }
@@ -592,6 +601,7 @@ impl MergeBuilder {
         all_nodes: &mut HashMap<String, NodeData>,
         all_edges: &mut HashMap<String, EdgeData>,
         graph_id: i32,
+        merge_stats: &mut MergeStats,
     ) -> Result<()> {
         use sea_orm::{ColumnTrait, QueryFilter};
 
@@ -613,7 +623,7 @@ impl MergeBuilder {
                 attrs: node.attrs,
                 dataset_id: node.dataset_id,
             };
-            merge_node(all_nodes, id, node_data);
+            merge_node(all_nodes, id, node_data, merge_stats);
         }
 
         // Read edges
@@ -634,7 +644,7 @@ impl MergeBuilder {
                 attrs: edge.attrs,
                 dataset_id: edge.dataset_id,
             };
-            merge_edge(all_edges, id, edge_data);
+            merge_edge(all_edges, id, edge_data, merge_stats);
         }
 
         Ok(())
@@ -670,16 +680,76 @@ struct NodeData {
     dataset_id: Option<i32>,
 }
 
+/// Track merged items for annotation
+struct MergeStats {
+    merged_nodes: Vec<(String, f64)>, // (id, total_weight)
+    merged_edges: Vec<(String, f64)>, // (id, total_weight)
+}
+
+impl MergeStats {
+    fn new() -> Self {
+        Self {
+            merged_nodes: Vec::new(),
+            merged_edges: Vec::new(),
+        }
+    }
+
+    fn to_annotation(&self) -> Option<String> {
+        if self.merged_nodes.is_empty() && self.merged_edges.is_empty() {
+            return None;
+        }
+
+        let mut parts = Vec::new();
+
+        if !self.merged_nodes.is_empty() {
+            let mut node_lines = vec!["## Merged Nodes".to_string()];
+            node_lines.push(String::new());
+            node_lines.push("| Node ID | Total Weight |".to_string());
+            node_lines.push("|---------|--------------|".to_string());
+            for (id, weight) in &self.merged_nodes {
+                node_lines.push(format!("| {} | {} |", id, weight));
+            }
+            parts.push(node_lines.join("\n"));
+        }
+
+        if !self.merged_edges.is_empty() {
+            let mut edge_lines = vec!["## Merged Edges".to_string()];
+            edge_lines.push(String::new());
+            edge_lines.push("| Edge ID | Total Weight |".to_string());
+            edge_lines.push("|---------|--------------|".to_string());
+            for (id, weight) in &self.merged_edges {
+                edge_lines.push(format!("| {} | {} |", id, weight));
+            }
+            parts.push(edge_lines.join("\n"));
+        }
+
+        Some(parts.join("\n\n"))
+    }
+}
+
 /// Merge a node into the map, summing weights if the ID already exists
-fn merge_node(all_nodes: &mut HashMap<String, NodeData>, id: String, node: NodeData) {
+fn merge_node(
+    all_nodes: &mut HashMap<String, NodeData>,
+    id: String,
+    node: NodeData,
+    stats: &mut MergeStats,
+) {
     use std::collections::hash_map::Entry;
-    match all_nodes.entry(id) {
+    match all_nodes.entry(id.clone()) {
         Entry::Occupied(mut entry) => {
             // Node exists - sum weights, keep first node's other values
             let existing = entry.get_mut();
             let existing_weight = existing.weight.unwrap_or(1.0);
             let new_weight = node.weight.unwrap_or(1.0);
-            existing.weight = Some(existing_weight + new_weight);
+            let total_weight = existing_weight + new_weight;
+            existing.weight = Some(total_weight);
+
+            // Update or add to stats
+            if let Some(stat) = stats.merged_nodes.iter_mut().find(|(sid, _)| sid == &id) {
+                stat.1 = total_weight;
+            } else {
+                stats.merged_nodes.push((id, total_weight));
+            }
         }
         Entry::Vacant(entry) => {
             // New node - insert as-is
@@ -689,15 +759,28 @@ fn merge_node(all_nodes: &mut HashMap<String, NodeData>, id: String, node: NodeD
 }
 
 /// Merge an edge into the map, summing weights if the ID already exists
-fn merge_edge(all_edges: &mut HashMap<String, EdgeData>, id: String, edge: EdgeData) {
+fn merge_edge(
+    all_edges: &mut HashMap<String, EdgeData>,
+    id: String,
+    edge: EdgeData,
+    stats: &mut MergeStats,
+) {
     use std::collections::hash_map::Entry;
-    match all_edges.entry(id) {
+    match all_edges.entry(id.clone()) {
         Entry::Occupied(mut entry) => {
             // Edge exists - sum weights, keep first edge's other values
             let existing = entry.get_mut();
             let existing_weight = existing.weight.unwrap_or(1.0);
             let new_weight = edge.weight.unwrap_or(1.0);
-            existing.weight = Some(existing_weight + new_weight);
+            let total_weight = existing_weight + new_weight;
+            existing.weight = Some(total_weight);
+
+            // Update or add to stats
+            if let Some(stat) = stats.merged_edges.iter_mut().find(|(sid, _)| sid == &id) {
+                stat.1 = total_weight;
+            } else {
+                stats.merged_edges.push((id, total_weight));
+            }
         }
         Entry::Vacant(entry) => {
             // New edge - insert as-is
