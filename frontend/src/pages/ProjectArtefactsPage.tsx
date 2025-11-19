@@ -415,38 +415,40 @@ const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
               <p className="text-xs text-muted-foreground">Graph Node</p>
             </div>
           </Group>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-8 w-8"
-                  disabled={!graphId}
-                  onClick={() => handleGraphData(graphId)}
-                >
-                  <IconTable size={16} />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Preview graph data</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-8 w-8"
-                  disabled={!graphId}
-                  onClick={() => navigate(`/projects/${projectId}/graphs/${graphId}`)}
-                >
-                  <IconExternalLink size={16} />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Open graph editor</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <Group gap="xs">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                    disabled={!graphId}
+                    onClick={() => handleGraphData(graphId)}
+                  >
+                    <IconTable size={16} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Preview graph data</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                    disabled={!graphId}
+                    onClick={() => navigate(`/projects/${projectId}/graphs/${graphId}`)}
+                  >
+                    <IconExternalLink size={16} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Open graph editor</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </Group>
         </div>
       )
     }
