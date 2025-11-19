@@ -3155,7 +3155,7 @@ dependencies = [
 
 [[package]]
 name = "layercake-core"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -3215,7 +3215,7 @@ dependencies = [
 
 [[package]]
 name = "layercake-data-acquisition"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3241,7 +3241,7 @@ dependencies = [
 
 [[package]]
 name = "layercake-tauri"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "anyhow",
  "axum",

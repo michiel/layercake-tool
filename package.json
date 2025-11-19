@@ -1,6 +1,6 @@
 {
   "name": "layercake-tool",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Interactive graph transformation and visualization tool",
   "private": true,
   "scripts": {
@@ -32,7 +32,5 @@
   "author": "Layercake Contributors",
   "license": "MIT OR Apache-2.0",
   "dependencies": {
-    "@assistant-ui/react-markdown": "^0.3.6",
-    "remark-gfm": "^4.0.0"
   }
 }
