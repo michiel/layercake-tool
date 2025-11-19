@@ -2417,6 +2417,24 @@ async fn insert_plan_dag_from_snapshot(
 ) -> Result<()> {
     let now = Utc::now();
 
+    // Remap node and edge IDs to avoid collisions with existing records
+    let mut node_id_map: HashMap<String, String> = HashMap::new();
+    let mut edge_id_map: HashMap<String, String> = HashMap::new();
+
+    let mut allocate_node_id = |old_id: &str| -> String {
+        node_id_map
+            .entry(old_id.to_string())
+            .or_insert_with(|| format!("node_{}", Uuid::new_v4().simple()))
+            .clone()
+    };
+
+    let mut allocate_edge_id = |old_id: &str| -> String {
+        edge_id_map
+            .entry(old_id.to_string())
+            .or_insert_with(|| format!("edge_{}", Uuid::new_v4().simple()))
+            .clone()
+    };
+
     for node in &snapshot.nodes {
         let mut config_value: Value = serde_json::from_str(&node.config)
             .map_err(|e| anyhow!("Invalid node config JSON: {}", e))?;
@@ -2438,8 +2456,10 @@ async fn insert_plan_dag_from_snapshot(
         let config_json = serde_json::to_string(&config_value)
             .map_err(|e| anyhow!("Failed to encode node config: {}", e))?;
 
+        let new_id = allocate_node_id(&node.id);
+
         plan_dag_nodes::ActiveModel {
-            id: Set(node.id.clone()),
+            id: Set(new_id.clone()),
             plan_id: Set(plan_id),
             node_type: Set(node_type_storage_name(&node.node_type).to_string()),
             position_x: Set(node.position.x),
@@ -2453,25 +2473,35 @@ async fn insert_plan_dag_from_snapshot(
         }
         .insert(db)
         .await
-        .map_err(|e| anyhow!("Failed to insert plan node {}: {}", node.id, e))?;
+        .map_err(|e| anyhow!("Failed to insert plan node {}: {}", new_id, e))?;
     }
 
     for edge in &snapshot.edges {
         let metadata_json = serde_json::to_string(&edge.metadata)
             .map_err(|e| anyhow!("Failed to encode edge metadata: {}", e))?;
 
+        let new_id = allocate_edge_id(&edge.id);
+        let source = node_id_map
+            .get(&edge.source)
+            .cloned()
+            .unwrap_or_else(|| edge.source.clone());
+        let target = node_id_map
+            .get(&edge.target)
+            .cloned()
+            .unwrap_or_else(|| edge.target.clone());
+
         plan_dag_edges::ActiveModel {
-            id: Set(edge.id.clone()),
+            id: Set(new_id.clone()),
             plan_id: Set(plan_id),
-            source_node_id: Set(edge.source.clone()),
-            target_node_id: Set(edge.target.clone()),
+            source_node_id: Set(source),
+            target_node_id: Set(target),
             metadata_json: Set(metadata_json),
             created_at: Set(now),
             updated_at: Set(now),
         }
         .insert(db)
         .await
-        .map_err(|e| anyhow!("Failed to insert plan edge {}: {}", edge.id, e))?;
+        .map_err(|e| anyhow!("Failed to insert plan edge {}: {}", new_id, e))?;
     }
 
     Ok(())
