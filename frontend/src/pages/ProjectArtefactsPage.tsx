@@ -13,6 +13,7 @@ import {
   IconChevronDown,
   IconChevronRight,
   IconSettings,
+  IconExternalLink,
 } from '@tabler/icons-react'
 import { gql } from '@apollo/client'
 import { GET_PLAN_DAG, UPDATE_PLAN_DAG_NODE } from '../graphql/plan-dag'
@@ -428,6 +429,22 @@ const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Preview graph data</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8"
+                  disabled={!graphId}
+                  onClick={() => navigate(`/projects/${projectId}/graphs/${graphId}`)}
+                >
+                  <IconExternalLink size={16} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Open graph editor</TooltipContent>
             </Tooltip>
           </TooltipProvider>
         </div>
