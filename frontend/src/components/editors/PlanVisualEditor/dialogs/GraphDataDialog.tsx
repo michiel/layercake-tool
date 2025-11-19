@@ -56,6 +56,7 @@ export const GraphDataDialog: React.FC<GraphDataDialogProps> = ({
         id: node.id,
         label: node.label || '',
         layer: node.layer,
+        weight: node.weight,
         is_partition: node.isPartition,
         belongs_to: node.belongsTo,
         ...node.attrs
@@ -66,6 +67,7 @@ export const GraphDataDialog: React.FC<GraphDataDialogProps> = ({
         target: edge.target,
         label: edge.label,
         layer: edge.layer,
+        weight: edge.weight,
         ...edge.attrs
       })),
       layers: data.graph.layers.map(layer => ({
