@@ -261,9 +261,8 @@ impl MergeBuilder {
         clear_graph_storage(&txn, graph.id).await?;
 
         let mut all_nodes = HashMap::new();
-        let mut all_edges = Vec::new();
+        let mut all_edges: HashMap<String, EdgeData> = HashMap::new();
         let mut all_layers = HashMap::new(); // layer_id -> layer data
-        let mut used_edge_ids = HashSet::new();
 
         // Process each source
         for source in sources {
@@ -275,7 +274,6 @@ impl MergeBuilder {
                             anyhow!("Failed to parse graph JSON for {}: {}", ds.name, e)
                         })?;
 
-                    let scope_label = format!("ds{}", ds.id);
                     self.extract_from_json(
                         &mut all_nodes,
                         &mut all_edges,
@@ -283,19 +281,14 @@ impl MergeBuilder {
                         &graph_data,
                         &ds.data_type,
                         Some(ds.id),
-                        Some(scope_label.as_str()),
-                        &mut used_edge_ids,
                     )?;
                 }
                 DataSetOrGraph::Graph(upstream_graph) => {
                     // Read nodes and edges from graph_nodes and graph_edges tables
-                    let scope_label = format!("graph{}", upstream_graph.id);
                     self.extract_from_graph_tables(
                         &mut all_nodes,
                         &mut all_edges,
                         upstream_graph.id,
-                        Some(scope_label.as_str()),
-                        &mut used_edge_ids,
                     )
                     .await?;
                     // Also read layers from the upstream graph
@@ -307,18 +300,18 @@ impl MergeBuilder {
 
         // Validate edges reference existing nodes
         let node_ids: HashSet<_> = all_nodes.keys().cloned().collect();
-        for edge in &all_edges {
+        for (edge_id, edge) in &all_edges {
             if !node_ids.contains(&edge.source) {
                 return Err(anyhow!(
                     "Edge {} references non-existent source node: {}",
-                    edge.id,
+                    edge_id,
                     edge.source
                 ));
             }
             if !node_ids.contains(&edge.target) {
                 return Err(anyhow!(
                     "Edge {} references non-existent target node: {}",
-                    edge.id,
+                    edge_id,
                     edge.target
                 ));
             }
@@ -328,7 +321,7 @@ impl MergeBuilder {
                 if source_node.is_partition {
                     return Err(anyhow!(
                         "Edge {} has source node {} which is a partition (subflow). Edges cannot connect to partition nodes.",
-                        edge.id,
+                        edge_id,
                         edge.source
                     ));
                 }
@@ -337,7 +330,7 @@ impl MergeBuilder {
                 if target_node.is_partition {
                     return Err(anyhow!(
                         "Edge {} has target node {} which is a partition (subflow). Edges cannot connect to partition nodes.",
-                        edge.id,
+                        edge_id,
                         edge.target
                     ));
                 }
@@ -367,8 +360,8 @@ impl MergeBuilder {
         let edge_count = all_edges.len();
         let edge_models: Vec<_> = all_edges
             .into_iter()
-            .map(|edge_data| graph_edges::ActiveModel {
-                id: Set(edge_data.id),
+            .map(|(edge_id, edge_data)| graph_edges::ActiveModel {
+                id: Set(edge_id),
                 graph_id: Set(graph.id),
                 source: Set(edge_data.source),
                 target: Set(edge_data.target),
@@ -395,13 +388,11 @@ impl MergeBuilder {
     fn extract_from_json(
         &self,
         all_nodes: &mut HashMap<String, NodeData>,
-        all_edges: &mut Vec<EdgeData>,
+        all_edges: &mut HashMap<String, EdgeData>,
         all_layers: &mut HashMap<String, LayerData>,
         graph_data: &serde_json::Value,
         data_type: &str,
         dataset_id: Option<i32>,
-        edge_scope_hint: Option<&str>,
-        used_edge_ids: &mut HashSet<String>,
     ) -> Result<()> {
         match data_type {
             "nodes" => {
@@ -426,14 +417,14 @@ impl MergeBuilder {
                             dataset_id,
                         };
 
-                        all_nodes.insert(id, node);
+                        merge_node(all_nodes, id, node);
                     }
                 }
             }
             "edges" => {
                 if let Some(edges_array) = graph_data.get("edges").and_then(|v| v.as_array()) {
                     for edge_val in edges_array {
-                        let raw_id = edge_val["id"]
+                        let id = edge_val["id"]
                             .as_str()
                             .ok_or_else(|| anyhow!("Edge missing 'id' field"))?
                             .to_string();
@@ -446,11 +437,7 @@ impl MergeBuilder {
                             .ok_or_else(|| anyhow!("Edge missing 'target' field"))?
                             .to_string();
 
-                        let id =
-                            allocate_edge_id_with_scope(&raw_id, edge_scope_hint, used_edge_ids);
-
                         let edge = EdgeData {
-                            id,
                             source,
                             target,
                             label: edge_val["label"].as_str().map(|s| s.to_string()),
@@ -461,7 +448,7 @@ impl MergeBuilder {
                             dataset_id,
                         };
 
-                        all_edges.push(edge);
+                        merge_edge(all_edges, id, edge);
                     }
                 }
             }
@@ -488,13 +475,13 @@ impl MergeBuilder {
                             dataset_id,
                         };
 
-                        all_nodes.insert(id, node);
+                        merge_node(all_nodes, id, node);
                     }
                 }
 
                 if let Some(edges_array) = graph_data.get("edges").and_then(|v| v.as_array()) {
                     for edge_val in edges_array {
-                        let raw_id = edge_val["id"]
+                        let id = edge_val["id"]
                             .as_str()
                             .ok_or_else(|| anyhow!("Edge missing 'id' field"))?
                             .to_string();
@@ -507,11 +494,7 @@ impl MergeBuilder {
                             .ok_or_else(|| anyhow!("Edge missing 'target' field"))?
                             .to_string();
 
-                        let id =
-                            allocate_edge_id_with_scope(&raw_id, edge_scope_hint, used_edge_ids);
-
                         let edge = EdgeData {
-                            id,
                             source,
                             target,
                             label: edge_val["label"].as_str().map(|s| s.to_string()),
@@ -522,7 +505,7 @@ impl MergeBuilder {
                             dataset_id,
                         };
 
-                        all_edges.push(edge);
+                        merge_edge(all_edges, id, edge);
                     }
                 }
             }
@@ -607,10 +590,8 @@ impl MergeBuilder {
     async fn extract_from_graph_tables(
         &self,
         all_nodes: &mut HashMap<String, NodeData>,
-        all_edges: &mut Vec<EdgeData>,
+        all_edges: &mut HashMap<String, EdgeData>,
         graph_id: i32,
-        edge_scope_hint: Option<&str>,
-        used_edge_ids: &mut HashSet<String>,
     ) -> Result<()> {
         use sea_orm::{ColumnTrait, QueryFilter};
 
@@ -621,19 +602,18 @@ impl MergeBuilder {
             .await?;
 
         for node in nodes {
-            all_nodes.insert(
-                node.id.clone(),
-                NodeData {
-                    label: node.label,
-                    layer: node.layer,
-                    weight: node.weight,
-                    is_partition: node.is_partition,
-                    belongs_to: node.belongs_to,
-                    comment: node.comment,
-                    attrs: node.attrs,
-                    dataset_id: node.dataset_id,
-                },
-            );
+            let id = node.id.clone();
+            let node_data = NodeData {
+                label: node.label,
+                layer: node.layer,
+                weight: node.weight,
+                is_partition: node.is_partition,
+                belongs_to: node.belongs_to,
+                comment: node.comment,
+                attrs: node.attrs,
+                dataset_id: node.dataset_id,
+            };
+            merge_node(all_nodes, id, node_data);
         }
 
         // Read edges
@@ -643,12 +623,8 @@ impl MergeBuilder {
             .await?;
 
         for edge in edges {
-            let dataset_scope = edge.dataset_id.map(|id| format!("ds{}", id));
-            let scoped_hint = dataset_scope.as_deref().or(edge_scope_hint);
-            let id = allocate_edge_id_with_scope(&edge.id, scoped_hint, used_edge_ids);
-
-            all_edges.push(EdgeData {
-                id,
+            let id = edge.id.clone();
+            let edge_data = EdgeData {
                 source: edge.source,
                 target: edge.target,
                 label: edge.label,
@@ -657,7 +633,8 @@ impl MergeBuilder {
                 comment: edge.comment,
                 attrs: edge.attrs,
                 dataset_id: edge.dataset_id,
-            });
+            };
+            merge_edge(all_edges, id, edge_data);
         }
 
         Ok(())
@@ -693,9 +670,44 @@ struct NodeData {
     dataset_id: Option<i32>,
 }
 
+/// Merge a node into the map, summing weights if the ID already exists
+fn merge_node(all_nodes: &mut HashMap<String, NodeData>, id: String, node: NodeData) {
+    use std::collections::hash_map::Entry;
+    match all_nodes.entry(id) {
+        Entry::Occupied(mut entry) => {
+            // Node exists - sum weights, keep first node's other values
+            let existing = entry.get_mut();
+            let existing_weight = existing.weight.unwrap_or(1.0);
+            let new_weight = node.weight.unwrap_or(1.0);
+            existing.weight = Some(existing_weight + new_weight);
+        }
+        Entry::Vacant(entry) => {
+            // New node - insert as-is
+            entry.insert(node);
+        }
+    }
+}
+
+/// Merge an edge into the map, summing weights if the ID already exists
+fn merge_edge(all_edges: &mut HashMap<String, EdgeData>, id: String, edge: EdgeData) {
+    use std::collections::hash_map::Entry;
+    match all_edges.entry(id) {
+        Entry::Occupied(mut entry) => {
+            // Edge exists - sum weights, keep first edge's other values
+            let existing = entry.get_mut();
+            let existing_weight = existing.weight.unwrap_or(1.0);
+            let new_weight = edge.weight.unwrap_or(1.0);
+            existing.weight = Some(existing_weight + new_weight);
+        }
+        Entry::Vacant(entry) => {
+            // New edge - insert as-is
+            entry.insert(edge);
+        }
+    }
+}
+
 /// Internal edge data structure
 struct EdgeData {
-    id: String,
     source: String,
     target: String,
     label: Option<String>,
@@ -704,37 +716,6 @@ struct EdgeData {
     comment: Option<String>,
     attrs: Option<serde_json::Value>,
     dataset_id: Option<i32>,
-}
-
-fn allocate_edge_id_with_scope(
-    original_id: &str,
-    scope_hint: Option<&str>,
-    used_ids: &mut HashSet<String>,
-) -> String {
-    let candidate = if original_id.is_empty() {
-        scope_hint
-            .map(|scope| format!("{scope}:edge"))
-            .unwrap_or_else(|| "edge".to_string())
-    } else {
-        original_id.to_string()
-    };
-
-    if used_ids.insert(candidate.clone()) {
-        return candidate;
-    }
-
-    let prefix = scope_hint
-        .map(|scope| format!("{scope}:"))
-        .unwrap_or_else(|| "edge:".to_string());
-
-    let mut counter = 1;
-    loop {
-        let attempt = format!("{}{}#{}", prefix, original_id, counter);
-        if used_ids.insert(attempt.clone()) {
-            return attempt;
-        }
-        counter += 1;
-    }
 }
 
 // LayerData now imported from super::types (was previously defined here)
