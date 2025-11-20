@@ -66,7 +66,26 @@ pub mod renderer {
         let hierarchy_tree =
             serde_json::to_value(&hierarchy_tree_nodes).unwrap_or(Value::Null);
 
-        let layer_map = graph.get_layer_map();
+        let mut layer_map = graph.get_layer_map();
+
+        let mut ensure_layer = |layer_id: &str| {
+            if layer_id.is_empty() || layer_map.contains_key(layer_id) {
+                return;
+            }
+            layer_map.insert(
+                layer_id.to_string(),
+                Layer::new(layer_id, layer_id, "222222", "ffffff", "dddddd"),
+            );
+        };
+
+        for node in flow_nodes.iter().chain(hierarchy_nodes.iter()) {
+            ensure_layer(&node.layer);
+        }
+
+        for edge in flow_edges.iter().chain(hierarchy_edges.iter()) {
+            ensure_layer(&edge.layer);
+        }
+
         let layers: Vec<_> = layer_map.values().cloned().collect();
 
         PreparedGraphData {
