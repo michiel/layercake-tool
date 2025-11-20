@@ -80,6 +80,8 @@ const normalizeRenderConfigForGraphQL = (renderConfig?: GraphArtefactNodeConfig[
     containNodes: renderConfig.containNodes,
     orientation: mapOrientation(renderConfig.orientation),
     applyLayers: renderConfig.applyLayers,
+    useNodeWeight: renderConfig.useNodeWeight,
+    useEdgeWeight: renderConfig.useEdgeWeight,
     builtInStyles: mapBuiltInStyles(renderConfig.builtInStyles),
     targetOptions: renderConfig.targetOptions && {
       graphviz: renderConfig.targetOptions.graphviz && {

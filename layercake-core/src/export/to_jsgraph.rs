@@ -29,13 +29,12 @@ struct JsEdge {
     attrs: HashMap<String, String>,
 }
 
-fn from_graph(graph: &Graph) -> JsGraph {
+fn from_graph(graph: &Graph, render_config: &RenderConfig) -> JsGraph {
+    let prepared = crate::export::renderer::prepare_graph_data(graph, render_config);
     let mut nodes = Vec::new();
     let mut edges = Vec::new();
-    let flow_nodes = graph.get_non_partition_nodes();
-    let flow_edges = graph.get_non_partition_edges();
 
-    for node in &flow_nodes {
+    for node in &prepared.flow_nodes {
         let mut attrs = HashMap::new();
         attrs.insert("is_partition".to_string(), node.is_partition.to_string());
         attrs.insert("weight".to_string(), node.weight.to_string());
@@ -48,7 +47,7 @@ fn from_graph(graph: &Graph) -> JsGraph {
         });
     }
 
-    for edge in &flow_edges {
+    for edge in &prepared.flow_edges {
         let mut attrs = HashMap::new();
         attrs.insert("weight".to_string(), edge.weight.to_string());
         attrs.insert("type".to_string(), edge.layer.to_string());
@@ -71,7 +70,7 @@ fn from_graph(graph: &Graph) -> JsGraph {
 pub fn render(graph: &Graph, render_config: &RenderConfig) -> Result<String, Box<dyn Error>> {
     let layers = graph.get_layer_map();
     let name = &graph.name;
-    let data = from_graph(graph);
+    let data = from_graph(graph, render_config);
     let config = json!({
         "name": name,
         "layers": layers,

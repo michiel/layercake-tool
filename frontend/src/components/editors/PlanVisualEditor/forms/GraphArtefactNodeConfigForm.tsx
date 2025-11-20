@@ -34,6 +34,8 @@ export const GraphArtefactNodeConfigForm: React.FC<GraphArtefactNodeConfigFormPr
     containNodes: config.renderConfig?.containNodes ?? true,
     orientation: config.renderConfig?.orientation ?? 'TB',
     applyLayers: config.renderConfig?.applyLayers ?? legacyUseDefaultStyling ?? true,
+    useNodeWeight: config.renderConfig?.useNodeWeight ?? true,
+    useEdgeWeight: config.renderConfig?.useEdgeWeight ?? true,
     builtInStyles:
       config.renderConfig?.builtInStyles ||
       (legacyUseDefaultStyling === false
@@ -187,6 +189,44 @@ export const GraphArtefactNodeConfigForm: React.FC<GraphArtefactNodeConfigFormPr
             <Label htmlFor="apply-layer-colors">Apply Layer Colors</Label>
             <p className="text-sm text-muted-foreground">
               When enabled, nodes and edges inherit the palette defined for each layer.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <Switch
+            id="use-node-weight"
+            checked={localConfig.renderConfig?.useNodeWeight ?? true}
+            onCheckedChange={(checked) =>
+              setLocalConfig(prev => ({
+                ...prev,
+                renderConfig: { ...(prev.renderConfig ?? {}), useNodeWeight: checked },
+              }))
+            }
+          />
+          <div>
+            <Label htmlFor="use-node-weight">Use Node Weight</Label>
+            <p className="text-sm text-muted-foreground">
+              Toggles whether exports use stored weights when sizing or shading nodes.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <Switch
+            id="use-edge-weight"
+            checked={localConfig.renderConfig?.useEdgeWeight ?? true}
+            onCheckedChange={(checked) =>
+              setLocalConfig(prev => ({
+                ...prev,
+                renderConfig: { ...(prev.renderConfig ?? {}), useEdgeWeight: checked },
+              }))
+            }
+          />
+          <div>
+            <Label htmlFor="use-edge-weight">Use Edge Weight</Label>
+            <p className="text-sm text-muted-foreground">
+              Disable to treat all edges uniformly regardless of their weight field.
             </p>
           </div>
         </div>

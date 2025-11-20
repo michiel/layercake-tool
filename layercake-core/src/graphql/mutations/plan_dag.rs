@@ -43,6 +43,8 @@ fn default_artefact_render_config() -> PlanRenderConfig {
         },
         add_node_comments_as_notes: false,
         note_position: PlanNotePosition::Left,
+        use_node_weight: true,
+        use_edge_weight: true,
     }
 }
 
@@ -172,6 +174,8 @@ fn render_config_from_graphql_input(
             .note_position
             .map(map_note_position)
             .unwrap_or(defaults.note_position),
+        use_node_weight: input.use_node_weight.unwrap_or(defaults.use_node_weight),
+        use_edge_weight: input.use_edge_weight.unwrap_or(defaults.use_edge_weight),
     }
 }
 

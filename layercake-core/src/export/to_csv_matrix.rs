@@ -8,7 +8,7 @@ use std::collections::HashSet;
 use std::error::Error;
 use tracing::warn;
 
-pub fn render(graph: &Graph, _render_config: &RenderConfig) -> Result<String, Box<dyn Error>> {
+pub fn render(graph: &Graph, render_config: &RenderConfig) -> Result<String, Box<dyn Error>> {
     warn!("Rendering to CSV matrix is an experimental feature, may not work as expected and will change.");
 
     fn create_dynamic_2d_array<T: Clone>(rows: usize, cols: usize, default: T) -> Vec<Vec<T>> {
@@ -38,9 +38,9 @@ pub fn render(graph: &Graph, _render_config: &RenderConfig) -> Result<String, Bo
     }
 
     let offset = 2;
-
-    let mut nodes = graph.get_non_partition_nodes();
-    let mut edges = graph.get_non_partition_edges();
+    let prepared = crate::export::renderer::prepare_graph_data(graph, render_config);
+    let mut nodes = prepared.flow_nodes;
+    let mut edges = prepared.flow_edges;
 
     if !check_unique_ids(&nodes, |node| &node.id) {
         return Err("Duplicate node IDs found.".into());

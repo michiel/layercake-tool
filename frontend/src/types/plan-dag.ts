@@ -132,6 +132,8 @@ export interface GraphArtefactNodeConfig {
     containNodes?: boolean;
     orientation?: 'LR' | 'TB';
     applyLayers?: boolean;
+    useNodeWeight?: boolean;
+    useEdgeWeight?: boolean;
     builtInStyles?: 'none' | 'light' | 'dark';
     targetOptions?: RenderTargetOptions;
     addNodeCommentsAsNotes?: boolean;
@@ -159,6 +161,8 @@ export interface TreeArtefactNodeConfig {
     containNodes?: boolean;
     orientation?: 'LR' | 'TB';
     applyLayers?: boolean;
+    useNodeWeight?: boolean;
+    useEdgeWeight?: boolean;
     builtInStyles?: 'none' | 'light' | 'dark';
     targetOptions?: RenderTargetOptions;
     addNodeCommentsAsNotes?: boolean;

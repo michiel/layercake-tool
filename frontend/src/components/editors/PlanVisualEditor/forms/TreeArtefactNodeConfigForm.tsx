@@ -33,6 +33,8 @@ export const TreeArtefactNodeConfigForm: React.FC<TreeArtefactNodeConfigFormProp
     containNodes: config.renderConfig?.containNodes ?? true,
     orientation: config.renderConfig?.orientation ?? 'TB',
     applyLayers: config.renderConfig?.applyLayers ?? legacyUseDefaultStyling ?? true,
+    useNodeWeight: config.renderConfig?.useNodeWeight ?? true,
+    useEdgeWeight: config.renderConfig?.useEdgeWeight ?? true,
     builtInStyles:
       config.renderConfig?.builtInStyles ||
       (legacyUseDefaultStyling === false
@@ -162,29 +164,67 @@ export const TreeArtefactNodeConfigForm: React.FC<TreeArtefactNodeConfigFormProp
             </p>
           </div>
         </div>
+      </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="built-in-style">Built-in Theme</Label>
-          <Select
-            value={localConfig.renderConfig?.builtInStyles || 'light'}
-            onValueChange={(value) => setLocalConfig(prev => ({
+      <div className="flex items-center space-x-2">
+        <Switch
+          id="tree-use-node-weight"
+          checked={localConfig.renderConfig?.useNodeWeight ?? true}
+          onCheckedChange={(checked) =>
+            setLocalConfig(prev => ({
               ...prev,
-              renderConfig: { ...(prev.renderConfig ?? {}), builtInStyles: value as 'none' | 'light' | 'dark' }
-            }))}
-          >
-            <SelectTrigger id="built-in-style">
-              <SelectValue placeholder="Select theme" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">None (engine defaults)</SelectItem>
-              <SelectItem value="light">Light</SelectItem>
-              <SelectItem value="dark">Dark</SelectItem>
-            </SelectContent>
-          </Select>
+              renderConfig: { ...(prev.renderConfig ?? {}), useNodeWeight: checked },
+            }))
+          }
+        />
+        <div>
+          <Label htmlFor="tree-use-node-weight">Use Node Weight</Label>
           <p className="text-sm text-muted-foreground">
-            Sets overall background/font defaults before layer-specific overrides are applied.
+            When disabled, mindmaps and treemaps treat every node as weight 1.
           </p>
         </div>
+      </div>
+
+      <div className="flex items-center space-x-2">
+        <Switch
+          id="tree-use-edge-weight"
+          checked={localConfig.renderConfig?.useEdgeWeight ?? true}
+          onCheckedChange={(checked) =>
+            setLocalConfig(prev => ({
+              ...prev,
+              renderConfig: { ...(prev.renderConfig ?? {}), useEdgeWeight: checked },
+            }))
+          }
+        />
+        <div>
+          <Label htmlFor="tree-use-edge-weight">Use Edge Weight</Label>
+          <p className="text-sm text-muted-foreground">
+            Disable to keep edge styling uniform regardless of weight metadata.
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="built-in-style">Built-in Theme</Label>
+        <Select
+          value={localConfig.renderConfig?.builtInStyles || 'light'}
+          onValueChange={(value) => setLocalConfig(prev => ({
+            ...prev,
+            renderConfig: { ...(prev.renderConfig ?? {}), builtInStyles: value as 'none' | 'light' | 'dark' }
+          }))}
+        >
+          <SelectTrigger id="built-in-style">
+            <SelectValue placeholder="Select theme" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">None (engine defaults)</SelectItem>
+            <SelectItem value="light">Light</SelectItem>
+            <SelectItem value="dark">Dark</SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-sm text-muted-foreground">
+          Sets overall background/font defaults before layer-specific overrides are applied.
+        </p>
       </div>
 
       {isMermaidTarget && (

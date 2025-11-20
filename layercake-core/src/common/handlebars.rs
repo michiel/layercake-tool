@@ -66,6 +66,19 @@ pub fn get_handlebars() -> Handlebars<'static> {
     });
     handlebars.register_helper("mindmap_indent", Box::new(mindmap_indent));
 
+    handlebars_helper!(edge_penwidth: |weight: Value| {
+        let w = weight
+            .as_f64()
+            .or_else(|| weight.as_i64().map(|v| v as f64))
+            .unwrap_or(1.0);
+        if w < 1.0 {
+            1.0
+        } else {
+            w
+        }
+    });
+    handlebars.register_helper("edge_penwidth", Box::new(edge_penwidth));
+
     handlebars_helper!(treemap_value: |weight: i64| {
         if weight <= 0 {
             1

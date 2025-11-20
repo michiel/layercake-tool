@@ -160,6 +160,8 @@ pub struct RenderConfig {
     pub target_options: Option<RenderTargetOptions>,
     pub add_node_comments_as_notes: Option<bool>,
     pub note_position: Option<NotePosition>,
+    pub use_node_weight: Option<bool>,
+    pub use_edge_weight: Option<bool>,
 }
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]

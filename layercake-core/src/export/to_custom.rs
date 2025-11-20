@@ -11,7 +11,6 @@ pub fn render(
 ) -> Result<String, Box<dyn Error>> {
     use serde_json::json;
 
-    let tree = graph.build_json_tree();
     let mut handlebars = crate::common::get_handlebars();
 
     if let Some(partials) = &params.partials {
@@ -39,15 +38,21 @@ pub fn render(
         )
     })?;
 
+    let prepared = crate::export::renderer::prepare_graph_data(graph, render_config);
+    let layer_map_clone = prepared.layer_map.clone();
     let res = handlebars.render_template(
         &template_content,
         &json!({
             "config": render_config,
-            "hierarchy_nodes": graph.get_hierarchy_nodes(),
-            "hierarchy_tree": tree,
-            "flow_nodes": graph.get_non_partition_nodes(),
-            "flow_edges": graph.get_non_partition_edges(),
-            "layers": graph.get_layer_map(),
+            "hierarchy_nodes": prepared.hierarchy_nodes,
+            "hierarchy_edges": prepared.hierarchy_edges,
+            "hierarchy_tree": prepared.hierarchy_tree,
+            "hierarchy_tree_edges": prepared.hierarchy_tree_edges,
+            "flow_nodes": prepared.flow_nodes,
+            "flow_edges": prepared.flow_edges,
+            "layers": layer_map_clone,
+            "layer_map": prepared.layer_map,
+            "layers_array": prepared.layers,
         }),
     )?;
     Ok(res)

@@ -4,8 +4,8 @@
 /// 1. Nodes with None label fall back to using the node ID
 /// 2. Nodes/edges with None layer use empty string (inherit default styling)
 /// 3. Appropriate warnings are logged when fallbacks are used
-use layercake_core::database::entities::{graph_nodes, graphs};
-use layercake_core::services::graph_service::GraphService;
+use layercake::database::entities::{graph_nodes, graphs};
+use layercake::services::graph_service::GraphService;
 use sea_orm::{ActiveModelTrait, Database, DatabaseConnection, EntityTrait, Set};
 
 async fn setup_test_db() -> DatabaseConnection {

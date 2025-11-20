@@ -124,6 +124,8 @@ pub struct ExportProfileRenderConfig {
     pub legacy_theme: Option<RenderConfigTheme>,
     pub add_node_comments_as_notes: Option<bool>,
     pub note_position: Option<NotePosition>,
+    pub use_node_weight: Option<bool>,
+    pub use_edge_weight: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Copy)]
@@ -203,6 +205,8 @@ impl Default for ExportProfileRenderConfig {
             legacy_theme: Some(RenderConfigTheme::Light),
             add_node_comments_as_notes: Some(false),
             note_position: Some(NotePosition::Left),
+            use_node_weight: Some(true),
+            use_edge_weight: Some(true),
         }
     }
 }
@@ -219,6 +223,14 @@ pub struct RenderConfig {
     pub add_node_comments_as_notes: bool,
     #[serde(default)]
     pub note_position: NotePosition,
+    #[serde(default = "default_true")]
+    pub use_node_weight: bool,
+    #[serde(default = "default_true")]
+    pub use_edge_weight: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -426,6 +438,8 @@ impl ExportProfileItem {
         }
         let add_node_comments_as_notes = render_config.add_node_comments_as_notes.unwrap_or(false);
         let note_position = render_config.note_position.unwrap_or(NotePosition::Left);
+        let use_node_weight = render_config.use_node_weight.unwrap_or(true);
+        let use_edge_weight = render_config.use_edge_weight.unwrap_or(true);
 
         RenderConfig {
             contain_nodes,
@@ -435,6 +449,8 @@ impl ExportProfileItem {
             target_options,
             add_node_comments_as_notes,
             note_position,
+            use_node_weight,
+            use_edge_weight,
         }
     }
 }

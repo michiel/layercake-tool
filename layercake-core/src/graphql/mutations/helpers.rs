@@ -76,6 +76,8 @@ pub struct StoredRenderConfig {
     pub theme: Option<String>,
     pub add_node_comments_as_notes: Option<bool>,
     pub note_position: Option<String>,
+    pub use_node_weight: Option<bool>,
+    pub use_edge_weight: Option<bool>,
 }
 
 impl StoredRenderConfig {
@@ -125,6 +127,8 @@ impl StoredRenderConfig {
                 .as_deref()
                 .map(parse_note_position)
                 .unwrap_or(crate::plan::NotePosition::Left),
+            use_node_weight: self.use_node_weight.unwrap_or(true),
+            use_edge_weight: self.use_edge_weight.unwrap_or(true),
         }
     }
 }

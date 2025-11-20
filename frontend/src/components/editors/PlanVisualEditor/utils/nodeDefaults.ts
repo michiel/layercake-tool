@@ -76,6 +76,8 @@ export const getDefaultNodeConfig = (type: PlanDagNodeType): NodeConfig => {
           containNodes: true,
           orientation: 'TB',
           applyLayers: true,
+          useNodeWeight: true,
+          useEdgeWeight: true,
           builtInStyles: 'light',
           targetOptions: {
             graphviz: { ...DEFAULT_GRAPHVIZ_OPTIONS },
@@ -92,6 +94,8 @@ export const getDefaultNodeConfig = (type: PlanDagNodeType): NodeConfig => {
           containNodes: true,
           orientation: 'TB',
           applyLayers: true,
+          useNodeWeight: true,
+          useEdgeWeight: true,
           builtInStyles: 'light',
           targetOptions: {
             graphviz: { ...DEFAULT_GRAPHVIZ_OPTIONS },
