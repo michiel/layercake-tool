@@ -107,12 +107,24 @@ export const ProjectLayersPage = () => {
   }
 
   // Filter for palette: only show enabled layers
-  const paletteLayers = editableLayers.filter((l) => l.enabled)
+  const paletteLayers = useMemo(() => {
+    return [...editableLayers].sort((a, b) => {
+      const dsA = a.sourceDatasetId ?? -1
+      const dsB = b.sourceDatasetId ?? -1
+      if (dsA !== dsB) return dsA - dsB
+      return a.layerId.localeCompare(b.layerId)
+    })
+  }, [editableLayers])
 
   // Helper to update editable layers and mark as unsaved
-  const updateEditableLayers = (updater: (prev: ProjectLayer[]) => ProjectLayer[]) => {
+  const updateEditableLayers = (
+    updater: (prev: ProjectLayer[]) => ProjectLayer[],
+    markUnsaved = true
+  ) => {
     setEditableLayers(updater)
-    setHasUnsavedChanges(true)
+    if (markUnsaved) {
+      setHasUnsavedChanges(true)
+    }
   }
 
   useEffect(() => {
@@ -378,8 +390,9 @@ export const ProjectLayersPage = () => {
                         )
                         return
                       }
-                      handleSaveLayer(newLayer)
-                      setNewLayer({ layerId: '', name: '', ...DEFAULT_LAYER_COLORS })
+                      handleSaveLayer(newLayer).then(() => {
+                        setNewLayer({ layerId: '', name: '', ...DEFAULT_LAYER_COLORS })
+                      })
                     }}
                   >
                     Add
@@ -466,22 +479,33 @@ export const ProjectLayersPage = () => {
                       <TableCell>
                         <Switch
                           checked={layer.enabled}
-                          onCheckedChange={(checked) =>
-                            updateEditableLayers((prev) =>
-                              prev.map((l) =>
-                                l.id === layer.id ? { ...l, enabled: checked } : l
-                              )
+                          onCheckedChange={async (checked) => {
+                            updateEditableLayers(
+                              (prev) =>
+                                prev.map((l) =>
+                                  l.id === layer.id ? { ...l, enabled: checked } : l
+                                ),
+                              false
                             )
-                          }
+                            await handleSaveLayer({
+                              layerId: layer.layerId,
+                              name: layer.name,
+                              backgroundColor: layer.backgroundColor,
+                              textColor: layer.textColor,
+                              borderColor: layer.borderColor,
+                              sourceDatasetId: layer.sourceDatasetId,
+                              enabled: checked,
+                            })
+                          }}
                         />
                       </TableCell>
                       <TableCell className="space-x-2">
                         <Button
                           size="sm"
                           variant="secondary"
-                          onClick={() => {
+                          onClick={async () => {
                             const latest = editableLayers.find((l) => l.id === layer.id) || layer
-                            handleSaveLayer({
+                            await handleSaveLayer({
                               layerId: latest.layerId,
                               name: latest.name,
                               backgroundColor: latest.backgroundColor,
@@ -495,7 +519,14 @@ export const ProjectLayersPage = () => {
                           Save
                         </Button>
                         {!layer.sourceDatasetId && (
-                          <Button size="sm" variant="destructive" onClick={() => handleDeleteLayer(layer)}>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={async () => {
+                              await handleDeleteLayer(layer)
+                              setEditableLayers((prev) => prev.filter((l) => l.id !== layer.id))
+                            }}
+                          >
                             Delete
                           </Button>
                         )}
