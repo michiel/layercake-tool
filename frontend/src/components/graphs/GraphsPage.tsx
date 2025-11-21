@@ -400,7 +400,7 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
                             size="sm"
                             variant="secondary"
                             onClick={() =>
-                              navigate(`/projects/${projectId}/plan-nodes/${graph.id}/edit`)
+                              navigate(`/projects/${projectId}/graph/${graph.id}/edit`)
                             }
                           >
                             <IconGraph className="mr-1.5 h-3.5 w-3.5" />

@@ -1920,7 +1920,7 @@ function App() {
               <ChatLogsPage />
             </ErrorBoundary>
           } />
-          <Route path="/projects/:projectId/plan-nodes/:graphId/edit" element={
+          <Route path="/projects/:projectId/graph/:graphId/edit" element={
             <ErrorBoundary>
               <GraphEditorPage />
             </ErrorBoundary>

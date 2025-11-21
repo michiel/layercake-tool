@@ -1,6 +1,5 @@
 import React from 'react';
 import { NodePropertiesForm } from './NodePropertiesForm';
-import { LayersAccordionPanel } from './LayersAccordionPanel';
 import { Graph, GraphNode } from '../../graphql/graphs';
 import { GraphViewMode, GraphOrientation, HierarchyViewMode } from './LayercakeGraphEditor';
 import { Stack, Group } from '@/components/layout-primitives';
@@ -13,12 +12,6 @@ interface PropertiesAndLayersPanelProps {
   graph: Graph;
   selectedNodeId: string | null;
   onNodeUpdate: (nodeId: string, updates: Partial<GraphNode>) => void;
-  layerVisibility: Map<string, boolean>;
-  onLayerVisibilityToggle: (layerId: string) => void;
-  onShowAllLayers: () => void;
-  onHideAllLayers: () => void;
-  onLayerColorChange?: (layerId: string, colorType: 'background' | 'border' | 'text', color: string) => void;
-  onAddLayer?: () => void;
   viewMode: GraphViewMode;
   onToggleViewMode: () => void;
   orientation: GraphOrientation;
@@ -39,12 +32,6 @@ export const PropertiesAndLayersPanel: React.FC<PropertiesAndLayersPanelProps> =
   graph,
   selectedNodeId,
   onNodeUpdate,
-  layerVisibility,
-  onLayerVisibilityToggle,
-  onShowAllLayers,
-  onHideAllLayers,
-  onLayerColorChange,
-  onAddLayer,
   viewMode,
   onToggleViewMode,
   orientation,
@@ -76,7 +63,7 @@ export const PropertiesAndLayersPanel: React.FC<PropertiesAndLayersPanelProps> =
     >
       <Accordion
         type="multiple"
-        defaultValue={['add-nodes', 'layout-options', 'node-properties', 'layers']}
+        defaultValue={['add-nodes', 'layout-options', 'node-properties']}
         className="space-y-2"
       >
         <AccordionItem value="add-nodes">
@@ -230,20 +217,6 @@ export const PropertiesAndLayersPanel: React.FC<PropertiesAndLayersPanelProps> =
           </AccordionContent>
         </AccordionItem>
 
-        <AccordionItem value="layers">
-          <AccordionTrigger>Layers</AccordionTrigger>
-          <AccordionContent>
-            <LayersAccordionPanel
-              graph={graph}
-              layerVisibility={layerVisibility}
-              onLayerVisibilityToggle={onLayerVisibilityToggle}
-              onShowAllLayers={onShowAllLayers}
-              onHideAllLayers={onHideAllLayers}
-              onLayerColorChange={onLayerColorChange}
-              onAddLayer={onAddLayer}
-            />
-          </AccordionContent>
-        </AccordionItem>
       </Accordion>
     </Paper>
   );

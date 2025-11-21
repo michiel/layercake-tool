@@ -388,7 +388,7 @@ export const GraphNode = memo((props: GraphNodeProps) => {
                       onClick={(e: React.MouseEvent) => {
                         e.stopPropagation()
                         e.preventDefault()
-                        navigate(`/projects/${projectId}/plan-nodes/${resolvedGraphId}/edit`)
+                        navigate(`/projects/${projectId}/graph/${resolvedGraphId}/edit`)
                       }}
                     >
                       <IconExternalLink size={12} />

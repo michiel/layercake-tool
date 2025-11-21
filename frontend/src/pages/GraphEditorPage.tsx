@@ -8,7 +8,7 @@ import { LayercakeGraphEditor, GraphViewMode, GraphOrientation, HierarchyViewMod
 import { PropertiesAndLayersPanel } from '../components/graphs/PropertiesAndLayersPanel';
 import EditHistoryModal from '../components/graphs/EditHistoryModal';
 import { ReactFlowProvider, Node as FlowNode, Edge as FlowEdge } from 'reactflow';
-import { Graph, GraphNode, UPDATE_GRAPH_NODE, UPDATE_LAYER_PROPERTIES, GET_GRAPH_EDIT_COUNT, CREATE_LAYER, ADD_GRAPH_NODE, ADD_GRAPH_EDGE, UPDATE_GRAPH_EDGE, DELETE_GRAPH_EDGE, DELETE_GRAPH_NODE } from '../graphql/graphs';
+import { Graph, GraphNode, UPDATE_GRAPH_NODE, GET_GRAPH_EDIT_COUNT, ADD_GRAPH_NODE, ADD_GRAPH_EDGE, UPDATE_GRAPH_EDGE, DELETE_GRAPH_EDGE, DELETE_GRAPH_NODE } from '../graphql/graphs';
 import { Stack, Group } from '../components/layout-primitives';
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
 import { Badge } from '../components/ui/badge';
@@ -179,34 +179,6 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
       : 'Editing graph',
     selectedProject?.id,
   );
-
-  const [updateLayerProperties] = useMutation(UPDATE_LAYER_PROPERTIES, {
-    update(cache, { data }: any) {
-      if (!data?.updateLayerProperties) return;
-      const existingData = cache.readQuery<{ graph: Graph }>({
-        query: GET_GRAPH_DETAILS,
-        variables: { id: parseInt(graphId || '0') }
-      });
-      if (!existingData?.graph) return;
-
-      cache.writeQuery({
-        query: GET_GRAPH_DETAILS,
-        variables: { id: parseInt(graphId || '0') },
-        data: {
-          graph: {
-            ...existingData.graph,
-            layers: existingData.graph.layers.map(l =>
-              l.id === data.updateLayerProperties.id ? { ...l, ...data.updateLayerProperties } : l
-            )
-          }
-        }
-      });
-    }
-  });
-
-  const [createLayer] = useMutation(CREATE_LAYER, {
-    refetchQueries: [{ query: GET_GRAPH_DETAILS, variables: { id: parseInt(graphId || '0') } }]
-  });
 
   const [addGraphNode] = useMutation(ADD_GRAPH_NODE, {
     update(cache, { data }: any) {
@@ -525,30 +497,6 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
     }
   }, [graph?.id]); // Only re-run when graph ID changes
 
-  const handleLayerVisibilityToggle = useCallback((layerId: string) => {
-    setLayerVisibility(prev => {
-      const newMap = new Map(prev);
-      newMap.set(layerId, !prev.get(layerId));
-      return newMap;
-    });
-  }, []);
-
-  const handleShowAllLayers = useCallback(() => {
-    setLayerVisibility(prev => {
-      const newMap = new Map(prev);
-      newMap.forEach((_, layerId) => newMap.set(layerId, true));
-      return newMap;
-    });
-  }, []);
-
-  const handleHideAllLayers = useCallback(() => {
-    setLayerVisibility(prev => {
-      const newMap = new Map(prev);
-      newMap.forEach((_, layerId) => newMap.set(layerId, false));
-      return newMap;
-    });
-  }, []);
-
   const handleToggleViewMode = useCallback(() => {
     setViewMode(prev => (prev === 'flow' ? 'hierarchy' : 'flow'));
     requestFitView();
@@ -645,105 +593,6 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
       console.error('Failed to download graph image:', error);
     }
   }, [ensureHtmlToImage, graph?.name]);
-
-  const handleAddLayer = useCallback(() => {
-    if (!graph) return;
-
-    // Generate unique layerId
-    const existingLayerIds = graph.layers.map(l => l.layerId);
-    let counter = graph.layers.length + 1;
-    let newLayerId = `layer_${counter}`;
-    while (existingLayerIds.includes(newLayerId)) {
-      counter++;
-      newLayerId = `layer_${counter}`;
-    }
-
-    createLayer({
-      variables: {
-        input: {
-          graphId: graph.id,
-          layerId: newLayerId,
-          name: `Layer ${counter}`
-        }
-      }
-    }).catch(error => {
-      console.error('Failed to create layer:', error);
-    });
-  }, [graph, createLayer]);
-
-  const handleLayerColorChange = useCallback((layerId: string, colorType: 'background' | 'border' | 'text', color: string) => {
-    if (!graph) return;
-
-    // Find the layer
-    const layer = graph.layers.find(l => l.layerId === layerId);
-    if (!layer) return;
-
-    // Build updated properties
-    const updatedProperties = {
-      ...(layer.properties || {}),
-      [`${colorType}_color`]: color,
-    };
-
-    // Check if color actually changed
-    const oldColor = layer.properties?.[`${colorType}_color`];
-    if (oldColor === color) {
-      // No change, skip mutation
-      return;
-    }
-
-    // Optimistic update: immediately update node styles in ReactFlow
-    if (setNodesRef.current) {
-      setNodesRef.current(currentNodes => {
-        return currentNodes.map(node => {
-          // Find graph node to check its layer
-          const graphNode = graph.graphNodes.find(gn => gn.id === node.id);
-          if (!graphNode || graphNode.layer !== layerId) return node;
-
-          // Update node style based on color type
-          const newStyle = { ...node.style };
-
-          if (colorType === 'background') {
-            newStyle.backgroundColor = `#${color}`;
-          } else if (colorType === 'border') {
-            newStyle.borderColor = `#${color}`;
-            newStyle.border = `${node.type === 'group' ? '2px' : '1px'} solid #${color}`;
-          } else if (colorType === 'text') {
-            newStyle.color = `#${color}`;
-          }
-
-          return { ...node, style: newStyle };
-        });
-      });
-    }
-
-    // Update edges if they have this layer
-    if (setEdgesRef.current && (colorType === 'border' || colorType === 'text')) {
-      setEdgesRef.current(currentEdges => {
-        return currentEdges.map(edge => {
-          const graphEdge = graph.graphEdges.find(ge => ge.id === edge.id);
-          if (!graphEdge || graphEdge.layer !== layerId) return edge;
-
-          const newStyle = { ...edge.style };
-          if (colorType === 'border' || colorType === 'text') {
-            newStyle.stroke = `#${color}`;
-          }
-
-          return { ...edge, style: newStyle };
-        });
-      });
-    }
-
-    // Send mutation to server
-    updateLayerProperties({
-      variables: {
-        id: layer.id,
-        properties: updatedProperties,
-      },
-    }).catch(error => {
-      console.error('Failed to update layer properties:', error);
-      // TODO: Rollback optimistic update on error
-    });
-  }, [graph, updateLayerProperties]);
 
   // Apply edits to canvas without full re-render
   const handleApplyEdits = useCallback((edits: any[]) => {
@@ -1050,12 +899,6 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
             graph={graph}
             selectedNodeId={selectedNodeId}
             onNodeUpdate={handleNodeUpdate}
-            layerVisibility={layerVisibility}
-            onLayerVisibilityToggle={handleLayerVisibilityToggle}
-            onShowAllLayers={handleShowAllLayers}
-            onHideAllLayers={handleHideAllLayers}
-            onLayerColorChange={handleLayerColorChange}
-            onAddLayer={handleAddLayer}
             viewMode={viewMode}
             onToggleViewMode={handleToggleViewMode}
             orientation={orientation}

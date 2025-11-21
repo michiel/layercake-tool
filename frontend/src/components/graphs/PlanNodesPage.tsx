@@ -436,7 +436,7 @@ export const PlanNodesPage: React.FC<PlanNodesPageProps> = () => {
                               <DropdownMenuContent align="end" className="w-[220px]">
                                 <DropdownMenuItem
                                   onClick={() =>
-                                    navigate(`/projects/${projectId}/plan-nodes/${graph.id}/edit`)
+                                    navigate(`/projects/${projectId}/graph/${graph.id}/edit`)
                                   }
                                 >
                                   <IconGraph className="mr-2 h-3.5 w-3.5" />
