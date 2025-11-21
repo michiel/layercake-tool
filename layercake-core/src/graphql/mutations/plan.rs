@@ -85,16 +85,38 @@ impl PlanMutation {
     }
 
     /// Execute a plan (executes all nodes in the DAG in optimal topological order)
-    async fn execute_plan(&self, ctx: &Context<'_>, id: i32) -> Result<PlanExecutionResult> {
+    async fn execute_plan(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(name = "projectId")] project_id: i32,
+        #[graphql(name = "planId")] plan_id: Option<i32>,
+    ) -> Result<PlanExecutionResult> {
         let context = ctx.data::<GraphQLContext>()?;
 
-        // Find the plan (id is actually the project_id)
-        let plan = plans::Entity::find()
-            .filter(plans::Column::ProjectId.eq(id))
-            .one(&context.db)
-            .await
-            .map_err(|e| StructuredError::database("plans::Entity::find (ProjectId)", e))?
-            .ok_or_else(|| StructuredError::not_found("Plan for project", id))?;
+        let plan_service = context.app.plan_service().clone();
+
+        let plan = if let Some(plan_id) = plan_id {
+            let plan = plan_service
+                .get_plan(plan_id)
+                .await
+                .map_err(|e| StructuredError::service("PlanService::get_plan", e))?
+                .ok_or_else(|| StructuredError::not_found("Plan", plan_id))?;
+
+            if plan.project_id != project_id {
+                return Err(StructuredError::validation(
+                    "planId",
+                    format!("Plan {} does not belong to project {}", plan_id, project_id),
+                ));
+            }
+
+            plan
+        } else {
+            plan_service
+                .get_default_plan(project_id)
+                .await
+                .map_err(|e| StructuredError::service("PlanService::get_default_plan", e))?
+                .ok_or_else(|| StructuredError::not_found("Plan for project", project_id))?
+        };
 
         // Get all nodes in the plan
         let nodes = plan_dag_nodes::Entity::find()
@@ -128,7 +150,7 @@ impl PlanMutation {
         let executor = crate::pipeline::DagExecutor::new(context.db.clone());
 
         executor
-            .execute_dag(id, plan.id, &nodes, &edges)
+            .execute_dag(project_id, plan.id, &nodes, &edges)
             .await
             .map_err(|e| StructuredError::service("DagExecutor::execute_dag", e))?;
 

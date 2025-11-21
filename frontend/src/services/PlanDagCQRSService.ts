@@ -69,6 +69,7 @@ export class PlanDagCQRSService {
   // Convenience methods for common patterns
   async createNodeWithReactFlowData(
     projectId: number,
+    planId: number,
     nodeType: string,
     position: { x: number; y: number },
     metadata?: any
@@ -77,6 +78,7 @@ export class PlanDagCQRSService {
 
     return this.commands.createNode({
       projectId,
+      planId,
       nodeType,
       node: {
         id: `node-${Date.now()}`,
@@ -93,6 +95,7 @@ export class PlanDagCQRSService {
 
   async updateNodePosition(
     projectId: number,
+    planId: number,
     nodeId: string,
     position: { x: number; y: number }
   ) {
@@ -100,6 +103,7 @@ export class PlanDagCQRSService {
 
     return this.commands.moveNode({
       projectId,
+      planId,
       nodeId,
       position
     })
@@ -107,6 +111,7 @@ export class PlanDagCQRSService {
 
   async createEdgeFromReactFlow(
     projectId: number,
+    planId: number,
     sourceId: string,
     targetId: string
     // Removed sourceHandle and targetHandle for floating edges
@@ -115,6 +120,7 @@ export class PlanDagCQRSService {
 
     return this.commands.createEdge({
       projectId,
+      planId,
       edge: {
         id: `edge-${sourceId}-${targetId}-${Date.now()}`,
         source: sourceId,
@@ -131,6 +137,7 @@ export class PlanDagCQRSService {
   // Bulk operations
   async syncReactFlowChanges(
     projectId: number,
+    planId: number,
     reactFlowNodes: any[],
     reactFlowEdges: any[]
   ) {
@@ -143,6 +150,7 @@ export class PlanDagCQRSService {
       // Update the entire Plan DAG
       await this.commands.updatePlanDag({
         projectId,
+        planId,
         planDag
       })
 
@@ -156,13 +164,14 @@ export class PlanDagCQRSService {
   // Real-time subscription with ReactFlow adapter
   subscribeToReactFlowUpdates(
     projectId: number,
+    planId: number,
     onUpdate: (nodes: any[], edges: any[]) => void,
     onError?: (error: Error) => void
   ) {
     console.log('[PlanDagCQRSService] Setting up ReactFlow subscription')
 
     return this.queries.subscribeToPlanDagChanges(
-      { projectId },
+      { projectId, planId },
       (planDag) => {
         // Convert Plan DAG to ReactFlow format
         const { nodes, edges } = this.adapter.planDagToReactFlow(planDag)
@@ -175,6 +184,7 @@ export class PlanDagCQRSService {
   // Delta-based subscription with ReactFlow adapter (efficient updates)
   subscribeToDeltaUpdates(
     projectId: number,
+    planId: number,
     getCurrentPlanDag: () => any | null,
     onUpdate: (planDag: any) => void,
     onError?: (error: Error) => void
@@ -182,7 +192,7 @@ export class PlanDagCQRSService {
     console.log('[PlanDagCQRSService] Setting up delta subscription')
 
     return this.queries.subscribeToPlanDagDeltas(
-      { projectId },
+      { projectId, planId },
       getCurrentPlanDag,
       onUpdate,
       onError
@@ -192,13 +202,14 @@ export class PlanDagCQRSService {
   // Execution status subscription for real-time status updates
   subscribeToExecutionStatusUpdates(
     projectId: number,
+    planId: number | undefined,
     onUpdate: (nodeId: string, executionData: any) => void,
     onError?: (error: Error) => void
   ) {
     console.log('[PlanDagCQRSService] Setting up execution status subscription')
 
     return this.queries.subscribeToExecutionStatus(
-      { projectId },
+      { projectId, planId },
       onUpdate,
       onError
     )

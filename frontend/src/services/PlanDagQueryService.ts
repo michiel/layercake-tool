@@ -26,11 +26,11 @@ export class PlanDagQueryService {
   // Query Operations
   async getPlanDag(query: GetPlanDagQuery): Promise<PlanDag | null> {
     try {
-      console.log('[PlanDagQueryService] Loading Plan DAG for project:', query.projectId)
+      console.log('[PlanDagQueryService] Loading Plan DAG for project:', query.projectId, 'plan:', query.planId)
 
       const result = await this.apollo.query({
         query: PlanDagGraphQL.GET_PLAN_DAG,
-        variables: { projectId: query.projectId },
+        variables: { projectId: query.projectId, planId: query.planId ?? null },
         fetchPolicy: query.fresh ? 'network-only' : 'cache-first'
       })
 
@@ -49,11 +49,11 @@ export class PlanDagQueryService {
     onUpdate: (planDag: PlanDag) => void,
     onError?: (error: Error) => void
   ) {
-    console.log('[PlanDagQueryService] Setting up Plan DAG subscription for project:', query.projectId)
+    console.log('[PlanDagQueryService] Setting up Plan DAG subscription for project:', query.projectId, 'plan:', query.planId)
 
     const subscription = this.apollo.subscribe({
       query: PlanDagGraphQL.PLAN_DAG_CHANGED_SUBSCRIPTION,
-      variables: { projectId: query.projectId }
+      variables: { projectId: query.projectId, planId: query.planId ?? null }
     })
 
     return asGraphQLSubscribable<any>(subscription).subscribe({
@@ -92,11 +92,11 @@ export class PlanDagQueryService {
     onUpdate: (planDag: PlanDag) => void,
     onError?: (error: Error) => void
   ) {
-    console.log('[PlanDagQueryService] Setting up delta subscription for project:', query.projectId, 'clientId:', this.clientId)
+    console.log('[PlanDagQueryService] Setting up delta subscription for project:', query.projectId, 'plan:', query.planId, 'clientId:', this.clientId)
 
     const subscription = this.apollo.subscribe({
       query: PlanDagGraphQL.PLAN_DAG_DELTA_SUBSCRIPTION,
-      variables: { projectId: query.projectId }
+      variables: { projectId: query.projectId, planId: query.planId ?? null }
     })
 
     console.log('[PlanDagQueryService] Delta subscription created, waiting for updates...')
@@ -182,11 +182,11 @@ export class PlanDagQueryService {
 
   // Cache Management
   invalidateCache(query: InvalidateCacheQuery): void {
-    console.log('[PlanDagQueryService] Invalidating cache for project:', query.projectId)
+    console.log('[PlanDagQueryService] Invalidating cache for project:', query.projectId, 'plan:', query.planId)
 
     this.apollo.cache.evict({
       fieldName: 'getPlanDag',
-      args: { projectId: query.projectId }
+      args: { projectId: query.projectId, planId: query.planId ?? null }
     })
 
     this.apollo.cache.gc()
@@ -220,11 +220,11 @@ export class PlanDagQueryService {
     onUpdate: (planDag: PlanDag | null) => void,
     onError?: (error: Error) => void
   ) {
-    console.log('[PlanDagQueryService] Setting up Plan DAG watch for project:', query.projectId)
+    console.log('[PlanDagQueryService] Setting up Plan DAG watch for project:', query.projectId, 'plan:', query.planId)
 
     const watchQuery = this.apollo.watchQuery({
       query: PlanDagGraphQL.GET_PLAN_DAG,
-      variables: { projectId: query.projectId },
+      variables: { projectId: query.projectId, planId: query.planId ?? null },
       fetchPolicy: 'cache-and-network',
       errorPolicy: 'all'
     })
@@ -248,7 +248,7 @@ export class PlanDagQueryService {
     onUpdate: (nodeId: string, executionData: any) => void,
     onError?: (error: Error) => void
   ) {
-    console.log('[PlanDagQueryService] Setting up execution status subscription for project:', query.projectId)
+    console.log('[PlanDagQueryService] Setting up execution status subscription for project:', query.projectId, 'plan:', query.planId)
 
     const subscription = this.apollo.subscribe({
       query: PlanDagGraphQL.NODE_EXECUTION_STATUS_SUBSCRIPTION,
@@ -289,24 +289,29 @@ export class PlanDagQueryService {
 // Query Types
 export interface GetPlanDagQuery {
   projectId: number
+  planId?: number
   fresh?: boolean // Force network request
 }
 
 export interface SubscribeToPlanDagQuery {
   projectId: number
+  planId?: number
   includePartialUpdates?: boolean
 }
 
 export interface InvalidateCacheQuery {
   projectId: number
+  planId?: number
 }
 
 export interface WatchPlanDagQuery {
   projectId: number
+  planId?: number
 }
 
 export interface SubscribeToExecutionStatusQuery {
   projectId: number
+  planId?: number
 }
 
 export type PlanDagQuery =

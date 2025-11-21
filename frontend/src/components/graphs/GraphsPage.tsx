@@ -26,6 +26,7 @@ import remarkGfm from 'remark-gfm'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { Spinner } from '../ui/spinner'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { gql } from '@apollo/client'
 import { Breadcrumbs } from '../common/Breadcrumbs'
 import { Graph, GET_GRAPHS, CREATE_GRAPH, UPDATE_GRAPH, DELETE_GRAPH, EXECUTE_NODE, GET_GRAPH_DETAILS } from '../../graphql/graphs'
@@ -36,6 +37,7 @@ import { GraphDataDialog } from '../editors/PlanVisualEditor/dialogs/GraphDataDi
 import { GraphPreviewDialog } from '../visualization'
 import type { GraphData } from '../visualization/GraphPreview'
 import { useRegisterChatContext } from '../../hooks/useRegisterChatContext'
+import { useProjectPlanSelection } from '../../hooks/useProjectPlanSelection'
 
 const GET_PROJECTS = gql`
   query GetProjects {
@@ -113,6 +115,7 @@ const toGraphPreviewData = (graph?: Graph | null): GraphData | null => {
 export const GraphsPage: React.FC<GraphsPageProps> = () => {
   const navigate = useNavigate()
   const { projectId } = useParams<{ projectId: string }>()
+  const projectIdNum = Number(projectId || 0)
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [selectedGraph, setSelectedGraph] = useState<Graph | null>(null)
@@ -125,12 +128,20 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
     text: '',
     title: 'Graph annotations'
   })
+  const {
+    plans,
+    selectedPlanId,
+    selectedPlan,
+    loading: plansLoading,
+    selectPlan,
+  } = useProjectPlanSelection(projectIdNum)
+  const planQuerySuffix = selectedPlanId ? `?planId=${selectedPlanId}` : ''
 
   const { data: projectsData } = useQuery<{ projects: Array<{ id: number; name: string }> }>(GET_PROJECTS)
-  const selectedProject = projectsData?.projects.find((p: { id: number; name: string }) => p.id === parseInt(projectId || '0'))
+  const selectedProject = projectsData?.projects.find((p: { id: number; name: string }) => p.id === projectIdNum)
 
-  const { data, loading, error } = useQuery<{ graphs: Graph[] }>(GET_GRAPHS, {
-    variables: { projectId: parseInt(projectId || '0') },
+  const { data, loading: graphsLoading, error } = useQuery<{ graphs: Graph[] }>(GET_GRAPHS, {
+    variables: { projectId: projectIdNum },
     fetchPolicy: 'cache-and-network'
   })
 
@@ -145,34 +156,36 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
     }
   }
 
-  const { data: planDagData } = useQuery<PlanDagResponse>(GET_PLAN_DAG, {
-    variables: { projectId: parseInt(projectId || '0') },
-    fetchPolicy: 'cache-and-network'
+  const { data: planDagData, loading: planDagLoading } = useQuery<PlanDagResponse>(GET_PLAN_DAG, {
+    variables: { projectId: projectIdNum, planId: selectedPlanId },
+    fetchPolicy: 'cache-and-network',
+    skip: !selectedPlanId,
   })
+  const loading = graphsLoading || planDagLoading || plansLoading
 
   useRegisterChatContext(
     selectedProject
-      ? `Viewing graphs for project ${selectedProject.name} (#${selectedProject.id})`
+      ? `Viewing graphs for ${selectedProject.name}${selectedPlan ? ` · ${selectedPlan.name}` : ''}`
       : 'Viewing project graphs',
     selectedProject?.id,
   )
 
   const [createGraph, { loading: createLoading }] = useMutation(CREATE_GRAPH, {
-    refetchQueries: [{ query: GET_GRAPHS, variables: { projectId: parseInt(projectId || '0') } }]
+    refetchQueries: [{ query: GET_GRAPHS, variables: { projectId: projectIdNum } }]
   })
 
   const [updateGraph, { loading: updateLoading }] = useMutation(UPDATE_GRAPH, {
-    refetchQueries: [{ query: GET_GRAPHS, variables: { projectId: parseInt(projectId || '0') } }]
+    refetchQueries: [{ query: GET_GRAPHS, variables: { projectId: projectIdNum } }]
   })
 
   const [updatePlanDagNode] = useMutation(UPDATE_PLAN_DAG_NODE)
 
   const [deleteGraph, { loading: deleteLoading }] = useMutation(DELETE_GRAPH, {
-    refetchQueries: [{ query: GET_GRAPHS, variables: { projectId: parseInt(projectId || '0') } }]
+    refetchQueries: [{ query: GET_GRAPHS, variables: { projectId: projectIdNum } }]
   })
 
   const [executeNode] = useMutation(EXECUTE_NODE, {
-    refetchQueries: [{ query: GET_GRAPHS, variables: { projectId: parseInt(projectId || '0') } }]
+    refetchQueries: [{ query: GET_GRAPHS, variables: { projectId: projectIdNum } }]
   })
 
   const { data: previewDetails, loading: previewLoading, error: previewError } = useQuery<{ graph: Graph }>(
@@ -233,7 +246,8 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
       await updateGraph({ variables: { id: selectedGraph.id, input: { name: values.name } } })
       await updatePlanDagNode({
         variables: {
-          projectId: parseInt(projectId || '0'),
+          projectId: projectIdNum,
+          planId: selectedPlanId,
           nodeId: selectedGraph.nodeId,
           updates: {
             metadata: {
@@ -245,7 +259,7 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
     } else {
       // For creation, we need to generate a nodeId internally or derive it.
       // For now, we'll use a placeholder. This will be handled by the backend.
-      await createGraph({ variables: { input: { name: values.name, projectId: parseInt(projectId || '0'), nodeId: 'generated-node-id' } } })
+      await createGraph({ variables: { input: { name: values.name, projectId: projectIdNum, nodeId: 'generated-node-id' } } })
     }
     setEditModalOpen(false)
     setSelectedGraph(null)
@@ -256,7 +270,7 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
       setExecutingGraphId(graph.id)
       await executeNode({
         variables: {
-          projectId: parseInt(projectId || '0'),
+          projectId: projectIdNum,
           nodeId: graph.nodeId
         }
       })
@@ -284,7 +298,7 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
         <Breadcrumbs
           projectName={selectedProject.name}
           projectId={selectedProject.id}
-          sections={[{ title: 'Workbench', href: `/projects/${selectedProject.id}/plan` }]}
+          sections={[{ title: 'Workbench', href: `/projects/${selectedProject.id}/workbench${planQuerySuffix}` }]}
           currentPage="Graphs"
           onNavigate={handleNavigate}
         />
@@ -293,13 +307,41 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
           <div>
             <h1 className="text-3xl font-bold">Graphs</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Manage graph entities for this project
+              Manage graph entities for {selectedPlan ? selectedPlan.name : 'this project'}
             </p>
           </div>
-          <Group gap="xs">
+          <Group gap="xs" className="flex-wrap justify-end">
+            <Select
+              value={selectedPlanId ? selectedPlanId.toString() : ''}
+              onValueChange={(value) => selectPlan(Number(value))}
+              disabled={plansLoading || plans.length === 0}
+            >
+              <SelectTrigger className="w-[220px]">
+                <SelectValue
+                  placeholder={
+                    plans.length
+                      ? 'Select a plan'
+                      : plansLoading
+                        ? 'Loading plans...'
+                        : 'No plans available'
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {plans.map((plan) => (
+                  <SelectItem key={plan.id} value={plan.id.toString()}>
+                    {plan.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button variant="secondary" onClick={() => navigate(`/projects/${selectedProject.id}/plans`)}>
+              Manage plans
+            </Button>
             <Button
               onClick={handleCreate}
               variant="secondary"
+              disabled={!selectedPlanId}
             >
               <IconPlus className="mr-2 h-4 w-4" />
               New Graph Node
@@ -400,7 +442,7 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
                             size="sm"
                             variant="secondary"
                             onClick={() =>
-                              navigate(`/projects/${projectId}/graph/${graph.id}/edit`)
+                              navigate(`/projects/${projectId}/graph/${graph.id}/edit${planQuerySuffix}`)
                             }
                           >
                             <IconGraph className="mr-1.5 h-3.5 w-3.5" />

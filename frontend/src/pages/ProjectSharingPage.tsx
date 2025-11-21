@@ -110,7 +110,7 @@ export const ProjectSharingPage: React.FC = () => {
             <p className="text-sm text-muted-foreground">
               Export the latest plan, datasets, and generated graphs as a static package that external reviewers can inspect offline.
             </p>
-            <Button variant="outline" onClick={() => navigate(`/projects/${selectedProject.id}/plan`)}>
+            <Button variant="outline" onClick={() => navigate(`/projects/${selectedProject.id}/plans`)}>
               Review and export plan
             </Button>
           </CardContent>

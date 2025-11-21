@@ -44,7 +44,8 @@ export const FilterNode = memo((props: FilterNodeProps) => {
 
   // Get project ID from context
   const projectId = data.projectId as number | undefined
-  const { updateNode } = usePlanDagCQRSMutations({ projectId: projectId || 0 })
+  const planId = data.planId as number | undefined
+  const { updateNode } = usePlanDagCQRSMutations({ projectId: projectId || 0, planId: planId || 0 })
 
   const parsedConfig = useMemo(() => parseConfig(data.config), [data.config])
   const queryConfig = useMemo(() => extractQueryConfigFromRaw(parsedConfig), [parsedConfig])

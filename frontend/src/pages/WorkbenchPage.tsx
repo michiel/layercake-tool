@@ -12,6 +12,8 @@ import { Spinner } from '@/components/ui/spinner'
 import { GET_PLAN_DAG, VALIDATE_AND_MIGRATE_PLAN_DAG } from '@/graphql/plan-dag'
 import { IconGraph, IconLayout2, IconDatabase, IconArrowRight, IconNetwork, IconAdjustments } from '@tabler/icons-react'
 import { showErrorNotification, showSuccessNotification } from '@/utils/notifications'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useProjectPlanSelection } from '@/hooks/useProjectPlanSelection'
 
 const GET_PROJECTS = gql`
   query GetProjectsForWorkbench {
@@ -36,15 +38,24 @@ export const WorkbenchPage = () => {
     [projects, projectIdNum]
   )
 
+  const {
+    plans,
+    selectedPlanId,
+    selectedPlan,
+    loading: plansLoading,
+    selectPlan,
+  } = useProjectPlanSelection(projectIdNum)
+
   const { data: planDagData, loading: planDagLoading } = useQuery(GET_PLAN_DAG, {
-    variables: { projectId: projectIdNum },
-    skip: !projectIdNum,
+    variables: { projectId: projectIdNum, planId: selectedPlanId },
+    skip: !projectIdNum || !selectedPlanId,
   })
 
   const planDag = (planDagData as any)?.getPlanDag
   const planNodeCount = planDag?.nodes?.length || 0
   const planEdgeCount = planDag?.edges?.length || 0
   const datasetNodeCount = planDag?.nodes?.filter((n: any) => n.nodeType === 'DataSetNode').length || 0
+  const planQuerySuffix = selectedPlanId ? `?planId=${selectedPlanId}` : ''
 
   const [validatePlanDagMutation, { loading: validatePlanDagLoading }] = useMutation(
     VALIDATE_AND_MIGRATE_PLAN_DAG
@@ -54,9 +65,13 @@ export const WorkbenchPage = () => {
     if (!Number.isFinite(projectIdNum)) {
       return
     }
+    if (!selectedPlanId) {
+      showErrorNotification('Select a plan', 'Choose a plan to validate before running checks.')
+      return
+    }
     try {
       const { data } = await validatePlanDagMutation({
-        variables: { projectId: projectIdNum },
+        variables: { projectId: projectIdNum, planId: selectedPlanId },
       })
       const result = (data as any)?.validateAndMigratePlanDag
       const migratedCount = result?.updatedNodes?.length || 0
@@ -85,7 +100,7 @@ export const WorkbenchPage = () => {
     }
   }
 
-  const loading = projectsLoading || planDagLoading
+  const loading = projectsLoading || planDagLoading || plansLoading
 
   if (loading) {
     return (
@@ -109,6 +124,22 @@ export const WorkbenchPage = () => {
     )
   }
 
+  const handleOpenPlanEditor = () => {
+    if (selectedPlanId) {
+      navigate(`/projects/${project.id}/plans/${selectedPlanId}`)
+    } else {
+      navigate(`/projects/${project.id}/plans`)
+    }
+  }
+
+  const handleOpenPlanNodes = () => {
+    navigate(`/projects/${project.id}/plan-nodes${planQuerySuffix}`)
+  }
+
+  const handleOpenGraphs = () => {
+    navigate(`/projects/${project.id}/graphs${planQuerySuffix}`)
+  }
+
   return (
     <PageContainer>
       <Breadcrumbs
@@ -116,7 +147,7 @@ export const WorkbenchPage = () => {
         projectId={project.id}
         currentPage="Workbench"
         onNavigate={(route) => navigate(route)}
-        sections={[{ title: 'Workbench', href: `/projects/${project.id}/workbench` }]}
+        sections={[{ title: 'Workbench', href: `/projects/${project.id}/workbench${planQuerySuffix}` }]}
       />
 
       <Group justify="between" className="mb-6">
@@ -124,11 +155,30 @@ export const WorkbenchPage = () => {
           <h1 className="text-3xl font-bold">Workbench</h1>
           <p className="text-muted-foreground">Overview of your plan and graph build tools.</p>
         </div>
-        <Group gap="sm">
+        <Group gap="sm" className="flex-wrap justify-end">
+          <Select
+            value={selectedPlanId ? selectedPlanId.toString() : ''}
+            onValueChange={(value) => selectPlan(Number(value))}
+            disabled={plans.length === 0}
+          >
+            <SelectTrigger className="w-[220px]">
+              <SelectValue placeholder={plans.length ? 'Select a plan' : 'No plans available'} />
+            </SelectTrigger>
+            <SelectContent>
+              {plans.map((plan) => (
+                <SelectItem key={plan.id} value={plan.id.toString()}>
+                  {plan.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button variant="secondary" onClick={() => navigate(`/projects/${project.id}/plans`)}>
+            Manage plans
+          </Button>
           <Button
             variant="secondary"
             onClick={handleValidateAndMigratePlan}
-            disabled={validatePlanDagLoading}
+            disabled={validatePlanDagLoading || !selectedPlanId}
           >
             {validatePlanDagLoading && <Spinner className="mr-2 h-4 w-4" />}
             <IconAdjustments className="mr-2 h-4 w-4" />
@@ -137,15 +187,15 @@ export const WorkbenchPage = () => {
           <Button variant="secondary" onClick={() => navigate(`/projects/${project.id}/workbench/layers`)}>
             Layers
           </Button>
-          <Button variant="secondary" onClick={() => navigate(`/projects/${project.id}/plan`)}>
+          <Button variant="secondary" onClick={handleOpenPlanEditor}>
             <IconGraph className="mr-2 h-4 w-4" />
             Open plan editor
           </Button>
-          <Button variant="secondary" onClick={() => navigate(`/projects/${project.id}/plan-nodes`)}>
+          <Button variant="secondary" onClick={handleOpenPlanNodes}>
             <IconLayout2 className="mr-2 h-4 w-4" />
             Plan nodes
           </Button>
-          <Button variant="secondary" onClick={() => navigate(`/projects/${project.id}/graphs`)}>
+          <Button variant="secondary" onClick={handleOpenGraphs}>
             <IconDatabase className="mr-2 h-4 w-4" />
             Graphs
           </Button>
@@ -157,21 +207,25 @@ export const WorkbenchPage = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base font-semibold">
               <IconGraph className="h-4 w-4 text-primary" />
-              Plan summary
+              {selectedPlan ? `Plan summary · ${selectedPlan.name}` : 'Plan summary'}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
+            <p className="text-xs text-muted-foreground">
+              {selectedPlan?.description || 'Track node counts and execution state for the active plan.'}
+            </p>
             <Group gap="sm">
               <Badge variant="secondary">Nodes: {planNodeCount}</Badge>
               <Badge variant="secondary">Edges: {planEdgeCount}</Badge>
             </Group>
             <p className="text-sm text-muted-foreground">
-              Version: {planDag?.version || 'n/a'}
+              Version: {planDag?.version ?? 'n/a'}
             </p>
             <Button
               variant="secondary"
               className="w-full"
-              onClick={() => navigate(`/projects/${project.id}/plan`)}
+              onClick={handleOpenPlanEditor}
+              disabled={!selectedPlanId}
             >
               <IconArrowRight className="mr-2 h-4 w-4" />
               Edit plan
@@ -214,10 +268,10 @@ export const WorkbenchPage = () => {
               Review plan nodes and generated graphs, or jump to graph listings.
             </p>
             <Group gap="xs">
-              <Button className="flex-1" variant="secondary" onClick={() => navigate(`/projects/${project.id}/plan-nodes`)}>
+              <Button className="flex-1" variant="secondary" onClick={handleOpenPlanNodes}>
                 Plan nodes
               </Button>
-              <Button className="flex-1" variant="secondary" onClick={() => navigate(`/projects/${project.id}/graphs`)}>
+              <Button className="flex-1" variant="secondary" onClick={handleOpenGraphs}>
                 Graphs
               </Button>
             </Group>

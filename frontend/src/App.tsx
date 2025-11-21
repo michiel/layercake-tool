@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Routes, Route, useNavigate, useParams, useLocation } from 'react-router-dom'
 import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconDownload, IconChevronLeft, IconChevronRight, IconFolderPlus, IconBooks, IconMessageDots, IconAdjustments, IconHierarchy2, IconChevronDown, IconUpload } from '@tabler/icons-react'
 import { useQuery, useMutation } from '@apollo/client/react'
@@ -37,7 +37,10 @@ import { cn } from './lib/utils'
 import { useTagsFilter } from './hooks/useTagsFilter'
 import { EXPORT_PROJECT_ARCHIVE, EXPORT_PROJECT_AS_TEMPLATE } from './graphql/libraryItems'
 import { VALIDATE_AND_MIGRATE_PLAN_DAG } from './graphql/plan-dag'
+import { LIST_PLANS, GET_PLAN } from './graphql/plans'
 import { showErrorNotification, showSuccessNotification } from './utils/notifications'
+import { PlansPage } from './components/plans/PlansPage'
+import type { Plan } from './types/plan'
 
 // Collaboration Context for providing project-level collaboration to all pages
 const CollaborationContext = React.createContext<any>(null)
@@ -204,6 +207,11 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
     return match ? parseInt(match[1], 10) : undefined
   }, [location.pathname])
 
+  const currentPlanId = useMemo(() => {
+    const match = location.pathname.match(/\/projects\/\d+\/plans\/(\d+)/)
+    return match ? match[1] : undefined
+  }, [location.pathname])
+
   // Initialize collaboration only if we're in a project context
   const collaboration = useCollaborationV2({
     projectId: projectId || 0,
@@ -268,12 +276,22 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
       },
     ]
 
+    const planEditorRoute = currentPlanId
+      ? `/projects/${projectId}/plans/${currentPlanId}`
+      : `/projects/${projectId}/plans`
+
     const graphCreationChildren: ProjectNavChild[] = [
       {
-        key: 'plan',
-        label: 'Plan',
-        route: `/projects/${projectId}/plan`,
-        isActive: makeRouteMatcher(`/projects/${projectId}/plan`),
+        key: 'plans',
+        label: 'Plans',
+        route: `/projects/${projectId}/plans`,
+        isActive: makeRouteMatcher(`/projects/${projectId}/plans`, { prefix: true }),
+      },
+      {
+        key: 'plan-editor',
+        label: 'Plan editor',
+        route: planEditorRoute,
+        isActive: makeRouteMatcher(`/projects/${projectId}/plans`, { prefix: true }),
       },
       {
         key: 'layers',
@@ -876,7 +894,7 @@ const HomePage = () => {
                       variant="ghost"
                       onClick={(e) => {
                         e.stopPropagation()
-                        navigate(`/projects/${project.id}/plan`)
+                        navigate(`/projects/${project.id}/plans`)
                       }}
                     >
                       <IconGraph className="mr-2 h-3.5 w-3.5" />
@@ -1162,7 +1180,7 @@ const ProjectsPage = () => {
                     size="sm"
                     onClick={(e) => {
                       e.stopPropagation()
-                      navigate(`/projects/${project.id}/plan`)
+                      navigate(`/projects/${project.id}/plans`)
                     }}
                   >
                     <IconGraph className="mr-2 h-3.5 w-3.5" />
@@ -1669,7 +1687,7 @@ const ProjectDetailPage = () => {
                   Version: {planVersion}
                 </p>
                 <Group gap="xs">
-                  <Button variant="secondary" className="flex-1" onClick={() => navigate(`/projects/${projectId}/plan`)}>
+                  <Button variant="secondary" className="flex-1" onClick={() => navigate(`/projects/${projectId}/plans`)}>
                     Open plan
                   </Button>
                   <Button variant="secondary" className="flex-1" onClick={() => navigate(`/projects/${projectId}/plan-nodes`)}>
@@ -1758,8 +1776,11 @@ const ProjectDetailPage = () => {
 const PlanEditorPage = () => {
   const navigate = useNavigate()
   const location = useLocation()
-  const { projectId } = useParams<{ projectId: string }>()
-  const collaboration = useCollaboration() // Get project-level collaboration from context
+  const { projectId, planId } = useParams<{ projectId: string; planId: string }>()
+  const projectIdNum = Number(projectId || 0)
+  const planIdNum = Number(planId || 0)
+  const collaboration = useCollaboration()
+
   const { data: projectsData, loading: projectsLoading } = useQuery<{
     projects: Array<{
       id: number
@@ -1770,18 +1791,33 @@ const PlanEditorPage = () => {
     }>
   }>(GET_PROJECTS)
 
+  const {
+    data: planData,
+    loading: planLoading,
+    error: planError,
+  } = useQuery<{ plan: Plan | null }>(GET_PLAN, {
+    variables: { id: planIdNum },
+    skip: !planIdNum,
+    fetchPolicy: 'cache-and-network',
+  })
+
   const projects = projectsData?.projects || []
-  const selectedProject = projects.find((p: any) => p.id === parseInt(projectId || '0'))
+  const selectedProject = projects.find((p: any) => p.id === projectIdNum)
+  const plan = planData?.plan
+  const planBelongsToProject = plan && plan.projectId === selectedProject?.id
 
   const contextDescription = useMemo(() => {
-    if (projectsLoading) {
+    if (projectsLoading || planLoading) {
       return 'Loading plan editor'
     }
     if (!selectedProject) {
       return projectId ? `Plan editor unavailable for project ${projectId}` : 'Plan editor'
     }
-    return `Editing plan for project ${selectedProject.name} (#${selectedProject.id})`
-  }, [projectsLoading, selectedProject, projectId])
+    if (!plan || !planBelongsToProject) {
+      return `Plan editor unavailable`
+    }
+    return `Editing ${plan.name} for ${selectedProject.name} (#${selectedProject.id})`
+  }, [projectsLoading, planLoading, selectedProject, plan, planBelongsToProject, projectId])
 
   useRegisterChatContext(contextDescription, selectedProject?.id)
 
@@ -1789,22 +1825,51 @@ const PlanEditorPage = () => {
     navigate(route)
   }
 
-  // Show loading state while projects are being fetched
-  if (projectsLoading) {
+  if (projectsLoading || planLoading) {
     return (
       <PageContainer>
-        <p>Loading project...</p>
+        <Group gap="sm" align="center">
+          <Spinner className="h-4 w-4" />
+          <span>Loading plan editor…</span>
+        </Group>
       </PageContainer>
     )
   }
 
-  // Only show "not found" if loading is complete and project doesn't exist
   if (!selectedProject) {
     return (
       <PageContainer>
-        <h1 className="text-3xl font-bold">Project Not Found</h1>
+        <h1 className="text-3xl font-bold">Project not found</h1>
         <Button onClick={() => navigate('/projects')} className="mt-4">
-          Back to Projects
+          Back to projects
+        </Button>
+      </PageContainer>
+    )
+  }
+
+  if (!planIdNum) {
+    return (
+      <PageContainer>
+        <h1 className="text-2xl font-bold">Select a plan</h1>
+        <p className="text-muted-foreground mt-2">
+          Choose a plan from the plans list to start editing.
+        </p>
+        <Button className="mt-4" onClick={() => navigate(`/projects/${selectedProject.id}/plans`)}>
+          View plans
+        </Button>
+      </PageContainer>
+    )
+  }
+
+  if (planError || !plan || !planBelongsToProject) {
+    return (
+      <PageContainer>
+        <h1 className="text-2xl font-bold">Plan not found</h1>
+        <p className="text-muted-foreground mt-2">
+          The requested plan is unavailable or does not belong to this project.
+        </p>
+        <Button className="mt-4" onClick={() => navigate(`/projects/${selectedProject.id}/plans`)}>
+          Back to plans
         </Button>
       </PageContainer>
     )
@@ -1819,8 +1884,11 @@ const PlanEditorPage = () => {
         <Breadcrumbs
           projectName={selectedProject.name}
           projectId={selectedProject.id}
-          sections={[{ title: 'Workbench', href: `/projects/${selectedProject.id}/plan` }]}
-          currentPage="Plan"
+          sections={[
+            { title: 'Plans', href: `/projects/${selectedProject.id}/plans` },
+            { title: plan.name, href: `/projects/${selectedProject.id}/plans/${plan.id}` },
+          ]}
+          currentPage="Plan editor"
           onNavigate={handleNavigate}
         />
       </div>
@@ -1828,6 +1896,7 @@ const PlanEditorPage = () => {
         <ErrorBoundary>
           <PlanVisualEditor
             projectId={selectedProject.id}
+            planId={planIdNum}
             onNodeSelect={(nodeId) => console.log('Selected node:', nodeId)}
             onEdgeSelect={(edgeId) => console.log('Selected edge:', edgeId)}
             focusNodeId={focusNodeId}
@@ -1836,6 +1905,39 @@ const PlanEditorPage = () => {
         </ErrorBoundary>
       </div>
     </div>
+  )
+}
+
+const LegacyPlanRedirect = () => {
+  const { projectId } = useParams<{ projectId: string }>()
+  const navigate = useNavigate()
+  const projectIdNum = Number(projectId || 0)
+
+  const { data, loading } = useQuery<{ plans: Array<{ id: number }> }>(LIST_PLANS, {
+    variables: { projectId: projectIdNum },
+    skip: !projectIdNum,
+    fetchPolicy: 'network-only',
+  })
+
+  useEffect(() => {
+    if (loading || !projectIdNum) {
+      return
+    }
+    const plans = data?.plans ?? []
+    if (plans.length > 0) {
+      navigate(`/projects/${projectIdNum}/plans/${plans[0].id}`, { replace: true })
+    } else {
+      navigate(`/projects/${projectIdNum}/plans`, { replace: true })
+    }
+  }, [loading, data, navigate, projectIdNum])
+
+  return (
+    <PageContainer>
+      <Group gap="sm" align="center">
+        <Spinner className="h-4 w-4" />
+        <span>Redirecting to plans…</span>
+      </Group>
+    </PageContainer>
   )
 }
 
@@ -1880,9 +1982,19 @@ function App() {
               <EditProjectPage />
             </ErrorBoundary>
           } />
-          <Route path="/projects/:projectId/plan" element={
+          <Route path="/projects/:projectId/plans" element={
+            <ErrorBoundary>
+              <PlansPage />
+            </ErrorBoundary>
+          } />
+          <Route path="/projects/:projectId/plans/:planId" element={
             <ErrorBoundary>
               <PlanEditorPage />
+            </ErrorBoundary>
+          } />
+          <Route path="/projects/:projectId/plan" element={
+            <ErrorBoundary>
+              <LegacyPlanRedirect />
             </ErrorBoundary>
           } />
           <Route path="/projects/:projectId/workbench" element={

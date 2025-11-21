@@ -58,6 +58,7 @@ import 'reactflow/dist/style.css'
 
 interface PlanVisualEditorProps {
   projectId: number
+  planId: number
   onNodeSelect?: (nodeId: string | null) => void
   onEdgeSelect?: (edgeId: string | null) => void
   readonly?: boolean
@@ -99,7 +100,7 @@ const sanitizeNodeMetadata = (raw: any, fallback?: NodeMetadata): NodeMetadata =
   return fallback ? { ...fallback } : { label: '' }
 }
 
-const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly = false, focusNodeId, collaboration }: PlanVisualEditorProps) => {
+const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, readonly = false, focusNodeId, collaboration }: PlanVisualEditorProps) => {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [updateGraphNameMutation] = useMutation(UPDATE_GRAPH)
   // Get ReactFlow instance for fit view and screen position conversion
@@ -158,6 +159,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
   // Use Plan DAG CQRS state management with delta subscriptions
   const planDagState = usePlanDagCQRS({
     projectId,
+    planId,
     readonly,
     onNodeEdit: handleNodeEdit,
     onNodeDelete: handleNodeDelete,
@@ -211,9 +213,9 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
   // Adapt CQRS command interface to match old mutation interface
   const mutations = {
     addNode: (node: Partial<PlanDagNode>) =>
-      cqrsService.commands.createNode({ projectId, nodeType: node.nodeType || 'DataSet', node }),
+      cqrsService.commands.createNode({ projectId, planId, nodeType: node.nodeType || 'DataSet', node }),
     addEdge: (edge: Partial<any>) =>
-      cqrsService.commands.createEdge({ projectId, edge: edge as any }),
+      cqrsService.commands.createEdge({ projectId, planId, edge: edge as any }),
     updateNode: (nodeId: string, updates: Partial<PlanDagNode>) => {
       const serializedUpdates = { ...updates } as any
       if (serializedUpdates.config !== undefined) {
@@ -222,16 +224,16 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
             ? serializedUpdates.config
             : JSON.stringify(serializedUpdates.config ?? {})
       }
-      return cqrsService.commands.updateNode({ projectId, nodeId, updates: serializedUpdates })
+      return cqrsService.commands.updateNode({ projectId, planId, nodeId, updates: serializedUpdates })
     },
     deleteNode: (nodeId: string) =>
-      cqrsService.commands.deleteNode({ projectId, nodeId }),
+      cqrsService.commands.deleteNode({ projectId, planId, nodeId }),
     deleteEdge: (edgeId: string) =>
-      cqrsService.commands.deleteEdge({ projectId, edgeId }),
+      cqrsService.commands.deleteEdge({ projectId, planId, edgeId }),
     moveNode: (nodeId: string, position: { x: number; y: number }) =>
-      cqrsService.commands.moveNode({ projectId, nodeId, position }),
+      cqrsService.commands.moveNode({ projectId, planId, nodeId, position }),
     updatePlanDag: (planDag: any) =>
-      cqrsService.commands.updatePlanDag({ projectId, planDag }),
+      cqrsService.commands.updatePlanDag({ projectId, planId, planDag }),
   }
 
   // Setup delete handler with access to mutations
@@ -1072,7 +1074,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
       targetPosition: node.targetPosition
     }));
 
-    await cqrsService.commands.batchMoveNodes(projectId, nodePositions);
+    await cqrsService.commands.batchMoveNodes({ projectId, planId, nodePositions });
 
     // Floating edges don't use handles, no edge updates needed
 
@@ -1099,7 +1101,7 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
       targetPosition: node.targetPosition
     }));
 
-    await cqrsService.commands.batchMoveNodes(projectId, nodePositions);
+    await cqrsService.commands.batchMoveNodes({ projectId, planId, nodePositions });
 
     // Floating edges don't use handles, no edge updates needed
 
@@ -1148,8 +1150,8 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
 
   // Execution control handlers
   const handlePlay = useCallback(() => {
-    if (!projectId) {
-      showErrorNotification('Error', 'No project ID available');
+    if (!projectId || !planId) {
+      showErrorNotification('Error', 'Cannot execute without a project and plan selected.');
       return;
     }
 
@@ -1157,10 +1159,11 @@ const PlanVisualEditorInner = ({ projectId, onNodeSelect, onEdgeSelect, readonly
 
     executePlan({
       variables: {
-        id: projectId
+        projectId,
+        planId,
       }
     });
-  }, [projectId, executePlan]);
+  }, [projectId, planId, executePlan]);
 
   const handleStop = useCallback(() => {
     if (!projectId) {

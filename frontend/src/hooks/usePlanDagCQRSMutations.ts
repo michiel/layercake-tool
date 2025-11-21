@@ -6,6 +6,7 @@ import { useSubscriptionFilter } from './useGraphQLSubscriptionFilter'
 
 interface UsePlanDagCQRSMutationsOptions {
   projectId: number
+  planId: number
 }
 
 interface PlanDagCQRSMutations {
@@ -20,7 +21,7 @@ interface PlanDagCQRSMutations {
 }
 
 export const usePlanDagCQRSMutations = (options: UsePlanDagCQRSMutationsOptions): PlanDagCQRSMutations => {
-  const { projectId } = options
+  const { projectId, planId } = options
   const apollo = useApolloClient()
 
   // Get client ID at top level to follow React hook rules
@@ -40,6 +41,7 @@ export const usePlanDagCQRSMutations = (options: UsePlanDagCQRSMutationsOptions)
 
     return await cqrsService.commands.createNode({
       projectId,
+      planId,
       nodeType: node.nodeType as string,
       node: {
         id: node.id!,
@@ -49,66 +51,72 @@ export const usePlanDagCQRSMutations = (options: UsePlanDagCQRSMutationsOptions)
         config: typeof node.config === 'string' ? node.config : JSON.stringify(node.config || {})
       }
     })
-  }, [cqrsService, projectId])
+  }, [cqrsService, projectId, planId])
 
   const updateNode = useCallback(async (nodeId: string, updates: { config?: any; metadata?: any }): Promise<PlanDagNode> => {
     console.log('[usePlanDagCQRSMutations] Updating node via CQRS:', nodeId)
 
     return await cqrsService.commands.updateNode({
       projectId,
+      planId,
       nodeId,
       updates: {
         config: typeof updates.config === 'string' ? updates.config : JSON.stringify(updates.config || {}),
         metadata: updates.metadata
       }
     })
-  }, [cqrsService, projectId])
+  }, [cqrsService, projectId, planId])
 
   const deleteNode = useCallback(async (nodeId: string): Promise<boolean> => {
     console.log('[usePlanDagCQRSMutations] Deleting node via CQRS:', nodeId)
 
     return await cqrsService.commands.deleteNode({
       projectId,
+      planId,
       nodeId
     })
-  }, [cqrsService, projectId])
+  }, [cqrsService, projectId, planId])
 
   const moveNode = useCallback(async (nodeId: string, position: { x: number; y: number }): Promise<boolean> => {
     console.log('[usePlanDagCQRSMutations] Moving node via CQRS:', nodeId, position)
 
     return await cqrsService.commands.moveNode({
       projectId,
+      planId,
       nodeId,
       position
     })
-  }, [cqrsService, projectId])
+  }, [cqrsService, projectId, planId])
 
   const addEdge = useCallback(async (edge: ReactFlowEdge): Promise<ReactFlowEdge> => {
     console.log('[usePlanDagCQRSMutations] Adding edge via CQRS:', edge.id)
 
     return await cqrsService.commands.createEdge({
       projectId,
+      planId,
       edge
     })
-  }, [cqrsService, projectId])
+  }, [cqrsService, projectId, planId])
 
   const deleteEdge = useCallback(async (edgeId: string): Promise<void> => {
     console.log('[usePlanDagCQRSMutations] Deleting edge via CQRS:', edgeId)
 
     await cqrsService.commands.deleteEdge({
       projectId,
+      planId,
       edgeId
     })
-  }, [cqrsService, projectId])
+  }, [cqrsService, projectId, planId])
 
   const updatePlanDag = useCallback(async (planDag: any): Promise<void> => {
     console.log('[usePlanDagCQRSMutations] Updating Plan DAG via CQRS')
 
     await cqrsService.commands.updatePlanDag({
       projectId,
+      planId,
       planDag
     })
-  }, [cqrsService, projectId])
+  }, [cqrsService, planId, projectId])
 
   return {
     addNode,

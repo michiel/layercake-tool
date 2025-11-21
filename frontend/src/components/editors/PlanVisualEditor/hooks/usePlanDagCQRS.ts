@@ -11,6 +11,7 @@ import { useSubscriptionFilter } from '../../../../hooks/useGraphQLSubscriptionF
 
 interface UsePlanDagCQRSOptions {
   projectId: number
+  planId: number
   readonly?: boolean
   onNodeEdit?: (nodeId: string) => void
   onNodeDelete?: (nodeId: string) => void
@@ -72,7 +73,7 @@ const planDagEqual = (a: PlanDag | null, b: PlanDag | null): boolean => {
 }
 
 export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResult => {
-  const { projectId, readonly = false, onNodeEdit, onNodeDelete } = options
+  const { projectId, planId, readonly = false, onNodeEdit, onNodeDelete } = options
 
   // Apollo client for CQRS service
   const apollo = useApolloClient()
@@ -99,6 +100,7 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
     maxEventFrequency: 10,
     memoryWarningThreshold: 150, // MB
   })
+  const trackPerformanceEvent = performanceMonitor.trackEvent
 
   // Consolidated state refs for better organisation and debugging
   const editorStateRef = useRef({
@@ -143,6 +145,7 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
     try {
       await cqrsService.commands.updatePlanDag({
         projectId,
+        planId,
         planDag
       })
       setIsDirty(false)
@@ -203,6 +206,7 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
         data: {
           ...node.data,
           projectId, // Add projectId for preview queries
+          planId,
           onEdit: () => stableOnNodeEdit(node.id),
           onDelete: () => stableOnNodeDelete(node.id),
           readonly,
@@ -213,7 +217,7 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
     })
 
     return { nodes: nodesWithCallbacks, edges: converted.edges }
-  }, [stablePlanDag, stableOnNodeEdit, stableOnNodeDelete, readonly, projectId])
+  }, [stablePlanDag, stableOnNodeEdit, stableOnNodeDelete, readonly, projectId, planId])
 
   // ReactFlow state
   const [nodes, setNodes, onNodesChangeInternal] = useNodesState(reactFlowData.nodes)
@@ -310,7 +314,7 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
       return
     }
 
-    console.log('[usePlanDagCQRS] Setting up data loading and subscription for project:', projectId)
+    console.log('[usePlanDagCQRS] Setting up data loading and subscription for project:', projectId, 'plan:', planId)
     editorStateRef.current.sync.isInitialized = true
 
     const loadInitialData = async () => {
@@ -319,7 +323,7 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
         setError(null)
 
         // Load initial data using CQRS query service with fresh fetch to avoid stale cache
-        const initialData = await cqrsService.queries.getPlanDag({ projectId, fresh: true })
+        const initialData = await cqrsService.queries.getPlanDag({ projectId, planId, fresh: true })
 
         if (initialData) {
           console.log('[usePlanDagCQRS] Initial Plan DAG loaded:', initialData)
@@ -339,16 +343,17 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
     // Setup delta-based subscription for efficient real-time updates
     const deltaSubscription = cqrsService.subscribeToDeltaUpdates(
       projectId,
+      planId,
       () => editorStateRef.current.planDag.stable, // Get current Plan DAG for patch application
       (updatedPlanDag) => {
         console.log('[usePlanDagCQRS] Received delta update via JSON Patch subscription')
-        performanceMonitor.trackEvent('websocketMessages')
+        trackPerformanceEvent('websocketMessages')
         setPlanDag(updatedPlanDag)
       },
       (error) => {
         console.error('[usePlanDagCQRS] Delta subscription error, triggering full refresh:', error)
         // On delta error, refresh full state
-        cqrsService.queries.getPlanDag({ projectId, fresh: true })
+        cqrsService.queries.getPlanDag({ projectId, planId, fresh: true })
           .then(refreshedData => {
             if (refreshedData) {
               setPlanDag(refreshedData)
@@ -361,9 +366,10 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
     // Setup execution status subscription for real-time status updates
     const executionStatusSubscription = cqrsService.subscribeToExecutionStatusUpdates(
       projectId,
+      planId,
       (nodeId, executionData) => {
         console.log('[usePlanDagCQRS] Received execution status update for node:', nodeId, executionData)
-        performanceMonitor.trackEvent('websocketMessages')
+        trackPerformanceEvent('websocketMessages')
 
         // Update Plan DAG with execution status
         setPlanDag(current => {
@@ -409,7 +415,7 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
       }
       editorStateRef.current.sync.isInitialized = false
     }
-  }, [projectId])  // Only depend on projectId to prevent circular dependencies
+  }, [projectId, planId, cqrsService, trackPerformanceEvent, readonly])  // Re-run when project or plan changes
 
   // Actions
   const savePlanDag = useCallback(async () => {
@@ -432,7 +438,7 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
     console.log('[usePlanDagCQRS] Refreshing Plan DAG data')
     try {
       setLoading(true)
-      const refreshedData = await cqrsService.queries.getPlanDag({ projectId })
+      const refreshedData = await cqrsService.queries.getPlanDag({ projectId, planId })
       setPlanDag(refreshedData)
     } catch (err) {
       console.error('[usePlanDagCQRS] Error refreshing data:', err)

@@ -22,6 +22,7 @@ import { Stack, Group } from '../components/layout-primitives'
 import PageContainer from '../components/layout/PageContainer'
 import { Breadcrumbs } from '../components/common/Breadcrumbs'
 import { Spinner } from '../components/ui/spinner'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert'
 import { Button } from '../components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip'
@@ -38,6 +39,7 @@ import { NodeConfigDialog } from '../components/editors/PlanVisualEditor/NodeCon
 import { MermaidPreviewDialog, DotPreviewDialog } from '../components/visualization'
 import { showErrorNotification, showSuccessNotification } from '../utils/notifications'
 import { PlanDagNodeType } from '../types/plan-dag'
+import { useProjectPlanSelection } from '../hooks/useProjectPlanSelection'
 
 const GET_PROJECTS = gql`
   query GetProjects {
@@ -122,15 +124,26 @@ const getRenderOptionLabels = (config: Record<string, any>): string[] => {
 const ProjectArtefactsPage: React.FC = () => {
   const navigate = useNavigate()
   const { projectId } = useParams<{ projectId: string }>()
-  const numericProjectId = parseInt(projectId || '0', 10)
+  const projectIdNum = Number(projectId || 0)
 
   const { data: projectsData } = useQuery<{ projects: Array<{ id: number; name: string }> }>(GET_PROJECTS)
-  const selectedProject = projectsData?.projects.find((p: { id: number; name: string }) => p.id === numericProjectId)
+  const selectedProject = projectsData?.projects.find((p: { id: number; name: string }) => p.id === projectIdNum)
 
-  const { data, loading, error } = useQuery<PlanDagResponse>(GET_PLAN_DAG, {
-    variables: { projectId: numericProjectId },
+  const {
+    plans,
+    selectedPlanId,
+    selectedPlan,
+    loading: plansLoading,
+    selectPlan,
+  } = useProjectPlanSelection(projectIdNum)
+  const planQuerySuffix = selectedPlanId ? `?planId=${selectedPlanId}` : ''
+
+  const { data, loading: planDagLoading, error } = useQuery<PlanDagResponse>(GET_PLAN_DAG, {
+    variables: { projectId: projectIdNum, planId: selectedPlanId },
     fetchPolicy: 'cache-and-network',
+    skip: !selectedPlanId,
   })
+  const loading = planDagLoading || plansLoading
 
   const [graphDataDialog, setGraphDataDialog] = useState<{ open: boolean; graphId: number | null }>({
     open: false,
@@ -251,7 +264,7 @@ const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
   })
 
   const [updatePlanDagNode] = useMutation(UPDATE_PLAN_DAG_NODE, {
-    refetchQueries: [{ query: GET_PLAN_DAG, variables: { projectId: numericProjectId } }],
+    refetchQueries: [{ query: GET_PLAN_DAG, variables: { projectId: projectIdNum, planId: selectedPlanId } }],
     onCompleted: () => {
       showSuccessNotification('Node Updated', 'Artefact node configuration saved')
     },
@@ -336,18 +349,18 @@ const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
   }
 
   const handlePreview = (nodeId: string, target: 'text' | 'mermaid' | 'dot') => {
-    if (!numericProjectId) return
+    if (!projectIdNum) return
     setPreviewLoading({ nodeId, kind: target })
     exportForPreview({
-      variables: { projectId: numericProjectId, nodeId },
+      variables: { projectId: projectIdNum, planId: selectedPlanId, nodeId },
     })
   }
 
   const handleDownload = (nodeId: string) => {
-    if (!numericProjectId) return
+    if (!projectIdNum) return
     setDownloadingNodeId(nodeId)
     exportNodeOutput({
-      variables: { projectId: numericProjectId, nodeId },
+      variables: { projectId: projectIdNum, planId: selectedPlanId, nodeId },
     })
   }
 
@@ -371,7 +384,7 @@ const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
   const handleSaveNode = async (nodeId: string, config: any, metadata: any) => {
     await updatePlanDagNode({
       variables: {
-        projectId: numericProjectId,
+        projectId: projectIdNum,
         nodeId,
         updates: {
           config: JSON.stringify(config),
@@ -440,7 +453,7 @@ const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
                     variant="ghost"
                     className="h-8 w-8"
                     disabled={!graphId}
-                    onClick={() => navigate(`/projects/${projectId}/graphs/${graphId}`)}
+                    onClick={() => navigate(`/projects/${projectId}/graph/${graphId}/edit${planQuerySuffix}`)}
                   >
                     <IconExternalLink size={16} />
                   </Button>
@@ -592,7 +605,7 @@ const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
         <Breadcrumbs
           projectName={selectedProject.name}
           projectId={selectedProject.id}
-          sections={[{ title: 'Workbench', href: `/projects/${selectedProject.id}/plan` }]}
+          sections={[{ title: 'Workbench', href: `/projects/${selectedProject.id}/workbench${planQuerySuffix}` }]}
           currentPage="Artefacts"
           onNavigate={handleNavigate}
         />
@@ -601,9 +614,38 @@ const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
           <div>
             <h1 className="text-3xl font-bold">Artefacts</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Browse graphs and their exported artefacts
+              Browse graphs and exported artefacts for {selectedPlan ? selectedPlan.name : 'this project'}
             </p>
           </div>
+          <Group gap="xs" className="flex-wrap justify-end">
+            <Select
+              value={selectedPlanId ? selectedPlanId.toString() : ''}
+              onValueChange={(value) => selectPlan(Number(value))}
+              disabled={plansLoading || plans.length === 0}
+            >
+              <SelectTrigger className="w-[220px]">
+                <SelectValue
+                  placeholder={
+                    plans.length
+                      ? 'Select a plan'
+                      : plansLoading
+                        ? 'Loading plans...'
+                        : 'No plans available'
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {plans.map((plan) => (
+                  <SelectItem key={plan.id} value={plan.id.toString()}>
+                    {plan.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button variant="secondary" onClick={() => navigate(`/projects/${selectedProject.id}/plans`)}>
+              Manage plans
+            </Button>
+          </Group>
         </Group>
 
         {error && (
@@ -687,7 +729,7 @@ const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
           opened={editNodeDialog.open}
           onClose={() => setEditNodeDialog({ open: false, nodeId: null, nodeType: null, config: null, metadata: null })}
           nodeType={editNodeDialog.nodeType}
-          projectId={numericProjectId}
+          projectId={projectIdNum}
           onSave={handleSaveNode}
           nodeId={editNodeDialog.nodeId}
           config={editNodeDialog.config}

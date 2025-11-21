@@ -225,8 +225,8 @@ export interface NodeExecutionResult {
 
 // Execute Plan (DAG) Mutation
 export const EXECUTE_PLAN = gql`
-  mutation ExecutePlan($id: Int!) {
-    executePlan(id: $id) {
+  mutation ExecutePlan($projectId: Int!, $planId: Int!) {
+    executePlan(projectId: $projectId, planId: $planId) {
       success
       message
       outputFiles

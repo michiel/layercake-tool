@@ -38,6 +38,7 @@ export class PlanDagCommandService {
         mutation: PlanDagGraphQL.ADD_PLAN_DAG_NODE,
         variables: {
           projectId: command.projectId,
+          planId: command.planId,
           node: command.node
         },
         context: createMutationContext(this.clientId)
@@ -66,6 +67,7 @@ export class PlanDagCommandService {
         mutation: PlanDagGraphQL.UPDATE_PLAN_DAG_NODE,
         variables: {
           projectId: command.projectId,
+          planId: command.planId,
           nodeId: command.nodeId,
           updates: command.updates
         },
@@ -95,6 +97,7 @@ export class PlanDagCommandService {
         mutation: PlanDagGraphQL.DELETE_PLAN_DAG_NODE,
         variables: {
           projectId: command.projectId,
+          planId: command.planId,
           nodeId: command.nodeId
         },
         context: createMutationContext(this.clientId)
@@ -120,6 +123,7 @@ export class PlanDagCommandService {
         mutation: PlanDagGraphQL.MOVE_PLAN_DAG_NODE,
         variables: {
           projectId: command.projectId,
+          planId: command.planId,
           nodeId: command.nodeId,
           position: command.position
         },
@@ -134,12 +138,9 @@ export class PlanDagCommandService {
     }
   }
 
-  async batchMoveNodes(
-    projectId: number,
-    nodePositions: Array<{ nodeId: string; position: { x: number; y: number } }>
-  ): Promise<boolean> {
+  async batchMoveNodes(command: BatchMoveNodesCommand): Promise<boolean> {
     try {
-      console.log('[PlanDagCommandService] Batch moving nodes:', nodePositions.length)
+      console.log('[PlanDagCommandService] Batch moving nodes:', command.nodePositions.length)
 
       // Mark mutation to suppress subscription echo
       this.markMutationOccurred()
@@ -147,8 +148,9 @@ export class PlanDagCommandService {
       const result = await this.apollo.mutate({
         mutation: PlanDagGraphQL.BATCH_MOVE_PLAN_DAG_NODES,
         variables: {
-          projectId,
-          nodePositions
+          projectId: command.projectId,
+          planId: command.planId,
+          nodePositions: command.nodePositions
         },
         context: createMutationContext(this.clientId)
       })
@@ -173,6 +175,7 @@ export class PlanDagCommandService {
         mutation: PlanDagGraphQL.ADD_PLAN_DAG_EDGE,
         variables: {
           projectId: command.projectId,
+          planId: command.planId,
           edge: command.edge
         },
         context: createMutationContext(this.clientId)
@@ -201,6 +204,7 @@ export class PlanDagCommandService {
         mutation: PlanDagGraphQL.DELETE_PLAN_DAG_EDGE,
         variables: {
           projectId: command.projectId,
+          planId: command.planId,
           edgeId: command.edgeId
         },
         context: createMutationContext(this.clientId)
@@ -226,6 +230,7 @@ export class PlanDagCommandService {
         mutation: PlanDagGraphQL.UPDATE_PLAN_DAG_EDGE,
         variables: {
           projectId: command.projectId,
+          planId: command.planId,
           edgeId: command.edgeId,
           updates: command.updates
         },
@@ -253,6 +258,7 @@ export class PlanDagCommandService {
         mutation: PlanDagGraphQL.UPDATE_PLAN_DAG,
         variables: {
           projectId: command.projectId,
+          planId: command.planId,
           planDag: command.planDag
         },
         context: createMutationContext(this.clientId)
@@ -288,39 +294,46 @@ export class PlanDagCommandService {
 // Command Types
 export interface CreateNodeCommand {
   projectId: number
+  planId: number
   node: Partial<PlanDagNode>
   nodeType: string
 }
 
 export interface UpdateNodeCommand {
   projectId: number
+  planId: number
   nodeId: string
   updates: Partial<PlanDagNode>
 }
 
 export interface DeleteNodeCommand {
   projectId: number
+  planId: number
   nodeId: string
 }
 
 export interface MoveNodeCommand {
   projectId: number
+  planId: number
   nodeId: string
   position: { x: number; y: number }
 }
 
 export interface CreateEdgeCommand {
   projectId: number
+  planId: number
   edge: ReactFlowEdge
 }
 
 export interface DeleteEdgeCommand {
   projectId: number
+  planId: number
   edgeId: string
 }
 
 export interface UpdateEdgeCommand {
   projectId: number
+  planId: number
   edgeId: string
   updates: {
     metadata?: any
@@ -329,7 +342,14 @@ export interface UpdateEdgeCommand {
 
 export interface UpdatePlanDagCommand {
   projectId: number
+  planId: number
   planDag: PlanDag
+}
+
+export interface BatchMoveNodesCommand {
+  projectId: number
+  planId: number
+  nodePositions: Array<{ nodeId: string; position: { x: number; y: number } }>
 }
 
 export interface ValidatePlanDagCommand {
@@ -341,6 +361,7 @@ export type PlanDagCommand =
   | UpdateNodeCommand
   | DeleteNodeCommand
   | MoveNodeCommand
+  | BatchMoveNodesCommand
   | CreateEdgeCommand
   | DeleteEdgeCommand
   | UpdateEdgeCommand

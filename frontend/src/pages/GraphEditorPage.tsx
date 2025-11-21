@@ -1,5 +1,5 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { IconAlertCircle, IconArrowLeft, IconHistory, IconEdit, IconDownload, IconRoute, IconZoomScan, IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { gql } from '@apollo/client';
@@ -89,7 +89,12 @@ interface GraphEditorPageProps {}
 
 export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { projectId, graphId } = useParams<{ projectId: string; graphId: string }>();
+  const planSearchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const planIdParam = planSearchParams.get('planId');
+  const planId = planIdParam ? Number(planIdParam) : null;
+  const planQuerySuffix = planId ? `?planId=${planId}` : '';
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [layerVisibility, setLayerVisibility] = useState<Map<string, boolean>>(new Map());
   const [editHistoryOpen, setEditHistoryOpen] = useState(false);
@@ -293,7 +298,7 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
   };
 
   const handleBack = () => {
-    navigate(`/projects/${projectId}/plan-nodes`);
+    navigate(`/projects/${projectId}/graphs${planQuerySuffix}`);
   };
 
   // Callback to capture ReactFlow setters for optimistic updates
@@ -871,8 +876,8 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
               projectName={selectedProject.name}
               projectId={selectedProject.id}
               sections={[
-                { title: 'Workbench', href: `/projects/${projectId}/plan` },
-                { title: 'Graphs', href: `/projects/${projectId}/graphs` },
+                { title: 'Workbench', href: `/projects/${projectId}/workbench${planQuerySuffix}` },
+                { title: 'Graphs', href: `/projects/${projectId}/graphs${planQuerySuffix}` },
               ]}
               currentPage={graph.name}
               onNavigate={handleNavigate}
@@ -918,7 +923,13 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => navigate(`/projects/${projectId}/plan?focusNode=${graph.nodeId}`)}
+                      onClick={() => {
+                        if (planId) {
+                          navigate(`/projects/${projectId}/plans/${planId}?focusNode=${graph.nodeId}`)
+                        } else {
+                          navigate(`/projects/${projectId}/plans`)
+                        }
+                      }}
                     >
                       <IconRoute className="h-[18px] w-[18px]" />
                     </Button>
