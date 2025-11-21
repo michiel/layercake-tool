@@ -712,7 +712,6 @@ impl AppContext {
         let config = json!({
             "dataSetId": data_set.id,
             "filename": data_set.filename,
-            "dataType": data_set.data_type.to_lowercase(),
         });
 
         let _ = self
@@ -1872,7 +1871,6 @@ pub struct DataSetSummary {
     pub name: String,
     pub description: Option<String>,
     pub file_format: String,
-    pub data_type: String,
     pub origin: String,
     pub filename: String,
     pub graph_json: String,
@@ -1882,17 +1880,22 @@ pub struct DataSetSummary {
     pub processed_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub node_count: Option<usize>,
+    pub edge_count: Option<usize>,
+    pub layer_count: Option<usize>,
+    pub has_layers: bool,
 }
 
 impl From<data_sets::Model> for DataSetSummary {
     fn from(model: data_sets::Model) -> Self {
+        let (node_count, edge_count, layer_count) = summarize_graph_counts(&model.graph_json);
+        let has_layers = layer_count.unwrap_or(0) > 0;
         Self {
             id: model.id,
             project_id: model.project_id,
             name: model.name,
             description: model.description,
             file_format: model.file_format,
-            data_type: model.data_type,
             origin: model.origin,
             filename: model.filename,
             graph_json: model.graph_json,
@@ -1902,6 +1905,10 @@ impl From<data_sets::Model> for DataSetSummary {
             processed_at: model.processed_at,
             created_at: model.created_at,
             updated_at: model.updated_at,
+            node_count,
+            edge_count,
+            layer_count,
+            has_layers,
         }
     }
 }
@@ -2209,7 +2216,7 @@ fn analyze_data_sets(
     Ok((descriptors, tables))
 }
 
-fn summarize_graph_counts(graph_json: &str) -> (Option<usize>, Option<usize>, Option<usize>) {
+pub fn summarize_graph_counts(graph_json: &str) -> (Option<usize>, Option<usize>, Option<usize>) {
     serde_json::from_str::<Value>(graph_json)
         .ok()
         .and_then(|parsed| {

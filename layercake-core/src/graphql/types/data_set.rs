@@ -3,7 +3,7 @@
 use async_graphql::*;
 use serde::{Deserialize, Serialize};
 
-use crate::app_context::DataSetSummary;
+use crate::app_context::{summarize_graph_counts, DataSetSummary};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
 use crate::graphql::types::Project;
@@ -34,6 +34,14 @@ pub struct DataSet {
     pub created_at: chrono::DateTime<chrono::Utc>,
     #[graphql(name = "updatedAt")]
     pub updated_at: chrono::DateTime<chrono::Utc>,
+    #[graphql(name = "nodeCount")]
+    pub node_count: Option<i32>,
+    #[graphql(name = "edgeCount")]
+    pub edge_count: Option<i32>,
+    #[graphql(name = "layerCount")]
+    pub layer_count: Option<i32>,
+    #[graphql(name = "hasLayers")]
+    pub has_layers: bool,
 }
 
 #[ComplexObject]
@@ -88,6 +96,7 @@ impl DataSet {
 
 impl From<crate::database::entities::data_sets::Model> for DataSet {
     fn from(model: crate::database::entities::data_sets::Model) -> Self {
+        let (node_count, edge_count, layer_count) = summarize_graph_counts(&model.graph_json);
         Self {
             id: model.id,
             project_id: model.project_id,
@@ -104,6 +113,10 @@ impl From<crate::database::entities::data_sets::Model> for DataSet {
             processed_at: model.processed_at,
             created_at: model.created_at,
             updated_at: model.updated_at,
+            node_count: node_count.map(|c| c as i32),
+            edge_count: edge_count.map(|c| c as i32),
+            layer_count: layer_count.map(|c| c as i32),
+            has_layers: layer_count.unwrap_or(0) > 0,
         }
     }
 }
@@ -125,6 +138,10 @@ impl From<DataSetSummary> for DataSet {
             processed_at: summary.processed_at,
             created_at: summary.created_at,
             updated_at: summary.updated_at,
+            node_count: summary.node_count.map(|c| c as i32),
+            edge_count: summary.edge_count.map(|c| c as i32),
+            layer_count: summary.layer_count.map(|c| c as i32),
+            has_layers: summary.has_layers,
         }
     }
 }

@@ -3,7 +3,6 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::app_context::DataSetSummary;
-use crate::database::entities::data_sets;
 
 // Data Source Node Configuration
 #[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
@@ -40,20 +39,15 @@ pub struct DataSetReference {
     pub id: i32,
     pub name: String,
     pub description: Option<String>,
-    pub data_type: String,
+    #[graphql(name = "nodeCount")]
+    pub node_count: Option<i32>,
+    #[graphql(name = "edgeCount")]
+    pub edge_count: Option<i32>,
+    #[graphql(name = "layerCount")]
+    pub layer_count: Option<i32>,
+    #[graphql(name = "hasLayers")]
+    pub has_layers: bool,
     pub created_at: DateTime<Utc>,
-}
-
-impl From<data_sets::Model> for DataSetReference {
-    fn from(model: data_sets::Model) -> Self {
-        Self {
-            id: model.id,
-            name: model.name,
-            description: model.description,
-            data_type: model.data_type,
-            created_at: model.created_at,
-        }
-    }
 }
 
 impl From<DataSetSummary> for DataSetReference {
@@ -62,7 +56,10 @@ impl From<DataSetSummary> for DataSetReference {
             id: summary.id,
             name: summary.name,
             description: summary.description,
-            data_type: summary.data_type,
+            node_count: summary.node_count.map(|c| c as i32),
+            edge_count: summary.edge_count.map(|c| c as i32),
+            layer_count: summary.layer_count.map(|c| c as i32),
+            has_layers: summary.has_layers,
             created_at: summary.created_at,
         }
     }

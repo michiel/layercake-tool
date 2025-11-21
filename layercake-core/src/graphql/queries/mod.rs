@@ -127,8 +127,21 @@ impl Query {
         let mut by_type = std::collections::HashMap::new();
 
         for ds in datasets {
-            let type_key = ds.data_type.to_lowercase();
-            *by_type.entry(type_key).or_insert(0) += 1;
+            if ds.node_count.unwrap_or(0) > 0 {
+                *by_type.entry("nodes".to_string()).or_insert(0) += 1;
+            }
+            if ds.edge_count.unwrap_or(0) > 0 {
+                *by_type.entry("edges".to_string()).or_insert(0) += 1;
+            }
+            if ds.layer_count.unwrap_or(0) > 0 {
+                *by_type.entry("layers".to_string()).or_insert(0) += 1;
+            }
+            if ds.node_count.unwrap_or(0) == 0
+                && ds.edge_count.unwrap_or(0) == 0
+                && ds.layer_count.unwrap_or(0) == 0
+            {
+                *by_type.entry("empty".to_string()).or_insert(0) += 1;
+            }
         }
 
         let dataset_stats = crate::graphql::types::DatasetStats {
