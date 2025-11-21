@@ -139,9 +139,7 @@ export const GraphArtefactNodeConfigForm: React.FC<GraphArtefactNodeConfigFormPr
     const datasetNameMap = new Map<number, string>();
     const datasets = (layerDatasetsData as any)?.dataSets ?? [];
     datasets
-      .filter(
-        (dataset: any) => (dataset.dataType ?? '').toLowerCase() === 'layers'
-      )
+      .filter((dataset: any) => dataset.hasLayers || (dataset.layerCount ?? 0) > 0)
       .forEach((dataset: any) => {
         datasetNameMap.set(dataset.id, dataset.name ?? `Dataset #${dataset.id}`);
       });

@@ -38,7 +38,6 @@ import {
   DataSet,
   formatFileSize,
   getFileFormatDisplayName,
-  getDataTypeDisplayName,
   getOriginDisplayName
 } from '../../graphql/datasets'
 

@@ -9,7 +9,6 @@ export const GET_DATASOURCES = gql`
       name
       description
       fileFormat
-      dataType
       origin
       filename
       graphJson
@@ -19,6 +18,10 @@ export const GET_DATASOURCES = gql`
       processedAt
       createdAt
       updatedAt
+      nodeCount
+      edgeCount
+      layerCount
+      hasLayers
     }
   }
 `
@@ -32,7 +35,6 @@ export const GET_DATASOURCE = gql`
       name
       description
       fileFormat
-      dataType
       origin
       filename
       graphJson
@@ -42,6 +44,10 @@ export const GET_DATASOURCE = gql`
       processedAt
       createdAt
       updatedAt
+      nodeCount
+      edgeCount
+      layerCount
+      hasLayers
     }
   }
 `
@@ -55,7 +61,6 @@ export const CREATE_DATASOURCE_FROM_FILE = gql`
       name
       description
       fileFormat
-      dataType
       origin
       filename
       graphJson
@@ -65,6 +70,10 @@ export const CREATE_DATASOURCE_FROM_FILE = gql`
       processedAt
       createdAt
       updatedAt
+      nodeCount
+      edgeCount
+      layerCount
+      hasLayers
     }
   }
 `
@@ -78,7 +87,6 @@ export const CREATE_EMPTY_DATASOURCE = gql`
       name
       description
       fileFormat
-      dataType
       origin
       filename
       graphJson
@@ -88,6 +96,10 @@ export const CREATE_EMPTY_DATASOURCE = gql`
       processedAt
       createdAt
       updatedAt
+      nodeCount
+      edgeCount
+      layerCount
+      hasLayers
     }
   }
 `
@@ -101,7 +113,6 @@ export const BULK_UPLOAD_DATASOURCES = gql`
       name
       description
       fileFormat
-      dataType
       origin
       filename
       graphJson
@@ -111,6 +122,10 @@ export const BULK_UPLOAD_DATASOURCES = gql`
       processedAt
       createdAt
       updatedAt
+      nodeCount
+      edgeCount
+      layerCount
+      hasLayers
     }
   }
 `
@@ -124,7 +139,6 @@ export const UPDATE_DATASOURCE = gql`
       name
       description
       fileFormat
-      dataType
       origin
       filename
       graphJson
@@ -134,6 +148,10 @@ export const UPDATE_DATASOURCE = gql`
       processedAt
       createdAt
       updatedAt
+      nodeCount
+      edgeCount
+      layerCount
+      hasLayers
     }
   }
 `
@@ -154,7 +172,6 @@ export const REPROCESS_DATASOURCE = gql`
       name
       description
       fileFormat
-      dataType
       origin
       filename
       graphJson
@@ -164,6 +181,10 @@ export const REPROCESS_DATASOURCE = gql`
       processedAt
       createdAt
       updatedAt
+      nodeCount
+      edgeCount
+      layerCount
+      hasLayers
     }
   }
 `
@@ -177,7 +198,6 @@ export const UPDATE_DATASOURCE_GRAPH_DATA = gql`
       name
       description
       fileFormat
-      dataType
       origin
       filename
       graphJson
@@ -187,6 +207,10 @@ export const UPDATE_DATASOURCE_GRAPH_DATA = gql`
       processedAt
       createdAt
       updatedAt
+      nodeCount
+      edgeCount
+      layerCount
+      hasLayers
     }
   }
 `
@@ -200,7 +224,6 @@ export const DATASOURCE_UPDATED = gql`
       name
       description
       fileFormat
-      dataType
       origin
       filename
       graphJson
@@ -210,6 +233,10 @@ export const DATASOURCE_UPDATED = gql`
       processedAt
       createdAt
       updatedAt
+      nodeCount
+      edgeCount
+      layerCount
+      hasLayers
     }
   }
 `
@@ -235,7 +262,6 @@ export const IMPORT_DATASOURCES = gql`
         name
         description
         fileFormat
-        dataType
         filename
         graphJson
         status
@@ -244,6 +270,10 @@ export const IMPORT_DATASOURCES = gql`
         processedAt
         createdAt
         updatedAt
+      nodeCount
+      edgeCount
+      layerCount
+      hasLayers
       }
       createdCount
       updatedCount
@@ -274,7 +304,6 @@ export interface DataSet {
   name: string
   description?: string
   fileFormat: string
-  dataType: string
   origin: string
   filename: string
   graphJson: string
@@ -284,6 +313,10 @@ export interface DataSet {
   processedAt?: string
   createdAt: string
   updatedAt: string
+  nodeCount?: number
+  edgeCount?: number
+  layerCount?: number
+  hasLayers?: boolean
 }
 
 export interface CreateDataSetInput {
@@ -300,7 +333,6 @@ export interface CreateEmptyDataSetInput {
   projectId: number
   name: string
   description?: string
-  dataType: DataType
 }
 
 export interface BulkUploadDataSetInput {
