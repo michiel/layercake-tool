@@ -132,15 +132,38 @@ export const ProjectLayersPage = () => {
   }, [projectLayers])
 
   useEffect(() => {
-    const nextState: Record<number, boolean> = {}
-    const datasetIds = new Set(
-      projectLayers.filter((l) => l.sourceDatasetId).map((l) => l.sourceDatasetId as number)
-    )
-    datasetIds.forEach((datasetId) => {
-      nextState[datasetId] = calculateDatasetState(datasetId, projectLayers)
+    setDatasetToggleState((prev) => {
+      const datasetIds = new Set(layerDatasets.map((ds: any) => ds.id))
+      let changed = false
+      const next: Record<number, boolean> = { ...prev }
+
+      datasetIds.forEach((datasetId) => {
+        const datasetLayers = projectLayers.filter(
+          (l) => l.sourceDatasetId === datasetId
+        )
+        if (datasetLayers.length > 0) {
+          const computed = calculateDatasetState(datasetId, projectLayers)
+          if (next[datasetId] !== computed) {
+            next[datasetId] = computed
+            changed = true
+          }
+        } else if (!(datasetId in next)) {
+          next[datasetId] = false
+          changed = true
+        }
+      })
+
+      Object.keys(next).forEach((key) => {
+        const id = Number(key)
+        if (!datasetIds.has(id)) {
+          delete next[id]
+          changed = true
+        }
+      })
+
+      return changed ? next : prev
     })
-    setDatasetToggleState(nextState)
-  }, [projectLayers])
+  }, [projectLayers, layerDatasets])
 
   const handleSaveLayer = async (layer: ProjectLayerInput) => {
     try {
