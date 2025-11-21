@@ -207,11 +207,6 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
     return match ? parseInt(match[1], 10) : undefined
   }, [location.pathname])
 
-  const currentPlanId = useMemo(() => {
-    const match = location.pathname.match(/\/projects\/\d+\/plans\/(\d+)/)
-    return match ? match[1] : undefined
-  }, [location.pathname])
-
   // Initialize collaboration only if we're in a project context
   const collaboration = useCollaborationV2({
     projectId: projectId || 0,
@@ -276,21 +271,11 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
       },
     ]
 
-    const planEditorRoute = currentPlanId
-      ? `/projects/${projectId}/plans/${currentPlanId}`
-      : `/projects/${projectId}/plans`
-
     const graphCreationChildren: ProjectNavChild[] = [
       {
         key: 'plans',
         label: 'Plans',
         route: `/projects/${projectId}/plans`,
-        isActive: makeRouteMatcher(`/projects/${projectId}/plans`, { prefix: true }),
-      },
-      {
-        key: 'plan-editor',
-        label: 'Plan editor',
-        route: planEditorRoute,
         isActive: makeRouteMatcher(`/projects/${projectId}/plans`, { prefix: true }),
       },
       {
@@ -304,12 +289,6 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
         label: 'Graphs',
         route: `/projects/${projectId}/graphs`,
         isActive: makeRouteMatcher(`/projects/${projectId}/graphs`),
-      },
-      {
-        key: 'plan-nodes',
-        label: 'Plan nodes',
-        route: `/projects/${projectId}/plan-nodes`,
-        isActive: makeRouteMatcher(`/projects/${projectId}/plan-nodes`),
       },
     ]
 
@@ -1686,14 +1665,9 @@ const ProjectDetailPage = () => {
                 <p className="text-xs text-muted-foreground">
                   Version: {planVersion}
                 </p>
-                <Group gap="xs">
-                  <Button variant="secondary" className="flex-1" onClick={() => navigate(`/projects/${projectId}/plans`)}>
-                    Open plan
-                  </Button>
-                  <Button variant="secondary" className="flex-1" onClick={() => navigate(`/projects/${projectId}/plan-nodes`)}>
-                    Plan nodes
-                  </Button>
-                </Group>
+                <Button variant="secondary" className="w-full" onClick={() => navigate(`/projects/${projectId}/plans`)}>
+                  Open plans
+                </Button>
               </CardContent>
             </Card>
 
@@ -1941,7 +1915,6 @@ const LegacyPlanRedirect = () => {
   )
 }
 
-import { PlanNodesPage } from './components/graphs/PlanNodesPage'
 import { GraphsPage } from './components/graphs/GraphsPage'
 import { GraphEditorPage } from './pages/GraphEditorPage'
 import { DatabaseSettings } from './components/settings/DatabaseSettings'
@@ -2005,11 +1978,6 @@ function App() {
           <Route path="/projects/:projectId/workbench/layers" element={
             <ErrorBoundary>
               <ProjectLayersPage />
-            </ErrorBoundary>
-          } />
-          <Route path="/projects/:projectId/plan-nodes" element={
-            <ErrorBoundary>
-              <PlanNodesPage />
             </ErrorBoundary>
           } />
           <Route path="/projects/:projectId/graphs" element={

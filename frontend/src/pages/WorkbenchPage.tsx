@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
 import { GET_PLAN_DAG, VALIDATE_AND_MIGRATE_PLAN_DAG } from '@/graphql/plan-dag'
-import { IconGraph, IconLayout2, IconDatabase, IconArrowRight, IconNetwork, IconAdjustments } from '@tabler/icons-react'
+import { IconGraph, IconDatabase, IconArrowRight, IconNetwork, IconAdjustments } from '@tabler/icons-react'
 import { showErrorNotification, showSuccessNotification } from '@/utils/notifications'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useProjectPlanSelection } from '@/hooks/useProjectPlanSelection'
@@ -132,10 +132,6 @@ export const WorkbenchPage = () => {
     }
   }
 
-  const handleOpenPlanNodes = () => {
-    navigate(`/projects/${project.id}/plan-nodes${planQuerySuffix}`)
-  }
-
   const handleOpenGraphs = () => {
     navigate(`/projects/${project.id}/graphs${planQuerySuffix}`)
   }
@@ -190,10 +186,6 @@ export const WorkbenchPage = () => {
           <Button variant="secondary" onClick={handleOpenPlanEditor}>
             <IconGraph className="mr-2 h-4 w-4" />
             Open plan editor
-          </Button>
-          <Button variant="secondary" onClick={handleOpenPlanNodes}>
-            <IconLayout2 className="mr-2 h-4 w-4" />
-            Plan nodes
           </Button>
           <Button variant="secondary" onClick={handleOpenGraphs}>
             <IconDatabase className="mr-2 h-4 w-4" />
@@ -265,16 +257,11 @@ export const WorkbenchPage = () => {
           </CardHeader>
           <CardContent className="space-y-2">
             <p className="text-sm text-muted-foreground">
-              Review plan nodes and generated graphs, or jump to graph listings.
+              Review generated graphs and artefacts, or jump to graph listings.
             </p>
-            <Group gap="xs">
-              <Button className="flex-1" variant="secondary" onClick={handleOpenPlanNodes}>
-                Plan nodes
-              </Button>
-              <Button className="flex-1" variant="secondary" onClick={handleOpenGraphs}>
-                Graphs
-              </Button>
-            </Group>
+            <Button className="w-full" variant="secondary" onClick={handleOpenGraphs}>
+              Graphs
+            </Button>
           </CardContent>
         </Card>
       </div>
