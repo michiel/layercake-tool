@@ -32,4 +32,8 @@ The goal is to retire the legacy `dataType` field (Nodes/Edges/Layers/etc.) and 
 - Do we need to expose lightweight metadata (e.g., counts of nodes/edges/layers) so UIs can show “Layers present” badges without parsing full graphs?
 - Should we opportunistically clean up unused `dataType` database columns, or keep them nullable for compatibility and drop later?
 
+## Progress Log
+
+- **2024-XX-XX**: Initial audit completed. `dataType` is still referenced in GraphQL types (`DataSet`, `LibraryItem` metadata), dataset services (`DataSetService`, `GraphService`), upload/import paths, Plan DAG validation, and multiple frontend components (dataset tables, uploader, plan editors, library UI). Upcoming work will remove these references while preserving file upload hints.
+
 This plan covers the high-level refactor; implementation should proceed in the order above so GraphQL schema/backend changes land before frontend removals.
