@@ -769,41 +769,41 @@ const HomePage = () => {
   return (
     <div className="w-full h-full">
       {/* Action buttons section */}
-      <div className="py-12 px-8 bg-muted/50 border-b">
-        <Group justify="center" gap="xl">
+      <div className="py-12 px-4 md:px-8 bg-muted/50 border-b">
+        <div className="flex flex-col gap-4 md:flex-row md:flex-wrap md:justify-center">
           <Button
             size="lg"
             onClick={() => navigate('/projects')}
-            className="min-w-[240px] h-20 text-lg"
+            className="w-full md:w-auto md:min-w-[220px] h-16 md:h-20 text-base md:text-lg"
           >
-            <IconDatabase className="mr-2 h-6 w-6" />
+            <IconDatabase className="mr-2 h-5 w-5 md:h-6 md:w-6" />
             Browse Projects
           </Button>
           <Button
             size="lg"
             onClick={handleCreateProject}
-            className="min-w-[240px] h-20 text-lg"
+            className="w-full md:w-auto md:min-w-[220px] h-16 md:h-20 text-base md:text-lg"
           >
-            <IconPlus className="mr-2 h-6 w-6" />
+            <IconPlus className="mr-2 h-5 w-5 md:h-6 md:w-6" />
             Start New Project
           </Button>
           <Button
             size="lg"
             onClick={handleOpenSampleModal}
             variant="secondary"
-            className="min-w-[240px] h-20 text-lg"
+            className="w-full md:w-auto md:min-w-[220px] h-16 md:h-20 text-base md:text-lg"
           >
-            <IconFolderPlus className="mr-2 h-6 w-6" />
+            <IconFolderPlus className="mr-2 h-5 w-5 md:h-6 md:w-6" />
             Import Sample Project
           </Button>
           <Button
             size="lg"
             onClick={handleImportClick}
             variant="secondary"
-            className="min-w-[240px] h-20 text-lg"
+            className="w-full md:w-auto md:min-w-[220px] h-16 md:h-20 text-base md:text-lg"
             disabled={importLoading}
           >
-            <IconUpload className="mr-2 h-6 w-6" />
+            <IconUpload className="mr-2 h-5 w-5 md:h-6 md:w-6" />
             {importLoading ? 'Importing...' : 'Import Project'}
           </Button>
           <input
@@ -813,7 +813,7 @@ const HomePage = () => {
             onChange={handleFileChange}
             style={{ display: 'none' }}
           />
-        </Group>
+        </div>
       </div>
 
       {/* Recent projects section */}
