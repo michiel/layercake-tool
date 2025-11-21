@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery } from '@apollo/client/react'
+import { gql } from '@apollo/client'
 import { Breadcrumbs } from '@/components/common/Breadcrumbs'
 import PageContainer from '@/components/layout/PageContainer'
 import { Group, Stack } from '@/components/layout-primitives'
@@ -57,6 +58,22 @@ export const ProjectLayersPage = () => {
       skip: !projectIdNum,
     }
   )
+
+  const { data: projectInfo } = useQuery<{ project: { id: number; name: string } | null }>(
+    gql`
+      query LayersProjectName($id: Int!) {
+        project(id: $id) {
+          id
+          name
+        }
+      }
+    `,
+    {
+      variables: { id: projectIdNum },
+      skip: !projectIdNum,
+    }
+  )
+  const projectName = projectInfo?.project?.name ?? `Project ${projectIdNum}`
 
   const [upsertLayer, { loading: upserting }] = useMutation(UPSERT_PROJECT_LAYER)
   const [deleteLayer] = useMutation(DELETE_PROJECT_LAYER)
@@ -322,7 +339,7 @@ export const ProjectLayersPage = () => {
 
       <Breadcrumbs
         projectId={projectIdNum}
-        projectName={`Project ${projectIdNum}`}
+        projectName={projectName}
         currentPage="Layers"
         onNavigate={(route) => navigate(route)}
         sections={[
