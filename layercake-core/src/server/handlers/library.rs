@@ -135,7 +135,6 @@ pub async fn upload_library_item(
     let result = match item_type.as_str() {
         "dataset" => {
             let file_format = file_format.ok_or(StatusCode::BAD_REQUEST)?;
-            let data_type = data_type.ok_or(StatusCode::BAD_REQUEST)?;
             service
                 .create_dataset_item(
                     name,

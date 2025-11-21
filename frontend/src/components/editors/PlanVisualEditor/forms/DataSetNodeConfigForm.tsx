@@ -16,7 +16,6 @@ const GET_AVAILABLE_DATA_SETS = gql`
       name
       description
       fileFormat
-      dataType
       createdAt
     }
   }
@@ -27,7 +26,6 @@ interface DataSetReference {
   name: string;
   description?: string;
   fileFormat: string;
-  dataType: string;
   createdAt: string;
 }
 
@@ -132,11 +130,12 @@ export const DataSetNodeConfigForm: React.FC<DataSetNodeConfigFormProps> = ({
     );
   }
 
-  const dataSourceOptions = data?.dataSets?.map((ds: DataSetReference) => ({
-    value: ds.id.toString(),
-    label: ds.name,
-    description: ds.description || `Type: ${ds.fileFormat}/${ds.dataType}`,
-  })) || [];
+  const dataSourceOptions =
+    data?.dataSets?.map((ds: DataSetReference) => ({
+      value: ds.id.toString(),
+      label: ds.name,
+      description: ds.description || `Format: ${ds.fileFormat}`,
+    })) || [];
 
   const selectedDataSet = data?.dataSets?.find(
     (ds: DataSetReference) => ds.id === localConfig.dataSetId
@@ -177,7 +176,7 @@ export const DataSetNodeConfigForm: React.FC<DataSetNodeConfigFormProps> = ({
           <AlertDescription>
             <div className="space-y-1 text-xs">
               <div>
-                <strong>Type:</strong> {selectedDataSet.fileFormat}/{selectedDataSet.dataType}
+                <strong>Format:</strong> {selectedDataSet.fileFormat}
               </div>
               {selectedDataSet.description && (
                 <div>

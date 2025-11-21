@@ -4,9 +4,7 @@
 /// 1. Nodes with None label fall back to using the node ID
 /// 2. Nodes/edges with None layer use empty string (inherit default styling)
 /// 3. Appropriate warnings are logged when fallbacks are used
-use layercake::database::entities::{
-    graph_nodes, graphs, plan_dag_nodes, plans, projects,
-};
+use layercake::database::entities::{graph_nodes, graphs, plan_dag_nodes, plans, projects};
 use layercake::database::migrations::Migrator;
 use layercake::services::graph_service::GraphService;
 use sea_orm::{ActiveModelTrait, Database, DatabaseConnection, Set};
@@ -29,7 +27,11 @@ async fn create_test_project(db: &DatabaseConnection) -> i32 {
         name: Set("Test Project".to_string()),
         ..projects::ActiveModel::new()
     };
-    project.insert(db).await.expect("Failed to insert project").id
+    project
+        .insert(db)
+        .await
+        .expect("Failed to insert project")
+        .id
 }
 
 async fn create_test_plan(db: &DatabaseConnection, project_id: i32) -> i32 {

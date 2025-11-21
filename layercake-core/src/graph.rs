@@ -87,8 +87,7 @@ impl Graph {
             .filter(|n| {
                 let belongs_to = n.belongs_to.as_deref();
                 n.is_partition
-                    && (belongs_to.is_none()
-                        || belongs_to == Some("synthetic_partition_root"))
+                    && (belongs_to.is_none() || belongs_to == Some("synthetic_partition_root"))
             })
             .collect();
         nodes.sort_by(|a, b| a.id.cmp(&b.id));
@@ -662,10 +661,8 @@ impl Graph {
                 // aggregate edges
                 let aggregated_child_ids: HashSet<String> = aggregate_ids.iter().cloned().collect();
                 let mut untouched_edges = Vec::new();
-                let mut aggregated_edge_map: HashMap<
-                    (String, String, String, Option<i32>),
-                    Edge,
-                > = HashMap::new();
+                let mut aggregated_edge_map: HashMap<(String, String, String, Option<i32>), Edge> =
+                    HashMap::new();
 
                 for edge in graph.edges.iter() {
                     let mut new_edge = edge.clone();

@@ -746,101 +746,77 @@ impl Query {
                 StructuredError::bad_request(format!("Failed to parse graph JSON: {}", e))
             })?;
 
-        // Determine what to extract based on data_type
-        let (columns, rows, total_rows) = match data_set.data_type.as_str() {
-            "nodes" => {
-                let nodes_array = graph_data
-                    .get("nodes")
-                    .and_then(|v| v.as_array())
-                    .ok_or_else(|| {
-                        StructuredError::bad_request(
-                            "Graph JSON does not contain nodes array".to_string(),
-                        )
-                    })?;
+        enum PreviewSection<'a> {
+            Nodes(&'a Vec<serde_json::Value>),
+            Edges(&'a Vec<serde_json::Value>),
+            Layers(&'a Vec<serde_json::Value>),
+            Empty,
+        }
 
-                // Build columns from first node's keys
-                let columns =
-                    if let Some(first_node) = nodes_array.first().and_then(|v| v.as_object()) {
-                        first_node
-                            .keys()
-                            .map(|key| TableColumn {
-                                name: key.clone(),
-                                data_type: "string".to_string(),
-                                nullable: true,
-                            })
-                            .collect()
-                    } else {
-                        vec![]
-                    };
+        let nodes_array = graph_data.get("nodes").and_then(|v| v.as_array());
+        let edges_array = graph_data.get("edges").and_then(|v| v.as_array());
+        let layers_array = graph_data.get("layers").and_then(|v| v.as_array());
 
-                // Build rows from nodes with pagination
-                let paginated_nodes: Vec<&serde_json::Value> = nodes_array
-                    .iter()
-                    .skip(offset as usize)
-                    .take(limit as usize)
-                    .collect();
-
-                let rows: Vec<TableRow> = paginated_nodes
-                    .into_iter()
-                    .enumerate()
-                    .map(|(idx, node)| TableRow {
-                        row_number: (offset as i32) + (idx as i32) + 1,
-                        data: node.clone(),
-                    })
-                    .collect();
-
-                (columns, rows, nodes_array.len() as i32)
-            }
-            "edges" => {
-                let edges_array = graph_data
-                    .get("edges")
-                    .and_then(|v| v.as_array())
-                    .ok_or_else(|| {
-                        StructuredError::bad_request(
-                            "Graph JSON does not contain edges array".to_string(),
-                        )
-                    })?;
-
-                // Build columns from first edge's keys
-                let columns =
-                    if let Some(first_edge) = edges_array.first().and_then(|v| v.as_object()) {
-                        first_edge
-                            .keys()
-                            .map(|key| TableColumn {
-                                name: key.clone(),
-                                data_type: "string".to_string(),
-                                nullable: true,
-                            })
-                            .collect()
-                    } else {
-                        vec![]
-                    };
-
-                // Build rows from edges with pagination
-                let paginated_edges: Vec<&serde_json::Value> = edges_array
-                    .iter()
-                    .skip(offset as usize)
-                    .take(limit as usize)
-                    .collect();
-
-                let rows: Vec<TableRow> = paginated_edges
-                    .into_iter()
-                    .enumerate()
-                    .map(|(idx, edge)| TableRow {
-                        row_number: (offset as i32) + (idx as i32) + 1,
-                        data: edge.clone(),
-                    })
-                    .collect();
-
-                (columns, rows, edges_array.len() as i32)
-            }
-            _ => {
-                return Err(StructuredError::bad_request(format!(
-                    "Unsupported data type: {}",
-                    data_set.data_type
-                )));
-            }
+        let section = if nodes_array.map_or(false, |arr| !arr.is_empty()) {
+            PreviewSection::Nodes(nodes_array.unwrap())
+        } else if edges_array.map_or(false, |arr| !arr.is_empty()) {
+            PreviewSection::Edges(edges_array.unwrap())
+        } else if layers_array.map_or(false, |arr| !arr.is_empty()) {
+            PreviewSection::Layers(layers_array.unwrap())
+        } else if let Some(nodes) = nodes_array {
+            PreviewSection::Nodes(nodes)
+        } else if let Some(edges) = edges_array {
+            PreviewSection::Edges(edges)
+        } else if let Some(layers) = layers_array {
+            PreviewSection::Layers(layers)
+        } else {
+            PreviewSection::Empty
         };
+
+        let (section_label, section_records) = match section {
+            PreviewSection::Nodes(records) => ("nodes", Some(records)),
+            PreviewSection::Edges(records) => ("edges", Some(records)),
+            PreviewSection::Layers(records) => ("layers", Some(records)),
+            PreviewSection::Empty => ("nodes", None),
+        };
+
+        let columns = section_records
+            .and_then(|records| records.first())
+            .and_then(|value| value.as_object())
+            .map(|object| {
+                object
+                    .keys()
+                    .map(|key| TableColumn {
+                        name: key.clone(),
+                        data_type: "string".to_string(),
+                        nullable: true,
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+
+        let total_rows = section_records
+            .map(|records| records.len() as i32)
+            .unwrap_or(0);
+
+        let paginated_records: Vec<&serde_json::Value> = section_records
+            .map(|records| {
+                records
+                    .iter()
+                    .skip(offset as usize)
+                    .take(limit as usize)
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        let rows: Vec<TableRow> = paginated_records
+            .into_iter()
+            .enumerate()
+            .map(|(idx, value)| TableRow {
+                row_number: (offset as i32) + (idx as i32) + 1,
+                data: value.clone(),
+            })
+            .collect();
 
         // Determine execution state based on data_set status
         let execution_state = match data_set.status.as_str() {
@@ -855,7 +831,7 @@ impl Query {
             dataset_id: data_set.id,
             name: data_set.name.clone(),
             file_path: data_set.filename.clone(),
-            file_type: data_set.data_type.clone(),
+            file_type: section_label.to_string(),
             total_rows,
             columns,
             rows,

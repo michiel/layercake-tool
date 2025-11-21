@@ -95,8 +95,8 @@ pub struct UploadLibraryItemInput {
     pub file_content: String,
     #[graphql(name = "fileFormat")]
     pub file_format: Option<FileFormat>,
-    #[graphql(name = "dataType")]
-    pub data_type: Option<DataSetDataType>,
+    #[graphql(name = "tabularDataType")]
+    pub tabular_data_type: Option<DataSetDataType>,
     #[graphql(name = "contentType")]
     pub content_type: Option<String>,
 }

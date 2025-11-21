@@ -43,7 +43,7 @@ impl DataSetMutation {
                 description: input.description,
                 filename: input.filename,
                 file_format: input.file_format.into(),
-                data_type: input.data_type.into(),
+                tabular_data_type: input.tabular_data_type.map(Into::into),
                 file_bytes,
             })
             .await
@@ -65,7 +65,6 @@ impl DataSetMutation {
                 project_id: input.project_id,
                 name: input.name,
                 description: input.description,
-                data_type: input.data_type.into(),
             })
             .await
             .map_err(|e| StructuredError::service("AppContext::create_empty_data_set", e))?;

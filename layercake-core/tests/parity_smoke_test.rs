@@ -288,7 +288,6 @@ async fn graphql_mcp_parity_smoke_test() -> anyhow::Result<()> {
                 id
                 projectId
                 name
-                dataType
                 status
                 createdAt
                 updatedAt
@@ -300,8 +299,7 @@ async fn graphql_mcp_parity_smoke_test() -> anyhow::Result<()> {
         "input": {
             "projectId": project_id,
             "name": "GraphQL Empty Source",
-            "description": "Created via GraphQL",
-            "dataType": "NODES"
+            "description": "Created via GraphQL"
         }
     }));
 
@@ -335,7 +333,6 @@ async fn graphql_mcp_parity_smoke_test() -> anyhow::Result<()> {
 
     assert_eq!(gql_data_set["id"], mcp_data_set["id"]);
     assert_eq!(gql_data_set["projectId"], mcp_data_set["projectId"]);
-    assert_eq!(gql_data_set["dataType"], mcp_data_set["dataType"]);
     assert_eq!(gql_data_set["status"], mcp_data_set["status"]);
     assert_eq!(
         parse_timestamp(&gql_data_set["createdAt"], "graphql data source createdAt"),
@@ -371,7 +368,6 @@ async fn graphql_mcp_parity_smoke_test() -> anyhow::Result<()> {
                 projectId
                 name
                 description
-                dataType
                 status
                 createdAt
                 updatedAt

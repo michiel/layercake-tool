@@ -14,21 +14,21 @@ use crate::database::entities::{
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
 use crate::graphql::types::plan_dag::{
-    config::RenderConfig as GraphQLRenderConfig,
+    config::GraphvizCommentStyle as GraphQLGraphvizCommentStyle,
     config::LayerSourceStyle as GraphQLLayerSourceStyle,
     config::LayerSourceStyleOverride as GraphQLLayerSourceStyleOverride,
-    config::NotePosition as GraphQLNotePosition,
-    config::RenderTargetOptions as GraphQLRenderTargetOptions,
-    config::Orientation as GraphQLOrientation,
+    config::NotePosition as GraphQLNotePosition, config::Orientation as GraphQLOrientation,
     config::RenderBuiltinStyle as GraphQLRenderBuiltinStyle,
-    config::GraphvizCommentStyle as GraphQLGraphvizCommentStyle,
-    PlanDag, PlanDagEdge, PlanDagInput, PlanDagMigrationDetail, PlanDagMigrationResult, PlanDagNode,
+    config::RenderConfig as GraphQLRenderConfig,
+    config::RenderTargetOptions as GraphQLRenderTargetOptions, PlanDag, PlanDagEdge, PlanDagInput,
+    PlanDagMigrationDetail, PlanDagMigrationResult, PlanDagNode,
 };
 use crate::pipeline::DagExecutor;
 use crate::plan::{
-    LayerSourceStyle as PlanLayerSourceStyle, LayerSourceStyleOverride as PlanLayerSourceStyleOverride,
-    NotePosition as PlanNotePosition, RenderConfig as PlanRenderConfig, RenderConfigBuiltInStyle,
-    RenderConfigOrientation, RenderTargetOptions, GraphvizRenderOptions, GraphvizCommentStyle,
+    GraphvizCommentStyle, GraphvizRenderOptions, LayerSourceStyle as PlanLayerSourceStyle,
+    LayerSourceStyleOverride as PlanLayerSourceStyleOverride, NotePosition as PlanNotePosition,
+    RenderConfig as PlanRenderConfig, RenderConfigBuiltInStyle, RenderConfigOrientation,
+    RenderTargetOptions,
 };
 
 #[derive(Default)]
@@ -365,7 +365,9 @@ impl PlanDagMutation {
         ctx: &Context<'_>,
         project_id: i32,
         node_id: String,
-        #[graphql(name = "renderConfigOverride")] render_config_override: Option<GraphQLRenderConfig>,
+        #[graphql(name = "renderConfigOverride")] render_config_override: Option<
+            GraphQLRenderConfig,
+        >,
         preview_rows: Option<i32>,
     ) -> Result<ExportNodeOutputResult> {
         let context = ctx.data::<GraphQLContext>()?;
@@ -407,7 +409,9 @@ impl PlanDagMutation {
                         .render_target
                         .unwrap_or_else(|| "PlantUmlMindmap".to_string()),
                     stored_config.output_path,
-                    stored_config.render_config.map(|rc| rc.into_render_config()),
+                    stored_config
+                        .render_config
+                        .map(|rc| rc.into_render_config()),
                 )
             }
             _ => {
@@ -423,7 +427,9 @@ impl PlanDagMutation {
                         .render_target
                         .unwrap_or_else(|| "GML".to_string()),
                     stored_config.output_path,
-                    stored_config.render_config.map(|rc| rc.into_render_config()),
+                    stored_config
+                        .render_config
+                        .map(|rc| rc.into_render_config()),
                 )
             }
         };

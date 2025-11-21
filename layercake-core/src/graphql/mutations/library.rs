@@ -2,6 +2,9 @@ use async_graphql::*;
 use base64::{engine::general_purpose, Engine as _};
 use serde_json::json;
 
+use crate::database::entities::common_types::{
+    DataType as EntityDataType, FileFormat as EntityFileFormat,
+};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
 use crate::graphql::types::{
@@ -9,10 +12,9 @@ use crate::graphql::types::{
     UpdateLibraryItemInput, UploadLibraryItemInput,
 };
 use crate::services::library_item_service::{
-    LibraryItemService, SeedLibraryResult, ITEM_TYPE_DATASET, ITEM_TYPE_PROJECT,
-    ITEM_TYPE_PROJECT_TEMPLATE, DatasetMetadata, infer_data_type,
+    infer_data_type, DatasetMetadata, LibraryItemService, SeedLibraryResult, ITEM_TYPE_DATASET,
+    ITEM_TYPE_PROJECT, ITEM_TYPE_PROJECT_TEMPLATE,
 };
-use crate::database::entities::common_types::{DataType as EntityDataType, FileFormat as EntityFileFormat};
 
 #[derive(InputObject)]
 pub struct ImportLibraryDatasetsInput {
@@ -72,10 +74,6 @@ impl LibraryMutation {
                     StructuredError::bad_request("fileFormat is required for dataset uploads")
                 })?;
 
-                let data_type = input.data_type.ok_or_else(|| {
-                    StructuredError::bad_request("dataType is required for dataset uploads")
-                })?;
-
                 service
                     .create_dataset_item(
                         input.name,
@@ -83,7 +81,7 @@ impl LibraryMutation {
                         tags,
                         input.file_name,
                         file_format.into(),
-                        data_type.into(),
+                        input.tabular_data_type.map(Into::into),
                         input.content_type,
                         file_bytes,
                     )
@@ -215,7 +213,12 @@ impl LibraryMutation {
 
         let archive_bytes = general_purpose::STANDARD
             .decode(&file_content)
-            .map_err(|e| StructuredError::validation("fileContent", format!("Invalid base64 file content: {}", e)))?;
+            .map_err(|e| {
+                StructuredError::validation(
+                    "fileContent",
+                    format!("Invalid base64 file content: {}", e),
+                )
+            })?;
 
         let project = context
             .app
@@ -283,8 +286,8 @@ impl LibraryMutation {
         }
 
         // Parse existing metadata
-        let mut metadata = serde_json::from_str::<DatasetMetadata>(&item.metadata)
-            .unwrap_or_default();
+        let mut metadata =
+            serde_json::from_str::<DatasetMetadata>(&item.metadata).unwrap_or_default();
 
         // Parse format from metadata
         let file_format = metadata
@@ -299,15 +302,16 @@ impl LibraryMutation {
         // Infer data type from content
         let inferred_type = infer_data_type(&metadata.filename, &file_format, &item.content_blob)
             .map_err(|e| {
-                StructuredError::bad_request(format!("Failed to infer data type: {}", e))
-            })?;
+            StructuredError::bad_request(format!("Failed to infer data type: {}", e))
+        })?;
 
         // Update metadata with new data type
         metadata.data_type = inferred_type.as_ref().to_string();
 
         // Update the library item metadata
-        let updated_metadata_json = serde_json::to_string(&metadata)
-            .map_err(|e| StructuredError::internal(format!("Failed to serialize metadata: {}", e)))?;
+        let updated_metadata_json = serde_json::to_string(&metadata).map_err(|e| {
+            StructuredError::internal(format!("Failed to serialize metadata: {}", e))
+        })?;
 
         use crate::database::entities::library_items;
         use sea_orm::{ActiveModelTrait, EntityTrait, Set};

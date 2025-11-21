@@ -19,11 +19,7 @@ impl MigrationTrait for Migration {
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(
-                        ColumnDef::new(LayerAliases::ProjectId)
-                            .integer()
-                            .not_null(),
-                    )
+                    .col(ColumnDef::new(LayerAliases::ProjectId).integer().not_null())
                     .col(
                         ColumnDef::new(LayerAliases::AliasLayerId)
                             .string()

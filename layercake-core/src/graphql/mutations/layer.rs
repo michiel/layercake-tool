@@ -100,7 +100,10 @@ impl LayerMutation {
             .ok_or_else(|| {
                 StructuredError::validation(
                     "targetLayerId",
-                    format!("Target layer {} not found in project {}", target_layer_id, project_id),
+                    format!(
+                        "Target layer {} not found in project {}",
+                        target_layer_id, project_id
+                    ),
                 )
             })?;
 
@@ -113,9 +116,10 @@ impl LayerMutation {
             created_at: Set(chrono::Utc::now()),
         };
 
-        let result = alias.insert(&context.db).await.map_err(|e| {
-            StructuredError::database("layer_aliases::insert", e)
-        })?;
+        let result = alias
+            .insert(&context.db)
+            .await
+            .map_err(|e| StructuredError::database("layer_aliases::insert", e))?;
 
         Ok(LayerAlias::from(result))
     }

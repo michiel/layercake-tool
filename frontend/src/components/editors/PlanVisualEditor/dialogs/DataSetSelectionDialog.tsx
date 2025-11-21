@@ -13,7 +13,6 @@ import {
   GET_DATASOURCES,
   DataSet,
   getFileFormatDisplayName,
-  getDataTypeDisplayName,
   formatFileSize
 } from '../../../../graphql/datasets'
 import { Stack, Group } from '../../../layout-primitives'
@@ -209,9 +208,6 @@ export const DataSetSelectionDialog: React.FC<DataSetSelectionDialogProps> = ({
                               </Badge>
                               <Badge variant="outline">
                                 {getFileFormatDisplayName(dataSource.fileFormat)}
-                              </Badge>
-                              <Badge variant="outline">
-                                {getDataTypeDisplayName(dataSource.dataType)}
                               </Badge>
                             </Group>
 

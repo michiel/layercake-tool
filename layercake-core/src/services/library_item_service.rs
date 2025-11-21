@@ -132,13 +132,16 @@ impl LibraryItemService {
         tags: Vec<String>,
         file_name: String,
         file_format: FileFormat,
-        data_type: DataType,
+        tabular_data_type: Option<DataType>,
         content_type: Option<String>,
         bytes: Vec<u8>,
     ) -> Result<library_items::Model> {
-        self.validate_dataset_format(&file_format, &data_type)?;
+        let resolved_data_type =
+            Self::resolve_dataset_data_type(&file_format, &bytes, &file_name, tabular_data_type)?;
+        self.validate_dataset_format(&file_format, &resolved_data_type)?;
 
-        let metadata = self.build_dataset_metadata(&file_format, &data_type, &file_name, &bytes)?;
+        let metadata =
+            self.build_dataset_metadata(&file_format, &resolved_data_type, &file_name, &bytes)?;
         let tags_json = serde_json::to_string(&tags).unwrap_or_else(|_| "[]".to_string());
         let now = Utc::now();
 
@@ -271,7 +274,7 @@ impl LibraryItemService {
             vec![],
             filename.to_string(),
             file_format,
-            data_type,
+            Some(data_type),
             None,
             file_bytes,
         )
@@ -316,7 +319,8 @@ impl LibraryItemService {
         });
 
         // Always try to infer the data type from the actual file content first (most accurate)
-        let data_type = match infer_data_type(&metadata.filename, &file_format, &item.content_blob) {
+        let data_type = match infer_data_type(&metadata.filename, &file_format, &item.content_blob)
+        {
             Ok(inferred) if inferred.is_compatible_with_format(&file_format) => inferred,
             _ => {
                 // Fall back to metadata if inference fails
@@ -444,6 +448,31 @@ impl LibraryItemService {
         }
 
         Ok(metadata)
+    }
+
+    fn resolve_dataset_data_type(
+        file_format: &FileFormat,
+        file_bytes: &[u8],
+        file_name: &str,
+        manual_hint: Option<DataType>,
+    ) -> Result<DataType> {
+        match file_format {
+            FileFormat::Csv | FileFormat::Tsv => {
+                if let Some(hint) = manual_hint {
+                    if matches!(hint, DataType::Nodes | DataType::Edges | DataType::Layers) {
+                        return Ok(hint);
+                    } else {
+                        anyhow::bail!(
+                            "CSV/TSV uploads only support Nodes, Edges, or Layers data types"
+                        );
+                    }
+                }
+
+                infer_data_type(file_name, file_format, file_bytes)
+            }
+            FileFormat::Json => Ok(DataType::Graph),
+            _ => infer_data_type(file_name, file_format, file_bytes),
+        }
     }
 }
 

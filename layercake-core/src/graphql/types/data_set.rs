@@ -157,8 +157,8 @@ pub struct CreateDataSetInput {
     pub file_content: String, // Base64 encoded file content
     #[graphql(name = "fileFormat")]
     pub file_format: FileFormat,
-    #[graphql(name = "dataType")]
-    pub data_type: DataSetDataType,
+    #[graphql(name = "tabularDataType")]
+    pub tabular_data_type: Option<DataSetDataType>,
 }
 
 #[derive(InputObject)]

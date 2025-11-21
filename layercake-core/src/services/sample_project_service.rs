@@ -366,8 +366,8 @@ impl SampleProjectService {
                 Some(description),
                 file.filename.clone(),
                 FileFormat::Csv,
-                data_type,
                 file.contents.clone(),
+                Some(data_type),
             )
             .await
     }

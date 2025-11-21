@@ -51,9 +51,18 @@ pub fn get_data_set_tools() -> Vec<Tool> {
                     "filename": { "type": "string" },
                     "file_content": { "type": "string", "description": "Base64 file content" },
                     "file_format": { "type": "string", "enum": ["csv", "tsv", "json"] },
-                    "data_type": { "type": "string", "enum": ["nodes", "edges", "layers", "graph"] }
+                    "tabular_data_type": {
+                        "type": "string",
+                        "enum": ["nodes", "edges", "layers"],
+                        "description": "Optional hint for CSV/TSV uploads"
+                    },
+                    "data_type": {
+                        "type": "string",
+                        "enum": ["nodes", "edges", "layers", "graph"],
+                        "description": "Deprecated alias for tabular_data_type; kept for backwards compatibility"
+                    }
                 },
-                "required": ["project_id", "name", "filename", "file_content", "file_format", "data_type"],
+                "required": ["project_id", "name", "filename", "file_content", "file_format"],
                 "additionalProperties": false
             }),
             metadata: HashMap::new(),
@@ -66,10 +75,9 @@ pub fn get_data_set_tools() -> Vec<Tool> {
                 "properties": {
                     "project_id": { "type": "integer" },
                     "name": { "type": "string" },
-                    "description": { "type": "string" },
-                    "data_type": { "type": "string", "enum": ["nodes", "edges", "layers", "graph"] }
+                    "description": { "type": "string" }
                 },
-                "required": ["project_id", "name", "data_type"],
+                "required": ["project_id", "name"],
                 "additionalProperties": false
             }),
             metadata: HashMap::new(),
@@ -280,7 +288,12 @@ pub async fn create_data_set_from_file(
             .and_then(|v| v.as_str())
             .unwrap_or(""),
     )?;
-    let data_type = parse_data_type(args.get("data_type").and_then(|v| v.as_str()).unwrap_or(""))?;
+    let tabular_data_type = args
+        .get("tabular_data_type")
+        .or_else(|| args.get("data_type"))
+        .and_then(|v| v.as_str())
+        .map(parse_data_type)
+        .transpose()?;
 
     use base64::Engine;
     let file_bytes = base64::engine::general_purpose::STANDARD
@@ -296,7 +309,7 @@ pub async fn create_data_set_from_file(
             description,
             filename,
             file_format,
-            data_type,
+            tabular_data_type,
             file_bytes,
         })
         .await
@@ -335,14 +348,12 @@ pub async fn create_empty_data_set(
         .get("description")
         .and_then(|v| v.as_str())
         .map(str::to_string);
-    let data_type = parse_data_type(args.get("data_type").and_then(|v| v.as_str()).unwrap_or(""))?;
 
     let summary = app
         .create_empty_data_set(DataSetEmptyCreateRequest {
             project_id,
             name,
             description,
-            data_type,
         })
         .await
         .map_err(|e| McpError::Internal {

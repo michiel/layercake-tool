@@ -24,7 +24,6 @@ import {
   DataSet,
   UpdateDataSetInput,
   formatFileSize,
-  getDataTypeDisplayName,
   getFileFormatDisplayName
 } from '../../graphql/datasets'
 import { GraphSpreadsheetEditor, GraphData } from '../editors/GraphSpreadsheetEditor'
@@ -307,7 +306,7 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
           <h1 className="text-3xl font-bold">{dataSource.name}</h1>
           <Group gap="xs" className="mt-2">
             <Badge variant="secondary" className="text-xs">
-              {getFileFormatDisplayName(dataSource.fileFormat)}/{getDataTypeDisplayName(dataSource.dataType)}
+              {getFileFormatDisplayName(dataSource.fileFormat)}
             </Badge>
             <Badge
               variant="secondary"

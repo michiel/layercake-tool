@@ -64,8 +64,7 @@ pub mod renderer {
             reset_edge_weights(&mut hierarchy_edges);
         }
 
-        let hierarchy_tree =
-            serde_json::to_value(&hierarchy_tree_nodes).unwrap_or(Value::Null);
+        let hierarchy_tree = serde_json::to_value(&hierarchy_tree_nodes).unwrap_or(Value::Null);
 
         let mut layer_map = graph.get_layer_map();
 

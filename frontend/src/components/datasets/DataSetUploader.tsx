@@ -111,21 +111,17 @@ export const DataSetUploader: React.FC<DataSetUploaderProps> = ({
     ? createLibraryError
     : (activeTab === 'empty' ? createEmptyError : activeTab === 'bulk' ? bulkError : activeTab === 'import' ? importError : createError)
 
-  const form = useForm<{name: string; description: string; dataType: string}>({
+  type DataSetUploadForm = { name: string; description: string; tabularDataType?: DataType | '' }
+  const form = useForm<DataSetUploadForm>({
     defaultValues: {
       name: '',
       description: '',
-      dataType: ''
+      tabularDataType: ''
     }
   })
 
-  // Get available data types based on file format or active tab
+  // Get available data types based on file format
   const getAvailableDataTypes = (format: FileFormat | null): DataType[] => {
-    if (activeTab === 'empty') {
-      // For empty datasets, all types are available
-      return [DataType.NODES, DataType.EDGES, DataType.LAYERS, DataType.GRAPH]
-    }
-
     if (!format) return []
     if (format === FileFormat.CSV || format === FileFormat.TSV) {
       return [DataType.NODES, DataType.EDGES, DataType.LAYERS]
@@ -135,6 +131,9 @@ export const DataSetUploader: React.FC<DataSetUploaderProps> = ({
     }
     return []
   }
+
+  const supportsManualDataType = (format: FileFormat | null) =>
+    format === FileFormat.CSV || format === FileFormat.TSV
 
   // Generate preview of file content
   const generatePreview = async (file: File): Promise<string> => {
@@ -169,16 +168,9 @@ export const DataSetUploader: React.FC<DataSetUploaderProps> = ({
     setSelectedFile(fileInfo)
     setPreviewData(preview)
 
-    // Auto-populate form name
+    // Auto-populate form fields
     form.setValue('name', fileInfo.name)
-
-    // Auto-select data type if only one option (JSON -> GRAPH)
-    const availableTypes = getAvailableDataTypes(detectedFormat)
-    if (availableTypes.length === 1) {
-      form.setValue('dataType', availableTypes[0])
-    } else {
-      form.setValue('dataType', '')
-    }
+    form.setValue('tabularDataType', '')
   }
 
   const handleManualFileSelect = () => {
@@ -195,6 +187,7 @@ export const DataSetUploader: React.FC<DataSetUploaderProps> = ({
   const handleRemoveFile = () => {
     setSelectedFile(null)
     setPreviewData(null)
+    form.setValue('tabularDataType', '')
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
@@ -237,7 +230,7 @@ export const DataSetUploader: React.FC<DataSetUploaderProps> = ({
     })
   }
 
-  const handleSubmit = async (values: { name: string; description: string; dataType: string }) => {
+  const handleSubmit = async (values: DataSetUploadForm) => {
     try {
       setUploadProgress(10)
 
@@ -306,7 +299,6 @@ export const DataSetUploader: React.FC<DataSetUploaderProps> = ({
           projectId,
           name: values.name,
           description: values.description || undefined,
-          dataType: values.dataType as DataType
         }
 
         setUploadProgress(50)
@@ -324,6 +316,10 @@ export const DataSetUploader: React.FC<DataSetUploaderProps> = ({
 
         setUploadProgress(50)
 
+        const tabularDataType = supportsManualDataType(selectedFile.format)
+          ? values.tabularDataType || undefined
+          : undefined
+
         if (isLibraryMode) {
           const input: UploadLibraryItemInput = {
             type: LibraryItemType.DATASET,
@@ -333,7 +329,7 @@ export const DataSetUploader: React.FC<DataSetUploaderProps> = ({
             fileName: selectedFile.file.name,
             fileContent,
             fileFormat: selectedFile.format,
-            dataType: values.dataType as DataType
+            tabularDataType,
           }
 
           await uploadLibraryItem({ variables: { input } })
@@ -345,12 +341,12 @@ export const DataSetUploader: React.FC<DataSetUploaderProps> = ({
           const input: CreateDataSetInput = {
             projectId,
             name: values.name,
-            description: values.description || undefined,
-            filename: selectedFile.file.name,
-            fileContent,
-            fileFormat: selectedFile.format,
-            dataType: values.dataType as DataType
-          }
+              description: values.description || undefined,
+              filename: selectedFile.file.name,
+              fileContent,
+              fileFormat: selectedFile.format,
+              tabularDataType,
+            }
 
           await createDataSet({
             variables: { input }
@@ -513,11 +509,15 @@ export const DataSetUploader: React.FC<DataSetUploaderProps> = ({
                     format: newFormat,
                     formatOverride: newFormat !== selectedFile.detectedFormat
                   })
-                  // Reset data type when format changes
-                  form.setValue('dataType', '')
-                  const newAvailableTypes = getAvailableDataTypes(newFormat)
-                  if (newAvailableTypes.length === 1) {
-                    form.setValue('dataType', newAvailableTypes[0])
+                  if (supportsManualDataType(newFormat)) {
+                    const newAvailableTypes = getAvailableDataTypes(newFormat)
+                    if (newAvailableTypes.length === 1) {
+                      form.setValue('tabularDataType', newAvailableTypes[0])
+                    } else {
+                      form.setValue('tabularDataType', '')
+                    }
+                  } else {
+                    form.setValue('tabularDataType', '')
                   }
                 }}
               >
@@ -540,30 +540,29 @@ export const DataSetUploader: React.FC<DataSetUploaderProps> = ({
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="data-type">Data Type *</Label>
-              <Select
-                value={form.watch('dataType')}
-                onValueChange={(value) => form.setValue('dataType', value)}
-              >
-                <SelectTrigger id="data-type">
-                  <SelectValue placeholder="Select what kind of data this file contains" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableDataTypes.map(type => (
-                    <SelectItem key={type} value={type}>
-                      {getDataTypeDisplayName(type)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                {selectedFile?.format === FileFormat.JSON
-                  ? 'JSON files must contain a complete graph structure'
-                  : 'Choose whether this file contains nodes, edges, or layers'
-                }
-              </p>
-            </div>
+            {supportsManualDataType(selectedFile?.format ?? null) && (
+              <div className="space-y-2">
+                <Label htmlFor="data-type">Data Type (optional)</Label>
+                <Select
+                  value={form.watch('tabularDataType') || ''}
+                  onValueChange={(value) => form.setValue('tabularDataType', value as DataType | '')}
+                >
+                  <SelectTrigger id="data-type">
+                    <SelectValue placeholder="Select what kind of data this file contains" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {getAvailableDataTypes(selectedFile?.format ?? null).map(type => (
+                      <SelectItem key={type} value={type}>
+                        {getDataTypeDisplayName(type)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Choose whether this CSV/TSV file lists nodes, edges, or layers. Leave blank to auto-detect.
+                </p>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="name">Name *</Label>
@@ -598,28 +597,6 @@ export const DataSetUploader: React.FC<DataSetUploaderProps> = ({
             Create an empty data source that can be filled with data using the graph editor.
           </AlertDescription>
         </Alert>
-
-        <div className="space-y-2">
-          <Label htmlFor="empty-data-type">Data Type *</Label>
-          <Select
-            value={form.watch('dataType')}
-            onValueChange={(value) => form.setValue('dataType', value)}
-          >
-            <SelectTrigger id="empty-data-type">
-              <SelectValue placeholder="Select what kind of data this will contain" />
-            </SelectTrigger>
-            <SelectContent>
-              {availableDataTypes.map(type => (
-                <SelectItem key={type} value={type}>
-                  {getDataTypeDisplayName(type)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <p className="text-xs text-muted-foreground">
-            Choose what type of data this dataset will contain
-          </p>
-        </div>
 
         <div className="space-y-2">
           <Label htmlFor="empty-name">Name *</Label>
@@ -781,9 +758,6 @@ export const DataSetUploader: React.FC<DataSetUploaderProps> = ({
   }
 
   const isValidFileFormat = selectedFile?.format !== null
-  const availableDataTypes = activeTab === 'empty'
-    ? getAvailableDataTypes(null)
-    : (selectedFile ? getAvailableDataTypes(selectedFile.format) : [])
   const modalTitle = isLibraryMode ? 'Add Library Source' : 'New Data Set'
 
   // Determine if submit should be disabled
@@ -821,7 +795,7 @@ export const DataSetUploader: React.FC<DataSetUploaderProps> = ({
                   setActiveTab(value || 'upload')
                   setSelectedFile(null)
                   setPreviewData(null)
-                  form.setValue('dataType', '')
+                  form.setValue('tabularDataType', '')
                 }}>
                   <TabsList className="grid w-full grid-cols-4">
                     <TabsTrigger value="upload">Upload File</TabsTrigger>

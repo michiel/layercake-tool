@@ -326,7 +326,7 @@ export interface CreateDataSetInput {
   filename: string
   fileContent: string // Base64 encoded file content
   fileFormat: FileFormat
-  dataType: DataType
+  tabularDataType?: DataType
 }
 
 export interface CreateEmptyDataSetInput {

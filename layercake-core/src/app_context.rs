@@ -442,7 +442,7 @@ impl AppContext {
             description,
             filename,
             file_format,
-            data_type,
+            tabular_data_type,
             file_bytes,
         } = request;
 
@@ -454,8 +454,8 @@ impl AppContext {
                 description,
                 filename,
                 file_format,
-                data_type,
                 file_bytes,
+                tabular_data_type.map(Into::into),
             )
             .await
             .map_err(|e| anyhow!("Failed to create data set from file: {}", e))?;
@@ -1048,8 +1048,8 @@ impl AppContext {
                     descriptor.description.clone(),
                     descriptor.filename.clone(),
                     file_format,
-                    DataType::Graph,
                     file_bytes,
+                    None,
                 )
                 .await
                 .map_err(|e| anyhow!("Failed to import dataset {}: {}", descriptor.name, e))?;
@@ -1165,8 +1165,8 @@ impl AppContext {
                         descriptor.description.clone(),
                         descriptor.filename.clone(),
                         file_format,
-                        DataType::Graph,
                         file_bytes,
+                        None,
                     )
                     .await
             }
@@ -1917,10 +1917,10 @@ impl From<data_sets::Model> for DataSetSummary {
 pub struct DataSetFileCreateRequest {
     pub project_id: i32,
     pub name: String,
-    pub description: Option<String>,
-    pub filename: String,
-    pub file_format: DataSetFileFormat,
-    pub data_type: DataSetDataType,
+   pub description: Option<String>,
+   pub filename: String,
+   pub file_format: DataSetFileFormat,
+    pub tabular_data_type: Option<DataSetDataType>,
     pub file_bytes: Vec<u8>,
 }
 

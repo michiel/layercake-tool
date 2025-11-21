@@ -74,7 +74,6 @@ export const IMPORT_LIBRARY_DATASETS = gql`
       name
       description
       fileFormat
-      dataType
       origin
       filename
       graphJson
@@ -163,7 +162,7 @@ export interface UploadLibraryItemInput {
   fileName: string
   fileContent: string
   fileFormat?: FileFormat
-  dataType?: DataType
+  tabularDataType?: DataType
   contentType?: string
 }
 

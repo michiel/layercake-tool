@@ -453,8 +453,8 @@ impl DataSetBulkService {
                         Some("Imported from spreadsheet".to_string()),
                         filename,
                         FileFormat::Csv,
-                        data_type,
                         csv_data,
+                        Some(data_type),
                     )
                     .await?;
 
@@ -571,8 +571,8 @@ impl DataSetBulkService {
                         Some("Imported from spreadsheet".to_string()),
                         filename,
                         FileFormat::Csv,
-                        data_type,
                         csv_data,
+                        Some(data_type),
                     )
                     .await?;
 

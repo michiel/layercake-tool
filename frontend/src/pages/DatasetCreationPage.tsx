@@ -38,7 +38,6 @@ import {
   LibraryItemType,
   formatFileSize,
   getFileFormatDisplayName,
-  getDataTypeDisplayName,
 } from '../graphql/libraryItems'
 
 const GET_PROJECTS = gql`
@@ -357,7 +356,6 @@ export const DatasetCreationPage: React.FC = () => {
                     <TableHead className="w-12" />
                     <TableHead>Name</TableHead>
                     <TableHead>Format</TableHead>
-                    <TableHead>Data Type</TableHead>
                     <TableHead>Size</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -365,7 +363,6 @@ export const DatasetCreationPage: React.FC = () => {
                   {libraryItems.map((item) => {
                     const metadata = item.metadata || {}
                     const format = metadata.format || metadata.file_format || 'csv'
-                    const dataType = metadata.dataType || metadata.data_type || 'GRAPH'
                     return (
                       <TableRow
                         key={item.id}
@@ -384,7 +381,6 @@ export const DatasetCreationPage: React.FC = () => {
                           <div className="text-sm text-muted-foreground">{item.description}</div>
                         </TableCell>
                         <TableCell>{getFileFormatDisplayName(format)}</TableCell>
-                        <TableCell>{getDataTypeDisplayName(dataType)}</TableCell>
                         <TableCell>
                           {item.contentSize ? formatFileSize(item.contentSize) : '—'}
                         </TableCell>

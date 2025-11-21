@@ -69,13 +69,17 @@ export const ProjectLayersPage = () => {
     () => ((layersData as any)?.missingLayers as string[] | undefined) ?? [],
     [layersData]
   )
-  const layerDatasets = useMemo(
-    () =>
-      ((datasetsData as any)?.dataSets as any[] | undefined)?.filter(
-        (ds: any) => ds.dataType?.toLowerCase() === 'layers'
-      ) ?? [],
-    [datasetsData]
-  )
+  const layerDatasets = useMemo(() => {
+    const allDataSets: any[] = ((datasetsData as any)?.dataSets as any[] | undefined) ?? []
+    return allDataSets.filter((ds) => {
+      try {
+        const parsed = JSON.parse(ds.graphJson ?? '{}')
+        return Array.isArray(parsed.layers) && parsed.layers.length > 0
+      } catch {
+        return false
+      }
+    })
+  }, [datasetsData])
 
   const [editableLayers, setEditableLayers] = useState<ProjectLayer[]>([])
   const [newLayer, setNewLayer] = useState<ProjectLayerInput>({
