@@ -45,6 +45,7 @@ use rmcp::{
     ServiceExt,
 };
 
+use crate::app_context::summarize_graph_counts;
 use crate::database::entities::{
     data_sets, graphs, plan_dag_edges, plan_dag_nodes, plans, projects, users,
 };
@@ -1289,8 +1290,22 @@ async fn load_agent_project_context(
     let dataset_total = datasets.len();
     let mut dataset_by_type: BTreeMap<String, usize> = BTreeMap::new();
     for ds in datasets {
-        let key = ds.data_type.to_lowercase();
-        *dataset_by_type.entry(key).or_insert(0) += 1;
+        let (node_count, edge_count, layer_count) = summarize_graph_counts(&ds.graph_json);
+        if node_count.unwrap_or(0) > 0 {
+            *dataset_by_type.entry("nodes".to_string()).or_insert(0) += 1;
+        }
+        if edge_count.unwrap_or(0) > 0 {
+            *dataset_by_type.entry("edges".to_string()).or_insert(0) += 1;
+        }
+        if layer_count.unwrap_or(0) > 0 {
+            *dataset_by_type.entry("layers".to_string()).or_insert(0) += 1;
+        }
+        if node_count.unwrap_or(0) == 0
+            && edge_count.unwrap_or(0) == 0
+            && layer_count.unwrap_or(0) == 0
+        {
+            *dataset_by_type.entry("empty".to_string()).or_insert(0) += 1;
+        }
     }
 
     let graphs = graphs::Entity::find()

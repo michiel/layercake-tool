@@ -39,5 +39,6 @@ The goal is to retire the legacy `dataType` field (Nodes/Edges/Layers/etc.) and 
 - **2025-11-21**: GraphService layer seeding now detects layer-capable datasets by inspecting stored `graph_json` rather than the legacy `data_type` column, so any mixed dataset containing layer entries can act as a layer source.
 - **2025-11-21**: GraphQL `DataSet`/`DataSetReference` objects no longer expose `dataType`. They now surface `nodeCount`/`edgeCount`/`layerCount`/`hasLayers`, and AppContext summaries compute those counts directly from `graph_json`, aligning the public API with the new “datasets are complete graphs” model.
 - **2025-11-21**: Internally every dataset is treated as a single graph object with `nodes`, `edges`, and `layers` arrays (any of which may be empty). Pipeline builders now iterate those collections unconditionally instead of branching on legacy `dataType` tags, simplifying ingestion and ensuring consistent behavior across the codebase.
+- **2025-11-21**: Bulk export now writes nodes/edges/layers for each dataset directly from `graph_json`, emitting separate sheets per section and ignoring the deprecated `data_type` flag. Empty datasets produce placeholder sheets rather than failing.
 
 This plan covers the high-level refactor; implementation should proceed in the order above so GraphQL schema/backend changes land before frontend removals.
