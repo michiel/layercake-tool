@@ -130,15 +130,33 @@ export const ProjectLayersPage = () => {
   useEffect(() => {
     setEditableLayers(projectLayers)
     setHasUnsavedChanges(false) // Reset unsaved changes when fresh data arrives
-    const nextState: Record<number, boolean> = {}
-    // Get unique dataset IDs
-    const datasetIds = new Set(
-      projectLayers.filter((l) => l.sourceDatasetId).map((l) => l.sourceDatasetId as number)
-    )
-    datasetIds.forEach((datasetId) => {
-      nextState[datasetId] = calculateDatasetState(datasetId, projectLayers)
+  }, [projectLayers])
+
+  useEffect(() => {
+    setDatasetToggleState((prev) => {
+      const next = { ...prev }
+      let changed = false
+      const datasetIds = new Set(
+        projectLayers.filter((l) => l.sourceDatasetId).map((l) => l.sourceDatasetId as number)
+      )
+
+      datasetIds.forEach((datasetId) => {
+        if (!(datasetId in next)) {
+          next[datasetId] = calculateDatasetState(datasetId, projectLayers)
+          changed = true
+        }
+      })
+
+      Object.keys(next).forEach((key) => {
+        const id = Number(key)
+        if (!datasetIds.has(id)) {
+          delete next[id]
+          changed = true
+        }
+      })
+
+      return changed ? next : prev
     })
-    setDatasetToggleState(nextState)
   }, [projectLayers])
 
   const handleSaveLayer = async (layer: ProjectLayerInput) => {
