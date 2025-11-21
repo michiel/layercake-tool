@@ -3,6 +3,7 @@ use icu_locid::locale;
 use rust_xlsxwriter::*;
 use sea_orm::{DatabaseConnection, EntityTrait};
 use spreadsheet_ods::{Sheet, Value, WorkBook};
+use std::collections::HashSet;
 
 use crate::database::entities::common_types::{DataType, FileFormat};
 use crate::database::entities::data_sets;
@@ -87,19 +88,7 @@ impl DataSetBulkService {
     }
 
     /// Convert graph_json to CSV rows
-    fn graph_json_to_csv_rows(graph_json: &str, data_type: &str) -> Result<Vec<Vec<String>>> {
-        let data: serde_json::Value =
-            serde_json::from_str(graph_json).context("Failed to parse graph_json")?;
-
-        let array = match data_type {
-            "nodes" => data.get("nodes"),
-            "edges" => data.get("edges"),
-            "layers" => data.get("layers"),
-            _ => None,
-        }
-        .and_then(|v| v.as_array())
-        .ok_or_else(|| anyhow::anyhow!("No {} array in graph_json", data_type))?;
-
+    fn json_array_to_csv_rows(array: &[serde_json::Value]) -> Result<Vec<Vec<String>>> {
         if array.is_empty() {
             return Ok(Vec::new());
         }
@@ -141,6 +130,43 @@ impl DataSetBulkService {
         Ok(rows)
     }
 
+    fn build_sheet_name(
+        base: &str,
+        suffix: &str,
+        used: &mut HashSet<String>,
+        max_len: Option<usize>,
+    ) -> String {
+        let mut raw = if suffix.is_empty() {
+            base.to_string()
+        } else {
+            format!("{} - {}", base, suffix)
+        };
+        if let Some(limit) = max_len {
+            raw = Self::truncate_to_len(&raw, limit);
+        }
+        let mut candidate = raw.clone();
+        let mut counter = 2;
+        while used.contains(&candidate) {
+            let appendix = format!(" ({})", counter);
+            counter += 1;
+            let prefix_len = max_len
+                .map(|limit| limit.saturating_sub(appendix.chars().count()))
+                .unwrap_or(usize::MAX);
+            let mut prefix = Self::truncate_to_len(&raw, prefix_len);
+            prefix.push_str(&appendix);
+            candidate = prefix;
+        }
+        used.insert(candidate.clone());
+        candidate
+    }
+
+    fn truncate_to_len(name: &str, limit: usize) -> String {
+        if name.chars().count() <= limit {
+            return name.to_string();
+        }
+        name.chars().take(limit).collect()
+    }
+
     /// Export datasets to XLSX format
     /// Each dataset becomes a separate sheet named with its name containing CSV data
     pub async fn export_to_xlsx(&self, dataset_ids: &[i32]) -> Result<Vec<u8>> {
@@ -179,26 +205,30 @@ impl DataSetBulkService {
             ));
         }
 
+        let mut used_sheet_names = HashSet::new();
         for dataset in datasets {
+            let parsed: serde_json::Value = serde_json::from_str(&dataset.graph_json)
+                .context("Failed to parse graph_json during export")?;
+            let sections = [("nodes", "Nodes"), ("edges", "Edges"), ("layers", "Layers")];
+            let mut section_written = false;
             // Create a sheet named with the dataset name
-            let sheet_name = dataset.name.clone();
-            let worksheet = workbook.add_worksheet();
-            worksheet.set_name(&sheet_name)?;
+            for (key, label) in sections {
+                if let Some(array) = parsed.get(key).and_then(|v| v.as_array()) {
+                    if array.is_empty() {
+                        continue;
+                    }
+                    let rows = Self::json_array_to_csv_rows(array)?;
+                    let sheet_name = Self::build_sheet_name(
+                        &dataset.name,
+                        label,
+                        &mut used_sheet_names,
+                        Some(31),
+                    );
+                    let worksheet = workbook.add_worksheet();
+                    worksheet.set_name(&sheet_name)?;
 
-            tracing::info!(
-                "Exporting dataset {} ({}) to sheet {}",
-                dataset.id,
-                dataset.name,
-                sheet_name
-            );
-
-            // Convert graph_json to CSV rows
-            match Self::graph_json_to_csv_rows(&dataset.graph_json, &dataset.data_type) {
-                Ok(rows) => {
-                    // Write rows to sheet
                     for (row_idx, row_data) in rows.iter().enumerate() {
                         for (col_idx, value) in row_data.iter().enumerate() {
-                            // Try to parse as number, otherwise write as string
                             if let Ok(num) = value.parse::<f64>() {
                                 worksheet.write_number(row_idx as u32, col_idx as u16, num)?;
                             } else {
@@ -206,14 +236,22 @@ impl DataSetBulkService {
                             }
                         }
                     }
-                    tracing::info!("Wrote {} rows to sheet {}", rows.len(), sheet_name);
+                    tracing::info!(
+                        "Wrote {} rows to sheet {} ({})",
+                        rows.len(),
+                        sheet_name,
+                        label
+                    );
+                    section_written = true;
                 }
-                Err(e) => {
-                    tracing::warn!("Failed to convert dataset {} to CSV: {}", dataset.id, e);
-                    // Write error message to sheet
-                    worksheet.write_string(0, 0, "Error")?;
-                    worksheet.write_string(0, 1, format!("Failed to export: {}", e))?;
-                }
+            }
+
+            if !section_written {
+                let sheet_name =
+                    Self::build_sheet_name(&dataset.name, "Empty", &mut used_sheet_names, Some(31));
+                let worksheet = workbook.add_worksheet();
+                worksheet.set_name(&sheet_name)?;
+                worksheet.write_string(0, 0, "Dataset contains no nodes, edges, or layers")?;
             }
         }
 
@@ -259,25 +297,25 @@ impl DataSetBulkService {
             ));
         }
 
+        let mut used_sheet_names = HashSet::new();
         for dataset in datasets {
-            // Create a sheet named with the dataset name
-            let sheet_name = dataset.name.clone();
-            let mut sheet = Sheet::new(&sheet_name);
+            let parsed: serde_json::Value = serde_json::from_str(&dataset.graph_json)
+                .context("Failed to parse graph_json during export")?;
+            let sections = [("nodes", "Nodes"), ("edges", "Edges"), ("layers", "Layers")];
+            let mut section_written = false;
 
-            tracing::info!(
-                "Exporting dataset {} ({}) to sheet {}",
-                dataset.id,
-                dataset.name,
-                sheet_name
-            );
+            for (key, label) in sections {
+                if let Some(array) = parsed.get(key).and_then(|v| v.as_array()) {
+                    if array.is_empty() {
+                        continue;
+                    }
+                    let rows = Self::json_array_to_csv_rows(array)?;
+                    let sheet_name =
+                        Self::build_sheet_name(&dataset.name, label, &mut used_sheet_names, None);
+                    let mut sheet = Sheet::new(&sheet_name);
 
-            // Convert graph_json to CSV rows
-            match Self::graph_json_to_csv_rows(&dataset.graph_json, &dataset.data_type) {
-                Ok(rows) => {
-                    // Write rows to sheet
                     for (row_idx, row_data) in rows.iter().enumerate() {
                         for (col_idx, value) in row_data.iter().enumerate() {
-                            // Try to parse as number, otherwise write as string
                             if let Ok(num) = value.parse::<f64>() {
                                 sheet.set_value(row_idx as u32, col_idx as u32, Value::Number(num));
                             } else {
@@ -289,17 +327,23 @@ impl DataSetBulkService {
                             }
                         }
                     }
-                    tracing::info!("Wrote {} rows to sheet {}", rows.len(), sheet_name);
-                }
-                Err(e) => {
-                    tracing::warn!("Failed to convert dataset {} to CSV: {}", dataset.id, e);
-                    // Write error message to sheet
-                    sheet.set_value(0, 0, Value::Text("Error".to_string()));
-                    sheet.set_value(0, 1, Value::Text(format!("Failed to export: {}", e)));
+
+                    workbook.push_sheet(sheet);
+                    section_written = true;
                 }
             }
 
-            workbook.push_sheet(sheet);
+            if !section_written {
+                let sheet_name =
+                    Self::build_sheet_name(&dataset.name, "Empty", &mut used_sheet_names, None);
+                let mut sheet = Sheet::new(&sheet_name);
+                sheet.set_value(
+                    0,
+                    0,
+                    Value::Text("Dataset contains no nodes, edges, or layers".to_string()),
+                );
+                workbook.push_sheet(sheet);
+            }
         }
 
         // Save to buffer
