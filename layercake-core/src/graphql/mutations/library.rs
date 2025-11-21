@@ -87,7 +87,9 @@ impl LibraryMutation {
                     )
                     .await
             }
-            LibraryItemType::Project | LibraryItemType::ProjectTemplate | LibraryItemType::Prompt => {
+            LibraryItemType::Project
+            | LibraryItemType::ProjectTemplate
+            | LibraryItemType::Prompt => {
                 let metadata = json!({
                     "filename": input.file_name,
                     "uploadSource": "graphql",

@@ -1,7 +1,8 @@
 //! Plan management tools for MCP backed by shared AppContext helpers.
 
-use crate::app_context::{AppContext, PlanCreateRequest, PlanUpdateRequest};
+use crate::app_context::AppContext;
 use crate::mcp::tools::{create_success_response, get_optional_param, get_required_param};
+use crate::services::plan_service::{PlanCreateRequest, PlanUpdateRequest};
 use axum_mcp::prelude::*;
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -223,6 +224,8 @@ pub async fn create_plan(arguments: Option<Value>, app: &AppContext) -> McpResul
     let request = PlanCreateRequest {
         project_id,
         name,
+        description: None,
+        tags: None,
         yaml_content,
         dependencies,
         status: None,
@@ -273,6 +276,8 @@ pub async fn update_plan(arguments: Option<Value>, app: &AppContext) -> McpResul
 
     let update = PlanUpdateRequest {
         name: Some(name),
+        description: None,
+        tags: None,
         yaml_content: Some(yaml_content),
         dependencies,
         dependencies_is_set,
@@ -380,6 +385,8 @@ pub async fn execute_plan(
         plan_id,
         PlanUpdateRequest {
             name: None,
+            description: None,
+            tags: None,
             yaml_content: None,
             dependencies: None,
             dependencies_is_set: false,
@@ -410,6 +417,8 @@ pub async fn execute_plan(
         plan_id,
         PlanUpdateRequest {
             name: None,
+            description: None,
+            tags: None,
             yaml_content: None,
             dependencies: None,
             dependencies_is_set: false,

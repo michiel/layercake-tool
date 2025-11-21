@@ -35,6 +35,7 @@ use crate::services::library_item_service::{
     LibraryItemService, ITEM_TYPE_PROJECT, ITEM_TYPE_PROJECT_TEMPLATE,
 };
 use crate::services::plan_dag_service::PlanDagNodePositionUpdate;
+use crate::services::plan_service::{PlanCreateRequest, PlanService, PlanUpdateRequest};
 use crate::services::{
     data_set_service::DataSetService, dataset_bulk_service::DataSetBulkService, ExportService,
     GraphService, ImportService, PlanDagService,
@@ -53,6 +54,7 @@ pub struct AppContext {
     data_set_service: Arc<DataSetService>,
     data_set_bulk_service: Arc<DataSetBulkService>,
     plan_dag_service: Arc<PlanDagService>,
+    plan_service: Arc<PlanService>,
     graph_edit_service: Arc<GraphEditService>,
     graph_analysis_service: Arc<GraphAnalysisService>,
     data_acquisition_service: Arc<DataAcquisitionService>,
@@ -80,6 +82,7 @@ impl AppContext {
         let export_service = Arc::new(ExportService::new(db.clone()));
         let graph_service = Arc::new(GraphService::new(db.clone()));
         let plan_dag_service = Arc::new(PlanDagService::new(db.clone()));
+        let plan_service = Arc::new(PlanService::new(db.clone()));
         let graph_edit_service = Arc::new(GraphEditService::new(db.clone()));
         let graph_analysis_service = Arc::new(GraphAnalysisService::new(db.clone()));
         let data_set_service = Arc::new(DataSetService::new(db.clone()));
@@ -93,6 +96,7 @@ impl AppContext {
             data_set_service,
             data_set_bulk_service,
             plan_dag_service,
+            plan_service,
             graph_edit_service,
             graph_analysis_service,
             data_acquisition_service,
@@ -127,6 +131,10 @@ impl AppContext {
 
     pub fn plan_dag_service(&self) -> &Arc<PlanDagService> {
         &self.plan_dag_service
+    }
+
+    pub fn plan_service(&self) -> &Arc<PlanService> {
+        &self.plan_service
     }
 
     #[allow(dead_code)]
@@ -271,23 +279,26 @@ impl AppContext {
 
     #[allow(dead_code)]
     pub async fn list_plans(&self, project_id: Option<i32>) -> Result<Vec<PlanSummary>> {
-        let mut query = plans::Entity::find().order_by_desc(plans::Column::UpdatedAt);
-
-        if let Some(project_id) = project_id {
-            query = query.filter(plans::Column::ProjectId.eq(project_id));
-        }
-
-        let plans = query
-            .all(&self.db)
-            .await
-            .map_err(|e| anyhow!("Failed to list plans: {}", e))?;
+        let plans = if let Some(project_id) = project_id {
+            self.plan_service
+                .list_plans(project_id)
+                .await
+                .map_err(|e| anyhow!("Failed to list plans: {}", e))?
+        } else {
+            plans::Entity::find()
+                .order_by_desc(plans::Column::UpdatedAt)
+                .all(&self.db)
+                .await
+                .map_err(|e| anyhow!("Failed to list plans: {}", e))?
+        };
 
         Ok(plans.into_iter().map(PlanSummary::from).collect())
     }
 
     pub async fn get_plan(&self, id: i32) -> Result<Option<PlanSummary>> {
-        let plan = plans::Entity::find_by_id(id)
-            .one(&self.db)
+        let plan = self
+            .plan_service
+            .get_plan(id)
             .await
             .map_err(|e| anyhow!("Failed to load plan {}: {}", id, e))?;
 
@@ -295,10 +306,9 @@ impl AppContext {
     }
 
     pub async fn get_plan_for_project(&self, project_id: i32) -> Result<Option<PlanSummary>> {
-        let plan = plans::Entity::find()
-            .filter(plans::Column::ProjectId.eq(project_id))
-            .order_by_desc(plans::Column::UpdatedAt)
-            .one(&self.db)
+        let plan = self
+            .plan_service
+            .get_default_plan(project_id)
             .await
             .map_err(|e| anyhow!("Failed to load plan for project {}: {}", project_id, e))?;
 
@@ -306,37 +316,9 @@ impl AppContext {
     }
 
     pub async fn create_plan(&self, request: PlanCreateRequest) -> Result<PlanSummary> {
-        let PlanCreateRequest {
-            project_id,
-            name,
-            yaml_content,
-            dependencies,
-            status,
-        } = request;
-
-        let dependencies_json = match dependencies {
-            Some(values) => Some(
-                serde_json::to_string(&values)
-                    .map_err(|e| anyhow!("Invalid plan dependencies: {}", e))?,
-            ),
-            None => None,
-        };
-
-        let now = Utc::now();
-        let plan = plans::ActiveModel {
-            project_id: Set(project_id),
-            name: Set(name),
-            yaml_content: Set(yaml_content),
-            dependencies: Set(dependencies_json),
-            status: Set(status.unwrap_or_else(|| "pending".to_string())),
-            version: Set(1),
-            created_at: Set(now),
-            updated_at: Set(now),
-            ..Default::default()
-        };
-
-        let plan = plan
-            .insert(&self.db)
+        let plan = self
+            .plan_service
+            .create_plan(request)
             .await
             .map_err(|e| anyhow!("Failed to create plan: {}", e))?;
 
@@ -344,49 +326,9 @@ impl AppContext {
     }
 
     pub async fn update_plan(&self, id: i32, update: PlanUpdateRequest) -> Result<PlanSummary> {
-        let plan = plans::Entity::find_by_id(id)
-            .one(&self.db)
-            .await
-            .map_err(|e| anyhow!("Failed to load plan {}: {}", id, e))?
-            .ok_or_else(|| anyhow!("Plan {} not found", id))?;
-
-        let PlanUpdateRequest {
-            name,
-            yaml_content,
-            dependencies,
-            dependencies_is_set,
-            status,
-        } = update;
-
-        let mut active: plans::ActiveModel = plan.into();
-
-        if let Some(name) = name {
-            active.name = Set(name);
-        }
-
-        if let Some(content) = yaml_content {
-            active.yaml_content = Set(content);
-        }
-
-        if dependencies_is_set {
-            let dependencies_json = match dependencies {
-                Some(values) => Some(
-                    serde_json::to_string(&values)
-                        .map_err(|e| anyhow!("Invalid plan dependencies: {}", e))?,
-                ),
-                None => None,
-            };
-            active.dependencies = Set(dependencies_json);
-        }
-
-        if let Some(status) = status {
-            active.status = Set(status);
-        }
-
-        active.updated_at = Set(Utc::now());
-
-        let plan = active
-            .update(&self.db)
+        let plan = self
+            .plan_service
+            .update_plan(id, update)
             .await
             .map_err(|e| anyhow!("Failed to update plan {}: {}", id, e))?;
 
@@ -394,16 +336,20 @@ impl AppContext {
     }
 
     pub async fn delete_plan(&self, id: i32) -> Result<()> {
-        let result = plans::Entity::delete_by_id(id)
-            .exec(&self.db)
+        self.plan_service
+            .delete_plan(id)
             .await
-            .map_err(|e| anyhow!("Failed to delete plan {}: {}", id, e))?;
+            .map_err(|e| anyhow!("Failed to delete plan {}: {}", id, e))
+    }
 
-        if result.rows_affected == 0 {
-            return Err(anyhow!("Plan {} not found", id));
-        }
+    pub async fn duplicate_plan(&self, id: i32, name: String) -> Result<PlanSummary> {
+        let plan = self
+            .plan_service
+            .duplicate_plan(id, name)
+            .await
+            .map_err(|e| anyhow!("Failed to duplicate plan {}: {}", id, e))?;
 
-        Ok(())
+        Ok(PlanSummary::from(plan))
     }
 
     // ----- Data set helpers ---------------------------------------------
@@ -1017,6 +963,8 @@ impl AppContext {
                 } else {
                     manifest.plan_name.clone()
                 },
+                description: None,
+                tags: Some(vec![]),
                 yaml_content: "".to_string(),
                 dependencies: None,
                 status: Some("draft".to_string()),
@@ -1122,6 +1070,8 @@ impl AppContext {
                 } else {
                     manifest.plan_name.clone()
                 },
+                description: None,
+                tags: Some(vec![]),
                 yaml_content: "".to_string(),
                 dependencies: None,
                 status: Some("draft".to_string()),
@@ -1817,6 +1767,8 @@ pub struct PlanSummary {
     pub id: i32,
     pub project_id: i32,
     pub name: String,
+    pub description: Option<String>,
+    pub tags: Vec<String>,
     pub yaml_content: String,
     pub dependencies: Option<Vec<i32>>,
     pub status: String,
@@ -1830,11 +1782,14 @@ impl From<plans::Model> for PlanSummary {
         let dependencies = model
             .dependencies
             .and_then(|value| serde_json::from_str::<Vec<i32>>(&value).ok());
+        let tags = serde_json::from_str::<Vec<String>>(&model.tags).unwrap_or_default();
 
         Self {
             id: model.id,
             project_id: model.project_id,
             name: model.name,
+            description: model.description,
+            tags,
             yaml_content: model.yaml_content,
             dependencies,
             status: model.status,
@@ -1843,24 +1798,6 @@ impl From<plans::Model> for PlanSummary {
             updated_at: model.updated_at,
         }
     }
-}
-
-#[derive(Clone)]
-pub struct PlanCreateRequest {
-    pub project_id: i32,
-    pub name: String,
-    pub yaml_content: String,
-    pub dependencies: Option<Vec<i32>>,
-    pub status: Option<String>,
-}
-
-#[derive(Clone)]
-pub struct PlanUpdateRequest {
-    pub name: Option<String>,
-    pub yaml_content: Option<String>,
-    pub dependencies: Option<Vec<i32>>,
-    pub dependencies_is_set: bool,
-    pub status: Option<String>,
 }
 
 #[derive(Clone, Serialize)]

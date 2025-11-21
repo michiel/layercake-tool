@@ -82,6 +82,8 @@ impl SampleProjectService {
             id: sea_orm::ActiveValue::NotSet,
             project_id: Set(project.id),
             name: Set(format!("{} Plan", assets.metadata.name)),
+            description: Set(None),
+            tags: Set("[]".to_string()),
             yaml_content: Set(String::new()),
             dependencies: Set(None),
             status: Set("draft".to_string()),

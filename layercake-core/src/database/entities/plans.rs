@@ -11,6 +11,9 @@ pub struct Model {
     pub id: i32,
     pub project_id: i32,
     pub name: String,
+    pub description: Option<String>,
+    #[sea_orm(column_type = "Text", default_value = "[]")]
+    pub tags: String,
     pub yaml_content: String,
     pub dependencies: Option<String>, // JSON array of plan IDs
     pub status: PlanStatus,

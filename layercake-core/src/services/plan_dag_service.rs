@@ -62,6 +62,8 @@ impl PlanDagService {
                     id: sea_orm::ActiveValue::NotSet,
                     project_id: Set(project_id),
                     name: Set(format!("Plan for Project {}", project_id)),
+                    description: Set(None),
+                    tags: Set("[]".to_string()),
                     yaml_content: Set("".to_string()),
                     dependencies: Set(None),
                     status: Set("draft".to_string()),

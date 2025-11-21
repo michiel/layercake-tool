@@ -169,6 +169,18 @@ impl Query {
         Ok(plan.map(Plan::from))
     }
 
+    /// List all plans for a project
+    async fn plans(&self, ctx: &Context<'_>, project_id: i32) -> Result<Vec<Plan>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let plans = context
+            .app
+            .list_plans(Some(project_id))
+            .await
+            .map_err(|e| StructuredError::service("AppContext::list_plans", e))?;
+
+        Ok(plans.into_iter().map(Plan::from).collect())
+    }
+
     /// List project-wide layers (project palette)
     #[graphql(name = "projectLayers")]
     async fn project_layers(

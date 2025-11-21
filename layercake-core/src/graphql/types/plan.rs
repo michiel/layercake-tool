@@ -13,9 +13,12 @@ pub struct Plan {
     pub id: i32,
     pub project_id: i32,
     pub name: String,
+    pub description: Option<String>,
+    pub tags: Vec<String>,
     pub yaml_content: String,
     pub dependencies: Option<Vec<i32>>,
     pub status: String,
+    pub version: i32,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -26,9 +29,12 @@ impl From<PlanSummary> for Plan {
             id: summary.id,
             project_id: summary.project_id,
             name: summary.name,
+            description: summary.description,
+            tags: summary.tags,
             yaml_content: summary.yaml_content,
             dependencies: summary.dependencies,
             status: summary.status,
+            version: summary.version,
             created_at: summary.created_at,
             updated_at: summary.updated_at,
         }
@@ -57,13 +63,17 @@ impl Plan {
 pub struct CreatePlanInput {
     pub project_id: i32,
     pub name: String,
+    pub description: Option<String>,
+    pub tags: Option<Vec<String>>,
     pub yaml_content: String,
     pub dependencies: Option<Vec<i32>>,
 }
 
 #[derive(InputObject)]
 pub struct UpdatePlanInput {
-    pub name: String,
-    pub yaml_content: String,
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub tags: Option<Vec<String>>,
+    pub yaml_content: Option<String>,
     pub dependencies: Option<Vec<i32>>,
 }

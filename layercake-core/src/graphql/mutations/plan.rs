@@ -2,11 +2,11 @@ use async_graphql::*;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
 use super::helpers::PlanExecutionResult;
-use crate::app_context::{PlanCreateRequest, PlanUpdateRequest};
 use crate::database::entities::{plan_dag_edges, plan_dag_nodes, plans};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
 use crate::graphql::types::plan::{CreatePlanInput, Plan, UpdatePlanInput};
+use crate::services::plan_service::{PlanCreateRequest, PlanUpdateRequest};
 
 #[derive(Default)]
 pub struct PlanMutation;
@@ -20,6 +20,8 @@ impl PlanMutation {
         let request = PlanCreateRequest {
             project_id: input.project_id,
             name: input.name,
+            description: input.description,
+            tags: input.tags,
             yaml_content: input.yaml_content,
             dependencies: input.dependencies,
             status: None,
@@ -42,11 +44,22 @@ impl PlanMutation {
     ) -> Result<Plan> {
         let context = ctx.data::<GraphQLContext>()?;
 
+        let UpdatePlanInput {
+            name,
+            description,
+            tags,
+            yaml_content,
+            dependencies,
+        } = input;
+        let dependencies_is_set = dependencies.is_some();
+
         let update = PlanUpdateRequest {
-            name: Some(input.name),
-            yaml_content: Some(input.yaml_content),
-            dependencies: input.dependencies,
-            dependencies_is_set: true,
+            name,
+            description,
+            tags,
+            yaml_content,
+            dependencies,
+            dependencies_is_set,
             status: None,
         };
 
@@ -62,16 +75,11 @@ impl PlanMutation {
     async fn delete_plan(&self, ctx: &Context<'_>, id: i32) -> Result<bool> {
         let context = ctx.data::<GraphQLContext>()?;
 
-        let plan = plans::Entity::find_by_id(id)
-            .one(&context.db)
+        context
+            .app
+            .delete_plan(id)
             .await
-            .map_err(|e| StructuredError::database("plans::Entity::find_by_id", e))?
-            .ok_or_else(|| StructuredError::not_found("Plan", id))?;
-
-        plans::Entity::delete_by_id(plan.id)
-            .exec(&context.db)
-            .await
-            .map_err(|e| StructuredError::database("plans::Entity::delete_by_id", e))?;
+            .map_err(|e| StructuredError::service("AppContext::delete_plan", e))?;
 
         Ok(true)
     }
@@ -129,5 +137,18 @@ impl PlanMutation {
             message: format!("Executed {} nodes in topological order", nodes.len()),
             output_files: vec![],
         })
+    }
+
+    /// Duplicate a plan with all DAG nodes and edges
+    async fn duplicate_plan(&self, ctx: &Context<'_>, id: i32, name: String) -> Result<Plan> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        let summary = context
+            .app
+            .duplicate_plan(id, name)
+            .await
+            .map_err(|e| StructuredError::service("AppContext::duplicate_plan", e))?;
+
+        Ok(Plan::from(summary))
     }
 }

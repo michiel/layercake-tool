@@ -28,6 +28,7 @@ mod m20251115_000024_create_library_items;
 mod m20251116_000025_add_annotations_to_graphs;
 mod m20251117_000026_create_project_layers;
 mod m20251118_000027_create_layer_aliases;
+mod m20251122_000001_add_plan_description_tags;
 
 pub struct Migrator;
 
@@ -63,6 +64,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20251116_000025_add_annotations_to_graphs::Migration),
             Box::new(m20251117_000026_create_project_layers::Migration),
             Box::new(m20251118_000027_create_layer_aliases::Migration),
+            Box::new(m20251122_000001_add_plan_description_tags::Migration),
         ]
     }
 }
