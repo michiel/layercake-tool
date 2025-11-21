@@ -19,6 +19,7 @@ import {
   GET_PROJECT_LAYERS,
   ProjectLayer,
   ProjectLayerInput,
+  REMOVE_LAYER_ALIAS,
   SET_LAYER_DATASET_ENABLED,
   UPSERT_PROJECT_LAYER,
 } from '@/graphql/layers'
@@ -60,6 +61,7 @@ export const ProjectLayersPage = () => {
   const [upsertLayer, { loading: upserting }] = useMutation(UPSERT_PROJECT_LAYER)
   const [deleteLayer] = useMutation(DELETE_PROJECT_LAYER)
   const [setDatasetEnabled, { loading: togglingDataset }] = useMutation(SET_LAYER_DATASET_ENABLED)
+  const [removeLayerAlias] = useMutation(REMOVE_LAYER_ALIAS)
 
   const projectLayers: ProjectLayer[] = useMemo(
     () => ((layersData as any)?.projectLayers as ProjectLayer[] | undefined) ?? [],
@@ -93,6 +95,7 @@ export const ProjectLayersPage = () => {
   const [selectedMissingLayer, setSelectedMissingLayer] = useState<string>('')
   const [manageAliasesDialogOpen, setManageAliasesDialogOpen] = useState(false)
   const [selectedAliasLayer, setSelectedAliasLayer] = useState<{ id: number; name: string } | null>(null)
+  const [resettingLayers, setResettingLayers] = useState(false)
 
   // Helper function to calculate dataset enabled state
   // Dataset is enabled if ALL its layers are enabled, disabled if ALL are disabled
@@ -264,11 +267,97 @@ export const ProjectLayersPage = () => {
     }
   }
 
+  const handleResetLayers = async () => {
+    const manualLayers = projectLayers.filter((layer) => !layer.sourceDatasetId)
+    const aliasEntries = projectLayers.flatMap((layer) => layer.aliases ?? [])
+    const datasetIds = layerDatasets.map((ds: any) => ds.id)
+
+    if (
+      manualLayers.length === 0 &&
+      aliasEntries.length === 0 &&
+      datasetIds.length === 0
+    ) {
+      showSuccessNotification(
+        'Layers already reset',
+        'There are no manual layers, aliases, or sources to clear.'
+      )
+      return
+    }
+
+    const confirmed = window.confirm(
+      'Reset layers? This removes all manual layers, deletes every alias, and disables all layer sources.'
+    )
+    if (!confirmed) {
+      return
+    }
+
+    try {
+      setResettingLayers(true)
+
+      if (manualLayers.length > 0) {
+        await Promise.all(
+          manualLayers.map((layer) =>
+            deleteLayer({
+              variables: {
+                projectId: projectIdNum,
+                layerId: layer.layerId,
+                ...(layer.sourceDatasetId
+                  ? { sourceDatasetId: layer.sourceDatasetId }
+                  : {}),
+              },
+            })
+          )
+        )
+      }
+
+      if (aliasEntries.length > 0) {
+        await Promise.all(
+          aliasEntries.map((alias) =>
+            removeLayerAlias({
+              variables: {
+                projectId: projectIdNum,
+                aliasLayerId: alias.aliasLayerId,
+              },
+            })
+          )
+        )
+      }
+
+      if (datasetIds.length > 0) {
+        await Promise.all(
+          datasetIds.map((datasetId) =>
+            setDatasetEnabled({
+              variables: {
+                projectId: projectIdNum,
+                dataSetId: datasetId,
+                enabled: false,
+              },
+            })
+          )
+        )
+      }
+
+      await Promise.all([refetchLayers(), refetchDatasets()])
+      showSuccessNotification(
+        'Layers reset',
+        'Manual layers removed, aliases cleared, and layer sources disabled.'
+      )
+    } catch (error: any) {
+      showErrorNotification(
+        'Failed to reset layers',
+        error?.message || 'Unknown error'
+      )
+    } finally {
+      setResettingLayers(false)
+    }
+  }
+
   if (!projectIdNum) {
     return null
   }
 
-  const loading = layersLoading || datasetsLoading || upserting || togglingDataset
+  const loading =
+    layersLoading || datasetsLoading || upserting || togglingDataset || resettingLayers
 
   return (
     <PageContainer>
@@ -303,8 +392,12 @@ export const ProjectLayersPage = () => {
           </p>
         </div>
         <Group gap="sm">
-          <Button variant="secondary" onClick={() => navigate(-1)}>
-            Back
+          <Button
+            variant="destructive"
+            onClick={handleResetLayers}
+            disabled={resettingLayers}
+          >
+            {resettingLayers ? 'Resetting…' : 'Reset layers'}
           </Button>
         </Group>
       </Group>
