@@ -81,6 +81,20 @@ impl LayerMutation {
         Ok(true)
     }
 
+    /// Reset all project layer configuration (manual layers, aliases, dataset entries)
+    #[graphql(name = "resetProjectLayers")]
+    async fn reset_project_layers(&self, ctx: &Context<'_>, project_id: i32) -> Result<bool> {
+        let context = ctx.data::<GraphQLContext>()?;
+        context
+            .app
+            .graph_service()
+            .reset_project_layers(project_id)
+            .await
+            .map_err(|e| StructuredError::service("GraphService::reset_project_layers", e))?;
+
+        Ok(true)
+    }
+
     /// Create an alias from a missing layer to an existing project layer
     #[graphql(name = "createLayerAlias")]
     async fn create_layer_alias(

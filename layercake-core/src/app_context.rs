@@ -1917,9 +1917,9 @@ impl From<data_sets::Model> for DataSetSummary {
 pub struct DataSetFileCreateRequest {
     pub project_id: i32,
     pub name: String,
-   pub description: Option<String>,
-   pub filename: String,
-   pub file_format: DataSetFileFormat,
+    pub description: Option<String>,
+    pub filename: String,
+    pub file_format: DataSetFileFormat,
     pub tabular_data_type: Option<DataSetDataType>,
     pub file_bytes: Vec<u8>,
 }

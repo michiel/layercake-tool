@@ -123,12 +123,8 @@ impl DataSetService {
             ));
         }
 
-        let resolved_data_type = Self::determine_data_type(
-            &file_format,
-            &file_data,
-            tabular_data_type,
-            None,
-        )?;
+        let resolved_data_type =
+            Self::determine_data_type(&file_format, &file_data, tabular_data_type, None)?;
 
         // Create initial DataSet record
         let data_set = data_sets::ActiveModel {
@@ -150,34 +146,31 @@ impl DataSetService {
         let data_set = data_set.insert(&self.db).await?;
 
         // Process the file
-        let updated_data_set = match source_processing::process_file(
-            &file_format,
-            &resolved_data_type,
-            &file_data,
-        )
-        .await
-        {
-            Ok(graph_json) => {
-                // Update with successful processing
-                let mut active_model: data_sets::ActiveModel = data_set.into();
-                active_model.graph_json = Set(graph_json);
-                active_model.status = Set("active".to_string());
-                active_model.processed_at = Set(Some(chrono::Utc::now()));
-                active_model.updated_at = Set(chrono::Utc::now());
+        let updated_data_set =
+            match source_processing::process_file(&file_format, &resolved_data_type, &file_data)
+                .await
+            {
+                Ok(graph_json) => {
+                    // Update with successful processing
+                    let mut active_model: data_sets::ActiveModel = data_set.into();
+                    active_model.graph_json = Set(graph_json);
+                    active_model.status = Set("active".to_string());
+                    active_model.processed_at = Set(Some(chrono::Utc::now()));
+                    active_model.updated_at = Set(chrono::Utc::now());
 
-                active_model.update(&self.db).await?
-            }
-            Err(e) => {
-                // Update with error
-                let mut active_model: data_sets::ActiveModel = data_set.into();
-                active_model.status = Set("error".to_string());
-                active_model.error_message = Set(Some(e.to_string()));
-                active_model.updated_at = Set(chrono::Utc::now());
+                    active_model.update(&self.db).await?
+                }
+                Err(e) => {
+                    // Update with error
+                    let mut active_model: data_sets::ActiveModel = data_set.into();
+                    active_model.status = Set("error".to_string());
+                    active_model.error_message = Set(Some(e.to_string()));
+                    active_model.updated_at = Set(chrono::Utc::now());
 
-                let _updated = active_model.update(&self.db).await?;
-                return Err(e);
-            }
-        };
+                    let _updated = active_model.update(&self.db).await?;
+                    return Err(e);
+                }
+            };
 
         Ok(updated_data_set)
     }
@@ -286,12 +279,8 @@ impl DataSetService {
         let existing_data_type = data_set
             .get_data_type()
             .ok_or_else(|| anyhow!("Invalid data type in existing data source"))?;
-        let resolved_data_type = Self::determine_data_type(
-            &file_format,
-            &file_data,
-            None,
-            Some(existing_data_type),
-        )?;
+        let resolved_data_type =
+            Self::determine_data_type(&file_format, &file_data, None, Some(existing_data_type))?;
 
         // Update with new file data
         let mut active_model: data_sets::ActiveModel = data_set.into();
@@ -307,32 +296,29 @@ impl DataSetService {
         let data_set = active_model.update(&self.db).await?;
 
         // Process the new file
-        let updated_data_set = match source_processing::process_file(
-            &file_format,
-            &resolved_data_type,
-            &file_data,
-        )
-        .await
-        {
-            Ok(graph_json) => {
-                let mut active_model: data_sets::ActiveModel = data_set.into();
-                active_model.graph_json = Set(graph_json);
-                active_model.status = Set("active".to_string());
-                active_model.processed_at = Set(Some(chrono::Utc::now()));
-                active_model.updated_at = Set(chrono::Utc::now());
+        let updated_data_set =
+            match source_processing::process_file(&file_format, &resolved_data_type, &file_data)
+                .await
+            {
+                Ok(graph_json) => {
+                    let mut active_model: data_sets::ActiveModel = data_set.into();
+                    active_model.graph_json = Set(graph_json);
+                    active_model.status = Set("active".to_string());
+                    active_model.processed_at = Set(Some(chrono::Utc::now()));
+                    active_model.updated_at = Set(chrono::Utc::now());
 
-                active_model.update(&self.db).await?
-            }
-            Err(e) => {
-                let mut active_model: data_sets::ActiveModel = data_set.into();
-                active_model.status = Set("error".to_string());
-                active_model.error_message = Set(Some(e.to_string()));
-                active_model.updated_at = Set(chrono::Utc::now());
+                    active_model.update(&self.db).await?
+                }
+                Err(e) => {
+                    let mut active_model: data_sets::ActiveModel = data_set.into();
+                    active_model.status = Set("error".to_string());
+                    active_model.error_message = Set(Some(e.to_string()));
+                    active_model.updated_at = Set(chrono::Utc::now());
 
-                let _updated = active_model.update(&self.db).await?;
-                return Err(e);
-            }
-        };
+                    let _updated = active_model.update(&self.db).await?;
+                    return Err(e);
+                }
+            };
 
         Ok(updated_data_set)
     }

@@ -56,6 +56,12 @@ export const SET_LAYER_DATASET_ENABLED = gql`
   }
 `
 
+export const RESET_PROJECT_LAYERS = gql`
+  mutation ResetProjectLayers($projectId: Int!) {
+    resetProjectLayers(projectId: $projectId)
+  }
+`
+
 export const LIST_LAYER_ALIASES = gql`
   query ListLayerAliases($projectId: Int!) {
     listLayerAliases(projectId: $projectId) {

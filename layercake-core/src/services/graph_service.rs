@@ -802,6 +802,34 @@ impl GraphService {
         Ok(updated)
     }
 
+    pub async fn reset_project_layers(&self, project_id: i32) -> GraphResult<()> {
+        let now = chrono::Utc::now();
+
+        layer_aliases::Entity::delete_many()
+            .filter(layer_aliases::Column::ProjectId.eq(project_id))
+            .exec(&self.db)
+            .await
+            .map_err(GraphError::Database)?;
+
+        project_layers::Entity::delete_many()
+            .filter(project_layers::Column::ProjectId.eq(project_id))
+            .filter(project_layers::Column::SourceDatasetId.is_null())
+            .exec(&self.db)
+            .await
+            .map_err(GraphError::Database)?;
+
+        project_layers::Entity::update_many()
+            .col_expr(project_layers::Column::Enabled, Expr::value(false))
+            .col_expr(project_layers::Column::UpdatedAt, Expr::value(now))
+            .filter(project_layers::Column::ProjectId.eq(project_id))
+            .filter(project_layers::Column::SourceDatasetId.is_not_null())
+            .exec(&self.db)
+            .await
+            .map_err(GraphError::Database)?;
+
+        Ok(())
+    }
+
     pub async fn missing_layers(&self, project_id: i32) -> GraphResult<Vec<String>> {
         use crate::database::entities::graphs::Entity as Graphs;
 

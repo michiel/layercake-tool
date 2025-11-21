@@ -19,7 +19,7 @@ import {
   GET_PROJECT_LAYERS,
   ProjectLayer,
   ProjectLayerInput,
-  REMOVE_LAYER_ALIAS,
+  RESET_PROJECT_LAYERS,
   SET_LAYER_DATASET_ENABLED,
   UPSERT_PROJECT_LAYER,
 } from '@/graphql/layers'
@@ -61,7 +61,9 @@ export const ProjectLayersPage = () => {
   const [upsertLayer, { loading: upserting }] = useMutation(UPSERT_PROJECT_LAYER)
   const [deleteLayer] = useMutation(DELETE_PROJECT_LAYER)
   const [setDatasetEnabled, { loading: togglingDataset }] = useMutation(SET_LAYER_DATASET_ENABLED)
-  const [removeLayerAlias] = useMutation(REMOVE_LAYER_ALIAS)
+  const [resetProjectLayersMutation, { loading: resettingLayers }] = useMutation(
+    RESET_PROJECT_LAYERS
+  )
 
   const projectLayers: ProjectLayer[] = useMemo(
     () => ((layersData as any)?.projectLayers as ProjectLayer[] | undefined) ?? [],
@@ -95,7 +97,6 @@ export const ProjectLayersPage = () => {
   const [selectedMissingLayer, setSelectedMissingLayer] = useState<string>('')
   const [manageAliasesDialogOpen, setManageAliasesDialogOpen] = useState(false)
   const [selectedAliasLayer, setSelectedAliasLayer] = useState<{ id: number; name: string } | null>(null)
-  const [resettingLayers, setResettingLayers] = useState(false)
 
   // Helper function to calculate dataset enabled state
   // Dataset is enabled if ALL its layers are enabled, disabled if ALL are disabled
@@ -114,12 +115,16 @@ export const ProjectLayersPage = () => {
   }
 
   const paletteLayers = useMemo(() => {
-    return [...editableLayers].sort((a, b) => {
-      const dsA = a.sourceDatasetId ?? -1
-      const dsB = b.sourceDatasetId ?? -1
-      if (dsA !== dsB) return dsA - dsB
-      return a.layerId.localeCompare(b.layerId)
-    })
+    return [...editableLayers]
+      .filter((layer) =>
+        layer.sourceDatasetId ? layer.enabled : true
+      )
+      .sort((a, b) => {
+        const dsA = a.sourceDatasetId ?? -1
+        const dsB = b.sourceDatasetId ?? -1
+        if (dsA !== dsB) return dsA - dsB
+        return a.layerId.localeCompare(b.layerId)
+      })
   }, [editableLayers])
 
   // Helper to update editable layers and mark as unsaved
@@ -268,87 +273,27 @@ export const ProjectLayersPage = () => {
   }
 
   const handleResetLayers = async () => {
-    const manualLayers = projectLayers.filter((layer) => !layer.sourceDatasetId)
-    const aliasEntries = projectLayers.flatMap((layer) => layer.aliases ?? [])
-    const datasetIds = layerDatasets.map((ds: any) => ds.id)
-
-    if (
-      manualLayers.length === 0 &&
-      aliasEntries.length === 0 &&
-      datasetIds.length === 0
-    ) {
-      showSuccessNotification(
-        'Layers already reset',
-        'There are no manual layers, aliases, or sources to clear.'
-      )
-      return
-    }
-
     const confirmed = window.confirm(
-      'Reset layers? This removes all manual layers, deletes every alias, and disables all layer sources.'
+      'Reset layers? This removes all manual layers, clears aliases, and disables every layer source.'
     )
     if (!confirmed) {
       return
     }
 
     try {
-      setResettingLayers(true)
-
-      if (manualLayers.length > 0) {
-        await Promise.all(
-          manualLayers.map((layer) =>
-            deleteLayer({
-              variables: {
-                projectId: projectIdNum,
-                layerId: layer.layerId,
-                ...(layer.sourceDatasetId
-                  ? { sourceDatasetId: layer.sourceDatasetId }
-                  : {}),
-              },
-            })
-          )
-        )
-      }
-
-      if (aliasEntries.length > 0) {
-        await Promise.all(
-          aliasEntries.map((alias) =>
-            removeLayerAlias({
-              variables: {
-                projectId: projectIdNum,
-                aliasLayerId: alias.aliasLayerId,
-              },
-            })
-          )
-        )
-      }
-
-      if (datasetIds.length > 0) {
-        await Promise.all(
-          datasetIds.map((datasetId) =>
-            setDatasetEnabled({
-              variables: {
-                projectId: projectIdNum,
-                dataSetId: datasetId,
-                enabled: false,
-              },
-            })
-          )
-        )
-      }
-
+      await resetProjectLayersMutation({
+        variables: { projectId: projectIdNum },
+      })
       await Promise.all([refetchLayers(), refetchDatasets()])
       showSuccessNotification(
         'Layers reset',
-        'Manual layers removed, aliases cleared, and layer sources disabled.'
+        'Project layer configuration cleared and sources disabled.'
       )
     } catch (error: any) {
       showErrorNotification(
         'Failed to reset layers',
         error?.message || 'Unknown error'
       )
-    } finally {
-      setResettingLayers(false)
     }
   }
 
