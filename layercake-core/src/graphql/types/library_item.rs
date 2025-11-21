@@ -13,6 +13,8 @@ pub enum LibraryItemType {
     Project,
     #[graphql(name = "PROJECT_TEMPLATE")]
     ProjectTemplate,
+    #[graphql(name = "PROMPT")]
+    Prompt,
 }
 
 impl LibraryItemType {
@@ -21,6 +23,7 @@ impl LibraryItemType {
             LibraryItemType::Dataset => "dataset",
             LibraryItemType::Project => "project",
             LibraryItemType::ProjectTemplate => "project_template",
+            LibraryItemType::Prompt => "prompt",
         }
     }
 }
@@ -57,6 +60,7 @@ impl From<library_items::Model> for LibraryItem {
             "dataset" => LibraryItemType::Dataset,
             "project" => LibraryItemType::Project,
             "project_template" => LibraryItemType::ProjectTemplate,
+            "prompt" => LibraryItemType::Prompt,
             _ => LibraryItemType::Dataset,
         };
 

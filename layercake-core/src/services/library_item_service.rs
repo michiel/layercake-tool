@@ -17,10 +17,12 @@ use crate::database::entities::{data_sets, library_items, projects};
 use crate::services::source_processing;
 
 const REPO_LIBRARY_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../resources/library");
+const REPO_PROMPTS_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../resources/prompts");
 
 pub const ITEM_TYPE_DATASET: &str = "dataset";
 pub const ITEM_TYPE_PROJECT: &str = "project";
 pub const ITEM_TYPE_PROJECT_TEMPLATE: &str = "project_template";
+pub const ITEM_TYPE_PROMPT: &str = "prompt";
 
 #[derive(Debug, Default, Clone)]
 pub struct LibraryItemFilter {
@@ -199,57 +201,103 @@ impl LibraryItemService {
     }
 
     pub async fn seed_from_repository(&self) -> Result<SeedLibraryResult> {
-        let library_dir = PathBuf::from(REPO_LIBRARY_PATH);
-        if !library_dir.is_dir() {
-            return Err(anyhow!(
-                "Repository library directory not found at {}",
-                REPO_LIBRARY_PATH
-            ));
-        }
-
-        let files: Vec<PathBuf> = fs::read_dir(&library_dir)
-            .with_context(|| format!("Failed to read {}", library_dir.display()))?
-            .filter_map(|entry| entry.ok().map(|e| e.path()).filter(|path| path.is_file()))
-            .collect();
-
-        let mut existing_filenames: HashSet<String> = library_items::Entity::find()
-            .filter(library_items::Column::ItemType.eq(ITEM_TYPE_DATASET))
-            .all(&self.db)
-            .await?
-            .into_iter()
-            .filter_map(|model| {
-                serde_json::from_str::<DatasetMetadata>(&model.metadata)
-                    .ok()
-                    .map(|meta| meta.filename)
-            })
-            .collect();
-
         let mut result = SeedLibraryResult {
-            total_remote_files: files.len(),
+            total_remote_files: 0,
             created_count: 0,
             skipped_count: 0,
             failed_files: Vec::new(),
         };
 
-        for path in files {
-            let filename = path
-                .file_name()
-                .and_then(|os| os.to_str())
-                .ok_or_else(|| anyhow!("Invalid filename in {}", path.display()))?
-                .to_string();
+        // Seed datasets from library directory
+        let library_dir = PathBuf::from(REPO_LIBRARY_PATH);
+        if library_dir.is_dir() {
+            let files: Vec<PathBuf> = fs::read_dir(&library_dir)
+                .with_context(|| format!("Failed to read {}", library_dir.display()))?
+                .filter_map(|entry| entry.ok().map(|e| e.path()).filter(|path| path.is_file()))
+                .collect();
 
-            if existing_filenames.contains(&filename) {
-                result.skipped_count += 1;
-                continue;
-            }
+            let mut existing_filenames: HashSet<String> = library_items::Entity::find()
+                .filter(library_items::Column::ItemType.eq(ITEM_TYPE_DATASET))
+                .all(&self.db)
+                .await?
+                .into_iter()
+                .filter_map(|model| {
+                    serde_json::from_str::<DatasetMetadata>(&model.metadata)
+                        .ok()
+                        .map(|meta| meta.filename)
+                })
+                .collect();
 
-            match self.seed_local_file(&path, &filename).await {
-                Ok(_) => {
-                    result.created_count += 1;
-                    existing_filenames.insert(filename);
+            result.total_remote_files += files.len();
+
+            for path in files {
+                let filename = path
+                    .file_name()
+                    .and_then(|os| os.to_str())
+                    .ok_or_else(|| anyhow!("Invalid filename in {}", path.display()))?
+                    .to_string();
+
+                if existing_filenames.contains(&filename) {
+                    result.skipped_count += 1;
+                    continue;
                 }
-                Err(err) => {
-                    result.failed_files.push(format!("{}: {}", filename, err));
+
+                match self.seed_local_file(&path, &filename).await {
+                    Ok(_) => {
+                        result.created_count += 1;
+                        existing_filenames.insert(filename);
+                    }
+                    Err(err) => {
+                        result.failed_files.push(format!("{}: {}", filename, err));
+                    }
+                }
+            }
+        }
+
+        // Seed prompts from prompts directory
+        let prompts_dir = PathBuf::from(REPO_PROMPTS_PATH);
+        if prompts_dir.is_dir() {
+            let prompt_files: Vec<PathBuf> = fs::read_dir(&prompts_dir)
+                .with_context(|| format!("Failed to read {}", prompts_dir.display()))?
+                .filter_map(|entry| entry.ok().map(|e| e.path()).filter(|path| path.is_file()))
+                .filter(|path| {
+                    path.extension()
+                        .and_then(|ext| ext.to_str())
+                        .map(|ext| ext == "md" || ext == "txt")
+                        .unwrap_or(false)
+                })
+                .collect();
+
+            let existing_prompt_names: HashSet<String> = library_items::Entity::find()
+                .filter(library_items::Column::ItemType.eq(ITEM_TYPE_PROMPT))
+                .all(&self.db)
+                .await?
+                .into_iter()
+                .map(|model| model.name)
+                .collect();
+
+            result.total_remote_files += prompt_files.len();
+
+            for path in prompt_files {
+                let filename = path
+                    .file_name()
+                    .and_then(|os| os.to_str())
+                    .ok_or_else(|| anyhow!("Invalid filename in {}", path.display()))?
+                    .to_string();
+
+                let name = derive_name(&filename);
+                if existing_prompt_names.contains(&name) {
+                    result.skipped_count += 1;
+                    continue;
+                }
+
+                match self.seed_prompt_file(&path, &filename).await {
+                    Ok(_) => {
+                        result.created_count += 1;
+                    }
+                    Err(err) => {
+                        result.failed_files.push(format!("{}: {}", filename, err));
+                    }
                 }
             }
         }
@@ -276,6 +324,39 @@ impl LibraryItemService {
             file_format,
             Some(data_type),
             None,
+            file_bytes,
+        )
+        .await?;
+
+        Ok(())
+    }
+
+    async fn seed_prompt_file(&self, path: &PathBuf, filename: &str) -> Result<()> {
+        let file_bytes =
+            fs::read(path).with_context(|| format!("Failed to read {}", path.display()))?;
+
+        let name = derive_name(filename);
+        let description = Some("Seeded from resources/prompts".to_string());
+
+        let is_markdown = filename.ends_with(".md");
+        let content_type = if is_markdown {
+            "text/markdown"
+        } else {
+            "text/plain"
+        };
+
+        let metadata = serde_json::json!({
+            "filename": filename,
+            "format": if is_markdown { "markdown" } else { "text" }
+        });
+
+        self.create_binary_item(
+            ITEM_TYPE_PROMPT.to_string(),
+            name,
+            description,
+            vec!["prompt".to_string()],
+            metadata,
+            Some(content_type.to_string()),
             file_bytes,
         )
         .await?;

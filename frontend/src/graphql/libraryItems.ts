@@ -139,7 +139,8 @@ export const CREATE_PROJECT_FROM_LIBRARY = gql`
 export enum LibraryItemType {
   DATASET = 'DATASET',
   PROJECT = 'PROJECT',
-  PROJECT_TEMPLATE = 'PROJECT_TEMPLATE'
+  PROJECT_TEMPLATE = 'PROJECT_TEMPLATE',
+  PROMPT = 'PROMPT',
 }
 
 export interface LibraryItem {

@@ -10,6 +10,7 @@ import {
   IconSearch,
   IconUpload,
   IconCircleCheck,
+  IconEye,
 } from '@tabler/icons-react'
 import PageContainer from '../layout/PageContainer'
 import { DataSetUploader } from '../datasets/DataSetUploader'
@@ -59,6 +60,7 @@ const typeFilters: { label: string; value: LibraryItemType | 'ALL' }[] = [
   { label: 'Datasets', value: LibraryItemType.DATASET },
   { label: 'Projects', value: LibraryItemType.PROJECT },
   { label: 'Templates', value: LibraryItemType.PROJECT_TEMPLATE },
+  { label: 'Prompts', value: LibraryItemType.PROMPT },
 ]
 
 const fileToBase64 = (file: File): Promise<string> =>
@@ -84,6 +86,9 @@ export const LibraryPage: React.FC = () => {
   const [editName, setEditName] = useState('')
   const [editDescription, setEditDescription] = useState('')
   const [editTags, setEditTags] = useState('')
+  const [previewItem, setPreviewItem] = useState<LibraryItem | null>(null)
+  const [previewContent, setPreviewContent] = useState<string>('')
+  const [previewLoading, setPreviewLoading] = useState(false)
 
   const filterVariables = useMemo(() => {
     const tags = tagQuery
@@ -182,6 +187,32 @@ export const LibraryPage: React.FC = () => {
     setEditName(item.name)
     setEditDescription(item.description || '')
     setEditTags(item.tags.join(', '))
+  }
+
+  const isPreviewable = (item: LibraryItem): boolean => {
+    const contentType = item.metadata?.contentType
+    const format = item.metadata?.format
+    if (contentType === 'text/markdown' || contentType === 'text/plain') return true
+    if (format === 'markdown' || format === 'text') return true
+    if (item.type === LibraryItemType.PROMPT) return true
+    return false
+  }
+
+  const handlePreview = async (item: LibraryItem) => {
+    setPreviewItem(item)
+    setPreviewContent('')
+    setPreviewLoading(true)
+    try {
+      const response = await fetch(`/api/library/${item.id}/download`)
+      if (!response.ok) throw new Error('Failed to fetch content')
+      const text = await response.text()
+      setPreviewContent(text)
+    } catch (err: any) {
+      showErrorNotification('Preview failed', err?.message || 'Unknown error')
+      setPreviewItem(null)
+    } finally {
+      setPreviewLoading(false)
+    }
   }
 
   const handleCreateProject = async () => {
@@ -371,7 +402,9 @@ export const LibraryPage: React.FC = () => {
                         ? 'Dataset'
                         : item.type === LibraryItemType.PROJECT
                           ? 'Project'
-                          : 'Template'}
+                          : item.type === LibraryItemType.PROMPT
+                            ? 'Prompt'
+                            : 'Template'}
                     </Badge>
                   </CardHeader>
                   <CardContent>
@@ -395,7 +428,17 @@ export const LibraryPage: React.FC = () => {
                           <IconDownload className="mr-2 h-4 w-4" />
                           Download
                         </Button>
-                        {item.type !== LibraryItemType.DATASET && (
+                        {isPreviewable(item) && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handlePreview(item)}
+                          >
+                            <IconEye className="mr-2 h-4 w-4" />
+                            Preview
+                          </Button>
+                        )}
+                        {item.type !== LibraryItemType.DATASET && item.type !== LibraryItemType.PROMPT && (
                           <Button size="sm" onClick={() => openProjectModal(item)}>
                             <IconCircleCheck className="mr-2 h-4 w-4" />
                             Create Project
@@ -411,6 +454,11 @@ export const LibraryPage: React.FC = () => {
                             <DropdownMenuItem onClick={() => handleDownload(item)}>
                               <IconDownload className="mr-2 h-4 w-4" /> Download
                             </DropdownMenuItem>
+                            {isPreviewable(item) && (
+                              <DropdownMenuItem onClick={() => handlePreview(item)}>
+                                <IconEye className="mr-2 h-4 w-4" /> Preview
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem onClick={() => openEditModal(item)}>
                               <IconSparkles className="mr-2 h-4 w-4" /> Edit
                             </DropdownMenuItem>
@@ -627,6 +675,37 @@ export const LibraryPage: React.FC = () => {
               {updateLibraryItemLoading && <Spinner className="mr-2 h-4 w-4" />}
               Save
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!previewItem} onOpenChange={(open) => !open && setPreviewItem(null)}>
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Preview: {previewItem?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto min-h-0">
+            {previewLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Spinner className="h-6 w-6" />
+                <span className="ml-2 text-muted-foreground">Loading preview...</span>
+              </div>
+            ) : (
+              <pre className="whitespace-pre-wrap text-sm font-mono bg-muted p-4 rounded-md overflow-auto max-h-[60vh]">
+                {previewContent}
+              </pre>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setPreviewItem(null)}>
+              Close
+            </Button>
+            {previewItem && (
+              <Button variant="outline" onClick={() => handleDownload(previewItem)}>
+                <IconDownload className="mr-2 h-4 w-4" />
+                Download
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

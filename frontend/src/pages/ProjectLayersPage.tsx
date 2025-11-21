@@ -99,12 +99,12 @@ export const ProjectLayersPage = () => {
   const [selectedAliasLayer, setSelectedAliasLayer] = useState<{ id: number; name: string } | null>(null)
 
   // Helper function to calculate dataset enabled state
-  // Dataset is enabled if ALL its layers are enabled, disabled if ALL are disabled
+  // Dataset is enabled if ANY of its layers are enabled (i.e., dataset toggle was not turned off)
   const calculateDatasetState = (datasetId: number, layers: ProjectLayer[]): boolean => {
     const datasetLayers = layers.filter((l) => l.sourceDatasetId === datasetId)
     if (datasetLayers.length === 0) return false
-    // All layers must be enabled for dataset to be considered enabled
-    return datasetLayers.every((l) => l.enabled)
+    // Dataset is enabled if at least one layer is enabled
+    return datasetLayers.some((l) => l.enabled)
   }
 
   // Helper function to get dataset name by ID
@@ -116,16 +116,21 @@ export const ProjectLayersPage = () => {
 
   const paletteLayers = useMemo(() => {
     return [...editableLayers]
-      .filter((layer) =>
-        layer.sourceDatasetId ? layer.enabled : true
-      )
+      .filter((layer) => {
+        // Manual layers (no sourceDatasetId) are always shown
+        if (!layer.sourceDatasetId) return true
+        // Dataset layers: show if the dataset toggle is enabled (hides ALL layers when dataset disabled)
+        // Individual layer.enabled does NOT affect visibility - only the dataset toggle does
+        const datasetEnabled = datasetToggleState[layer.sourceDatasetId] ?? true
+        return datasetEnabled
+      })
       .sort((a, b) => {
         const dsA = a.sourceDatasetId ?? -1
         const dsB = b.sourceDatasetId ?? -1
         if (dsA !== dsB) return dsA - dsB
         return a.layerId.localeCompare(b.layerId)
       })
-  }, [editableLayers])
+  }, [editableLayers, datasetToggleState])
 
   // Helper to update editable layers and mark as unsaved
   const updateEditableLayers = (

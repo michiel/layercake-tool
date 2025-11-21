@@ -13,7 +13,7 @@ use crate::graphql::types::{
 };
 use crate::services::library_item_service::{
     infer_data_type, DatasetMetadata, LibraryItemService, SeedLibraryResult, ITEM_TYPE_DATASET,
-    ITEM_TYPE_PROJECT, ITEM_TYPE_PROJECT_TEMPLATE,
+    ITEM_TYPE_PROJECT, ITEM_TYPE_PROJECT_TEMPLATE, ITEM_TYPE_PROMPT,
 };
 
 #[derive(InputObject)]
@@ -87,7 +87,7 @@ impl LibraryMutation {
                     )
                     .await
             }
-            LibraryItemType::Project | LibraryItemType::ProjectTemplate => {
+            LibraryItemType::Project | LibraryItemType::ProjectTemplate | LibraryItemType::Prompt => {
                 let metadata = json!({
                     "filename": input.file_name,
                     "uploadSource": "graphql",
@@ -97,6 +97,7 @@ impl LibraryMutation {
                 let item_type = match input.item_type {
                     LibraryItemType::Project => ITEM_TYPE_PROJECT.to_string(),
                     LibraryItemType::ProjectTemplate => ITEM_TYPE_PROJECT_TEMPLATE.to_string(),
+                    LibraryItemType::Prompt => ITEM_TYPE_PROMPT.to_string(),
                     _ => ITEM_TYPE_DATASET.to_string(),
                 };
 
