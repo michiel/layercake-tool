@@ -1,10 +1,13 @@
 import React from 'react';
 import { NodePropertiesForm } from './NodePropertiesForm';
 import { Graph, GraphNode } from '../../graphql/graphs';
+import { DataSet } from '../../graphql/datasets';
 import { GraphViewMode, GraphOrientation, HierarchyViewMode } from './LayercakeGraphEditor';
 import { Stack, Group } from '@/components/layout-primitives';
 import { Paper } from '@/components/layout-primitives';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
@@ -26,6 +29,11 @@ interface PropertiesAndLayersPanelProps {
   onRankSpacingChange: (value: number) => void;
   minEdgeLength: number;
   onMinEdgeLengthChange: (value: number) => void;
+  datasets: DataSet[];
+  targetNodeDatasetId: number | null;
+  onTargetNodeDatasetChange: (id: number | null) => void;
+  targetEdgeDatasetId: number | null;
+  onTargetEdgeDatasetChange: (id: number | null) => void;
 }
 
 export const PropertiesAndLayersPanel: React.FC<PropertiesAndLayersPanelProps> = ({
@@ -46,6 +54,11 @@ export const PropertiesAndLayersPanel: React.FC<PropertiesAndLayersPanelProps> =
   onRankSpacingChange,
   minEdgeLength,
   onMinEdgeLengthChange,
+  datasets,
+  targetNodeDatasetId,
+  onTargetNodeDatasetChange,
+  targetEdgeDatasetId,
+  onTargetEdgeDatasetChange,
 }) => {
   const selectedNode = selectedNodeId
     ? graph.graphNodes.find(n => n.id === selectedNodeId)
@@ -63,9 +76,58 @@ export const PropertiesAndLayersPanel: React.FC<PropertiesAndLayersPanelProps> =
     >
       <Accordion
         type="multiple"
-        defaultValue={['add-nodes', 'layout-options', 'node-properties']}
+        defaultValue={['target-datasets', 'add-nodes', 'layout-options', 'node-properties']}
         className="space-y-2"
       >
+        <AccordionItem value="target-datasets">
+          <AccordionTrigger>Target Datasets</AccordionTrigger>
+          <AccordionContent>
+            <Stack gap="sm">
+              <div className="space-y-1">
+                <Label className="text-xs">Node dataset</Label>
+                <Select
+                  value={targetNodeDatasetId?.toString() || 'none'}
+                  onValueChange={(value) => onTargetNodeDatasetChange(value === 'none' ? null : parseInt(value))}
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="None" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {datasets.filter(d => d.status === 'active').map(dataset => (
+                      <SelectItem key={dataset.id} value={dataset.id.toString()}>
+                        {dataset.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Edge dataset</Label>
+                <Select
+                  value={targetEdgeDatasetId?.toString() || 'none'}
+                  onValueChange={(value) => onTargetEdgeDatasetChange(value === 'none' ? null : parseInt(value))}
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="None" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {datasets.filter(d => d.status === 'active').map(dataset => (
+                      <SelectItem key={dataset.id} value={dataset.id.toString()}>
+                        {dataset.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                New nodes and edges will be added to selected datasets
+              </p>
+            </Stack>
+          </AccordionContent>
+        </AccordionItem>
+
         <AccordionItem value="add-nodes">
           <AccordionTrigger>Add Nodes</AccordionTrigger>
           <AccordionContent>

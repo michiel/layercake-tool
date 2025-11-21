@@ -9,6 +9,7 @@ import { PropertiesAndLayersPanel } from '../components/graphs/PropertiesAndLaye
 import EditHistoryModal from '../components/graphs/EditHistoryModal';
 import { ReactFlowProvider, Node as FlowNode, Edge as FlowEdge } from 'reactflow';
 import { Graph, GraphNode, UPDATE_GRAPH_NODE, GET_GRAPH_EDIT_COUNT, ADD_GRAPH_NODE, ADD_GRAPH_EDGE, UPDATE_GRAPH_EDGE, DELETE_GRAPH_EDGE, DELETE_GRAPH_NODE } from '../graphql/graphs';
+import { GET_DATASOURCES, UPDATE_DATASOURCE_GRAPH_DATA, DataSet } from '../graphql/datasets';
 import { Stack, Group } from '../components/layout-primitives';
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
 import { Badge } from '../components/ui/badge';
@@ -101,6 +102,8 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
   const [nodeSpacing, setNodeSpacing] = useState(40);
   const [rankSpacing, setRankSpacing] = useState(50);
   const [minEdgeLength, setMinEdgeLength] = useState(30);
+  const [targetNodeDatasetId, setTargetNodeDatasetId] = useState<number | null>(null);
+  const [targetEdgeDatasetId, setTargetEdgeDatasetId] = useState<number | null>(null);
   const reactFlowWrapperRef = useRef<HTMLDivElement>(null);
   const htmlToImagePromiseRef = useRef<Promise<any> | null>(null);
 
@@ -110,6 +113,15 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
 
   const { data: projectsData } = useQuery<{ projects: Array<{ id: number; name: string }> }>(GET_PROJECTS);
   const selectedProject = projectsData?.projects.find((p: { id: number; name: string }) => p.id === parseInt(projectId || '0'));
+
+  // Fetch datasets for target dataset selection
+  const { data: datasetsData } = useQuery<{ dataSets: DataSet[] }>(GET_DATASOURCES, {
+    variables: { projectId: parseInt(projectId || '0') },
+    skip: !projectId,
+  });
+  const datasets = datasetsData?.dataSets || [];
+
+  const [updateDatasetGraphData] = useMutation(UPDATE_DATASOURCE_GRAPH_DATA);
 
   const { data: graphData, loading: graphLoading, error: graphError } = useQuery<{ graph: Graph }, { id: number }>(GET_GRAPH_DETAILS, {
     variables: { id: parseInt(graphId || '0') },
@@ -343,6 +355,70 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
     });
   }, [graphId, updateGraphNode]);
 
+  // Helper to sync node addition to target dataset
+  const syncNodeToDataset = useCallback(async (node: FlowNode, operation: 'add' | 'delete') => {
+    if (!targetNodeDatasetId) return;
+
+    const dataset = datasets.find(d => d.id === targetNodeDatasetId);
+    if (!dataset) return;
+
+    try {
+      const graphJson = JSON.parse(dataset.graphJson || '{"nodes":[],"edges":[],"layers":[]}');
+
+      if (operation === 'add') {
+        const newNode = {
+          id: node.id,
+          label: node.data?.label || 'New Node',
+          layer: node.data?.layer,
+          weight: node.data?.weight || 1,
+          is_partition: node.data?.isPartition || false,
+          belongs_to: node.parentNode || node.data?.belongsTo,
+        };
+        graphJson.nodes = [...(graphJson.nodes || []), newNode];
+      } else {
+        graphJson.nodes = (graphJson.nodes || []).filter((n: any) => n.id !== node.id);
+      }
+
+      await updateDatasetGraphData({
+        variables: { id: targetNodeDatasetId, graphJson: JSON.stringify(graphJson) }
+      });
+    } catch (error) {
+      console.error('Failed to sync node to dataset:', error);
+    }
+  }, [targetNodeDatasetId, datasets, updateDatasetGraphData]);
+
+  // Helper to sync edge addition to target dataset
+  const syncEdgeToDataset = useCallback(async (edge: FlowEdge, operation: 'add' | 'delete') => {
+    if (!targetEdgeDatasetId) return;
+
+    const dataset = datasets.find(d => d.id === targetEdgeDatasetId);
+    if (!dataset) return;
+
+    try {
+      const graphJson = JSON.parse(dataset.graphJson || '{"nodes":[],"edges":[],"layers":[]}');
+
+      if (operation === 'add') {
+        const newEdge = {
+          id: edge.id,
+          source: edge.source,
+          target: edge.target,
+          label: edge.label || edge.data?.label,
+          layer: edge.data?.layer,
+          weight: edge.data?.weight || 1,
+        };
+        graphJson.edges = [...(graphJson.edges || []), newEdge];
+      } else {
+        graphJson.edges = (graphJson.edges || []).filter((e: any) => e.id !== edge.id);
+      }
+
+      await updateDatasetGraphData({
+        variables: { id: targetEdgeDatasetId, graphJson: JSON.stringify(graphJson) }
+      });
+    } catch (error) {
+      console.error('Failed to sync edge to dataset:', error);
+    }
+  }, [targetEdgeDatasetId, datasets, updateDatasetGraphData]);
+
   const handleEdgeAdd = useCallback((edge: FlowEdge) => {
     if (!graphId) return;
 
@@ -361,7 +437,10 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
       console.error('Failed to add edge:', error);
       // TODO: Rollback optimistic update on error
     });
-  }, [graphId, addGraphEdge]);
+
+    // Sync to target dataset
+    syncEdgeToDataset(edge, 'add');
+  }, [graphId, addGraphEdge, syncEdgeToDataset]);
 
   const handleEdgeDelete = useCallback((edgeId: string) => {
     if (!graphId) return;
@@ -375,7 +454,10 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
       console.error('Failed to delete edge:', error);
       // TODO: Rollback optimistic update on error
     });
-  }, [graphId, deleteGraphEdge]);
+
+    // Sync to target dataset
+    syncEdgeToDataset({ id: edgeId } as FlowEdge, 'delete');
+  }, [graphId, deleteGraphEdge, syncEdgeToDataset]);
 
   const handleNodeAdd = useCallback((node: FlowNode) => {
     if (!graphId) return;
@@ -398,7 +480,10 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
       console.error('Failed to add node:', error);
       // TODO: Rollback optimistic update on error
     });
-  }, [graphId, addGraphNode]);
+
+    // Sync to target dataset
+    syncNodeToDataset(node, 'add');
+  }, [graphId, addGraphNode, syncNodeToDataset]);
 
   const handleNodeDelete = useCallback((nodeId: string) => {
     if (!graphId) return;
@@ -412,7 +497,10 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
       console.error('Failed to delete node:', error);
       // TODO: Rollback optimistic update on error
     });
-  }, [graphId, deleteGraphNode]);
+
+    // Sync to target dataset
+    syncNodeToDataset({ id: nodeId } as FlowNode, 'delete');
+  }, [graphId, deleteGraphNode, syncNodeToDataset]);
 
   const handleNodeLabelChange = useCallback((nodeId: string, newLabel: string) => {
     if (!graphId) return;
@@ -913,6 +1001,11 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
             onRankSpacingChange={handleRankSpacingChange}
             minEdgeLength={minEdgeLength}
             onMinEdgeLengthChange={handleMinEdgeLengthChange}
+            datasets={datasets}
+            targetNodeDatasetId={targetNodeDatasetId}
+            onTargetNodeDatasetChange={setTargetNodeDatasetId}
+            targetEdgeDatasetId={targetEdgeDatasetId}
+            onTargetEdgeDatasetChange={setTargetEdgeDatasetId}
           />
         )}
         </div>
