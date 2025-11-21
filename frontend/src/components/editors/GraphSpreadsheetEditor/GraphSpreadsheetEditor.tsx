@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { IconTable, IconDeviceFloppy, IconClipboard, IconTrash } from '@tabler/icons-react';
+import { IconTable, IconDeviceFloppy, IconClipboard, IconClipboardCopy, IconTrash } from '@tabler/icons-react';
 import { Stack, Group } from '@/components/layout-primitives';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -146,6 +146,59 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
     }
 
     return rows;
+  };
+
+  // Convert data to CSV format
+  const toCSV = (data: Record<string, any>[], columns: string[]): string => {
+    if (data.length === 0) return columns.join(',') + '\n';
+
+    const escapeCSV = (value: any): string => {
+      const str = String(value ?? '');
+      if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    const header = columns.join(',');
+    const rows = data.map(row =>
+      columns.map(col => escapeCSV(row[col])).join(',')
+    );
+
+    return [header, ...rows].join('\n');
+  };
+
+  const handleCopyNodes = async () => {
+    const csv = toCSV(localNodes, nodeColumnDefs);
+    try {
+      await navigator.clipboard.writeText(csv);
+      alert(`Copied ${localNodes.length} nodes to clipboard`);
+    } catch (error) {
+      console.error('Failed to copy nodes:', error);
+      alert('Failed to copy to clipboard');
+    }
+  };
+
+  const handleCopyEdges = async () => {
+    const csv = toCSV(localEdges, edgeColumnDefs);
+    try {
+      await navigator.clipboard.writeText(csv);
+      alert(`Copied ${localEdges.length} edges to clipboard`);
+    } catch (error) {
+      console.error('Failed to copy edges:', error);
+      alert('Failed to copy to clipboard');
+    }
+  };
+
+  const handleCopyLayers = async () => {
+    const csv = toCSV(localLayers, layerColumnDefs);
+    try {
+      await navigator.clipboard.writeText(csv);
+      alert(`Copied ${localLayers.length} layers to clipboard`);
+    } catch (error) {
+      console.error('Failed to copy layers:', error);
+      alert('Failed to copy to clipboard');
+    }
   };
 
   const confirmDestructiveAction = (subject: string, existingCount: number) => {
@@ -298,6 +351,14 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
               {activeTab === 'nodes' && (
                 <>
                   <Button
+                    onClick={handleCopyNodes}
+                    variant="outline"
+                    size="sm"
+                  >
+                    <IconClipboardCopy className="mr-2 h-4 w-4" />
+                    Copy Nodes
+                  </Button>
+                  <Button
                     onClick={handlePasteNodes}
                     variant="secondary"
                     size="sm"
@@ -318,6 +379,14 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
               {activeTab === 'edges' && (
                 <>
                   <Button
+                    onClick={handleCopyEdges}
+                    variant="outline"
+                    size="sm"
+                  >
+                    <IconClipboardCopy className="mr-2 h-4 w-4" />
+                    Copy Edges
+                  </Button>
+                  <Button
                     onClick={handlePasteEdges}
                     variant="secondary"
                     size="sm"
@@ -337,6 +406,14 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
               )}
               {activeTab === 'layers' && (
                 <>
+                  <Button
+                    onClick={handleCopyLayers}
+                    variant="outline"
+                    size="sm"
+                  >
+                    <IconClipboardCopy className="mr-2 h-4 w-4" />
+                    Copy Layers
+                  </Button>
                   <Button
                     onClick={handlePasteLayers}
                     variant="secondary"
