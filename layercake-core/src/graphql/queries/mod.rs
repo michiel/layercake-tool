@@ -284,11 +284,16 @@ impl Query {
     // }
 
     /// Get Plan DAG for a project
-    async fn get_plan_dag(&self, ctx: &Context<'_>, project_id: i32) -> Result<Option<PlanDag>> {
+    async fn get_plan_dag(
+        &self,
+        ctx: &Context<'_>,
+        project_id: i32,
+        plan_id: Option<i32>,
+    ) -> Result<Option<PlanDag>> {
         let context = ctx.data::<GraphQLContext>()?;
         let snapshot = context
             .app
-            .load_plan_dag(project_id)
+            .load_plan_dag(project_id, plan_id)
             .await
             .map_err(|e| StructuredError::service("AppContext::load_plan_dag", e))?
             .ok_or_else(|| StructuredError::not_found("Project", project_id))?;

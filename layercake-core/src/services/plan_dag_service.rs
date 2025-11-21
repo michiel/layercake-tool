@@ -79,10 +79,33 @@ impl PlanDagService {
         }
     }
 
+    async fn resolve_plan(&self, project_id: i32, plan_id: Option<i32>) -> Result<plans::Model> {
+        if let Some(plan_id) = plan_id {
+            let plan = plans::Entity::find_by_id(plan_id)
+                .one(&self.db)
+                .await
+                .map_err(|e| anyhow!("Database error: {}", e))?
+                .ok_or_else(|| anyhow!("Plan {} not found", plan_id))?;
+
+            if plan.project_id != project_id {
+                return Err(anyhow!(
+                    "Plan {} does not belong to project {}",
+                    plan_id,
+                    project_id
+                ));
+            }
+
+            Ok(plan)
+        } else {
+            self.get_or_create_plan(project_id).await
+        }
+    }
+
     /// Create a new Plan DAG node
     pub async fn create_node(
         &self,
         project_id: i32,
+        plan_id: Option<i32>,
         node_id: String,
         node_type: String,
         position: Position,
@@ -97,7 +120,7 @@ impl PlanDagService {
         let validated_metadata = ValidationService::validate_plan_dag_metadata(&metadata_json)?;
         let validated_config = ValidationService::validate_plan_dag_config(&config_json)?;
 
-        let plan = self.get_or_create_plan(project_id).await?;
+        let plan = self.resolve_plan(project_id, plan_id).await?;
 
         // Fetch current state for delta generation and validation
         let (current_nodes, current_edges) =
@@ -151,12 +174,13 @@ impl PlanDagService {
     pub async fn update_node(
         &self,
         project_id: i32,
+        plan_id: Option<i32>,
         node_id: String,
         position: Option<Position>,
         metadata_json: Option<String>,
         config_json: Option<String>,
     ) -> Result<PlanDagNode> {
-        let plan = self.get_or_create_plan(project_id).await?;
+        let plan = self.resolve_plan(project_id, plan_id).await?;
 
         // Fetch current state for delta generation
         let (current_nodes, _) = plan_dag_delta::fetch_current_plan_dag(&self.db, plan.id)
@@ -297,13 +321,13 @@ impl PlanDagService {
     }
 
     /// Delete a Plan DAG node and its connected edges
-    pub async fn delete_node(&self, project_id: i32, node_id: String) -> Result<PlanDagNode> {
-        let plan = plans::Entity::find()
-            .filter(plans::Column::ProjectId.eq(project_id))
-            .one(&self.db)
-            .await
-            .map_err(|e| anyhow!("Database error: {}", e))?
-            .ok_or_else(|| anyhow!("Plan not found for project"))?;
+    pub async fn delete_node(
+        &self,
+        project_id: i32,
+        plan_id: Option<i32>,
+        node_id: String,
+    ) -> Result<PlanDagNode> {
+        let plan = self.resolve_plan(project_id, plan_id).await?;
 
         // Fetch current state for delta generation
         let (current_nodes, current_edges) =
@@ -388,10 +412,11 @@ impl PlanDagService {
     pub async fn move_node(
         &self,
         project_id: i32,
+        plan_id: Option<i32>,
         node_id: String,
         position: Position,
     ) -> Result<PlanDagNode> {
-        self.update_node(project_id, node_id, Some(position), None, None)
+        self.update_node(project_id, plan_id, node_id, Some(position), None, None)
             .await
     }
 
@@ -399,6 +424,7 @@ impl PlanDagService {
     pub async fn create_edge(
         &self,
         project_id: i32,
+        plan_id: Option<i32>,
         edge_id: String,
         source_node_id: String,
         target_node_id: String,
@@ -413,7 +439,7 @@ impl PlanDagService {
         // Validate no self-loop
         ValidationService::validate_edge_no_self_loop(&validated_source, &validated_target)?;
 
-        let plan = self.get_or_create_plan(project_id).await?;
+        let plan = self.resolve_plan(project_id, plan_id).await?;
 
         // Fetch current state for delta generation and validation
         let (current_nodes, current_edges) =
@@ -461,13 +487,13 @@ impl PlanDagService {
     }
 
     /// Delete a Plan DAG edge
-    pub async fn delete_edge(&self, project_id: i32, edge_id: String) -> Result<PlanDagEdge> {
-        let plan = plans::Entity::find()
-            .filter(plans::Column::ProjectId.eq(project_id))
-            .one(&self.db)
-            .await
-            .map_err(|e| anyhow!("Database error: {}", e))?
-            .ok_or_else(|| anyhow!("Plan not found for project"))?;
+    pub async fn delete_edge(
+        &self,
+        project_id: i32,
+        plan_id: Option<i32>,
+        edge_id: String,
+    ) -> Result<PlanDagEdge> {
+        let plan = self.resolve_plan(project_id, plan_id).await?;
 
         // Fetch current state for delta generation
         let (_, current_edges) = plan_dag_delta::fetch_current_plan_dag(&self.db, plan.id)
@@ -521,13 +547,12 @@ impl PlanDagService {
     }
 
     /// Get all nodes for a project's plan
-    pub async fn get_nodes(&self, project_id: i32) -> Result<Vec<PlanDagNode>> {
-        let plan = plans::Entity::find()
-            .filter(plans::Column::ProjectId.eq(project_id))
-            .one(&self.db)
-            .await
-            .map_err(|e| anyhow!("Database error: {}", e))?
-            .ok_or_else(|| anyhow!("Plan not found for project"))?;
+    pub async fn get_nodes(
+        &self,
+        project_id: i32,
+        plan_id: Option<i32>,
+    ) -> Result<Vec<PlanDagNode>> {
+        let plan = self.resolve_plan(project_id, plan_id).await?;
 
         let nodes = plan_dag_nodes::Entity::find()
             .filter(plan_dag_nodes::Column::PlanId.eq(plan.id))
@@ -540,13 +565,12 @@ impl PlanDagService {
     }
 
     /// Get all edges for a project's plan
-    pub async fn get_edges(&self, project_id: i32) -> Result<Vec<PlanDagEdge>> {
-        let plan = plans::Entity::find()
-            .filter(plans::Column::ProjectId.eq(project_id))
-            .one(&self.db)
-            .await
-            .map_err(|e| anyhow!("Database error: {}", e))?
-            .ok_or_else(|| anyhow!("Plan not found for project"))?;
+    pub async fn get_edges(
+        &self,
+        project_id: i32,
+        plan_id: Option<i32>,
+    ) -> Result<Vec<PlanDagEdge>> {
+        let plan = self.resolve_plan(project_id, plan_id).await?;
 
         let edges = plan_dag_edges::Entity::find()
             .filter(plan_dag_edges::Column::PlanId.eq(plan.id))
@@ -562,10 +586,11 @@ impl PlanDagService {
     pub async fn update_edge(
         &self,
         project_id: i32,
+        plan_id: Option<i32>,
         edge_id: String,
         metadata_json: Option<String>,
     ) -> Result<PlanDagEdge> {
-        let plan = self.get_or_create_plan(project_id).await?;
+        let plan = self.resolve_plan(project_id, plan_id).await?;
 
         let (_, current_edges) = plan_dag_delta::fetch_current_plan_dag(&self.db, plan.id)
             .await
@@ -623,13 +648,14 @@ impl PlanDagService {
     pub async fn batch_move_nodes(
         &self,
         project_id: i32,
+        plan_id: Option<i32>,
         node_positions: Vec<PlanDagNodePositionUpdate>,
     ) -> Result<Vec<PlanDagNode>> {
         if node_positions.is_empty() {
             return Ok(Vec::new());
         }
 
-        let plan = self.get_or_create_plan(project_id).await?;
+        let plan = self.resolve_plan(project_id, plan_id).await?;
 
         let (current_nodes, _) = plan_dag_delta::fetch_current_plan_dag(&self.db, plan.id)
             .await

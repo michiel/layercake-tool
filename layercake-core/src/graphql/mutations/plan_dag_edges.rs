@@ -16,6 +16,7 @@ impl PlanDagEdgesMutation {
         &self,
         ctx: &Context<'_>,
         project_id: i32,
+        plan_id: Option<i32>,
         edge: PlanDagEdgeInput,
     ) -> Result<Option<PlanDagEdge>> {
         let context = ctx.data::<GraphQLContext>()?;
@@ -38,7 +39,7 @@ impl PlanDagEdgesMutation {
 
         let created = context
             .app
-            .create_plan_dag_edge(project_id, request)
+            .create_plan_dag_edge(project_id, plan_id, request)
             .await
             .map_err(|e| StructuredError::service("AppContext::create_plan_dag_edge", e))?;
 
@@ -50,13 +51,14 @@ impl PlanDagEdgesMutation {
         &self,
         ctx: &Context<'_>,
         project_id: i32,
+        plan_id: Option<i32>,
         edge_id: String,
     ) -> Result<Option<PlanDagEdge>> {
         let context = ctx.data::<GraphQLContext>()?;
 
         let deleted = context
             .app
-            .delete_plan_dag_edge(project_id, edge_id)
+            .delete_plan_dag_edge(project_id, plan_id, edge_id)
             .await
             .map_err(|e| StructuredError::service("AppContext::delete_plan_dag_edge", e))?;
 
@@ -68,6 +70,7 @@ impl PlanDagEdgesMutation {
         &self,
         ctx: &Context<'_>,
         project_id: i32,
+        plan_id: Option<i32>,
         edge_id: String,
         updates: PlanDagEdgeUpdateInput,
     ) -> Result<Option<PlanDagEdge>> {
@@ -87,7 +90,7 @@ impl PlanDagEdgesMutation {
 
         let updated = context
             .app
-            .update_plan_dag_edge(project_id, edge_id, request)
+            .update_plan_dag_edge(project_id, plan_id, edge_id, request)
             .await
             .map_err(|e| StructuredError::service("AppContext::update_plan_dag_edge", e))?;
 

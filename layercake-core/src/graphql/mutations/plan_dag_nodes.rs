@@ -1,5 +1,5 @@
 use async_graphql::*;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 
 use super::helpers::NodeExecutionResult;
 use crate::app_context::{
@@ -24,6 +24,7 @@ impl PlanDagNodesMutation {
         &self,
         ctx: &Context<'_>,
         project_id: i32,
+        plan_id: Option<i32>,
         node: PlanDagNodeInput,
     ) -> Result<Option<PlanDagNode>> {
         let context = ctx.data::<GraphQLContext>()?;
@@ -51,7 +52,7 @@ impl PlanDagNodesMutation {
 
         let created = context
             .app
-            .create_plan_dag_node(project_id, request)
+            .create_plan_dag_node(project_id, plan_id, request)
             .await
             .map_err(|e| StructuredError::service("AppContext::create_plan_dag_node", e))?;
 
@@ -63,6 +64,7 @@ impl PlanDagNodesMutation {
         &self,
         ctx: &Context<'_>,
         project_id: i32,
+        plan_id: Option<i32>,
         node_id: String,
         updates: PlanDagNodeUpdateInput,
     ) -> Result<Option<PlanDagNode>> {
@@ -98,7 +100,7 @@ impl PlanDagNodesMutation {
 
         let updated = context
             .app
-            .update_plan_dag_node(project_id, node_id, request)
+            .update_plan_dag_node(project_id, plan_id, node_id, request)
             .await
             .map_err(|e| StructuredError::service("AppContext::update_plan_dag_node", e))?;
 
@@ -110,13 +112,14 @@ impl PlanDagNodesMutation {
         &self,
         ctx: &Context<'_>,
         project_id: i32,
+        plan_id: Option<i32>,
         node_id: String,
     ) -> Result<Option<PlanDagNode>> {
         let context = ctx.data::<GraphQLContext>()?;
 
         let deleted = context
             .app
-            .delete_plan_dag_node(project_id, node_id)
+            .delete_plan_dag_node(project_id, plan_id, node_id)
             .await
             .map_err(|e| StructuredError::service("AppContext::delete_plan_dag_node", e))?;
 
@@ -128,6 +131,7 @@ impl PlanDagNodesMutation {
         &self,
         ctx: &Context<'_>,
         project_id: i32,
+        plan_id: Option<i32>,
         node_id: String,
         position: Position,
     ) -> Result<Option<PlanDagNode>> {
@@ -135,7 +139,7 @@ impl PlanDagNodesMutation {
 
         let moved = context
             .app
-            .move_plan_dag_node(project_id, node_id, position)
+            .move_plan_dag_node(project_id, plan_id, node_id, position)
             .await
             .map_err(|e| StructuredError::service("AppContext::move_plan_dag_node", e))?;
 
@@ -147,6 +151,7 @@ impl PlanDagNodesMutation {
         &self,
         ctx: &Context<'_>,
         project_id: i32,
+        plan_id: Option<i32>,
         node_positions: Vec<NodePositionInput>,
     ) -> Result<Vec<PlanDagNode>> {
         let context = ctx.data::<GraphQLContext>()?;
@@ -163,7 +168,7 @@ impl PlanDagNodesMutation {
 
         let moved = context
             .app
-            .batch_move_plan_dag_nodes(project_id, requests)
+            .batch_move_plan_dag_nodes(project_id, plan_id, requests)
             .await
             .map_err(|e| StructuredError::service("AppContext::batch_move_plan_dag_nodes", e))?;
 
@@ -175,17 +180,34 @@ impl PlanDagNodesMutation {
         &self,
         ctx: &Context<'_>,
         project_id: i32,
+        plan_id: Option<i32>,
         node_id: String,
     ) -> Result<NodeExecutionResult> {
         let context = ctx.data::<GraphQLContext>()?;
 
         // Find the plan for this project
-        let plan = plans::Entity::find()
-            .filter(plans::Column::ProjectId.eq(project_id))
-            .one(&context.db)
-            .await
-            .map_err(|e| StructuredError::database("plans::Entity::find (ProjectId)", e))?
-            .ok_or_else(|| StructuredError::not_found("Plan for project", project_id))?;
+        let plan = if let Some(plan_id) = plan_id {
+            let plan = plans::Entity::find_by_id(plan_id)
+                .one(&context.db)
+                .await
+                .map_err(|e| StructuredError::database("plans::Entity::find_by_id", e))?
+                .ok_or_else(|| StructuredError::not_found("Plan", plan_id))?;
+            if plan.project_id != project_id {
+                return Err(StructuredError::bad_request(format!(
+                    "Plan {} does not belong to project {}",
+                    plan_id, project_id
+                )));
+            }
+            plan
+        } else {
+            plans::Entity::find()
+                .filter(plans::Column::ProjectId.eq(project_id))
+                .order_by_desc(plans::Column::UpdatedAt)
+                .one(&context.db)
+                .await
+                .map_err(|e| StructuredError::database("plans::Entity::find (ProjectId)", e))?
+                .ok_or_else(|| StructuredError::not_found("Plan for project", project_id))?
+        };
 
         // Get all nodes in the plan
         let nodes = plan_dag_nodes::Entity::find()

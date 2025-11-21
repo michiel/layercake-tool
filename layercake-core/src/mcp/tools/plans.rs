@@ -486,7 +486,7 @@ pub async fn get_plan_dag(
         })? as i32;
 
     let snapshot = app
-        .load_plan_dag(project_id)
+        .load_plan_dag(project_id, None)
         .await
         .map_err(|e| McpError::Internal {
             message: format!("Failed to load Plan DAG: {}", e),

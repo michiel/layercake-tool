@@ -212,7 +212,7 @@ pub async fn add_plan_dag_node(
     };
 
     let node = app
-        .create_plan_dag_node(project_id, request)
+        .create_plan_dag_node(project_id, None, request)
         .await
         .map_err(|e| McpError::Internal {
             message: format!("Failed to create Plan DAG node: {}", e),
@@ -250,7 +250,7 @@ pub async fn update_plan_dag_node(
     };
 
     let node = app
-        .update_plan_dag_node(project_id, node_id, request)
+        .update_plan_dag_node(project_id, None, node_id, request)
         .await
         .map_err(|e| McpError::Internal {
             message: format!("Failed to update Plan DAG node: {}", e),
@@ -275,7 +275,7 @@ pub async fn delete_plan_dag_node(
         .to_string();
 
     let node = app
-        .delete_plan_dag_node(project_id, node_id)
+        .delete_plan_dag_node(project_id, None, node_id)
         .await
         .map_err(|e| McpError::Internal {
             message: format!("Failed to delete Plan DAG node: {}", e),
@@ -302,7 +302,7 @@ pub async fn move_plan_dag_node(
     let position = parse_position(position_value)?;
 
     let node = app
-        .move_plan_dag_node(project_id, node_id, position)
+        .move_plan_dag_node(project_id, None, node_id, position)
         .await
         .map_err(|e| McpError::Internal {
             message: format!("Failed to move Plan DAG node: {}", e),
@@ -356,7 +356,7 @@ pub async fn batch_move_plan_dag_nodes(
     }
 
     let nodes = app
-        .batch_move_plan_dag_nodes(project_id, requests)
+        .batch_move_plan_dag_nodes(project_id, None, requests)
         .await
         .map_err(|e| McpError::Internal {
             message: format!("Failed to batch move Plan DAG nodes: {}", e),
@@ -396,7 +396,7 @@ pub async fn add_plan_dag_edge(
     };
 
     let edge = app
-        .create_plan_dag_edge(project_id, request)
+        .create_plan_dag_edge(project_id, None, request)
         .await
         .map_err(|e| McpError::Internal {
             message: format!("Failed to create Plan DAG edge: {}", e),
@@ -424,7 +424,7 @@ pub async fn update_plan_dag_edge(
     let request = PlanDagEdgeUpdateRequest { metadata };
 
     let edge = app
-        .update_plan_dag_edge(project_id, edge_id, request)
+        .update_plan_dag_edge(project_id, None, edge_id, request)
         .await
         .map_err(|e| McpError::Internal {
             message: format!("Failed to update Plan DAG edge: {}", e),
@@ -449,7 +449,7 @@ pub async fn delete_plan_dag_edge(
         .to_string();
 
     let edge = app
-        .delete_plan_dag_edge(project_id, edge_id)
+        .delete_plan_dag_edge(project_id, None, edge_id)
         .await
         .map_err(|e| McpError::Internal {
             message: format!("Failed to delete Plan DAG edge: {}", e),

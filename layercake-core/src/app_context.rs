@@ -352,6 +352,37 @@ impl AppContext {
         Ok(PlanSummary::from(plan))
     }
 
+    pub async fn resolve_plan_model(
+        &self,
+        project_id: i32,
+        plan_id: Option<i32>,
+    ) -> Result<plans::Model> {
+        if let Some(plan_id) = plan_id {
+            let plan = self
+                .plan_service
+                .get_plan(plan_id)
+                .await
+                .map_err(|e| anyhow!("Failed to load plan {}: {}", plan_id, e))?
+                .ok_or_else(|| anyhow!("Plan {} not found", plan_id))?;
+
+            if plan.project_id != project_id {
+                return Err(anyhow!(
+                    "Plan {} does not belong to project {}",
+                    plan_id,
+                    project_id
+                ));
+            }
+
+            Ok(plan)
+        } else {
+            self.plan_service
+                .get_default_plan(project_id)
+                .await
+                .map_err(|e| anyhow!("Failed to load plan for project {}: {}", project_id, e))?
+                .ok_or_else(|| anyhow!("Project {} has no plan", project_id))
+        }
+    }
+
     // ----- Data set helpers ---------------------------------------------
 
     pub async fn list_data_sets(&self, project_id: i32) -> Result<Vec<DataSetSummary>> {
@@ -633,7 +664,7 @@ impl AppContext {
     ) -> Result<()> {
         let nodes = self
             .plan_dag_service
-            .get_nodes(project_id)
+            .get_nodes(project_id, None)
             .await
             .unwrap_or_default();
 
@@ -663,6 +694,7 @@ impl AppContext {
         let _ = self
             .create_plan_dag_node(
                 project_id,
+                None,
                 PlanDagNodeRequest {
                     node_type: PlanDagNodeType::DataSet,
                     position,
@@ -694,7 +726,7 @@ impl AppContext {
             .ok_or_else(|| anyhow!("Project {} has no plan to export", project_id))?;
 
         let snapshot = self
-            .load_plan_dag(project_id)
+            .load_plan_dag(project_id, None)
             .await?
             .ok_or_else(|| anyhow!("Project {} has no DAG to export", project_id))?;
 
@@ -827,7 +859,7 @@ impl AppContext {
             .ok_or_else(|| anyhow!("Project {} has no plan to export", project_id))?;
 
         let snapshot = self
-            .load_plan_dag(project_id)
+            .load_plan_dag(project_id, None)
             .await?
             .ok_or_else(|| anyhow!("Project {} has no DAG to export", project_id))?;
 
@@ -1133,7 +1165,11 @@ impl AppContext {
     }
 
     // ----- Plan DAG helpers -------------------------------------------------
-    pub async fn load_plan_dag(&self, project_id: i32) -> Result<Option<PlanDagSnapshot>> {
+    pub async fn load_plan_dag(
+        &self,
+        project_id: i32,
+        plan_id: Option<i32>,
+    ) -> Result<Option<PlanDagSnapshot>> {
         let project = match projects::Entity::find_by_id(project_id)
             .one(&self.db)
             .await
@@ -1143,21 +1179,24 @@ impl AppContext {
             None => return Ok(None),
         };
 
-        let plan = plans::Entity::find()
-            .filter(plans::Column::ProjectId.eq(project_id))
-            .one(&self.db)
-            .await
-            .map_err(|e| anyhow!("Failed to load plan for project {}: {}", project_id, e))?;
+        let plan = match plan_id {
+            Some(plan_id) => Some(self.resolve_plan_model(project_id, Some(plan_id)).await?),
+            None => self
+                .plan_service
+                .get_default_plan(project_id)
+                .await
+                .map_err(|e| anyhow!("Failed to load plan for project {}: {}", project_id, e))?,
+        };
 
         if let Some(plan) = plan {
             let mut nodes = self
                 .plan_dag_service
-                .get_nodes(project_id)
+                .get_nodes(project_id, Some(plan.id))
                 .await
                 .map_err(|e| anyhow!("Failed to load Plan DAG nodes: {}", e))?;
             let edges = self
                 .plan_dag_service
-                .get_edges(project_id)
+                .get_edges(project_id, Some(plan.id))
                 .await
                 .map_err(|e| anyhow!("Failed to load Plan DAG edges: {}", e))?;
 
@@ -1270,17 +1309,12 @@ impl AppContext {
     pub async fn create_plan_dag_node(
         &self,
         project_id: i32,
+        plan_id: Option<i32>,
         request: PlanDagNodeRequest,
     ) -> Result<PlanDagNode> {
-        // Ensure plan exists before inspecting existing nodes
-        self.plan_dag_service
-            .get_or_create_plan(project_id)
-            .await
-            .map_err(|e| anyhow!("Failed to prepare plan for project {}: {}", project_id, e))?;
-
         let existing_nodes = self
             .plan_dag_service
-            .get_nodes(project_id)
+            .get_nodes(project_id, plan_id)
             .await
             .unwrap_or_default();
 
@@ -1294,6 +1328,7 @@ impl AppContext {
         self.plan_dag_service
             .create_node(
                 project_id,
+                plan_id,
                 node_id,
                 node_type,
                 request.position,
@@ -1306,6 +1341,7 @@ impl AppContext {
     pub async fn update_plan_dag_node(
         &self,
         project_id: i32,
+        plan_id: Option<i32>,
         node_id: String,
         updates: PlanDagNodeUpdateRequest,
     ) -> Result<PlanDagNode> {
@@ -1330,6 +1366,7 @@ impl AppContext {
         self.plan_dag_service
             .update_node(
                 project_id,
+                plan_id,
                 node_id,
                 updates.position,
                 metadata_json,
@@ -1341,25 +1378,30 @@ impl AppContext {
     pub async fn delete_plan_dag_node(
         &self,
         project_id: i32,
+        plan_id: Option<i32>,
         node_id: String,
     ) -> Result<PlanDagNode> {
-        self.plan_dag_service.delete_node(project_id, node_id).await
+        self.plan_dag_service
+            .delete_node(project_id, plan_id, node_id)
+            .await
     }
 
     pub async fn move_plan_dag_node(
         &self,
         project_id: i32,
+        plan_id: Option<i32>,
         node_id: String,
         position: Position,
     ) -> Result<PlanDagNode> {
         self.plan_dag_service
-            .move_node(project_id, node_id, position)
+            .move_node(project_id, plan_id, node_id, position)
             .await
     }
 
     pub async fn batch_move_plan_dag_nodes(
         &self,
         project_id: i32,
+        plan_id: Option<i32>,
         positions: Vec<PlanDagNodePositionRequest>,
     ) -> Result<Vec<PlanDagNode>> {
         let updates = positions
@@ -1373,21 +1415,16 @@ impl AppContext {
             .collect();
 
         self.plan_dag_service
-            .batch_move_nodes(project_id, updates)
+            .batch_move_nodes(project_id, plan_id, updates)
             .await
     }
 
     pub async fn create_plan_dag_edge(
         &self,
         project_id: i32,
+        plan_id: Option<i32>,
         request: PlanDagEdgeRequest,
     ) -> Result<PlanDagEdge> {
-        // Ensure plan exists before creating edge
-        self.plan_dag_service
-            .get_or_create_plan(project_id)
-            .await
-            .map_err(|e| anyhow!("Failed to prepare plan for project {}: {}", project_id, e))?;
-
         let edge_id = generate_edge_id(&request.source, &request.target);
         let metadata_json = serde_json::to_string(&request.metadata)
             .map_err(|e| anyhow!("Invalid edge metadata: {}", e))?;
@@ -1395,6 +1432,7 @@ impl AppContext {
         self.plan_dag_service
             .create_edge(
                 project_id,
+                plan_id,
                 edge_id,
                 request.source,
                 request.target,
@@ -1406,6 +1444,7 @@ impl AppContext {
     pub async fn update_plan_dag_edge(
         &self,
         project_id: i32,
+        plan_id: Option<i32>,
         edge_id: String,
         updates: PlanDagEdgeUpdateRequest,
     ) -> Result<PlanDagEdge> {
@@ -1419,16 +1458,19 @@ impl AppContext {
         };
 
         self.plan_dag_service
-            .update_edge(project_id, edge_id, metadata_json)
+            .update_edge(project_id, plan_id, edge_id, metadata_json)
             .await
     }
 
     pub async fn delete_plan_dag_edge(
         &self,
         project_id: i32,
+        plan_id: Option<i32>,
         edge_id: String,
     ) -> Result<PlanDagEdge> {
-        self.plan_dag_service.delete_edge(project_id, edge_id).await
+        self.plan_dag_service
+            .delete_edge(project_id, plan_id, edge_id)
+            .await
     }
 
     // ----- Graph editing helpers ------------------------------------------
