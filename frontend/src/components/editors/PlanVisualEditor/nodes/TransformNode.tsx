@@ -23,6 +23,7 @@ const FRIENDLY_NAMES: Record<string, string> = {
   EdgeLabelInsertNewlines: 'Wrap edge labels',
   InvertGraph: 'Invert graph',
   GenerateHierarchy: 'Hierarchy to flow',
+  AggregateLayerNodes: 'Aggregate nodes by layer',
   AggregateEdges: 'Aggregate edges',
 }
 
@@ -46,6 +47,10 @@ const formatTransform = (transform: GraphTransform): string | null => {
       return FRIENDLY_NAMES[kind]
     case 'GenerateHierarchy':
       return params.enabled === false ? null : FRIENDLY_NAMES[kind]
+    case 'AggregateLayerNodes':
+      return params.layerConnectionsThreshold
+        ? `Layer aggregation ≥ ${params.layerConnectionsThreshold}`
+        : FRIENDLY_NAMES[kind]
     case 'AggregateEdges':
       // Only surface when aggregation is explicitly disabled
       return params.enabled === false ? 'Keep duplicate edges' : null

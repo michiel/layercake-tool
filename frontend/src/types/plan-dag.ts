@@ -68,6 +68,7 @@ export type GraphTransformKind =
   | 'EdgeLabelInsertNewlines'
   | 'InvertGraph'
   | 'GenerateHierarchy'
+  | 'AggregateLayerNodes'
   | 'AggregateEdges';
 
 export interface GraphTransformParams {
@@ -78,6 +79,7 @@ export interface GraphTransformParams {
   edgeLabelMaxLength?: number;
   edgeLabelInsertNewlinesAt?: number;
   enabled?: boolean;
+  layerConnectionsThreshold?: number;
 }
 
 export interface GraphTransform {

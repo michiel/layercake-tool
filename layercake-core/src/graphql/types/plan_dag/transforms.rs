@@ -263,6 +263,63 @@ impl GraphTransform {
                     graph.edges.len()
                 ))
             }
+            GraphTransformKind::AggregateLayerNodes => {
+                let threshold = self.params.layer_connections_threshold.unwrap_or(3);
+                if threshold == 0 {
+                    return Err(anyhow!(
+                        "AggregateLayerNodes transform requires layerConnectionsThreshold greater than zero"
+                    ));
+                }
+                let summary = graph
+                    .aggregate_nodes_by_layer(threshold)
+                    .map_err(|e| anyhow!(e))?;
+                let annotation = if summary.is_empty() {
+                    format!(
+                        "### Transform: Aggregate Nodes by Layer\n- Threshold: {}\n- No aggregations performed",
+                        threshold
+                    )
+                } else {
+                    let mut table = String::from(
+                        "| Layer | Common node | Aggregated | New node |\n| --- | --- | --- | --- |\n",
+                    );
+                    let mut details = String::new();
+                    for entry in &summary {
+                        let anchor = entry
+                            .anchor_node_label
+                            .as_deref()
+                            .unwrap_or(&entry.anchor_node_id);
+                        table.push_str(&format!(
+                            "| {} | {} | {} | {} |\n",
+                            entry.layer_id,
+                            anchor,
+                            entry.aggregated_nodes.len(),
+                            entry.aggregate_node_label
+                        ));
+                        let aggregated_list = entry
+                            .aggregated_nodes
+                            .iter()
+                            .map(|(id, label)| format!("{}:{}", id, label))
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        details.push_str(&format!(
+                            "- **{}** condensed {} nodes via {}: {}\n",
+                            entry.aggregate_node_label,
+                            entry.aggregated_nodes.len(),
+                            anchor,
+                            aggregated_list
+                        ));
+                    }
+
+                    format!(
+                        "### Transform: Aggregate Nodes by Layer\n- Threshold: {}\n- Groups aggregated: {}\n\n{}\n\n{}",
+                        threshold,
+                        summary.len(),
+                        table,
+                        details
+                    )
+                };
+                Some(annotation)
+            }
             GraphTransformKind::AggregateEdges => {
                 unreachable!("AggregateEdges should have been handled earlier")
             }
@@ -283,6 +340,7 @@ pub enum GraphTransformKind {
     EdgeLabelInsertNewlines,
     InvertGraph,
     GenerateHierarchy,
+    AggregateLayerNodes,
     AggregateEdges,
 }
 
@@ -303,6 +361,8 @@ pub struct GraphTransformParams {
     #[serde(alias = "edge_label_insert_newlines_at")]
     pub edge_label_insert_newlines_at: Option<usize>,
     pub enabled: Option<bool>,
+    #[serde(alias = "layerConnectionsThreshold")]
+    pub layer_connections_threshold: Option<usize>,
 }
 
 /// Wire format for deserializing TransformNodeConfig supporting both v1 and v2 schemas.
@@ -485,6 +545,7 @@ impl TransformNodeConfig {
                 GraphTransformKind::GenerateHierarchy => {
                     config.generate_hierarchy = true;
                 }
+                GraphTransformKind::AggregateLayerNodes => {}
                 GraphTransformKind::AggregateEdges => {
                     config.aggregate_edges = transform.params.enabled.unwrap_or(true);
                 }

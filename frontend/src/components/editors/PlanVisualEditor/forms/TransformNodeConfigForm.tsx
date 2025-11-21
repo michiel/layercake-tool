@@ -35,6 +35,7 @@ const TRANSFORM_OPTIONS: { value: GraphTransformKind; label: string }[] = [
   { value: 'EdgeLabelInsertNewlines', label: 'Wrap Edge Labels' },
   { value: 'InvertGraph', label: 'Invert Graph' },
   { value: 'GenerateHierarchy', label: 'Hierarchy to flow' },
+  { value: 'AggregateLayerNodes', label: 'Aggregate Nodes by Layer' },
   { value: 'AggregateEdges', label: 'Aggregate Duplicate Edges' },
 ];
 
@@ -57,6 +58,8 @@ const getDefaultParams = (kind: GraphTransformKind): GraphTransform['params'] =>
     case 'InvertGraph':
     case 'GenerateHierarchy':
       return { enabled: true };
+    case 'AggregateLayerNodes':
+      return { layerConnectionsThreshold: 3 };
     case 'AggregateEdges':
       return {};
     default:
@@ -176,6 +179,7 @@ const isTransformValid = (transform: GraphTransform): boolean => {
     case 'GenerateHierarchy':
     case 'DropUnconnectedNodes':
     case 'AggregateEdges':
+    case 'AggregateLayerNodes':
       return true;
     default:
       return true;
@@ -461,6 +465,29 @@ export const TransformNodeConfigForm: React.FC<TransformNodeConfigFormProps> = (
               duplicate edges separate.
             </AlertDescription>
           </Alert>
+        );
+      case 'AggregateLayerNodes':
+        return (
+          <div className="space-y-2">
+            <Label htmlFor={`layer-aggregation-threshold-${index}`}>
+              Shared connections threshold
+            </Label>
+            <Input
+              id={`layer-aggregation-threshold-${index}`}
+              type="number"
+              min={1}
+              max={100}
+              value={transform.params.layerConnectionsThreshold ?? 3}
+              onChange={e => {
+                const value = e.target.value ? parseInt(e.target.value, 10) : undefined;
+                updateTransformParam(index, 'layerConnectionsThreshold', value);
+              }}
+            />
+            <p className="text-sm text-muted-foreground">
+              Merge sibling nodes in the same layer when at least this many nodes connect to the same
+              external node.
+            </p>
+          </div>
         );
       default:
         return null;

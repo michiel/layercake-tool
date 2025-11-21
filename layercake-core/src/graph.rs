@@ -25,6 +25,17 @@ pub struct PartitionWidthAggregation {
     pub retained_count: usize,
 }
 
+#[derive(Debug, Clone)]
+pub struct LayerAggregationSummary {
+    pub layer_id: String,
+    pub belongs_to: Option<String>,
+    pub anchor_node_id: String,
+    pub anchor_node_label: Option<String>,
+    pub aggregate_node_id: String,
+    pub aggregate_node_label: String,
+    pub aggregated_nodes: Vec<(String, String)>,
+}
+
 impl Graph {
     pub fn get_layer_map(&self) -> IndexMap<String, Layer> {
         let layers: IndexMap<String, Layer> = self
@@ -355,6 +366,100 @@ impl Graph {
         }
     }
 
+    fn replace_with_aggregate_node(
+        &mut self,
+        aggregated_ids: &[String],
+        label: String,
+        layer: String,
+        belongs_to: Option<String>,
+        comment: Option<String>,
+    ) -> Option<(Node, Vec<(String, String)>)> {
+        if aggregated_ids.is_empty() {
+            return None;
+        }
+
+        let aggregated_children: Vec<Node> = aggregated_ids
+            .iter()
+            .filter_map(|id| self.get_node_by_id(id).cloned())
+            .collect();
+
+        if aggregated_children.is_empty() {
+            return None;
+        }
+
+        let id_seed = belongs_to
+            .as_deref()
+            .map(|value| value.to_string())
+            .filter(|value| !value.is_empty())
+            .unwrap_or_else(|| format!("layer_{}", layer));
+
+        let aggregate_node_id = self.generate_aggregate_node_id(&id_seed);
+        let aggregate_node = Node {
+            id: aggregate_node_id.clone(),
+            label,
+            layer: layer.clone(),
+            is_partition: false,
+            belongs_to: belongs_to.clone(),
+            weight: aggregated_children.iter().map(|child| child.weight).sum(),
+            comment,
+            dataset: None,
+        };
+
+        let aggregated_child_ids: HashSet<String> = aggregated_ids.iter().cloned().collect();
+        let mut untouched_edges = Vec::new();
+        let mut aggregated_edge_map: HashMap<(String, String, String, Option<i32>), Edge> =
+            HashMap::new();
+
+        for edge in self.edges.iter() {
+            let mut new_edge = edge.clone();
+            let source_replaced = aggregated_child_ids.contains(&edge.source);
+            let target_replaced = aggregated_child_ids.contains(&edge.target);
+
+            if source_replaced {
+                new_edge.source = aggregate_node.id.clone();
+            }
+            if target_replaced {
+                new_edge.target = aggregate_node.id.clone();
+            }
+
+            if new_edge.source == new_edge.target {
+                continue;
+            }
+
+            if source_replaced || target_replaced {
+                let key = (
+                    new_edge.source.clone(),
+                    new_edge.target.clone(),
+                    new_edge.layer.clone(),
+                    new_edge.dataset,
+                );
+
+                aggregated_edge_map
+                    .entry(key)
+                    .and_modify(|existing| existing.weight += new_edge.weight)
+                    .or_insert(new_edge);
+            } else {
+                untouched_edges.push(new_edge);
+            }
+        }
+
+        untouched_edges.extend(aggregated_edge_map.into_values());
+        self.edges = untouched_edges;
+
+        self.set_node(aggregate_node.clone());
+
+        for node_id in aggregated_ids {
+            self.remove_node(node_id.to_string());
+        }
+
+        let aggregated_pairs = aggregated_children
+            .into_iter()
+            .map(|child| (child.id, child.label))
+            .collect();
+
+        Some((aggregate_node, aggregated_pairs))
+    }
+
     // This function is now an alias to get_node_by_id, defined above
 
     pub fn stats(&self) -> String {
@@ -628,94 +733,34 @@ impl Graph {
                     ));
                 }
 
-                let aggregated_children: Vec<Node> = aggregate_ids
-                    .iter()
-                    .filter_map(|id| graph.get_node_by_id(id).cloned())
-                    .collect();
-
-                if aggregated_children.is_empty() {
-                    return Ok(());
-                }
-
-                let agg_node_id = graph.generate_aggregate_node_id(&node.id);
                 let parent_label = if !node.label.is_empty() {
                     node.label.clone()
                 } else {
                     node.id.clone()
                 };
-                let agg_node = Node {
-                    id: agg_node_id.clone(),
-                    label: format!(
-                        "{} - {} nodes (aggregated)",
-                        parent_label,
-                        aggregated_children.len()
-                    ),
-                    layer: "aggregated".to_string(),
-                    is_partition: false,
-                    belongs_to: Some(node.id.clone()),
-                    weight: aggregated_children.iter().map(|child| child.weight).sum(),
-                    comment: node.comment.clone(),
-                    dataset: None,
+                let aggregate_label = format!(
+                    "{} - {} nodes (aggregated)",
+                    parent_label,
+                    aggregate_ids.len()
+                );
+
+                let (agg_node, aggregated_pairs) = match graph.replace_with_aggregate_node(
+                    &aggregate_ids,
+                    aggregate_label,
+                    "aggregated".to_string(),
+                    Some(node.id.clone()),
+                    node.comment.clone(),
+                ) {
+                    Some(value) => value,
+                    None => return Ok(()),
                 };
-
-                // aggregate edges
-                let aggregated_child_ids: HashSet<String> = aggregate_ids.iter().cloned().collect();
-                let mut untouched_edges = Vec::new();
-                let mut aggregated_edge_map: HashMap<(String, String, String, Option<i32>), Edge> =
-                    HashMap::new();
-
-                for edge in graph.edges.iter() {
-                    let mut new_edge = edge.clone();
-                    let source_replaced = aggregated_child_ids.contains(&edge.source);
-                    let target_replaced = aggregated_child_ids.contains(&edge.target);
-
-                    if source_replaced {
-                        new_edge.source = agg_node.id.clone();
-                    }
-                    if target_replaced {
-                        new_edge.target = agg_node.id.clone();
-                    }
-
-                    if new_edge.source == new_edge.target {
-                        continue;
-                    }
-
-                    if source_replaced || target_replaced {
-                        let key = (
-                            new_edge.source.clone(),
-                            new_edge.target.clone(),
-                            new_edge.layer.clone(),
-                            new_edge.dataset,
-                        );
-
-                        aggregated_edge_map
-                            .entry(key)
-                            .and_modify(|existing| existing.weight += new_edge.weight)
-                            .or_insert(new_edge);
-                    } else {
-                        untouched_edges.push(new_edge);
-                    }
-                }
-
-                untouched_edges.extend(aggregated_edge_map.into_values());
-                graph.edges = untouched_edges;
-
-                graph.set_node(agg_node.clone());
-
-                for node_id in aggregate_ids {
-                    debug!("\tRemoving node: {}", node_id);
-                    graph.remove_node(node_id);
-                }
 
                 summaries.push(PartitionWidthAggregation {
                     parent_id: node.id.clone(),
                     parent_label: node.label.clone(),
                     aggregate_node_id: agg_node.id.clone(),
                     aggregate_node_label: agg_node.label.clone(),
-                    aggregated_nodes: aggregated_children
-                        .into_iter()
-                        .map(|child| (child.id, child.label))
-                        .collect(),
+                    aggregated_nodes: aggregated_pairs,
                     retained_count: retain_count,
                 });
             }
@@ -750,6 +795,131 @@ impl Graph {
             info!("Synthetic partition hierarchy used for width limiting");
         }
         Ok(summaries)
+    }
+
+    pub fn aggregate_nodes_by_layer(
+        &mut self,
+        min_shared_neighbors: usize,
+    ) -> Result<Vec<LayerAggregationSummary>, String> {
+        if min_shared_neighbors == 0 {
+            return Err("layer aggregation requires at least one shared connection".to_string());
+        }
+
+        let mut summaries = Vec::new();
+        loop {
+            if let Some(summary) = self.aggregate_nodes_by_layer_once(min_shared_neighbors)? {
+                summaries.push(summary);
+            } else {
+                break;
+            }
+        }
+        Ok(summaries)
+    }
+
+    fn aggregate_nodes_by_layer_once(
+        &mut self,
+        min_shared_neighbors: usize,
+    ) -> Result<Option<LayerAggregationSummary>, String> {
+        let mut adjacency: HashMap<String, HashSet<String>> = HashMap::new();
+        for edge in &self.edges {
+            adjacency
+                .entry(edge.source.clone())
+                .or_default()
+                .insert(edge.target.clone());
+            adjacency
+                .entry(edge.target.clone())
+                .or_default()
+                .insert(edge.source.clone());
+        }
+
+        let node_lookup: HashMap<String, Node> = self
+            .nodes
+            .iter()
+            .cloned()
+            .map(|node| (node.id.clone(), node))
+            .collect();
+
+        let mut groups: HashMap<(Option<String>, String), Vec<String>> = HashMap::new();
+        for node in &self.nodes {
+            if node.is_partition {
+                continue;
+            }
+            if node.layer.trim().is_empty() {
+                continue;
+            }
+            let key = (node.belongs_to.clone(), node.layer.clone());
+            groups.entry(key).or_default().push(node.id.clone());
+        }
+
+        for ((belongs_to, layer_id), node_ids) in groups.into_iter() {
+            if node_ids.len() < min_shared_neighbors {
+                continue;
+            }
+
+            let group_set: HashSet<String> = node_ids.iter().cloned().collect();
+            let mut neighbor_map: HashMap<String, HashSet<String>> = HashMap::new();
+
+            for node_id in &node_ids {
+                if let Some(neighbors) = adjacency.get(node_id) {
+                    for neighbor_id in neighbors {
+                        if group_set.contains(neighbor_id) {
+                            continue;
+                        }
+                        if let Some(neighbor_node) = node_lookup.get(neighbor_id) {
+                            if neighbor_node.layer == layer_id {
+                                continue;
+                            }
+                            neighbor_map
+                                .entry(neighbor_id.clone())
+                                .or_default()
+                                .insert(node_id.clone());
+                        }
+                    }
+                }
+            }
+
+            if neighbor_map.is_empty() {
+                continue;
+            }
+
+            let mut neighbor_entries: Vec<(String, HashSet<String>)> =
+                neighbor_map.into_iter().collect();
+            neighbor_entries.sort_by(|a, b| b.1.len().cmp(&a.1.len()));
+
+            for (anchor_id, members) in neighbor_entries {
+                if members.len() < min_shared_neighbors {
+                    continue;
+                }
+
+                let aggregate_ids: Vec<String> = members.into_iter().collect();
+                let aggregate_label = format!("{} agg({})", layer_id, aggregate_ids.len());
+
+                let (aggregate_node, aggregated_pairs) = match self.replace_with_aggregate_node(
+                    &aggregate_ids,
+                    aggregate_label,
+                    layer_id.clone(),
+                    belongs_to.clone(),
+                    None,
+                ) {
+                    Some(value) => value,
+                    None => continue,
+                };
+
+                let anchor_label = node_lookup.get(&anchor_id).map(|node| node.label.clone());
+
+                return Ok(Some(LayerAggregationSummary {
+                    layer_id,
+                    belongs_to,
+                    anchor_node_id: anchor_id,
+                    anchor_node_label: anchor_label,
+                    aggregate_node_id: aggregate_node.id,
+                    aggregate_node_label: aggregate_node.label,
+                    aggregated_nodes: aggregated_pairs,
+                }));
+            }
+        }
+
+        Ok(None)
     }
 
     // Aggregate duplicate edges
@@ -1866,6 +2036,252 @@ mod tests {
         for id in ["child1", "child2", "child3", "child4"] {
             assert!(graph.get_node_by_id(id).is_none());
         }
+    }
+
+    #[test]
+    fn test_aggregate_nodes_by_layer() {
+        let mut graph = Graph {
+            name: "Layer aggregation".to_string(),
+            nodes: vec![
+                Node {
+                    id: "parent".to_string(),
+                    label: "Parent".to_string(),
+                    layer: "partition".to_string(),
+                    is_partition: true,
+                    belongs_to: None,
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+                Node {
+                    id: "parent2".to_string(),
+                    label: "Parent2".to_string(),
+                    layer: "partition".to_string(),
+                    is_partition: true,
+                    belongs_to: None,
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+                Node {
+                    id: "a1".to_string(),
+                    label: "App1".to_string(),
+                    layer: "app".to_string(),
+                    is_partition: false,
+                    belongs_to: Some("parent".to_string()),
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+                Node {
+                    id: "a2".to_string(),
+                    label: "App2".to_string(),
+                    layer: "app".to_string(),
+                    is_partition: false,
+                    belongs_to: Some("parent".to_string()),
+                    weight: 2,
+                    comment: None,
+                    dataset: None,
+                },
+                Node {
+                    id: "a3".to_string(),
+                    label: "App3".to_string(),
+                    layer: "app".to_string(),
+                    is_partition: false,
+                    belongs_to: Some("parent".to_string()),
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+                Node {
+                    id: "a4".to_string(),
+                    label: "App4".to_string(),
+                    layer: "app".to_string(),
+                    is_partition: false,
+                    belongs_to: Some("parent".to_string()),
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+                Node {
+                    id: "b1".to_string(),
+                    label: "Report1".to_string(),
+                    layer: "report".to_string(),
+                    is_partition: false,
+                    belongs_to: Some("parent2".to_string()),
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+                Node {
+                    id: "b2".to_string(),
+                    label: "Report2".to_string(),
+                    layer: "report".to_string(),
+                    is_partition: false,
+                    belongs_to: Some("parent2".to_string()),
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+                Node {
+                    id: "b3".to_string(),
+                    label: "Report3".to_string(),
+                    layer: "report".to_string(),
+                    is_partition: false,
+                    belongs_to: Some("parent2".to_string()),
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+                Node {
+                    id: "hub".to_string(),
+                    label: "Hub".to_string(),
+                    layer: "infra".to_string(),
+                    is_partition: false,
+                    belongs_to: Some("parent".to_string()),
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+                Node {
+                    id: "side".to_string(),
+                    label: "Side".to_string(),
+                    layer: "infra".to_string(),
+                    is_partition: false,
+                    belongs_to: Some("parent".to_string()),
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+                Node {
+                    id: "db".to_string(),
+                    label: "Database".to_string(),
+                    layer: "infra".to_string(),
+                    is_partition: false,
+                    belongs_to: Some("parent2".to_string()),
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+            ],
+            edges: vec![
+                Edge {
+                    id: "e1".to_string(),
+                    source: "a1".to_string(),
+                    target: "hub".to_string(),
+                    label: "depends".to_string(),
+                    layer: "default".to_string(),
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+                Edge {
+                    id: "e2".to_string(),
+                    source: "a2".to_string(),
+                    target: "hub".to_string(),
+                    label: "depends".to_string(),
+                    layer: "default".to_string(),
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+                Edge {
+                    id: "e3".to_string(),
+                    source: "a3".to_string(),
+                    target: "hub".to_string(),
+                    label: "depends".to_string(),
+                    layer: "default".to_string(),
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+                Edge {
+                    id: "e4".to_string(),
+                    source: "a4".to_string(),
+                    target: "side".to_string(),
+                    label: "depends".to_string(),
+                    layer: "default".to_string(),
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+                Edge {
+                    id: "e5".to_string(),
+                    source: "b1".to_string(),
+                    target: "db".to_string(),
+                    label: "writes".to_string(),
+                    layer: "default".to_string(),
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+                Edge {
+                    id: "e6".to_string(),
+                    source: "b2".to_string(),
+                    target: "db".to_string(),
+                    label: "writes".to_string(),
+                    layer: "default".to_string(),
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+                Edge {
+                    id: "e7".to_string(),
+                    source: "b3".to_string(),
+                    target: "db".to_string(),
+                    label: "writes".to_string(),
+                    layer: "default".to_string(),
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+            ],
+            layers: vec![
+                Layer::new("partition", "Partition", "111111", "ffffff", "cccccc"),
+                Layer::new("app", "App", "eeeeee", "000000", "aaaaaa"),
+                Layer::new("report", "Report", "dddddd", "000000", "bbbbbb"),
+                Layer::new("infra", "Infra", "cccccc", "000000", "999999"),
+            ],
+            annotations: None,
+        };
+
+        let summary = graph.aggregate_nodes_by_layer(3).unwrap();
+        assert_eq!(summary.len(), 2);
+        assert!(summary
+            .iter()
+            .any(|entry| entry.layer_id == "app" && entry.anchor_node_id == "hub"));
+        assert!(summary
+            .iter()
+            .any(|entry| entry.layer_id == "report" && entry.anchor_node_id == "db"));
+
+        let app_aggregate = graph
+            .nodes
+            .iter()
+            .find(|node| node.label == "app agg(3)")
+            .expect("App aggregate node missing");
+        assert_eq!(app_aggregate.layer, "app");
+        assert_eq!(app_aggregate.belongs_to.as_deref(), Some("parent"));
+        assert_eq!(app_aggregate.weight, 4);
+
+        let hub_edge = graph
+            .edges
+            .iter()
+            .find(|edge| {
+                (edge.source == app_aggregate.id && edge.target == "hub")
+                    || (edge.target == app_aggregate.id && edge.source == "hub")
+            })
+            .expect("Aggregated edge to hub missing");
+        assert_eq!(hub_edge.weight, 3);
+
+        assert!(graph.nodes.iter().any(|node| node.id == "a4"));
+
+        let report_aggregate = graph
+            .nodes
+            .iter()
+            .find(|node| node.label == "report agg(3)")
+            .expect("Report aggregate node missing");
+        assert_eq!(report_aggregate.layer, "report");
+        assert_eq!(report_aggregate.belongs_to.as_deref(), Some("parent2"));
     }
 
     #[test]
