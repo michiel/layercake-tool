@@ -19,8 +19,6 @@ pub struct DataSet {
 
     #[graphql(name = "fileFormat")]
     pub file_format: String,
-    #[graphql(name = "dataType")]
-    pub data_type: String,
     pub origin: String,
     pub filename: String,
     #[graphql(name = "graphJson")]
@@ -97,7 +95,6 @@ impl From<crate::database::entities::data_sets::Model> for DataSet {
             description: model.description,
 
             file_format: model.file_format,
-            data_type: model.data_type,
             origin: model.origin,
             filename: model.filename,
             graph_json: model.graph_json,
@@ -119,7 +116,6 @@ impl From<DataSetSummary> for DataSet {
             name: summary.name,
             description: summary.description,
             file_format: summary.file_format,
-            data_type: summary.data_type,
             origin: summary.origin,
             filename: summary.filename,
             graph_json: summary.graph_json,
@@ -154,8 +150,6 @@ pub struct CreateEmptyDataSetInput {
     pub project_id: i32,
     pub name: String,
     pub description: Option<String>,
-    #[graphql(name = "dataType")]
-    pub data_type: DataSetDataType,
 }
 
 #[derive(InputObject)]

@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use std::io::{Cursor, Read, Seek, Write};
 use std::str::FromStr;
 use std::sync::Arc;
@@ -473,12 +473,11 @@ impl AppContext {
             project_id,
             name,
             description,
-            data_type,
         } = request;
 
         let created = self
             .data_set_service
-            .create_empty(project_id, name, description, data_type)
+            .create_empty(project_id, name, description)
             .await
             .map_err(|e| anyhow!("Failed to create empty data set: {}", e))?;
 
@@ -776,7 +775,7 @@ impl AppContext {
                 .map_err(|e| anyhow!("Failed to load data sets for template: {}", e))?
         };
 
-        let (dataset_records, dataset_tables) = analyze_data_sets(&data_sets)?;
+        let (dataset_records, dataset_graphs) = analyze_data_sets(&data_sets)?;
         let dataset_index = DatasetBundleIndex {
             datasets: dataset_records.clone(),
         };
@@ -824,14 +823,11 @@ impl AppContext {
             let options = FileOptions::default().compression_method(CompressionMethod::Deflated);
 
             for descriptor in &dataset_records {
-                if let Some(table) = dataset_tables.get(&descriptor.original_id) {
-                    let csv_bytes = dataset_schema_to_csv(table)
-                        .map_err(|e| anyhow!("Failed to render dataset schema: {}", e))?;
-
+                if let Some(graph_json) = dataset_graphs.get(&descriptor.original_id) {
                     let path = format!("datasets/{}", descriptor.filename);
                     zip.start_file(path, options)
                         .map_err(|e| anyhow!("Failed to add dataset file: {}", e))?;
-                    zip.write_all(&csv_bytes)
+                    zip.write_all(graph_json.as_bytes())
                         .map_err(|e| anyhow!("Failed to write dataset file: {}", e))?;
                 }
             }
@@ -912,7 +908,7 @@ impl AppContext {
                 .map_err(|e| anyhow!("Failed to load data sets for export: {}", e))?
         };
 
-        let (dataset_records, dataset_tables) = analyze_data_sets(&data_sets)?;
+        let (dataset_records, dataset_graphs) = analyze_data_sets(&data_sets)?;
         let dataset_index = DatasetBundleIndex {
             datasets: dataset_records.clone(),
         };
@@ -960,13 +956,11 @@ impl AppContext {
 
             let options = FileOptions::default().compression_method(CompressionMethod::Deflated);
             for descriptor in &dataset_records {
-                if let Some(table) = dataset_tables.get(&descriptor.original_id) {
-                    let csv_bytes = dataset_full_to_csv(table)
-                        .map_err(|e| anyhow!("Failed to render dataset CSV: {}", e))?;
+                if let Some(graph_json) = dataset_graphs.get(&descriptor.original_id) {
                     let path = format!("datasets/{}", descriptor.filename);
                     zip.start_file(path, options)
                         .map_err(|e| anyhow!("Failed to add dataset file: {}", e))?;
-                    zip.write_all(&csv_bytes)
+                    zip.write_all(graph_json.as_bytes())
                         .map_err(|e| anyhow!("Failed to write dataset file: {}", e))?;
                 }
             }
@@ -991,9 +985,8 @@ impl AppContext {
         archive_bytes: Vec<u8>,
         project_name: Option<String>,
     ) -> Result<ProjectSummary> {
-        let mut archive = ZipArchive::new(Cursor::new(archive_bytes)).map_err(|e| {
-            anyhow!("Failed to read project archive: {}", e)
-        })?;
+        let mut archive = ZipArchive::new(Cursor::new(archive_bytes))
+            .map_err(|e| anyhow!("Failed to read project archive: {}", e))?;
 
         let manifest: ProjectBundleManifest = read_template_json(&mut archive, "manifest.json")?;
         let project_record: ProjectRecord = read_template_json(&mut archive, "project.json")?;
@@ -1035,13 +1028,11 @@ impl AppContext {
         let mut id_map = HashMap::new();
 
         for descriptor in &dataset_index.datasets {
-            let data_type = DataType::from_str(&descriptor.data_type).unwrap_or(DataType::Graph);
-
             let dataset_path = format!("datasets/{}", descriptor.filename);
             let file_bytes = {
-                let mut dataset_file = archive.by_name(&dataset_path).map_err(|e| {
-                    anyhow!("Missing dataset file {}: {}", descriptor.filename, e)
-                })?;
+                let mut dataset_file = archive
+                    .by_name(&dataset_path)
+                    .map_err(|e| anyhow!("Missing dataset file {}: {}", descriptor.filename, e))?;
                 let mut bytes = Vec::new();
                 dataset_file.read_to_end(&mut bytes).map_err(|e| {
                     anyhow!("Failed to read dataset {}: {}", descriptor.filename, e)
@@ -1049,7 +1040,7 @@ impl AppContext {
                 bytes
             };
             let file_format = DataSetFileFormat::from_str(&descriptor.file_format)
-                .unwrap_or(DataSetFileFormat::Csv);
+                .unwrap_or(DataSetFileFormat::Json);
 
             let dataset = dataset_service
                 .create_from_file(
@@ -1058,7 +1049,7 @@ impl AppContext {
                     descriptor.description.clone(),
                     descriptor.filename.clone(),
                     file_format,
-                    data_type,
+                    DataType::Graph,
                     file_bytes,
                 )
                 .await
@@ -1144,8 +1135,6 @@ impl AppContext {
         let is_template = item.item_type == ITEM_TYPE_PROJECT_TEMPLATE;
 
         for descriptor in &dataset_index.datasets {
-            let data_type = DataType::from_str(&descriptor.data_type).unwrap_or(DataType::Graph);
-
             let dataset = if is_template {
                 // Templates should not carry data rows forward; create empty datasets using the schema metadata.
                 dataset_service
@@ -1153,7 +1142,6 @@ impl AppContext {
                         project.id,
                         descriptor.name.clone(),
                         descriptor.description.clone(),
-                        data_type,
                     )
                     .await
             } else {
@@ -1169,7 +1157,7 @@ impl AppContext {
                     bytes
                 };
                 let file_format = DataSetFileFormat::from_str(&descriptor.file_format)
-                    .unwrap_or(DataSetFileFormat::Csv);
+                    .unwrap_or(DataSetFileFormat::Json);
 
                 dataset_service
                     .create_from_file(
@@ -1178,7 +1166,7 @@ impl AppContext {
                         descriptor.description.clone(),
                         descriptor.filename.clone(),
                         file_format,
-                        data_type,
+                        DataType::Graph,
                         file_bytes,
                     )
                     .await
@@ -1934,7 +1922,6 @@ pub struct DataSetEmptyCreateRequest {
     pub project_id: i32,
     pub name: String,
     pub description: Option<String>,
-    pub data_type: DataSetDataType,
 }
 
 #[derive(Clone)]
@@ -2162,9 +2149,9 @@ struct DatasetBundleDescriptor {
     pub description: Option<String>,
     pub filename: String,
     pub file_format: String,
-    pub data_type: String,
-    pub row_count: Option<usize>,
-    pub column_count: Option<usize>,
+    pub node_count: Option<usize>,
+    pub edge_count: Option<usize>,
+    pub layer_count: Option<usize>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -2193,149 +2180,54 @@ struct ProjectRecord {
     pub tags: Vec<String>,
 }
 
-#[derive(Clone)]
-struct DatasetTable {
-    headers: Vec<String>,
-    rows: Vec<Vec<String>>,
-}
-
 fn analyze_data_sets(
     data_sets: &[data_sets::Model],
-) -> Result<(Vec<DatasetBundleDescriptor>, HashMap<i32, DatasetTable>)> {
+) -> Result<(Vec<DatasetBundleDescriptor>, HashMap<i32, String>)> {
     let mut descriptors = Vec::new();
     let mut tables = HashMap::new();
 
     for data_set in data_sets {
-        let table = dataset_table_from_graph(data_set)?;
+        let (node_count, edge_count, layer_count) = summarize_graph_counts(&data_set.graph_json);
         let descriptor = DatasetBundleDescriptor {
             original_id: data_set.id,
             name: data_set.name.clone(),
             description: data_set.description.clone(),
             filename: format!(
-                "{}_{}.csv",
+                "{}_{}.json",
                 sanitize_dataset_filename(&data_set.name),
                 data_set.id
             ),
-            file_format: "csv".to_string(),
-            data_type: data_set.data_type.clone(),
-            row_count: Some(table.rows.len()),
-            column_count: Some(table.headers.len()),
+            file_format: "json".to_string(),
+            node_count,
+            edge_count,
+            layer_count,
         };
-        tables.insert(data_set.id, table);
+        tables.insert(data_set.id, data_set.graph_json.clone());
         descriptors.push(descriptor);
     }
 
     Ok((descriptors, tables))
 }
 
-fn dataset_schema_to_csv(table: &DatasetTable) -> Result<Vec<u8>> {
-    let mut writer = csv::Writer::from_writer(Vec::new());
-    if !table.headers.is_empty() {
-        writer
-            .write_record(&table.headers)
-            .map_err(|e| anyhow!("Failed to write dataset headers: {}", e))?;
-    }
-    writer
-        .flush()
-        .map_err(|e| anyhow!("Failed to flush dataset CSV: {}", e))?;
-    writer
-        .into_inner()
-        .map_err(|e| anyhow!("Failed to finalize dataset CSV: {}", e))
-}
-
-fn dataset_full_to_csv(table: &DatasetTable) -> Result<Vec<u8>> {
-    let mut writer = csv::Writer::from_writer(Vec::new());
-    if !table.headers.is_empty() {
-        writer
-            .write_record(&table.headers)
-            .map_err(|e| anyhow!("Failed to write dataset headers: {}", e))?;
-    }
-    for row in &table.rows {
-        writer
-            .write_record(row)
-            .map_err(|e| anyhow!("Failed to write dataset row: {}", e))?;
-    }
-    writer
-        .flush()
-        .map_err(|e| anyhow!("Failed to flush dataset CSV: {}", e))?;
-    writer
-        .into_inner()
-        .map_err(|e| anyhow!("Failed to finalize dataset CSV: {}", e))
-}
-
-fn dataset_table_from_graph(data_set: &data_sets::Model) -> Result<DatasetTable> {
-    let parsed: Value = serde_json::from_str(&data_set.graph_json)
-        .map_err(|e| anyhow!("Failed to parse dataset graph_json: {}", e))?;
-    let key = dataset_key_for_type(&data_set.data_type);
-
-    let mut header_set = BTreeSet::new();
-    if let Some(array) = parsed.get(key).and_then(|value| value.as_array()) {
-        for item in array {
-            if let Some(obj) = item.as_object() {
-                for header in obj.keys() {
-                    header_set.insert(header.to_string());
-                }
-            }
-        }
-    }
-
-    let mut headers: Vec<String> = if header_set.is_empty() {
-        data_set
-            .data_type
-            .parse::<DataType>()
-            .ok()
-            .map(|dt| {
-                dt.get_expected_headers()
-                    .into_iter()
-                    .map(|s| s.to_string())
-                    .collect()
-            })
-            .unwrap_or_else(Vec::new)
-    } else {
-        header_set.into_iter().collect()
-    };
-
-    if headers.is_empty() {
-        headers = vec!["id".to_string(), "label".to_string()];
-    }
-
-    let mut rows = Vec::new();
-    if let Some(array) = parsed.get(key).and_then(|value| value.as_array()) {
-        for item in array {
-            if let Some(obj) = item.as_object() {
-                let mut row = Vec::new();
-                for header in &headers {
-                    let value = obj
-                        .get(header)
-                        .map(render_value_to_string)
-                        .unwrap_or_default();
-                    row.push(value);
-                }
-                rows.push(row);
-            }
-        }
-    }
-
-    Ok(DatasetTable { headers, rows })
-}
-
-fn render_value_to_string(value: &Value) -> String {
-    match value {
-        Value::Null => String::new(),
-        Value::Bool(b) => b.to_string(),
-        Value::Number(num) => num.to_string(),
-        Value::String(s) => s.clone(),
-        other => other.to_string(),
-    }
-}
-
-fn dataset_key_for_type(data_type: &str) -> &str {
-    match data_type {
-        "nodes" => "nodes",
-        "edges" => "edges",
-        "layers" => "layers",
-        _ => "nodes",
-    }
+fn summarize_graph_counts(graph_json: &str) -> (Option<usize>, Option<usize>, Option<usize>) {
+    serde_json::from_str::<Value>(graph_json)
+        .ok()
+        .and_then(|parsed| {
+            let node_count = parsed
+                .get("nodes")
+                .and_then(|v| v.as_array())
+                .map(|arr| arr.len());
+            let edge_count = parsed
+                .get("edges")
+                .and_then(|v| v.as_array())
+                .map(|arr| arr.len());
+            let layer_count = parsed
+                .get("layers")
+                .and_then(|v| v.as_array())
+                .map(|arr| arr.len());
+            Some((node_count, edge_count, layer_count))
+        })
+        .unwrap_or((None, None, None))
 }
 
 fn write_bundle_common_files<W: Write + Seek>(
