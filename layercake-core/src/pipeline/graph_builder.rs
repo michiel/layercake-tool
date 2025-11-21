@@ -363,7 +363,6 @@ impl GraphBuilder {
 
         for ds in data_sets {
             hasher.update(ds.id.to_le_bytes());
-            hasher.update(ds.data_type.as_bytes());
             hasher.update(ds.graph_json.as_bytes());
             if let Some(processed_at) = &ds.processed_at {
                 hasher.update(processed_at.to_rfc3339().as_bytes());
@@ -395,280 +394,138 @@ impl GraphBuilder {
             let graph_data: serde_json::Value = serde_json::from_str(&ds.graph_json)
                 .map_err(|e| anyhow!("Failed to parse graph JSON for {}: {}", ds.name, e))?;
 
-            // Extract based on data_type
-            match ds.data_type.as_str() {
-                "nodes" => {
-                    // Extract nodes from graph_json.nodes array
-                    if let Some(nodes_array) = graph_data.get("nodes").and_then(|v| v.as_array()) {
-                        for node_val in nodes_array {
-                            let id = node_val["id"]
-                                .as_str()
-                                .ok_or_else(|| anyhow!("Node missing 'id' field"))?
-                                .to_string();
+            if let Some(nodes_array) = graph_data.get("nodes").and_then(|v| v.as_array()) {
+                for node_val in nodes_array {
+                    let id = node_val["id"]
+                        .as_str()
+                        .ok_or_else(|| anyhow!("Node missing 'id' field"))?
+                        .to_string();
 
-                            let node = NodeData {
-                                label: node_val["label"].as_str().map(|s| s.to_string()),
-                            layer: node_val["layer"].as_str().map(|s| s.to_string()),
-                            weight: node_val["weight"].as_f64(),
-                            is_partition: parse_is_partition(&node_val["is_partition"]),
-                            belongs_to: node_val["belongs_to"]
-                                .as_str()
-                                .filter(|s| !s.is_empty())
-                                .map(|s| s.to_string()),
-                            comment: node_val["comment"].as_str().map(|s| s.to_string()),
-                            attrs: Some(node_val.clone()),
-                            dataset_id: Some(ds.id),
-                        };
+                    let node = NodeData {
+                        label: node_val["label"].as_str().map(|s| s.to_string()),
+                        layer: node_val["layer"].as_str().map(|s| s.to_string()),
+                        weight: node_val["weight"].as_f64(),
+                        is_partition: parse_is_partition(&node_val["is_partition"]),
+                        belongs_to: node_val["belongs_to"]
+                            .as_str()
+                            .filter(|s| !s.is_empty())
+                            .map(|s| s.to_string()),
+                        comment: node_val["comment"].as_str().map(|s| s.to_string()),
+                        attrs: Some(node_val.clone()),
+                        dataset_id: Some(ds.id),
+                    };
 
-                            all_nodes.insert(id, node);
-                        }
-                    }
+                    all_nodes.insert(id, node);
                 }
-                "edges" => {
-                    // Extract edges from graph_json.edges array
-                    if let Some(edges_array) = graph_data.get("edges").and_then(|v| v.as_array()) {
-                        for edge_val in edges_array {
-                            let id = edge_val["id"]
-                                .as_str()
-                                .ok_or_else(|| anyhow!("Edge missing 'id' field"))?
-                                .to_string();
-                            let source = edge_val["source"]
-                                .as_str()
-                                .ok_or_else(|| anyhow!("Edge missing 'source' field"))?
-                                .to_string();
-                            let target = edge_val["target"]
-                                .as_str()
-                                .ok_or_else(|| anyhow!("Edge missing 'target' field"))?
-                                .to_string();
+            }
 
-                            let edge = EdgeData {
-                                id: allocate_edge_id(&id, Some(ds.id), &mut used_edge_ids),
-                                source,
-                            target,
-                            label: edge_val["label"].as_str().map(|s| s.to_string()),
-                            layer: edge_val["layer"].as_str().map(|s| s.to_string()),
-                            weight: edge_val["weight"].as_f64(),
-                            comment: edge_val["comment"].as_str().map(|s| s.to_string()),
-                            attrs: Some(edge_val.clone()),
-                            dataset_id: Some(ds.id),
-                        };
+            if let Some(edges_array) = graph_data.get("edges").and_then(|v| v.as_array()) {
+                for edge_val in edges_array {
+                    let id = edge_val["id"]
+                        .as_str()
+                        .ok_or_else(|| anyhow!("Edge missing 'id' field"))?
+                        .to_string();
+                    let source = edge_val["source"]
+                        .as_str()
+                        .ok_or_else(|| anyhow!("Edge missing 'source' field"))?
+                        .to_string();
+                    let target = edge_val["target"]
+                        .as_str()
+                        .ok_or_else(|| anyhow!("Edge missing 'target' field"))?
+                        .to_string();
 
-                            all_edges.push(edge);
-                        }
-                    }
+                    let edge = EdgeData {
+                        id: allocate_edge_id(&id, Some(ds.id), &mut used_edge_ids),
+                        source,
+                        target,
+                        label: edge_val["label"].as_str().map(|s| s.to_string()),
+                        layer: edge_val["layer"].as_str().map(|s| s.to_string()),
+                        weight: edge_val["weight"].as_f64(),
+                        comment: edge_val["comment"].as_str().map(|s| s.to_string()),
+                        attrs: Some(edge_val.clone()),
+                        dataset_id: Some(ds.id),
+                    };
+
+                    all_edges.push(edge);
                 }
-                "graph" => {
-                    // Extract nodes, edges, and graph_layers from full graph JSON
-                    if let Some(nodes_array) = graph_data.get("nodes").and_then(|v| v.as_array()) {
-                        for node_val in nodes_array {
-                            let id = node_val["id"]
-                                .as_str()
-                                .ok_or_else(|| anyhow!("Node missing 'id' field"))?
-                                .to_string();
+            }
 
-                            let node = NodeData {
-                                label: node_val["label"].as_str().map(|s| s.to_string()),
-                                layer: node_val["layer"].as_str().map(|s| s.to_string()),
-                                weight: node_val["weight"].as_f64(),
-                                is_partition: parse_is_partition(&node_val["is_partition"]),
-                                belongs_to: node_val["belongs_to"]
-                                    .as_str()
-                                    .filter(|s| !s.is_empty())
-                                    .map(|s| s.to_string()),
-                                comment: node_val["comment"].as_str().map(|s| s.to_string()),
-                                attrs: Some(node_val.clone()),
-                                dataset_id: Some(ds.id),
-                            };
+            let mut process_layer_array = |array: &Vec<serde_json::Value>| -> Result<()> {
+                for layer_val in array {
+                    let layer_id = layer_val["id"]
+                        .as_str()
+                        .ok_or_else(|| anyhow!("Layer missing 'id' field"))?
+                        .to_string();
 
-                            all_nodes.insert(id, node);
-                        }
+                    if layer_id.is_empty() {
+                        continue;
                     }
 
-                    if let Some(edges_array) = graph_data.get("edges").and_then(|v| v.as_array()) {
-                        for edge_val in edges_array {
-                            let id = edge_val["id"]
-                                .as_str()
-                                .ok_or_else(|| anyhow!("Edge missing 'id' field"))?
-                                .to_string();
-                            let source = edge_val["source"]
-                                .as_str()
-                                .ok_or_else(|| anyhow!("Edge missing 'source' field"))?
-                                .to_string();
-                            let target = edge_val["target"]
-                                .as_str()
-                                .ok_or_else(|| anyhow!("Edge missing 'target' field"))?
-                                .to_string();
+                    let name = layer_val["label"].as_str().unwrap_or(&layer_id).to_string();
 
-                            let edge = EdgeData {
-                                id: allocate_edge_id(&id, Some(ds.id), &mut used_edge_ids),
-                                source,
-                                target,
-                                label: edge_val["label"].as_str().map(|s| s.to_string()),
-                                layer: edge_val["layer"].as_str().map(|s| s.to_string()),
-                                weight: edge_val["weight"].as_f64(),
-                                comment: edge_val["comment"].as_str().map(|s| s.to_string()),
-                                attrs: Some(edge_val.clone()),
-                                dataset_id: Some(ds.id),
-                            };
+                    let background_color = layer_val["background_color"]
+                        .as_str()
+                        .filter(|s| !s.is_empty())
+                        .map(|s| s.to_string());
 
-                            all_edges.push(edge);
-                        }
-                    }
+                    let text_color = layer_val["text_color"]
+                        .as_str()
+                        .filter(|s| !s.is_empty())
+                        .map(|s| s.to_string());
 
-                    // Extract graph_layers from graph JSON
-                    if let Some(layers_array) =
-                        graph_data.get("graph_layers").and_then(|v| v.as_array())
-                    {
-                        for layer_val in layers_array {
-                            let layer_id = layer_val["id"]
-                                .as_str()
-                                .ok_or_else(|| anyhow!("Layer missing 'id' field"))?
-                                .to_string();
+                    let border_color = layer_val["border_color"]
+                        .as_str()
+                        .filter(|s| !s.is_empty())
+                        .map(|s| s.to_string());
 
-                            // Skip empty layer IDs
-                            if layer_id.is_empty() {
-                                continue;
+                    let comment = layer_val["comment"]
+                        .as_str()
+                        .filter(|s| !s.is_empty())
+                        .map(|s| s.to_string());
+
+                    let mut properties = serde_json::Map::new();
+                    if let Some(obj) = layer_val.as_object() {
+                        for (key, value) in obj {
+                            if !matches!(
+                                key.as_str(),
+                                "id" | "label"
+                                    | "background_color"
+                                    | "text_color"
+                                    | "border_color"
+                                    | "comment"
+                            ) {
+                                properties.insert(key.clone(), value.clone());
                             }
-
-                            let name = layer_val["label"].as_str().unwrap_or(&layer_id).to_string();
-
-                            let background_color = layer_val["background_color"]
-                                .as_str()
-                                .filter(|s| !s.is_empty())
-                                .map(|s| s.to_string());
-
-                            let text_color = layer_val["text_color"]
-                                .as_str()
-                                .filter(|s| !s.is_empty())
-                                .map(|s| s.to_string());
-
-                            let border_color = layer_val["border_color"]
-                                .as_str()
-                                .filter(|s| !s.is_empty())
-                                .map(|s| s.to_string());
-
-                            let comment = layer_val["comment"]
-                                .as_str()
-                                .filter(|s| !s.is_empty())
-                                .map(|s| s.to_string());
-
-                            // Extract other properties
-                            let mut properties = serde_json::Map::new();
-                            if let Some(obj) = layer_val.as_object() {
-                                for (key, value) in obj {
-                                    // Skip fields that are now first-class fields
-                                    if !matches!(
-                                        key.as_str(),
-                                        "id" | "label"
-                                            | "background_color"
-                                            | "text_color"
-                                            | "border_color"
-                                            | "comment"
-                                    ) {
-                                        properties.insert(key.clone(), value.clone());
-                                    }
-                                }
-                            }
-
-                            let properties_json = if properties.is_empty() {
-                                None
-                            } else {
-                                Some(serde_json::to_string(&properties)?)
-                            };
-
-                            let layer = LayerData {
-                                name,
-                                background_color,
-                                text_color,
-                                border_color,
-                                comment,
-                                properties: properties_json,
-                                dataset_id: Some(ds.id),
-                            };
-
-                            all_layers.insert(layer_id, layer);
                         }
                     }
+
+                    let properties_json = if properties.is_empty() {
+                        None
+                    } else {
+                        Some(serde_json::to_string(&properties)?)
+                    };
+
+                    let layer = LayerData {
+                        name,
+                        background_color,
+                        text_color,
+                        border_color,
+                        comment,
+                        properties: properties_json,
+                        dataset_id: Some(ds.id),
+                    };
+
+                    all_layers.insert(layer_id, layer);
                 }
-                "graph_layers" => {
-                    // Extract graph_layers from dataset
-                    if let Some(layers_array) =
-                        graph_data.get("graph_layers").and_then(|v| v.as_array())
-                    {
-                        for layer_val in layers_array {
-                            let layer_id = layer_val["id"]
-                                .as_str()
-                                .ok_or_else(|| anyhow!("Layer missing 'id' field"))?
-                                .to_string();
+                Ok(())
+            };
 
-                            // Skip empty layer IDs
-                            if layer_id.is_empty() {
-                                continue;
-                            }
+            if let Some(layers_array) = graph_data.get("graph_layers").and_then(|v| v.as_array()) {
+                process_layer_array(layers_array)?;
+            }
 
-                            let name = layer_val["label"].as_str().unwrap_or(&layer_id).to_string();
-
-                            let background_color = layer_val["background_color"]
-                                .as_str()
-                                .filter(|s| !s.is_empty())
-                                .map(|s| s.to_string());
-
-                            let text_color = layer_val["text_color"]
-                                .as_str()
-                                .filter(|s| !s.is_empty())
-                                .map(|s| s.to_string());
-
-                            let border_color = layer_val["border_color"]
-                                .as_str()
-                                .filter(|s| !s.is_empty())
-                                .map(|s| s.to_string());
-
-                            let comment = layer_val["comment"]
-                                .as_str()
-                                .filter(|s| !s.is_empty())
-                                .map(|s| s.to_string());
-
-                            // Extract other properties
-                            let mut properties = serde_json::Map::new();
-                            if let Some(obj) = layer_val.as_object() {
-                                for (key, value) in obj {
-                                    // Skip fields that are now first-class fields
-                                    if !matches!(
-                                        key.as_str(),
-                                        "id" | "label"
-                                            | "background_color"
-                                            | "text_color"
-                                            | "border_color"
-                                            | "comment"
-                                    ) {
-                                        properties.insert(key.clone(), value.clone());
-                                    }
-                                }
-                            }
-
-                            let properties_json = if properties.is_empty() {
-                                None
-                            } else {
-                                Some(serde_json::to_string(&properties)?)
-                            };
-
-                            let layer = LayerData {
-                                name,
-                                background_color,
-                                text_color,
-                                border_color,
-                                comment,
-                                properties: properties_json,
-                                dataset_id: Some(ds.id),
-                            };
-
-                            all_layers.insert(layer_id, layer);
-                        }
-                    }
-                }
-                _ => {
-                    return Err(anyhow!("Unknown data type: {}", ds.data_type));
-                }
+            if let Some(layers_array) = graph_data.get("layers").and_then(|v| v.as_array()) {
+                process_layer_array(layers_array)?;
             }
         }
 
