@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery } from '@apollo/client/react'
 import { Breadcrumbs } from '@/components/common/Breadcrumbs'
@@ -106,7 +106,6 @@ export const ProjectLayersPage = () => {
     return dataset?.name || `Dataset #${datasetId}`
   }
 
-  // Filter for palette: only show enabled layers
   const paletteLayers = useMemo(() => {
     return [...editableLayers].sort((a, b) => {
       const dsA = a.sourceDatasetId ?? -1
@@ -129,34 +128,18 @@ export const ProjectLayersPage = () => {
 
   useEffect(() => {
     setEditableLayers(projectLayers)
-    setHasUnsavedChanges(false) // Reset unsaved changes when fresh data arrives
+    setHasUnsavedChanges(false)
   }, [projectLayers])
 
   useEffect(() => {
-    setDatasetToggleState((prev) => {
-      const next = { ...prev }
-      let changed = false
-      const datasetIds = new Set(
-        projectLayers.filter((l) => l.sourceDatasetId).map((l) => l.sourceDatasetId as number)
-      )
-
-      datasetIds.forEach((datasetId) => {
-        if (!(datasetId in next)) {
-          next[datasetId] = calculateDatasetState(datasetId, projectLayers)
-          changed = true
-        }
-      })
-
-      Object.keys(next).forEach((key) => {
-        const id = Number(key)
-        if (!datasetIds.has(id)) {
-          delete next[id]
-          changed = true
-        }
-      })
-
-      return changed ? next : prev
+    const nextState: Record<number, boolean> = {}
+    const datasetIds = new Set(
+      projectLayers.filter((l) => l.sourceDatasetId).map((l) => l.sourceDatasetId as number)
+    )
+    datasetIds.forEach((datasetId) => {
+      nextState[datasetId] = calculateDatasetState(datasetId, projectLayers)
     })
+    setDatasetToggleState(nextState)
   }, [projectLayers])
 
   const handleSaveLayer = async (layer: ProjectLayerInput) => {
@@ -192,7 +175,7 @@ export const ProjectLayersPage = () => {
         variables: {
           projectId: projectIdNum,
           layerId: layer.layerId,
-          sourceDatasetId: layer.sourceDatasetId,
+          sourceDatasetId: layer.sourceDatasetId ?? null,
         },
       })
       await refetchLayers()
@@ -435,8 +418,8 @@ export const ProjectLayersPage = () => {
                 </TableHeader>
                 <TableBody>
                   {paletteLayers.map((layer) => (
-                    <>
-                      <TableRow key={`${layer.layerId}-${layer.sourceDatasetId ?? 'manual'}`}>
+                    <Fragment key={layer.id}>
+                      <TableRow>
                       <TableCell className="font-mono">{layer.layerId}</TableCell>
                       <TableCell>
                         <Input
@@ -540,10 +523,7 @@ export const ProjectLayersPage = () => {
                           <Button
                             size="sm"
                             variant="destructive"
-                            onClick={async () => {
-                              await handleDeleteLayer(layer)
-                              setEditableLayers((prev) => prev.filter((l) => l.id !== layer.id))
-                            }}
+                            onClick={() => handleDeleteLayer(layer)}
                           >
                             Delete
                           </Button>
@@ -576,7 +556,21 @@ export const ProjectLayersPage = () => {
                           </TableCell>
                         </TableRow>
                       )}
-                    </>
+                      {layer.aliases && layer.aliases.length > 0 && (
+                        <TableRow className="bg-muted/30" key={`alias-${layer.id}`}>
+                          <TableCell colSpan={8} className="py-2 px-4">
+                            <div className="text-xs text-muted-foreground">
+                              <span className="font-semibold">Aliases:</span>{' '}
+                              {layer.aliases.map((alias) => (
+                                <Badge key={alias.id} variant="secondary" className="ml-1">
+                                  {alias.aliasLayerId}
+                                </Badge>
+                              ))}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </Fragment>
                   ))}
                 </TableBody>
               </Table>
