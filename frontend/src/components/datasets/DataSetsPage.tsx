@@ -166,6 +166,43 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
     }
   }
 
+  const renderGraphContents = (dataSource: DataSet) => {
+    const nodeCount = dataSource.nodeCount ?? 0
+    const edgeCount = dataSource.edgeCount ?? 0
+    const layerCount = dataSource.layerCount ?? 0
+    const parts: { key: string; label: string }[] = []
+
+    if (nodeCount > 0) {
+      parts.push({ key: 'nodes', label: `${nodeCount.toLocaleString()} nodes` })
+    }
+    if (edgeCount > 0) {
+      parts.push({ key: 'edges', label: `${edgeCount.toLocaleString()} edges` })
+    }
+    if (layerCount > 0 || dataSource.hasLayers) {
+      parts.push({
+        key: 'layers',
+        label:
+          layerCount > 0
+            ? `${layerCount.toLocaleString()} layers`
+            : 'Layers available'
+      })
+    }
+
+    if (parts.length === 0) {
+      return [
+        <Badge key="empty" variant="outline" className="bg-transparent">
+          Empty
+        </Badge>
+      ]
+    }
+
+    return parts.map((part) => (
+      <Badge key={part.key} variant="outline" className="bg-transparent">
+        {part.label}
+      </Badge>
+    ))
+  }
+
   const handleReprocess = async (dataSource: DataSet) => {
     try {
       await reprocessDataSet({
@@ -438,7 +475,7 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
                     </TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Origin</TableHead>
-                    <TableHead>Data Type</TableHead>
+                    <TableHead>Contents</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Size</TableHead>
                     <TableHead>Updated</TableHead>
@@ -470,9 +507,9 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="secondary">
-                          {getDataTypeDisplayName(dataSource.dataType)}
-                        </Badge>
+                        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                          {renderGraphContents(dataSource)}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Group gap="xs">
@@ -662,7 +699,6 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
                         </TableHead>
                         <TableHead>Name</TableHead>
                         <TableHead>Format</TableHead>
-                        <TableHead>Data Type</TableHead>
                         <TableHead>Updated</TableHead>
                         <TableHead>Size</TableHead>
                       </TableRow>
@@ -671,7 +707,6 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
                       {libraryItems.map((item) => {
                         const metadata = item.metadata || {}
                         const format = metadata.format || metadata.file_format || 'csv'
-                        const dataType = metadata.dataType || metadata.data_type || 'GRAPH'
                         return (
                           <TableRow key={item.id}>
                             <TableCell>
@@ -690,7 +725,6 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
                               </Stack>
                             </TableCell>
                             <TableCell>{getFileFormatDisplayName(format)}</TableCell>
-                            <TableCell>{getDataTypeDisplayName(dataType)}</TableCell>
                             <TableCell>{new Date(item.updatedAt).toLocaleString()}</TableCell>
                             <TableCell>
                               {item.contentSize ? formatFileSize(item.contentSize) : '—'}
