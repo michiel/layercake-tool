@@ -19,9 +19,10 @@ pub mod to_plantuml_wbs;
 /// This helps eliminate duplication across export modules
 pub mod renderer {
     use crate::graph::{Edge, Graph, Layer, Node, TreeNode};
-    use crate::plan::RenderConfig;
+    use crate::plan::{LayerSourceStyle, RenderConfig};
     use indexmap::IndexMap;
     use serde_json::{json, Value};
+    use std::collections::HashMap;
     use std::error::Error;
 
     pub struct PreparedGraphData {
@@ -84,6 +85,18 @@ pub mod renderer {
 
         for edge in flow_edges.iter().chain(hierarchy_edges.iter()) {
             ensure_layer(&edge.layer);
+        }
+
+        let overrides: HashMap<Option<i32>, LayerSourceStyle> = render_config
+            .layer_source_styles
+            .iter()
+            .map(|override_entry| (override_entry.source_dataset_id, override_entry.mode))
+            .collect();
+
+        for layer in layer_map.values_mut() {
+            if let Some(mode) = overrides.get(&layer.dataset) {
+                apply_layer_style(layer, mode);
+            }
         }
 
         let layers: Vec<_> = layer_map.values().cloned().collect();
@@ -149,5 +162,17 @@ pub mod renderer {
             node.weight = 1;
             reset_tree_weights(&mut node.children);
         }
+    }
+
+    fn apply_layer_style(layer: &mut Layer, mode: &LayerSourceStyle) {
+        let palette = match mode {
+            LayerSourceStyle::Default => ("222222", "ffffff", "dddddd"),
+            LayerSourceStyle::Light => ("f7f7f8", "0f172a", "e2e8f0"),
+            LayerSourceStyle::Dark => ("1f2933", "f8fafc", "94a3b8"),
+        };
+
+        layer.background_color = palette.0.to_string();
+        layer.text_color = palette.1.to_string();
+        layer.border_color = palette.2.to_string();
     }
 }

@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@apollo/client/react';
 import {
   GraphArtefactNodeConfig,
   GraphArtefactRenderTarget,
@@ -11,6 +12,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { GET_PROJECT_LAYERS, ProjectLayer } from '@/graphql/layers';
+import { GET_DATASOURCES } from '@/graphql/datasets';
+import type { LayerSourceStyleMode } from '@/types/plan-dag';
 
 interface GraphArtefactNodeConfigFormProps {
   config: GraphArtefactNodeConfig;
@@ -35,6 +39,7 @@ export const GraphArtefactNodeConfigForm: React.FC<GraphArtefactNodeConfigFormPr
     applyLayers: config.renderConfig?.applyLayers ?? legacyUseDefaultStyling ?? true,
     useNodeWeight: config.renderConfig?.useNodeWeight ?? true,
     useEdgeWeight: config.renderConfig?.useEdgeWeight ?? true,
+    layerSourceStyles: config.renderConfig?.layerSourceStyles ?? [],
     builtInStyles:
       config.renderConfig?.builtInStyles ||
       (legacyUseDefaultStyling === false
@@ -63,6 +68,15 @@ export const GraphArtefactNodeConfigForm: React.FC<GraphArtefactNodeConfigFormPr
     graphConfig: config.graphConfig || {}
   });
   const [activeTab, setActiveTab] = useState<'general' | 'target' | 'layers'>('general');
+
+  const { data: projectLayersData, loading: projectLayersLoading } = useQuery(GET_PROJECT_LAYERS, {
+    variables: { projectId: _projectId },
+    skip: !_projectId,
+  });
+  const { data: layerDatasetsData, loading: layerDatasetsLoading } = useQuery(GET_DATASOURCES, {
+    variables: { projectId: _projectId },
+    skip: !_projectId,
+  });
 
   useEffect(() => {
     setConfig(localConfig);
@@ -114,6 +128,95 @@ export const GraphArtefactNodeConfigForm: React.FC<GraphArtefactNodeConfigFormPr
       },
     }));
   };
+
+  const layerSourceOptions = useMemo(() => {
+    const layers: ProjectLayer[] = (projectLayersData as any)?.projectLayers ?? [];
+    const enabledLayers = layers.filter(layer => layer.enabled);
+    if (!enabledLayers.length) {
+      return [];
+    }
+
+    const datasetNameMap = new Map<number, string>();
+    const datasets = (layerDatasetsData as any)?.dataSets ?? [];
+    datasets
+      .filter(
+        (dataset: any) => (dataset.dataType ?? '').toLowerCase() === 'layers'
+      )
+      .forEach((dataset: any) => {
+        datasetNameMap.set(dataset.id, dataset.name ?? `Dataset #${dataset.id}`);
+      });
+
+    const grouped = new Map<
+      string,
+      { datasetId: number | null; count: number; label: string; key: string }
+    >();
+
+    enabledLayers.forEach(layer => {
+      const datasetId = layer.sourceDatasetId ?? null;
+      const key = datasetId === null ? 'manual' : datasetId.toString();
+      if (!grouped.has(key)) {
+        const label =
+          datasetId === null
+            ? 'Manual layers'
+            : datasetNameMap.get(datasetId) ?? `Dataset #${datasetId}`;
+        grouped.set(key, { datasetId, count: 1, label, key });
+      } else {
+        const entry = grouped.get(key)!;
+        entry.count += 1;
+      }
+    });
+
+    return Array.from(grouped.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [projectLayersData, layerDatasetsData]);
+
+  const findLayerSourceOverride = (datasetId: number | null) =>
+    localConfig.renderConfig?.layerSourceStyles?.find(
+      style => (style.sourceDatasetId ?? null) === (datasetId ?? null)
+    );
+
+  const getLayerSourceMode = (datasetId: number | null): LayerSourceStyleMode => {
+    const existing = findLayerSourceOverride(datasetId);
+    return existing?.mode ?? 'default';
+  };
+
+  const setLayerSourceOverride = (datasetId: number | null, mode: LayerSourceStyleMode) => {
+    setLocalConfig(prev => {
+      const existing = prev.renderConfig?.layerSourceStyles ?? [];
+      const filtered = existing.filter(
+        style => (style.sourceDatasetId ?? null) !== (datasetId ?? null)
+      );
+      return {
+        ...prev,
+        renderConfig: {
+          ...(prev.renderConfig ?? {}),
+          layerSourceStyles: [...filtered, { sourceDatasetId: datasetId, mode }],
+        },
+      };
+    });
+  };
+
+  const removeLayerSourceOverride = (datasetId: number | null) => {
+    setLocalConfig(prev => ({
+      ...prev,
+      renderConfig: {
+        ...(prev.renderConfig ?? {}),
+        layerSourceStyles: (prev.renderConfig?.layerSourceStyles ?? []).filter(
+          style => (style.sourceDatasetId ?? null) !== (datasetId ?? null)
+        ),
+      },
+    }));
+  };
+
+  const setLayerSourceDisabled = (datasetId: number | null, disabled: boolean) => {
+    if (disabled) {
+      const mode = getLayerSourceMode(datasetId);
+      setLayerSourceOverride(datasetId, mode);
+    } else {
+      removeLayerSourceOverride(datasetId);
+    }
+  };
+
+  const layerSourcesLoading = projectLayersLoading || layerDatasetsLoading;
 
   return (
     <Stack gap="md">
@@ -196,43 +299,41 @@ export const GraphArtefactNodeConfigForm: React.FC<GraphArtefactNodeConfigFormPr
             </Select>
           </div>
 
-          <div className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="use-node-weight"
-                checked={localConfig.renderConfig?.useNodeWeight ?? true}
-                onCheckedChange={(checked) =>
-                  setLocalConfig(prev => ({
-                    ...prev,
-                    renderConfig: { ...(prev.renderConfig ?? {}), useNodeWeight: checked },
-                  }))
-                }
-              />
-              <div>
-                <Label htmlFor="use-node-weight">Use Node Weight</Label>
-                <p className="text-sm text-muted-foreground">
-                  Toggles whether exports use stored weights when sizing or shading nodes.
-                </p>
-              </div>
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="use-node-weight"
+              checked={localConfig.renderConfig?.useNodeWeight ?? true}
+              onCheckedChange={(checked) =>
+                setLocalConfig(prev => ({
+                  ...prev,
+                  renderConfig: { ...(prev.renderConfig ?? {}), useNodeWeight: checked },
+                }))
+              }
+            />
+            <div>
+              <Label htmlFor="use-node-weight">Use Node Weight</Label>
+              <p className="text-sm text-muted-foreground">
+                Toggles whether exports use stored weights when sizing or shading nodes.
+              </p>
             </div>
+          </div>
 
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="use-edge-weight"
-                checked={localConfig.renderConfig?.useEdgeWeight ?? true}
-                onCheckedChange={(checked) =>
-                  setLocalConfig(prev => ({
-                    ...prev,
-                    renderConfig: { ...(prev.renderConfig ?? {}), useEdgeWeight: checked },
-                  }))
-                }
-              />
-              <div>
-                <Label htmlFor="use-edge-weight">Use Edge Weight</Label>
-                <p className="text-sm text-muted-foreground">
-                  Disable to treat all edges uniformly regardless of their weight field.
-                </p>
-              </div>
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="use-edge-weight"
+              checked={localConfig.renderConfig?.useEdgeWeight ?? true}
+              onCheckedChange={(checked) =>
+                setLocalConfig(prev => ({
+                  ...prev,
+                  renderConfig: { ...(prev.renderConfig ?? {}), useEdgeWeight: checked },
+                }))
+              }
+            />
+            <div>
+              <Label htmlFor="use-edge-weight">Use Edge Weight</Label>
+              <p className="text-sm text-muted-foreground">
+                Disable to treat all edges uniformly regardless of their weight field.
+              </p>
             </div>
           </div>
         </TabsContent>
@@ -472,7 +573,7 @@ export const GraphArtefactNodeConfigForm: React.FC<GraphArtefactNodeConfigFormPr
           )}
         </TabsContent>
 
-        <TabsContent value="layers" className="space-y-4 pt-4">
+        <TabsContent value="layers" className="space-y-6 pt-4">
           <div className="flex items-center space-x-2">
             <Switch
               id="apply-layer-colors"
@@ -488,6 +589,81 @@ export const GraphArtefactNodeConfigForm: React.FC<GraphArtefactNodeConfigFormPr
                 When enabled, nodes and edges inherit the palette defined for each layer.
               </p>
             </div>
+          </div>
+
+          <div className="space-y-3 rounded-md border p-4">
+            <div>
+              <Label>Layer Sources</Label>
+              <p className="text-sm text-muted-foreground">
+                Disable individual sources to fall back to built-in palettes for their layers.
+              </p>
+            </div>
+
+            {layerSourcesLoading ? (
+              <p className="text-sm text-muted-foreground">Loading layer sources…</p>
+            ) : !layerSourceOptions.length ? (
+              <p className="text-sm text-muted-foreground">
+                No enabled layer sources found for this project.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {layerSourceOptions.map(option => {
+                  const datasetKey = option.key;
+                  const disabled = !!findLayerSourceOverride(option.datasetId ?? null);
+                  const mode = getLayerSourceMode(option.datasetId ?? null);
+                  const switchId = `layer-source-disable-${datasetKey}`;
+                  const selectId = `layer-source-style-${datasetKey}`;
+
+                  return (
+                    <div key={datasetKey} className="rounded-md border p-3">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="font-medium">{option.label}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {option.count} {option.count === 1 ? 'layer' : 'layers'}{' '}
+                            {option.datasetId === null ? 'added manually' : 'from dataset'}
+                          </p>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Switch
+                            id={switchId}
+                            checked={disabled}
+                            onCheckedChange={(checked) =>
+                              setLayerSourceDisabled(option.datasetId ?? null, checked)
+                            }
+                          />
+                          <Label htmlFor={switchId} className="text-sm font-normal">
+                            Disable source colors
+                          </Label>
+                        </div>
+                      </div>
+                      {disabled && (
+                        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+                          <Label htmlFor={selectId} className="text-sm font-medium">
+                            Fallback palette
+                          </Label>
+                          <Select
+                            value={mode}
+                            onValueChange={(value) =>
+                              setLayerSourceOverride(option.datasetId ?? null, value as LayerSourceStyleMode)
+                            }
+                          >
+                            <SelectTrigger id={selectId} className="sm:w-48">
+                              <SelectValue placeholder="Select palette" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="default">Default</SelectItem>
+                              <SelectItem value="light">Light</SelectItem>
+                              <SelectItem value="dark">Dark</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </TabsContent>
       </Tabs>

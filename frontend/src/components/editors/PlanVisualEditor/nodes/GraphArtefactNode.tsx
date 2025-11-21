@@ -101,6 +101,10 @@ const normalizeRenderConfigForGraphQL = (renderConfig?: GraphArtefactNodeConfig[
     },
     addNodeCommentsAsNotes: renderConfig.addNodeCommentsAsNotes,
     notePosition: mapNotePosition(renderConfig.notePosition),
+    layerSourceStyles: renderConfig.layerSourceStyles?.map(style => ({
+      sourceDatasetId: style.sourceDatasetId ?? null,
+      mode: style.mode ? style.mode.toUpperCase() : undefined,
+    })),
   }
 }
 

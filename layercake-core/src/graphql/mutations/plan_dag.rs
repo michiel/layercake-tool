@@ -15,6 +15,8 @@ use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
 use crate::graphql::types::plan_dag::{
     config::RenderConfig as GraphQLRenderConfig,
+    config::LayerSourceStyle as GraphQLLayerSourceStyle,
+    config::LayerSourceStyleOverride as GraphQLLayerSourceStyleOverride,
     config::NotePosition as GraphQLNotePosition,
     config::RenderTargetOptions as GraphQLRenderTargetOptions,
     config::Orientation as GraphQLOrientation,
@@ -24,7 +26,8 @@ use crate::graphql::types::plan_dag::{
 };
 use crate::pipeline::DagExecutor;
 use crate::plan::{
-    RenderConfig as PlanRenderConfig, NotePosition as PlanNotePosition, RenderConfigBuiltInStyle,
+    LayerSourceStyle as PlanLayerSourceStyle, LayerSourceStyleOverride as PlanLayerSourceStyleOverride,
+    NotePosition as PlanNotePosition, RenderConfig as PlanRenderConfig, RenderConfigBuiltInStyle,
     RenderConfigOrientation, RenderTargetOptions, GraphvizRenderOptions, GraphvizCommentStyle,
 };
 
@@ -45,6 +48,7 @@ fn default_artefact_render_config() -> PlanRenderConfig {
         note_position: PlanNotePosition::Left,
         use_node_weight: true,
         use_edge_weight: true,
+        layer_source_styles: Vec::new(),
     }
 }
 
@@ -82,6 +86,31 @@ fn render_config_from_graphql_input(
             GraphQLGraphvizCommentStyle::Tooltip => GraphvizCommentStyle::Tooltip,
             GraphQLGraphvizCommentStyle::Label => GraphvizCommentStyle::Label,
         }
+    }
+
+    fn map_layer_source_style(value: GraphQLLayerSourceStyle) -> PlanLayerSourceStyle {
+        match value {
+            GraphQLLayerSourceStyle::Default => PlanLayerSourceStyle::Default,
+            GraphQLLayerSourceStyle::Light => PlanLayerSourceStyle::Light,
+            GraphQLLayerSourceStyle::Dark => PlanLayerSourceStyle::Dark,
+        }
+    }
+
+    fn map_layer_source_styles(
+        input: Option<&Vec<GraphQLLayerSourceStyleOverride>>,
+        defaults: &[PlanLayerSourceStyleOverride],
+    ) -> Vec<PlanLayerSourceStyleOverride> {
+        input
+            .map(|items| {
+                items
+                    .iter()
+                    .map(|item| PlanLayerSourceStyleOverride {
+                        source_dataset_id: item.source_dataset_id,
+                        mode: map_layer_source_style(item.mode),
+                    })
+                    .collect()
+            })
+            .unwrap_or_else(|| defaults.to_vec())
     }
 
     fn map_target_options(
@@ -176,6 +205,10 @@ fn render_config_from_graphql_input(
             .unwrap_or(defaults.note_position),
         use_node_weight: input.use_node_weight.unwrap_or(defaults.use_node_weight),
         use_edge_weight: input.use_edge_weight.unwrap_or(defaults.use_edge_weight),
+        layer_source_styles: map_layer_source_styles(
+            input.layer_source_styles.as_ref(),
+            &defaults.layer_source_styles,
+        ),
     }
 }
 

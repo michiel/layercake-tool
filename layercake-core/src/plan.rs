@@ -126,6 +126,7 @@ pub struct ExportProfileRenderConfig {
     pub note_position: Option<NotePosition>,
     pub use_node_weight: Option<bool>,
     pub use_edge_weight: Option<bool>,
+    pub layer_source_styles: Option<Vec<LayerSourceStyleOverride>>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Copy)]
@@ -168,6 +169,22 @@ pub enum RenderConfigTheme {
     Dark,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, Copy, PartialEq, Eq)]
+pub enum LayerSourceStyle {
+    #[serde(rename = "default")]
+    Default,
+    #[serde(rename = "light")]
+    Light,
+    #[serde(rename = "dark")]
+    Dark,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct LayerSourceStyleOverride {
+    pub source_dataset_id: Option<i32>,
+    pub mode: LayerSourceStyle,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CustomExportProfile {
     pub template: String,
@@ -207,6 +224,7 @@ impl Default for ExportProfileRenderConfig {
             note_position: Some(NotePosition::Left),
             use_node_weight: Some(true),
             use_edge_weight: Some(true),
+            layer_source_styles: None,
         }
     }
 }
@@ -227,6 +245,8 @@ pub struct RenderConfig {
     pub use_node_weight: bool,
     #[serde(default = "default_true")]
     pub use_edge_weight: bool,
+    #[serde(default)]
+    pub layer_source_styles: Vec<LayerSourceStyleOverride>,
 }
 
 fn default_true() -> bool {
@@ -440,6 +460,7 @@ impl ExportProfileItem {
         let note_position = render_config.note_position.unwrap_or(NotePosition::Left);
         let use_node_weight = render_config.use_node_weight.unwrap_or(true);
         let use_edge_weight = render_config.use_edge_weight.unwrap_or(true);
+        let layer_source_styles = render_config.layer_source_styles.unwrap_or_default();
 
         RenderConfig {
             contain_nodes,
@@ -451,6 +472,7 @@ impl ExportProfileItem {
             note_position,
             use_node_weight,
             use_edge_weight,
+            layer_source_styles,
         }
     }
 }

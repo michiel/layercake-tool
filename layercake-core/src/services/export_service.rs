@@ -39,6 +39,7 @@ impl ExportService {
             note_position: NotePosition::Left,
             use_node_weight: true,
             use_edge_weight: true,
+            layer_source_styles: Vec::new(),
         };
         let render_config = render_config_override.unwrap_or(default_render_config);
 

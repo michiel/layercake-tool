@@ -78,6 +78,7 @@ pub struct StoredRenderConfig {
     pub note_position: Option<String>,
     pub use_node_weight: Option<bool>,
     pub use_edge_weight: Option<bool>,
+    pub layer_source_styles: Option<Vec<crate::plan::LayerSourceStyleOverride>>,
 }
 
 impl StoredRenderConfig {
@@ -129,6 +130,7 @@ impl StoredRenderConfig {
                 .unwrap_or(crate::plan::NotePosition::Left),
             use_node_weight: self.use_node_weight.unwrap_or(true),
             use_edge_weight: self.use_edge_weight.unwrap_or(true),
+            layer_source_styles: self.layer_source_styles.unwrap_or_default(),
         }
     }
 }

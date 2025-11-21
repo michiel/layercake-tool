@@ -13,6 +13,19 @@ digraph G {
     node [ shape="plaintext" style="filled, rounded" fontsize=12]
     edge [ fontname="Lato" color="#2B303A" fontsize=8]
 
+  node [style="filled, dashed" fillcolor="#8194a0" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
+            mgmt_a[label="Management A"];
+            mgmt_a_a[label="Management A/A"];
+            mgmt_a_b[label="Management A/B"];
+            mgmt_b[label="Management B"];
+            mgmt_b_a[label="Management B/A"];
+            mgmt_b_a_b[label="Management B/A/B"];
+            mgmt_b_b[label="Management B/B"];
+            mgmt_b_b_a[label="Management B/B/A"];
+    }
+  node [style="filled, dashed" fillcolor="#426070" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
+            root[label="Root"];
+    }
   node [style="filled, dashed" fillcolor="#002a41" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
             drone_01[label="Drone"];
             drone_02[label="Drone"];
@@ -47,21 +60,8 @@ digraph G {
     }
   node [style="filled, dashed" fillcolor="#224558" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
     }
-  node [style="filled, dashed" fillcolor="#426070" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
-            root[label="Root"];
+  node [style="filled, dashed" fillcolor="#222222" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
     }
-  node [style="filled, dashed" fillcolor="#8194a0" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
-            mgmt_a[label="Management A"];
-            mgmt_a_a[label="Management A/A"];
-            mgmt_a_b[label="Management A/B"];
-            mgmt_b[label="Management B"];
-            mgmt_b_a[label="Management B/A"];
-            mgmt_b_a_b[label="Management B/A/B"];
-            mgmt_b_b[label="Management B/B"];
-            mgmt_b_b_a[label="Management B/B/A"];
-    }
-
-node [style="filled, rounded" fillcolor="#dddddd" fontcolor="#000000"];
 
       root -> mgmt_a;
       mgmt_a -> mgmt_a_a;

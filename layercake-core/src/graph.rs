@@ -84,7 +84,12 @@ impl Graph {
         let mut nodes: Vec<&Node> = self
             .nodes
             .iter()
-            .filter(|n| n.belongs_to.is_none() && n.is_partition)
+            .filter(|n| {
+                let belongs_to = n.belongs_to.as_deref();
+                n.is_partition
+                    && (belongs_to.is_none()
+                        || belongs_to == Some("synthetic_partition_root"))
+            })
             .collect();
         nodes.sort_by(|a, b| a.id.cmp(&b.id));
         nodes
@@ -585,13 +590,15 @@ impl Graph {
                 partition_child_node_ids.len()
             );
 
+            let width_threshold = if max_width <= 1 { 2 } else { max_width };
+
             // Recursively process partition children first
             for child_id in &partition_child_node_ids {
                 debug!("Processing partition child: {} / {}", node.id, child_id);
                 trim_node(child_id, graph, max_width, summaries)?;
             }
 
-            if non_partition_child_node_ids.len() as i32 > max_width {
+            if non_partition_child_node_ids.len() as i32 > width_threshold {
                 debug!("\tChopping time in node: {}", node.id);
 
                 let retain_count = if max_width > 1 {
@@ -656,7 +663,7 @@ impl Graph {
                 let aggregated_child_ids: HashSet<String> = aggregate_ids.iter().cloned().collect();
                 let mut untouched_edges = Vec::new();
                 let mut aggregated_edge_map: HashMap<
-                    (String, String, String, String, Option<i32>),
+                    (String, String, String, Option<i32>),
                     Edge,
                 > = HashMap::new();
 
@@ -681,7 +688,6 @@ impl Graph {
                             new_edge.source.clone(),
                             new_edge.target.clone(),
                             new_edge.layer.clone(),
-                            new_edge.label.clone(),
                             new_edge.dataset,
                         );
 
@@ -857,9 +863,14 @@ impl Graph {
             return false;
         }
 
+        let root_id = "synthetic_partition_root".to_string();
         let mut child_counts: HashMap<String, usize> = HashMap::new();
+        let mut parents_by_child: HashMap<String, String> = HashMap::new();
         for edge in &self.edges {
             *child_counts.entry(edge.source.clone()).or_insert(0) += 1;
+            parents_by_child
+                .entry(edge.target.clone())
+                .or_insert_with(|| edge.source.clone());
         }
 
         for node in &mut self.nodes {
@@ -868,7 +879,16 @@ impl Graph {
             }
         }
 
-        let root_id = "synthetic_partition_root".to_string();
+        if !self.layer_exists("aggregated") {
+            self.add_layer(Layer::new(
+                "aggregated",
+                "Aggregated",
+                "222222",
+                "ffffff",
+                "dddddd",
+            ));
+        }
+
         if !self.nodes.iter().any(|n| n.id == root_id) {
             self.nodes.push(Node {
                 id: root_id.clone(),
@@ -883,7 +903,13 @@ impl Graph {
         }
 
         for node in &mut self.nodes {
-            if node.belongs_to.is_none() {
+            if node.id == root_id || node.belongs_to.is_some() {
+                continue;
+            }
+
+            if let Some(parent) = parents_by_child.get(&node.id) {
+                node.belongs_to = Some(parent.clone());
+            } else {
                 node.belongs_to = Some(root_id.clone());
             }
         }

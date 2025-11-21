@@ -4,26 +4,80 @@
 /// 1. Nodes with None label fall back to using the node ID
 /// 2. Nodes/edges with None layer use empty string (inherit default styling)
 /// 3. Appropriate warnings are logged when fallbacks are used
-use layercake::database::entities::{graph_nodes, graphs};
+use layercake::database::entities::{
+    graph_nodes, graphs, plan_dag_nodes, plans, projects,
+};
+use layercake::database::migrations::Migrator;
 use layercake::services::graph_service::GraphService;
-use sea_orm::{ActiveModelTrait, Database, DatabaseConnection, EntityTrait, Set};
+use sea_orm::{ActiveModelTrait, Database, DatabaseConnection, Set};
+use sea_orm_migration::prelude::MigratorTrait;
 
 async fn setup_test_db() -> DatabaseConnection {
-    Database::connect("sqlite::memory:")
+    let db = Database::connect("sqlite::memory:")
         .await
-        .expect("Failed to create test database")
+        .expect("Failed to create test database");
+
+    Migrator::up(&db, None)
+        .await
+        .expect("Failed to run migrations for test database");
+
+    db
+}
+
+async fn create_test_project(db: &DatabaseConnection) -> i32 {
+    let project = projects::ActiveModel {
+        name: Set("Test Project".to_string()),
+        ..projects::ActiveModel::new()
+    };
+    project.insert(db).await.expect("Failed to insert project").id
+}
+
+async fn create_test_plan(db: &DatabaseConnection, project_id: i32) -> i32 {
+    let plan = plans::ActiveModel {
+        project_id: Set(project_id),
+        name: Set("Test Plan".to_string()),
+        yaml_content: Set("{}".to_string()),
+        dependencies: Set(None),
+        status: Set("draft".to_string()),
+        version: Set(1),
+        created_at: Set(chrono::Utc::now()),
+        updated_at: Set(chrono::Utc::now()),
+        ..Default::default()
+    };
+    plan.insert(db).await.expect("Failed to insert plan").id
+}
+
+async fn create_plan_node(db: &DatabaseConnection, plan_id: i32, node_id: &str) {
+    let node = plan_dag_nodes::ActiveModel {
+        id: Set(node_id.to_string()),
+        plan_id: Set(plan_id),
+        node_type: Set("GraphArtefactNode".to_string()),
+        position_x: Set(0.0),
+        position_y: Set(0.0),
+        source_position: Set(None),
+        target_position: Set(None),
+        metadata_json: Set("{}".to_string()),
+        config_json: Set("{}".to_string()),
+        created_at: Set(chrono::Utc::now()),
+        updated_at: Set(chrono::Utc::now()),
+        ..plan_dag_nodes::ActiveModel::new()
+    };
+    node.insert(db).await.expect("Failed to insert plan node");
 }
 
 async fn create_test_graph(db: &DatabaseConnection) -> i32 {
-    // Create a graph
+    let project_id = create_test_project(db).await;
+    let plan_id = create_test_plan(db, project_id).await;
+    let node_id = "test_graph_node";
+    create_plan_node(db, plan_id, node_id).await;
+
     let graph = graphs::ActiveModel {
-        project_id: Set(1),
+        project_id: Set(project_id),
         name: Set("Test Graph".to_string()),
-        node_id: Set("test_graph_node".to_string()),
-        ..Default::default()
+        node_id: Set(node_id.to_string()),
+        ..graphs::ActiveModel::new()
     };
-    let graph = graph.insert(db).await.expect("Failed to insert graph");
-    graph.id
+    graph.insert(db).await.expect("Failed to insert graph").id
 }
 
 async fn create_node_with_none_label(db: &DatabaseConnection, graph_id: i32, node_id: &str) {

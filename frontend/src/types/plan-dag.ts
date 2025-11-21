@@ -138,6 +138,7 @@ export interface GraphArtefactNodeConfig {
     targetOptions?: RenderTargetOptions;
     addNodeCommentsAsNotes?: boolean;
     notePosition?: 'left' | 'right' | 'top' | 'bottom';
+    layerSourceStyles?: LayerSourceStyleOverride[];
   };
     graphConfig?: {
     generateHierarchy?: boolean;
@@ -167,6 +168,7 @@ export interface TreeArtefactNodeConfig {
     targetOptions?: RenderTargetOptions;
     addNodeCommentsAsNotes?: boolean;
     notePosition?: 'left' | 'right' | 'top' | 'bottom';
+    layerSourceStyles?: LayerSourceStyleOverride[];
   };
   graphConfig?: {
     generateHierarchy?: boolean;
@@ -207,6 +209,13 @@ export interface GraphvizRenderOptions {
 export interface MermaidRenderOptions {
   look?: 'default' | 'handDrawn';
   display?: 'full' | 'compact';
+}
+
+export type LayerSourceStyleMode = 'default' | 'light' | 'dark';
+
+export interface LayerSourceStyleOverride {
+  sourceDatasetId?: number | null;
+  mode: LayerSourceStyleMode;
 }
 
 export const DEFAULT_GRAPHVIZ_OPTIONS: GraphvizRenderOptions = {

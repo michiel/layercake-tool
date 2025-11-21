@@ -162,6 +162,7 @@ pub struct RenderConfig {
     pub note_position: Option<NotePosition>,
     pub use_node_weight: Option<bool>,
     pub use_edge_weight: Option<bool>,
+    pub layer_source_styles: Option<Vec<LayerSourceStyleOverride>>,
 }
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
@@ -194,6 +195,27 @@ pub enum RenderBuiltinStyle {
     Light,
     #[graphql(name = "DARK")]
     Dark,
+}
+
+#[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
+pub enum LayerSourceStyle {
+    #[graphql(name = "DEFAULT")]
+    #[serde(rename = "default")]
+    Default,
+    #[graphql(name = "LIGHT")]
+    #[serde(rename = "light")]
+    Light,
+    #[graphql(name = "DARK")]
+    #[serde(rename = "dark")]
+    Dark,
+}
+
+#[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
+#[graphql(input_name = "LayerSourceStyleOverrideInput")]
+pub struct LayerSourceStyleOverride {
+    #[graphql(name = "sourceDatasetId")]
+    pub source_dataset_id: Option<i32>,
+    pub mode: LayerSourceStyle,
 }
 
 #[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
