@@ -36,5 +36,6 @@ The goal is to retire the legacy `dataType` field (Nodes/Edges/Layers/etc.) and 
 
 - **2024-XX-XX**: Initial audit completed. `dataType` is still referenced in GraphQL types (`DataSet`, `LibraryItem` metadata), dataset services (`DataSetService`, `GraphService`), upload/import paths, Plan DAG validation, and multiple frontend components (dataset tables, uploader, plan editors, library UI). Upcoming work will remove these references while preserving file upload hints.
 - **2025-11-21**: Project archive/template exports now bundle full dataset `graph_json` payloads (as `.json`) instead of CSV extracts, and imports rehydrate datasets directly from those graphs. This paves the way for dropping the per-dataset `dataType` classification entirely.
+- **2025-11-21**: GraphService layer seeding now detects layer-capable datasets by inspecting stored `graph_json` rather than the legacy `data_type` column, so any mixed dataset containing layer entries can act as a layer source.
 
 This plan covers the high-level refactor; implementation should proceed in the order above so GraphQL schema/backend changes land before frontend removals.

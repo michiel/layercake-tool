@@ -1,7 +1,7 @@
 use crate::database::entities::{
-    graph_edges, graph_edges::Entity as GraphEdges, graph_layers, graph_layers::Entity as Layers,
-    graph_nodes, graph_nodes::Entity as GraphNodes, layer_aliases, plan_dag_edges, plan_dag_nodes,
-    project_layers,
+    data_sets, graph_edges, graph_edges::Entity as GraphEdges, graph_layers,
+    graph_layers::Entity as Layers, graph_nodes, graph_nodes::Entity as GraphNodes, layer_aliases,
+    plan_dag_edges, plan_dag_nodes, project_layers,
 };
 use crate::errors::{GraphError, GraphResult};
 use crate::graph::{Edge, Graph, Layer, Node};
@@ -19,6 +19,14 @@ pub struct GraphService {
 impl GraphService {
     pub fn new(db: DatabaseConnection) -> Self {
         Self { db }
+    }
+
+    fn dataset_contains_layers(data_set: &data_sets::Model) -> bool {
+        serde_json::from_str::<Value>(&data_set.graph_json)
+            .ok()
+            .and_then(|parsed| parsed.get("layers").and_then(|v| v.as_array()).cloned())
+            .map(|layers| !layers.is_empty())
+            .unwrap_or(false)
     }
 
     /// Normalize color value to ensure it has # prefix for CSS compatibility
@@ -188,19 +196,25 @@ impl GraphService {
 
         let datasets = data_sets::Entity::find()
             .filter(data_sets::Column::ProjectId.eq(project_id))
-            .filter(data_sets::Column::DataType.eq("layers"))
             .all(&self.db)
             .await
             .map_err(GraphError::Database)?;
 
-        let dataset_count = datasets.len();
+        let mut layer_datasets = Vec::new();
+        for ds in datasets {
+            if Self::dataset_contains_layers(&ds) {
+                layer_datasets.push(ds);
+            }
+        }
+
+        let dataset_count = layer_datasets.len();
         tracing::info!(
             "Found {} layer datasets for project {}, seeding...",
             dataset_count,
             project_id
         );
 
-        for ds in datasets {
+        for ds in layer_datasets {
             let _ = self
                 .seed_layers_from_dataset(project_id, ds.id, true)
                 .await?;
@@ -308,7 +322,10 @@ impl GraphService {
                     .map(|layer| Layer {
                         id: layer.id,
                         label: layer.label,
-                        background_color: layer.background_color.trim_start_matches('#').to_string(),
+                        background_color: layer
+                            .background_color
+                            .trim_start_matches('#')
+                            .to_string(),
                         text_color: layer.text_color.trim_start_matches('#').to_string(),
                         border_color: layer.border_color.trim_start_matches('#').to_string(),
                         dataset: layer.dataset,
