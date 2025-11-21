@@ -201,7 +201,11 @@ export const ProjectLayersPage = () => {
           sourceDatasetId: layer.sourceDatasetId ?? null,
         },
       })
-      await refetchLayers()
+      const refreshed = await refetchLayers()
+      const refreshedLayers: ProjectLayer[] = (refreshed.data as any)?.projectLayers ?? []
+      if (refreshedLayers.length >= 0) {
+        setEditableLayers(refreshedLayers)
+      }
       showSuccessNotification('Layer deleted', `Layer ${layer.layerId} removed`)
     } catch (error: any) {
       showErrorNotification('Failed to delete layer', error?.message || 'Unknown error')
@@ -209,6 +213,7 @@ export const ProjectLayersPage = () => {
   }
 
   const handleToggleDataset = async (datasetId: number, enabled: boolean) => {
+    const previousState = datasetToggleState[datasetId]
     setDatasetToggleState((prev) => ({ ...prev, [datasetId]: enabled }))
     try {
       await setDatasetEnabled({
@@ -216,24 +221,15 @@ export const ProjectLayersPage = () => {
       })
       const [refetchedLayers] = await Promise.all([refetchLayers(), refetchDatasets()])
       const layers: ProjectLayer[] = (refetchedLayers.data as any)?.projectLayers ?? []
-      if (layers.length) {
+      if (layers.length >= 0) {
         setEditableLayers(layers)
       }
-      // Recalculate dataset states using the helper function
-      const nextState: Record<number, boolean> = {}
-      const datasetIds = new Set(
-        layers.filter((l) => l.sourceDatasetId).map((l) => l.sourceDatasetId as number)
-      )
-      datasetIds.forEach((dsId) => {
-        nextState[dsId] = calculateDatasetState(dsId, layers)
-      })
-      setDatasetToggleState(nextState)
       showSuccessNotification(
         enabled ? 'Dataset layers enabled' : 'Dataset layers disabled',
         enabled ? 'Imported layer definitions' : 'Disabled dataset-provided layers'
       )
     } catch (error: any) {
-      setDatasetToggleState((prev) => ({ ...prev, [datasetId]: !enabled }))
+      setDatasetToggleState((prev) => ({ ...prev, [datasetId]: previousState ?? !enabled }))
       showErrorNotification('Failed to toggle dataset layers', error?.message || 'Unknown error')
     }
   }
@@ -565,20 +561,6 @@ export const ProjectLayersPage = () => {
                         )}
                       </TableCell>
                     </TableRow>
-                      {layer.aliases && layer.aliases.length > 0 && (
-                        <TableRow className="bg-muted/30">
-                          <TableCell colSpan={8} className="py-2 px-4">
-                            <div className="text-xs text-muted-foreground">
-                              <span className="font-semibold">Aliases:</span>{' '}
-                              {layer.aliases.map((alias) => (
-                                <Badge key={alias.id} variant="secondary" className="ml-1">
-                                  {alias.aliasLayerId}
-                                </Badge>
-                              ))}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )}
                       {layer.aliases && layer.aliases.length > 0 && (
                         <TableRow className="bg-muted/30" key={`alias-${layer.id}`}>
                           <TableCell colSpan={8} className="py-2 px-4">
