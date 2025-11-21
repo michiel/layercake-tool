@@ -394,7 +394,7 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
         <Breadcrumbs
           projectName={selectedProject.name}
           projectId={selectedProject.id}
-          sections={[{ title: 'Data acquisition', href: `/projects/${selectedProject.id}/datasets` }]}
+          sections={[{ title: 'Data management', href: `/projects/${selectedProject.id}/datasets` }]}
           currentPage="Data sets"
           onNavigate={handleNavigate}
         />

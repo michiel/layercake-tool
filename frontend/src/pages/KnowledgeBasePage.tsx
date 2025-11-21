@@ -387,7 +387,7 @@ export const KnowledgeBasePage: React.FC = () => {
     }
     return [
       {
-        title: 'Data acquisition',
+        title: 'Data management',
         href: `/projects/${selectedProject.id}/datasets`,
       },
     ]

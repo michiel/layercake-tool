@@ -310,7 +310,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
       }),
       createSection({
         key: 'data-acquisition',
-        label: 'Data acquisition',
+        label: 'Data management',
         icon: <IconDatabase className="h-4 w-4" />,
         route: dataAcquisitionChildren[0].route,
         children: dataAcquisitionChildren,

@@ -294,7 +294,7 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
         projectName={selectedProject.name}
         projectId={selectedProject.id}
         sections={[
-          { title: 'Data acquisition', href: `/projects/${selectedProject.id}/datasets` },
+          { title: 'Data management', href: `/projects/${selectedProject.id}/datasets` },
           { title: 'Data sets', href: `/projects/${selectedProject.id}/datasets` },
         ]}
         currentPage={dataSource.name}
