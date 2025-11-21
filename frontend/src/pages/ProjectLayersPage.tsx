@@ -203,9 +203,7 @@ export const ProjectLayersPage = () => {
       })
       const refreshed = await refetchLayers()
       const refreshedLayers: ProjectLayer[] = (refreshed.data as any)?.projectLayers ?? []
-      if (refreshedLayers.length >= 0) {
-        setEditableLayers(refreshedLayers)
-      }
+      setEditableLayers(refreshedLayers)
       showSuccessNotification('Layer deleted', `Layer ${layer.layerId} removed`)
     } catch (error: any) {
       showErrorNotification('Failed to delete layer', error?.message || 'Unknown error')
@@ -221,9 +219,7 @@ export const ProjectLayersPage = () => {
       })
       const [refetchedLayers] = await Promise.all([refetchLayers(), refetchDatasets()])
       const layers: ProjectLayer[] = (refetchedLayers.data as any)?.projectLayers ?? []
-      if (layers.length >= 0) {
-        setEditableLayers(layers)
-      }
+      setEditableLayers(layers)
       showSuccessNotification(
         enabled ? 'Dataset layers enabled' : 'Dataset layers disabled',
         enabled ? 'Imported layer definitions' : 'Disabled dataset-provided layers'
