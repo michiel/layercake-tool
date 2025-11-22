@@ -5,9 +5,9 @@ import { gql } from '@apollo/client'
 import {
   IconScript,
   IconDeviceFloppy,
-  IconFileDescription,
   IconStack2,
   IconListDetails,
+  IconDatabase,
 } from '@tabler/icons-react'
 import { Breadcrumbs } from '@/components/common/Breadcrumbs'
 import PageContainer from '@/components/layout/PageContainer'
@@ -19,7 +19,6 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Textarea } from '@/components/ui/textarea'
 import { Spinner } from '@/components/ui/spinner'
 import { GET_STORY, UPDATE_STORY, Story, StoryLayerConfig, UpdateStoryInput } from '@/graphql/stories'
 import { GET_DATASOURCES, DataSet } from '@/graphql/datasets'
@@ -36,7 +35,7 @@ const GET_PROJECTS = gql`
   }
 `
 
-const VALID_TABS = ['details', 'layers', 'sequences'] as const
+const VALID_TABS = ['sequences', 'datasets', 'layers'] as const
 type TabValue = (typeof VALID_TABS)[number]
 
 export const StoryPage = () => {
@@ -46,14 +45,14 @@ export const StoryPage = () => {
   const projectIdNum = Number(projectId || 0)
   const storyIdNum = Number(storyId || 0)
 
-  // Get active tab from URL, default to 'details'
+  // Get active tab from URL, default to 'sequences'
   const tabParam = searchParams.get('tab')
-  const activeTab: TabValue = VALID_TABS.includes(tabParam as TabValue) ? (tabParam as TabValue) : 'details'
+  const activeTab: TabValue = VALID_TABS.includes(tabParam as TabValue) ? (tabParam as TabValue) : 'sequences'
 
   const setActiveTab = (tab: string) => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev)
-      if (tab === 'details') {
+      if (tab === 'sequences') {
         next.delete('tab')
       } else {
         next.set('tab', tab)
@@ -228,109 +227,107 @@ export const StoryPage = () => {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
-          <TabsTrigger value="details">
-            <IconFileDescription className="mr-2 h-4 w-4" />
-            Details
+          <TabsTrigger value="sequences">
+            <IconListDetails className="mr-2 h-4 w-4" />
+            Sequences
+          </TabsTrigger>
+          <TabsTrigger value="datasets">
+            <IconDatabase className="mr-2 h-4 w-4" />
+            Datasets
           </TabsTrigger>
           <TabsTrigger value="layers">
             <IconStack2 className="mr-2 h-4 w-4" />
             Layers
           </TabsTrigger>
-          <TabsTrigger value="sequences">
-            <IconListDetails className="mr-2 h-4 w-4" />
-            Sequences
-          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="details">
-          <div className="grid gap-6 md:grid-cols-2 mt-4">
-            {/* Metadata Card */}
-            <Card className="border">
-              <CardHeader>
-                <CardTitle className="text-base">Story Details</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Stack gap="md">
-                  <div className="space-y-2">
-                    <Label htmlFor="story-name">Name</Label>
-                    <Input
-                      id="story-name"
-                      value={name}
-                      onChange={(e) => {
-                        setName(e.target.value)
-                        handleFieldChange()
-                      }}
-                      placeholder="Story name"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="story-description">Description</Label>
-                    <Textarea
-                      id="story-description"
-                      value={description}
-                      onChange={(e) => {
-                        setDescription(e.target.value)
-                        handleFieldChange()
-                      }}
-                      placeholder="Optional description"
-                      rows={3}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="story-tags">Tags</Label>
-                    <Input
-                      id="story-tags"
-                      value={tagsInput}
-                      onChange={(e) => {
-                        setTagsInput(e.target.value)
-                        handleFieldChange()
-                      }}
-                      placeholder="tag1, tag2, tag3"
-                    />
-                    <p className="text-xs text-muted-foreground">Separate tags with commas</p>
-                  </div>
-                </Stack>
-              </CardContent>
-            </Card>
+        <TabsContent value="sequences">
+          {/* Story Details Row */}
+          <Card className="border mt-4 mb-4">
+            <CardContent className="py-4">
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="space-y-1">
+                  <Label htmlFor="story-name" className="text-xs">Name</Label>
+                  <Input
+                    id="story-name"
+                    value={name}
+                    onChange={(e) => {
+                      setName(e.target.value)
+                      handleFieldChange()
+                    }}
+                    placeholder="Story name"
+                    className="h-8"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="story-description" className="text-xs">Description</Label>
+                  <Input
+                    id="story-description"
+                    value={description}
+                    onChange={(e) => {
+                      setDescription(e.target.value)
+                      handleFieldChange()
+                    }}
+                    placeholder="Optional description"
+                    className="h-8"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="story-tags" className="text-xs">Tags</Label>
+                  <Input
+                    id="story-tags"
+                    value={tagsInput}
+                    onChange={(e) => {
+                      setTagsInput(e.target.value)
+                      handleFieldChange()
+                    }}
+                    placeholder="tag1, tag2, tag3"
+                    className="h-8"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <StorySequencesTab storyId={storyIdNum} projectId={projectIdNum} />
+        </TabsContent>
 
-            {/* Dataset Selection Card */}
-            <Card className="border">
-              <CardHeader>
-                <CardTitle className="text-base">Dataset Selection</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Select which datasets are available for use in this story's sequences.
+        <TabsContent value="datasets">
+          <Card className="border mt-4">
+            <CardHeader>
+              <CardTitle className="text-base">Dataset Selection</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-4">
+                Select which datasets are available for use in this story's sequences.
+              </p>
+              {datasets.length === 0 ? (
+                <p className="text-sm text-muted-foreground italic">
+                  No datasets available. Create datasets first.
                 </p>
-                {datasets.length === 0 ? (
-                  <p className="text-sm text-muted-foreground italic">
-                    No datasets available. Create datasets first.
-                  </p>
-                ) : (
-                  <Stack gap="sm">
-                    {datasets.map((dataset) => (
-                      <div key={dataset.id} className="flex items-center space-x-3">
-                        <Checkbox
-                          id={`dataset-${dataset.id}`}
-                          checked={enabledDatasetIds.includes(dataset.id)}
-                          onCheckedChange={() => toggleDataset(dataset.id)}
-                        />
-                        <label
-                          htmlFor={`dataset-${dataset.id}`}
-                          className="flex-1 text-sm cursor-pointer"
-                        >
-                          <div className="font-medium">{dataset.name}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {dataset.nodeCount || 0} nodes, {dataset.edgeCount || 0} edges
-                          </div>
-                        </label>
-                      </div>
-                    ))}
-                  </Stack>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+              ) : (
+                <Stack gap="sm">
+                  {datasets.map((dataset) => (
+                    <div key={dataset.id} className="flex items-center space-x-3">
+                      <Checkbox
+                        id={`dataset-${dataset.id}`}
+                        checked={enabledDatasetIds.includes(dataset.id)}
+                        onCheckedChange={() => toggleDataset(dataset.id)}
+                      />
+                      <label
+                        htmlFor={`dataset-${dataset.id}`}
+                        className="flex-1 text-sm cursor-pointer"
+                      >
+                        <div className="font-medium">{dataset.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {dataset.nodeCount || 0} nodes, {dataset.edgeCount || 0} edges
+                        </div>
+                      </label>
+                    </div>
+                  ))}
+                </Stack>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="layers">
@@ -339,10 +336,6 @@ export const StoryPage = () => {
             layerConfig={layerConfig}
             onLayerConfigChange={handleLayerConfigChange}
           />
-        </TabsContent>
-
-        <TabsContent value="sequences">
-          <StorySequencesTab storyId={storyIdNum} projectId={projectIdNum} />
         </TabsContent>
       </Tabs>
     </PageContainer>

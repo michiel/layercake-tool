@@ -198,13 +198,6 @@ export const SequenceEditorPage = () => {
     return edges
   }, [enabledDatasetIds, datasetGraphData, storyDatasets])
 
-  // Get edges not yet added to the sequence
-  const unselectedEdges = useMemo(() => {
-    return availableEdges.filter(
-      ({ datasetId, edge }) =>
-        !edgeOrder.some((ref) => ref.datasetId === datasetId && ref.edgeId === edge.id)
-    )
-  }, [availableEdges, edgeOrder])
 
   const getNodeInfo = useCallback((nodeId: string): { label: string; layer?: string } => {
     for (const dsId of enabledDatasetIds) {
@@ -232,8 +225,8 @@ export const SequenceEditorPage = () => {
     }
   }
 
-  // Group unselected edges by dataset
-  const unselectedEdgesByDataset = useMemo(() => {
+  // Group available edges by dataset (edges can be added multiple times to a sequence)
+  const edgesByDataset = useMemo(() => {
     const grouped: Record<
       number,
       {
@@ -249,7 +242,7 @@ export const SequenceEditorPage = () => {
     > = {}
     const normalizedFilter = edgeFilter.trim().toLowerCase()
 
-    for (const { datasetId, datasetName, edge } of unselectedEdges) {
+    for (const { datasetId, datasetName, edge } of availableEdges) {
       const sourceInfo = getNodeInfo(edge.source)
       const targetInfo = getNodeInfo(edge.target)
       const sourceLabel = sourceInfo.label
@@ -283,7 +276,7 @@ export const SequenceEditorPage = () => {
     })
 
     return grouped
-  }, [unselectedEdges, edgeFilter, getNodeInfo])
+  }, [availableEdges, edgeFilter, getNodeInfo])
 
   const toggleDatasetCollapse = (datasetId: number) => {
     setCollapsedDatasets((prev) => {
@@ -314,14 +307,6 @@ export const SequenceEditorPage = () => {
     }
   }
 
-  // Helper to get layer background color
-  const getLayerBgColor = (layerId?: string): string | null => {
-    if (!layerId) return null
-    const layer = projectLayers.find((l) => l.layerId === layerId && l.enabled)
-    if (!layer) return null
-    return layer.backgroundColor || null
-  }
-
   // Generate Mermaid sequence diagram
   const mermaidDiagram = useMemo(() => {
     if (!edgeOrder.length) {
@@ -333,9 +318,8 @@ export const SequenceEditorPage = () => {
     const makeParticipantId = (nodeId: string): string =>
       nodeId.replace(/[^a-zA-Z0-9_]/g, '_')
 
-    const lines: string[] = ['sequenceDiagram']
     const participantOrder: string[] = []
-    const participantInfo: Map<string, { label: string; color: string | null }> = new Map()
+    const participantLabels: Map<string, string> = new Map()
 
     // First pass: collect participants in order of first appearance
     for (const ref of edgeOrder) {
@@ -343,37 +327,23 @@ export const SequenceEditorPage = () => {
       const edge = graphData?.edges.find((e) => e.id === ref.edgeId)
       if (!edge) continue
 
-      if (!participantInfo.has(edge.source)) {
+      if (!participantLabels.has(edge.source)) {
         participantOrder.push(edge.source)
-        const nodeInfo = getNodeInfo(edge.source)
-        participantInfo.set(edge.source, {
-          label: nodeInfo.label,
-          color: getLayerBgColor(nodeInfo.layer),
-        })
+        participantLabels.set(edge.source, getNodeInfo(edge.source).label)
       }
-      if (!participantInfo.has(edge.target)) {
+      if (!participantLabels.has(edge.target)) {
         participantOrder.push(edge.target)
-        const nodeInfo = getNodeInfo(edge.target)
-        participantInfo.set(edge.target, {
-          label: nodeInfo.label,
-          color: getLayerBgColor(nodeInfo.layer),
-        })
+        participantLabels.set(edge.target, getNodeInfo(edge.target).label)
       }
     }
 
-    // Add participant declarations with colored boxes
+    const lines: string[] = ['sequenceDiagram']
+
+    // Add participant declarations
     for (const nodeId of participantOrder) {
-      const info = participantInfo.get(nodeId)
-      if (!info) continue
+      const label = participantLabels.get(nodeId) || nodeId
       const participantId = makeParticipantId(nodeId)
-      const color = info.color
-      if (color) {
-        lines.push(`    box ${color}`)
-        lines.push(`        participant ${participantId} as "${escapeLabel(info.label)}"`)
-        lines.push(`    end`)
-      } else {
-        lines.push(`    participant ${participantId} as "${escapeLabel(info.label)}"`)
-      }
+      lines.push(`    participant ${participantId} as "${escapeLabel(label)}"`)
     }
 
     // Add edges as messages
@@ -394,7 +364,7 @@ export const SequenceEditorPage = () => {
     }
 
     return lines.join('\n')
-  }, [edgeOrder, datasetGraphData, projectLayers, getNodeInfo])
+  }, [edgeOrder, datasetGraphData, getNodeInfo])
 
   // Mutations
   const [createSequence, { loading: createLoading }] = useMutation(CREATE_SEQUENCE, {
@@ -525,10 +495,6 @@ export const SequenceEditorPage = () => {
   }
 
   const addEdge = (datasetId: number, edgeId: string) => {
-    // Check if already in list
-    if (edgeOrder.some((ref) => ref.datasetId === datasetId && ref.edgeId === edgeId)) {
-      return
-    }
     setEdgeOrder((prev) => [...prev, { datasetId, edgeId }])
   }
 
@@ -794,14 +760,14 @@ export const SequenceEditorPage = () => {
               {!allEdgesCollapsed && (
                 <ScrollArea className="flex-1">
                   <div className="p-2 space-y-2">
-                    {Object.keys(unselectedEdgesByDataset).length === 0 ? (
+                    {Object.keys(edgesByDataset).length === 0 ? (
                       <p className="text-xs text-muted-foreground p-2 text-center">
                         {availableEdges.length === 0
                           ? 'No edges available. Enable datasets in Attributes tab.'
-                          : 'All edges have been added to the sequence.'}
+                          : 'No edges match the filter.'}
                       </p>
                     ) : (
-                      Object.entries(unselectedEdgesByDataset).map(([datasetIdStr, { datasetName, edges }]) => {
+                      Object.entries(edgesByDataset).map(([datasetIdStr, { datasetName, edges }]) => {
                         const datasetId = Number(datasetIdStr)
                         const isCollapsed = collapsedDatasets.has(datasetId)
                         return (
