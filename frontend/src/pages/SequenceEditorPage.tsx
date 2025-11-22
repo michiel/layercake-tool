@@ -196,23 +196,21 @@ export const SequenceEditorPage = () => {
     })
   }
 
-  // Helper to get node label
-  const getNodeLabel = (datasetId: number, nodeId: string): string => {
-    const graphData = datasetGraphData[datasetId]
-    if (!graphData) {
-      console.warn(`No graph data for dataset ${datasetId}`)
-      return nodeId
+  // Helper to get node label - searches across all enabled datasets
+  const getNodeLabel = (nodeId: string): string => {
+    // Search all enabled datasets for this node
+    for (const dsId of enabledDatasetIds) {
+      const graphData = datasetGraphData[dsId]
+      if (!graphData) continue
+      const node = graphData.nodes.find((n) => n.id === nodeId)
+      if (node) {
+        // Check multiple possible label properties, use non-empty value
+        const label = node.label || node.name || node.attrs?.label || node.attrs?.name
+        // Return label if it exists and has content, otherwise return ID
+        return label && String(label).trim() ? String(label) : nodeId
+      }
     }
-    const node = graphData.nodes.find((n) => n.id === nodeId)
-    if (!node) {
-      console.warn(`Node ${nodeId} not found in dataset ${datasetId}. Available nodes:`, graphData.nodes.map(n => n.id))
-      return nodeId
-    }
-    // Check multiple possible label properties, use non-empty value
-    const label = node.label || node.name || node.attrs?.label || node.attrs?.name
-    console.log(`Node ${nodeId} label lookup:`, { label, node })
-    // Return label if it exists and has content, otherwise return ID
-    return label && String(label).trim() ? String(label) : nodeId
+    return nodeId
   }
 
   // Helper to get edge info
@@ -223,8 +221,8 @@ export const SequenceEditorPage = () => {
     return {
       edge,
       dataset,
-      sourceLabel: edge ? getNodeLabel(ref.datasetId, edge.source) : 'Unknown',
-      targetLabel: edge ? getNodeLabel(ref.datasetId, edge.target) : 'Unknown',
+      sourceLabel: edge ? getNodeLabel(edge.source) : 'Unknown',
+      targetLabel: edge ? getNodeLabel(edge.target) : 'Unknown',
     }
   }
 
@@ -584,8 +582,8 @@ export const SequenceEditorPage = () => {
                             {!isCollapsed && (
                               <div className="border-t p-1 space-y-1">
                                 {edges.map(({ edge }) => {
-                                  const sourceLabel = getNodeLabel(datasetId, edge.source)
-                                  const targetLabel = getNodeLabel(datasetId, edge.target)
+                                  const sourceLabel = getNodeLabel(edge.source)
+                                  const targetLabel = getNodeLabel(edge.target)
                                   return (
                                     <div
                                       key={edge.id}
