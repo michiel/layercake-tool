@@ -281,6 +281,32 @@ export const IMPORT_DATASOURCES = gql`
   }
 `
 
+// Merge multiple data sets into a single new data set
+export const MERGE_DATASOURCES = gql`
+  mutation MergeDataSets($input: MergeDataSetsInput!) {
+    mergeDataSets(input: $input) {
+      id
+      projectId
+      name
+      description
+      fileFormat
+      origin
+      filename
+      graphJson
+      status
+      errorMessage
+      fileSize
+      processedAt
+      createdAt
+      updatedAt
+      nodeCount
+      edgeCount
+      layerCount
+      hasLayers
+    }
+  }
+`
+
 // File format enum (physical representation)
 export enum FileFormat {
   CSV = 'CSV',

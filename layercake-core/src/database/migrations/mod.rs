@@ -29,6 +29,8 @@ mod m20251116_000025_add_annotations_to_graphs;
 mod m20251117_000026_create_project_layers;
 mod m20251118_000027_create_layer_aliases;
 mod m20251122_000001_add_plan_description_tags;
+mod m20251122_000003_create_stories;
+mod m20251122_000004_create_sequences;
 mod m20251123_000002_allow_multiple_plans;
 
 pub struct Migrator;
@@ -66,6 +68,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20251117_000026_create_project_layers::Migration),
             Box::new(m20251118_000027_create_layer_aliases::Migration),
             Box::new(m20251122_000001_add_plan_description_tags::Migration),
+            Box::new(m20251122_000003_create_stories::Migration),
+            Box::new(m20251122_000004_create_sequences::Migration),
             Box::new(m20251123_000002_allow_multiple_plans::Migration),
         ]
     }

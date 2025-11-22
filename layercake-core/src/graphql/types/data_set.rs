@@ -299,3 +299,16 @@ pub struct ImportDataSetsResult {
     #[graphql(name = "updatedCount")]
     pub updated_count: i32,
 }
+
+#[derive(InputObject)]
+pub struct MergeDataSetsInput {
+    #[graphql(name = "projectId")]
+    pub project_id: i32,
+    #[graphql(name = "dataSetIds")]
+    pub data_set_ids: Vec<i32>,
+    pub name: String,
+    #[graphql(name = "sumWeights")]
+    pub sum_weights: bool,
+    #[graphql(name = "deleteMerged")]
+    pub delete_merged: bool,
+}

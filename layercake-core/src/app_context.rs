@@ -556,6 +556,176 @@ impl AppContext {
             .map_err(|e| anyhow!("Failed to delete data set {}: {}", id, e))
     }
 
+    pub async fn merge_data_sets(
+        &self,
+        project_id: i32,
+        data_set_ids: Vec<i32>,
+        name: String,
+        sum_weights: bool,
+        delete_merged: bool,
+    ) -> Result<DataSetSummary> {
+        if data_set_ids.len() < 2 {
+            return Err(anyhow!("At least 2 data sets are required for merging"));
+        }
+
+        // Load all datasets
+        let models = data_sets::Entity::find()
+            .filter(data_sets::Column::Id.is_in(data_set_ids.clone()))
+            .filter(data_sets::Column::ProjectId.eq(project_id))
+            .all(&self.db)
+            .await
+            .map_err(|e| anyhow!("Failed to load data sets for merging: {}", e))?;
+
+        if models.len() != data_set_ids.len() {
+            return Err(anyhow!(
+                "Some data sets were not found or don't belong to project {}",
+                project_id
+            ));
+        }
+
+        // Merge graph JSON data
+        let merged_json = self.merge_graph_json_data(&models, sum_weights)?;
+
+        // Create new dataset with merged data
+        let summary = self
+            .create_empty_data_set(DataSetEmptyCreateRequest {
+                project_id,
+                name,
+                description: Some(format!(
+                    "Merged from {} data sets",
+                    data_set_ids.len()
+                )),
+            })
+            .await?;
+
+        // Update the new dataset with merged graph data
+        let summary = self
+            .data_set_service
+            .update_graph_data(summary.id, merged_json)
+            .await
+            .map_err(|e| anyhow!("Failed to update merged data set: {}", e))?;
+
+        // Delete source datasets if requested
+        if delete_merged {
+            for id in &data_set_ids {
+                self.data_set_service.delete(*id).await.ok();
+            }
+        }
+
+        Ok(DataSetSummary::from(summary))
+    }
+
+    fn merge_graph_json_data(
+        &self,
+        models: &[data_sets::Model],
+        sum_weights: bool,
+    ) -> Result<String> {
+        #[derive(Deserialize, Serialize, Default)]
+        struct GraphData {
+            #[serde(default)]
+            nodes: Vec<Value>,
+            #[serde(default)]
+            edges: Vec<Value>,
+            #[serde(default)]
+            layers: Vec<Value>,
+        }
+
+        let mut merged = GraphData::default();
+        let mut node_map: HashMap<String, Value> = HashMap::new();
+        let mut edge_map: HashMap<String, Value> = HashMap::new();
+        let mut layer_map: HashMap<String, Value> = HashMap::new();
+
+        for model in models {
+            let graph: GraphData = serde_json::from_str(&model.graph_json).unwrap_or_default();
+
+            // Merge nodes
+            for node in graph.nodes {
+                let id = node
+                    .get("id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                if id.is_empty() {
+                    merged.nodes.push(node);
+                    continue;
+                }
+                if let Some(existing) = node_map.get_mut(&id) {
+                    if sum_weights {
+                        if let (Some(existing_weight), Some(new_weight)) = (
+                            existing.get("weight").and_then(|v| v.as_f64()),
+                            node.get("weight").and_then(|v| v.as_f64()),
+                        ) {
+                            if let Some(obj) = existing.as_object_mut() {
+                                obj.insert(
+                                    "weight".to_string(),
+                                    json!(existing_weight + new_weight),
+                                );
+                            }
+                        }
+                    }
+                } else {
+                    node_map.insert(id, node);
+                }
+            }
+
+            // Merge edges
+            for edge in graph.edges {
+                let source = edge
+                    .get("source")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let target = edge
+                    .get("target")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let key = format!("{}:{}", source, target);
+                if source.is_empty() || target.is_empty() {
+                    merged.edges.push(edge);
+                    continue;
+                }
+                if let Some(existing) = edge_map.get_mut(&key) {
+                    if sum_weights {
+                        if let (Some(existing_weight), Some(new_weight)) = (
+                            existing.get("weight").and_then(|v| v.as_f64()),
+                            edge.get("weight").and_then(|v| v.as_f64()),
+                        ) {
+                            if let Some(obj) = existing.as_object_mut() {
+                                obj.insert(
+                                    "weight".to_string(),
+                                    json!(existing_weight + new_weight),
+                                );
+                            }
+                        }
+                    }
+                } else {
+                    edge_map.insert(key, edge);
+                }
+            }
+
+            // Merge layers
+            for layer in graph.layers {
+                let id = layer
+                    .get("id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                if id.is_empty() {
+                    merged.layers.push(layer);
+                    continue;
+                }
+                layer_map.entry(id).or_insert(layer);
+            }
+        }
+
+        merged.nodes.extend(node_map.into_values());
+        merged.edges.extend(edge_map.into_values());
+        merged.layers.extend(layer_map.into_values());
+
+        serde_json::to_string(&merged).map_err(|e| anyhow!("Failed to serialize merged data: {}", e))
+    }
+
     pub async fn export_data_sets(
         &self,
         request: DataSetExportRequest,

@@ -12,7 +12,7 @@ use crate::graphql::errors::StructuredError;
 use crate::graphql::types::{
     BulkUploadDataSetInput, CreateDataSetInput, CreateEmptyDataSetInput, DataSet,
     ExportDataSetsInput, ExportDataSetsResult, ImportDataSetsInput, ImportDataSetsResult,
-    UpdateDataSetInput,
+    MergeDataSetsInput, UpdateDataSetInput,
 };
 
 #[derive(Default)]
@@ -261,5 +261,28 @@ impl DataSetMutation {
             created_count: outcome.created_count,
             updated_count: outcome.updated_count,
         })
+    }
+
+    /// Merge multiple data sets into a single new data set
+    async fn merge_data_sets(
+        &self,
+        ctx: &Context<'_>,
+        input: MergeDataSetsInput,
+    ) -> Result<DataSet> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        let summary = context
+            .app
+            .merge_data_sets(
+                input.project_id,
+                input.data_set_ids,
+                input.name,
+                input.sum_weights,
+                input.delete_merged,
+            )
+            .await
+            .map_err(|e| StructuredError::service("AppContext::merge_data_sets", e))?;
+
+        Ok(DataSet::from(summary))
     }
 }

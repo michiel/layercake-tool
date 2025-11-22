@@ -10,6 +10,8 @@ pub mod plans;
 pub mod project_collaborators;
 pub mod project_layers;
 pub mod projects;
+pub mod sequences;
+pub mod stories;
 pub mod system_settings;
 pub mod user_sessions;
 pub mod users;

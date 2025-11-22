@@ -14,7 +14,8 @@ import {
   IconClock,
   IconX,
   IconFileExport,
-  IconBooks
+  IconBooks,
+  IconGitMerge
 } from '@tabler/icons-react'
 import { useQuery as useProjectsQuery } from '@apollo/client/react'
 import { Breadcrumbs } from '../common/Breadcrumbs'
@@ -27,6 +28,8 @@ import { Button } from '../ui/button'
 import { Card, CardContent } from '../ui/card'
 import { Checkbox } from '../ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog'
+import { Label } from '../ui/label'
+import { Input } from '../ui/input'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '../ui/dropdown-menu'
 import { Spinner } from '../ui/spinner'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table'
@@ -35,6 +38,7 @@ import {
   DELETE_DATASOURCE,
   REPROCESS_DATASOURCE,
   EXPORT_DATASOURCES,
+  MERGE_DATASOURCES,
   DataSet,
   formatFileSize,
   getFileFormatDisplayName,
@@ -76,6 +80,10 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
   const [libraryImportModalOpen, setLibraryImportModalOpen] = useState(false)
   const [selectedLibraryRows, setSelectedLibraryRows] = useState<Set<number>>(new Set())
   const [librarySelectionError, setLibrarySelectionError] = useState<string | null>(null)
+  const [mergeModalOpen, setMergeModalOpen] = useState(false)
+  const [mergeName, setMergeName] = useState('')
+  const [sumWeights, setSumWeights] = useState(false)
+  const [deleteMerged, setDeleteMerged] = useState(false)
 
   // Query for project info
   const { data: projectsData } = useProjectsQuery<{
@@ -119,6 +127,7 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
   const [exportDataSets] = useMutation(EXPORT_DATASOURCES)
   const [importLibraryDatasets, { loading: libraryImportLoading, error: libraryImportError }] =
     useMutation(IMPORT_LIBRARY_DATASETS)
+  const [mergeDataSets, { loading: mergeLoading }] = useMutation(MERGE_DATASOURCES)
 
   const dataSources: DataSet[] = (dataSourcesData as any)?.dataSets || []
   const libraryItems: LibraryItem[] = (libraryItemsData as any)?.libraryItems || []
@@ -314,6 +323,46 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
     setExportFormatModalOpen(true)
   }
 
+  const handleMergeClick = () => {
+    // Set default name to first selected dataset
+    const firstSelectedId = Array.from(selectedRows)[0]
+    const firstDataset = dataSources.find(ds => ds.id === firstSelectedId)
+    setMergeName(firstDataset?.name || 'Merged Dataset')
+    setSumWeights(false)
+    setDeleteMerged(false)
+    setMergeModalOpen(true)
+  }
+
+  const handleMerge = async () => {
+    if (!mergeName.trim()) {
+      alert('Please enter a name for the merged dataset')
+      return
+    }
+
+    try {
+      await mergeDataSets({
+        variables: {
+          input: {
+            projectId: projectNumericId,
+            dataSetIds: Array.from(selectedRows),
+            name: mergeName.trim(),
+            sumWeights,
+            deleteMerged
+          }
+        }
+      })
+
+      await refetchDataSets()
+      setMergeModalOpen(false)
+      setSelectedRows(new Set())
+      alert(`Successfully merged ${selectedRows.size} data sets into "${mergeName.trim()}"`)
+    } catch (error) {
+      console.error('Failed to merge data sets:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      alert(`Failed to merge data sets: ${errorMessage}`)
+    }
+  }
+
   const handleExport = async (format: 'xlsx' | 'ods') => {
     const selectedDataSets = dataSources.filter(ds => selectedRows.has(ds.id))
     console.log('Exporting datasets:', selectedDataSets.map(ds => ds.id), 'as', format)
@@ -414,6 +463,14 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
             >
               <IconFileExport className="mr-2 h-4 w-4" />
               Export ({selectedRows.size})
+            </Button>
+            <Button
+              onClick={handleMergeClick}
+              disabled={selectedRows.size < 2}
+              variant="secondary"
+            >
+              <IconGitMerge className="mr-2 h-4 w-4" />
+              Merge ({selectedRows.size})
             </Button>
             <Button
               onClick={handleOpenLibraryImport}
@@ -793,6 +850,78 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
               Export as ODS (OpenDocument)
             </Button>
           </Stack>
+        </DialogContent>
+      </Dialog>
+
+      {/* Merge Datasets Modal */}
+      <Dialog open={mergeModalOpen} onOpenChange={setMergeModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Merge Data Sets</DialogTitle>
+            <DialogDescription>
+              Combine {selectedRows.size} data sets into a single new data set.
+            </DialogDescription>
+          </DialogHeader>
+
+          <Stack gap="md" className="py-4">
+            <div className="space-y-2">
+              <Label htmlFor="merge-name">Name</Label>
+              <Input
+                id="merge-name"
+                value={mergeName}
+                onChange={(e) => setMergeName(e.target.value)}
+                placeholder="Merged dataset name"
+              />
+            </div>
+
+            <div className="space-y-3">
+              <Label>Options</Label>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="sum-weights"
+                  checked={sumWeights}
+                  onCheckedChange={(checked) => setSumWeights(checked === true)}
+                />
+                <label
+                  htmlFor="sum-weights"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Sum weights on aggregation
+                </label>
+              </div>
+              <p className="text-xs text-muted-foreground ml-6">
+                When duplicate nodes/edges are found, add their weights together instead of keeping the first value.
+              </p>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="delete-merged"
+                  checked={deleteMerged}
+                  onCheckedChange={(checked) => setDeleteMerged(checked === true)}
+                />
+                <label
+                  htmlFor="delete-merged"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Delete merged data sets
+                </label>
+              </div>
+              <p className="text-xs text-muted-foreground ml-6">
+                Remove the original data sets after successful merge.
+              </p>
+            </div>
+          </Stack>
+
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setMergeModalOpen(false)} disabled={mergeLoading}>
+              Cancel
+            </Button>
+            <Button onClick={handleMerge} disabled={mergeLoading}>
+              {mergeLoading && <Spinner className="mr-2 h-4 w-4" />}
+              <IconGitMerge className="mr-2 h-4 w-4" />
+              Merge
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
