@@ -128,12 +128,17 @@ export const SequenceEditorPage = () => {
     for (const ds of storyDatasets) {
       try {
         const data = JSON.parse(ds.graphJson)
-        result[ds.id] = {
-          nodes: data.nodes || [],
-          // Handle both 'edges' and 'links' property names
-          edges: data.edges || data.links || [],
-        }
-      } catch {
+        const nodes = data.nodes || []
+        const edges = data.edges || data.links || []
+        console.log(`Dataset ${ds.id} (${ds.name}):`, {
+          nodeCount: nodes.length,
+          edgeCount: edges.length,
+          sampleNode: nodes[0],
+          sampleEdge: edges[0]
+        })
+        result[ds.id] = { nodes, edges }
+      } catch (e) {
+        console.error(`Failed to parse graphJson for dataset ${ds.id}:`, e)
         result[ds.id] = { nodes: [], edges: [] }
       }
     }
@@ -194,9 +199,18 @@ export const SequenceEditorPage = () => {
   // Helper to get node label
   const getNodeLabel = (datasetId: number, nodeId: string): string => {
     const graphData = datasetGraphData[datasetId]
-    const node = graphData?.nodes.find((n) => n.id === nodeId)
+    if (!graphData) {
+      console.warn(`No graph data for dataset ${datasetId}`)
+      return nodeId
+    }
+    const node = graphData.nodes.find((n) => n.id === nodeId)
+    if (!node) {
+      console.warn(`Node ${nodeId} not found in dataset ${datasetId}. Available nodes:`, graphData.nodes.map(n => n.id))
+      return nodeId
+    }
     // Check multiple possible label properties, use non-empty value
-    const label = node?.label || node?.name || node?.attrs?.label || node?.attrs?.name
+    const label = node.label || node.name || node.attrs?.label || node.attrs?.name
+    console.log(`Node ${nodeId} label lookup:`, { label, node })
     // Return label if it exists and has content, otherwise return ID
     return label && String(label).trim() ? String(label) : nodeId
   }
