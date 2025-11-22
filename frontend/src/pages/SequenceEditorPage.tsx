@@ -63,6 +63,7 @@ interface GraphNode {
   id: string
   label?: string
   name?: string
+  attrs?: Record<string, any>
 }
 
 interface GraphData {
@@ -195,9 +196,9 @@ export const SequenceEditorPage = () => {
     const graphData = datasetGraphData[datasetId]
     const node = graphData?.nodes.find((n) => n.id === nodeId)
     // Check multiple possible label properties, use non-empty value
-    const label = node?.label || node?.name
-    // Return label if it exists and is different from the ID, otherwise return ID
-    return label && label.trim() ? label : nodeId
+    const label = node?.label || node?.name || node?.attrs?.label || node?.attrs?.name
+    // Return label if it exists and has content, otherwise return ID
+    return label && String(label).trim() ? String(label) : nodeId
   }
 
   // Helper to get edge info
