@@ -3,7 +3,7 @@ use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 
 use crate::database::entities::{
     data_sets, graph_edges, graph_layers, graph_nodes, graphs, layer_aliases, plan_dag_edges,
-    plan_dag_nodes, plans, project_collaborators, user_sessions, users,
+    plan_dag_nodes, plans, project_collaborators, sequences, stories, user_sessions, users,
 };
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
@@ -16,7 +16,7 @@ use crate::graphql::types::sample_project::SampleProject;
 use crate::graphql::types::{
     DataSet, DataSetPreview, GraphEdgePreview, GraphEdit, GraphNodePreview, GraphPreview, Layer,
     LayerAlias, LibraryItem, LibraryItemFilterInput, ProjectCollaborator, ProjectLayer,
-    SystemSetting, TableColumn, TableRow, User, UserFilter, UserSession,
+    Sequence, Story, SystemSetting, TableColumn, TableRow, User, UserFilter, UserSession,
 };
 use crate::services::{
     graph_edit_service::GraphEditService, library_item_service::LibraryItemFilter,
@@ -179,6 +179,52 @@ impl Query {
             .map_err(|e| StructuredError::service("AppContext::list_plans", e))?;
 
         Ok(plans.into_iter().map(Plan::from).collect())
+    }
+
+    // Story and Sequence Queries
+
+    /// Get all stories for a project
+    async fn stories(&self, ctx: &Context<'_>, project_id: i32) -> Result<Vec<Story>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let story_list = stories::Entity::find()
+            .filter(stories::Column::ProjectId.eq(project_id))
+            .order_by_desc(stories::Column::UpdatedAt)
+            .all(&context.db)
+            .await?;
+
+        Ok(story_list.into_iter().map(Story::from).collect())
+    }
+
+    /// Get a specific story by ID
+    async fn story(&self, ctx: &Context<'_>, id: i32) -> Result<Option<Story>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let story = stories::Entity::find_by_id(id)
+            .one(&context.db)
+            .await?;
+
+        Ok(story.map(Story::from))
+    }
+
+    /// Get all sequences for a story
+    async fn sequences(&self, ctx: &Context<'_>, story_id: i32) -> Result<Vec<Sequence>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let sequence_list = sequences::Entity::find()
+            .filter(sequences::Column::StoryId.eq(story_id))
+            .order_by_desc(sequences::Column::UpdatedAt)
+            .all(&context.db)
+            .await?;
+
+        Ok(sequence_list.into_iter().map(Sequence::from).collect())
+    }
+
+    /// Get a specific sequence by ID
+    async fn sequence(&self, ctx: &Context<'_>, id: i32) -> Result<Option<Sequence>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let sequence = sequences::Entity::find_by_id(id)
+            .one(&context.db)
+            .await?;
+
+        Ok(sequence.map(Sequence::from))
     }
 
     /// List project-wide layers (project palette)

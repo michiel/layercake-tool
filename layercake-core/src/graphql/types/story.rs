@@ -1,0 +1,110 @@
+use async_graphql::*;
+use chrono::{DateTime, Utc};
+use sea_orm::{EntityTrait, PaginatorTrait};
+use serde::{Deserialize, Serialize};
+
+use crate::database::entities::{projects, sequences, stories};
+use crate::graphql::context::GraphQLContext;
+use crate::graphql::types::Project;
+
+/// Layer configuration for a story
+#[derive(Clone, Debug, Serialize, Deserialize, SimpleObject, InputObject)]
+#[graphql(input_name = "StoryLayerConfigInput")]
+pub struct StoryLayerConfig {
+    #[graphql(name = "layerId")]
+    pub layer_id: String,
+    pub enabled: bool,
+    pub color: Option<String>,
+    #[graphql(name = "sourceDatasetId")]
+    pub source_dataset_id: Option<i32>,
+}
+
+#[derive(SimpleObject)]
+#[graphql(complex)]
+pub struct Story {
+    pub id: i32,
+    #[graphql(name = "projectId")]
+    pub project_id: i32,
+    pub name: String,
+    pub description: Option<String>,
+    pub tags: Vec<String>,
+    #[graphql(name = "enabledDatasetIds")]
+    pub enabled_dataset_ids: Vec<i32>,
+    #[graphql(name = "layerConfig")]
+    pub layer_config: Vec<StoryLayerConfig>,
+    #[graphql(name = "createdAt")]
+    pub created_at: DateTime<Utc>,
+    #[graphql(name = "updatedAt")]
+    pub updated_at: DateTime<Utc>,
+}
+
+impl From<stories::Model> for Story {
+    fn from(model: stories::Model) -> Self {
+        let tags: Vec<String> = serde_json::from_str(&model.tags).unwrap_or_default();
+        let enabled_dataset_ids: Vec<i32> =
+            serde_json::from_str(&model.enabled_dataset_ids).unwrap_or_default();
+        let layer_config: Vec<StoryLayerConfig> =
+            serde_json::from_str(&model.layer_config).unwrap_or_default();
+
+        Self {
+            id: model.id,
+            project_id: model.project_id,
+            name: model.name,
+            description: model.description,
+            tags,
+            enabled_dataset_ids,
+            layer_config,
+            created_at: model.created_at,
+            updated_at: model.updated_at,
+        }
+    }
+}
+
+#[ComplexObject]
+impl Story {
+    async fn project(&self, ctx: &Context<'_>) -> Result<Option<Project>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let project = projects::Entity::find_by_id(self.project_id)
+            .one(&context.db)
+            .await?;
+
+        Ok(project.map(Project::from))
+    }
+
+    #[graphql(name = "sequenceCount")]
+    async fn sequence_count(&self, ctx: &Context<'_>) -> Result<i32> {
+        use sea_orm::{ColumnTrait, QueryFilter};
+
+        let context = ctx.data::<GraphQLContext>()?;
+        let count = sequences::Entity::find()
+            .filter(sequences::Column::StoryId.eq(self.id))
+            .count(&context.db)
+            .await?;
+
+        Ok(count as i32)
+    }
+}
+
+#[derive(InputObject)]
+pub struct CreateStoryInput {
+    #[graphql(name = "projectId")]
+    pub project_id: i32,
+    pub name: String,
+    pub description: Option<String>,
+    pub tags: Option<Vec<String>>,
+    #[graphql(name = "enabledDatasetIds")]
+    pub enabled_dataset_ids: Option<Vec<i32>>,
+    #[graphql(name = "layerConfig")]
+    pub layer_config: Option<Vec<StoryLayerConfig>>,
+}
+
+#[derive(InputObject)]
+pub struct UpdateStoryInput {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub tags: Option<Vec<String>>,
+    #[graphql(name = "enabledDatasetIds")]
+    pub enabled_dataset_ids: Option<Vec<i32>>,
+    #[graphql(name = "layerConfig")]
+    pub layer_config: Option<Vec<StoryLayerConfig>>,
+}

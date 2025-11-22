@@ -1,6 +1,8 @@
 pub mod plan;
 pub mod plan_dag;
 pub mod project;
+pub mod sequence;
+pub mod story;
 // REMOVED: node, edge - dead code, GraphQL types not used
 pub mod chat;
 pub mod data_acquisition;
@@ -29,5 +31,7 @@ pub use plan::*;
 pub use plan_dag::*;
 pub use preview::*;
 pub use project::*;
+pub use sequence::*;
+pub use story::*;
 pub use system_setting::*;
 pub use user::*;
