@@ -285,6 +285,12 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
         isActive: makeRouteMatcher(`/projects/${projectId}/workbench/layers`),
       },
       {
+        key: 'stories',
+        label: 'Stories',
+        route: `/projects/${projectId}/stories`,
+        isActive: makeRouteMatcher(`/projects/${projectId}/stories`, { prefix: true }),
+      },
+      {
         key: 'graphs',
         label: 'Graphs',
         route: `/projects/${projectId}/graphs`,
@@ -1922,6 +1928,8 @@ import { SystemSettingsPage } from './pages/SystemSettingsPage'
 import PageContainer from './components/layout/PageContainer'
 import { EditProjectPage } from './pages/EditProjectPage'
 import { WorkbenchPage } from './pages/WorkbenchPage'
+import { StoriesPage } from './pages/StoriesPage'
+import { StoryPage } from './pages/StoryPage'
 
 // Main App component with routing
 function App() {
@@ -1978,6 +1986,16 @@ function App() {
           <Route path="/projects/:projectId/workbench/layers" element={
             <ErrorBoundary>
               <ProjectLayersPage />
+            </ErrorBoundary>
+          } />
+          <Route path="/projects/:projectId/stories" element={
+            <ErrorBoundary>
+              <StoriesPage />
+            </ErrorBoundary>
+          } />
+          <Route path="/projects/:projectId/stories/:storyId" element={
+            <ErrorBoundary>
+              <StoryPage />
             </ErrorBoundary>
           } />
           <Route path="/projects/:projectId/graphs" element={
