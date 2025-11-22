@@ -292,7 +292,7 @@ impl DataAcquisitionService {
         let file_id = self
             .persist_file(&request, &bytes, &checksum)
             .await
-            .map_err(|err| DataAcquisitionError::Ingestion(err))?;
+            .map_err(DataAcquisitionError::Ingestion)?;
 
         let mut indexed = false;
         if request.index_immediately {

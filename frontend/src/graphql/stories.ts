@@ -11,10 +11,8 @@ export const LIST_STORIES = gql`
       tags
       enabledDatasetIds
       layerConfig {
-        layerId
-        enabled
-        color
         sourceDatasetId
+        mode
       }
       sequenceCount
       createdAt
@@ -34,10 +32,8 @@ export const GET_STORY = gql`
       tags
       enabledDatasetIds
       layerConfig {
-        layerId
-        enabled
-        color
         sourceDatasetId
+        mode
       }
       sequenceCount
       createdAt
@@ -57,10 +53,8 @@ export const CREATE_STORY = gql`
       tags
       enabledDatasetIds
       layerConfig {
-        layerId
-        enabled
-        color
         sourceDatasetId
+        mode
       }
       sequenceCount
       createdAt
@@ -80,10 +74,8 @@ export const UPDATE_STORY = gql`
       tags
       enabledDatasetIds
       layerConfig {
-        layerId
-        enabled
-        color
         sourceDatasetId
+        mode
       }
       sequenceCount
       createdAt
@@ -101,11 +93,12 @@ export const DELETE_STORY = gql`
 
 // TypeScript interfaces
 
+// Layer source configuration - controls how layer sources are rendered
+// If a source is in the list, it's disabled and uses the fallback style
+// If a source is not in the list, it uses the project layer colours
 export interface StoryLayerConfig {
-  layerId: string
-  enabled: boolean
-  color: string | null
-  sourceDatasetId: number | null
+  sourceDatasetId: number | null  // null = manual layers
+  mode: 'default' | 'light' | 'dark'  // fallback style when source is disabled
 }
 
 export interface Story {

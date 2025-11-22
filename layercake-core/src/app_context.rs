@@ -15,7 +15,7 @@ use uuid::Uuid;
 use zip::{write::FileOptions, CompressionMethod, ZipArchive, ZipWriter};
 
 use crate::database::entities::common_types::{
-    DataType, DataType as DataSetDataType, FileFormat as DataSetFileFormat,
+    DataType as DataSetDataType, FileFormat as DataSetFileFormat,
 };
 use crate::database::entities::{
     data_sets, graphs, library_items, plan_dag_edges, plan_dag_nodes, plans, projects,
@@ -432,7 +432,7 @@ impl AppContext {
                 filename,
                 file_format,
                 file_bytes,
-                tabular_data_type.map(Into::into),
+                tabular_data_type,
             )
             .await
             .map_err(|e| anyhow!("Failed to create data set from file: {}", e))?;
@@ -2368,7 +2368,7 @@ fn analyze_data_sets(
 pub fn summarize_graph_counts(graph_json: &str) -> (Option<usize>, Option<usize>, Option<usize>) {
     serde_json::from_str::<Value>(graph_json)
         .ok()
-        .and_then(|parsed| {
+        .map(|parsed| {
             let node_count = parsed
                 .get("nodes")
                 .and_then(|v| v.as_array())
@@ -2381,7 +2381,7 @@ pub fn summarize_graph_counts(graph_json: &str) -> (Option<usize>, Option<usize>
                 .get("layers")
                 .and_then(|v| v.as_array())
                 .map(|arr| arr.len());
-            Some((node_count, edge_count, layer_count))
+            (node_count, edge_count, layer_count)
         })
         .unwrap_or((None, None, None))
 }

@@ -7,7 +7,6 @@ mod merge_builder;
 mod persist_utils;
 mod types;
 
-pub use dag_context::DagExecutionContext;
 pub use dag_executor::DagExecutor;
 pub use dataset_importer::DatasourceImporter;
 pub use graph_builder::GraphBuilder;

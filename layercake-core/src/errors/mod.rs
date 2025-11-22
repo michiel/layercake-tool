@@ -73,8 +73,6 @@ pub use import_export::ImportExportError;
 pub use plan::PlanError;
 
 // Re-export common utilities
-#[cfg(feature = "graphql")]
-pub use common::{anyhow_to_graphql, ResultExt, ToGraphQLError};
 
 /// Result type alias for graph operations
 pub type GraphResult<T> = Result<T, GraphError>;

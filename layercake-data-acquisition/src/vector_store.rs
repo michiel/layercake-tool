@@ -104,7 +104,7 @@ impl SqliteVectorStore {
     }
 
     fn deserialize_embedding(bytes: &[u8]) -> Result<Vec<f32>> {
-        if bytes.len() % 4 != 0 {
+        if !bytes.len().is_multiple_of(4) {
             anyhow::bail!("invalid embedding byte length");
         }
 

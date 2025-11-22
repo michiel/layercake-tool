@@ -4,31 +4,33 @@ import { IconStack2 } from '@tabler/icons-react'
 import { Group } from '@/components/layout-primitives'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Switch } from '@/components/ui/switch'
 import { GET_PROJECT_LAYERS, ProjectLayer } from '@/graphql/layers'
+import { GET_DATASOURCES } from '@/graphql/datasets'
 import { StoryLayerConfig } from '@/graphql/stories'
-import { DataSet } from '@/graphql/datasets'
+
+type LayerSourceStyleMode = 'default' | 'light' | 'dark'
 
 interface StoryLayersTabProps {
   projectId: number
   layerConfig: StoryLayerConfig[]
-  enabledDatasetIds: number[]
-  datasets: DataSet[]
   onLayerConfigChange: (config: StoryLayerConfig[]) => void
 }
 
 export const StoryLayersTab = ({
   projectId,
   layerConfig,
-  enabledDatasetIds,
-  datasets,
   onLayerConfigChange,
 }: StoryLayersTabProps) => {
   const { data: layersData, loading: layersLoading } = useQuery(GET_PROJECT_LAYERS, {
+    variables: { projectId },
+    skip: !projectId,
+  })
+
+  const { data: datasetsData, loading: datasetsLoading } = useQuery(GET_DATASOURCES, {
     variables: { projectId },
     skip: !projectId,
   })
@@ -38,87 +40,93 @@ export const StoryLayersTab = ({
     [layersData]
   )
 
-  // Filter to only enabled layers from project
-  const enabledProjectLayers = useMemo(
-    () => projectLayers.filter((l) => l.enabled),
-    [projectLayers]
-  )
-
-  // Filter datasets to only enabled ones
-  const storyDatasets = useMemo(
-    () => datasets.filter((d) => enabledDatasetIds.includes(d.id)),
-    [datasets, enabledDatasetIds]
-  )
-
-  // Build a map of current layer configs for quick lookup
-  const configMap = useMemo(() => {
-    const map: Record<string, StoryLayerConfig> = {}
-    for (const config of layerConfig) {
-      map[config.layerId] = config
+  // Build layer source options (grouped by dataset)
+  const layerSourceOptions = useMemo(() => {
+    const enabledLayers = projectLayers.filter((layer) => layer.enabled)
+    if (!enabledLayers.length) {
+      return []
     }
-    return map
-  }, [layerConfig])
 
-  // Get or create config for a layer
-  const getLayerConfig = (layerId: string, projectLayer: ProjectLayer): StoryLayerConfig => {
-    if (configMap[layerId]) {
-      return configMap[layerId]
-    }
-    // Default config from project layer
-    return {
-      layerId,
-      enabled: true,
-      color: projectLayer.backgroundColor,
-      sourceDatasetId: projectLayer.sourceDatasetId ?? null,
+    // Build dataset name map
+    const datasetNameMap = new Map<number, string>()
+    const datasets = (datasetsData as any)?.dataSets ?? []
+    datasets.forEach((dataset: any) => {
+      datasetNameMap.set(dataset.id, dataset.name ?? `Dataset #${dataset.id}`)
+    })
+
+    // Group layers by source dataset
+    const grouped = new Map<
+      string,
+      { datasetId: number | null; count: number; label: string; key: string }
+    >()
+
+    enabledLayers.forEach((layer) => {
+      const datasetId = layer.sourceDatasetId ?? null
+      const key = datasetId === null ? 'manual' : datasetId.toString()
+      if (!grouped.has(key)) {
+        const label =
+          datasetId === null
+            ? 'Manual layers'
+            : datasetNameMap.get(datasetId) ?? `Dataset #${datasetId}`
+        grouped.set(key, { datasetId, count: 1, label, key })
+      } else {
+        const entry = grouped.get(key)!
+        entry.count += 1
+      }
+    })
+
+    return Array.from(grouped.values()).sort((a, b) => a.label.localeCompare(b.label))
+  }, [projectLayers, datasetsData])
+
+  // Find override for a source
+  const findLayerSourceOverride = (datasetId: number | null) =>
+    layerConfig.find(
+      (config) => (config.sourceDatasetId ?? null) === (datasetId ?? null)
+    )
+
+  // Get the mode for a source
+  const getLayerSourceMode = (datasetId: number | null): LayerSourceStyleMode => {
+    const existing = findLayerSourceOverride(datasetId)
+    return (existing?.mode as LayerSourceStyleMode) ?? 'default'
+  }
+
+  // Set override for a source (disables source colours, uses fallback)
+  const setLayerSourceOverride = (datasetId: number | null, mode: LayerSourceStyleMode) => {
+    const filtered = layerConfig.filter(
+      (config) => (config.sourceDatasetId ?? null) !== (datasetId ?? null)
+    )
+    onLayerConfigChange([...filtered, { sourceDatasetId: datasetId, mode }])
+  }
+
+  // Remove override for a source (enables source colours)
+  const removeLayerSourceOverride = (datasetId: number | null) => {
+    onLayerConfigChange(
+      layerConfig.filter(
+        (config) => (config.sourceDatasetId ?? null) !== (datasetId ?? null)
+      )
+    )
+  }
+
+  // Toggle source disabled state
+  const setLayerSourceDisabled = (datasetId: number | null, disabled: boolean) => {
+    if (disabled) {
+      const mode = getLayerSourceMode(datasetId)
+      setLayerSourceOverride(datasetId, mode)
+    } else {
+      removeLayerSourceOverride(datasetId)
     }
   }
 
-  // Update a specific layer's config
-  const updateLayerConfig = (layerId: string, updates: Partial<StoryLayerConfig>) => {
-    const existing = configMap[layerId]
-    const projectLayer = projectLayers.find((l) => l.layerId === layerId)
+  const loading = layersLoading || datasetsLoading
 
-    const baseConfig = existing || {
-      layerId,
-      enabled: true,
-      color: projectLayer?.backgroundColor || '#ffffff',
-      sourceDatasetId: projectLayer?.sourceDatasetId || null,
-    }
-
-    const updated: StoryLayerConfig = {
-      ...baseConfig,
-      ...updates,
-    }
-
-    // Update the config array
-    const newConfig = layerConfig.filter((c) => c.layerId !== layerId)
-    newConfig.push(updated)
-    onLayerConfigChange(newConfig)
-  }
-
-  if (layersLoading) {
+  if (loading) {
     return (
       <Card className="border mt-4">
         <CardContent className="py-8">
           <Group gap="sm" align="center" justify="center">
             <Spinner className="h-4 w-4" />
-            <span>Loading layers...</span>
+            <span>Loading layer sources...</span>
           </Group>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  if (enabledProjectLayers.length === 0) {
-    return (
-      <Card className="border mt-4">
-        <CardHeader>
-          <CardTitle className="text-base">Layer Configuration</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">
-            No layers are configured for this project. Configure project layers first in the Workbench → Layers page.
-          </p>
         </CardContent>
       </Card>
     )
@@ -130,94 +138,80 @@ export const StoryLayersTab = ({
         <Group justify="between" align="center">
           <CardTitle className="text-base flex items-center gap-2">
             <IconStack2 className="h-4 w-4" />
-            Layer Configuration
+            Layer Sources
           </CardTitle>
           <Badge variant="secondary">
-            {enabledProjectLayers.length} layer{enabledProjectLayers.length !== 1 ? 's' : ''}
+            {layerSourceOptions.length} source{layerSourceOptions.length !== 1 ? 's' : ''}
           </Badge>
         </Group>
       </CardHeader>
       <CardContent>
         <p className="text-sm text-muted-foreground mb-4">
-          Configure how layers appear in this story. Override colours and select which dataset provides each layer's data.
+          Disable individual layer sources to use a built-in palette instead of project layer colours.
         </p>
 
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[50px]">Enabled</TableHead>
-              <TableHead>Layer</TableHead>
-              <TableHead className="w-[100px]">Colour</TableHead>
-              <TableHead className="w-[200px]">Source Dataset</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {enabledProjectLayers.map((projectLayer) => {
-              const config = getLayerConfig(projectLayer.layerId, projectLayer)
+        {!layerSourceOptions.length ? (
+          <p className="text-sm text-muted-foreground">
+            No enabled layer sources found for this project. Configure layers in the Workbench → Layers page.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {layerSourceOptions.map((option) => {
+              const datasetKey = option.key
+              const disabled = !!findLayerSourceOverride(option.datasetId ?? null)
+              const mode = getLayerSourceMode(option.datasetId ?? null)
+              const switchId = `layer-source-disable-${datasetKey}`
+              const selectId = `layer-source-style-${datasetKey}`
+
               return (
-                <TableRow key={projectLayer.id}>
-                  <TableCell>
-                    <Checkbox
-                      checked={config.enabled}
-                      onCheckedChange={(checked) =>
-                        updateLayerConfig(projectLayer.layerId, { enabled: !!checked })
-                      }
-                    />
-                  </TableCell>
-                  <TableCell>
+                <div key={datasetKey} className="rounded-md border p-3">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <div className="font-medium">{projectLayer.name}</div>
-                      <div className="text-xs text-muted-foreground font-mono">
-                        {projectLayer.layerId}
-                      </div>
+                      <p className="font-medium">{option.label}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {option.count} {option.count === 1 ? 'layer' : 'layers'}{' '}
+                        {option.datasetId === null ? 'added manually' : 'from dataset'}
+                      </p>
                     </div>
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      type="color"
-                      className="w-16 h-8 p-1 cursor-pointer"
-                      value={config.color || projectLayer.backgroundColor || '#ffffff'}
-                      onChange={(e) =>
-                        updateLayerConfig(projectLayer.layerId, { color: e.target.value })
-                      }
-                      disabled={!config.enabled}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Select
-                      value={config.sourceDatasetId?.toString() || 'none'}
-                      onValueChange={(value) =>
-                        updateLayerConfig(projectLayer.layerId, {
-                          sourceDatasetId: value === 'none' ? null : Number(value),
-                        })
-                      }
-                      disabled={!config.enabled}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select dataset" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">
-                          <span className="text-muted-foreground">None (use project default)</span>
-                        </SelectItem>
-                        {storyDatasets.map((dataset) => (
-                          <SelectItem key={dataset.id} value={dataset.id.toString()}>
-                            {dataset.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
-                </TableRow>
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id={switchId}
+                        checked={disabled}
+                        onCheckedChange={(checked) =>
+                          setLayerSourceDisabled(option.datasetId ?? null, checked)
+                        }
+                      />
+                      <Label htmlFor={switchId} className="text-sm font-normal">
+                        Disable source colours
+                      </Label>
+                    </div>
+                  </div>
+                  {disabled && (
+                    <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+                      <Label htmlFor={selectId} className="text-sm font-medium">
+                        Fallback palette
+                      </Label>
+                      <Select
+                        value={mode}
+                        onValueChange={(value) =>
+                          setLayerSourceOverride(option.datasetId ?? null, value as LayerSourceStyleMode)
+                        }
+                      >
+                        <SelectTrigger id={selectId} className="sm:w-48">
+                          <SelectValue placeholder="Select palette" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="default">Default</SelectItem>
+                          <SelectItem value="light">Light</SelectItem>
+                          <SelectItem value="dark">Dark</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
               )
             })}
-          </TableBody>
-        </Table>
-
-        {storyDatasets.length === 0 && (
-          <p className="text-sm text-muted-foreground mt-4 italic">
-            No datasets enabled for this story. Enable datasets in the Details tab to use them as layer sources.
-          </p>
+          </div>
         )}
       </CardContent>
     </Card>

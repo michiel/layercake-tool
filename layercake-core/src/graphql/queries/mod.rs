@@ -820,11 +820,11 @@ impl Query {
         let edges_array = graph_data.get("edges").and_then(|v| v.as_array());
         let layers_array = graph_data.get("layers").and_then(|v| v.as_array());
 
-        let section = if nodes_array.map_or(false, |arr| !arr.is_empty()) {
+        let section = if nodes_array.is_some_and(|arr| !arr.is_empty()) {
             PreviewSection::Nodes(nodes_array.unwrap())
-        } else if edges_array.map_or(false, |arr| !arr.is_empty()) {
+        } else if edges_array.is_some_and(|arr| !arr.is_empty()) {
             PreviewSection::Edges(edges_array.unwrap())
-        } else if layers_array.map_or(false, |arr| !arr.is_empty()) {
+        } else if layers_array.is_some_and(|arr| !arr.is_empty()) {
             PreviewSection::Layers(layers_array.unwrap())
         } else if let Some(nodes) = nodes_array {
             PreviewSection::Nodes(nodes)

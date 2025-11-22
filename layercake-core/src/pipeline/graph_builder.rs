@@ -8,8 +8,7 @@ use super::persist_utils::{clear_graph_storage, insert_edge_batches, insert_node
 use super::types::LayerData;
 use crate::database::entities::ExecutionState;
 use crate::database::entities::{
-    data_sets, datasets, graph_edges, graph_layers, graph_nodes, graphs, plan_dag_nodes,
-    project_layers,
+    data_sets, datasets, graph_edges, graph_nodes, graphs, plan_dag_nodes,
 };
 use crate::services::GraphEditService;
 use tracing::{info, warn};

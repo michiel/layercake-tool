@@ -2,7 +2,7 @@ use async_graphql::*;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
 use super::helpers::PlanExecutionResult;
-use crate::database::entities::{plan_dag_edges, plan_dag_nodes, plans};
+use crate::database::entities::{plan_dag_edges, plan_dag_nodes};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
 use crate::graphql::types::plan::{CreatePlanInput, Plan, UpdatePlanInput};

@@ -56,31 +56,31 @@ pub fn default_parsers() -> Vec<(String, Box<dyn DocumentParser>)> {
     vec![
         (
             "text/plain".to_string(),
-            Box::new(TextParser::default()) as Box<dyn DocumentParser>,
+            Box::new(TextParser) as Box<dyn DocumentParser>,
         ),
         (
             "application/pdf".to_string(),
-            Box::new(PdfParser::default()) as Box<dyn DocumentParser>,
+            Box::new(PdfParser) as Box<dyn DocumentParser>,
         ),
         (
             "text/markdown".to_string(),
-            Box::new(MarkdownParser::default()) as Box<dyn DocumentParser>,
+            Box::new(MarkdownParser) as Box<dyn DocumentParser>,
         ),
         (
             "text/csv".to_string(),
-            Box::new(CsvParser::default()) as Box<dyn DocumentParser>,
+            Box::new(CsvParser) as Box<dyn DocumentParser>,
         ),
         (
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet".to_string(),
-            Box::new(SpreadsheetParser::default()) as Box<dyn DocumentParser>,
+            Box::new(SpreadsheetParser) as Box<dyn DocumentParser>,
         ),
         (
             "application/vnd.oasis.opendocument.spreadsheet".to_string(),
-            Box::new(SpreadsheetParser::default()) as Box<dyn DocumentParser>,
+            Box::new(SpreadsheetParser) as Box<dyn DocumentParser>,
         ),
         (
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document".to_string(),
-            Box::new(DocxParser::default()) as Box<dyn DocumentParser>,
+            Box::new(DocxParser) as Box<dyn DocumentParser>,
         ),
     ]
 }

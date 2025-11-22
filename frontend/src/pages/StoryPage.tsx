@@ -96,11 +96,9 @@ export const StoryPage = () => {
       .filter((t) => t.length > 0)
 
     // Strip __typename from layerConfig items
-    const cleanLayerConfig = layerConfig.map(({ layerId, enabled, color, sourceDatasetId }) => ({
-      layerId,
-      enabled,
-      color,
+    const cleanLayerConfig = layerConfig.map(({ sourceDatasetId, mode }) => ({
       sourceDatasetId,
+      mode,
     }))
 
     const input: UpdateStoryInput = {
@@ -321,8 +319,6 @@ export const StoryPage = () => {
           <StoryLayersTab
             projectId={projectIdNum}
             layerConfig={layerConfig}
-            enabledDatasetIds={enabledDatasetIds}
-            datasets={datasets}
             onLayerConfigChange={handleLayerConfigChange}
           />
         </TabsContent>

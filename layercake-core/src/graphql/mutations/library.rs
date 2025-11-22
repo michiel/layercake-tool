@@ -2,9 +2,7 @@ use async_graphql::*;
 use base64::{engine::general_purpose, Engine as _};
 use serde_json::json;
 
-use crate::database::entities::common_types::{
-    DataType as EntityDataType, FileFormat as EntityFileFormat,
-};
+use crate::database::entities::common_types::FileFormat as EntityFileFormat;
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
 use crate::graphql::types::{
@@ -277,15 +275,14 @@ impl LibraryMutation {
             .get(id)
             .await
             .map_err(|e| StructuredError::service("LibraryItemService::get", e))?
-            .ok_or_else(|| StructuredError::not_found("Library item", &id.to_string()))?;
+            .ok_or_else(|| StructuredError::not_found("Library item", id.to_string()))?;
 
         // Verify it's a dataset
         if item.item_type != ITEM_TYPE_DATASET {
             return Err(StructuredError::bad_request(format!(
                 "Cannot re-detect type for non-dataset item (type: {})",
                 item.item_type
-            ))
-            .into());
+            )));
         }
 
         // Parse existing metadata

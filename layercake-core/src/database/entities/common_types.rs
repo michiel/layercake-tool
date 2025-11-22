@@ -61,7 +61,7 @@ impl FileFormat {
     /// assert_eq!(FileFormat::from_extension("noext"), None);
     /// ```
     pub fn from_extension(filename: &str) -> Option<Self> {
-        let ext = filename.split('.').last()?.to_lowercase();
+        let ext = filename.split('.').next_back()?.to_lowercase();
         ext.parse().ok()
     }
 

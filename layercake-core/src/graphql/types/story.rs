@@ -7,16 +7,15 @@ use crate::database::entities::{projects, sequences, stories};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::Project;
 
-/// Layer configuration for a story
+/// Layer source configuration for a story
+/// Controls how layer sources are rendered - if a source is in this list,
+/// it's disabled and uses the fallback style mode instead of project layer colours
 #[derive(Clone, Debug, Serialize, Deserialize, SimpleObject, InputObject)]
 #[graphql(input_name = "StoryLayerConfigInput")]
 pub struct StoryLayerConfig {
-    #[graphql(name = "layerId")]
-    pub layer_id: String,
-    pub enabled: bool,
-    pub color: Option<String>,
     #[graphql(name = "sourceDatasetId")]
-    pub source_dataset_id: Option<i32>,
+    pub source_dataset_id: Option<i32>, // None = manual layers
+    pub mode: String, // 'default' | 'light' | 'dark' - fallback style when source is disabled
 }
 
 #[derive(SimpleObject)]

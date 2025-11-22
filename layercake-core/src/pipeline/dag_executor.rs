@@ -191,7 +191,7 @@ impl DagExecutor {
                     node,
                     nodes,
                     edges,
-                    context.as_deref_mut(),
+                    context,
                 )
                 .await?;
             }
@@ -303,7 +303,7 @@ impl DagExecutor {
         )
         .await?;
 
-        if let Some(ctx) = context.as_deref_mut() {
+        if let Some(ctx) = context {
             ctx.set_graph(node_id.to_string(), graph);
         }
 
@@ -417,7 +417,7 @@ impl DagExecutor {
         )
         .await?;
 
-        if let Some(ctx) = context.as_deref_mut() {
+        if let Some(ctx) = context {
             ctx.set_graph(node_id.to_string(), graph);
         }
 
@@ -454,7 +454,7 @@ impl DagExecutor {
             .as_deref_mut()
             .and_then(|ctx| ctx.dataset_graph(data_set_id));
 
-        let mut graph = match cached_graph {
+        let graph = match cached_graph {
             Some(graph) => graph,
             None => {
                 // Parse the graph_json from the data_set
@@ -619,7 +619,7 @@ impl DagExecutor {
             graph.layers.len(),
         );
 
-        if let Some(ctx) = context.as_deref_mut() {
+        if let Some(ctx) = context {
             ctx.set_graph(node_id.to_string(), graph);
         }
 
@@ -927,7 +927,7 @@ impl DagExecutor {
                 &node_id,
                 nodes,
                 edges,
-                context.as_mut().map(|ctx| ctx),
+                context.as_mut(),
             )
             .instrument(span)
             .await?;
@@ -984,7 +984,7 @@ impl DagExecutor {
                 &node_id,
                 nodes,
                 edges,
-                context.as_mut().map(|ctx| ctx),
+                context.as_mut(),
             )
             .instrument(span)
             .await?;
@@ -1129,7 +1129,7 @@ impl DagExecutor {
                 &node_id,
                 nodes,
                 edges,
-                context.as_mut().map(|ctx| ctx),
+                context.as_mut(),
             )
             .instrument(span)
             .await?;
