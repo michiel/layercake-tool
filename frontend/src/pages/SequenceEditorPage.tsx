@@ -129,7 +129,8 @@ export const SequenceEditorPage = () => {
         const data = JSON.parse(ds.graphJson)
         result[ds.id] = {
           nodes: data.nodes || [],
-          edges: data.edges || [],
+          // Handle both 'edges' and 'links' property names
+          edges: data.edges || data.links || [],
         }
       } catch {
         result[ds.id] = { nodes: [], edges: [] }
@@ -193,7 +194,10 @@ export const SequenceEditorPage = () => {
   const getNodeLabel = (datasetId: number, nodeId: string): string => {
     const graphData = datasetGraphData[datasetId]
     const node = graphData?.nodes.find((n) => n.id === nodeId)
-    return node?.label || node?.name || nodeId
+    // Check multiple possible label properties, use non-empty value
+    const label = node?.label || node?.name
+    // Return label if it exists and is different from the ID, otherwise return ID
+    return label && label.trim() ? label : nodeId
   }
 
   // Helper to get edge info
