@@ -21,9 +21,10 @@ import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { Spinner } from '@/components/ui/spinner'
-import { GET_STORY, UPDATE_STORY, Story, UpdateStoryInput } from '@/graphql/stories'
+import { GET_STORY, UPDATE_STORY, Story, StoryLayerConfig, UpdateStoryInput } from '@/graphql/stories'
 import { GET_DATASOURCES, DataSet } from '@/graphql/datasets'
 import { StorySequencesTab } from '@/components/stories/StorySequencesTab'
+import { StoryLayersTab } from '@/components/stories/StoryLayersTab'
 
 const GET_PROJECTS = gql`
   query GetProjectsForStory {
@@ -46,6 +47,7 @@ export const StoryPage = () => {
   const [description, setDescription] = useState('')
   const [tagsInput, setTagsInput] = useState('')
   const [enabledDatasetIds, setEnabledDatasetIds] = useState<number[]>([])
+  const [layerConfig, setLayerConfig] = useState<StoryLayerConfig[]>([])
   const [hasChanges, setHasChanges] = useState(false)
 
   const { data: projectsData, loading: projectsLoading } = useQuery(GET_PROJECTS)
@@ -82,6 +84,7 @@ export const StoryPage = () => {
       setDescription(story.description || '')
       setTagsInput(story.tags.join(', '))
       setEnabledDatasetIds(story.enabledDatasetIds)
+      setLayerConfig(story.layerConfig || [])
       setHasChanges(false)
     }
   }, [story])
@@ -92,11 +95,20 @@ export const StoryPage = () => {
       .map((t) => t.trim())
       .filter((t) => t.length > 0)
 
+    // Strip __typename from layerConfig items
+    const cleanLayerConfig = layerConfig.map(({ layerId, enabled, color, sourceDatasetId }) => ({
+      layerId,
+      enabled,
+      color,
+      sourceDatasetId,
+    }))
+
     const input: UpdateStoryInput = {
       name,
       description: description || undefined,
       tags,
       enabledDatasetIds,
+      layerConfig: cleanLayerConfig,
     }
 
     try {
@@ -118,6 +130,11 @@ export const StoryPage = () => {
         ? prev.filter((id) => id !== datasetId)
         : [...prev, datasetId]
     )
+    setHasChanges(true)
+  }
+
+  const handleLayerConfigChange = (config: StoryLayerConfig[]) => {
+    setLayerConfig(config)
     setHasChanges(true)
   }
 
@@ -301,16 +318,13 @@ export const StoryPage = () => {
         </TabsContent>
 
         <TabsContent value="layers">
-          <Card className="border mt-4">
-            <CardHeader>
-              <CardTitle className="text-base">Layer Configuration</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">
-                Layer configuration for stories coming soon. This will allow you to configure layer colours, sources, and visibility for use in this story.
-              </p>
-            </CardContent>
-          </Card>
+          <StoryLayersTab
+            projectId={projectIdNum}
+            layerConfig={layerConfig}
+            enabledDatasetIds={enabledDatasetIds}
+            datasets={datasets}
+            onLayerConfigChange={handleLayerConfigChange}
+          />
         </TabsContent>
 
         <TabsContent value="sequences">
