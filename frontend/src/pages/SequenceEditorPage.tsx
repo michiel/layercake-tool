@@ -8,6 +8,12 @@ import {
   IconArrowRight,
   IconDeviceFloppy,
   IconArrowLeft,
+  IconChevronLeft,
+  IconChevronRight,
+  IconPlus,
+  IconFileDescription,
+  IconListDetails,
+  IconTool,
 } from '@tabler/icons-react'
 import { Breadcrumbs } from '@/components/common/Breadcrumbs'
 import PageContainer from '@/components/layout/PageContainer'
@@ -19,9 +25,10 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { Spinner } from '@/components/ui/spinner'
+import { cn } from '@/lib/utils'
 import {
   GET_SEQUENCE,
   CREATE_SEQUENCE,
@@ -73,11 +80,14 @@ export const SequenceEditorPage = () => {
   const sequenceIdNum = sequenceId === 'new' ? null : Number(sequenceId || 0)
   const isEditing = sequenceIdNum !== null
 
+  const [activeTab, setActiveTab] = useState<string>('attributes')
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [enabledDatasetIds, setEnabledDatasetIds] = useState<number[]>([])
   const [edgeOrder, setEdgeOrder] = useState<SequenceEdgeRef[]>([])
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
+  const [allEdgesCollapsed, setAllEdgesCollapsed] = useState(false)
+  const [toolsCollapsed, setToolsCollapsed] = useState(false)
 
   // Queries
   const { data: projectsData, loading: projectsLoading } = useQuery(GET_PROJECTS)
@@ -143,6 +153,14 @@ export const SequenceEditorPage = () => {
     }
     return edges
   }, [enabledDatasetIds, datasetGraphData, storyDatasets])
+
+  // Get edges not yet added to the sequence
+  const unselectedEdges = useMemo(() => {
+    return availableEdges.filter(
+      ({ datasetId, edge }) =>
+        !edgeOrder.some((ref) => ref.datasetId === datasetId && ref.edgeId === edge.id)
+    )
+  }, [availableEdges, edgeOrder])
 
   // Helper to get node label
   const getNodeLabel = (datasetId: number, nodeId: string): string => {
@@ -356,192 +374,279 @@ export const SequenceEditorPage = () => {
           <Button onClick={handleSave} disabled={saving || !name.trim()}>
             {saving && <Spinner className="mr-2 h-4 w-4" />}
             <IconDeviceFloppy className="mr-2 h-4 w-4" />
-            {isEditing ? 'Save Changes' : 'Create Sequence'}
+            Save
           </Button>
         </Group>
       </Group>
 
-      <div className="grid grid-cols-[320px_1fr] gap-6">
-        {/* Left panel: Settings and Dataset selection */}
-        <div className="space-y-6">
-          <Card className="border">
-            <CardHeader>
-              <CardTitle className="text-base">Sequence Details</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Stack gap="md">
-                <div className="space-y-2">
-                  <Label htmlFor="seq-name">Name *</Label>
-                  <Input
-                    id="seq-name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Sequence name"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="seq-description">Description</Label>
-                  <Textarea
-                    id="seq-description"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Optional description"
-                    rows={3}
-                  />
-                </div>
-              </Stack>
-            </CardContent>
-          </Card>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="h-[calc(100vh-280px)]">
+        <TabsList>
+          <TabsTrigger value="attributes">
+            <IconFileDescription className="mr-2 h-4 w-4" />
+            Attributes
+          </TabsTrigger>
+          <TabsTrigger value="sequence">
+            <IconListDetails className="mr-2 h-4 w-4" />
+            Sequence
+          </TabsTrigger>
+        </TabsList>
 
-          <Card className="border">
-            <CardHeader>
-              <CardTitle className="text-base">Datasets</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-xs text-muted-foreground mb-4">
-                Enable datasets to select edges from. Only datasets enabled in the story are shown.
-              </p>
-              {storyDatasets.length === 0 ? (
-                <p className="text-sm text-muted-foreground italic">
-                  No datasets enabled in this story.
-                </p>
-              ) : (
-                <Stack gap="sm">
-                  {storyDatasets.map((dataset) => {
-                    const graphData = datasetGraphData[dataset.id]
-                    const edgeCount = graphData?.edges.length || 0
-                    return (
-                      <div key={dataset.id} className="flex items-center space-x-3">
-                        <Checkbox
-                          id={`seq-ds-${dataset.id}`}
-                          checked={enabledDatasetIds.includes(dataset.id)}
-                          onCheckedChange={() => toggleDataset(dataset.id)}
-                        />
-                        <label
-                          htmlFor={`seq-ds-${dataset.id}`}
-                          className="text-sm cursor-pointer flex-1"
-                        >
-                          <div className="font-medium">{dataset.name}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {edgeCount} edge{edgeCount !== 1 ? 's' : ''}
-                          </div>
-                        </label>
-                      </div>
-                    )
-                  })}
+        {/* Attributes Tab */}
+        <TabsContent value="attributes" className="mt-4">
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* Sequence Details Card */}
+            <Card className="border">
+              <CardHeader>
+                <CardTitle className="text-base">Sequence Details</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Stack gap="md">
+                  <div className="space-y-2">
+                    <Label htmlFor="seq-name">Name *</Label>
+                    <Input
+                      id="seq-name"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Sequence name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="seq-description">Description</Label>
+                    <Textarea
+                      id="seq-description"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="Optional description"
+                      rows={3}
+                    />
+                  </div>
                 </Stack>
+              </CardContent>
+            </Card>
+
+            {/* Datasets Card */}
+            <Card className="border">
+              <CardHeader>
+                <CardTitle className="text-base">Datasets</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground mb-4">
+                  Enable datasets to select edges from. Only datasets enabled in the story are shown.
+                </p>
+                {storyDatasets.length === 0 ? (
+                  <p className="text-sm text-muted-foreground italic">
+                    No datasets enabled in this story.
+                  </p>
+                ) : (
+                  <Stack gap="sm">
+                    {storyDatasets.map((dataset) => {
+                      const graphData = datasetGraphData[dataset.id]
+                      const edgeCount = graphData?.edges.length || 0
+                      return (
+                        <div key={dataset.id} className="flex items-center space-x-3">
+                          <Checkbox
+                            id={`seq-ds-${dataset.id}`}
+                            checked={enabledDatasetIds.includes(dataset.id)}
+                            onCheckedChange={() => toggleDataset(dataset.id)}
+                          />
+                          <label
+                            htmlFor={`seq-ds-${dataset.id}`}
+                            className="text-sm cursor-pointer flex-1"
+                          >
+                            <div className="font-medium">{dataset.name}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {edgeCount} edge{edgeCount !== 1 ? 's' : ''}
+                            </div>
+                          </label>
+                        </div>
+                      )
+                    })}
+                  </Stack>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Sequence Tab */}
+        <TabsContent value="sequence" className="mt-4 h-[calc(100%-60px)]">
+          <div className="flex gap-2 h-full">
+            {/* All Edges Column (collapsible) */}
+            <div
+              className={cn(
+                'border rounded-lg flex flex-col transition-all duration-200',
+                allEdgesCollapsed ? 'w-10' : 'w-80'
               )}
-            </CardContent>
-          </Card>
-
-          <Card className="border">
-            <CardHeader>
-              <CardTitle className="text-base">Add Edge</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Select
-                value=""
-                onValueChange={(value) => {
-                  const [datasetId, edgeId] = value.split(':')
-                  addEdge(Number(datasetId), edgeId)
-                }}
-                disabled={availableEdges.length === 0}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={availableEdges.length === 0 ? 'No edges available' : 'Select an edge'} />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableEdges.map(({ datasetId, datasetName, edge }) => {
-                    const sourceLabel = getNodeLabel(datasetId, edge.source)
-                    const targetLabel = getNodeLabel(datasetId, edge.target)
-                    const alreadyAdded = edgeOrder.some(
-                      (ref) => ref.datasetId === datasetId && ref.edgeId === edge.id
-                    )
-                    return (
-                      <SelectItem
-                        key={`${datasetId}:${edge.id}`}
-                        value={`${datasetId}:${edge.id}`}
-                        disabled={alreadyAdded}
-                      >
-                        <span className="text-xs text-muted-foreground mr-1">[{datasetName}]</span>
-                        {sourceLabel} → {targetLabel}
-                      </SelectItem>
-                    )
-                  })}
-                </SelectContent>
-              </Select>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Right panel: Edge sequence list */}
-        <Card className="border">
-          <CardHeader className="border-b">
-            <Group justify="between" align="center">
-              <CardTitle className="text-base">Edge Sequence</CardTitle>
-              <Badge variant="secondary">{edgeOrder.length} edge{edgeOrder.length !== 1 ? 's' : ''}</Badge>
-            </Group>
-          </CardHeader>
-          <CardContent className="p-0">
-            <ScrollArea className="h-[calc(100vh-400px)] min-h-[300px]">
-              {edgeOrder.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                  <p className="text-sm">No edges in sequence</p>
-                  <p className="text-xs mt-1">Add edges using the selector on the left</p>
-                </div>
-              ) : (
-                <Stack gap="xs" className="p-4">
-                  {edgeOrder.map((ref, index) => {
-                    const { edge, dataset, sourceLabel, targetLabel } = getEdgeInfo(ref)
-                    return (
-                      <div
-                        key={`${ref.datasetId}-${ref.edgeId}-${index}`}
-                        className={`flex items-center gap-3 p-3 border rounded-md bg-background hover:bg-muted/50 ${
-                          draggedIndex === index ? 'opacity-50' : ''
-                        }`}
-                        draggable
-                        onDragStart={() => handleDragStart(index)}
-                        onDragOver={(e) => handleDragOver(e, index)}
-                        onDragEnd={handleDragEnd}
-                      >
-                        <IconGripVertical className="h-5 w-5 text-muted-foreground cursor-grab shrink-0" />
-                        <Badge variant="outline" className="shrink-0">{index + 1}</Badge>
-                        <div className="flex-1 grid grid-cols-[1fr_auto_1fr] gap-3 items-center min-w-0">
-                          <div className="text-sm font-medium truncate" title={sourceLabel}>
-                            {sourceLabel}
-                          </div>
-                          <div className="flex items-center gap-2 text-muted-foreground">
-                            <IconArrowRight className="h-4 w-4 shrink-0" />
-                            {edge?.comments && (
-                              <span className="text-xs max-w-[150px] truncate" title={edge.comments}>
-                                {edge.comments}
+            >
+              <div className="flex items-center justify-between p-2 border-b bg-muted/30">
+                {!allEdgesCollapsed && (
+                  <span className="font-medium text-sm">All Edges</span>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0"
+                  onClick={() => setAllEdgesCollapsed(!allEdgesCollapsed)}
+                >
+                  {allEdgesCollapsed ? (
+                    <IconChevronRight className="h-4 w-4" />
+                  ) : (
+                    <IconChevronLeft className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+              {!allEdgesCollapsed && (
+                <ScrollArea className="flex-1">
+                  <div className="p-2 space-y-1">
+                    {unselectedEdges.length === 0 ? (
+                      <p className="text-xs text-muted-foreground p-2 text-center">
+                        {availableEdges.length === 0
+                          ? 'No edges available. Enable datasets in Attributes tab.'
+                          : 'All edges have been added to the sequence.'}
+                      </p>
+                    ) : (
+                      unselectedEdges.map(({ datasetId, datasetName, edge }) => {
+                        const sourceLabel = getNodeLabel(datasetId, edge.source)
+                        const targetLabel = getNodeLabel(datasetId, edge.target)
+                        return (
+                          <div
+                            key={`${datasetId}:${edge.id}`}
+                            className="p-2 border rounded text-sm hover:bg-muted/50 cursor-pointer group"
+                            onClick={() => addEdge(datasetId, edge.id)}
+                          >
+                            <div className="flex items-center justify-between">
+                              <Badge variant="outline" className="text-xs mb-1">
+                                {datasetName}
+                              </Badge>
+                              <IconPlus className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </div>
+                            <div className="flex items-center gap-1 text-xs">
+                              <span className="truncate max-w-[100px]" title={sourceLabel}>
+                                {sourceLabel}
                               </span>
+                              <IconArrowRight className="h-3 w-3 shrink-0 text-muted-foreground" />
+                              <span className="truncate max-w-[100px]" title={targetLabel}>
+                                {targetLabel}
+                              </span>
+                            </div>
+                            {edge.comments && (
+                              <p className="text-xs text-muted-foreground mt-1 truncate" title={edge.comments}>
+                                {edge.comments}
+                              </p>
                             )}
                           </div>
-                          <div className="text-sm font-medium truncate text-right" title={targetLabel}>
-                            {targetLabel}
-                          </div>
-                        </div>
-                        <Badge variant="secondary" className="text-xs shrink-0">
-                          {dataset?.name}
-                        </Badge>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0 text-destructive hover:text-destructive/80 shrink-0"
-                          onClick={() => removeEdge(index)}
-                        >
-                          <IconTrash className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    )
-                  })}
-                </Stack>
+                        )
+                      })
+                    )}
+                  </div>
+                </ScrollArea>
               )}
-            </ScrollArea>
-          </CardContent>
-        </Card>
-      </div>
+            </div>
+
+            {/* Sequence Column (main, flexible width) */}
+            <Card className="border flex-1 flex flex-col min-w-0">
+              <CardHeader className="border-b py-2 px-3">
+                <Group justify="between" align="center">
+                  <CardTitle className="text-sm">Sequence</CardTitle>
+                  <Badge variant="secondary">{edgeOrder.length} edge{edgeOrder.length !== 1 ? 's' : ''}</Badge>
+                </Group>
+              </CardHeader>
+              <CardContent className="p-0 flex-1 overflow-hidden">
+                <ScrollArea className="h-full">
+                  {edgeOrder.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                      <p className="text-sm">No edges in sequence</p>
+                      <p className="text-xs mt-1">Click edges from "All Edges" to add them</p>
+                    </div>
+                  ) : (
+                    <Stack gap="xs" className="p-2">
+                      {edgeOrder.map((ref, index) => {
+                        const { edge, dataset, sourceLabel, targetLabel } = getEdgeInfo(ref)
+                        return (
+                          <div
+                            key={`${ref.datasetId}-${ref.edgeId}-${index}`}
+                            className={cn(
+                              'flex items-center gap-2 p-2 border rounded-md bg-background hover:bg-muted/50',
+                              draggedIndex === index && 'opacity-50'
+                            )}
+                            draggable
+                            onDragStart={() => handleDragStart(index)}
+                            onDragOver={(e) => handleDragOver(e, index)}
+                            onDragEnd={handleDragEnd}
+                          >
+                            <IconGripVertical className="h-4 w-4 text-muted-foreground cursor-grab shrink-0" />
+                            <Badge variant="outline" className="shrink-0 text-xs">{index + 1}</Badge>
+                            <div className="flex-1 flex items-center gap-2 min-w-0">
+                              <span className="text-sm truncate" title={sourceLabel}>
+                                {sourceLabel}
+                              </span>
+                              <IconArrowRight className="h-3 w-3 shrink-0 text-muted-foreground" />
+                              {edge?.comments && (
+                                <span className="text-xs text-muted-foreground truncate max-w-[120px]" title={edge.comments}>
+                                  {edge.comments}
+                                </span>
+                              )}
+                              <IconArrowRight className="h-3 w-3 shrink-0 text-muted-foreground" />
+                              <span className="text-sm truncate" title={targetLabel}>
+                                {targetLabel}
+                              </span>
+                            </div>
+                            <Badge variant="secondary" className="text-xs shrink-0">
+                              {dataset?.name}
+                            </Badge>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0 text-destructive hover:text-destructive/80 shrink-0"
+                              onClick={() => removeEdge(index)}
+                            >
+                              <IconTrash className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        )
+                      })}
+                    </Stack>
+                  )}
+                </ScrollArea>
+              </CardContent>
+            </Card>
+
+            {/* Tools Column (collapsible) */}
+            <div
+              className={cn(
+                'border rounded-lg flex flex-col transition-all duration-200',
+                toolsCollapsed ? 'w-10' : 'w-48'
+              )}
+            >
+              <div className="flex items-center justify-between p-2 border-b bg-muted/30">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0"
+                  onClick={() => setToolsCollapsed(!toolsCollapsed)}
+                >
+                  {toolsCollapsed ? (
+                    <IconChevronLeft className="h-4 w-4" />
+                  ) : (
+                    <IconChevronRight className="h-4 w-4" />
+                  )}
+                </Button>
+                {!toolsCollapsed && (
+                  <span className="font-medium text-sm">Tools</span>
+                )}
+              </div>
+              {!toolsCollapsed && (
+                <div className="p-2 space-y-2">
+                  <Button variant="outline" size="sm" className="w-full" disabled>
+                    <IconTool className="mr-2 h-4 w-4" />
+                    Placeholder
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        </TabsContent>
+      </Tabs>
     </PageContainer>
   )
 }
