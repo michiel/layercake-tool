@@ -99,9 +99,13 @@ export const StoryPage = () => {
       enabledDatasetIds,
     }
 
-    await updateStory({
-      variables: { id: storyIdNum, input },
-    })
+    try {
+      await updateStory({
+        variables: { id: storyIdNum, input },
+      })
+    } catch (error) {
+      console.error('Save error:', error)
+    }
   }
 
   const handleFieldChange = () => {

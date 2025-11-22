@@ -221,8 +221,8 @@ export const SequenceEditorPage = () => {
   })
 
   const [updateSequence, { loading: updateLoading }] = useMutation(UPDATE_SEQUENCE, {
-    onCompleted: () => {
-      // Saved successfully
+    onCompleted: (data) => {
+      console.log('Sequence updated successfully:', data)
     },
     onError: (error) => {
       console.error('Failed to update sequence:', error)
@@ -252,26 +252,32 @@ export const SequenceEditorPage = () => {
       return
     }
 
+    const trimmedDescription = description.trim()
     const input = {
       name: name.trim(),
-      description: description.trim() || null,
+      description: trimmedDescription || undefined,
       enabledDatasetIds,
       edgeOrder,
     }
 
-    if (isEditing && sequenceIdNum) {
-      await updateSequence({
-        variables: { id: sequenceIdNum, input },
-      })
-    } else {
-      await createSequence({
-        variables: {
-          input: {
-            storyId: storyIdNum,
-            ...input,
+    try {
+      if (isEditing && sequenceIdNum) {
+        await updateSequence({
+          variables: { id: sequenceIdNum, input },
+        })
+      } else {
+        await createSequence({
+          variables: {
+            input: {
+              storyId: storyIdNum,
+              ...input,
+            },
           },
-        },
-      })
+        })
+      }
+    } catch (error) {
+      // Error is handled by mutation onError
+      console.error('Save error:', error)
     }
   }
 
