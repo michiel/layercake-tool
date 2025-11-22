@@ -62,6 +62,7 @@ interface GraphEdge {
 interface GraphNode {
   id: string
   label?: string
+  name?: string
 }
 
 interface GraphData {
@@ -192,7 +193,7 @@ export const SequenceEditorPage = () => {
   const getNodeLabel = (datasetId: number, nodeId: string): string => {
     const graphData = datasetGraphData[datasetId]
     const node = graphData?.nodes.find((n) => n.id === nodeId)
-    return node?.label || nodeId
+    return node?.label || node?.name || nodeId
   }
 
   // Helper to get edge info
