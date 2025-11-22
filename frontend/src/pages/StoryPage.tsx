@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import {
@@ -36,13 +36,31 @@ const GET_PROJECTS = gql`
   }
 `
 
+const VALID_TABS = ['details', 'layers', 'sequences'] as const
+type TabValue = (typeof VALID_TABS)[number]
+
 export const StoryPage = () => {
   const navigate = useNavigate()
   const { projectId, storyId } = useParams<{ projectId: string; storyId: string }>()
+  const [searchParams, setSearchParams] = useSearchParams()
   const projectIdNum = Number(projectId || 0)
   const storyIdNum = Number(storyId || 0)
 
-  const [activeTab, setActiveTab] = useState<string>('details')
+  // Get active tab from URL, default to 'details'
+  const tabParam = searchParams.get('tab')
+  const activeTab: TabValue = VALID_TABS.includes(tabParam as TabValue) ? (tabParam as TabValue) : 'details'
+
+  const setActiveTab = (tab: string) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (tab === 'details') {
+        next.delete('tab')
+      } else {
+        next.set('tab', tab)
+      }
+      return next
+    }, { replace: true })
+  }
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [tagsInput, setTagsInput] = useState('')
@@ -324,7 +342,7 @@ export const StoryPage = () => {
         </TabsContent>
 
         <TabsContent value="sequences">
-          <StorySequencesTab storyId={storyIdNum} />
+          <StorySequencesTab storyId={storyIdNum} projectId={projectIdNum} />
         </TabsContent>
       </Tabs>
     </PageContainer>

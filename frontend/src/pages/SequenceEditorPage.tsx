@@ -1,12 +1,11 @@
-import { useState, useEffect, useMemo } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import {
   IconGripVertical,
   IconTrash,
   IconArrowRight,
-  IconDeviceFloppy,
   IconArrowLeft,
   IconChevronLeft,
   IconChevronRight,
@@ -15,6 +14,9 @@ import {
   IconFileDescription,
   IconListDetails,
   IconTool,
+  IconCheck,
+  IconLoader2,
+  IconTimeline,
 } from '@tabler/icons-react'
 import { Breadcrumbs } from '@/components/common/Breadcrumbs'
 import PageContainer from '@/components/layout/PageContainer'
@@ -39,6 +41,8 @@ import {
 } from '@/graphql/sequences'
 import { GET_STORY, Story } from '@/graphql/stories'
 import { GET_DATASOURCES, DataSet } from '@/graphql/datasets'
+import { GET_PROJECT_LAYERS, ProjectLayer } from '@/graphql/layers'
+import { MermaidPreviewDialog } from '@/components/visualization/MermaidPreviewDialog'
 
 const GET_PROJECTS = gql`
   query GetProjectsForSequenceEditor {
@@ -63,6 +67,7 @@ interface GraphNode {
   id: string
   label?: string
   name?: string
+  layer?: string
   attrs?: Record<string, any>
 }
 
@@ -71,6 +76,9 @@ interface GraphData {
   edges: GraphEdge[]
 }
 
+const VALID_TABS = ['attributes', 'sequence'] as const
+type TabValue = (typeof VALID_TABS)[number]
+
 export const SequenceEditorPage = () => {
   const navigate = useNavigate()
   const { projectId, storyId, sequenceId } = useParams<{
@@ -78,12 +86,27 @@ export const SequenceEditorPage = () => {
     storyId: string
     sequenceId: string
   }>()
+  const [searchParams, setSearchParams] = useSearchParams()
   const projectIdNum = Number(projectId || 0)
   const storyIdNum = Number(storyId || 0)
   const sequenceIdNum = sequenceId === 'new' ? null : Number(sequenceId || 0)
   const isEditing = sequenceIdNum !== null
 
-  const [activeTab, setActiveTab] = useState<string>('attributes')
+  // Get active tab from URL, default to 'attributes'
+  const tabParam = searchParams.get('tab')
+  const activeTab: TabValue = VALID_TABS.includes(tabParam as TabValue) ? (tabParam as TabValue) : 'attributes'
+
+  const setActiveTab = (tab: string) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (tab === 'attributes') {
+        next.delete('tab')
+      } else {
+        next.set('tab', tab)
+      }
+      return next
+    }, { replace: true })
+  }
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [enabledDatasetIds, setEnabledDatasetIds] = useState<number[]>([])
@@ -92,6 +115,10 @@ export const SequenceEditorPage = () => {
   const [allEdgesCollapsed, setAllEdgesCollapsed] = useState(false)
   const [toolsCollapsed, setToolsCollapsed] = useState(false)
   const [collapsedDatasets, setCollapsedDatasets] = useState<Set<number>>(new Set())
+  const [isInitialized, setIsInitialized] = useState(false)
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle')
+  const [diagramDialogOpen, setDiagramDialogOpen] = useState(false)
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Queries
   const { data: projectsData, loading: projectsLoading } = useQuery(GET_PROJECTS)
@@ -115,6 +142,12 @@ export const SequenceEditorPage = () => {
     skip: !projectIdNum,
   })
   const allDatasets: DataSet[] = (datasetsData as any)?.dataSets || []
+
+  const { data: layersData, loading: layersLoading } = useQuery(GET_PROJECT_LAYERS, {
+    variables: { projectId: projectIdNum },
+    skip: !projectIdNum,
+  })
+  const projectLayers: ProjectLayer[] = (layersData as any)?.projectLayers || []
 
   // Filter datasets to only those enabled in the story
   const storyDatasets = useMemo(() => {
@@ -196,40 +229,141 @@ export const SequenceEditorPage = () => {
     })
   }
 
-  // Helper to get node label - searches across all enabled datasets
-  const getNodeLabel = (nodeId: string): string => {
-    // Search all enabled datasets for this node
+  // Helper to get node info including layer - searches across all enabled datasets
+  const getNodeInfo = (nodeId: string): { label: string; layer?: string } => {
     for (const dsId of enabledDatasetIds) {
       const graphData = datasetGraphData[dsId]
       if (!graphData) continue
       const node = graphData.nodes.find((n) => n.id === nodeId)
       if (node) {
-        // Check multiple possible label properties, use non-empty value
         const label = node.label || node.name || node.attrs?.label || node.attrs?.name
-        // Return label if it exists and has content, otherwise return ID
-        return label && String(label).trim() ? String(label) : nodeId
+        return {
+          label: label && String(label).trim() ? String(label) : nodeId,
+          layer: node.layer,
+        }
       }
     }
-    return nodeId
+    return { label: nodeId }
   }
 
-  // Helper to get edge info
+  // Helper to get layer colors from project layers
+  const getLayerColors = (layerId?: string): { bg: string; text: string } | null => {
+    if (!layerId) return null
+    const layer = projectLayers.find((l) => l.layerId === layerId && l.enabled)
+    if (!layer) return null
+    return {
+      bg: layer.backgroundColor || '#e5e7eb',
+      text: layer.textColor || '#000000',
+    }
+  }
+
+  // Helper to get edge info with node labels and layer info
   const getEdgeInfo = (ref: SequenceEdgeRef) => {
     const graphData = datasetGraphData[ref.datasetId]
     const edge = graphData?.edges.find((e) => e.id === ref.edgeId)
     const dataset = storyDatasets.find((d) => d.id === ref.datasetId)
+    const sourceInfo = edge ? getNodeInfo(edge.source) : { label: 'Unknown' }
+    const targetInfo = edge ? getNodeInfo(edge.target) : { label: 'Unknown' }
     return {
       edge,
       dataset,
-      sourceLabel: edge ? getNodeLabel(edge.source) : 'Unknown',
-      targetLabel: edge ? getNodeLabel(edge.target) : 'Unknown',
+      sourceLabel: sourceInfo.label,
+      targetLabel: targetInfo.label,
+      sourceColors: getLayerColors(sourceInfo.layer),
+      targetColors: getLayerColors(targetInfo.layer),
     }
   }
 
+  // Helper to get layer background color
+  const getLayerBgColor = (layerId?: string): string | null => {
+    if (!layerId) return null
+    const layer = projectLayers.find((l) => l.layerId === layerId && l.enabled)
+    if (!layer) return null
+    return layer.backgroundColor || null
+  }
+
+  // Generate Mermaid sequence diagram
+  const mermaidDiagram = useMemo(() => {
+    if (!edgeOrder.length) {
+      return 'sequenceDiagram\n    Note over A: No edges in sequence'
+    }
+
+    const escapeLabel = (label: string): string =>
+      label.replace(/"/g, '\\"').replace(/\n/g, ' ')
+    const makeParticipantId = (nodeId: string): string =>
+      nodeId.replace(/[^a-zA-Z0-9_]/g, '_')
+
+    const lines: string[] = ['sequenceDiagram']
+    const participantOrder: string[] = []
+    const participantInfo: Map<string, { label: string; color: string | null }> = new Map()
+
+    // First pass: collect participants in order of first appearance
+    for (const ref of edgeOrder) {
+      const graphData = datasetGraphData[ref.datasetId]
+      const edge = graphData?.edges.find((e) => e.id === ref.edgeId)
+      if (!edge) continue
+
+      if (!participantInfo.has(edge.source)) {
+        participantOrder.push(edge.source)
+        const nodeInfo = getNodeInfo(edge.source)
+        participantInfo.set(edge.source, {
+          label: nodeInfo.label,
+          color: getLayerBgColor(nodeInfo.layer),
+        })
+      }
+      if (!participantInfo.has(edge.target)) {
+        participantOrder.push(edge.target)
+        const nodeInfo = getNodeInfo(edge.target)
+        participantInfo.set(edge.target, {
+          label: nodeInfo.label,
+          color: getLayerBgColor(nodeInfo.layer),
+        })
+      }
+    }
+
+    // Add participant declarations with colored boxes
+    for (const nodeId of participantOrder) {
+      const info = participantInfo.get(nodeId)
+      if (!info) continue
+      const participantId = makeParticipantId(nodeId)
+      const color = info.color
+      if (color) {
+        lines.push(`    box ${color}`)
+        lines.push(`        participant ${participantId} as "${escapeLabel(info.label)}"`)
+        lines.push(`    end`)
+      } else {
+        lines.push(`    participant ${participantId} as "${escapeLabel(info.label)}"`)
+      }
+    }
+
+    // Add edges as messages
+    for (let i = 0; i < edgeOrder.length; i++) {
+      const ref = edgeOrder[i]
+      const graphData = datasetGraphData[ref.datasetId]
+      const edge = graphData?.edges.find((e) => e.id === ref.edgeId)
+      if (!edge) continue
+
+      const sourceId = makeParticipantId(edge.source)
+      const targetId = makeParticipantId(edge.target)
+      const orderNum = i + 1
+      const parts: string[] = [String(orderNum)]
+      if (edge.label) parts.push(escapeLabel(edge.label))
+      if (edge.comments) parts.push(escapeLabel(edge.comments))
+      const message = parts.join(': ')
+      lines.push(`    ${sourceId}->>${targetId}: ${message}`)
+    }
+
+    return lines.join('\n')
+  }, [edgeOrder, datasetGraphData, projectLayers])
+
   // Mutations
   const [createSequence, { loading: createLoading }] = useMutation(CREATE_SEQUENCE, {
-    onCompleted: () => {
-      navigate(`/projects/${projectIdNum}/stories/${storyIdNum}`)
+    onCompleted: (data) => {
+      const newId = (data as { createSequence?: Sequence })?.createSequence?.id
+      if (newId) {
+        // Redirect to edit URL so auto-save works
+        navigate(`/projects/${projectIdNum}/stories/${storyIdNum}/sequences/${newId}`, { replace: true })
+      }
     },
     onError: (error) => {
       console.error('Failed to create sequence:', error)
@@ -237,13 +371,13 @@ export const SequenceEditorPage = () => {
     },
   })
 
-  const [updateSequence, { loading: updateLoading }] = useMutation(UPDATE_SEQUENCE, {
-    onCompleted: (data) => {
-      console.log('Sequence updated successfully:', data)
+  const [updateSequence] = useMutation(UPDATE_SEQUENCE, {
+    onCompleted: () => {
+      setSyncStatus('synced')
     },
     onError: (error) => {
       console.error('Failed to update sequence:', error)
-      alert(`Failed to update sequence: ${error.message}`)
+      setSyncStatus('error')
     },
   })
 
@@ -254,23 +388,24 @@ export const SequenceEditorPage = () => {
       setDescription(sequence.description || '')
       setEnabledDatasetIds(sequence.enabledDatasetIds)
       setEdgeOrder(sequence.edgeOrder)
+      // Mark as initialized after a short delay to avoid immediate save
+      setTimeout(() => setIsInitialized(true), 100)
     } else if (!isEditing && story) {
       // New sequence - enable all story datasets by default
       setName('')
       setDescription('')
       setEnabledDatasetIds(story.enabledDatasetIds)
       setEdgeOrder([])
+      setIsInitialized(false)
     }
   }, [isEditing, sequence, story])
 
-  const handleSave = async () => {
-    if (!name.trim()) {
-      alert('Please enter a sequence name')
-      return
-    }
+  // Auto-save for existing sequences
+  const performSave = useCallback(async () => {
+    if (!isEditing || !sequenceIdNum || !name.trim()) return
 
+    setSyncStatus('syncing')
     const trimmedDescription = description.trim()
-    // Strip __typename from edgeOrder items (Apollo adds this to cached objects)
     const cleanEdgeOrder = edgeOrder.map(({ datasetId, edgeId }) => ({ datasetId, edgeId }))
     const input = {
       name: name.trim(),
@@ -280,23 +415,56 @@ export const SequenceEditorPage = () => {
     }
 
     try {
-      if (isEditing && sequenceIdNum) {
-        await updateSequence({
-          variables: { id: sequenceIdNum, input },
-        })
-      } else {
-        await createSequence({
-          variables: {
-            input: {
-              storyId: storyIdNum,
-              ...input,
-            },
-          },
-        })
-      }
+      await updateSequence({
+        variables: { id: sequenceIdNum, input },
+      })
     } catch (error) {
-      // Error is handled by mutation onError
-      console.error('Save error:', error)
+      console.error('Auto-save error:', error)
+    }
+  }, [isEditing, sequenceIdNum, name, description, enabledDatasetIds, edgeOrder, updateSequence])
+
+  // Debounced auto-save effect
+  useEffect(() => {
+    if (!isInitialized || !isEditing) return
+
+    // Clear any existing timeout
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current)
+    }
+
+    // Set new timeout for debounced save
+    saveTimeoutRef.current = setTimeout(() => {
+      performSave()
+    }, 500)
+
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current)
+      }
+    }
+  }, [name, description, enabledDatasetIds, edgeOrder, isInitialized, isEditing, performSave])
+
+  // Create new sequence
+  const handleCreate = async () => {
+    if (!name.trim()) {
+      alert('Please enter a sequence name')
+      return
+    }
+
+    const trimmedDescription = description.trim()
+    const cleanEdgeOrder = edgeOrder.map(({ datasetId, edgeId }) => ({ datasetId, edgeId }))
+    const input = {
+      storyId: storyIdNum,
+      name: name.trim(),
+      description: trimmedDescription || undefined,
+      enabledDatasetIds,
+      edgeOrder: cleanEdgeOrder,
+    }
+
+    try {
+      await createSequence({ variables: { input } })
+    } catch (error) {
+      console.error('Create error:', error)
     }
   }
 
@@ -348,8 +516,7 @@ export const SequenceEditorPage = () => {
     setDraggedIndex(null)
   }
 
-  const loading = projectsLoading || storyLoading || sequenceLoading || datasetsLoading
-  const saving = createLoading || updateLoading
+  const loading = projectsLoading || storyLoading || sequenceLoading || datasetsLoading || layersLoading
 
   if (loading) {
     return (
@@ -418,16 +585,45 @@ export const SequenceEditorPage = () => {
             Build a narrative sequence by selecting and ordering edges from your datasets.
           </p>
         </div>
-        <Group gap="sm">
+        <Group gap="sm" align="center">
+          {isEditing && (
+            <span className="text-sm text-muted-foreground flex items-center gap-1">
+              {syncStatus === 'syncing' && (
+                <>
+                  <IconLoader2 className="h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              )}
+              {syncStatus === 'synced' && (
+                <>
+                  <IconCheck className="h-4 w-4 text-green-600" />
+                  Saved
+                </>
+              )}
+              {syncStatus === 'error' && (
+                <span className="text-destructive">Save failed</span>
+              )}
+            </span>
+          )}
+          <Button
+            variant="outline"
+            onClick={() => setDiagramDialogOpen(true)}
+            disabled={edgeOrder.length === 0}
+            title="View sequence diagram"
+          >
+            <IconTimeline className="mr-2 h-4 w-4" />
+            Diagram
+          </Button>
           <Button variant="outline" onClick={handleBack}>
             <IconArrowLeft className="mr-2 h-4 w-4" />
             Back to Story
           </Button>
-          <Button onClick={handleSave} disabled={saving || !name.trim()}>
-            {saving && <Spinner className="mr-2 h-4 w-4" />}
-            <IconDeviceFloppy className="mr-2 h-4 w-4" />
-            Save
-          </Button>
+          {!isEditing && (
+            <Button onClick={handleCreate} disabled={createLoading || !name.trim()}>
+              {createLoading && <Spinner className="mr-2 h-4 w-4" />}
+              Create Sequence
+            </Button>
+          )}
         </Group>
       </Group>
 
@@ -582,8 +778,10 @@ export const SequenceEditorPage = () => {
                             {!isCollapsed && (
                               <div className="border-t p-1 space-y-1">
                                 {edges.map(({ edge }) => {
-                                  const sourceLabel = getNodeLabel(edge.source)
-                                  const targetLabel = getNodeLabel(edge.target)
+                                  const sourceInfo = getNodeInfo(edge.source)
+                                  const targetInfo = getNodeInfo(edge.target)
+                                  const sourceColors = getLayerColors(sourceInfo.layer)
+                                  const targetColors = getLayerColors(targetInfo.layer)
                                   return (
                                     <div
                                       key={edge.id}
@@ -591,13 +789,21 @@ export const SequenceEditorPage = () => {
                                       onClick={() => addEdge(datasetId, edge.id)}
                                     >
                                       <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-1 text-xs">
-                                          <span className="truncate max-w-[90px]" title={sourceLabel}>
-                                            {sourceLabel}
+                                        <div className="flex items-center gap-1">
+                                          <span
+                                            className="text-xs px-1.5 py-0.5 rounded truncate w-[100px] inline-block text-center"
+                                            style={sourceColors ? { backgroundColor: sourceColors.bg, color: sourceColors.text } : undefined}
+                                            title={sourceInfo.label}
+                                          >
+                                            {sourceInfo.label}
                                           </span>
                                           <IconArrowRight className="h-3 w-3 shrink-0 text-muted-foreground" />
-                                          <span className="truncate max-w-[90px]" title={targetLabel}>
-                                            {targetLabel}
+                                          <span
+                                            className="text-xs px-1.5 py-0.5 rounded truncate w-[100px] inline-block text-center"
+                                            style={targetColors ? { backgroundColor: targetColors.bg, color: targetColors.text } : undefined}
+                                            title={targetInfo.label}
+                                          >
+                                            {targetInfo.label}
                                           </span>
                                         </div>
                                         {edge.comments && (
@@ -639,7 +845,7 @@ export const SequenceEditorPage = () => {
                   ) : (
                     <Stack gap="xs" className="p-2">
                       {edgeOrder.map((ref, index) => {
-                        const { edge, dataset, sourceLabel, targetLabel } = getEdgeInfo(ref)
+                        const { edge, dataset, sourceLabel, targetLabel, sourceColors, targetColors } = getEdgeInfo(ref)
                         return (
                           <div
                             key={`${ref.datasetId}-${ref.edgeId}-${index}`}
@@ -655,19 +861,29 @@ export const SequenceEditorPage = () => {
                             <IconGripVertical className="h-4 w-4 text-muted-foreground cursor-grab shrink-0" />
                             <Badge variant="outline" className="shrink-0 text-xs">{index + 1}</Badge>
                             <div className="flex-1 flex items-center gap-2 min-w-0">
-                              <span className="text-sm truncate" title={sourceLabel}>
+                              <span
+                                className="text-xs px-1.5 py-0.5 rounded truncate w-[140px] shrink-0 inline-block text-center"
+                                style={sourceColors ? { backgroundColor: sourceColors.bg, color: sourceColors.text } : undefined}
+                                title={sourceLabel}
+                              >
                                 {sourceLabel}
                               </span>
                               <IconArrowRight className="h-3 w-3 shrink-0 text-muted-foreground" />
-                              {edge?.comments && (
-                                <span className="text-xs text-muted-foreground truncate max-w-[120px]" title={edge.comments}>
-                                  {edge.comments}
-                                </span>
-                              )}
-                              <IconArrowRight className="h-3 w-3 shrink-0 text-muted-foreground" />
-                              <span className="text-sm truncate" title={targetLabel}>
+                              <span
+                                className="text-xs px-1.5 py-0.5 rounded truncate w-[140px] shrink-0 inline-block text-center"
+                                style={targetColors ? { backgroundColor: targetColors.bg, color: targetColors.text } : undefined}
+                                title={targetLabel}
+                              >
                                 {targetLabel}
                               </span>
+                              {edge?.comments && (
+                                <>
+                                  <IconArrowRight className="h-3 w-3 shrink-0 text-muted-foreground" />
+                                  <span className="text-xs text-muted-foreground truncate" title={edge.comments}>
+                                    {edge.comments}
+                                  </span>
+                                </>
+                              )}
                             </div>
                             <Badge variant="secondary" className="text-xs shrink-0">
                               {dataset?.name}
@@ -725,6 +941,14 @@ export const SequenceEditorPage = () => {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Sequence Diagram Preview */}
+      <MermaidPreviewDialog
+        open={diagramDialogOpen}
+        onClose={() => setDiagramDialogOpen(false)}
+        diagram={mermaidDiagram}
+        title={`Sequence Diagram: ${name || 'Untitled'}`}
+      />
     </PageContainer>
   )
 }

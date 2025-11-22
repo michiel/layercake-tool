@@ -6,6 +6,7 @@ import {
   IconTrash,
   IconEdit,
   IconListDetails,
+  IconTimeline,
 } from '@tabler/icons-react'
 import { Group, Stack } from '@/components/layout-primitives'
 import { Badge } from '@/components/ui/badge'
@@ -13,6 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Spinner } from '@/components/ui/spinner'
+import { SequenceDiagramDialog } from '@/components/stories/SequenceDiagramDialog'
 import {
   LIST_SEQUENCES,
   DELETE_SEQUENCE,
@@ -21,15 +23,20 @@ import {
 
 interface StorySequencesTabProps {
   storyId: number
+  projectId: number
 }
 
 export const StorySequencesTab = ({
   storyId,
+  projectId,
 }: StorySequencesTabProps) => {
   const navigate = useNavigate()
-  const { projectId } = useParams<{ projectId: string }>()
+  const { projectId: routeProjectId } = useParams<{ projectId: string }>()
+  const effectiveProjectId = projectId || Number(routeProjectId || 0)
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [sequenceToDelete, setSequenceToDelete] = useState<Sequence | null>(null)
+  const [diagramDialogOpen, setDiagramDialogOpen] = useState(false)
+  const [diagramSequence, setDiagramSequence] = useState<Sequence | null>(null)
 
   const { data, loading, refetch } = useQuery(LIST_SEQUENCES, {
     variables: { storyId },
@@ -49,11 +56,17 @@ export const StorySequencesTab = ({
   })
 
   const handleNewSequence = () => {
-    navigate(`/projects/${projectId}/stories/${storyId}/sequences/new`)
+    navigate(`/projects/${effectiveProjectId}/stories/${storyId}/sequences/new`)
   }
 
   const handleEditSequence = (sequence: Sequence) => {
-    navigate(`/projects/${projectId}/stories/${storyId}/sequences/${sequence.id}`)
+    navigate(`/projects/${effectiveProjectId}/stories/${storyId}/sequences/${sequence.id}`)
+  }
+
+  const handleOpenDiagram = (sequence: Sequence, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setDiagramSequence(sequence)
+    setDiagramDialogOpen(true)
   }
 
   const handleOpenDelete = (sequence: Sequence, e: React.MouseEvent) => {
@@ -133,6 +146,15 @@ export const StorySequencesTab = ({
                     <Button
                       variant="ghost"
                       size="sm"
+                      title="View sequence diagram"
+                      onClick={(e) => handleOpenDiagram(sequence, e)}
+                    >
+                      <IconTimeline className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      title="Edit sequence"
                       onClick={(e) => {
                         e.stopPropagation()
                         handleEditSequence(sequence)
@@ -144,6 +166,7 @@ export const StorySequencesTab = ({
                       variant="ghost"
                       size="sm"
                       className="text-destructive hover:text-destructive/80"
+                      title="Delete sequence"
                       onClick={(e) => handleOpenDelete(sequence, e)}
                     >
                       <IconTrash className="h-4 w-4" />
@@ -176,6 +199,14 @@ export const StorySequencesTab = ({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Sequence Diagram Preview */}
+      <SequenceDiagramDialog
+        open={diagramDialogOpen}
+        onClose={() => setDiagramDialogOpen(false)}
+        sequence={diagramSequence}
+        projectId={effectiveProjectId}
+      />
     </>
   )
 }
