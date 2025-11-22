@@ -253,11 +253,13 @@ export const SequenceEditorPage = () => {
     }
 
     const trimmedDescription = description.trim()
+    // Strip __typename from edgeOrder items (Apollo adds this to cached objects)
+    const cleanEdgeOrder = edgeOrder.map(({ datasetId, edgeId }) => ({ datasetId, edgeId }))
     const input = {
       name: name.trim(),
       description: trimmedDescription || undefined,
       enabledDatasetIds,
-      edgeOrder,
+      edgeOrder: cleanEdgeOrder,
     }
 
     try {
