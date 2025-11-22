@@ -10,6 +10,7 @@ import {
   IconArrowLeft,
   IconChevronLeft,
   IconChevronRight,
+  IconChevronDown,
   IconPlus,
   IconFileDescription,
   IconListDetails,
@@ -88,6 +89,7 @@ export const SequenceEditorPage = () => {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   const [allEdgesCollapsed, setAllEdgesCollapsed] = useState(false)
   const [toolsCollapsed, setToolsCollapsed] = useState(false)
+  const [collapsedDatasets, setCollapsedDatasets] = useState<Set<number>>(new Set())
 
   // Queries
   const { data: projectsData, loading: projectsLoading } = useQuery(GET_PROJECTS)
@@ -161,6 +163,30 @@ export const SequenceEditorPage = () => {
         !edgeOrder.some((ref) => ref.datasetId === datasetId && ref.edgeId === edge.id)
     )
   }, [availableEdges, edgeOrder])
+
+  // Group unselected edges by dataset
+  const unselectedEdgesByDataset = useMemo(() => {
+    const grouped: Record<number, { datasetName: string; edges: Array<{ edge: GraphEdge }> }> = {}
+    for (const { datasetId, datasetName, edge } of unselectedEdges) {
+      if (!grouped[datasetId]) {
+        grouped[datasetId] = { datasetName, edges: [] }
+      }
+      grouped[datasetId].edges.push({ edge })
+    }
+    return grouped
+  }, [unselectedEdges])
+
+  const toggleDatasetCollapse = (datasetId: number) => {
+    setCollapsedDatasets((prev) => {
+      const next = new Set(prev)
+      if (next.has(datasetId)) {
+        next.delete(datasetId)
+      } else {
+        next.add(datasetId)
+      }
+      return next
+    })
+  }
 
   // Helper to get node label
   const getNodeLabel = (datasetId: number, nodeId: string): string => {
@@ -497,42 +523,68 @@ export const SequenceEditorPage = () => {
               </div>
               {!allEdgesCollapsed && (
                 <ScrollArea className="flex-1">
-                  <div className="p-2 space-y-1">
-                    {unselectedEdges.length === 0 ? (
+                  <div className="p-2 space-y-2">
+                    {Object.keys(unselectedEdgesByDataset).length === 0 ? (
                       <p className="text-xs text-muted-foreground p-2 text-center">
                         {availableEdges.length === 0
                           ? 'No edges available. Enable datasets in Attributes tab.'
                           : 'All edges have been added to the sequence.'}
                       </p>
                     ) : (
-                      unselectedEdges.map(({ datasetId, datasetName, edge }) => {
-                        const sourceLabel = getNodeLabel(datasetId, edge.source)
-                        const targetLabel = getNodeLabel(datasetId, edge.target)
+                      Object.entries(unselectedEdgesByDataset).map(([datasetIdStr, { datasetName, edges }]) => {
+                        const datasetId = Number(datasetIdStr)
+                        const isCollapsed = collapsedDatasets.has(datasetId)
                         return (
-                          <div
-                            key={`${datasetId}:${edge.id}`}
-                            className="p-2 border rounded text-sm hover:bg-muted/50 cursor-pointer group"
-                            onClick={() => addEdge(datasetId, edge.id)}
-                          >
-                            <div className="flex items-center justify-between">
-                              <Badge variant="outline" className="text-xs mb-1">
-                                {datasetName}
-                              </Badge>
-                              <IconPlus className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                            </div>
-                            <div className="flex items-center gap-1 text-xs">
-                              <span className="truncate max-w-[100px]" title={sourceLabel}>
-                                {sourceLabel}
-                              </span>
-                              <IconArrowRight className="h-3 w-3 shrink-0 text-muted-foreground" />
-                              <span className="truncate max-w-[100px]" title={targetLabel}>
-                                {targetLabel}
-                              </span>
-                            </div>
-                            {edge.comments && (
-                              <p className="text-xs text-muted-foreground mt-1 truncate" title={edge.comments}>
-                                {edge.comments}
-                              </p>
+                          <div key={datasetId} className="border rounded">
+                            <button
+                              type="button"
+                              className="w-full flex items-center justify-between p-2 hover:bg-muted/50 text-left"
+                              onClick={() => toggleDatasetCollapse(datasetId)}
+                            >
+                              <span className="font-medium text-sm truncate">{datasetName}</span>
+                              <div className="flex items-center gap-1">
+                                <Badge variant="secondary" className="text-xs">
+                                  {edges.length}
+                                </Badge>
+                                {isCollapsed ? (
+                                  <IconChevronRight className="h-4 w-4" />
+                                ) : (
+                                  <IconChevronDown className="h-4 w-4" />
+                                )}
+                              </div>
+                            </button>
+                            {!isCollapsed && (
+                              <div className="border-t p-1 space-y-1">
+                                {edges.map(({ edge }) => {
+                                  const sourceLabel = getNodeLabel(datasetId, edge.source)
+                                  const targetLabel = getNodeLabel(datasetId, edge.target)
+                                  return (
+                                    <div
+                                      key={edge.id}
+                                      className="p-2 rounded text-sm hover:bg-muted/50 cursor-pointer group flex items-center justify-between"
+                                      onClick={() => addEdge(datasetId, edge.id)}
+                                    >
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-1 text-xs">
+                                          <span className="truncate max-w-[90px]" title={sourceLabel}>
+                                            {sourceLabel}
+                                          </span>
+                                          <IconArrowRight className="h-3 w-3 shrink-0 text-muted-foreground" />
+                                          <span className="truncate max-w-[90px]" title={targetLabel}>
+                                            {targetLabel}
+                                          </span>
+                                        </div>
+                                        {edge.comments && (
+                                          <p className="text-xs text-muted-foreground mt-0.5 truncate" title={edge.comments}>
+                                            {edge.comments}
+                                          </p>
+                                        )}
+                                      </div>
+                                      <IconPlus className="h-3 w-3 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    </div>
+                                  )
+                                })}
+                              </div>
                             )}
                           </div>
                         )
