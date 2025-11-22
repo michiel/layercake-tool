@@ -115,6 +115,7 @@ export const SequenceEditorPage = () => {
   const [allEdgesCollapsed, setAllEdgesCollapsed] = useState(false)
   const [toolsCollapsed, setToolsCollapsed] = useState(false)
   const [collapsedDatasets, setCollapsedDatasets] = useState<Set<number>>(new Set())
+  const [edgeFilter, setEdgeFilter] = useState('')
   const [isInitialized, setIsInitialized] = useState(false)
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle')
   const [diagramDialogOpen, setDiagramDialogOpen] = useState(false)
@@ -205,32 +206,7 @@ export const SequenceEditorPage = () => {
     )
   }, [availableEdges, edgeOrder])
 
-  // Group unselected edges by dataset
-  const unselectedEdgesByDataset = useMemo(() => {
-    const grouped: Record<number, { datasetName: string; edges: Array<{ edge: GraphEdge }> }> = {}
-    for (const { datasetId, datasetName, edge } of unselectedEdges) {
-      if (!grouped[datasetId]) {
-        grouped[datasetId] = { datasetName, edges: [] }
-      }
-      grouped[datasetId].edges.push({ edge })
-    }
-    return grouped
-  }, [unselectedEdges])
-
-  const toggleDatasetCollapse = (datasetId: number) => {
-    setCollapsedDatasets((prev) => {
-      const next = new Set(prev)
-      if (next.has(datasetId)) {
-        next.delete(datasetId)
-      } else {
-        next.add(datasetId)
-      }
-      return next
-    })
-  }
-
-  // Helper to get node info including layer - searches across all enabled datasets
-  const getNodeInfo = (nodeId: string): { label: string; layer?: string } => {
+  const getNodeInfo = useCallback((nodeId: string): { label: string; layer?: string } => {
     for (const dsId of enabledDatasetIds) {
       const graphData = datasetGraphData[dsId]
       if (!graphData) continue
@@ -244,9 +220,8 @@ export const SequenceEditorPage = () => {
       }
     }
     return { label: nodeId }
-  }
+  }, [enabledDatasetIds, datasetGraphData])
 
-  // Helper to get layer colors from project layers
   const getLayerColors = (layerId?: string): { bg: string; text: string } | null => {
     if (!layerId) return null
     const layer = projectLayers.find((l) => l.layerId === layerId && l.enabled)
@@ -255,6 +230,71 @@ export const SequenceEditorPage = () => {
       bg: layer.backgroundColor || '#e5e7eb',
       text: layer.textColor || '#000000',
     }
+  }
+
+  // Group unselected edges by dataset
+  const unselectedEdgesByDataset = useMemo(() => {
+    const grouped: Record<
+      number,
+      {
+        datasetName: string
+        edges: Array<{
+          edge: GraphEdge
+          sourceLabel: string
+          targetLabel: string
+          sourceColors: { bg: string; text: string } | null
+          targetColors: { bg: string; text: string } | null
+        }>
+      }
+    > = {}
+    const normalizedFilter = edgeFilter.trim().toLowerCase()
+
+    for (const { datasetId, datasetName, edge } of unselectedEdges) {
+      const sourceInfo = getNodeInfo(edge.source)
+      const targetInfo = getNodeInfo(edge.target)
+      const sourceLabel = sourceInfo.label
+      const targetLabel = targetInfo.label
+
+      if (
+        normalizedFilter &&
+        !sourceLabel.toLowerCase().includes(normalizedFilter) &&
+        !targetLabel.toLowerCase().includes(normalizedFilter)
+      ) {
+        continue
+      }
+
+      if (!grouped[datasetId]) {
+        grouped[datasetId] = { datasetName, edges: [] }
+      }
+
+      grouped[datasetId].edges.push({
+        edge,
+        sourceLabel,
+        targetLabel,
+        sourceColors: getLayerColors(sourceInfo.layer),
+        targetColors: getLayerColors(targetInfo.layer),
+      })
+    }
+
+    Object.values(grouped).forEach(({ edges }) => {
+      edges.sort((a, b) =>
+        a.sourceLabel.localeCompare(b.sourceLabel, undefined, { sensitivity: 'base' })
+      )
+    })
+
+    return grouped
+  }, [unselectedEdges, edgeFilter, getNodeInfo])
+
+  const toggleDatasetCollapse = (datasetId: number) => {
+    setCollapsedDatasets((prev) => {
+      const next = new Set(prev)
+      if (next.has(datasetId)) {
+        next.delete(datasetId)
+      } else {
+        next.add(datasetId)
+      }
+      return next
+    })
   }
 
   // Helper to get edge info with node labels and layer info
@@ -354,7 +394,7 @@ export const SequenceEditorPage = () => {
     }
 
     return lines.join('\n')
-  }, [edgeOrder, datasetGraphData, projectLayers])
+  }, [edgeOrder, datasetGraphData, projectLayers, getNodeInfo])
 
   // Mutations
   const [createSequence, { loading: createLoading }] = useMutation(CREATE_SEQUENCE, {
@@ -726,14 +766,22 @@ export const SequenceEditorPage = () => {
                 allEdgesCollapsed ? 'w-10' : 'w-80'
               )}
             >
-              <div className="flex items-center justify-between p-2 border-b bg-muted/30">
+              <div className="flex items-center gap-2 p-2 border-b bg-muted/30">
                 {!allEdgesCollapsed && (
-                  <span className="font-medium text-sm">All Edges</span>
+                  <>
+                    <span className="font-medium text-sm whitespace-nowrap">All Edges</span>
+                    <Input
+                      value={edgeFilter}
+                      onChange={(e) => setEdgeFilter(e.target.value)}
+                      placeholder="Filter nodes"
+                      className="h-7 text-xs flex-1"
+                    />
+                  </>
                 )}
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-6 w-6 p-0"
+                  className="h-6 w-6 p-0 ml-auto"
                   onClick={() => setAllEdgesCollapsed(!allEdgesCollapsed)}
                 >
                   {allEdgesCollapsed ? (
@@ -777,11 +825,7 @@ export const SequenceEditorPage = () => {
                             </button>
                             {!isCollapsed && (
                               <div className="border-t p-1 space-y-1">
-                                {edges.map(({ edge }) => {
-                                  const sourceInfo = getNodeInfo(edge.source)
-                                  const targetInfo = getNodeInfo(edge.target)
-                                  const sourceColors = getLayerColors(sourceInfo.layer)
-                                  const targetColors = getLayerColors(targetInfo.layer)
+                                {edges.map(({ edge, sourceLabel, targetLabel, sourceColors, targetColors }) => {
                                   return (
                                     <div
                                       key={edge.id}
@@ -793,17 +837,17 @@ export const SequenceEditorPage = () => {
                                           <span
                                             className="text-xs px-1.5 py-0.5 rounded truncate w-[100px] inline-block text-center"
                                             style={sourceColors ? { backgroundColor: sourceColors.bg, color: sourceColors.text } : undefined}
-                                            title={sourceInfo.label}
+                                            title={sourceLabel}
                                           >
-                                            {sourceInfo.label}
+                                            {sourceLabel}
                                           </span>
                                           <IconArrowRight className="h-3 w-3 shrink-0 text-muted-foreground" />
                                           <span
                                             className="text-xs px-1.5 py-0.5 rounded truncate w-[100px] inline-block text-center"
                                             style={targetColors ? { backgroundColor: targetColors.bg, color: targetColors.text } : undefined}
-                                            title={targetInfo.label}
+                                            title={targetLabel}
                                           >
-                                            {targetInfo.label}
+                                            {targetLabel}
                                           </span>
                                         </div>
                                         {edge.comments && (
