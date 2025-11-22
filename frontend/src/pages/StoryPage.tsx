@@ -310,11 +310,7 @@ export const StoryPage = () => {
         </TabsContent>
 
         <TabsContent value="sequences">
-          <StorySequencesTab
-            storyId={storyIdNum}
-            enabledDatasetIds={enabledDatasetIds}
-            datasets={datasets}
-          />
+          <StorySequencesTab storyId={storyIdNum} />
         </TabsContent>
       </Tabs>
     </PageContainer>

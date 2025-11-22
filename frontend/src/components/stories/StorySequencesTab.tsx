@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation } from '@apollo/client/react'
 import {
   IconPlus,
@@ -17,22 +18,16 @@ import {
   DELETE_SEQUENCE,
   Sequence,
 } from '@/graphql/sequences'
-import { DataSet } from '@/graphql/datasets'
-import { SequenceEditorDialog } from './SequenceEditorDialog'
 
 interface StorySequencesTabProps {
   storyId: number
-  enabledDatasetIds: number[]
-  datasets: DataSet[]
 }
 
 export const StorySequencesTab = ({
   storyId,
-  enabledDatasetIds,
-  datasets,
 }: StorySequencesTabProps) => {
-  const [editorOpen, setEditorOpen] = useState(false)
-  const [selectedSequence, setSelectedSequence] = useState<Sequence | null>(null)
+  const navigate = useNavigate()
+  const { projectId } = useParams<{ projectId: string }>()
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [sequenceToDelete, setSequenceToDelete] = useState<Sequence | null>(null)
 
@@ -54,19 +49,11 @@ export const StorySequencesTab = ({
   })
 
   const handleNewSequence = () => {
-    setSelectedSequence(null)
-    setEditorOpen(true)
+    navigate(`/projects/${projectId}/stories/${storyId}/sequences/new`)
   }
 
   const handleEditSequence = (sequence: Sequence) => {
-    setSelectedSequence(sequence)
-    setEditorOpen(true)
-  }
-
-  const handleEditorClose = () => {
-    setEditorOpen(false)
-    setSelectedSequence(null)
-    refetch()
+    navigate(`/projects/${projectId}/stories/${storyId}/sequences/${sequence.id}`)
   }
 
   const handleOpenDelete = (sequence: Sequence, e: React.MouseEvent) => {
@@ -82,9 +69,6 @@ export const StorySequencesTab = ({
       variables: { id: sequenceToDelete.id },
     })
   }
-
-  // Filter datasets to only enabled ones
-  const storyDatasets = datasets.filter((d) => enabledDatasetIds.includes(d.id))
 
   if (loading) {
     return (
@@ -171,15 +155,6 @@ export const StorySequencesTab = ({
           )}
         </CardContent>
       </Card>
-
-      {/* Sequence Editor Dialog */}
-      <SequenceEditorDialog
-        open={editorOpen}
-        onClose={handleEditorClose}
-        storyId={storyId}
-        sequence={selectedSequence}
-        storyDatasets={storyDatasets}
-      />
 
       {/* Delete Confirmation Modal */}
       <Dialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>

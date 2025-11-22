@@ -1930,6 +1930,7 @@ import { EditProjectPage } from './pages/EditProjectPage'
 import { WorkbenchPage } from './pages/WorkbenchPage'
 import { StoriesPage } from './pages/StoriesPage'
 import { StoryPage } from './pages/StoryPage'
+import { SequenceEditorPage } from './pages/SequenceEditorPage'
 
 // Main App component with routing
 function App() {
@@ -1996,6 +1997,11 @@ function App() {
           <Route path="/projects/:projectId/stories/:storyId" element={
             <ErrorBoundary>
               <StoryPage />
+            </ErrorBoundary>
+          } />
+          <Route path="/projects/:projectId/stories/:storyId/sequences/:sequenceId" element={
+            <ErrorBoundary>
+              <SequenceEditorPage />
             </ErrorBoundary>
           } />
           <Route path="/projects/:projectId/graphs" element={
