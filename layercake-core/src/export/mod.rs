@@ -178,3 +178,175 @@ pub mod renderer {
         layer.border_color = palette.2.to_string();
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::renderer::prepare_graph_data;
+    use crate::graph::{Graph, Layer, Node};
+    use crate::plan::{
+        NotePosition, RenderConfig, RenderConfigBuiltInStyle, RenderConfigOrientation,
+        RenderTargetOptions,
+    };
+
+    fn create_node(id: &str, label: &str, layer: &str) -> Node {
+        Node {
+            id: id.to_string(),
+            label: label.to_string(),
+            layer: layer.to_string(),
+            is_partition: false,
+            belongs_to: None,
+            weight: 1,
+            comment: None,
+            dataset: None,
+        }
+    }
+
+    fn create_layer(id: &str) -> Layer {
+        Layer::new(id, id, "aabbcc", "112233", "445566")
+    }
+
+    fn create_test_config() -> RenderConfig {
+        RenderConfig {
+            contain_nodes: false,
+            orientation: RenderConfigOrientation::TB,
+            apply_layers: true,
+            built_in_styles: RenderConfigBuiltInStyle::Light,
+            target_options: RenderTargetOptions::default(),
+            add_node_comments_as_notes: false,
+            note_position: NotePosition::Left,
+            use_node_weight: true,
+            use_edge_weight: true,
+            layer_source_styles: vec![],
+        }
+    }
+
+    #[test]
+    fn test_missing_layers_are_created_with_defaults() {
+        // Graph with nodes referencing layers that don't exist
+        let graph = Graph {
+            name: "Test".to_string(),
+            nodes: vec![
+                create_node("n1", "Node 1", "defined_layer"),
+                create_node("n2", "Node 2", "missing_layer"),
+                create_node("n3", "Node 3", "another_missing"),
+            ],
+            edges: vec![],
+            layers: vec![create_layer("defined_layer")],
+            annotations: None,
+        };
+
+        let config = create_test_config();
+        let prepared = prepare_graph_data(&graph, &config);
+
+        // Should have 3 layers: 1 defined + 2 missing (created with defaults)
+        assert_eq!(prepared.layers.len(), 3);
+        assert_eq!(prepared.layer_map.len(), 3);
+
+        // Check that defined layer retains its colours
+        let defined = prepared.layer_map.get("defined_layer").unwrap();
+        assert_eq!(defined.background_color, "aabbcc");
+
+        // Check that missing layers have default colours
+        let missing1 = prepared.layer_map.get("missing_layer").unwrap();
+        assert_eq!(missing1.background_color, "222222");
+        assert_eq!(missing1.text_color, "ffffff");
+        assert_eq!(missing1.border_color, "dddddd");
+
+        let missing2 = prepared.layer_map.get("another_missing").unwrap();
+        assert_eq!(missing2.background_color, "222222");
+    }
+
+    #[test]
+    fn test_empty_layer_id_is_not_added() {
+        let graph = Graph {
+            name: "Test".to_string(),
+            nodes: vec![
+                create_node("n1", "Node 1", "layer1"),
+                create_node("n2", "Node 2", ""), // empty layer
+            ],
+            edges: vec![],
+            layers: vec![create_layer("layer1")],
+            annotations: None,
+        };
+
+        let config = create_test_config();
+        let prepared = prepare_graph_data(&graph, &config);
+
+        // Should only have 1 layer (empty string layer should not be added)
+        assert_eq!(prepared.layers.len(), 1);
+        assert!(prepared.layer_map.contains_key("layer1"));
+        assert!(!prepared.layer_map.contains_key(""));
+    }
+
+    #[test]
+    fn test_dot_render_includes_nodes_with_missing_layers() {
+        use crate::export::to_dot;
+
+        let graph = Graph {
+            name: "Test".to_string(),
+            nodes: vec![
+                create_node("n1", "Node 1", "defined_layer"),
+                create_node("n2", "Node 2", "missing_layer"),
+            ],
+            edges: vec![],
+            layers: vec![create_layer("defined_layer")],
+            annotations: None,
+        };
+
+        let mut config = create_test_config();
+        config.apply_layers = true;
+
+        let result = to_dot::render(&graph, &config).unwrap();
+
+        // Both nodes should be defined in the output
+        assert!(result.contains("n1[label="), "Node n1 should be defined");
+        assert!(result.contains("n2[label="), "Node n2 should be defined");
+
+        // Missing layer should have default styling applied
+        assert!(
+            result.contains("222222"),
+            "Default background colour should be present"
+        );
+    }
+
+    #[test]
+    fn test_mermaid_render_includes_nodes_with_missing_layers() {
+        use crate::export::to_mermaid;
+
+        let graph = Graph {
+            name: "Test".to_string(),
+            nodes: vec![
+                create_node("n1", "Node 1", "defined_layer"),
+                create_node("n2", "Node 2", "missing_layer"),
+            ],
+            edges: vec![],
+            layers: vec![create_layer("defined_layer")],
+            annotations: None,
+        };
+
+        let mut config = create_test_config();
+        config.apply_layers = true;
+
+        let result = to_mermaid::render(&graph, &config).unwrap();
+
+        // Both nodes should be defined
+        assert!(
+            result.contains("n1[\"Node 1\"]"),
+            "Node n1 should be defined"
+        );
+        assert!(
+            result.contains("n2[\"Node 2\"]"),
+            "Node n2 should be defined"
+        );
+
+        // Both class definitions should exist
+        assert!(
+            result.contains("classDef defined_layer"),
+            "defined_layer class should be present"
+        );
+        assert!(
+            result.contains("classDef missing_layer"),
+            "missing_layer class should be present"
+        );
+    }
+}
