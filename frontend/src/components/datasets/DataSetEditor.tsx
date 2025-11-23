@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation } from '@apollo/client/react'
 import {
@@ -26,6 +26,7 @@ import {
   formatFileSize,
   getFileFormatDisplayName
 } from '../../graphql/datasets'
+import { GET_PROJECT_LAYERS, ProjectLayer } from '../../graphql/layers'
 import { GraphSpreadsheetEditor, GraphData } from '../editors/GraphSpreadsheetEditor'
 import { Stack, Group } from '../layout-primitives'
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert'
@@ -87,12 +88,132 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
     errorPolicy: 'all'
   })
 
+  const {
+    data: projectLayersData,
+    loading: projectLayersLoading,
+    error: projectLayersError
+  } = useQuery(GET_PROJECT_LAYERS, {
+    variables: { projectId: parseInt(projectId || '0') },
+    skip: !projectId
+  })
+
   // Mutations
   const [updateDataSet, { loading: updateLoading }] = useMutation(UPDATE_DATASOURCE)
   const [reprocessDataSet, { loading: reprocessLoading }] = useMutation(REPROCESS_DATASOURCE)
   const [updateDataSetGraphData] = useMutation(UPDATE_DATASOURCE_GRAPH_DATA)
 
   const dataSource: DataSet | null = (dataSourceData as any)?.dataSet || null
+  const projectPaletteLayers: ProjectLayer[] = useMemo(
+    () =>
+      ((projectLayersData as any)?.projectLayers as ProjectLayer[] | undefined) ?? [],
+    [projectLayersData]
+  )
+
+  const originalDatasetLayers = useMemo(() => {
+    if (!dataSource?.graphJson) {
+      return []
+    }
+    try {
+      const parsed = JSON.parse(dataSource.graphJson)
+      return Array.isArray(parsed.layers) ? parsed.layers : []
+    } catch (error) {
+      console.error('Failed to parse dataset layers', error)
+      return []
+    }
+  }, [dataSource])
+
+  const resolvedGraphData = useMemo((): GraphData | null => {
+    if (!dataSource?.graphJson) {
+      return null
+    }
+
+    const ensureColor = (value?: string | null, fallback = '#f7f7f8') => {
+      if (!value) {
+        return fallback
+      }
+      return value.startsWith('#') ? value : `#${value}`
+    }
+
+    try {
+      const parsed = JSON.parse(dataSource.graphJson)
+      const nodesArray = Array.isArray(parsed.nodes) ? parsed.nodes : []
+      const edgesArray = Array.isArray(parsed.edges) ? parsed.edges : []
+
+      const nodes = nodesArray.map((node: any) => ({
+        id: node.id,
+        label: node.label || '',
+        layer: node.layer,
+        weight: node.weight,
+        is_partition: node.is_partition,
+        belongs_to: node.belongs_to,
+        comment: node.comment,
+        ...node
+      }))
+
+      const edges = edgesArray.map((edge: any) => ({
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        label: edge.label || '',
+        layer: edge.layer,
+        weight: edge.weight,
+        comment: edge.comment,
+        ...edge
+      }))
+
+      const referencedLayerIds = new Set<string>()
+      nodes.forEach(node => {
+        if (node.layer) {
+          referencedLayerIds.add(node.layer)
+        }
+      })
+      edges.forEach(edge => {
+        if (edge.layer) {
+          referencedLayerIds.add(edge.layer)
+        }
+      })
+
+      const paletteMap = new Map<
+        string,
+        { label: string; background_color: string; text_color: string; border_color: string }
+      >()
+
+      projectPaletteLayers.forEach(layer => {
+        const entry = {
+          label: layer.name || layer.layerId,
+          background_color: ensureColor(layer.backgroundColor, '#f7f7f8'),
+          text_color: ensureColor(layer.textColor, '#0f172a'),
+          border_color: ensureColor(layer.borderColor, '#dddddd')
+        }
+        paletteMap.set(layer.layerId, entry)
+        layer.aliases?.forEach(alias => {
+          paletteMap.set(alias.aliasLayerId, entry)
+        })
+      })
+
+      const resolvedLayers = Array.from(referencedLayerIds)
+        .sort()
+        .map(layerId => {
+          const resolved = paletteMap.get(layerId)
+          return {
+            id: layerId,
+            label: resolved?.label ?? layerId,
+            background_color: resolved?.background_color ?? '#f7f7f8',
+            text_color: resolved?.text_color ?? '#0f172a',
+            border_color: resolved?.border_color ?? '#dddddd'
+          }
+        })
+
+      return {
+        nodes,
+        edges,
+        layers: resolvedLayers
+      }
+    } catch (error) {
+      console.error('Failed to parse dataset graph JSON', error)
+      return null
+    }
+  }, [dataSource, projectPaletteLayers])
 
   // Form for editing DataSet metadata
   const form = useForm<{name: string; description: string}>({
@@ -221,10 +342,15 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
     if (!dataSource) return
 
     try {
+      const graphJson = JSON.stringify({
+        nodes: graphData.nodes,
+        edges: graphData.edges,
+        layers: originalDatasetLayers
+      })
       await updateDataSetGraphData({
         variables: {
           id: dataSource.id,
-          graphJson: JSON.stringify(graphData)
+          graphJson
         }
       })
       await refetchDataSet()
@@ -505,27 +631,48 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
         <TabsContent value="edit">
           <Card className="border mt-4">
             <CardContent className="pt-6">
-              {dataSource.status === 'active' && (() => {
-                try {
-                  const graphData: GraphData = JSON.parse(dataSource.graphJson);
-                  return (
-                    <GraphSpreadsheetEditor
-                      graphData={graphData}
-                      onSave={handleSaveGraphData}
-                    />
-                  );
-                } catch (error) {
-                  return (
+              {dataSource.status === 'active' ? (
+                <>
+                  {projectLayersLoading && (
+                    <Stack align="center" className="py-12">
+                      <Spinner size="lg" />
+                      <p className="text-sm text-muted-foreground">Loading layer palette…</p>
+                    </Stack>
+                  )}
+                  {projectLayersError && (
                     <Alert variant="destructive">
                       <IconAlertCircle className="h-4 w-4" />
-                      <AlertTitle>Invalid Graph Data</AlertTitle>
-                      <AlertDescription>
-                        Failed to parse graph JSON data. Please check the data format in the "Graph Data" tab.
-                      </AlertDescription>
+                      <AlertTitle>Failed to load palette</AlertTitle>
+                      <AlertDescription>{projectLayersError.message}</AlertDescription>
                     </Alert>
-                  );
-                }
-              })()}
+                  )}
+                  {!projectLayersLoading && !projectLayersError && (
+                    resolvedGraphData ? (
+                      <GraphSpreadsheetEditor
+                        graphData={resolvedGraphData}
+                        onSave={handleSaveGraphData}
+                        layersReadOnly
+                      />
+                    ) : (
+                      <Alert variant="destructive">
+                        <IconAlertCircle className="h-4 w-4" />
+                        <AlertTitle>Invalid Graph Data</AlertTitle>
+                        <AlertDescription>
+                          Failed to parse graph JSON data. Please check the data format in the "Graph Data" tab.
+                        </AlertDescription>
+                      </Alert>
+                    )
+                  )}
+                </>
+              ) : (
+                <Alert>
+                  <IconAlertCircle className="h-4 w-4" />
+                  <AlertTitle>Dataset editing disabled</AlertTitle>
+                  <AlertDescription>
+                    Graph data can only be edited when the dataset status is active.
+                  </AlertDescription>
+                </Alert>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
