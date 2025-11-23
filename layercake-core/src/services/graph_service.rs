@@ -682,10 +682,15 @@ impl GraphService {
     ) -> GraphResult<project_layers::Model> {
         use sea_orm::{ActiveModelTrait, Set};
 
-        let existing = project_layers::Entity::find()
+        let mut existing_query = project_layers::Entity::find()
             .filter(project_layers::Column::ProjectId.eq(project_id))
-            .filter(project_layers::Column::LayerId.eq(layer_id.clone()))
-            .filter(project_layers::Column::SourceDatasetId.eq(source_dataset_id))
+            .filter(project_layers::Column::LayerId.eq(layer_id.clone()));
+        existing_query = if let Some(dataset_id) = source_dataset_id {
+            existing_query.filter(project_layers::Column::SourceDatasetId.eq(dataset_id))
+        } else {
+            existing_query.filter(project_layers::Column::SourceDatasetId.is_null())
+        };
+        let existing = existing_query
             .one(&self.db)
             .await
             .map_err(GraphError::Database)?;
@@ -730,13 +735,15 @@ impl GraphService {
         use crate::database::entities::layer_aliases;
 
         // Find the layer first
-        let layer = project_layers::Entity::find()
+        let mut query = project_layers::Entity::find()
             .filter(project_layers::Column::ProjectId.eq(project_id))
-            .filter(project_layers::Column::LayerId.eq(layer_id.clone()))
-            .filter(project_layers::Column::SourceDatasetId.eq(source_dataset_id))
-            .one(&self.db)
-            .await
-            .map_err(GraphError::Database)?;
+            .filter(project_layers::Column::LayerId.eq(layer_id.clone()));
+        query = if let Some(dataset_id) = source_dataset_id {
+            query.filter(project_layers::Column::SourceDatasetId.eq(dataset_id))
+        } else {
+            query.filter(project_layers::Column::SourceDatasetId.is_null())
+        };
+        let layer = query.one(&self.db).await.map_err(GraphError::Database)?;
 
         if let Some(layer_model) = layer {
             // Delete all aliases pointing to this layer
@@ -802,14 +809,20 @@ impl GraphService {
     pub async fn missing_layers(&self, project_id: i32) -> GraphResult<Vec<String>> {
         use crate::database::entities::graphs::Entity as Graphs;
 
-        // Get ALL project layers (enabled and disabled) to build the known set
-        // A layer is only "missing" if it doesn't exist at all, not if it's disabled
-        let all_layers = project_layers::Entity::find()
+        // Get enabled project layers to build the known set. Disabled entries should be treated
+        // as missing so that palette coverage reflects the active configuration.
+        let enabled_layers = project_layers::Entity::find()
             .filter(project_layers::Column::ProjectId.eq(project_id))
+            .filter(project_layers::Column::Enabled.eq(true))
             .all(&self.db)
             .await
             .map_err(GraphError::Database)?;
-        let mut known: HashSet<String> = all_layers.into_iter().map(|l| l.layer_id).collect();
+        let mut enabled_layer_ids = HashSet::new();
+        let mut known: HashSet<String> = HashSet::new();
+        for layer in enabled_layers {
+            enabled_layer_ids.insert(layer.id);
+            known.insert(layer.layer_id);
+        }
 
         // Also include aliased layer IDs in the known set
         // An aliased layer is not "missing" since it resolves to an existing layer
@@ -819,7 +832,9 @@ impl GraphService {
             .await
             .map_err(GraphError::Database)?;
         for alias in aliases {
-            known.insert(alias.alias_layer_id);
+            if enabled_layer_ids.contains(&alias.target_layer_id) {
+                known.insert(alias.alias_layer_id);
+            }
         }
 
         let graph_ids: Vec<i32> = Graphs::find()
