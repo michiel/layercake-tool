@@ -2,12 +2,16 @@ import { useMemo } from 'react'
 import { useQuery } from '@apollo/client/react'
 import { MermaidPreviewDialog } from '@/components/visualization/MermaidPreviewDialog'
 import { GET_DATASOURCES, DataSet } from '@/graphql/datasets'
+import { GET_PROJECT_LAYERS, ProjectLayer } from '@/graphql/layers'
 import { Sequence, SequenceEdgeRef } from '@/graphql/sequences'
 
 interface GraphNode {
   id: string
   label?: string
   name?: string
+  layer?: string
+  belongs_to?: string
+  is_partition?: boolean | string
   attrs?: Record<string, any>
 }
 
@@ -54,6 +58,13 @@ export const SequenceDiagramDialog = ({
   })
   const allDatasets: DataSet[] = (datasetsData as any)?.dataSets || []
 
+  // Fetch project layers for styling
+  const { data: layersData } = useQuery(GET_PROJECT_LAYERS, {
+    variables: { projectId },
+    skip: !projectId || !open,
+  })
+  const projectLayers: ProjectLayer[] = (layersData as any)?.projectLayers || []
+
   // Parse graph data from enabled datasets
   const datasetGraphData = useMemo(() => {
     if (!sequence) return {}
@@ -74,6 +85,29 @@ export const SequenceDiagramDialog = ({
     }
     return result
   }, [allDatasets, sequence])
+
+  // Helper to get layer colors
+  const getLayerColors = (layerId?: string): { bg: string; text: string } | null => {
+    if (!layerId) return null
+    const layer = projectLayers.find((l) => l.layerId === layerId && l.enabled)
+    if (!layer) return null
+    return {
+      bg: layer.backgroundColor || '#e5e7eb',
+      text: layer.textColor || '#000000',
+    }
+  }
+
+  // Helper to find a node across all enabled datasets
+  const findNode = (nodeId: string): GraphNode | null => {
+    if (!sequence) return null
+    for (const dsId of sequence.enabledDatasetIds) {
+      const graphData = datasetGraphData[dsId]
+      if (!graphData) continue
+      const node = graphData.nodes.find((n) => n.id === nodeId)
+      if (node) return node
+    }
+    return null
+  }
 
   // Helper to get node label - searches across all enabled datasets
   const getNodeLabel = (nodeId: string): string => {
@@ -111,29 +145,62 @@ export const SequenceDiagramDialog = ({
 
     const participantOrder: string[] = []
     const participantLabels: Map<string, string> = new Map()
+    const participantPartitions: Map<string, string | null> = new Map()
 
     // First pass: collect participants in order of first appearance
     for (const ref of sequence.edgeOrder) {
       const edgeInfo = getEdgeInfo(ref)
       if (!edgeInfo) continue
 
-      if (!participantLabels.has(edgeInfo.source)) {
-        participantOrder.push(edgeInfo.source)
-        participantLabels.set(edgeInfo.source, getNodeLabel(edgeInfo.source))
+      for (const nodeId of [edgeInfo.source, edgeInfo.target]) {
+        if (!participantLabels.has(nodeId)) {
+          participantOrder.push(nodeId)
+          participantLabels.set(nodeId, getNodeLabel(nodeId))
+          // Get partition (belongs_to) for this node
+          const node = findNode(nodeId)
+          const belongsTo = node?.belongs_to || node?.attrs?.belongs_to || null
+          participantPartitions.set(nodeId, belongsTo)
+        }
       }
-      if (!participantLabels.has(edgeInfo.target)) {
-        participantOrder.push(edgeInfo.target)
-        participantLabels.set(edgeInfo.target, getNodeLabel(edgeInfo.target))
+    }
+
+    // Group participants by partition
+    const partitionGroups: Map<string | null, string[]> = new Map()
+    for (const nodeId of participantOrder) {
+      const partition = participantPartitions.get(nodeId) || null
+      if (!partitionGroups.has(partition)) {
+        partitionGroups.set(partition, [])
       }
+      partitionGroups.get(partition)!.push(nodeId)
     }
 
     const lines: string[] = ['sequenceDiagram']
 
-    // Add participant declarations
-    for (const nodeId of participantOrder) {
-      const label = participantLabels.get(nodeId) || nodeId
-      const participantId = makeParticipantId(nodeId)
-      lines.push(`    participant ${participantId} as "${escapeLabel(label)}"`)
+    // Add participant declarations, grouped by partition boxes
+    for (const [partition, nodeIds] of partitionGroups) {
+      if (partition) {
+        // Get partition node info for label and layer color
+        const partitionNode = findNode(partition)
+        const partitionLabel = partitionNode?.label || partitionNode?.name || partition
+        const partitionLayer = partitionNode?.layer || partitionNode?.attrs?.layer
+        const layerColors = getLayerColors(partitionLayer)
+        const bgColor = layerColors?.bg || 'transparent'
+
+        lines.push(`    box ${bgColor} ${escapeLabel(partitionLabel)}`)
+        for (const nodeId of nodeIds) {
+          const label = participantLabels.get(nodeId) || nodeId
+          const participantId = makeParticipantId(nodeId)
+          lines.push(`        participant ${participantId} as "${escapeLabel(label)}"`)
+        }
+        lines.push(`    end`)
+      } else {
+        // Nodes without partition - no box
+        for (const nodeId of nodeIds) {
+          const label = participantLabels.get(nodeId) || nodeId
+          const participantId = makeParticipantId(nodeId)
+          lines.push(`    participant ${participantId} as "${escapeLabel(label)}"`)
+        }
+      }
     }
 
     // Add edges as messages
@@ -167,7 +234,7 @@ export const SequenceDiagramDialog = ({
     }
 
     return lines.join('\n')
-  }, [sequence, datasetGraphData])
+  }, [sequence, datasetGraphData, projectLayers])
 
   return (
     <MermaidPreviewDialog

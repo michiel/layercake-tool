@@ -71,6 +71,8 @@ interface GraphNode {
   label?: string
   name?: string
   layer?: string
+  belongs_to?: string
+  is_partition?: boolean | string
   attrs?: Record<string, any>
 }
 
@@ -312,6 +314,17 @@ export const SequenceEditorPage = () => {
     }
   }
 
+  // Helper to find a node across all enabled datasets
+  const findNode = useCallback((nodeId: string): GraphNode | null => {
+    for (const dsId of enabledDatasetIds) {
+      const graphData = datasetGraphData[dsId]
+      if (!graphData) continue
+      const node = graphData.nodes.find((n) => n.id === nodeId)
+      if (node) return node
+    }
+    return null
+  }, [enabledDatasetIds, datasetGraphData])
+
   // Generate Mermaid sequence diagram
   const mermaidDiagram = useMemo(() => {
     if (!edgeOrder.length) {
@@ -325,6 +338,7 @@ export const SequenceEditorPage = () => {
 
     const participantOrder: string[] = []
     const participantLabels: Map<string, string> = new Map()
+    const participantPartitions: Map<string, string | null> = new Map()
 
     // First pass: collect participants in order of first appearance
     for (const ref of edgeOrder) {
@@ -332,23 +346,55 @@ export const SequenceEditorPage = () => {
       const edge = graphData?.edges.find((e) => e.id === ref.edgeId)
       if (!edge) continue
 
-      if (!participantLabels.has(edge.source)) {
-        participantOrder.push(edge.source)
-        participantLabels.set(edge.source, getNodeInfo(edge.source).label)
+      for (const nodeId of [edge.source, edge.target]) {
+        if (!participantLabels.has(nodeId)) {
+          participantOrder.push(nodeId)
+          participantLabels.set(nodeId, getNodeInfo(nodeId).label)
+          // Get partition (belongs_to) for this node
+          const node = findNode(nodeId)
+          const belongsTo = node?.belongs_to || node?.attrs?.belongs_to || null
+          participantPartitions.set(nodeId, belongsTo)
+        }
       }
-      if (!participantLabels.has(edge.target)) {
-        participantOrder.push(edge.target)
-        participantLabels.set(edge.target, getNodeInfo(edge.target).label)
+    }
+
+    // Group participants by partition
+    const partitionGroups: Map<string | null, string[]> = new Map()
+    for (const nodeId of participantOrder) {
+      const partition = participantPartitions.get(nodeId) || null
+      if (!partitionGroups.has(partition)) {
+        partitionGroups.set(partition, [])
       }
+      partitionGroups.get(partition)!.push(nodeId)
     }
 
     const lines: string[] = ['sequenceDiagram']
 
-    // Add participant declarations
-    for (const nodeId of participantOrder) {
-      const label = participantLabels.get(nodeId) || nodeId
-      const participantId = makeParticipantId(nodeId)
-      lines.push(`    participant ${participantId} as "${escapeLabel(label)}"`)
+    // Add participant declarations, grouped by partition boxes
+    for (const [partition, nodeIds] of partitionGroups) {
+      if (partition) {
+        // Get partition node info for label and layer color
+        const partitionNode = findNode(partition)
+        const partitionLabel = partitionNode?.label || partitionNode?.name || partition
+        const partitionLayer = partitionNode?.layer || partitionNode?.attrs?.layer
+        const layerColors = getLayerColors(partitionLayer)
+        const bgColor = layerColors?.bg || 'transparent'
+
+        lines.push(`    box ${bgColor} ${escapeLabel(partitionLabel)}`)
+        for (const nodeId of nodeIds) {
+          const label = participantLabels.get(nodeId) || nodeId
+          const participantId = makeParticipantId(nodeId)
+          lines.push(`        participant ${participantId} as "${escapeLabel(label)}"`)
+        }
+        lines.push(`    end`)
+      } else {
+        // Nodes without partition - no box
+        for (const nodeId of nodeIds) {
+          const label = participantLabels.get(nodeId) || nodeId
+          const participantId = makeParticipantId(nodeId)
+          lines.push(`    participant ${participantId} as "${escapeLabel(label)}"`)
+        }
+      }
     }
 
     // Add edges as messages
@@ -383,7 +429,7 @@ export const SequenceEditorPage = () => {
     }
 
     return lines.join('\n')
-  }, [edgeOrder, datasetGraphData, getNodeInfo])
+  }, [edgeOrder, datasetGraphData, getNodeInfo, findNode, projectLayers])
 
   // Mutations
   const [createSequence, { loading: createLoading }] = useMutation(CREATE_SEQUENCE, {
