@@ -142,6 +142,12 @@ pub fn apply_render_config(
 
     let participant_groups =
         build_participant_groups(&base.story.name, &participants, &render_config);
+    let first_participant_alias = participants.first().map(|p| p.alias.clone());
+    let last_participant_alias = if participants.len() > 1 {
+        participants.last().map(|p| p.alias.clone())
+    } else {
+        first_participant_alias.clone()
+    };
 
     SequenceRenderContext {
         config: render_config.clone(),
@@ -155,6 +161,8 @@ pub fn apply_render_config(
         participant_groups,
         graph_data: base.graph_data.clone(),
         layers: base.layers.clone(),
+        first_participant_alias,
+        last_participant_alias,
     }
 }
 

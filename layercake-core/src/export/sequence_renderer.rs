@@ -13,6 +13,8 @@ pub struct SequenceRenderContext {
     pub participant_groups: Vec<SequenceParticipantGroup>,
     pub graph_data: SequenceGraphData,
     pub layers: Vec<SequenceLayer>,
+    pub first_participant_alias: Option<String>,
+    pub last_participant_alias: Option<String>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Default)]

@@ -20,7 +20,9 @@ end
 {{#unless (is_empty sequence.sequences)}}
   {{#each sequence.sequences}}
 %% Sequence: {{name}}
-== {{name}} ==
+    {{#if @root.sequence.firstParticipantAlias}}
+    Note over {{@root.sequence.firstParticipantAlias}},{{@root.sequence.lastParticipantAlias}}: {{name}}
+    {{/if}}
     {{#each steps}}
       {{#if ../../config.showNotes}}
         {{#if note}}
