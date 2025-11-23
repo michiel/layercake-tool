@@ -21,7 +21,7 @@ participant {{alias}} as "{{label}}"
   {{#each sequence.sequences}}
 == {{name}} ==
     {{#each steps}}
-      {{#if ../../config.showNotes}}
+      {{#if @root.sequence.config.showNotes}}
         {{#if note}}
           {{#if (stringeq notePosition "source")}}
 note over {{source.alias}}

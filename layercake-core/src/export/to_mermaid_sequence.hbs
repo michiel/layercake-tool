@@ -24,7 +24,7 @@ end
     Note over {{@root.sequence.firstParticipantAlias}},{{@root.sequence.lastParticipantAlias}}: {{name}}
     {{/if}}
     {{#each steps}}
-      {{#if ../../config.showNotes}}
+      {{#if @root.sequence.config.showNotes}}
         {{#if note}}
           {{#if (stringeq notePosition "source")}}
     Note over {{source.alias}}: {{note}}
