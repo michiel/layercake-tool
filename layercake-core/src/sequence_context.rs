@@ -86,7 +86,9 @@ pub async fn build_story_context(
     );
 
     let mut participants: Vec<SequenceParticipant> = participants_map.values().cloned().collect();
-    let graph_data = build_sequence_graph_data(&dataset_contexts);
+    let mut graph_data = build_sequence_graph_data(&dataset_contexts);
+    graph_data.layers = build_project_layer_entries(&project_layers_list);
+
     if participants.is_empty() && !graph_data.nodes.is_empty() {
         participants = graph_data
             .nodes
@@ -106,8 +108,7 @@ pub async fn build_story_context(
             .collect();
     }
 
-    let mut layer_entries: Vec<SequenceLayer> = graph_data.layers.clone();
-    layer_entries.extend(build_project_layer_entries(&project_layers_list));
+    let layer_entries = graph_data.layers.clone();
 
     Ok(SequenceStoryContext {
         story: story_summary,
@@ -190,7 +191,6 @@ pub struct ParsedDatasetContext {
     pub name: String,
     pub nodes: IndexMap<String, SequenceNode>,
     pub edges: IndexMap<String, SequenceEdge>,
-    pub layers: Vec<SequenceLayer>,
     pub partitions: HashMap<String, String>,
 }
 
@@ -215,12 +215,6 @@ fn parse_dataset_context(model: &data_sets::Model) -> ParsedDatasetContext {
         .and_then(|v| v.as_array())
         .cloned()
         .unwrap_or_default();
-    let layers = parsed
-        .get("layers")
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
-
     let mut nodes_map: IndexMap<String, SequenceNode> = IndexMap::new();
     let mut partitions: HashMap<String, String> = HashMap::new();
 
@@ -300,43 +294,13 @@ fn parse_dataset_context(model: &data_sets::Model) -> ParsedDatasetContext {
         );
     }
 
-    let mut layer_entries = Vec::new();
-    for layer in layers {
-        if let Some(id) = value_to_string(layer.get("id")) {
-            let name = value_to_string(layer.get("name")).unwrap_or_else(|| id.clone());
-            let background = normalize_color(value_to_string(layer.get("background_color")));
-            let text = normalize_color(value_to_string(layer.get("text_color")));
-            let border = normalize_color(value_to_string(layer.get("border_color")));
-            layer_entries.push(SequenceLayer {
-                id,
-                name,
-                background_color: background,
-                text_color: text,
-                border_color: border,
-                dataset_id: Some(model.id),
-                dataset_name: Some(model.name.clone()),
-            });
-        }
-    }
-
     ParsedDatasetContext {
         dataset_id: model.id,
         name: model.name.clone(),
         nodes: nodes_map,
         edges: edges_map,
-        layers: layer_entries,
         partitions,
     }
-}
-
-fn normalize_color(value: Option<String>) -> Option<String> {
-    value.map(|color| {
-        if color.starts_with('#') {
-            color
-        } else {
-            format!("#{}", color)
-        }
-    })
 }
 
 fn extract_label(node: &Value, default_id: &str) -> String {
@@ -372,26 +336,24 @@ fn build_sequence_graph_data(
     let mut datasets = Vec::new();
     let mut nodes = Vec::new();
     let mut edges = Vec::new();
-    let mut layers = Vec::new();
 
     for ctx in dataset_contexts.values() {
         nodes.extend(ctx.nodes.values().cloned());
         edges.extend(ctx.edges.values().cloned());
-        layers.extend(ctx.layers.clone());
 
         datasets.push(SequenceDataset {
             id: ctx.dataset_id,
             name: ctx.name.clone(),
             nodes: ctx.nodes.values().cloned().collect(),
             edges: ctx.edges.values().cloned().collect(),
-            layers: ctx.layers.clone(),
+            layers: Vec::new(),
         });
     }
 
     SequenceGraphData {
         nodes,
         edges,
-        layers: layers.clone(),
+        layers: Vec::new(),
         datasets,
     }
 }

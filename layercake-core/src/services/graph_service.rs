@@ -311,59 +311,28 @@ impl GraphService {
             .map_err(GraphError::Database)?;
 
         // Fetch project-wide layers; fall back to legacy graph-level layers
-        let graph_layers: Vec<Layer> = {
-            let palette = self
-                .get_project_layers_palette(graph_meta.project_id)
-                .await?;
-            if !palette.is_empty() {
-                // Strip # prefix for export template compatibility (templates add # themselves)
-                palette
-                    .into_iter()
-                    .map(|layer| Layer {
-                        id: layer.id,
-                        label: layer.label,
-                        background_color: layer
-                            .background_color
-                            .trim_start_matches('#')
-                            .to_string(),
-                        text_color: layer.text_color.trim_start_matches('#').to_string(),
-                        border_color: layer.border_color.trim_start_matches('#').to_string(),
-                        dataset: layer.dataset,
-                    })
-                    .collect()
-            } else {
-                let db_layers = Layers::find()
-                    .filter(graph_layers::Column::GraphId.eq(graph_id))
-                    .all(&self.db)
-                    .await
-                    .map_err(GraphError::Database)?;
+        let palette_layers = self
+            .get_project_layers_palette(graph_meta.project_id)
+            .await?;
 
-                // Strip # prefix for export template compatibility (templates add # themselves)
-                db_layers
-                    .into_iter()
-                    .map(|db_layer| Layer {
-                        id: db_layer.layer_id,
-                        label: db_layer.name,
-                        background_color: db_layer
-                            .background_color
-                            .unwrap_or_else(|| "FFFFFF".to_string())
-                            .trim_start_matches('#')
-                            .to_string(),
-                        text_color: db_layer
-                            .text_color
-                            .unwrap_or_else(|| "000000".to_string())
-                            .trim_start_matches('#')
-                            .to_string(),
-                        border_color: db_layer
-                            .border_color
-                            .unwrap_or_else(|| "000000".to_string())
-                            .trim_start_matches('#')
-                            .to_string(),
-                        dataset: db_layer.dataset_id,
-                    })
-                    .collect()
-            }
-        };
+        if palette_layers.is_empty() {
+            tracing::warn!(
+                "Project {} has no enabled palette layers; exports will fall back to neutral styling",
+                graph_meta.project_id
+            );
+        }
+
+        let graph_layers: Vec<Layer> = palette_layers
+            .into_iter()
+            .map(|layer| Layer {
+                id: layer.id,
+                label: layer.label,
+                background_color: sanitize_hex(&layer.background_color, "FFFFFF"),
+                text_color: sanitize_hex(&layer.text_color, "000000"),
+                border_color: sanitize_hex(&layer.border_color, "000000"),
+                dataset: layer.dataset,
+            })
+            .collect();
 
         // Track data quality issues for logging
         let mut nodes_missing_label = 0;
@@ -1017,4 +986,14 @@ impl GraphService {
 
         Ok(layers)
     }
+}
+
+fn sanitize_hex(value: &str, fallback: &str) -> String {
+    let trimmed = value.trim();
+    let source = if trimmed.is_empty() {
+        fallback
+    } else {
+        trimmed
+    };
+    source.trim_start_matches('#').to_string()
 }
