@@ -144,6 +144,20 @@ export const SequenceDiagramDialog = ({
 
       const sourceId = makeParticipantId(edgeInfo.source)
       const targetId = makeParticipantId(edgeInfo.target)
+
+      // Add note before the connection if present
+      if (ref.note) {
+        const noteText = escapeLabel(ref.note)
+        const position = ref.notePosition || 'Both'
+        if (position === 'Both') {
+          lines.push(`    Note over ${sourceId},${targetId}: ${noteText}`)
+        } else if (position === 'Source') {
+          lines.push(`    Note over ${sourceId}: ${noteText}`)
+        } else if (position === 'Target') {
+          lines.push(`    Note over ${targetId}: ${noteText}`)
+        }
+      }
+
       const orderNum = i + 1
       const parts: string[] = [String(orderNum)]
       if (edgeInfo.label) parts.push(escapeLabel(edgeInfo.label))

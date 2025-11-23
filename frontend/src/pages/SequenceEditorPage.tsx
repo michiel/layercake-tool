@@ -143,7 +143,7 @@ export const SequenceEditorPage = () => {
   })
   const sequence: Sequence | null = (sequenceData as any)?.sequence || null
 
-  const { data: datasetsData, loading: datasetsLoading } = useQuery(GET_DATASOURCES, {
+  const { data: datasetsData, loading: datasetsLoading, refetch: refetchDatasets } = useQuery(GET_DATASOURCES, {
     variables: { projectId: projectIdNum },
     skip: !projectIdNum,
   })
@@ -360,6 +360,20 @@ export const SequenceEditorPage = () => {
 
       const sourceId = makeParticipantId(edge.source)
       const targetId = makeParticipantId(edge.target)
+
+      // Add note before the connection if present
+      if (ref.note) {
+        const noteText = escapeLabel(ref.note)
+        const position = ref.notePosition || 'Both'
+        if (position === 'Both') {
+          lines.push(`    Note over ${sourceId},${targetId}: ${noteText}`)
+        } else if (position === 'Source') {
+          lines.push(`    Note over ${sourceId}: ${noteText}`)
+        } else if (position === 'Target') {
+          lines.push(`    Note over ${targetId}: ${noteText}`)
+        }
+      }
+
       const orderNum = i + 1
       const parts: string[] = [String(orderNum)]
       if (edge.label) parts.push(escapeLabel(edge.label))
@@ -1034,8 +1048,7 @@ export const SequenceEditorPage = () => {
               updateEdgeNote(editingEdgeIndex, updates.note, updates.notePosition)
             }}
             onGraphUpdate={() => {
-              // Refetch datasets to get updated graph data
-              // The Apollo cache should handle this automatically
+              refetchDatasets()
             }}
           />
         )
