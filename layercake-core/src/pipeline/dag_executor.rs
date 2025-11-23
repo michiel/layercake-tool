@@ -519,40 +519,6 @@ impl DagExecutor {
                     }
                 }
 
-                // Extract layers (note: it's "graph_layers" in JSON format from data_sets)
-                // Try both "graph_layers" and "layers" for compatibility
-                let layers_array = graph_data
-                    .get("graph_layers")
-                    .or_else(|| graph_data.get("layers"))
-                    .and_then(|v| v.as_array());
-
-                if let Some(layers_array) = layers_array {
-                    for layer_val in layers_array {
-                        let layer = crate::graph::Layer {
-                            id: layer_val["id"].as_str().unwrap_or("").to_string(),
-                            label: layer_val["label"].as_str().unwrap_or("").to_string(),
-                            // Strip # prefix for template compatibility (templates add # themselves)
-                            background_color: layer_val["background_color"]
-                                .as_str()
-                                .unwrap_or("FFFFFF")
-                                .trim_start_matches('#')
-                                .to_string(),
-                            text_color: layer_val["text_color"]
-                                .as_str()
-                                .unwrap_or("000000")
-                                .trim_start_matches('#')
-                                .to_string(),
-                            border_color: layer_val["border_color"]
-                                .as_str()
-                                .unwrap_or("CCCCCC")
-                                .trim_start_matches('#')
-                                .to_string(),
-                            dataset: None,
-                        };
-                        graph.layers.push(layer);
-                    }
-                }
-
                 if let Some(ctx) = context.as_deref_mut() {
                     ctx.set_dataset_graph(data_set_id, graph.clone());
                 }

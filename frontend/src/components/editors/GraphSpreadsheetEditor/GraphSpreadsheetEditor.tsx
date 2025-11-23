@@ -49,12 +49,14 @@ interface GraphSpreadsheetEditorProps {
   graphData: GraphData;
   onSave: (graphData: GraphData) => Promise<void>;
   readOnly?: boolean;
+  layersReadOnly?: boolean;
 }
 
 export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
   graphData,
   onSave,
-  readOnly = false
+  readOnly = false,
+  layersReadOnly = false
 }) => {
   const [activeTab, setActiveTab] = useState<string>('nodes');
   const [localNodes, setLocalNodes] = useState<GraphNode[]>(graphData.nodes || []);
@@ -62,6 +64,7 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
   const [localLayers, setLocalLayers] = useState<GraphLayer[]>(graphData.layers || []);
   const [hasChanges, setHasChanges] = useState(false);
   const [saving, setSaving] = useState(false);
+  const layerEditingDisabled = readOnly || layersReadOnly;
 
   const nodeColumnDefs = ['id', 'label', 'layer', 'weight', 'is_partition', 'belongs_to', 'comment'];
   const edgeColumnDefs = ['id', 'source', 'target', 'label', 'layer', 'weight', 'comment'];
@@ -92,6 +95,9 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
   };
 
   const handleLayerChange = (rowIdx: number, field: string, value: string) => {
+    if (layerEditingDisabled) {
+      return;
+    }
     setLocalLayers(prevLayers => {
       const newLayers = [...prevLayers];
       newLayers[rowIdx] = {
@@ -278,6 +284,9 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
   };
 
   const handlePasteLayers = async () => {
+    if (layerEditingDisabled) {
+      return;
+    }
     if (!confirmDestructiveAction('layer records', localLayers.length)) {
       return;
     }
@@ -328,6 +337,9 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
   };
 
   const handleClearLayers = () => {
+    if (layerEditingDisabled) {
+      return;
+    }
     if (!confirmDestructiveAction('layer records', localLayers.length)) {
       return;
     }
@@ -414,22 +426,26 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
                     <IconClipboardCopy className="mr-2 h-4 w-4" />
                     Copy Layers
                   </Button>
-                  <Button
-                    onClick={handlePasteLayers}
-                    variant="secondary"
-                    size="sm"
-                  >
-                    <IconClipboard className="mr-2 h-4 w-4" />
-                    Paste Layers
-                  </Button>
-                  <Button
-                    onClick={handleClearLayers}
-                    variant="destructive"
-                    size="sm"
-                  >
-                    <IconTrash className="mr-2 h-4 w-4" />
-                    Clear Layers
-                  </Button>
+                  {!layersReadOnly && (
+                    <>
+                      <Button
+                        onClick={handlePasteLayers}
+                        variant="secondary"
+                        size="sm"
+                      >
+                        <IconClipboard className="mr-2 h-4 w-4" />
+                        Paste Layers
+                      </Button>
+                      <Button
+                        onClick={handleClearLayers}
+                        variant="destructive"
+                        size="sm"
+                      >
+                        <IconTrash className="mr-2 h-4 w-4" />
+                        Clear Layers
+                      </Button>
+                    </>
+                  )}
                 </>
               )}
               <Button
@@ -547,7 +563,7 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
                   <TableRow key={rowIdx}>
                     {layerColumnDefs.map(col => (
                       <TableCell key={col}>
-                        {readOnly ? (
+                        {layerEditingDisabled ? (
                           <p className="text-sm">{String(layer[col] ?? '')}</p>
                         ) : (
                           <Input

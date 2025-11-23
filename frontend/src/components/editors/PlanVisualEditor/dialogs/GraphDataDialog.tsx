@@ -328,6 +328,7 @@ export const GraphDataDialog: React.FC<GraphDataDialogProps> = ({
                   graphData={graphData}
                   onSave={handleSave}
                   readOnly={false}
+                  layersReadOnly
                 />
               );
             })()}
