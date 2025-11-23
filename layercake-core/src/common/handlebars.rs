@@ -95,6 +95,19 @@ pub fn get_handlebars() -> Handlebars<'static> {
     });
     handlebars.register_helper("sanitize_id", Box::new(sanitize_id));
 
+    handlebars_helper!(layer_has_nodes: |nodes: Value, layer_id: String| {
+        match nodes {
+            Value::Array(items) => items.iter().any(|node| {
+                node.get("layer")
+                    .and_then(|value| value.as_str())
+                    .map(|value| value == layer_id)
+                    .unwrap_or(false)
+            }),
+            _ => false,
+        }
+    });
+    handlebars.register_helper("layer_has_nodes", Box::new(layer_has_nodes));
+
     handlebars_helper!(puml_render_tree: |node: Value, layermap: Value, style_config: Value| {
         fn render_tree(
             node: Value,

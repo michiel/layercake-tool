@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Stack, Group } from '@/components/layout-primitives'
-import { IconSettings, IconExternalLink } from '@tabler/icons-react'
+import { IconSettings, IconExternalLink, IconTrash } from '@tabler/icons-react'
 import { PlanDagNodeType, StoryNodeConfig } from '../../../../types/plan-dag'
 import { BaseNode } from './BaseNode'
 import { GET_STORY, Story } from '../../../../graphql/stories'
@@ -52,7 +52,14 @@ export const StoryNode = memo((props: ExtendedNodeProps) => {
     ? { ...(data.metadata ?? {}), label: story.name }
     : data.metadata
 
-  const customToolButtons = !readonly && (
+  const handleActionClick = (event: React.MouseEvent, callback?: () => void) => {
+    event.stopPropagation()
+    event.preventDefault()
+    if (event.button !== 0) return
+    callback?.()
+  }
+
+  const storyToolButtons = readonly ? null : (
     <TooltipProvider>
       {hasValidConfig ? (
         <Tooltip>
@@ -75,13 +82,9 @@ export const StoryNode = memo((props: ExtendedNodeProps) => {
             <Button
               size="icon"
               variant="ghost"
-              className="h-7 w-7 text-gray-600 hover:text-gray-700 hover:bg-gray-100"
-              data-action-icon="edit"
-              onMouseDown={(e) => {
-                e.stopPropagation()
-                e.preventDefault()
-                onEdit?.(props.id)
-              }}
+              className="h-7 w-7 text-blue-600 hover:text-blue-700 hover:bg-blue-100"
+              data-action-icon="configure-story"
+              onMouseDown={(event) => handleActionClick(event, () => onEdit?.(props.id))}
             >
               <IconSettings size={13} />
             </Button>
@@ -89,6 +92,34 @@ export const StoryNode = memo((props: ExtendedNodeProps) => {
           <TooltipContent>Configure Story</TooltipContent>
         </Tooltip>
       )}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7 text-gray-600 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700/50"
+            data-action-icon="edit"
+            onMouseDown={(event) => handleActionClick(event, () => onEdit?.(props.id))}
+          >
+            <IconSettings size={13} />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Edit node</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7 text-red-600 hover:text-red-700 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/50"
+            data-action-icon="delete"
+            onMouseDown={(event) => handleActionClick(event, () => onDelete?.(props.id))}
+          >
+            <IconTrash size={13} />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Delete node</TooltipContent>
+      </Tooltip>
     </TooltipProvider>
   )
 
@@ -104,7 +135,7 @@ export const StoryNode = memo((props: ExtendedNodeProps) => {
       edges={data.edges || []}
       hasValidConfig={hasValidConfig}
       labelBadges={labelBadges}
-      toolButtons={customToolButtons}
+      toolButtons={storyToolButtons}
     >
       <Stack gap="xs">
         {storyLoading && (

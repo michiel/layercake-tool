@@ -91,6 +91,7 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
       case PlanDagNodeType.DATA_SOURCE:
         return (
           <DataSetNodeConfigForm
+            key={nodeId}
             {...commonProps}
             metadata={metadata}
             setMetadata={setMetadata}
@@ -99,31 +100,39 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
       case PlanDagNodeType.GRAPH:
         return (
           <GraphNodeConfigForm
+            key={nodeId}
             {...commonProps}
             metadata={metadata}
             setMetadata={setMetadata}
           />
         );
       case PlanDagNodeType.TRANSFORM:
-        return <TransformNodeConfigForm {...commonProps} />;
+        return <TransformNodeConfigForm key={nodeId} {...commonProps} />;
       case PlanDagNodeType.FILTER:
-        return <FilterNodeConfigForm {...commonProps} />;
+        return <FilterNodeConfigForm key={nodeId} {...commonProps} />;
       case PlanDagNodeType.MERGE:
-        return <MergeNodeConfigForm {...commonProps} />;
+        return <MergeNodeConfigForm key={nodeId} {...commonProps} />;
       case PlanDagNodeType.GRAPH_ARTEFACT:
-        return <GraphArtefactNodeConfigForm {...commonProps} />;
+        return <GraphArtefactNodeConfigForm key={nodeId} {...commonProps} />;
       case PlanDagNodeType.TREE_ARTEFACT:
-        return <TreeArtefactNodeConfigForm {...commonProps} />;
+        return <TreeArtefactNodeConfigForm key={nodeId} {...commonProps} />;
       case PlanDagNodeType.STORY:
         return (
           <StoryNodeConfigForm
+            key={nodeId}
             {...commonProps}
             metadata={metadata}
             setMetadata={setMetadata}
           />
         );
       case PlanDagNodeType.SEQUENCE_ARTEFACT:
-        return <SequenceArtefactNodeConfigForm {...commonProps} storyId={storyIdHint} />;
+        return (
+          <SequenceArtefactNodeConfigForm
+            key={nodeId}
+            {...commonProps}
+            storyId={storyIdHint}
+          />
+        );
       default:
         return <p className="text-destructive">Unknown node type: {nodeType}</p>;
     }

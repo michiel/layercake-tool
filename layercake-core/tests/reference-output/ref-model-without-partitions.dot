@@ -12,10 +12,6 @@ digraph G {
         node [ shape="box" style="rounded,filled" fontsize=12 fontname="Lato" fillcolor="#f7f7f8" fontcolor="#0f172a" color="#1f2933" penwidth=1.2 ]
         edge [ fontname="Lato" color="#2B303A" fontsize=8]
 
-  node [style="filled,rounded" fillcolor="#8194a0" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
-      }
-  node [style="filled,rounded" fillcolor="#426070" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
-      }
   node [style="filled,rounded" fillcolor="#002a41" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
               drone_01[label="Drone"];
               drone_02[label="Drone"];
@@ -57,10 +53,6 @@ digraph G {
               drone_38[label="Drone"];
               drone_39[label="Drone"];
               drone_40[label="Drone"];
-      }
-  node [style="filled,rounded" fillcolor="#224558" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
-      }
-  node [style="filled,rounded" fillcolor="#222222" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
       }
 
       drone_03 -> drone_09 [label="link"  penwidth=1.0];

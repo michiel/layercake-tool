@@ -48,6 +48,8 @@ async fn create_test_graph(
             id: ActiveValue::NotSet,
             project_id: Set(project_id),
             name: Set(format!("Test Plan {}", uuid::Uuid::new_v4())),
+            description: Set(Some("Test plan".to_string())),
+            tags: Set("[]".to_string()),
             yaml_content: Set("{}".to_string()),
             dependencies: Set(None),
             status: Set("draft".to_string()),

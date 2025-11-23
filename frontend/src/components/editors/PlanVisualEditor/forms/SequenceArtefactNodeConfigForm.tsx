@@ -21,6 +21,23 @@ interface SequenceArtefactNodeConfigFormProps {
   storyId?: number; // May be passed from connected StoryNode
 }
 
+const buildRenderConfig = (
+  renderConfig?: SequenceArtefactNodeConfig['renderConfig']
+): NonNullable<SequenceArtefactNodeConfig['renderConfig']> => ({
+  containNodes: renderConfig?.containNodes ?? 'one',
+  builtInStyles: renderConfig?.builtInStyles ?? 'light',
+  showNotes: renderConfig?.showNotes ?? true,
+  renderAllSequences: renderConfig?.renderAllSequences ?? true,
+  enabledSequenceIds: renderConfig?.enabledSequenceIds ?? [],
+});
+
+const buildInitialConfig = (rawConfig: SequenceArtefactNodeConfig): SequenceArtefactNodeConfig => ({
+  renderTarget: (rawConfig.renderTarget || 'MermaidSequence') as SequenceArtefactRenderTarget,
+  outputPath: rawConfig.outputPath ?? '',
+  renderConfig: buildRenderConfig(rawConfig.renderConfig),
+  useStoryLayers: rawConfig.useStoryLayers ?? true,
+});
+
 export const SequenceArtefactNodeConfigForm: React.FC<SequenceArtefactNodeConfigFormProps> = ({
   config,
   setConfig,
@@ -28,21 +45,9 @@ export const SequenceArtefactNodeConfigForm: React.FC<SequenceArtefactNodeConfig
   projectId: _projectId,
   storyId,
 }) => {
-  const initialRenderConfig = {
-    ...config.renderConfig,
-    containNodes: config.renderConfig?.containNodes ?? 'one',
-    builtInStyles: config.renderConfig?.builtInStyles ?? 'light',
-    showNotes: config.renderConfig?.showNotes ?? true,
-    renderAllSequences: config.renderConfig?.renderAllSequences ?? true,
-    enabledSequenceIds: config.renderConfig?.enabledSequenceIds ?? [],
-  };
-
-  const [localConfig, setLocalConfig] = useState<SequenceArtefactNodeConfig>({
-    renderTarget: (config.renderTarget || 'MermaidSequence') as SequenceArtefactRenderTarget,
-    outputPath: config.outputPath ?? '',
-    renderConfig: initialRenderConfig,
-    useStoryLayers: config.useStoryLayers ?? true,
-  });
+  const [localConfig, setLocalConfig] = useState<SequenceArtefactNodeConfig>(() =>
+    buildInitialConfig(config)
+  );
   const [activeTab, setActiveTab] = useState<'general' | 'target' | 'layers'>('general');
 
   // Fetch sequences if we have a storyId (from connected StoryNode)
@@ -53,24 +58,30 @@ export const SequenceArtefactNodeConfigForm: React.FC<SequenceArtefactNodeConfig
   const sequences: Sequence[] = (sequencesData as any)?.sequences || [];
 
   useEffect(() => {
-    setConfig(localConfig);
-  }, [localConfig, setConfig]);
-
-  useEffect(() => {
     // Always valid as long as renderTarget is set
     setIsValid(!!localConfig.renderTarget);
-  }, [localConfig, setIsValid]);
+  }, [localConfig.renderTarget, setIsValid]);
+
+  const updateConfigState = (
+    updater: (prev: SequenceArtefactNodeConfig) => SequenceArtefactNodeConfig
+  ) => {
+    setLocalConfig(prev => {
+      const next = updater(prev);
+      setConfig(next);
+      return next;
+    });
+  };
 
   const handleSequenceToggle = (sequenceId: number, enabled: boolean) => {
-    setLocalConfig(prev => {
+    updateConfigState(prev => {
       const currentEnabled = prev.renderConfig?.enabledSequenceIds ?? [];
       const newEnabled = enabled
-        ? [...currentEnabled, sequenceId]
+        ? Array.from(new Set([...currentEnabled, sequenceId]))
         : currentEnabled.filter(id => id !== sequenceId);
       return {
         ...prev,
         renderConfig: {
-          ...(prev.renderConfig ?? {}),
+          ...buildRenderConfig(prev.renderConfig),
           enabledSequenceIds: newEnabled,
         },
       };
@@ -101,7 +112,12 @@ export const SequenceArtefactNodeConfigForm: React.FC<SequenceArtefactNodeConfig
               id="filename"
               placeholder="e.g., sequence.mmd (auto-generated if not specified)"
               value={localConfig.outputPath}
-              onChange={(event) => setLocalConfig(prev => ({ ...prev, outputPath: event.currentTarget.value }))}
+              onChange={(event) =>
+                updateConfigState(prev => ({
+                  ...prev,
+                  outputPath: event.currentTarget.value,
+                }))
+              }
             />
             <p className="text-sm text-muted-foreground">
               If not specified, will use project name and file extension
@@ -112,29 +128,42 @@ export const SequenceArtefactNodeConfigForm: React.FC<SequenceArtefactNodeConfig
             <Label htmlFor="contain-nodes">Contain Nodes</Label>
             <Select
               value={localConfig.renderConfig?.containNodes || 'one'}
-              onValueChange={(value) => setLocalConfig(prev => ({
-                ...prev,
-                renderConfig: { ...(prev.renderConfig ?? {}), containNodes: value as 'one' | 'all' }
-              }))}
+              onValueChange={(value) =>
+                updateConfigState(prev => ({
+                  ...prev,
+                  renderConfig: {
+                    ...buildRenderConfig(prev.renderConfig),
+                    containNodes: value as 'one' | 'all',
+                  },
+                }))
+              }
             >
               <SelectTrigger id="contain-nodes">
                 <SelectValue placeholder="Select containment" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="one">One container per sequence</SelectItem>
-                <SelectItem value="all">All in one container</SelectItem>
+                <SelectItem value="one">Group related participants</SelectItem>
+                <SelectItem value="all">Single container for all participants</SelectItem>
               </SelectContent>
             </Select>
+            <p className="text-sm text-muted-foreground">
+              Grouping wraps participants that share the same partition (belongs_to) in a labeled box.
+            </p>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="built-in-style">Built-in Theme</Label>
             <Select
               value={localConfig.renderConfig?.builtInStyles || 'light'}
-              onValueChange={(value) => setLocalConfig(prev => ({
-                ...prev,
-                renderConfig: { ...(prev.renderConfig ?? {}), builtInStyles: value as 'none' | 'light' | 'dark' }
-              }))}
+              onValueChange={(value) =>
+                updateConfigState(prev => ({
+                  ...prev,
+                  renderConfig: {
+                    ...buildRenderConfig(prev.renderConfig),
+                    builtInStyles: value as 'none' | 'light' | 'dark',
+                  },
+                }))
+              }
             >
               <SelectTrigger id="built-in-style">
                 <SelectValue placeholder="Select theme" />
@@ -151,10 +180,15 @@ export const SequenceArtefactNodeConfigForm: React.FC<SequenceArtefactNodeConfig
             <Switch
               id="show-notes"
               checked={localConfig.renderConfig?.showNotes ?? true}
-              onCheckedChange={(checked) => setLocalConfig(prev => ({
-                ...prev,
-                renderConfig: { ...(prev.renderConfig ?? {}), showNotes: checked }
-              }))}
+              onCheckedChange={(checked) =>
+                updateConfigState(prev => ({
+                  ...prev,
+                  renderConfig: {
+                    ...buildRenderConfig(prev.renderConfig),
+                    showNotes: checked,
+                  },
+                }))
+              }
             />
             <div>
               <Label htmlFor="show-notes">Show Notes</Label>
@@ -168,10 +202,15 @@ export const SequenceArtefactNodeConfigForm: React.FC<SequenceArtefactNodeConfig
             <Switch
               id="render-all-sequences"
               checked={localConfig.renderConfig?.renderAllSequences ?? true}
-              onCheckedChange={(checked) => setLocalConfig(prev => ({
-                ...prev,
-                renderConfig: { ...(prev.renderConfig ?? {}), renderAllSequences: checked }
-              }))}
+              onCheckedChange={(checked) =>
+                updateConfigState(prev => ({
+                  ...prev,
+                  renderConfig: {
+                    ...buildRenderConfig(prev.renderConfig),
+                    renderAllSequences: checked,
+                  },
+                }))
+              }
             />
             <div>
               <Label htmlFor="render-all-sequences">Render All Sequences</Label>
@@ -226,7 +265,10 @@ export const SequenceArtefactNodeConfigForm: React.FC<SequenceArtefactNodeConfig
             <Select
               value={localConfig.renderTarget}
               onValueChange={(value) =>
-                setLocalConfig(prev => ({ ...prev, renderTarget: value as SequenceArtefactRenderTarget }))
+                updateConfigState(prev => ({
+                  ...prev,
+                  renderTarget: value as SequenceArtefactRenderTarget,
+                }))
               }
             >
               <SelectTrigger id="render-target">
@@ -245,10 +287,12 @@ export const SequenceArtefactNodeConfigForm: React.FC<SequenceArtefactNodeConfig
             <Switch
               id="use-story-layers"
               checked={localConfig.useStoryLayers ?? true}
-              onCheckedChange={(checked) => setLocalConfig(prev => ({
-                ...prev,
-                useStoryLayers: checked
-              }))}
+              onCheckedChange={(checked) =>
+                updateConfigState(prev => ({
+                  ...prev,
+                  useStoryLayers: checked,
+                }))
+              }
             />
             <div>
               <Label htmlFor="use-story-layers">Use Story Layers</Label>

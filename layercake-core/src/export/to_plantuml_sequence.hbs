@@ -1,0 +1,47 @@
+@startuml
+{{#if sequence.config.plantumlTheme}}
+!theme {{sequence.config.plantumlTheme}}
+{{/if}}
+
+{{#unless (is_empty sequence.participantGroups)}}
+  {{#each sequence.participantGroups}}
+box "{{this.label}}" {{#if this.color}}{{this.color}}{{/if}}
+  {{#each this.participants}}
+  participant {{alias}} as "{{label}}"
+  {{/each}}
+end box
+  {{/each}}
+{{else}}
+  {{#each sequence.participants}}
+participant {{alias}} as "{{label}}"
+  {{/each}}
+{{/unless}}
+
+{{#unless (is_empty sequence.sequences)}}
+  {{#each sequence.sequences}}
+== {{name}} ==
+    {{#each steps}}
+      {{#if ../../config.showNotes}}
+        {{#if note}}
+          {{#if (stringeq notePosition "source")}}
+note over {{source.alias}}
+{{note}}
+end note
+          {{else if (stringeq notePosition "target")}}
+note over {{target.alias}}
+{{note}}
+end note
+          {{else}}
+note over {{source.alias}},{{target.alias}}
+{{note}}
+end note
+          {{/if}}
+        {{/if}}
+      {{/if}}
+{{source.alias}} -> {{target.alias}} : {{label}}
+    {{/each}}
+  {{/each}}
+{{else}}
+' No sequences configured for this story
+{{/unless}}
+@enduml

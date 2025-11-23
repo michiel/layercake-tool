@@ -1,11 +1,19 @@
-import { memo, useState } from 'react'
+import { memo, useRef, useState } from 'react'
 import { NodeProps } from 'reactflow'
 import { useMutation } from '@apollo/client/react'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Stack, Group } from '@/components/layout-primitives'
-import { IconDownload, IconChartDots } from '@tabler/icons-react'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Textarea } from '@/components/ui/textarea'
+import { IconDownload, IconChartDots, IconEye, IconCopy, IconSelect } from '@tabler/icons-react'
 import { PlanDagNodeType, SequenceArtefactNodeConfig } from '../../../../types/plan-dag'
 import { isNodeConfigured } from '../../../../utils/planDagValidation'
 import { EXPORT_NODE_OUTPUT, ExportNodeOutputResult } from '../../../../graphql/export'
@@ -24,7 +32,11 @@ export const SequenceArtefactNode = memo((props: ExtendedNodeProps) => {
   const [downloading, setDownloading] = useState(false)
   const [mermaidOpen, setMermaidOpen] = useState(false)
   const [mermaidContent, setMermaidContent] = useState('')
-  const [loadingPreview, setLoadingPreview] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [previewContent, setPreviewContent] = useState('')
+  const [previewTarget, setPreviewTarget] = useState<'text' | 'mermaid' | null>(null)
+  const [loadingTarget, setLoadingTarget] = useState<'text' | 'mermaid' | null>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const config = data.config as SequenceArtefactNodeConfig
 
@@ -90,38 +102,80 @@ export const SequenceArtefactNode = memo((props: ExtendedNodeProps) => {
       if (result.success) {
         try {
           const decodedContent = atob(result.content)
-          setMermaidContent(decodedContent)
-          setMermaidOpen(true)
+          if (previewTarget === 'mermaid') {
+            setMermaidContent(decodedContent)
+            setMermaidOpen(true)
+          } else {
+            setPreviewContent(decodedContent)
+            setPreviewOpen(true)
+          }
         } catch (error) {
           console.error('Failed to decode content:', error)
           showErrorNotification('Preview Failed', 'Failed to decode export content')
-          setMermaidContent('Error: Failed to decode content')
+          if (previewTarget === 'mermaid') {
+            setMermaidContent('Error: Failed to decode content')
+          } else {
+            setPreviewContent('Error: Failed to decode content')
+          }
         }
       } else {
         showErrorNotification('Preview Failed', result.message)
-        setMermaidContent(`Error: ${result.message}`)
+        if (previewTarget === 'mermaid') {
+          setMermaidContent(`Error: ${result.message}`)
+        } else {
+          setPreviewContent(`Error: ${result.message}`)
+        }
       }
-      setLoadingPreview(false)
+      setLoadingTarget(null)
+      setPreviewTarget(null)
     },
     onError: (error: any) => {
       console.error('Export failed:', error.message)
       showErrorNotification('Preview Failed', error.message)
-      setMermaidContent(`Error: ${error.message}`)
-      setLoadingPreview(false)
+      setLoadingTarget(null)
+      setPreviewTarget(null)
     },
   })
 
-  const handleMermaidPreview = async () => {
+  const triggerPreview = (target: 'text' | 'mermaid') => {
     if (!projectId || !isConfiguredNode) return
-
-    setLoadingPreview(true)
-    setMermaidContent('')
+    if (target === 'text') {
+      setPreviewContent('')
+    } else {
+      setMermaidContent('')
+    }
+    setPreviewTarget(target)
+    setLoadingTarget(target)
     exportForPreview({
       variables: {
         projectId,
         nodeId: props.id,
       },
     })
+  }
+
+  const handlePreviewExport = (event: React.MouseEvent) => {
+    event.stopPropagation()
+    event.preventDefault()
+    triggerPreview('text')
+  }
+
+  const handleMermaidPreview = (event: React.MouseEvent) => {
+    event.stopPropagation()
+    event.preventDefault()
+    triggerPreview('mermaid')
+  }
+
+  const handleCopyPreview = () => {
+    if (textareaRef.current) {
+      textareaRef.current.select()
+      document.execCommand('copy')
+      showSuccessNotification('Copied', 'Preview copied to clipboard')
+    }
+  }
+
+  const handleSelectPreview = () => {
+    textareaRef.current?.select()
   }
 
   const labelBadges = !isConfiguredNode ? (
@@ -152,6 +206,21 @@ export const SequenceArtefactNode = memo((props: ExtendedNodeProps) => {
           {!readonly && isConfiguredNode && (
             <Group justify="center" gap="xs">
               <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-9 w-9 rounded-full text-emerald-600"
+                      data-action-icon="preview-export"
+                      disabled={loadingTarget === 'text'}
+                      onMouseDown={handlePreviewExport}
+                    >
+                      <IconEye size={12} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Preview export</TooltipContent>
+                </Tooltip>
                 {isMermaid && (
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -160,12 +229,8 @@ export const SequenceArtefactNode = memo((props: ExtendedNodeProps) => {
                         variant="ghost"
                         className="h-9 w-9 rounded-full text-purple-600"
                         data-action-icon="mermaid-preview"
-                        disabled={loadingPreview}
-                        onMouseDown={(e: React.MouseEvent) => {
-                          e.stopPropagation()
-                          e.preventDefault()
-                          handleMermaidPreview()
-                        }}
+                        disabled={loadingTarget === 'mermaid'}
+                        onMouseDown={handleMermaidPreview}
                       >
                         <IconChartDots size={12} />
                       </Button>
@@ -203,7 +268,34 @@ export const SequenceArtefactNode = memo((props: ExtendedNodeProps) => {
           )}
         </Stack>
       </BaseNode>
-
+      <Dialog open={previewOpen} onOpenChange={(open) => setPreviewOpen(open)}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Export preview</DialogTitle>
+          </DialogHeader>
+          <Stack gap="sm">
+            <Group gap="xs">
+              <Button size="sm" variant="outline" onClick={handleCopyPreview}>
+                <IconCopy size={14} className="mr-1" />
+                Copy
+              </Button>
+              <Button size="sm" variant="outline" onClick={handleSelectPreview}>
+                <IconSelect size={14} className="mr-1" />
+                Select
+              </Button>
+            </Group>
+            <ScrollArea className="max-h-[400px]">
+              <Textarea
+                ref={textareaRef}
+                value={previewContent}
+                readOnly
+                rows={12}
+                className="font-mono text-xs"
+              />
+            </ScrollArea>
+          </Stack>
+        </DialogContent>
+      </Dialog>
       <MermaidPreviewDialog
         open={mermaidOpen}
         onClose={() => setMermaidOpen(false)}

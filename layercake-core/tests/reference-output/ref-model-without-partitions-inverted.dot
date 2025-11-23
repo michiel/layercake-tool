@@ -12,14 +12,6 @@ digraph G {
         node [ shape="box" style="rounded,filled" fontsize=12 fontname="Lato" fillcolor="#f7f7f8" fontcolor="#0f172a" color="#1f2933" penwidth=1.2 ]
         edge [ fontname="Lato" color="#2B303A" fontsize=8]
 
-  node [style="filled,rounded" fillcolor="#8194a0" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
-      }
-  node [style="filled,rounded" fillcolor="#426070" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
-      }
-  node [style="filled,rounded" fillcolor="#002a41" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
-      }
-  node [style="filled,rounded" fillcolor="#224558" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
-      }
   node [style="filled,rounded" fillcolor="#222222" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
               n_drone_03_drone_09_24[label="link"];
               n_drone_03_drone_31_48[label="link"];
@@ -71,8 +63,6 @@ digraph G {
               n_drone_40_drone_19_27[label="link"];
               n_drone_40_drone_33_47[label="link"];
               n_drone_40_drone_38_9[label="link"];
-      }
-  node [style="filled,rounded" fillcolor="#222222" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
       }
 
       n_drone_03_drone_09_24 -> n_drone_03_drone_31_48 [penwidth=1.0];

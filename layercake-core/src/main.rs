@@ -8,6 +8,7 @@ mod graph;
 mod pipeline;
 mod plan;
 mod plan_execution;
+mod sequence_context;
 mod update;
 
 #[cfg(feature = "console")]

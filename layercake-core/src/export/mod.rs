@@ -1,4 +1,5 @@
 mod csv_common;
+pub mod sequence_renderer;
 pub mod to_csv_edges;
 pub mod to_csv_matrix;
 pub mod to_csv_nodes;
@@ -10,9 +11,11 @@ pub mod to_jsgraph;
 pub mod to_json;
 pub mod to_mermaid;
 pub mod to_mermaid_mindmap;
+pub mod to_mermaid_sequence;
 pub mod to_mermaid_treemap;
 pub mod to_plantuml;
 pub mod to_plantuml_mindmap;
+pub mod to_plantuml_sequence;
 pub mod to_plantuml_wbs;
 
 /// Common rendering function used by all exporters

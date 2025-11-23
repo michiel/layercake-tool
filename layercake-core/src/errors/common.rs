@@ -6,7 +6,8 @@
 //! # Examples
 //!
 //! ```rust
-//! use layercake::errors::{GraphError, ToGraphQLError};
+//! use layercake::errors::GraphError;
+//! use layercake::errors::common::ToGraphQLError;
 //!
 //! let err = GraphError::NotFound(42);
 //! let graphql_err = err.to_graphql_error();

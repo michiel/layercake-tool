@@ -10,7 +10,9 @@ import {
   IconDatabase,
   IconTransform,
   IconGitMerge,
-  IconFileExport
+  IconFileExport,
+  IconBook,
+  IconTimeline
 } from '@tabler/icons-react'
 import { Panel } from 'reactflow'
 import { PlanDagNodeType } from '../../../../types/plan-dag'
@@ -76,6 +78,12 @@ export const ControlPanel = ({
       color: '#339af0'
     },
     {
+      type: PlanDagNodeType.STORY,
+      label: 'Story',
+      icon: <IconBook size="0.7rem" />,
+      color: '#3b82f6'
+    },
+    {
       type: PlanDagNodeType.TRANSFORM,
       label: 'Transform',
       icon: <IconTransform size="0.7rem" />,
@@ -98,6 +106,12 @@ export const ControlPanel = ({
       label: 'Tree Artefact',
       icon: <IconFileExport size="0.7rem" />,
       color: '#845ef7'
+    },
+    {
+      type: PlanDagNodeType.SEQUENCE_ARTEFACT,
+      label: 'Sequence Artefact',
+      icon: <IconTimeline size="0.7rem" />,
+      color: '#f59e0b'
     }
   ];
 

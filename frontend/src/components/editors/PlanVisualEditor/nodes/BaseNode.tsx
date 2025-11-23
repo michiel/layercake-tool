@@ -30,6 +30,7 @@ interface BaseNodeProps extends NodeProps {
   hasValidConfig?: boolean
   children?: ReactNode
   toolButtons?: ReactNode
+  extraToolButtons?: ReactNode
   labelBadges?: ReactNode
   footerContent?: ReactNode
   editableLabel?: boolean
@@ -80,6 +81,7 @@ export const BaseNode = memo(({
   id,
   children,
   toolButtons,
+  extraToolButtons,
   labelBadges,
   footerContent,
   editableLabel = false,
@@ -273,6 +275,13 @@ const handleButtonClick = (event: ReactMouseEvent, callback?: () => void) => {
           <TooltipContent>Delete node</TooltipContent>
       </Tooltip>
     </TooltipProvider>
+  )
+
+  const resolvedToolButtons = toolButtons ?? (
+    <>
+      {extraToolButtons}
+      {defaultToolButtons}
+    </>
   )
 
   // Default label badges if not provided
@@ -497,7 +506,7 @@ const handleButtonClick = (event: ReactMouseEvent, callback?: () => void) => {
             {!readonly && (
               <>
                 <Group gap="xs" wrap={false}>
-                  {toolButtons || defaultToolButtons}
+                  {resolvedToolButtons}
                 </Group>
                 <div style={{ flex: 1 }} />
               </>

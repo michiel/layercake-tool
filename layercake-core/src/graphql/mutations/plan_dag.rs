@@ -6,10 +6,14 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrde
 use super::helpers::{
     generate_edge_id, generate_node_id_from_ids, get_extension_for_format,
     get_mime_type_for_format, parse_export_format, ExecutionActionResult, ExportNodeOutputResult,
-    StoredGraphArtefactNodeConfig, StoredTreeArtefactNodeConfig,
+    StoredGraphArtefactNodeConfig, StoredSequenceArtefactNodeConfig, StoredSequenceRenderConfig,
+    StoredTreeArtefactNodeConfig,
 };
 use crate::database::entities::{
     datasets, graphs, plan_dag_edges, plan_dag_nodes, plans, projects, ExecutionState,
+};
+use crate::export::{
+    sequence_renderer::SequenceRenderConfigResolved, to_mermaid_sequence, to_plantuml_sequence,
 };
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
@@ -20,8 +24,9 @@ use crate::graphql::types::plan_dag::{
     config::NotePosition as GraphQLNotePosition, config::Orientation as GraphQLOrientation,
     config::RenderBuiltinStyle as GraphQLRenderBuiltinStyle,
     config::RenderConfig as GraphQLRenderConfig,
-    config::RenderTargetOptions as GraphQLRenderTargetOptions, PlanDag, PlanDagEdge, PlanDagInput,
-    PlanDagMigrationDetail, PlanDagMigrationResult, PlanDagNode,
+    config::RenderTargetOptions as GraphQLRenderTargetOptions,
+    config::SequenceArtefactRenderTarget, config::StoryNodeConfig, PlanDag, PlanDagEdge,
+    PlanDagInput, PlanDagMigrationDetail, PlanDagMigrationResult, PlanDagNode,
 };
 use crate::pipeline::DagExecutor;
 use crate::plan::{
@@ -30,6 +35,7 @@ use crate::plan::{
     RenderConfig as PlanRenderConfig, RenderConfigBuiltInStyle, RenderConfigOrientation,
     RenderTargetOptions,
 };
+use crate::sequence_context::{apply_render_config, SequenceStoryContext};
 
 #[derive(Default)]
 pub struct PlanDagMutation;
@@ -210,6 +216,157 @@ fn render_config_from_graphql_input(
             &defaults.layer_source_styles,
         ),
     }
+}
+
+fn map_sequence_render_target(value: &str) -> Result<SequenceArtefactRenderTarget> {
+    match value {
+        "PlantUmlSequence" => Ok(SequenceArtefactRenderTarget::PlantUmlSequence),
+        "MermaidSequence" => Ok(SequenceArtefactRenderTarget::MermaidSequence),
+        other => Err(StructuredError::bad_request(format!(
+            "Unsupported sequence render target: {}",
+            other
+        ))),
+    }
+}
+
+fn resolve_sequence_render_config(
+    stored: Option<StoredSequenceRenderConfig>,
+    use_story_layers: bool,
+) -> SequenceRenderConfigResolved {
+    let mut config = SequenceRenderConfigResolved::default();
+    let stored = stored.unwrap_or_default();
+
+    config.contain_nodes = stored
+        .contain_nodes
+        .unwrap_or_else(|| "one".to_string())
+        .to_lowercase();
+    if config.contain_nodes != "one" && config.contain_nodes != "all" {
+        config.contain_nodes = "one".to_string();
+    }
+
+    config.built_in_styles = stored
+        .built_in_styles
+        .unwrap_or_else(|| "light".to_string())
+        .to_lowercase();
+    config.show_notes = stored.show_notes.unwrap_or(true);
+    config.render_all_sequences = stored.render_all_sequences.unwrap_or(true);
+    config.enabled_sequence_ids = stored.enabled_sequence_ids.unwrap_or_default();
+    config.use_story_layers = use_story_layers;
+    config.mermaid_theme = map_mermaid_theme(&config.built_in_styles);
+    config.plantuml_theme = map_plantuml_theme(&config.built_in_styles);
+    config
+}
+
+fn map_mermaid_theme(style: &str) -> String {
+    match style {
+        "dark" => "dark".to_string(),
+        "none" => "".to_string(),
+        _ => "default".to_string(),
+    }
+}
+
+fn map_plantuml_theme(style: &str) -> String {
+    match style {
+        "dark" => "cerulean".to_string(),
+        "none" => "".to_string(),
+        _ => "plain".to_string(),
+    }
+}
+
+async fn export_sequence_artefact_node(
+    context: &GraphQLContext,
+    artefact_node: &plan_dag_nodes::Model,
+    project_id: i32,
+    edges: &[plan_dag_edges::Model],
+    all_nodes: &[plan_dag_nodes::Model],
+) -> Result<ExportNodeOutputResult> {
+    let stored_config: StoredSequenceArtefactNodeConfig =
+        serde_json::from_str(&artefact_node.config_json).map_err(|e| {
+            StructuredError::bad_request(format!("Failed to parse sequence artefact config: {}", e))
+        })?;
+
+    let render_target_str = stored_config
+        .render_target
+        .unwrap_or_else(|| "MermaidSequence".to_string());
+    let render_target = map_sequence_render_target(&render_target_str)?;
+    let output_path = stored_config.output_path;
+    let use_story_layers = stored_config.use_story_layers.unwrap_or(true);
+    let resolved_config =
+        resolve_sequence_render_config(stored_config.render_config, use_story_layers);
+
+    let upstream_story_node = edges
+        .iter()
+        .find(|edge| edge.target_node_id == artefact_node.id)
+        .map(|edge| edge.source_node_id.clone())
+        .ok_or_else(|| StructuredError::not_found("Upstream story", "sequence artefact"))?;
+
+    let story_node = all_nodes
+        .iter()
+        .find(|node| node.id == upstream_story_node)
+        .ok_or_else(|| StructuredError::not_found("Story node", &upstream_story_node))?;
+
+    if story_node.node_type != "StoryNode" {
+        return Err(StructuredError::bad_request(format!(
+            "Sequence artefact must be connected to a Story node, found {}",
+            story_node.node_type
+        )));
+    }
+
+    let story_config: StoryNodeConfig =
+        serde_json::from_str(&story_node.config_json).map_err(|e| {
+            StructuredError::bad_request(format!(
+                "Failed to parse story node config for {}: {}",
+                story_node.id, e
+            ))
+        })?;
+    let _story_id = story_config
+        .story_id
+        .ok_or_else(|| StructuredError::bad_request("Story node is not configured"))?;
+
+    let project = projects::Entity::find_by_id(project_id)
+        .one(&context.db)
+        .await
+        .map_err(|e| StructuredError::database("projects::Entity::find_by_id", e))?
+        .ok_or_else(|| StructuredError::not_found("Project", project_id))?;
+
+    let extension = get_extension_for_format(render_target_str.as_str());
+    let filename = output_path.unwrap_or_else(|| format!("{}.{}", project.name, extension));
+
+    use crate::database::entities::sequence_contexts;
+    let stored_context = sequence_contexts::Entity::find()
+        .filter(sequence_contexts::Column::NodeId.eq(&story_node.id))
+        .one(&context.db)
+        .await
+        .map_err(|e| StructuredError::database("sequence_contexts::Entity::find", e))?
+        .ok_or_else(|| StructuredError::internal("Story context not found"))?;
+    let base_context: SequenceStoryContext = serde_json::from_str(&stored_context.context_json)
+        .map_err(|e| StructuredError::internal(format!("Invalid story context data: {}", e)))?;
+    let render_payload = apply_render_config(&base_context, resolved_config);
+
+    let rendered = match render_target {
+        SequenceArtefactRenderTarget::MermaidSequence => {
+            to_mermaid_sequence::render(&render_payload)
+                .map_err(|e| StructuredError::service("render_mermaid_sequence", e))?
+        }
+        SequenceArtefactRenderTarget::PlantUmlSequence => {
+            to_plantuml_sequence::render(&render_payload)
+                .map_err(|e| StructuredError::service("render_plantuml_sequence", e))?
+        }
+    };
+
+    let encoded_content = base64::engine::general_purpose::STANDARD.encode(rendered.as_bytes());
+    let mime_type = get_mime_type_for_format(render_target_str.as_str());
+
+    Ok(ExportNodeOutputResult {
+        success: true,
+        message: format!(
+            "Successfully exported {} as {}",
+            filename, render_target_str
+        ),
+        content: encoded_content,
+        filename,
+        mime_type,
+    })
 }
 
 #[Object]
@@ -439,6 +596,31 @@ impl PlanDagMutation {
             .ok_or_else(|| StructuredError::not_found("Artefact node", &node_id))?;
 
         let node_type = artefact_node.node_type.clone();
+
+        let edges = plan_dag_edges::Entity::find()
+            .filter(plan_dag_edges::Column::PlanId.eq(plan.id))
+            .all(&context.db)
+            .await
+            .map_err(|e| StructuredError::database("plan_dag_edges::Entity::find", e))?;
+
+        let all_nodes = plan_dag_nodes::Entity::find()
+            .filter(plan_dag_nodes::Column::PlanId.eq(plan.id))
+            .all(&context.db)
+            .await
+            .map_err(|e| StructuredError::database("plan_dag_nodes::Entity::find", e))?;
+
+        if node_type.as_str() == "SequenceArtefactNode" {
+            let result = export_sequence_artefact_node(
+                &context,
+                &artefact_node,
+                project_id,
+                &edges,
+                &all_nodes,
+            )
+            .await?;
+            return Ok(result);
+        }
+
         let (render_target, output_path, stored_render_config) = match node_type.as_str() {
             "TreeArtefactNode" | "TreeArtefact" => {
                 let stored_config: StoredTreeArtefactNodeConfig =
@@ -499,25 +681,11 @@ impl PlanDagMutation {
             .or(stored_render_config)
             .unwrap_or(defaults);
 
-        // Find the upstream GraphNode connected to this artefact node
-        let edges = plan_dag_edges::Entity::find()
-            .filter(plan_dag_edges::Column::PlanId.eq(plan.id))
-            .all(&context.db)
-            .await
-            .map_err(|e| StructuredError::database("plan_dag_edges::Entity::find", e))?;
-
         let upstream_node_id = edges
             .iter()
             .find(|e| e.target_node_id == node_id)
             .map(|e| e.source_node_id.clone())
             .ok_or_else(|| StructuredError::not_found("Upstream graph", "artefact node"))?;
-
-        // Get all nodes and edges for DAG execution
-        let all_nodes = plan_dag_nodes::Entity::find()
-            .filter(plan_dag_nodes::Column::PlanId.eq(plan.id))
-            .all(&context.db)
-            .await
-            .map_err(|e| StructuredError::database("plan_dag_nodes::Entity::find", e))?;
 
         let edge_tuples: Vec<(String, String)> = edges
             .iter()

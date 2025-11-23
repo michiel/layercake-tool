@@ -150,6 +150,7 @@ pub enum TreeArtefactRenderTarget {
 // Story Node Configuration
 #[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
 #[graphql(input_name = "StoryNodeConfigInput")]
+#[serde(rename_all = "camelCase")]
 pub struct StoryNodeConfig {
     #[graphql(name = "storyId")]
     pub story_id: Option<i32>,

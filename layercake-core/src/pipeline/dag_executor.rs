@@ -10,9 +10,9 @@ use tracing::{debug_span, info, Instrument};
 
 use crate::database::entities::graphs::ActiveModel as GraphActiveModel;
 use crate::database::entities::graphs::{Column as GraphColumn, Entity as GraphEntity};
-use crate::database::entities::{graphs, plan_dag_nodes, ExecutionState};
+use crate::database::entities::{graphs, plan_dag_nodes, sequence_contexts, ExecutionState};
 use crate::graphql::types::plan_dag::{
-    FilterEvaluationContext, FilterNodeConfig, TransformNodeConfig,
+    config::StoryNodeConfig, FilterEvaluationContext, FilterNodeConfig, TransformNodeConfig,
 };
 use crate::pipeline::dag_context::DagExecutionContext;
 use crate::pipeline::layer_operations::insert_layers_to_db;
@@ -22,7 +22,9 @@ use crate::pipeline::persist_utils::{
 };
 use crate::pipeline::types::LayerData;
 use crate::pipeline::{DatasourceImporter, GraphBuilder, MergeBuilder};
+use crate::sequence_context::{build_story_context, SequenceStoryContext};
 use crate::services::graph_service::GraphService;
+use chrono::Utc;
 
 /// DAG executor that processes nodes in topological order
 pub struct DagExecutor {
@@ -188,6 +190,20 @@ impl DagExecutor {
                     project_id, node_id, &node_name, node, nodes, edges, context,
                 )
                 .await?;
+            }
+            "StoryNode" | "Story" | "story" => {
+                let config: StoryNodeConfig = serde_json::from_str(&node.config_json)
+                    .with_context(|| format!("Failed to parse story config for {}", node_id))?;
+                let story_id = config
+                    .story_id
+                    .ok_or_else(|| anyhow!("Story node {} is not configured", node_id))?;
+                let story_context = build_story_context(&self.db, project_id, story_id).await?;
+                self.persist_story_context(project_id, node_id, story_id, &story_context)
+                    .await?;
+            }
+            "SequenceArtefactNode" | "SequenceArtefact" | "sequence_artefact" => {
+                // Rendering nodes run during export; nothing to execute eagerly
+                return Ok(());
             }
             _ => {
                 return Err(anyhow!("Unknown node type: {}", node.node_type));
@@ -1164,6 +1180,49 @@ impl DagExecutor {
             .filter(|(_, target)| target == node_id)
             .map(|(source, _)| source.clone())
             .collect()
+    }
+}
+
+impl DagExecutor {
+    async fn persist_story_context(
+        &self,
+        project_id: i32,
+        node_id: &str,
+        story_id: i32,
+        context: &SequenceStoryContext,
+    ) -> Result<()> {
+        use sequence_contexts::ActiveModel as SequenceContextActiveModel;
+        use sequence_contexts::Column as SequenceContextColumn;
+        use sequence_contexts::Entity as SequenceContextEntity;
+
+        let serialized =
+            serde_json::to_string(context).context("Failed to serialize sequence context")?;
+        let existing = SequenceContextEntity::find()
+            .filter(SequenceContextColumn::NodeId.eq(node_id))
+            .one(&self.db)
+            .await?;
+
+        if let Some(model) = existing {
+            let mut active: SequenceContextActiveModel = model.into();
+            active.context_json = Set(serialized);
+            active.story_id = Set(story_id);
+            active.project_id = Set(project_id);
+            active.updated_at = Set(Utc::now().into());
+            active.update(&self.db).await?;
+        } else {
+            let active = SequenceContextActiveModel {
+                project_id: Set(project_id),
+                node_id: Set(node_id.to_string()),
+                story_id: Set(story_id),
+                context_json: Set(serialized),
+                created_at: Set(Utc::now().into()),
+                updated_at: Set(Utc::now().into()),
+                ..Default::default()
+            };
+            active.insert(&self.db).await?;
+        }
+
+        Ok(())
     }
 }
 

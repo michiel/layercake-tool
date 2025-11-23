@@ -257,9 +257,16 @@ export class ReactFlowAdapter {
       'GraphNode': 'GraphNode',
       'StoryNode': 'StoryNode',
       'SequenceArtefactNode': 'SequenceArtefactNode',
+      // Lowercase fallbacks
+      'storynode': 'StoryNode',
+      'sequenceartefactnode': 'SequenceArtefactNode',
+      'sequenceartefact': 'SequenceArtefactNode',
     }
 
-    const mapped = typeMap[nodeType]
+    const normalized = (nodeType || '').trim()
+    const mapped =
+      typeMap[normalized] ||
+      typeMap[normalized.toLowerCase()]
     if (!mapped) {
       console.error(`[ReactFlowAdapter] Unknown node type: ${nodeType}, falling back to DataSetNode`)
       return 'DataSetNode' // Better than 'default' which won't match NODE_TYPES

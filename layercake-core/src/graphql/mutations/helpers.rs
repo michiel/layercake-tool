@@ -65,6 +65,26 @@ pub struct StoredTreeArtefactNodeConfig {
     pub render_config: Option<StoredRenderConfig>,
 }
 
+/// Stored sequence artefact node configuration
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StoredSequenceArtefactNodeConfig {
+    pub render_target: Option<String>,
+    pub output_path: Option<String>,
+    pub render_config: Option<StoredSequenceRenderConfig>,
+    pub use_story_layers: Option<bool>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StoredSequenceRenderConfig {
+    pub contain_nodes: Option<String>,
+    pub built_in_styles: Option<String>,
+    pub show_notes: Option<bool>,
+    pub render_all_sequences: Option<bool>,
+    pub enabled_sequence_ids: Option<Vec<i32>>,
+}
+
 /// Stored render configuration
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -412,9 +432,11 @@ pub fn get_extension_for_format(format: &str) -> &str {
         "PlantUML" => "puml",
         "PlantUmlMindmap" => "puml",
         "PlantUmlWbs" => "puml",
+        "PlantUmlSequence" => "puml",
         "Mermaid" => "mermaid",
         "MermaidMindmap" => "mmd",
         "MermaidTreemap" => "mmd",
+        "MermaidSequence" => "mmd",
         _ => "txt",
     }
 }
@@ -426,8 +448,8 @@ pub fn get_mime_type_for_format(format: &str) -> String {
         "GML" => "text/plain",
         "JSON" => "application/json",
         "CSV" | "CSVNodes" | "CSVEdges" => "text/csv",
-        "PlantUML" | "PlantUmlMindmap" | "PlantUmlWbs" => "text/plain",
-        "Mermaid" | "MermaidMindmap" | "MermaidTreemap" => "text/plain",
+        "PlantUML" | "PlantUmlMindmap" | "PlantUmlWbs" | "PlantUmlSequence" => "text/plain",
+        "Mermaid" | "MermaidMindmap" | "MermaidTreemap" | "MermaidSequence" => "text/plain",
         _ => "text/plain",
     }
     .to_string()

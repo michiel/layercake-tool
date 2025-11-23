@@ -20,13 +20,18 @@ use crate::database::entities::common_types::{
 use crate::database::entities::{
     data_sets, graphs, library_items, plan_dag_edges, plan_dag_nodes, plans, projects,
 };
+use crate::export::{
+    sequence_renderer::SequenceRenderConfigResolved, to_mermaid_sequence, to_plantuml_sequence,
+};
 use crate::graphql::types::graph_node::GraphNode as GraphNodeDto;
 use crate::graphql::types::layer::Layer as LayerDto;
+use crate::graphql::types::plan_dag::config::SequenceArtefactRenderTarget;
 use crate::graphql::types::plan_dag::{
     DataSetExecutionMetadata, GraphExecutionMetadata, PlanDagEdge, PlanDagMetadata, PlanDagNode,
     PlanDagNodeType, Position,
 };
 use crate::plan::{ExportFileType, RenderConfig};
+use crate::sequence_context::{apply_render_config, build_story_context};
 use crate::services::graph_analysis_service::{GraphAnalysisService, GraphConnectivityReport};
 use crate::services::graph_edit_service::{
     GraphEditService, ReplaySummary as GraphEditReplaySummary,
@@ -1913,6 +1918,31 @@ impl AppContext {
             .map_err(|e| anyhow!("Failed to render graph export: {}", e))?;
 
         Ok(apply_preview_limit(content, format, max_rows))
+    }
+
+    pub async fn preview_sequence_export(
+        &self,
+        project_id: i32,
+        story_id: i32,
+        render_target: SequenceArtefactRenderTarget,
+        render_config: SequenceRenderConfigResolved,
+    ) -> Result<String> {
+        let base_context = build_story_context(&self.db, project_id, story_id)
+            .await
+            .map_err(|e| anyhow!("Failed to build story context: {}", e))?;
+
+        let context = apply_render_config(&base_context, render_config);
+
+        let rendered = match render_target {
+            SequenceArtefactRenderTarget::MermaidSequence => to_mermaid_sequence::render(&context)
+                .map_err(|e| anyhow!("Failed to render Mermaid sequence: {}", e))?,
+            SequenceArtefactRenderTarget::PlantUmlSequence => {
+                to_plantuml_sequence::render(&context)
+                    .map_err(|e| anyhow!("Failed to render PlantUML sequence: {}", e))?
+            }
+        };
+
+        Ok(rendered)
     }
 }
 

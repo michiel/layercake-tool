@@ -1,0 +1,41 @@
+{{#if sequence.config.mermaidTheme}}
+%%{init: {'theme': '{{sequence.config.mermaidTheme}}'}}%%
+{{/if}}
+sequenceDiagram
+
+{{#unless (is_empty sequence.participantGroups)}}
+  {{#each sequence.participantGroups}}
+box {{#if this.color}}{{this.color}}{{/if}} "{{this.label}}"
+    {{#each this.participants}}
+    participant {{alias}} as "{{label}}"
+    {{/each}}
+end
+  {{/each}}
+{{else}}
+  {{#each sequence.participants}}
+  participant {{alias}} as "{{label}}"
+  {{/each}}
+{{/unless}}
+
+{{#unless (is_empty sequence.sequences)}}
+  {{#each sequence.sequences}}
+%% Sequence: {{name}}
+== {{name}} ==
+    {{#each steps}}
+      {{#if ../../config.showNotes}}
+        {{#if note}}
+          {{#if (stringeq notePosition "source")}}
+    Note over {{source.alias}}: {{note}}
+          {{else if (stringeq notePosition "target")}}
+    Note over {{target.alias}}: {{note}}
+          {{else}}
+    Note over {{source.alias}},{{target.alias}}: {{note}}
+          {{/if}}
+        {{/if}}
+      {{/if}}
+    {{source.alias}}->>{{target.alias}}: {{label}}
+    {{/each}}
+  {{/each}}
+{{else}}
+%% No sequences configured for this story
+{{/unless}}

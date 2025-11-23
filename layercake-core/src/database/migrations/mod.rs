@@ -32,6 +32,7 @@ mod m20251122_000001_add_plan_description_tags;
 mod m20251122_000003_create_stories;
 mod m20251122_000004_create_sequences;
 mod m20251123_000002_allow_multiple_plans;
+mod m20251205_000001_create_sequence_contexts;
 
 pub struct Migrator;
 
@@ -70,6 +71,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20251122_000001_add_plan_description_tags::Migration),
             Box::new(m20251122_000003_create_stories::Migration),
             Box::new(m20251122_000004_create_sequences::Migration),
+            Box::new(m20251205_000001_create_sequence_contexts::Migration),
             Box::new(m20251123_000002_allow_multiple_plans::Migration),
         ]
     }
