@@ -17,6 +17,7 @@ import {
   IconCheck,
   IconLoader2,
   IconTimeline,
+  IconEdit,
 } from '@tabler/icons-react'
 import { Breadcrumbs } from '@/components/common/Breadcrumbs'
 import PageContainer from '@/components/layout/PageContainer'
@@ -38,11 +39,13 @@ import {
   UPDATE_SEQUENCE,
   Sequence,
   SequenceEdgeRef,
+  NotePosition,
 } from '@/graphql/sequences'
 import { GET_STORY, Story } from '@/graphql/stories'
 import { GET_DATASOURCES, DataSet } from '@/graphql/datasets'
 import { GET_PROJECT_LAYERS, ProjectLayer } from '@/graphql/layers'
 import { MermaidPreviewDialog } from '@/components/visualization/MermaidPreviewDialog'
+import { EdgeEditDialog } from '@/components/stories/EdgeEditDialog'
 
 const GET_PROJECTS = gql`
   query GetProjectsForSequenceEditor {
@@ -119,6 +122,8 @@ export const SequenceEditorPage = () => {
   const [isInitialized, setIsInitialized] = useState(false)
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle')
   const [diagramDialogOpen, setDiagramDialogOpen] = useState(false)
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [editingEdgeIndex, setEditingEdgeIndex] = useState<number | null>(null)
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Queries
@@ -276,7 +281,7 @@ export const SequenceEditorPage = () => {
     })
 
     return grouped
-  }, [availableEdges, edgeFilter, getNodeInfo])
+  }, [availableEdges, edgeFilter, getNodeInfo, projectLayers])
 
   const toggleDatasetCollapse = (datasetId: number) => {
     setCollapsedDatasets((prev) => {
@@ -416,7 +421,12 @@ export const SequenceEditorPage = () => {
 
     setSyncStatus('syncing')
     const trimmedDescription = description.trim()
-    const cleanEdgeOrder = edgeOrder.map(({ datasetId, edgeId }) => ({ datasetId, edgeId }))
+    const cleanEdgeOrder = edgeOrder.map(({ datasetId, edgeId, note, notePosition }) => ({
+      datasetId,
+      edgeId,
+      note: note || undefined,
+      notePosition: notePosition || undefined,
+    }))
     const input = {
       name: name.trim(),
       description: trimmedDescription || undefined,
@@ -462,7 +472,12 @@ export const SequenceEditorPage = () => {
     }
 
     const trimmedDescription = description.trim()
-    const cleanEdgeOrder = edgeOrder.map(({ datasetId, edgeId }) => ({ datasetId, edgeId }))
+    const cleanEdgeOrder = edgeOrder.map(({ datasetId, edgeId, note, notePosition }) => ({
+      datasetId,
+      edgeId,
+      note: note || undefined,
+      notePosition: notePosition || undefined,
+    }))
     const input = {
       storyId: storyIdNum,
       name: name.trim(),
@@ -500,6 +515,24 @@ export const SequenceEditorPage = () => {
 
   const removeEdge = (index: number) => {
     setEdgeOrder((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const updateEdgeNote = (index: number, note?: string, notePosition?: NotePosition) => {
+    setEdgeOrder((prev) =>
+      prev.map((ref, i) =>
+        i === index ? { ...ref, note, notePosition } : ref
+      )
+    )
+  }
+
+  const openEditDialog = (index: number) => {
+    setEditingEdgeIndex(index)
+    setEditDialogOpen(true)
+  }
+
+  const closeEditDialog = () => {
+    setEditDialogOpen(false)
+    setEditingEdgeIndex(null)
   }
 
   // Drag and drop handlers
@@ -801,7 +834,7 @@ export const SequenceEditorPage = () => {
                                       <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-1">
                                           <span
-                                            className="text-xs px-1.5 py-0.5 rounded truncate w-[100px] inline-block text-center"
+                                            className="text-xs px-1.5 py-0.5 rounded truncate w-[100px] inline-block text-center bg-muted"
                                             style={sourceColors ? { backgroundColor: sourceColors.bg, color: sourceColors.text } : undefined}
                                             title={sourceLabel}
                                           >
@@ -809,7 +842,7 @@ export const SequenceEditorPage = () => {
                                           </span>
                                           <IconArrowRight className="h-3 w-3 shrink-0 text-muted-foreground" />
                                           <span
-                                            className="text-xs px-1.5 py-0.5 rounded truncate w-[100px] inline-block text-center"
+                                            className="text-xs px-1.5 py-0.5 rounded truncate w-[100px] inline-block text-center bg-muted"
                                             style={targetColors ? { backgroundColor: targetColors.bg, color: targetColors.text } : undefined}
                                             title={targetLabel}
                                           >
@@ -838,7 +871,7 @@ export const SequenceEditorPage = () => {
             </div>
 
             {/* Sequence Column (main, flexible width) */}
-            <Card className="border flex-1 flex flex-col min-w-0">
+            <Card className="border flex-1 flex flex-col min-w-0 @container">
               <CardHeader className="border-b py-2 px-3">
                 <Group justify="between" align="center">
                   <CardTitle className="text-sm">Sequence</CardTitle>
@@ -856,6 +889,8 @@ export const SequenceEditorPage = () => {
                     <Stack gap="xs" className="p-2">
                       {edgeOrder.map((ref, index) => {
                         const { edge, dataset, sourceLabel, targetLabel, sourceColors, targetColors } = getEdgeInfo(ref)
+                        const shortenText = (text: string | undefined, maxLen = 20) =>
+                          text && text.length > maxLen ? text.slice(0, maxLen) + '...' : text
                         return (
                           <div
                             key={`${ref.datasetId}-${ref.edgeId}-${index}`}
@@ -870,9 +905,10 @@ export const SequenceEditorPage = () => {
                           >
                             <IconGripVertical className="h-4 w-4 text-muted-foreground cursor-grab shrink-0" />
                             <Badge variant="outline" className="shrink-0 text-xs">{index + 1}</Badge>
-                            <div className="flex-1 flex items-center gap-2 min-w-0">
+                            <div className="flex-1 flex items-center gap-1.5 min-w-0 flex-wrap">
+                              {/* Source and Target */}
                               <span
-                                className="text-xs px-1.5 py-0.5 rounded truncate w-[140px] shrink-0 inline-block text-center"
+                                className="text-xs px-1.5 py-0.5 rounded truncate w-[100px] shrink-0 inline-block text-center bg-muted"
                                 style={sourceColors ? { backgroundColor: sourceColors.bg, color: sourceColors.text } : undefined}
                                 title={sourceLabel}
                               >
@@ -880,24 +916,44 @@ export const SequenceEditorPage = () => {
                               </span>
                               <IconArrowRight className="h-3 w-3 shrink-0 text-muted-foreground" />
                               <span
-                                className="text-xs px-1.5 py-0.5 rounded truncate w-[140px] shrink-0 inline-block text-center"
+                                className="text-xs px-1.5 py-0.5 rounded truncate w-[100px] shrink-0 inline-block text-center bg-muted"
                                 style={targetColors ? { backgroundColor: targetColors.bg, color: targetColors.text } : undefined}
                                 title={targetLabel}
                               >
                                 {targetLabel}
                               </span>
+                              {/* Edge label - hidden when narrow */}
+                              {edge?.label && (
+                                <Badge variant="outline" className="text-xs shrink-0 hidden @[500px]:inline-flex" title={edge.label}>
+                                  {shortenText(edge.label, 15)}
+                                </Badge>
+                              )}
+                              {/* Edge comment - hidden when narrow */}
                               {edge?.comments && (
-                                <>
-                                  <IconArrowRight className="h-3 w-3 shrink-0 text-muted-foreground" />
-                                  <span className="text-xs text-muted-foreground truncate" title={edge.comments}>
-                                    {edge.comments}
-                                  </span>
-                                </>
+                                <Badge variant="secondary" className="text-xs shrink-0 bg-muted hidden @[500px]:inline-flex" title={edge.comments}>
+                                  {shortenText(edge.comments, 15)}
+                                </Badge>
+                              )}
+                              {/* Sequence note - hidden when narrow */}
+                              {ref.note && (
+                                <Badge variant="secondary" className="text-xs shrink-0 bg-blue-100 text-blue-800 hidden @[500px]:inline-flex" title={`Note (${ref.notePosition || 'Both'}): ${ref.note}`}>
+                                  {shortenText(ref.note, 15)}
+                                </Badge>
                               )}
                             </div>
-                            <Badge variant="secondary" className="text-xs shrink-0">
+                            {/* Dataset name - hidden when narrow */}
+                            <Badge variant="secondary" className="text-xs shrink-0 hidden @[400px]:inline-flex">
                               {dataset?.name}
                             </Badge>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0 shrink-0"
+                              onClick={() => openEditDialog(index)}
+                              title="Edit edge"
+                            >
+                              <IconEdit className="h-3 w-3" />
+                            </Button>
                             <Button
                               variant="ghost"
                               size="sm"
@@ -959,6 +1015,31 @@ export const SequenceEditorPage = () => {
         diagram={mermaidDiagram}
         title={`Sequence Diagram: ${name || 'Untitled'}`}
       />
+
+      {/* Edge Edit Dialog */}
+      {editingEdgeIndex !== null && (() => {
+        const ref = edgeOrder[editingEdgeIndex]
+        const { edge } = getEdgeInfo(ref)
+        const dataset = storyDatasets.find((d) => d.id === ref.datasetId)
+        return (
+          <EdgeEditDialog
+            open={editDialogOpen}
+            onClose={closeEditDialog}
+            edge={edge || null}
+            datasetId={ref.datasetId}
+            graphJson={dataset?.graphJson || '{}'}
+            note={ref.note}
+            notePosition={ref.notePosition}
+            onSave={(updates) => {
+              updateEdgeNote(editingEdgeIndex, updates.note, updates.notePosition)
+            }}
+            onGraphUpdate={() => {
+              // Refetch datasets to get updated graph data
+              // The Apollo cache should handle this automatically
+            }}
+          />
+        )
+      })()}
     </PageContainer>
   )
 }

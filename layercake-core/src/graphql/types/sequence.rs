@@ -7,6 +7,15 @@ use crate::database::entities::{sequences, stories};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::Story;
 
+/// Note position for sequence edge annotations
+#[derive(Clone, Debug, Serialize, Deserialize, Enum, Copy, PartialEq, Eq)]
+#[graphql(name = "SequenceNotePosition", rename_items = "PascalCase")]
+pub enum NotePosition {
+    Source,
+    Target,
+    Both,
+}
+
 /// Reference to an edge in a dataset
 #[derive(Clone, Debug, Serialize, Deserialize, SimpleObject, InputObject)]
 #[graphql(input_name = "SequenceEdgeRefInput")]
@@ -15,6 +24,11 @@ pub struct SequenceEdgeRef {
     pub dataset_id: i32,
     #[graphql(name = "edgeId")]
     pub edge_id: String,
+    /// Optional note text for this edge in the sequence
+    pub note: Option<String>,
+    /// Where to display the note: Source, Target, or Both
+    #[graphql(name = "notePosition")]
+    pub note_position: Option<NotePosition>,
 }
 
 #[derive(SimpleObject)]

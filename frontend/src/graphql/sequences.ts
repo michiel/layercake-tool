@@ -12,6 +12,8 @@ export const LIST_SEQUENCES = gql`
       edgeOrder {
         datasetId
         edgeId
+        note
+        notePosition
       }
       edgeCount
       createdAt
@@ -32,6 +34,8 @@ export const GET_SEQUENCE = gql`
       edgeOrder {
         datasetId
         edgeId
+        note
+        notePosition
       }
       edgeCount
       createdAt
@@ -52,6 +56,8 @@ export const CREATE_SEQUENCE = gql`
       edgeOrder {
         datasetId
         edgeId
+        note
+        notePosition
       }
       edgeCount
       createdAt
@@ -72,6 +78,8 @@ export const UPDATE_SEQUENCE = gql`
       edgeOrder {
         datasetId
         edgeId
+        note
+        notePosition
       }
       edgeCount
       createdAt
@@ -89,9 +97,13 @@ export const DELETE_SEQUENCE = gql`
 
 // TypeScript interfaces
 
+export type NotePosition = 'Source' | 'Target' | 'Both'
+
 export interface SequenceEdgeRef {
   datasetId: number
   edgeId: string
+  note?: string
+  notePosition?: NotePosition
 }
 
 export interface Sequence {
