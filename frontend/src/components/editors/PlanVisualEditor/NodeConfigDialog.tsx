@@ -15,6 +15,8 @@ import { MergeNodeConfigForm } from './forms/MergeNodeConfigForm';
 import { GraphArtefactNodeConfigForm } from './forms/GraphArtefactNodeConfigForm';
 import { TreeArtefactNodeConfigForm } from './forms/TreeArtefactNodeConfigForm';
 import { GraphNodeConfigForm } from './forms/GraphNodeConfigForm';
+import { StoryNodeConfigForm } from './forms/StoryNodeConfigForm';
+import { SequenceArtefactNodeConfigForm } from './forms/SequenceArtefactNodeConfigForm';
 
 interface NodeConfigDialogProps {
   opened: boolean;
@@ -25,6 +27,7 @@ interface NodeConfigDialogProps {
   nodeId: string;
   config: any;
   metadata: any;
+  storyIdHint?: number;
 }
 
 const sanitizeMetadata = (raw: any): NodeMetadata => {
@@ -51,6 +54,7 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
   nodeId,
   config: initialConfig,
   metadata: initialMetadata,
+  storyIdHint,
 }) => {
   const [config, setConfigState] = React.useState(initialConfig);
   const [metadata, setMetadataState] = React.useState<NodeMetadata>(sanitizeMetadata(initialMetadata));
@@ -110,6 +114,16 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
         return <GraphArtefactNodeConfigForm {...commonProps} />;
       case PlanDagNodeType.TREE_ARTEFACT:
         return <TreeArtefactNodeConfigForm {...commonProps} />;
+      case PlanDagNodeType.STORY:
+        return (
+          <StoryNodeConfigForm
+            {...commonProps}
+            metadata={metadata}
+            setMetadata={setMetadata}
+          />
+        );
+      case PlanDagNodeType.SEQUENCE_ARTEFACT:
+        return <SequenceArtefactNodeConfigForm {...commonProps} storyId={storyIdHint} />;
       default:
         return <p className="text-destructive">Unknown node type: {nodeType}</p>;
     }
@@ -131,6 +145,10 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
         return 'Graph Artefact';
       case PlanDagNodeType.TREE_ARTEFACT:
         return 'Tree Artefact';
+      case PlanDagNodeType.STORY:
+        return 'Story';
+      case PlanDagNodeType.SEQUENCE_ARTEFACT:
+        return 'Sequence Artefact';
       default:
         return 'Unknown';
     }

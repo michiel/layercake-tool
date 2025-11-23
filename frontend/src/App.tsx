@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Routes, Route, useNavigate, useParams, useLocation } from 'react-router-dom'
-import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconDownload, IconChevronLeft, IconChevronRight, IconFolderPlus, IconBooks, IconMessageDots, IconAdjustments, IconHierarchy2, IconChevronDown, IconUpload } from '@tabler/icons-react'
+import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconDownload, IconChevronLeft, IconChevronRight, IconFolderPlus, IconBooks, IconAdjustments, IconHierarchy2, IconChevronDown, IconUpload, IconFlask } from '@tabler/icons-react'
 import { useQuery, useMutation } from '@apollo/client/react'
 import { gql } from '@apollo/client'
 import { Breadcrumbs } from './components/common/Breadcrumbs'
@@ -258,12 +258,6 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
         isActive: makeRouteMatcher(`/projects/${projectId}/data-acquisition/knowledge-base`),
       },
       {
-        key: 'dataset-creation',
-        label: 'Data set creation',
-        route: `/projects/${projectId}/data-acquisition/datasets`,
-        isActive: makeRouteMatcher(`/projects/${projectId}/data-acquisition/datasets`),
-      },
-      {
         key: 'data-sets',
         label: 'Data sets',
         route: `/projects/${projectId}/datasets`,
@@ -298,12 +292,24 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
       },
     ]
 
-    const chatChildren: ProjectNavChild[] = [
+    const experimentalChildren: ProjectNavChild[] = [
+      {
+        key: 'chat',
+        label: 'Chat',
+        route: `/projects/${projectId}/chat`,
+        isActive: makeRouteMatcher(`/projects/${projectId}/chat`),
+      },
       {
         key: 'chat-logs',
         label: 'Chat logs',
         route: `/projects/${projectId}/chat/logs`,
         isActive: makeRouteMatcher(`/projects/${projectId}/chat/logs`),
+      },
+      {
+        key: 'dataset-creation',
+        label: 'Data set creation',
+        route: `/projects/${projectId}/data-acquisition/datasets`,
+        isActive: makeRouteMatcher(`/projects/${projectId}/data-acquisition/datasets`),
       },
     ]
 
@@ -335,12 +341,12 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
         route: `/projects/${projectId}/artefacts`,
       }),
       createSection({
-        key: 'chat',
-        label: 'Chat',
-        icon: <IconMessageDots className="h-4 w-4" />,
+        key: 'experimental',
+        label: 'Experimental',
+        icon: <IconFlask className="h-4 w-4" />,
         route: `/projects/${projectId}/chat`,
         matchOptions: { prefix: true },
-        children: chatChildren,
+        children: experimentalChildren,
       }),
     ]
   }, [projectId, location.pathname])

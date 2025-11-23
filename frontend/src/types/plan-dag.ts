@@ -21,7 +21,7 @@ export interface NodeMetadata {
 
 export interface EdgeMetadata {
   label?: string;
-  dataType: 'GRAPH_DATA' | 'GRAPH_REFERENCE';
+  dataType: 'GRAPH_DATA' | 'GRAPH_REFERENCE' | 'SEQUENCE_DATA';
 }
 
 // Plan DAG Node Types
@@ -33,6 +33,8 @@ export enum PlanDagNodeType {
   MERGE = 'MergeNode',
   GRAPH_ARTEFACT = 'GraphArtefactNode',
   TREE_ARTEFACT = 'TreeArtefactNode',
+  STORY = 'StoryNode',
+  SEQUENCE_ARTEFACT = 'SequenceArtefactNode',
 }
 
 // Data Source Node Configuration
@@ -184,6 +186,27 @@ export interface TreeArtefactNodeConfig {
   };
 }
 
+// Story Node Configuration
+export interface StoryNodeConfig {
+  storyId?: number; // Reference to Story entity
+}
+
+// Sequence Artefact Node Configuration
+export type SequenceArtefactRenderTarget = 'MermaidSequence' | 'PlantUmlSequence';
+
+export interface SequenceArtefactNodeConfig {
+  renderTarget: SequenceArtefactRenderTarget;
+  outputPath: string;
+  renderConfig?: {
+    containNodes?: 'one' | 'all';
+    builtInStyles?: 'none' | 'light' | 'dark';
+    showNotes?: boolean;
+    renderAllSequences?: boolean;
+    enabledSequenceIds?: number[];
+  };
+  useStoryLayers?: boolean;
+}
+
 // Union type for all node configurations
 export type NodeConfig =
   | DataSetNodeConfig
@@ -192,7 +215,9 @@ export type NodeConfig =
   | FilterNodeConfig
   | MergeNodeConfig
   | GraphArtefactNodeConfig
-  | TreeArtefactNodeConfig;
+  | TreeArtefactNodeConfig
+  | StoryNodeConfig
+  | SequenceArtefactNodeConfig;
 
 export interface RenderTargetOptions {
   graphviz?: GraphvizRenderOptions;

@@ -27,6 +27,8 @@ pub fn generate_node_id_from_ids(
         PlanDagNodeType::Merge => "merge",
         PlanDagNodeType::GraphArtefact => "graphartefact",
         PlanDagNodeType::TreeArtefact => "treeartefact",
+        PlanDagNodeType::Story => "story",
+        PlanDagNodeType::SequenceArtefact => "sequenceartefact",
     };
 
     // Generate a globally unique ID using UUID to prevent collisions across projects/plans

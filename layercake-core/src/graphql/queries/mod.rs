@@ -15,8 +15,8 @@ use crate::graphql::types::project::Project;
 use crate::graphql::types::sample_project::SampleProject;
 use crate::graphql::types::{
     DataSet, DataSetPreview, GraphEdgePreview, GraphEdit, GraphNodePreview, GraphPreview, Layer,
-    LayerAlias, LibraryItem, LibraryItemFilterInput, ProjectCollaborator, ProjectLayer,
-    Sequence, Story, SystemSetting, TableColumn, TableRow, User, UserFilter, UserSession,
+    LayerAlias, LibraryItem, LibraryItemFilterInput, ProjectCollaborator, ProjectLayer, Sequence,
+    Story, SystemSetting, TableColumn, TableRow, User, UserFilter, UserSession,
 };
 use crate::services::{
     graph_edit_service::GraphEditService, library_item_service::LibraryItemFilter,
@@ -198,9 +198,7 @@ impl Query {
     /// Get a specific story by ID
     async fn story(&self, ctx: &Context<'_>, id: i32) -> Result<Option<Story>> {
         let context = ctx.data::<GraphQLContext>()?;
-        let story = stories::Entity::find_by_id(id)
-            .one(&context.db)
-            .await?;
+        let story = stories::Entity::find_by_id(id).one(&context.db).await?;
 
         Ok(story.map(Story::from))
     }
@@ -220,9 +218,7 @@ impl Query {
     /// Get a specific sequence by ID
     async fn sequence(&self, ctx: &Context<'_>, id: i32) -> Result<Option<Sequence>> {
         let context = ctx.data::<GraphQLContext>()?;
-        let sequence = sequences::Entity::find_by_id(id)
-            .one(&context.db)
-            .await?;
+        let sequence = sequences::Entity::find_by_id(id).one(&context.db).await?;
 
         Ok(sequence.map(Sequence::from))
     }

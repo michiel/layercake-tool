@@ -185,13 +185,7 @@ impl DagExecutor {
             }
             "FilterNode" => {
                 self.execute_filter_node(
-                    project_id,
-                    node_id,
-                    &node_name,
-                    node,
-                    nodes,
-                    edges,
-                    context,
+                    project_id, node_id, &node_name, node, nodes, edges, context,
                 )
                 .await?;
             }

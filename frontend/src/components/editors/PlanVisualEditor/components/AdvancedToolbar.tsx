@@ -6,6 +6,8 @@ import {
   IconFilter,
   IconGitMerge,
   IconFileExport,
+  IconBook,
+  IconTimeline,
   IconArrowRight,
   IconArrowDown,
   IconZoomScan,
@@ -60,6 +62,12 @@ export const AdvancedToolbar: React.FC<AdvancedToolbarProps> = ({
       color: '#3b82f6' // Blue-500
     },
     {
+      type: PlanDagNodeType.STORY,
+      label: 'Story',
+      icon: <IconBook size="0.7rem" />,
+      color: '#3b82f6' // Blue-500
+    },
+    {
       type: PlanDagNodeType.TRANSFORM,
       label: 'Transform',
       icon: <IconTransform size="0.7rem" />,
@@ -88,6 +96,12 @@ export const AdvancedToolbar: React.FC<AdvancedToolbarProps> = ({
       label: 'Tree Artefact',
       icon: <IconFileExport size="0.7rem" />,
       color: '#a855f7' // Purple-500
+    },
+    {
+      type: PlanDagNodeType.SEQUENCE_ARTEFACT,
+      label: 'Sequence',
+      icon: <IconTimeline size="0.7rem" />,
+      color: '#f97316' // Orange-500
     }
   ];
 

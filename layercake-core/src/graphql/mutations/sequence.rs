@@ -29,8 +29,8 @@ impl SequenceMutation {
                 ))
             })?;
 
-        let edge_order_json =
-            serde_json::to_string(&input.edge_order.unwrap_or_default()).map_err(|e| {
+        let edge_order_json = serde_json::to_string(&input.edge_order.unwrap_or_default())
+            .map_err(|e| {
                 StructuredError::bad_request(format!("Failed to serialize edge_order: {}", e))
             })?;
 

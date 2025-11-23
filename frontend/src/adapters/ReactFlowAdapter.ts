@@ -1,5 +1,7 @@
 import { Node, Edge } from 'reactflow'
 import { PlanDag, PlanDagNode, ReactFlowEdge } from '../types/plan-dag'
+import type { EdgeMetadata } from '../types/plan-dag'
+import { getEdgeColor, getEdgeLabel } from '../utils/edgeStyles'
 
 /**
  * ReactFlow Adapter Layer - Isolates ReactFlow concerns from business logic
@@ -167,7 +169,9 @@ export class ReactFlowAdapter {
    */
   private static convertPlanDagEdgeToReactFlow(edge: ReactFlowEdge): Edge {
     // FIX: Ensure metadata exists with defaults to prevent invisible edges
-    const metadata = edge.metadata || { label: 'Data', dataType: 'GRAPH_DATA' }
+    const metadata: EdgeMetadata = edge.metadata || { label: undefined, dataType: 'GRAPH_DATA' }
+    const resolvedLabel = metadata.label || getEdgeLabel(metadata.dataType)
+    const resolvedColor = getEdgeColor(metadata.dataType)
 
     return {
       id: edge.id,
@@ -176,9 +180,9 @@ export class ReactFlowAdapter {
       // Removed sourceHandle and targetHandle for floating edges
       type: 'floating',
       animated: false,
-      label: metadata.label || 'Data',
+      label: resolvedLabel,
       style: {
-        stroke: metadata.dataType === 'GRAPH_REFERENCE' ? '#228be6' : '#868e96',
+        stroke: resolvedColor,
         strokeWidth: 2,
       },
       labelStyle: {
@@ -188,7 +192,11 @@ export class ReactFlowAdapter {
       data: {
         // Original edge data for round-trip consistency
         originalEdge: edge,
-        metadata: metadata
+        metadata: {
+          ...metadata,
+          label: resolvedLabel,
+          dataType: metadata.dataType
+        }
       }
     }
   }
@@ -206,7 +214,7 @@ export class ReactFlowAdapter {
       // Removed sourceHandle and targetHandle for floating edges
       metadata: originalEdge?.metadata || {
         label: edge.label as string || '',
-        dataType: 'unknown'
+        dataType: 'GRAPH_DATA'
       }
     }
   }
@@ -225,6 +233,8 @@ export class ReactFlowAdapter {
       'graph_artefact': 'GraphArtefactNode',
       'tree_artefact': 'TreeArtefactNode',
       'graph': 'GraphNode',
+      'story': 'StoryNode',
+      'sequence_artefact': 'SequenceArtefactNode',
       // Backend may return capitalized variants
       'DataSet': 'DataSetNode',
       'Transform': 'TransformNode',
@@ -234,6 +244,8 @@ export class ReactFlowAdapter {
       'GraphArtefact': 'GraphArtefactNode',
       'TreeArtefact': 'TreeArtefactNode',
       'Graph': 'GraphNode',
+      'Story': 'StoryNode',
+      'SequenceArtefact': 'SequenceArtefactNode',
       // TypeScript enum format (PascalCase) - pass through
       'DataSetNode': 'DataSetNode',
       'TransformNode': 'TransformNode',
@@ -242,7 +254,9 @@ export class ReactFlowAdapter {
       'OutputNode': 'GraphArtefactNode', // legacy
       'GraphArtefactNode': 'GraphArtefactNode',
       'TreeArtefactNode': 'TreeArtefactNode',
-      'GraphNode': 'GraphNode'
+      'GraphNode': 'GraphNode',
+      'StoryNode': 'StoryNode',
+      'SequenceArtefactNode': 'SequenceArtefactNode',
     }
 
     const mapped = typeMap[nodeType]
@@ -265,7 +279,9 @@ export class ReactFlowAdapter {
       'OutputNode': 'graph_artefact',
       'GraphArtefactNode': 'graph_artefact',
       'TreeArtefactNode': 'tree_artefact',
-      'GraphNode': 'graph'
+      'GraphNode': 'graph',
+      'StoryNode': 'story',
+      'SequenceArtefactNode': 'sequence_artefact',
     }
 
     return typeMap[reactFlowType || 'default'] || 'unknown'

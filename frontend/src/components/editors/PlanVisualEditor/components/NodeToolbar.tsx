@@ -4,7 +4,9 @@ import {
   IconNetwork,
   IconTransform,
   IconGitMerge,
-  IconFileExport
+  IconFileExport,
+  IconBook,
+  IconTimeline
 } from '@tabler/icons-react';
 import { PlanDagNodeType } from '../../../../types/plan-dag';
 import { Group } from '../../../layout-primitives';
@@ -80,6 +82,12 @@ export const NodeToolbar: React.FC<NodeToolbarProps> = ({ onNodeDragStart, onNod
       color: '#339af0'
     },
     {
+      type: PlanDagNodeType.STORY,
+      label: 'Story',
+      icon: <IconBook size="1.2rem" />,
+      color: '#3b82f6'
+    },
+    {
       type: PlanDagNodeType.TRANSFORM,
       label: 'Transform',
       icon: <IconTransform size="1.2rem" />,
@@ -102,6 +110,12 @@ export const NodeToolbar: React.FC<NodeToolbarProps> = ({ onNodeDragStart, onNod
       label: 'Tree Artefact',
       icon: <IconFileExport size="1.2rem" />,
       color: '#845ef7'
+    },
+    {
+      type: PlanDagNodeType.SEQUENCE_ARTEFACT,
+      label: 'Sequence',
+      icon: <IconTimeline size="1.2rem" />,
+      color: '#f59e0b'
     },
   ];
 

@@ -591,10 +591,7 @@ impl AppContext {
             .create_empty_data_set(DataSetEmptyCreateRequest {
                 project_id,
                 name,
-                description: Some(format!(
-                    "Merged from {} data sets",
-                    data_set_ids.len()
-                )),
+                description: Some(format!("Merged from {} data sets", data_set_ids.len())),
             })
             .await?;
 
@@ -723,7 +720,8 @@ impl AppContext {
         merged.edges.extend(edge_map.into_values());
         merged.layers.extend(layer_map.into_values());
 
-        serde_json::to_string(&merged).map_err(|e| anyhow!("Failed to serialize merged data: {}", e))
+        serde_json::to_string(&merged)
+            .map_err(|e| anyhow!("Failed to serialize merged data: {}", e))
     }
 
     pub async fn export_data_sets(
@@ -2234,6 +2232,8 @@ fn node_type_prefix(node_type: &PlanDagNodeType) -> &'static str {
         PlanDagNodeType::Merge => "merge",
         PlanDagNodeType::GraphArtefact => "graphartefact",
         PlanDagNodeType::TreeArtefact => "treeartefact",
+        PlanDagNodeType::Story => "story",
+        PlanDagNodeType::SequenceArtefact => "sequenceartefact",
     }
 }
 
@@ -2246,6 +2246,8 @@ fn node_type_storage_name(node_type: &PlanDagNodeType) -> &'static str {
         PlanDagNodeType::Merge => "MergeNode",
         PlanDagNodeType::GraphArtefact => "GraphArtefactNode",
         PlanDagNodeType::TreeArtefact => "TreeArtefactNode",
+        PlanDagNodeType::Story => "StoryNode",
+        PlanDagNodeType::SequenceArtefact => "SequenceArtefactNode",
     }
 }
 

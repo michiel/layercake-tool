@@ -147,6 +147,46 @@ pub enum TreeArtefactRenderTarget {
     MermaidTreemap,
 }
 
+// Story Node Configuration
+#[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
+#[graphql(input_name = "StoryNodeConfigInput")]
+pub struct StoryNodeConfig {
+    #[graphql(name = "storyId")]
+    pub story_id: Option<i32>,
+}
+
+// Sequence Artefact Node Configuration
+#[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
+#[graphql(input_name = "SequenceArtefactNodeConfigInput")]
+pub struct SequenceArtefactNodeConfig {
+    pub render_target: SequenceArtefactRenderTarget,
+    pub output_path: String,
+    pub render_config: Option<SequenceRenderConfig>,
+    pub use_story_layers: Option<bool>,
+}
+
+#[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
+pub enum SequenceArtefactRenderTarget {
+    MermaidSequence,
+    PlantUmlSequence,
+}
+
+#[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
+#[graphql(input_name = "SequenceRenderConfigInput")]
+pub struct SequenceRenderConfig {
+    pub contain_nodes: Option<SequenceContainNodes>,
+    pub built_in_styles: Option<RenderBuiltinStyle>,
+    pub show_notes: Option<bool>,
+    pub render_all_sequences: Option<bool>,
+    pub enabled_sequence_ids: Option<Vec<i32>>,
+}
+
+#[derive(Enum, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
+pub enum SequenceContainNodes {
+    One,
+    All,
+}
+
 #[derive(SimpleObject, InputObject, Clone, Debug, Serialize, Deserialize)]
 #[graphql(input_name = "RenderConfigInput")]
 pub struct RenderConfig {
@@ -328,4 +368,6 @@ pub enum NodeConfig {
     Merge(MergeNodeConfig),
     GraphArtefact(GraphArtefactNodeConfig),
     TreeArtefact(TreeArtefactNodeConfig),
+    Story(StoryNodeConfig),
+    SequenceArtefact(SequenceArtefactNodeConfig),
 }

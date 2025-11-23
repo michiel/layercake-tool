@@ -286,6 +286,8 @@ impl ValidationService {
             "MergeNode",
             "GraphArtefactNode",
             "TreeArtefactNode",
+            "StoryNode",
+            "SequenceArtefactNode",
         ];
 
         let normalized = if node_type == "OutputNode" {

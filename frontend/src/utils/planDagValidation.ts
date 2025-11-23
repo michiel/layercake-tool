@@ -52,16 +52,26 @@ export const validateConnection = (
     ],
     [PlanDagNodeType.GRAPH_ARTEFACT]: [],
     [PlanDagNodeType.TREE_ARTEFACT]: [],
+    // Story nodes output sequence data to sequence artefact nodes
+    [PlanDagNodeType.STORY]: [
+      PlanDagNodeType.SEQUENCE_ARTEFACT,
+    ],
+    // Sequence artefact nodes are terminal (no outputs)
+    [PlanDagNodeType.SEQUENCE_ARTEFACT]: [],
   }
 
   const allowedTargets = validConnections[sourceType] || []
   const isValid = allowedTargets.includes(targetType)
 
   // Determine data type based on source node
-  const getDataType = (source: PlanDagNodeType): 'GRAPH_DATA' | 'GRAPH_REFERENCE' => {
+  const getDataType = (
+    source: PlanDagNodeType
+  ): 'GRAPH_DATA' | 'GRAPH_REFERENCE' | 'SEQUENCE_DATA' => {
     switch (source) {
       case PlanDagNodeType.GRAPH:
         return 'GRAPH_REFERENCE'
+      case PlanDagNodeType.STORY:
+        return 'SEQUENCE_DATA'
       case PlanDagNodeType.DATA_SOURCE:
       case PlanDagNodeType.TRANSFORM:
       case PlanDagNodeType.FILTER:
@@ -112,6 +122,8 @@ export const canAcceptMultipleInputs = (nodeType: PlanDagNodeType): boolean => {
     case PlanDagNodeType.FILTER:      // FilterNodes can have only one input
     case PlanDagNodeType.GRAPH_ARTEFACT: // Artefact nodes can have only one input
     case PlanDagNodeType.TREE_ARTEFACT:
+    case PlanDagNodeType.STORY:       // Story nodes don't accept inputs
+    case PlanDagNodeType.SEQUENCE_ARTEFACT: // Sequence artefact accepts one input
       return false
     default:
       return false
@@ -128,9 +140,11 @@ export const canHaveMultipleOutputs = (nodeType: PlanDagNodeType): boolean => {
     case PlanDagNodeType.TRANSFORM:   // TransformNodes can have multiple outputs (but not to same target)
     case PlanDagNodeType.FILTER:      // FilterNodes can have multiple outputs (but not to same target)
     case PlanDagNodeType.MERGE:       // MergeNodes output graph data and can connect to multiple targets
+    case PlanDagNodeType.STORY:       // Story nodes can connect to many sequence artefact nodes
       return true
     case PlanDagNodeType.GRAPH_ARTEFACT:
     case PlanDagNodeType.TREE_ARTEFACT:
+    case PlanDagNodeType.SEQUENCE_ARTEFACT:
       return false
     default:
       return false
@@ -143,13 +157,15 @@ export const canHaveMultipleOutputs = (nodeType: PlanDagNodeType): boolean => {
 export const getRequiredInputCount = (nodeType: PlanDagNodeType): number => {
   switch (nodeType) {
     case PlanDagNodeType.DATA_SOURCE:
-      return 0 // DataSet nodes are pure source nodes
+    case PlanDagNodeType.STORY:
+      return 0 // DataSet and Story nodes are pure source nodes
     case PlanDagNodeType.GRAPH:
       return 1 // Graph nodes can accept inputs from other nodes
     case PlanDagNodeType.TRANSFORM:
     case PlanDagNodeType.FILTER:
     case PlanDagNodeType.GRAPH_ARTEFACT:
     case PlanDagNodeType.TREE_ARTEFACT:
+    case PlanDagNodeType.SEQUENCE_ARTEFACT:
       return 1 // These require exactly one input
     case PlanDagNodeType.MERGE:
       return 2 // Merge requires at least two inputs
@@ -176,9 +192,12 @@ export const getNodeTypeColor = (nodeType: PlanDagNodeType): string => {
     case PlanDagNodeType.MERGE:
       return '#8b5cf6' // Violet-500
     case PlanDagNodeType.GRAPH_ARTEFACT:
+    case PlanDagNodeType.SEQUENCE_ARTEFACT:
       return '#f59e0b' // Amber-500
     case PlanDagNodeType.TREE_ARTEFACT:
       return '#845ef7' // Purple
+    case PlanDagNodeType.STORY:
+      return '#3b82f6' // Blue-500
     default:
       return '#868e96' // Gray
   }
@@ -202,6 +221,10 @@ export const getNodeTypeIcon = (nodeType: PlanDagNodeType): string => {
     case PlanDagNodeType.GRAPH_ARTEFACT:
     case PlanDagNodeType.TREE_ARTEFACT:
       return 'export'
+    case PlanDagNodeType.STORY:
+      return 'book'
+    case PlanDagNodeType.SEQUENCE_ARTEFACT:
+      return 'timeline'
     default:
       return 'box'
   }
@@ -371,12 +394,17 @@ export const isNodeConfigured = (
 
     case PlanDagNodeType.GRAPH_ARTEFACT:
     case PlanDagNodeType.TREE_ARTEFACT:
+    case PlanDagNodeType.SEQUENCE_ARTEFACT:
       // Artefact nodes MUST have one input to be configured
       return inputEdges.length === 1;
 
     case PlanDagNodeType.MERGE:
       // MergeNodes need at least 2 inputs to merge (assuming this requirement)
       return inputEdges.length >= 2;
+
+    case PlanDagNodeType.STORY:
+      // Story nodes are configured when they have a valid story ID
+      return hasValidConfig;
 
     default:
       return false;
@@ -404,13 +432,15 @@ export const validateUniqueTargets = (
 export const getMinimumRequiredInputs = (nodeType: PlanDagNodeType): number => {
   switch (nodeType) {
     case PlanDagNodeType.DATA_SOURCE:
-      return 0; // DataSet nodes don't need inputs
+    case PlanDagNodeType.STORY:
+      return 0; // DataSet and Story nodes don't need inputs
     case PlanDagNodeType.GRAPH:
       return 0; // GraphNodes can be empty (will show empty preview)
     case PlanDagNodeType.TRANSFORM:
     case PlanDagNodeType.FILTER:
     case PlanDagNodeType.GRAPH_ARTEFACT:
     case PlanDagNodeType.TREE_ARTEFACT:
+    case PlanDagNodeType.SEQUENCE_ARTEFACT:
       return 1; // These need exactly one input
     case PlanDagNodeType.MERGE:
       return 2; // Merge needs at least two inputs
@@ -430,9 +460,11 @@ export const getMinimumRequiredOutputs = (nodeType: PlanDagNodeType): number => 
       return 1; // These must have at least one output
     case PlanDagNodeType.GRAPH:
     case PlanDagNodeType.MERGE:
+    case PlanDagNodeType.STORY:
       return 0; // These can exist without outputs (terminal nodes)
     case PlanDagNodeType.GRAPH_ARTEFACT:
     case PlanDagNodeType.TREE_ARTEFACT:
+    case PlanDagNodeType.SEQUENCE_ARTEFACT:
       return 0; // Artefact nodes have no outputs
     default:
       return 0;

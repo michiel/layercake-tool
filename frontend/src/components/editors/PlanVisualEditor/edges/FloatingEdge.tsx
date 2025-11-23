@@ -1,5 +1,7 @@
 import { useStore, getBezierPath, EdgeProps, Node } from 'reactflow';
 import { getEdgeParams } from './edgeUtils';
+import { getEdgeColor } from '../../../../utils/edgeStyles';
+import type { EdgeDataType } from '../../../../utils/edgeStyles';
 
 // Selector for accessing nodes from ReactFlow store
 const selector = (s: any) => ({
@@ -63,7 +65,7 @@ export function FloatingEdge({
   });
 
   // Apply styling based on edge data type (maintaining current behavior)
-  const edgeColor = data?.metadata?.dataType === 'GRAPH_REFERENCE' ? '#228be6' : '#868e96';
+  const edgeColor = getEdgeColor(data?.metadata?.dataType as EdgeDataType);
   const strokeWidth = selected ? 3 : 2;
 
   return (

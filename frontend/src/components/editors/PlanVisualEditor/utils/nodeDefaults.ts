@@ -4,6 +4,8 @@ import {
   NodeMetadata,
   DEFAULT_GRAPHVIZ_OPTIONS,
   DEFAULT_MERMAID_OPTIONS,
+  StoryNodeConfig,
+  SequenceArtefactNodeConfig,
 } from '../../../../types/plan-dag';
 
 export const generateNodeId = (type: PlanDagNodeType, existingNodeIds: string[] = []): string => {
@@ -105,20 +107,41 @@ export const getDefaultNodeConfig = (type: PlanDagNodeType): NodeConfig => {
         graphConfig: {}
       };
 
+    case PlanDagNodeType.STORY:
+      return {
+        storyId: undefined,
+      } as StoryNodeConfig;
+
+    case PlanDagNodeType.SEQUENCE_ARTEFACT:
+      return {
+        renderTarget: 'MermaidSequence',
+        outputPath: '',
+        renderConfig: {
+          containNodes: 'one',
+          builtInStyles: 'light',
+          showNotes: true,
+          renderAllSequences: true,
+          enabledSequenceIds: [],
+        },
+        useStoryLayers: true,
+      } as SequenceArtefactNodeConfig;
+
     default:
       return {} as NodeConfig;
   }
 };
 
 export const getDefaultNodeMetadata = (type: PlanDagNodeType): NodeMetadata => {
-  const typeNames = {
+  const typeNames: Record<PlanDagNodeType, string> = {
     [PlanDagNodeType.DATA_SOURCE]: 'Data Source',
     [PlanDagNodeType.GRAPH]: 'Graph',
     [PlanDagNodeType.TRANSFORM]: 'Transform',
     [PlanDagNodeType.FILTER]: 'Filter',
     [PlanDagNodeType.MERGE]: 'Merge',
     [PlanDagNodeType.GRAPH_ARTEFACT]: 'Graph Artefact',
-    [PlanDagNodeType.TREE_ARTEFACT]: 'Tree Artefact'
+    [PlanDagNodeType.TREE_ARTEFACT]: 'Tree Artefact',
+    [PlanDagNodeType.STORY]: 'Story',
+    [PlanDagNodeType.SEQUENCE_ARTEFACT]: 'Sequence Artefact',
   };
 
   return {
@@ -134,5 +157,7 @@ export const getNodeColors = () => ({
   [PlanDagNodeType.FILTER]: '#a78bfa',
   [PlanDagNodeType.MERGE]: '#ffd43b',
   [PlanDagNodeType.GRAPH_ARTEFACT]: '#ff6b6b',
-  [PlanDagNodeType.TREE_ARTEFACT]: '#845ef7'
+  [PlanDagNodeType.TREE_ARTEFACT]: '#845ef7',
+  [PlanDagNodeType.STORY]: '#3b82f6',
+  [PlanDagNodeType.SEQUENCE_ARTEFACT]: '#f59e0b',
 });

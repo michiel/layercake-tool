@@ -23,9 +23,11 @@ import { Alert, AlertDescription } from '../../ui/alert'
 import { Spinner } from '../../ui/spinner'
 import { Card } from '../../ui/card'
 
-import { PlanDagNodeType, NodeConfig, NodeMetadata, DataSetNodeConfig, ReactFlowEdge, PlanDagNode, PlanDag } from '../../../types/plan-dag'
+import { PlanDagNodeType, NodeConfig, NodeMetadata, DataSetNodeConfig, ReactFlowEdge, PlanDagNode, PlanDag, StoryNodeConfig } from '../../../types/plan-dag'
 import { validateConnectionWithCycleDetection, canAcceptMultipleInputs, isNodeConfigured } from '../../../utils/planDagValidation'
 import { ReactFlowAdapter } from '../../../adapters/ReactFlowAdapter'
+import { getEdgeColor, getEdgeLabel } from '../../../utils/edgeStyles'
+import type { EdgeDataType } from '../../../utils/edgeStyles'
 
 // Import node types constant
 import { NODE_TYPES } from './nodeTypes'
@@ -508,15 +510,17 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
       const newEdgeId = `${newConnection.source}-${newConnection.target}-${Date.now()}`
 
       // Create the new edge with the updated connection (floating edges don't use handles)
+      const resolvedLabel = getEdgeLabel(isValid.dataType)
       const newEdge: ReactFlowEdge = {
         id: newEdgeId,
         source: newConnection.source!,
         target: newConnection.target!,
         metadata: {
-          label: isValid.dataType === 'GRAPH_REFERENCE' ? 'Graph Ref' : 'Data',
+          label: resolvedLabel,
           dataType: isValid.dataType,
         }
       }
+      const resolvedColor = getEdgeColor(isValid.dataType)
 
       // Update local state - remove old edge and add new one
       setEdges((els) => {
@@ -526,7 +530,7 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
           type: 'floating',
           animated: false,
           style: {
-            stroke: isValid.dataType === 'GRAPH_REFERENCE' ? '#228be6' : '#868e96',
+            stroke: resolvedColor,
             strokeWidth: 2,
           },
           data: { metadata: newEdge.metadata }
@@ -657,12 +661,12 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
         type: 'floating',
         animated: false,
         style: {
-          stroke: isValid.dataType === 'GRAPH_REFERENCE' ? '#228be6' : '#868e96',
+          stroke: getEdgeColor(isValid.dataType),
           strokeWidth: 2,
         },
         data: {
           metadata: {
-            label: isValid.dataType === 'GRAPH_REFERENCE' ? 'Graph Ref' : 'Data',
+            label: getEdgeLabel(isValid.dataType),
             dataType: isValid.dataType,
           }
         }
@@ -1325,7 +1329,7 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
                 source: sourceConnection.nodeId,
                 target: createdNode.id,  // Use backend-generated node ID
                 metadata: {
-                  label: validation.dataType === 'GRAPH_REFERENCE' ? 'Graph Ref' : 'Data',
+                  label: getEdgeLabel(validation.dataType),
                   dataType: validation.dataType,
                 },
               };
@@ -1467,8 +1471,11 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
       // Check if the source node is fully configured
       const sourceConfigured = isNodeFullyConfigured(edge.source)
 
-      // Determine color: blue for configured source, orange for unconfigured source
-      const edgeColor = sourceConfigured ? '#228be6' : '#fd7e14'
+      // Determine base color from edge data type; fall back to warning orange while source is unconfigured
+      const edgeDataType = ((edge.data as any)?.metadata?.dataType ||
+        (edge as any).metadata?.dataType) as EdgeDataType
+      const configuredColor = getEdgeColor(edgeDataType)
+      const edgeColor = sourceConfigured ? configuredColor : '#fd7e14'
 
       return {
         ...edge,
@@ -1487,6 +1494,28 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
       }
     })
   }, [edges, isNodeFullyConfigured, readonly])
+
+  const sequenceStoryId = useMemo(() => {
+    if (configNodeType !== PlanDagNodeType.SEQUENCE_ARTEFACT || !configNodeId) {
+      return undefined
+    }
+
+    const incomingStoryEdge = edges.find(edge => edge.target === configNodeId)
+    if (!incomingStoryEdge) return undefined
+
+    const sourceNode = nodes.find(node => node.id === incomingStoryEdge.source)
+    if (!sourceNode || sourceNode.data?.nodeType !== PlanDagNodeType.STORY) {
+      return undefined
+    }
+
+    const storyConfig = sourceNode.data?.config as StoryNodeConfig | undefined
+    const rawStoryId = storyConfig?.storyId
+    if (typeof rawStoryId === 'number') {
+      return rawStoryId > 0 ? rawStoryId : undefined
+    }
+    const parsed = Number(rawStoryId)
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined
+  }, [configNodeId, configNodeType, edges, nodes])
 
   if (loading) {
     return (
@@ -1678,6 +1707,7 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
         config={configNodeConfig}
         metadata={configNodeMetadata}
         projectId={projectId}
+        storyIdHint={sequenceStoryId}
         onSave={handleNodeConfigSave}
       />
 

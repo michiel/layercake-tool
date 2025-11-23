@@ -6,6 +6,8 @@ import {
   IconFilter,
   IconGitMerge,
   IconFileExport,
+  IconBook,
+  IconTimeline,
 } from '@tabler/icons-react'
 
 /**
@@ -16,6 +18,7 @@ export enum OperationCategory {
   GRAPH = 'GRAPH',       // Graph operations
   OPERATION = 'OPERATION', // Transform, Filter, Merge
   OUTPUT = 'OUTPUT',     // Artefact nodes
+  STORY = 'STORY',       // Story nodes
 }
 
 /**
@@ -26,6 +29,7 @@ export const OPERATION_COLORS = {
   [OperationCategory.GRAPH]: '#3b82f6',    // Blue-500 - Classic blue for graph operations
   [OperationCategory.OPERATION]: '#8b5cf6', // Violet-500 - Purple for data operations
   [OperationCategory.OUTPUT]: '#f59e0b',   // Amber-500 - Warm amber for output
+  [OperationCategory.STORY]: '#3b82f6',    // Blue-500 - Blue for story nodes
 } as const
 
 /**
@@ -43,7 +47,10 @@ export const getOperationCategory = (nodeType: PlanDagNodeType): OperationCatego
       return OperationCategory.OPERATION
     case PlanDagNodeType.GRAPH_ARTEFACT:
     case PlanDagNodeType.TREE_ARTEFACT:
+    case PlanDagNodeType.SEQUENCE_ARTEFACT:
       return OperationCategory.OUTPUT
+    case PlanDagNodeType.STORY:
+      return OperationCategory.STORY
     default:
       return OperationCategory.OPERATION
   }
@@ -77,6 +84,10 @@ export const getNodeIcon = (nodeType: PlanDagNodeType, size: string | number = '
     case PlanDagNodeType.GRAPH_ARTEFACT:
     case PlanDagNodeType.TREE_ARTEFACT:
       return <IconFileExport {...iconProps} />
+    case PlanDagNodeType.STORY:
+      return <IconBook {...iconProps} />
+    case PlanDagNodeType.SEQUENCE_ARTEFACT:
+      return <IconTimeline {...iconProps} />
     default:
       return <IconNetwork {...iconProps} />
   }
@@ -101,6 +112,10 @@ export const getNodeTypeLabel = (nodeType: PlanDagNodeType): string => {
       return 'Graph Artefact'
     case PlanDagNodeType.TREE_ARTEFACT:
       return 'Tree Artefact'
+    case PlanDagNodeType.STORY:
+      return 'Story'
+    case PlanDagNodeType.SEQUENCE_ARTEFACT:
+      return 'Sequence Artefact'
     default:
       return 'Unknown'
   }

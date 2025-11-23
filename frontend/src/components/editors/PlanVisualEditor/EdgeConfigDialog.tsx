@@ -30,11 +30,12 @@ import {
 } from '@/components/ui/form'
 import { Stack } from '@/components/layout-primitives'
 import { ReactFlowEdge } from '../../../types/plan-dag'
+import { getEdgeColor } from '../../../utils/edgeStyles'
 
 // Zod schema for edge form validation
 const edgeConfigSchema = z.object({
   label: z.string().min(1, 'Label is required').transform((val) => val.trim()),
-  dataType: z.enum(['GRAPH_DATA', 'GRAPH_REFERENCE']),
+  dataType: z.enum(['GRAPH_DATA', 'GRAPH_REFERENCE', 'SEQUENCE_DATA']),
 })
 
 type EdgeFormData = z.infer<typeof edgeConfigSchema>
@@ -55,6 +56,7 @@ export const EdgeConfigDialog = ({
   readonly = false
 }: EdgeConfigDialogProps) => {
   const [loading, setLoading] = useState(false)
+  const isSequenceEdge = edge?.metadata?.dataType === 'SEQUENCE_DATA'
 
   const form = useForm<EdgeFormData>({
     resolver: zodResolver(edgeConfigSchema),
@@ -69,7 +71,7 @@ export const EdgeConfigDialog = ({
     if (edge) {
       form.reset({
         label: edge.label || '',
-        dataType: (edge.metadata?.dataType as 'GRAPH_DATA' | 'GRAPH_REFERENCE') || 'GRAPH_DATA'
+        dataType: (edge.metadata?.dataType as 'GRAPH_DATA' | 'GRAPH_REFERENCE' | 'SEQUENCE_DATA') || 'GRAPH_DATA'
       })
     }
   }, [edge, form])
@@ -89,7 +91,7 @@ export const EdgeConfigDialog = ({
         },
         style: {
           ...edge.style,
-          stroke: values.dataType === 'GRAPH_REFERENCE' ? '#228be6' : '#868e96'
+          stroke: getEdgeColor(values.dataType)
         }
       }
 
@@ -148,7 +150,7 @@ export const EdgeConfigDialog = ({
                     <Select
                       value={field.value}
                       onValueChange={field.onChange}
-                      disabled={readonly || loading}
+                      disabled={readonly || loading || isSequenceEdge}
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -158,11 +160,21 @@ export const EdgeConfigDialog = ({
                       <SelectContent>
                         <SelectItem value="GRAPH_DATA">Graph Data</SelectItem>
                         <SelectItem value="GRAPH_REFERENCE">Graph Reference</SelectItem>
+                        <SelectItem value="SEQUENCE_DATA">Sequence Data</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormDescription>
-                      <strong>Graph Data:</strong> Actual data flow between nodes (grey line)<br/>
-                      <strong>Graph Reference:</strong> Reference to another graph (blue line)
+                      {isSequenceEdge ? (
+                        <>Sequence edges always carry Story output. The type is locked to ensure Sequence Artefact nodes receive SequenceData.</>
+                      ) : (
+                        <>
+                          <strong>Graph Data:</strong> Actual data flow between nodes (gray line)
+                          <br />
+                          <strong>Graph Reference:</strong> Reference to another graph (blue line)
+                          <br />
+                          <strong>Sequence Data:</strong> Story/sequence output (orange line)
+                        </>
+                      )}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>

@@ -17,8 +17,9 @@ impl StoryMutation {
         let context = ctx.data::<GraphQLContext>()?;
         let now = Utc::now();
 
-        let tags_json = serde_json::to_string(&input.tags.unwrap_or_default())
-            .map_err(|e| StructuredError::bad_request(format!("Failed to serialize tags: {}", e)))?;
+        let tags_json = serde_json::to_string(&input.tags.unwrap_or_default()).map_err(|e| {
+            StructuredError::bad_request(format!("Failed to serialize tags: {}", e))
+        })?;
 
         let enabled_dataset_ids_json =
             serde_json::to_string(&input.enabled_dataset_ids.unwrap_or_default()).map_err(|e| {
@@ -28,8 +29,8 @@ impl StoryMutation {
                 ))
             })?;
 
-        let layer_config_json =
-            serde_json::to_string(&input.layer_config.unwrap_or_default()).map_err(|e| {
+        let layer_config_json = serde_json::to_string(&input.layer_config.unwrap_or_default())
+            .map_err(|e| {
                 StructuredError::bad_request(format!("Failed to serialize layer_config: {}", e))
             })?;
 

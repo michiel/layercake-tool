@@ -135,8 +135,7 @@ pub enum RenderConfigOrientation {
     TB,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Copy, PartialEq, Eq)]
-#[derive(Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Copy, PartialEq, Eq, Default)]
 pub enum NotePosition {
     #[serde(rename = "left")]
     #[default]
@@ -148,7 +147,6 @@ pub enum NotePosition {
     #[serde(rename = "bottom")]
     Bottom,
 }
-
 
 #[derive(Serialize, Deserialize, Clone, Debug, Copy, PartialEq, Eq)]
 pub enum RenderConfigBuiltInStyle {
@@ -301,8 +299,7 @@ pub enum GraphvizLayout {
     Circo,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Copy, PartialEq, Eq)]
-#[derive(Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Copy, PartialEq, Eq, Default)]
 pub enum GraphvizCommentStyle {
     #[serde(rename = "label")]
     #[default]
@@ -310,7 +307,6 @@ pub enum GraphvizCommentStyle {
     #[serde(rename = "tooltip")]
     Tooltip,
 }
-
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MermaidRenderOptions {
@@ -444,9 +440,7 @@ impl ExportProfileItem {
                 }
             })
             .unwrap_or(RenderConfigBuiltInStyle::Light);
-        let mut target_options = render_config
-            .target_options
-            .unwrap_or_default();
+        let mut target_options = render_config.target_options.unwrap_or_default();
         if target_options.graphviz.is_none() {
             target_options.graphviz = Some(GraphvizRenderOptions::default());
         }

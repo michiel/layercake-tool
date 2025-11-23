@@ -48,6 +48,12 @@ pub enum PlanDagNodeType {
     #[graphql(name = "TreeArtefactNode")]
     #[serde(rename = "TreeArtefactNode")]
     TreeArtefact,
+    #[graphql(name = "StoryNode")]
+    #[serde(rename = "StoryNode")]
+    Story,
+    #[graphql(name = "SequenceArtefactNode")]
+    #[serde(rename = "SequenceArtefactNode")]
+    SequenceArtefact,
 }
 
 // Complete Plan DAG Structure

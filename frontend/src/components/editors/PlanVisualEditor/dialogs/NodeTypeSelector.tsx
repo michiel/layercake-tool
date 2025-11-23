@@ -24,6 +24,8 @@ export const NodeTypeSelector = ({ opened, onClose, onSelect }: NodeTypeSelector
     PlanDagNodeType.MERGE,
     PlanDagNodeType.GRAPH_ARTEFACT,
     PlanDagNodeType.TREE_ARTEFACT,
+    PlanDagNodeType.STORY,
+    PlanDagNodeType.SEQUENCE_ARTEFACT,
   ];
 
   return (

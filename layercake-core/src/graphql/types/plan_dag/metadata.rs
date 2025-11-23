@@ -25,6 +25,7 @@ pub struct EdgeMetadata {
 pub enum DataType {
     GraphData,
     GraphReference,
+    SequenceData,
 }
 
 // Execution metadata for DataSet nodes

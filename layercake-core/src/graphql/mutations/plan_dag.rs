@@ -285,6 +285,8 @@ impl PlanDagMutation {
                 crate::graphql::types::PlanDagNodeType::Merge => "MergeNode",
                 crate::graphql::types::PlanDagNodeType::GraphArtefact => "GraphArtefactNode",
                 crate::graphql::types::PlanDagNodeType::TreeArtefact => "TreeArtefactNode",
+                crate::graphql::types::PlanDagNodeType::Story => "StoryNode",
+                crate::graphql::types::PlanDagNodeType::SequenceArtefact => "SequenceArtefactNode",
             };
 
             let metadata_json = serde_json::to_string(&node.metadata)?;
