@@ -69,6 +69,7 @@ export const GET_GRAPH_PREVIEW = gql`
         backgroundColor
         textColor
         borderColor
+        alias
         comment
         properties
       }

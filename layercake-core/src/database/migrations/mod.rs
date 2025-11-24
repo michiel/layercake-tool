@@ -33,6 +33,7 @@ mod m20251122_000003_create_stories;
 mod m20251122_000004_create_sequences;
 mod m20251123_000002_allow_multiple_plans;
 mod m20251205_000001_create_sequence_contexts;
+mod m20251207_000002_add_alias_to_layers;
 
 pub struct Migrator;
 
@@ -73,6 +74,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20251122_000004_create_sequences::Migration),
             Box::new(m20251205_000001_create_sequence_contexts::Migration),
             Box::new(m20251123_000002_allow_multiple_plans::Migration),
+            Box::new(m20251207_000002_add_alias_to_layers::Migration),
         ]
     }
 }

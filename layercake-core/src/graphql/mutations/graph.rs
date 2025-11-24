@@ -75,6 +75,7 @@ impl GraphMutation {
             background_color: Set(None),
             text_color: Set(None),
             border_color: Set(None),
+            alias: Set(None),
             comment: Set(None),
             properties: Set(None),
             dataset_id: Set(None),
@@ -116,13 +117,14 @@ impl GraphMutation {
         ctx: &Context<'_>,
         id: i32,
         name: Option<String>,
+        alias: Option<String>,
         properties: Option<crate::graphql::types::scalars::JSON>,
     ) -> Result<crate::graphql::types::layer::Layer> {
         let context = ctx.data::<GraphQLContext>()?;
 
         let layer = context
             .app
-            .update_layer_properties(id, name, properties)
+            .update_layer_properties(id, name, alias, properties)
             .await
             .map_err(|e| StructuredError::service("AppContext::update_layer_properties", e))?;
 
@@ -406,6 +408,7 @@ impl GraphMutation {
                 id: layer_update.id,
                 name: layer_update.name,
                 properties: layer_update.properties,
+                alias: layer_update.alias,
             })
             .collect();
 

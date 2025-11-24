@@ -864,6 +864,7 @@ impl DagExecutor {
                     background_color,
                     text_color,
                     border_color,
+                    alias: layer.alias.clone(),
                     comment: None, // Layer struct doesn't have comment field
                     properties: properties_json,
                     dataset_id: layer.dataset,

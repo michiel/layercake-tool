@@ -424,6 +424,11 @@ impl GraphEditApplicator {
             .get("comment")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
+        let alias = new_value
+            .get("alias")
+            .and_then(|v| v.as_str())
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty());
 
         let layer = graph_layers::ActiveModel {
             id: Set(Default::default()),
@@ -433,6 +438,7 @@ impl GraphEditApplicator {
             background_color: Set(background_color),
             text_color: Set(text_color),
             border_color: Set(border_color),
+            alias: Set(alias),
             comment: Set(comment),
             properties: Set(properties),
             dataset_id: Set(None),
@@ -480,6 +486,13 @@ impl GraphEditApplicator {
                     }
                     "comment" => {
                         active_model.comment = Set(new_value.as_str().map(|s| s.to_string()));
+                    }
+                    "alias" => {
+                        let alias_value = new_value
+                            .as_str()
+                            .map(|s| s.trim().to_string())
+                            .filter(|s| !s.is_empty());
+                        active_model.alias = Set(alias_value);
                     }
                     "properties" => {
                         let properties_string = serde_json::to_string(new_value)?;

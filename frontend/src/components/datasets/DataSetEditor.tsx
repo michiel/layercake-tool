@@ -29,6 +29,7 @@ import {
 } from '../../graphql/datasets'
 import { GET_PROJECT_LAYERS, ProjectLayer } from '../../graphql/layers'
 import { GraphSpreadsheetEditor, GraphData } from '../editors/GraphSpreadsheetEditor'
+import type { GraphNode, GraphEdge } from '../editors/GraphSpreadsheetEditor'
 import { Stack, Group } from '../layout-primitives'
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert'
 import { Badge } from '../ui/badge'
@@ -121,19 +122,6 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
     [projectLayersData]
   )
 
-  const originalDatasetLayers = useMemo(() => {
-    if (!dataSource?.graphJson) {
-      return []
-    }
-    try {
-      const parsed = JSON.parse(dataSource.graphJson)
-      return Array.isArray(parsed.layers) ? parsed.layers : []
-    } catch (error) {
-      console.error('Failed to parse dataset layers', error)
-      return []
-    }
-  }, [dataSource])
-
   const resolvedGraphData = useMemo((): GraphData | null => {
     if (!dataSource?.graphJson) {
       return null
@@ -174,12 +162,12 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
       }))
 
       const referencedLayerIds = new Set<string>()
-      nodes.forEach(node => {
+      nodes.forEach((node: GraphNode) => {
         if (node.layer) {
           referencedLayerIds.add(node.layer)
         }
       })
-      edges.forEach(edge => {
+      edges.forEach((edge: GraphEdge) => {
         if (edge.layer) {
           referencedLayerIds.add(edge.layer)
         }

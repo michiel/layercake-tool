@@ -7,6 +7,7 @@ pub(crate) struct LayerData {
     pub background_color: Option<String>,
     pub text_color: Option<String>,
     pub border_color: Option<String>,
+    pub alias: Option<String>,
     pub comment: Option<String>,
     pub properties: Option<String>, // JSON string
     pub dataset_id: Option<i32>,

@@ -12,6 +12,7 @@ pub struct Model {
     pub background_color: String,
     pub text_color: String,
     pub border_color: String,
+    pub alias: Option<String>,
     pub source_dataset_id: Option<i32>,
     pub enabled: bool,
     pub created_at: ChronoDateTimeUtc,

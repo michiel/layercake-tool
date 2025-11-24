@@ -1467,6 +1467,8 @@ pub struct Layer {
     pub text_color: String,
     pub border_color: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub alias: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub dataset: Option<i32>,
 }
 
@@ -1484,6 +1486,7 @@ impl Layer {
             background_color: background_color.to_string(),
             text_color: text_color.to_string(),
             border_color: border_color.to_string(),
+            alias: None,
             dataset: None,
         }
     }
@@ -1607,6 +1610,7 @@ impl Layer {
             background_color: get_stripped_value(record, 2, "background")?,
             border_color: get_stripped_value(record, 3, "border_color")?,
             text_color: get_stripped_value(record, 4, "text_color")?,
+            alias: None,
             dataset: None,
         })
     }
@@ -1672,6 +1676,7 @@ mod tests {
                 background_color: "FFFFFF".to_string(),
                 text_color: "000000".to_string(),
                 border_color: "000000".to_string(),
+                alias: None,
                 dataset: None,
             }],
             annotations: None,
@@ -1826,6 +1831,7 @@ mod tests {
                     background_color: "FFFFFF".to_string(),
                     text_color: "000000".to_string(),
                     border_color: "000000".to_string(),
+                    alias: None,
                     dataset: None,
                 },
                 Layer {
@@ -1834,6 +1840,7 @@ mod tests {
                     background_color: "EEEEEE".to_string(),
                     text_color: "000000".to_string(),
                     border_color: "000000".to_string(),
+                    alias: None,
                     dataset: None,
                 },
                 Layer {
@@ -1842,6 +1849,7 @@ mod tests {
                     background_color: "222222".to_string(),
                     text_color: "FFFFFF".to_string(),
                     border_color: "DDDDDD".to_string(),
+                    alias: None,
                     dataset: None,
                 },
             ],
@@ -2361,6 +2369,7 @@ mod tests {
                 background_color: "FFFFFF".to_string(),
                 text_color: "000000".to_string(),
                 border_color: "000000".to_string(),
+                alias: None,
                 dataset: None,
             }],
             annotations: None,
@@ -2432,6 +2441,7 @@ mod tests {
                 background_color: "FFFFFF".to_string(),
                 text_color: "000000".to_string(),
                 border_color: "000000".to_string(),
+                alias: None,
                 dataset: None,
             }],
             annotations: None,
@@ -2516,6 +2526,7 @@ mod tests {
                 background_color: "FFFFFF".to_string(),
                 text_color: "000000".to_string(),
                 border_color: "000000".to_string(),
+                alias: None,
                 dataset: None,
             }],
             annotations: None,
@@ -2612,6 +2623,7 @@ mod tests {
                 background_color: "FFFFFF".to_string(),
                 text_color: "000000".to_string(),
                 border_color: "000000".to_string(),
+                alias: None,
                 dataset: None,
             }],
             annotations: None,
@@ -2695,6 +2707,7 @@ mod tests {
                 background_color: "FFFFFF".to_string(),
                 text_color: "000000".to_string(),
                 border_color: "000000".to_string(),
+                alias: None,
                 dataset: None,
             }],
             annotations: None,
@@ -2778,6 +2791,7 @@ mod tests {
                 background_color: "FFFFFF".to_string(),
                 text_color: "000000".to_string(),
                 border_color: "000000".to_string(),
+                alias: None,
                 dataset: None,
             }],
             annotations: None,
@@ -2824,6 +2838,7 @@ mod tests {
                 background_color: "FFFFFF".to_string(),
                 text_color: "000000".to_string(),
                 border_color: "000000".to_string(),
+                alias: None,
                 dataset: None,
             }],
             annotations: None,

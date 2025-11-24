@@ -10,6 +10,7 @@ export const GET_PROJECT_LAYERS = gql`
       backgroundColor
       textColor
       borderColor
+      alias
       sourceDatasetId
       enabled
       createdAt
@@ -34,6 +35,7 @@ export const UPSERT_PROJECT_LAYER = gql`
       backgroundColor
       textColor
       borderColor
+      alias
       sourceDatasetId
       enabled
     }
@@ -133,6 +135,7 @@ export interface ProjectLayerInput {
   backgroundColor?: string
   textColor?: string
   borderColor?: string
+  alias?: string | null
   sourceDatasetId?: number | null
   enabled?: boolean
 }
@@ -145,6 +148,7 @@ export interface ProjectLayer {
   backgroundColor: string
   textColor: string
   borderColor: string
+  alias?: string | null
   sourceDatasetId?: number | null
   enabled: boolean
   aliases?: LayerAlias[]

@@ -247,11 +247,16 @@ fn parse_layer_updates(arguments: &Option<Value>) -> McpResult<Vec<GraphLayerUpd
             .get("name")
             .and_then(Value::as_str)
             .map(|s| s.to_string());
+        let alias = layer
+            .get("alias")
+            .and_then(Value::as_str)
+            .map(|s| s.to_string());
         let properties = layer.get("properties").cloned();
 
         requests.push(GraphLayerUpdateRequest {
             id,
             name,
+            alias,
             properties,
         });
     }

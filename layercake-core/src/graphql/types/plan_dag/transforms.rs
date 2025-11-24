@@ -615,6 +615,7 @@ mod tests {
                 background_color: "FFFFFF".to_string(),
                 text_color: "000000".to_string(),
                 border_color: "000000".to_string(),
+                alias: None,
                 dataset: None,
             }],
             annotations: None,

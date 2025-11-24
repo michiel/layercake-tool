@@ -42,6 +42,17 @@ impl GraphService {
         }
     }
 
+    fn normalize_alias(alias: Option<String>) -> Option<String> {
+        alias.and_then(|value| {
+            let trimmed = value.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        })
+    }
+
     async fn seed_layers_from_dataset(
         &self,
         project_id: i32,
@@ -119,6 +130,10 @@ impl GraphService {
                             .and_then(|v| v.as_str())
                             .unwrap_or("000000"),
                     );
+                    let alias = obj
+                        .get("alias")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
 
                     tracing::debug!(
                         "Upserting layer '{}' from dataset {} (enabled={})",
@@ -135,6 +150,7 @@ impl GraphService {
                             background_color,
                             text_color,
                             border_color,
+                            alias,
                             Some(dataset_id),
                             enabled,
                         )
@@ -259,14 +275,7 @@ impl GraphService {
                 continue; // Skip duplicate layer_id
             }
             seen.insert(db_layer.layer_id.clone());
-            palette.push(Layer {
-                id: db_layer.layer_id,
-                label: db_layer.name,
-                background_color: db_layer.background_color,
-                text_color: db_layer.text_color,
-                border_color: db_layer.border_color,
-                dataset: db_layer.source_dataset_id,
-            });
+            palette.push(self.hydrate_project_layer(project_id, db_layer).await?);
         }
 
         Ok(palette)
@@ -330,6 +339,7 @@ impl GraphService {
                 background_color: sanitize_hex(&layer.background_color, "FFFFFF"),
                 text_color: sanitize_hex(&layer.text_color, "000000"),
                 border_color: sanitize_hex(&layer.border_color, "000000"),
+                alias: layer.alias,
                 dataset: layer.dataset,
             })
             .collect();
@@ -621,6 +631,7 @@ impl GraphService {
         &self,
         layer_id: i32,
         name: Option<String>,
+        alias: Option<String>,
         properties: Option<serde_json::Value>,
     ) -> GraphResult<graph_layers::Model> {
         use sea_orm::{ActiveModelTrait, Set};
@@ -635,6 +646,10 @@ impl GraphService {
 
         if let Some(name) = name {
             active_model.name = Set(name);
+        }
+
+        if let Some(alias_value) = alias {
+            active_model.alias = Set(Self::normalize_alias(Some(alias_value)));
         }
 
         if let Some(properties) = properties {
@@ -677,10 +692,13 @@ impl GraphService {
         background_color: String,
         text_color: String,
         border_color: String,
+        alias: Option<String>,
         source_dataset_id: Option<i32>,
         enabled: bool,
     ) -> GraphResult<project_layers::Model> {
         use sea_orm::{ActiveModelTrait, Set};
+
+        let alias = Self::normalize_alias(alias);
 
         let mut existing_query = project_layers::Entity::find()
             .filter(project_layers::Column::ProjectId.eq(project_id))
@@ -703,6 +721,7 @@ impl GraphService {
             active.background_color = Set(background_color);
             active.text_color = Set(text_color);
             active.border_color = Set(border_color);
+            active.alias = Set(alias.clone());
             active.enabled = Set(enabled);
             active.updated_at = Set(now);
 
@@ -716,6 +735,7 @@ impl GraphService {
                 background_color: Set(background_color),
                 text_color: Set(text_color),
                 border_color: Set(border_color),
+                alias: Set(alias),
                 source_dataset_id: Set(source_dataset_id),
                 enabled: Set(enabled),
                 created_at: Set(now),
@@ -901,14 +921,7 @@ impl GraphService {
             .map_err(GraphError::Database)?;
 
         if let Some(layer) = direct_layer {
-            return Ok(Some(Layer {
-                id: layer.layer_id,
-                label: layer.name,
-                background_color: layer.background_color.trim_start_matches('#').to_string(),
-                text_color: layer.text_color.trim_start_matches('#').to_string(),
-                border_color: layer.border_color.trim_start_matches('#').to_string(),
-                dataset: layer.source_dataset_id,
-            }));
+            return Ok(Some(self.hydrate_project_layer(project_id, layer).await?));
         }
 
         // 2. Check if this layer_id is aliased
@@ -928,12 +941,15 @@ impl GraphService {
 
             if let Some(target) = target_layer {
                 // Return layer using the alias ID but with target layer's colors
+                let (background_color, text_color, border_color) =
+                    self.resolve_layer_colors(project_id, &target).await?;
                 return Ok(Some(Layer {
                     id: layer_id.to_string(), // Use the alias ID
                     label: target.name,
-                    background_color: target.background_color.trim_start_matches('#').to_string(),
-                    text_color: target.text_color.trim_start_matches('#').to_string(),
-                    border_color: target.border_color.trim_start_matches('#').to_string(),
+                    background_color,
+                    text_color,
+                    border_color,
+                    alias: Some(target.layer_id),
                     dataset: target.source_dataset_id,
                 }));
             }
@@ -957,14 +973,7 @@ impl GraphService {
             .map_err(GraphError::Database)?;
 
         for layer in direct_layers {
-            layers.push(Layer {
-                id: layer.layer_id.clone(),
-                label: layer.name.clone(),
-                background_color: layer.background_color.trim_start_matches('#').to_string(),
-                text_color: layer.text_color.trim_start_matches('#').to_string(),
-                border_color: layer.border_color.trim_start_matches('#').to_string(),
-                dataset: layer.source_dataset_id,
-            });
+            layers.push(self.hydrate_project_layer(project_id, layer).await?);
         }
 
         // Get all aliases and add them as separate layer entries
@@ -984,15 +993,15 @@ impl GraphService {
             if let Some(target) = target_layer {
                 // Only include if the target layer is enabled
                 if target.enabled {
+                    let (background_color, text_color, border_color) =
+                        self.resolve_layer_colors(project_id, &target).await?;
                     layers.push(Layer {
                         id: alias_record.alias_layer_id,
                         label: target.name.clone(),
-                        background_color: target
-                            .background_color
-                            .trim_start_matches('#')
-                            .to_string(),
-                        text_color: target.text_color.trim_start_matches('#').to_string(),
-                        border_color: target.border_color.trim_start_matches('#').to_string(),
+                        background_color,
+                        text_color,
+                        border_color,
+                        alias: Some(target.layer_id.clone()),
                         dataset: target.source_dataset_id,
                     });
                 }
@@ -1000,6 +1009,100 @@ impl GraphService {
         }
 
         Ok(layers)
+    }
+
+    async fn hydrate_project_layer(
+        &self,
+        project_id: i32,
+        layer: project_layers::Model,
+    ) -> GraphResult<Layer> {
+        let (background_color, text_color, border_color) =
+            self.resolve_layer_colors(project_id, &layer).await?;
+
+        Ok(Layer {
+            id: layer.layer_id,
+            label: layer.name,
+            background_color,
+            text_color,
+            border_color,
+            alias: layer.alias,
+            dataset: layer.source_dataset_id,
+        })
+    }
+
+    async fn resolve_layer_colors(
+        &self,
+        project_id: i32,
+        layer: &project_layers::Model,
+    ) -> GraphResult<(String, String, String)> {
+        let mut background_color = sanitize_hex(&layer.background_color, "FFFFFF");
+        let mut text_color = sanitize_hex(&layer.text_color, "000000");
+        let mut border_color = sanitize_hex(&layer.border_color, "000000");
+
+        let mut current_alias = layer.alias.clone();
+        let mut visited = HashSet::new();
+
+        while let Some(alias_layer_id) = current_alias {
+            if !visited.insert(alias_layer_id.clone()) {
+                tracing::warn!(
+                    "Detected alias cycle while resolving layer '{}' in project {}",
+                    layer.layer_id,
+                    project_id
+                );
+                break;
+            }
+
+            let Some(target_layer) = self
+                .find_enabled_project_layer(project_id, &alias_layer_id)
+                .await?
+            else {
+                tracing::warn!(
+                    "Alias '{}' on layer '{}' has no enabled target in project {}",
+                    alias_layer_id,
+                    layer.layer_id,
+                    project_id
+                );
+                break;
+            };
+
+            background_color = sanitize_hex(&target_layer.background_color, "FFFFFF");
+            text_color = sanitize_hex(&target_layer.text_color, "000000");
+            border_color = sanitize_hex(&target_layer.border_color, "000000");
+            current_alias = target_layer.alias.clone();
+        }
+
+        Ok((background_color, text_color, border_color))
+    }
+
+    async fn find_enabled_project_layer(
+        &self,
+        project_id: i32,
+        layer_id: &str,
+    ) -> GraphResult<Option<project_layers::Model>> {
+        let manual = project_layers::Entity::find()
+            .filter(project_layers::Column::ProjectId.eq(project_id))
+            .filter(project_layers::Column::LayerId.eq(layer_id))
+            .filter(project_layers::Column::Enabled.eq(true))
+            .filter(project_layers::Column::SourceDatasetId.is_null())
+            .one(&self.db)
+            .await
+            .map_err(GraphError::Database)?;
+
+        if manual.is_some() {
+            return Ok(manual);
+        }
+
+        let fallback = project_layers::Entity::find()
+            .filter(project_layers::Column::ProjectId.eq(project_id))
+            .filter(project_layers::Column::LayerId.eq(layer_id))
+            .filter(project_layers::Column::Enabled.eq(true))
+            .order_by_asc(project_layers::Column::SourceDatasetId)
+            .order_by_asc(project_layers::Column::Id)
+            .one(&self.db)
+            .await
+            .map_err(GraphError::Database)?;
+
+        Ok(fallback)
     }
 }
 

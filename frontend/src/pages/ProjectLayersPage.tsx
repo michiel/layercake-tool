@@ -111,6 +111,7 @@ export const ProjectLayersPage = () => {
   const [newLayer, setNewLayer] = useState<ProjectLayerInput>({
     layerId: '',
     name: '',
+    alias: '',
     ...DEFAULT_LAYER_COLORS,
   })
   const [datasetToggleState, setDatasetToggleState] = useState<Record<number, boolean>>({})
@@ -206,6 +207,10 @@ export const ProjectLayersPage = () => {
 
   const handleSaveLayer = async (layer: ProjectLayerInput) => {
     try {
+      const trimmedAlias = layer.alias?.trim()
+      const normalizedAlias =
+        trimmedAlias && trimmedAlias.length > 0 ? trimmedAlias : null
+
       await upsertLayer({
         variables: {
           projectId: projectIdNum,
@@ -215,6 +220,7 @@ export const ProjectLayersPage = () => {
             backgroundColor: layer.backgroundColor ?? DEFAULT_LAYER_COLORS.backgroundColor,
             textColor: layer.textColor ?? DEFAULT_LAYER_COLORS.textColor,
             borderColor: layer.borderColor ?? DEFAULT_LAYER_COLORS.borderColor,
+            alias: normalizedAlias,
             sourceDatasetId: layer.sourceDatasetId ?? null,
             enabled: layer.enabled ?? true,
           },
@@ -439,7 +445,7 @@ export const ProjectLayersPage = () => {
               )}
               <div className="space-y-3">
                 <Label>Add layer</Label>
-                <div className="grid gap-3 md:grid-cols-5">
+                <div className="grid gap-3 md:grid-cols-6">
                   <Input
                     placeholder="Layer ID"
                     value={newLayer.layerId}
@@ -449,6 +455,11 @@ export const ProjectLayersPage = () => {
                     placeholder="Name"
                     value={newLayer.name}
                     onChange={(e) => setNewLayer((prev) => ({ ...prev, name: e.target.value }))}
+                  />
+                  <Input
+                    placeholder="Alias (optional)"
+                    value={newLayer.alias ?? ''}
+                    onChange={(e) => setNewLayer((prev) => ({ ...prev, alias: e.target.value }))}
                   />
                   <Group gap="xs">
                     <Input
@@ -506,7 +517,7 @@ export const ProjectLayersPage = () => {
                         return
                       }
                       handleSaveLayer(newLayer).then(() => {
-                        setNewLayer({ layerId: '', name: '', ...DEFAULT_LAYER_COLORS })
+                        setNewLayer({ layerId: '', name: '', alias: '', ...DEFAULT_LAYER_COLORS })
                       })
                     }}
                   >
@@ -522,6 +533,7 @@ export const ProjectLayersPage = () => {
                   <TableRow>
                     <TableHead>Layer ID</TableHead>
                     <TableHead>Name</TableHead>
+                    <TableHead>Alias</TableHead>
                     <TableHead>Background</TableHead>
                     <TableHead>Text</TableHead>
                     <TableHead>Border</TableHead>
@@ -542,6 +554,19 @@ export const ProjectLayersPage = () => {
                             updateEditableLayers((prev) =>
                               prev.map((l) =>
                                 l.id === layer.id ? { ...l, name: e.target.value } : l
+                              )
+                            )
+                          }
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          placeholder="Palette alias"
+                          value={layer.alias ?? ''}
+                          onChange={(e) =>
+                            updateEditableLayers((prev) =>
+                              prev.map((l) =>
+                                l.id === layer.id ? { ...l, alias: e.target.value } : l
                               )
                             )
                           }
@@ -671,6 +696,7 @@ export const ProjectLayersPage = () => {
                               backgroundColor: layer.backgroundColor,
                               textColor: layer.textColor,
                               borderColor: layer.borderColor,
+                              alias: layer.alias ?? null,
                               sourceDatasetId: layer.sourceDatasetId,
                               enabled: checked,
                             })
@@ -689,6 +715,7 @@ export const ProjectLayersPage = () => {
                               backgroundColor: latest.backgroundColor,
                               textColor: latest.textColor,
                               borderColor: latest.borderColor,
+                              alias: latest.alias ?? null,
                               sourceDatasetId: latest.sourceDatasetId,
                               enabled: latest.enabled,
                             })

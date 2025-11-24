@@ -1778,6 +1778,7 @@ impl AppContext {
         &self,
         layer_id: i32,
         name: Option<String>,
+        alias: Option<String>,
         properties: Option<Value>,
     ) -> Result<LayerDto> {
         use crate::database::entities::graph_layers::Entity as Layers;
@@ -1789,7 +1790,7 @@ impl AppContext {
 
         let updated_layer = self
             .graph_service
-            .update_layer_properties(layer_id, name.clone(), properties.clone())
+            .update_layer_properties(layer_id, name.clone(), alias.clone(), properties.clone())
             .await
             .map_err(|e| anyhow!("Failed to update layer {}: {}", layer_id, e))?;
 
@@ -1811,6 +1812,23 @@ impl AppContext {
                         )
                         .await;
                 }
+            }
+
+            if old_layer.alias != updated_layer.alias {
+                let _ = self
+                    .graph_edit_service
+                    .create_edit(
+                        old_layer.graph_id,
+                        "layer".to_string(),
+                        old_layer.layer_id.clone(),
+                        "update".to_string(),
+                        Some("alias".to_string()),
+                        old_layer.alias.as_ref().map(|value| json!(value)),
+                        updated_layer.alias.as_ref().map(|value| json!(value)),
+                        None,
+                        true,
+                    )
+                    .await;
             }
 
             if let Some(new_properties) = &properties {
@@ -1862,6 +1880,7 @@ impl AppContext {
             self.update_layer_properties(
                 layer_update.id,
                 layer_update.name,
+                layer_update.alias,
                 layer_update.properties,
             )
             .await?;
@@ -2250,6 +2269,7 @@ pub struct GraphNodeUpdateRequest {
 pub struct GraphLayerUpdateRequest {
     pub id: i32,
     pub name: Option<String>,
+    pub alias: Option<String>,
     pub properties: Option<Value>,
 }
 

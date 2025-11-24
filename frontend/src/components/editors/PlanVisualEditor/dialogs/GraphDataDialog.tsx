@@ -73,6 +73,7 @@ export const GraphDataDialog: React.FC<GraphDataDialogProps> = ({
       layers: data.graph.layers.map(layer => ({
         id: layer.layerId,
         label: layer.name,
+        alias: layer.alias ?? '',
         background_color: layer.backgroundColor,
         text_color: layer.textColor,
         border_color: layer.borderColor,
@@ -157,7 +158,7 @@ export const GraphDataDialog: React.FC<GraphDataDialogProps> = ({
         const oldName = normalizeValue(oldLayer.name);
         const newName = normalizeValue(newLayer.label);
 
-        const { id, label, ...properties } = newLayer;
+        const { id, label, alias, ...properties } = newLayer;
         const cleanedProperties: Record<string, any> = {};
         for (const [key, value] of Object.entries(properties)) {
           const normalized = normalizeValue(value);
@@ -168,11 +169,15 @@ export const GraphDataDialog: React.FC<GraphDataDialogProps> = ({
 
         const oldProperties = oldLayer.properties || {};
         const propertiesChanged = JSON.stringify(cleanedProperties) !== JSON.stringify(oldProperties);
+        const oldAlias = oldLayer.alias ?? '';
+        const newAlias = typeof alias === 'string' ? alias.trim() : '';
+        const aliasChanged = oldAlias !== newAlias;
 
-        if (oldName !== newName || propertiesChanged) {
+        if (oldName !== newName || propertiesChanged || aliasChanged) {
           updatedLayers.push({
             id: oldLayer.id,
             name: oldName !== newName ? newName : null,
+            alias: aliasChanged ? (newAlias.length > 0 ? newAlias : null) : null,
             properties: propertiesChanged ? cleanedProperties : null,
           });
         }

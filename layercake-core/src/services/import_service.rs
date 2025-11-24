@@ -42,6 +42,7 @@ impl ImportService {
             let mut text_color = None;
             let mut border_color = None;
             let mut comment = None;
+            let mut alias = None;
             let mut properties = HashMap::new();
 
             for (i, value) in record.iter().enumerate() {
@@ -52,6 +53,12 @@ impl ImportService {
                             "text_color" => text_color = Some(value.to_string()),
                             "border_color" => border_color = Some(value.to_string()),
                             "comment" => comment = Some(value.to_string()),
+                            "alias" => {
+                                let trimmed = value.trim();
+                                if !trimmed.is_empty() {
+                                    alias = Some(trimmed.to_string());
+                                }
+                            }
                             // Skip layer_id and name columns (0 and 1)
                             _ if i > 1 => {
                                 properties
@@ -76,6 +83,7 @@ impl ImportService {
                 background_color: Set(background_color),
                 text_color: Set(text_color),
                 border_color: Set(border_color),
+                alias: Set(alias),
                 comment: Set(comment),
                 properties: Set(properties_json),
                 ..Default::default()

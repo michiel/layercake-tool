@@ -12,6 +12,7 @@ pub struct LayerUpdateInput {
     pub id: i32,
     pub name: Option<String>,
     pub properties: Option<JSON>,
+    pub alias: Option<String>,
 }
 
 #[derive(InputObject, Clone, Debug)]
@@ -22,6 +23,7 @@ pub struct ProjectLayerInput {
     pub background_color: Option<String>,
     pub text_color: Option<String>,
     pub border_color: Option<String>,
+    pub alias: Option<String>,
     pub source_dataset_id: Option<i32>,
     pub enabled: Option<bool>,
 }
@@ -36,6 +38,7 @@ pub struct Layer {
     pub background_color: Option<String>,
     pub text_color: Option<String>,
     pub border_color: Option<String>,
+    pub alias: Option<String>,
     pub comment: Option<String>,
     pub properties: Option<JSON>,
     pub dataset_id: Option<i32>,
@@ -53,6 +56,7 @@ impl From<graph_layers::Model> for Layer {
             background_color: model.background_color,
             text_color: model.text_color,
             border_color: model.border_color,
+            alias: model.alias,
             comment: model.comment,
             properties,
             dataset_id: model.dataset_id,
@@ -70,6 +74,7 @@ pub struct ProjectLayer {
     pub background_color: String,
     pub text_color: String,
     pub border_color: String,
+    pub alias: Option<String>,
     pub source_dataset_id: Option<i32>,
     pub enabled: bool,
     pub created_at: chrono::DateTime<chrono::Utc>,
@@ -108,6 +113,7 @@ impl From<project_layers::Model> for ProjectLayer {
             background_color: model.background_color,
             text_color: model.text_color,
             border_color: model.border_color,
+            alias: model.alias,
             source_dataset_id: model.source_dataset_id,
             enabled: model.enabled,
             created_at: model.created_at,

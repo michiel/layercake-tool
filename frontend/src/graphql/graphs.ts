@@ -7,6 +7,7 @@ export interface Layer {
   backgroundColor?: string;
   textColor?: string;
   borderColor?: string;
+  alias?: string | null;
   comment?: string;
   properties?: any;
   datasetId?: number;
@@ -101,6 +102,7 @@ export const GET_GRAPHS = gql`
         backgroundColor
         textColor
         borderColor
+        alias
         comment
         properties
         datasetId
@@ -128,6 +130,7 @@ export const GET_GRAPH_DETAILS = gql`
         backgroundColor
         textColor
         borderColor
+        alias
         comment
         properties
         datasetId
@@ -185,6 +188,7 @@ export const CREATE_LAYER = gql`
       backgroundColor
       textColor
       borderColor
+      alias
       comment
       properties
       datasetId
@@ -333,16 +337,19 @@ export const UPDATE_LAYER_PROPERTIES = gql`
   mutation UpdateLayerProperties(
     $id: Int!
     $name: String
+    $alias: String
     $properties: JSON
   ) {
     updateLayerProperties(
       id: $id
       name: $name
+      alias: $alias
       properties: $properties
     ) {
       id
       layerId
       name
+      alias
       properties
     }
   }

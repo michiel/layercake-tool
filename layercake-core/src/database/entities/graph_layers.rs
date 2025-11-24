@@ -12,6 +12,7 @@ pub struct Model {
     pub background_color: Option<String>,
     pub text_color: Option<String>,
     pub border_color: Option<String>,
+    pub alias: Option<String>,
     pub comment: Option<String>,
     pub dataset_id: Option<i32>,
     pub properties: Option<String>, // JSON

@@ -477,6 +477,11 @@ impl GraphBuilder {
                         .filter(|s| !s.is_empty())
                         .map(|s| s.to_string());
 
+                    let alias = layer_val["alias"]
+                        .as_str()
+                        .filter(|s| !s.is_empty())
+                        .map(|s| s.to_string());
+
                     let comment = layer_val["comment"]
                         .as_str()
                         .filter(|s| !s.is_empty())
@@ -509,6 +514,7 @@ impl GraphBuilder {
                         background_color,
                         text_color,
                         border_color,
+                        alias,
                         comment,
                         properties: properties_json,
                         dataset_id: Some(ds.id),

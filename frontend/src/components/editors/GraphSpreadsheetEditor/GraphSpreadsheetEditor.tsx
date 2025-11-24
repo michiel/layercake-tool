@@ -32,6 +32,7 @@ export interface GraphEdge {
 export interface GraphLayer {
   id: string;
   label: string;
+  alias?: string;
   background_color?: string;
   text_color?: string;
   border_color?: string;
@@ -68,7 +69,7 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
 
   const nodeColumnDefs = ['id', 'label', 'layer', 'weight', 'is_partition', 'belongs_to', 'comment'];
   const edgeColumnDefs = ['id', 'source', 'target', 'label', 'layer', 'weight', 'comment'];
-  const layerColumnDefs = ['id', 'label', 'background_color', 'text_color', 'border_color', 'comment'];
+  const layerColumnDefs = ['id', 'label', 'alias', 'background_color', 'text_color', 'border_color', 'comment'];
 
   const handleNodeChange = (rowIdx: number, field: string, value: string) => {
     setLocalNodes(prevNodes => {

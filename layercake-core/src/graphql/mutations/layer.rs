@@ -32,6 +32,7 @@ impl LayerMutation {
                     .unwrap_or_else(|| "FFFFFF".to_string()),
                 input.text_color.unwrap_or_else(|| "000000".to_string()),
                 input.border_color.unwrap_or_else(|| "000000".to_string()),
+                input.alias.clone(),
                 input.source_dataset_id,
                 input.enabled.unwrap_or(true),
             )
