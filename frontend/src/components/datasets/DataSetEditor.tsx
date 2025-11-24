@@ -13,7 +13,8 @@ import {
   IconClock,
   IconX,
   IconTable,
-  IconPalette
+  IconPalette,
+  IconShieldCheck
 } from '@tabler/icons-react'
 import { useForm } from 'react-hook-form'
 import { Breadcrumbs } from '../common/Breadcrumbs'
@@ -22,7 +23,9 @@ import {
   UPDATE_DATASOURCE,
   REPROCESS_DATASOURCE,
   UPDATE_DATASOURCE_GRAPH_DATA,
+  VALIDATE_DATASET,
   DataSet,
+  DataSetValidationResult,
   UpdateDataSetInput,
   formatFileSize,
   getFileFormatDisplayName
@@ -35,6 +38,14 @@ import { Alert, AlertDescription, AlertTitle } from '../ui/alert'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { Card, CardContent } from '../ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '../ui/dialog'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { ScrollArea } from '../ui/scroll-area'
@@ -76,6 +87,9 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
   const initializedTabRef = useRef(false)
   const [fileUploadMode, setFileUploadMode] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [validationDialogOpen, setValidationDialogOpen] = useState(false)
+  const [validationResult, setValidationResult] = useState<DataSetValidationResult | null>(null)
+  const [validationError, setValidationError] = useState<string | null>(null)
 
   // Query for project info
   const { data: projectsData } = useQuery<{
@@ -114,6 +128,9 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
   const [updateDataSet, { loading: updateLoading }] = useMutation(UPDATE_DATASOURCE)
   const [reprocessDataSet, { loading: reprocessLoading }] = useMutation(REPROCESS_DATASOURCE)
   const [updateDataSetGraphData] = useMutation(UPDATE_DATASOURCE_GRAPH_DATA)
+  const [validateDataSetMutation, { loading: validateLoading }] = useMutation<{
+    validateDataSet: DataSetValidationResult
+  }, { id: number }>(VALIDATE_DATASET)
 
   const dataSource: DataSet | null = (dataSourceData as any)?.dataSet || null
   const projectPaletteLayers: ProjectLayer[] = useMemo(
@@ -386,6 +403,24 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
     }
   }
 
+  const handleValidateDataSet = useCallback(async () => {
+    if (!dataSetId) return
+
+    try {
+      const { data } = await validateDataSetMutation({
+        variables: { id: parseInt(dataSetId, 10) }
+      })
+      setValidationResult(data?.validateDataSet ?? null)
+      setValidationError(null)
+      setValidationDialogOpen(true)
+    } catch (error) {
+      console.error('Failed to validate DataSet:', error)
+      setValidationResult(null)
+      setValidationError(error instanceof Error ? error.message : 'Failed to validate dataset')
+      setValidationDialogOpen(true)
+    }
+  }, [dataSetId, validateDataSetMutation])
+
   const getStatusIcon = (status: DataSet['status']) => {
     switch (status) {
       case 'active':
@@ -614,7 +649,17 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
                       )}
                   </div>
 
-                  <Group justify="end">
+                  <Group justify="end" gap="sm">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={validateLoading || !dataSource}
+                      onClick={handleValidateDataSet}
+                    >
+                      {validateLoading && <Spinner className="mr-2 h-4 w-4" />}
+                      <IconShieldCheck className="mr-2 h-4 w-4" />
+                      Validate dataset
+                    </Button>
                     <Button
                       type="submit"
                       disabled={updateLoading}
@@ -725,6 +770,70 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={validationDialogOpen} onOpenChange={setValidationDialogOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Dataset validation</DialogTitle>
+            {validationResult?.checkedAt && (
+              <DialogDescription>
+                Checked {new Date(validationResult.checkedAt).toLocaleString()}
+              </DialogDescription>
+            )}
+          </DialogHeader>
+
+          {validationError && (
+            <Alert variant="destructive" className="mb-4">
+              <IconAlertCircle className="h-4 w-4" />
+              <AlertTitle>Validation failed</AlertTitle>
+              <AlertDescription>{validationError}</AlertDescription>
+            </Alert>
+          )}
+
+          {validationResult && (
+            <Stack gap="md">
+              <Group gap="sm" align="center">
+                <Badge variant={validationResult.isValid ? 'secondary' : 'destructive'}>
+                  {validationResult.isValid ? 'Valid' : 'Invalid'}
+                </Badge>
+                <span className="text-sm text-muted-foreground">
+                  Nodes: {validationResult.nodeCount} · Edges: {validationResult.edgeCount} · Layers: {validationResult.layerCount}
+                </span>
+              </Group>
+
+              <div>
+                <p className="text-sm font-medium mb-1">Issues</p>
+                {validationResult.errors.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    All structural checks passed. No blocking issues detected.
+                  </p>
+                ) : (
+                  <ul className="text-sm list-disc pl-5 space-y-1">
+                    {validationResult.errors.map((error, idx) => (
+                      <li key={`${error}-${idx}`}>{error}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              {validationResult.warnings.length > 0 && (
+                <div>
+                  <p className="text-sm font-medium mb-1">Warnings</p>
+                  <ul className="text-sm list-disc pl-5 space-y-1 text-muted-foreground">
+                    {validationResult.warnings.map((warning, idx) => (
+                      <li key={`${warning}-${idx}`}>{warning}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </Stack>
+          )}
+
+          <DialogFooter className="mt-6">
+            <Button onClick={() => setValidationDialogOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageContainer>
   )
 }

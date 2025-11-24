@@ -3,7 +3,7 @@
 use async_graphql::*;
 use serde::{Deserialize, Serialize};
 
-use crate::app_context::{summarize_graph_counts, DataSetSummary};
+use crate::app_context::{summarize_graph_counts, DataSetSummary, DataSetValidationSummary};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
 use crate::graphql::types::Project;
@@ -142,6 +142,43 @@ impl From<DataSetSummary> for DataSet {
             edge_count: summary.edge_count.map(|c| c as i32),
             layer_count: summary.layer_count.map(|c| c as i32),
             has_layers: summary.has_layers,
+        }
+    }
+}
+
+#[derive(SimpleObject)]
+#[graphql(name = "DataSetValidationResult")]
+pub struct DataSetValidationResult {
+    #[graphql(name = "dataSetId")]
+    pub data_set_id: i32,
+    #[graphql(name = "projectId")]
+    pub project_id: i32,
+    #[graphql(name = "isValid")]
+    pub is_valid: bool,
+    pub errors: Vec<String>,
+    pub warnings: Vec<String>,
+    #[graphql(name = "nodeCount")]
+    pub node_count: i32,
+    #[graphql(name = "edgeCount")]
+    pub edge_count: i32,
+    #[graphql(name = "layerCount")]
+    pub layer_count: i32,
+    #[graphql(name = "checkedAt")]
+    pub checked_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl From<DataSetValidationSummary> for DataSetValidationResult {
+    fn from(summary: DataSetValidationSummary) -> Self {
+        Self {
+            data_set_id: summary.data_set_id,
+            project_id: summary.project_id,
+            is_valid: summary.is_valid,
+            errors: summary.errors,
+            warnings: summary.warnings,
+            node_count: summary.node_count as i32,
+            edge_count: summary.edge_count as i32,
+            layer_count: summary.layer_count as i32,
+            checked_at: summary.checked_at,
         }
     }
 }

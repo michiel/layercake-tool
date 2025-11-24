@@ -549,6 +549,13 @@ impl AppContext {
         Ok(DataSetSummary::from(model))
     }
 
+    pub async fn validate_data_set(&self, id: i32) -> Result<DataSetValidationSummary> {
+        self.data_set_service
+            .validate(id)
+            .await
+            .map_err(|e| anyhow!("Failed to validate data set {}: {}", id, e))
+    }
+
     pub async fn delete_data_set(&self, id: i32) -> Result<()> {
         self.data_set_service
             .delete(id)
@@ -2046,6 +2053,20 @@ impl From<data_sets::Model> for DataSetSummary {
             has_layers,
         }
     }
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DataSetValidationSummary {
+    pub data_set_id: i32,
+    pub project_id: i32,
+    pub is_valid: bool,
+    pub errors: Vec<String>,
+    pub warnings: Vec<String>,
+    pub node_count: usize,
+    pub edge_count: usize,
+    pub layer_count: usize,
+    pub checked_at: DateTime<Utc>,
 }
 
 #[derive(Clone)]

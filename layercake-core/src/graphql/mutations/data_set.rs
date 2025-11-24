@@ -11,8 +11,8 @@ use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
 use crate::graphql::types::{
     BulkUploadDataSetInput, CreateDataSetInput, CreateEmptyDataSetInput, DataSet,
-    ExportDataSetsInput, ExportDataSetsResult, ImportDataSetsInput, ImportDataSetsResult,
-    MergeDataSetsInput, UpdateDataSetInput,
+    DataSetValidationResult, ExportDataSetsInput, ExportDataSetsResult, ImportDataSetsInput,
+    ImportDataSetsResult, MergeDataSetsInput, UpdateDataSetInput,
 };
 
 #[derive(Default)]
@@ -28,7 +28,6 @@ impl DataSetMutation {
     ) -> Result<DataSet> {
         let context = ctx.data::<GraphQLContext>()?;
 
-        use base64::Engine;
         let file_bytes = base64::engine::general_purpose::STANDARD
             .decode(&input.file_content)
             .map_err(|e| {
@@ -81,7 +80,6 @@ impl DataSetMutation {
     ) -> Result<Vec<DataSet>> {
         let context = ctx.data::<GraphQLContext>()?;
 
-        use base64::Engine;
         let mut uploads = Vec::with_capacity(files.len());
         for file_input in files {
             let file_bytes = base64::engine::general_purpose::STANDARD
@@ -119,7 +117,6 @@ impl DataSetMutation {
     ) -> Result<DataSet> {
         let context = ctx.data::<GraphQLContext>()?;
 
-        use base64::Engine;
         let new_file = if let Some(file_content_b64) = &input.file_content {
             let file_bytes = base64::engine::general_purpose::STANDARD
                 .decode(file_content_b64)
@@ -194,6 +191,22 @@ impl DataSetMutation {
             .map_err(|e| StructuredError::service("AppContext::update_data_set_graph_json", e))?;
 
         Ok(DataSet::from(summary))
+    }
+
+    /// Validate DataSet graph integrity
+    async fn validate_data_set(
+        &self,
+        ctx: &Context<'_>,
+        id: i32,
+    ) -> Result<DataSetValidationResult> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let summary = context
+            .app
+            .validate_data_set(id)
+            .await
+            .map_err(|e| StructuredError::service("AppContext::validate_data_set", e))?;
+
+        Ok(DataSetValidationResult::from(summary))
     }
 
     /// Export data sources as spreadsheet (XLSX or ODS)

@@ -1,9 +1,12 @@
 use anyhow::{anyhow, Result};
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
+use std::collections::{HashMap, HashSet};
 
+use crate::app_context::DataSetValidationSummary;
 use crate::database::entities::common_types::{DataType, FileFormat};
 use crate::database::entities::data_sets::{self};
 use crate::database::entities::{plan_dag_edges, plan_dag_nodes, projects};
+use crate::graph::{Graph, Layer};
 use crate::services::{file_type_detection, source_processing};
 
 /// Service for managing DataSets with file processing capabilities
@@ -427,6 +430,81 @@ impl DataSetService {
         };
 
         Ok(updated_data_set)
+    }
+
+    /// Validate the stored graph JSON for a dataset
+    pub async fn validate(&self, id: i32) -> Result<DataSetValidationSummary> {
+        let model = self
+            .get_by_id(id)
+            .await?
+            .ok_or_else(|| anyhow!("DataSet not found"))?;
+
+        let mut graph: Graph = if model.graph_json.trim().is_empty() {
+            Graph::default()
+        } else {
+            serde_json::from_str(&model.graph_json)
+                .map_err(|e| anyhow!("Failed to parse graph JSON: {}", e))?
+        };
+
+        if graph.name.is_empty() {
+            graph.name = model.name.clone();
+        }
+
+        if graph.layers.is_empty() {
+            let mut seen = HashSet::new();
+            for node in &graph.nodes {
+                if node.layer.is_empty() {
+                    continue;
+                }
+                if seen.insert(node.layer.clone()) {
+                    graph.layers.push(Layer::new(
+                        &node.layer,
+                        &node.layer,
+                        "f2f4f7",
+                        "0f172a",
+                        "d0d5dd",
+                    ));
+                }
+            }
+        }
+
+        let mut errors = Vec::new();
+        let warnings = Vec::new();
+
+        if let Err(mut validation_errors) = graph.verify_graph_integrity() {
+            errors.append(&mut validation_errors);
+        }
+
+        let partition_lookup: HashMap<_, _> = graph
+            .nodes
+            .iter()
+            .map(|node| (node.id.clone(), node.is_partition))
+            .collect();
+
+        for node in &graph.nodes {
+            if let Some(parent_id) = &node.belongs_to {
+                if let Some(is_partition) = partition_lookup.get(parent_id) {
+                    if !is_partition {
+                        errors.push(format!(
+                            "Node id:[{}] belongs_to {} but parent is not marked as a partition node",
+                            node.id, parent_id
+                        ));
+                    }
+                }
+            }
+        }
+
+        Ok(DataSetValidationSummary {
+            data_set_id: model.id,
+            project_id: model.project_id,
+            is_valid: errors.is_empty(),
+            errors,
+            warnings,
+            node_count: graph.nodes.len(),
+            edge_count: graph.edges.len(),
+            layer_count: graph.layers.len(),
+            checked_at: chrono::Utc::now(),
+        })
     }
 
     fn determine_data_type(

@@ -156,6 +156,22 @@ export const UPDATE_DATASOURCE = gql`
   }
 `
 
+export const VALIDATE_DATASET = gql`
+  mutation ValidateDataSet($id: Int!) {
+    validateDataSet(id: $id) {
+      dataSetId
+      projectId
+      isValid
+      errors
+      warnings
+      nodeCount
+      edgeCount
+      layerCount
+      checkedAt
+    }
+  }
+`
+
 // Mutation to delete a DataSet
 export const DELETE_DATASOURCE = gql`
   mutation DeleteDataSet($id: Int!) {
@@ -373,6 +389,18 @@ export interface UpdateDataSetInput {
   description?: string
   filename?: string
   fileContent?: string // Base64 encoded file content
+}
+
+export interface DataSetValidationResult {
+  dataSetId: number
+  projectId: number
+  isValid: boolean
+  errors: string[]
+  warnings: string[]
+  nodeCount: number
+  edgeCount: number
+  layerCount: number
+  checkedAt: string
 }
 
 // Helper function to format file size
