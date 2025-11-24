@@ -1,0 +1,12 @@
+id,label,layer,is_partition,belongs_to,comment
+risk_group,OWASP LLM Top 10 2025,risk,true,root,"The Top 10 Risks"
+r_01,LLM01: Prompt Injection,risk,false,risk_group,"Manipulating model via inputs "
+r_02,LLM02: Sensitive Info Disclosure,risk,false,risk_group,"Leaking PII or secrets [cite: 174]"
+r_03,LLM03: Supply Chain,risk,false,risk_group,"Vulnerable components or models [cite: 260]"
+r_04,LLM04: Data & Model Poisoning,risk,false,risk_group,"Tampering with training data [cite: 399]"
+r_05,LLM05: Improper Output Handling,risk,false,risk_group,"Lack of sanitisation on output [cite: 471]"
+r_06,LLM06: Excessive Agency,risk,false,risk_group,"Unchecked autonomous actions [cite: 537]"
+r_07,LLM07: System Prompt Leakage,risk,false,risk_group,"Leaking internal instructions [cite: 632]"
+r_08,LLM08: Vector & Embedding Weakness,risk,false,risk_group,"RAG specific vulnerabilities [cite: 700]"
+r_09,LLM09: Misinformation,risk,false,risk_group,"Hallucinations and false info [cite: 775]"
+r_10,LLM10: Unbounded Consumption,risk,false,risk_group,"DoS and resource exhaustion [cite: 862]"
