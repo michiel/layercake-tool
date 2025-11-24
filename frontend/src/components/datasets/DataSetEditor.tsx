@@ -381,7 +381,7 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
       const graphJson = JSON.stringify({
         nodes: graphData.nodes,
         edges: graphData.edges,
-        layers: originalDatasetLayers
+        layers: graphData.layers
       })
       await updateDataSetGraphData({
         variables: {
