@@ -301,24 +301,14 @@ impl GraphBuilder {
 
         // Convert to graph_json format
         let graph_json = serde_json::json!({
-            "nodes": nodes.iter().map(|n| serde_json::json!({
-                "id": n.id.clone(),
-                "label": n.label.clone(),
-                "layer": n.layer.clone(),
-                "weight": n.weight,
-                "is_partition": n.is_partition,
-                "belongs_to": n.belongs_to.clone(),
-                "attrs": n.attrs.clone()
-            })).collect::<Vec<_>>(),
-            "edges": edges.iter().map(|e| serde_json::json!({
-                "id": e.id.clone(),
-                "source": e.source.clone(),
-                "target": e.target.clone(),
-                "label": e.label.clone(),
-                "layer": e.layer.clone(),
-                "weight": e.weight,
-                "attrs": e.attrs.clone()
-            })).collect::<Vec<_>>(),
+            "nodes": nodes
+                .iter()
+                .map(|n| node_model_to_graph_json(n))
+                .collect::<Vec<_>>(),
+            "edges": edges
+                .iter()
+                .map(|e| edge_model_to_graph_json(e))
+                .collect::<Vec<_>>(),
             "graph_layers": all_layers.iter().map(|l| {
                 // Layers already have # stripped by get_all_resolved_layers
                 // (templates add # themselves)
@@ -785,6 +775,78 @@ impl GraphBuilder {
         }
 
         Ok((nodes, edges))
+    }
+}
+
+fn node_model_to_graph_json(node: &graph_nodes::Model) -> serde_json::Value {
+    serde_json::json!({
+        "id": node.id.clone(),
+        "label": node.label.clone(),
+        "layer": node.layer.clone(),
+        "weight": node.weight,
+        "is_partition": node.is_partition,
+        "belongs_to": node.belongs_to.clone(),
+        "comment": node.comment.clone(),
+        "attrs": node.attrs.clone()
+    })
+}
+
+fn edge_model_to_graph_json(edge: &graph_edges::Model) -> serde_json::Value {
+    serde_json::json!({
+        "id": edge.id.clone(),
+        "source": edge.source.clone(),
+        "target": edge.target.clone(),
+        "label": edge.label.clone(),
+        "layer": edge.layer.clone(),
+        "weight": edge.weight,
+        "comment": edge.comment.clone(),
+        "attrs": edge.attrs.clone()
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Utc;
+
+    #[test]
+    fn node_model_to_graph_json_preserves_comment_field() {
+        let node = graph_nodes::Model {
+            id: "node-1".to_string(),
+            graph_id: 1,
+            label: Some("Example".to_string()),
+            layer: Some("app".to_string()),
+            weight: Some(1.0),
+            is_partition: false,
+            belongs_to: None,
+            comment: Some("keep me".to_string()),
+            dataset_id: None,
+            attrs: None,
+            created_at: Utc::now(),
+        };
+
+        let json = node_model_to_graph_json(&node);
+        assert_eq!(json["comment"].as_str(), Some("keep me"));
+    }
+
+    #[test]
+    fn edge_model_to_graph_json_preserves_comment_field() {
+        let edge = graph_edges::Model {
+            id: "edge-1".to_string(),
+            graph_id: 1,
+            source: "node-1".to_string(),
+            target: "node-2".to_string(),
+            label: Some("Calls".to_string()),
+            layer: Some("app".to_string()),
+            weight: Some(1.0),
+            comment: Some("retain me".to_string()),
+            dataset_id: None,
+            attrs: None,
+            created_at: Utc::now(),
+        };
+
+        let json = edge_model_to_graph_json(&edge);
+        assert_eq!(json["comment"].as_str(), Some("retain me"));
     }
 }
 
