@@ -1,3 +1,4 @@
+use crate::app_context::GraphValidationSummary;
 use crate::database::entities::{
     data_sets, graph_edges, graph_edges::Entity as GraphEdges, graph_layers,
     graph_layers::Entity as Layers, graph_nodes, graph_nodes::Entity as GraphNodes, layer_aliases,
@@ -5,6 +6,7 @@ use crate::database::entities::{
 };
 use crate::errors::{GraphError, GraphResult};
 use crate::graph::{Edge, Graph, Layer, Node};
+use chrono::Utc;
 use indexmap::IndexMap;
 use sea_orm::prelude::Expr;
 use sea_orm::{
@@ -456,6 +458,37 @@ impl GraphService {
             edges: graph_edges,
             layers: layer_map.into_values().collect(),
             annotations: graph_meta.annotations,
+        })
+    }
+
+    pub async fn validate_graph(&self, graph_id: i32) -> GraphResult<GraphValidationSummary> {
+        use crate::database::entities::graphs::Entity as Graphs;
+
+        let graph_meta = Graphs::find_by_id(graph_id)
+            .one(&self.db)
+            .await
+            .map_err(GraphError::Database)?
+            .ok_or(GraphError::NotFound(graph_id))?;
+
+        let graph = self.build_graph_from_dag_graph(graph_id).await?;
+
+        let mut errors = Vec::new();
+        let warnings = Vec::new();
+
+        if let Err(mut validation_errors) = graph.verify_graph_integrity() {
+            errors.append(&mut validation_errors);
+        }
+
+        Ok(GraphValidationSummary {
+            graph_id,
+            project_id: graph_meta.project_id,
+            is_valid: errors.is_empty(),
+            errors,
+            warnings,
+            node_count: graph.nodes.len(),
+            edge_count: graph.edges.len(),
+            layer_count: graph.layers.len(),
+            checked_at: Utc::now(),
         })
     }
 

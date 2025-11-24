@@ -122,3 +122,40 @@ pub struct CreateLayerInput {
     pub layer_id: String,
     pub name: String,
 }
+
+#[derive(SimpleObject)]
+#[graphql(name = "GraphValidationResult")]
+pub struct GraphValidationResult {
+    #[graphql(name = "graphId")]
+    pub graph_id: i32,
+    #[graphql(name = "projectId")]
+    pub project_id: i32,
+    #[graphql(name = "isValid")]
+    pub is_valid: bool,
+    pub errors: Vec<String>,
+    pub warnings: Vec<String>,
+    #[graphql(name = "nodeCount")]
+    pub node_count: i32,
+    #[graphql(name = "edgeCount")]
+    pub edge_count: i32,
+    #[graphql(name = "layerCount")]
+    pub layer_count: i32,
+    #[graphql(name = "checkedAt")]
+    pub checked_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl From<crate::app_context::GraphValidationSummary> for GraphValidationResult {
+    fn from(summary: crate::app_context::GraphValidationSummary) -> Self {
+        Self {
+            graph_id: summary.graph_id,
+            project_id: summary.project_id,
+            is_valid: summary.is_valid,
+            errors: summary.errors,
+            warnings: summary.warnings,
+            node_count: summary.node_count as i32,
+            edge_count: summary.edge_count as i32,
+            layer_count: summary.layer_count as i32,
+            checked_at: summary.checked_at,
+        }
+    }
+}

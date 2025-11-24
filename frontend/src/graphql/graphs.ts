@@ -51,6 +51,18 @@ export interface Graph {
   graphEdges: GraphEdge[];
 }
 
+export interface GraphValidationResult {
+  graphId: number
+  projectId: number
+  isValid: boolean
+  errors: string[]
+  warnings: string[]
+  nodeCount: number
+  edgeCount: number
+  layerCount: number
+  checkedAt: string
+}
+
 export interface GraphEdit {
   id: number
   graphId: number
@@ -202,6 +214,22 @@ export const EXECUTE_NODE = gql`
       success
       message
       nodeId
+    }
+  }
+`
+
+export const VALIDATE_GRAPH = gql`
+  mutation ValidateGraph($id: Int!) {
+    validateGraph(id: $id) {
+      graphId
+      projectId
+      isValid
+      errors
+      warnings
+      nodeCount
+      edgeCount
+      layerCount
+      checkedAt
     }
   }
 `

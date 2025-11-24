@@ -556,6 +556,13 @@ impl AppContext {
             .map_err(|e| anyhow!("Failed to validate data set {}: {}", id, e))
     }
 
+    pub async fn validate_graph(&self, graph_id: i32) -> Result<GraphValidationSummary> {
+        self.graph_service
+            .validate_graph(graph_id)
+            .await
+            .map_err(|e| anyhow!("Failed to validate graph {}: {}", graph_id, e))
+    }
+
     pub async fn delete_data_set(&self, id: i32) -> Result<()> {
         self.data_set_service
             .delete(id)
@@ -2059,6 +2066,20 @@ impl From<data_sets::Model> for DataSetSummary {
 #[serde(rename_all = "camelCase")]
 pub struct DataSetValidationSummary {
     pub data_set_id: i32,
+    pub project_id: i32,
+    pub is_valid: bool,
+    pub errors: Vec<String>,
+    pub warnings: Vec<String>,
+    pub node_count: usize,
+    pub edge_count: usize,
+    pub layer_count: usize,
+    pub checked_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GraphValidationSummary {
+    pub graph_id: i32,
     pub project_id: i32,
     pub is_valid: bool,
     pub errors: Vec<String>,

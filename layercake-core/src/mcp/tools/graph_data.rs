@@ -497,8 +497,7 @@ async fn import_nodes_csv(db: &DatabaseConnection, graph_id: i32, csv_data: &str
 
         let is_partition = partition_idx
             .and_then(|idx| record.get(idx))
-            .map(str::trim)
-            .map(|v| matches_ignore_case(v, "true") || v == "1")
+            .map(parse_bool_token)
             .unwrap_or(false);
 
         let mut reserved = HashSet::new();
@@ -792,7 +791,22 @@ fn find_column(headers: &csv::StringRecord, names: &[&str]) -> Option<usize> {
 }
 
 fn matches_ignore_case(value: &str, expected: &str) -> bool {
-    value.trim().eq_ignore_ascii_case(expected)
+    normalize_token(value).eq_ignore_ascii_case(expected)
+}
+
+fn parse_bool_token(value: &str) -> bool {
+    let normalized = normalize_token(value);
+    normalized.eq_ignore_ascii_case("true")
+        || normalized.eq_ignore_ascii_case("yes")
+        || normalized.eq_ignore_ascii_case("y")
+        || normalized.eq_ignore_ascii_case("t")
+        || normalized == "1"
+}
+
+fn normalize_token(value: &str) -> &str {
+    value
+        .trim()
+        .trim_matches(|c| c == '"' || c == '\'')
 }
 
 fn parse_export_format(format: &str) -> Result<ExportFileType, String> {

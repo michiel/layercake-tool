@@ -1,11 +1,20 @@
-import { memo, useState } from 'react'
+import { memo, useCallback, useState } from 'react'
 import { NodeProps } from 'reactflow'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Spinner } from '@/components/ui/spinner'
 import { Group } from '@/components/layout-primitives'
-import { IconSettings, IconTrash, IconPlayerPlayFilled, IconChartDots, IconTable, IconExternalLink, IconFileText } from '@tabler/icons-react'
+import {
+  IconSettings,
+  IconTrash,
+  IconPlayerPlayFilled,
+  IconChartDots,
+  IconTable,
+  IconExternalLink,
+  IconFileText,
+  IconShieldCheck,
+} from '@tabler/icons-react'
 import { useMutation } from '@apollo/client/react'
 import { PlanDagNodeType, GraphNodeConfig } from '../../../../types/plan-dag'
 import { isNodeConfigured } from '../../../../utils/planDagValidation'
@@ -18,8 +27,16 @@ import { useNavigate } from 'react-router-dom'
 import { BaseNode } from './BaseNode'
 import { usePlanDagCQRSMutations } from '../../../../hooks/usePlanDagCQRSMutations'
 import { showErrorNotification, showSuccessNotification } from '../../../../utils/notifications'
-import { UPDATE_GRAPH } from '../../../../graphql/graphs'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { UPDATE_GRAPH, VALIDATE_GRAPH, type GraphValidationResult } from '../../../../graphql/graphs'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -34,6 +51,9 @@ export const GraphNode = memo((props: GraphNodeProps) => {
   const [showPreview, setShowPreview] = useState(false)
   const [showDataDialog, setShowDataDialog] = useState(false)
   const [showAnnotations, setShowAnnotations] = useState(false)
+  const [showValidationDialog, setShowValidationDialog] = useState(false)
+  const [graphValidationResult, setGraphValidationResult] = useState<GraphValidationResult | null>(null)
+  const [graphValidationError, setGraphValidationError] = useState<string | null>(null)
   const navigate = useNavigate()
 
   // Get project ID from context
@@ -41,6 +61,9 @@ export const GraphNode = memo((props: GraphNodeProps) => {
   const planId = data.planId as number | undefined
   const { updateNode } = usePlanDagCQRSMutations({ projectId: projectId || 0, planId: planId || 0 })
   const [updateGraphName] = useMutation(UPDATE_GRAPH)
+  const [validateGraphMutation, { loading: validatingGraph }] = useMutation<{
+    validateGraph: GraphValidationResult
+  }, { id: number }>(VALIDATE_GRAPH)
 
   const config = data.config as GraphNodeConfig
 
@@ -126,6 +149,23 @@ export const GraphNode = memo((props: GraphNodeProps) => {
       },
     })
   }
+
+  const handleValidateGraph = useCallback(async () => {
+    if (!resolvedGraphId) return
+    try {
+      const { data } = await validateGraphMutation({
+        variables: { id: resolvedGraphId },
+      })
+      setGraphValidationResult(data?.validateGraph ?? null)
+      setGraphValidationError(null)
+      setShowValidationDialog(true)
+    } catch (error) {
+      console.error('Failed to validate graph:', error)
+      setGraphValidationResult(null)
+      setGraphValidationError(error instanceof Error ? error.message : 'Validation failed')
+      setShowValidationDialog(true)
+    }
+  }, [resolvedGraphId, validateGraphMutation])
 
   // Helper to get badge classes based on Mantine color
   const getBadgeClasses = (color: string, variant: 'filled' | 'light' | 'outline') => {
@@ -360,6 +400,27 @@ export const GraphNode = memo((props: GraphNodeProps) => {
                 </TooltipTrigger>
                 <TooltipContent>View annotations</TooltipContent>
               </Tooltip>
+              {resolvedGraphId && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-9 w-9 rounded-full text-emerald-600"
+                      data-action-icon="validate"
+                      disabled={validatingGraph}
+                      onClick={(e: React.MouseEvent) => {
+                        e.stopPropagation()
+                        e.preventDefault()
+                        handleValidateGraph()
+                      }}
+                    >
+                      {validatingGraph ? <Spinner size="xs" /> : <IconShieldCheck size={12} />}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Validate graph integrity</TooltipContent>
+                </Tooltip>
+              )}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -418,6 +479,74 @@ export const GraphNode = memo((props: GraphNodeProps) => {
         graphId={resolvedGraphId}
         title={`Graph Data: ${data.metadata.label}`}
       />
+
+      <Dialog
+        open={showValidationDialog}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowValidationDialog(false)
+          }
+        }}
+      >
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Graph validation</DialogTitle>
+            {graphValidationResult?.checkedAt && (
+              <DialogDescription>
+                Checked {new Date(graphValidationResult.checkedAt).toLocaleString()}
+              </DialogDescription>
+            )}
+          </DialogHeader>
+
+          {graphValidationError && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertTitle>Validation failed</AlertTitle>
+              <AlertDescription>{graphValidationError}</AlertDescription>
+            </Alert>
+          )}
+
+          {graphValidationResult && (
+            <div className="space-y-4">
+              <Group gap="sm" align="center">
+                <Badge variant={graphValidationResult.isValid ? 'secondary' : 'destructive'}>
+                  {graphValidationResult.isValid ? 'Valid' : 'Invalid'}
+                </Badge>
+                <span className="text-sm text-muted-foreground">
+                  Nodes: {graphValidationResult.nodeCount} · Edges: {graphValidationResult.edgeCount} · Layers: {graphValidationResult.layerCount}
+                </span>
+              </Group>
+
+              <div>
+                <p className="text-sm font-medium mb-1">Issues</p>
+                {graphValidationResult.errors.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No blocking issues detected.</p>
+                ) : (
+                  <ul className="text-sm list-disc pl-5 space-y-1">
+                    {graphValidationResult.errors.map((error, index) => (
+                      <li key={`${error}-${index}`}>{error}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              {graphValidationResult.warnings.length > 0 && (
+                <div>
+                  <p className="text-sm font-medium mb-1">Warnings</p>
+                  <ul className="text-sm list-disc pl-5 space-y-1 text-muted-foreground">
+                    {graphValidationResult.warnings.map((warning, index) => (
+                      <li key={`${warning}-${index}`}>{warning}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter className="mt-6">
+            <Button onClick={() => setShowValidationDialog(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showAnnotations} onOpenChange={(open) => !open && setShowAnnotations(false)}>
         <DialogContent className="max-w-3xl">

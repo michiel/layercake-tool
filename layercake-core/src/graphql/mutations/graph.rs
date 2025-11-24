@@ -4,7 +4,9 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use crate::app_context::{GraphLayerUpdateRequest, GraphNodeUpdateRequest};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
-use crate::graphql::types::graph::{CreateGraphInput, CreateLayerInput, Graph, UpdateGraphInput};
+use crate::graphql::types::graph::{
+    CreateGraphInput, CreateLayerInput, Graph, GraphValidationResult, UpdateGraphInput,
+};
 use crate::services::graph_edit_service::GraphEditService;
 use crate::services::graph_service::GraphService;
 
@@ -42,6 +44,22 @@ impl GraphMutation {
             .map_err(|e| StructuredError::service("GraphService::update_graph", e))?;
 
         Ok(Graph::from(graph))
+    }
+
+    /// Validate persisted graph structure
+    async fn validate_graph(
+        &self,
+        ctx: &Context<'_>,
+        id: i32,
+    ) -> Result<GraphValidationResult> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let summary = context
+            .app
+            .validate_graph(id)
+            .await
+            .map_err(|e| StructuredError::service("AppContext::validate_graph", e))?;
+
+        Ok(GraphValidationResult::from(summary))
     }
 
     /// Delete Graph
