@@ -35,6 +35,17 @@ const DEFAULT_LAYER_COLORS = {
   borderColor: '#000000',
 }
 
+const LAYER_CSV_HEADERS = [
+  'layer_id',
+  'name',
+  'alias',
+  'background_color',
+  'text_color',
+  'border_color',
+  'source_dataset_id',
+  'missing',
+]
+
 const normalizeHexValue = (value: string, fallback: string) => {
   if (!value) return fallback
   return value.startsWith('#') ? value : `#${value.replace(/^#/, '')}`
@@ -120,6 +131,7 @@ export const ProjectLayersPage = () => {
   const [selectedMissingLayer, setSelectedMissingLayer] = useState<string>('')
   const [manageAliasesDialogOpen, setManageAliasesDialogOpen] = useState(false)
   const [selectedAliasLayer, setSelectedAliasLayer] = useState<{ id: number; name: string } | null>(null)
+  const [pastingLayers, setPastingLayers] = useState(false)
 
   // Helper function to calculate dataset enabled state
   // Dataset is enabled if ANY of its layers are enabled (i.e., dataset toggle was not turned off)
@@ -330,6 +342,152 @@ export const ProjectLayersPage = () => {
     }
   }
 
+  const escapeCsvValue = (value: string) => {
+    if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+      return `"${value.replace(/"/g, '""')}"`
+    }
+    return value
+  }
+
+  const layersToCsv = () => {
+    const rows = [LAYER_CSV_HEADERS]
+    paletteLayers.forEach((layer) => {
+      rows.push([
+        layer.layerId,
+        layer.name,
+        layer.alias ?? '',
+        layer.backgroundColor ?? '',
+        layer.textColor ?? '',
+        layer.borderColor ?? '',
+        layer.sourceDatasetId?.toString() ?? '',
+        '',
+      ])
+    })
+    missingLayers.forEach((id) => {
+      rows.push([id, '', '', '', '', '', '', 'true'])
+    })
+    return rows.map((row) => row.map((value) => escapeCsvValue(value ?? '')).join(',')).join('\n')
+  }
+
+  const parseCsvLine = (line: string) => {
+    return line
+      .split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/)
+      .map((value) => value.trim().replace(/^"|"$/g, '').replace(/""/g, '"'))
+  }
+
+  const normalizeCsvColor = (value?: string | null, fallback?: string) => {
+    if (!value) return fallback
+    const trimmed = value.trim()
+    if (!trimmed) return fallback
+    const sanitized = trimmed.startsWith('#') ? trimmed : `#${trimmed.replace(/^#/, '')}`
+    return sanitized
+  }
+
+  const parseLayerCsv = (text: string): ProjectLayerInput[] => {
+    const lines = text
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+    if (lines.length < 2) {
+      throw new Error('Clipboard CSV must contain at least a header and one row')
+    }
+
+    const headers = parseCsvLine(lines[0]).map((header) => header.trim().toLowerCase())
+    const layerIdIndex = headers.indexOf('layer_id')
+    if (layerIdIndex === -1) {
+      throw new Error('CSV is missing a layer_id column')
+    }
+
+    return lines.slice(1).reduce<ProjectLayerInput[]>((acc, line) => {
+      const values = parseCsvLine(line)
+      if (values.length !== headers.length) {
+        return acc
+      }
+
+      const record: Record<string, string> = {}
+      headers.forEach((header, idx) => {
+        record[header] = values[idx] ?? ''
+      })
+
+      const layerId = record['layer_id']?.trim()
+      if (!layerId) {
+        return acc
+      }
+
+      const alias = record['alias']?.trim()
+      const missingFlag = record['missing']?.toLowerCase() === 'true'
+      const sourceValue = record['source_dataset_id']?.trim()
+      const parsedSource = sourceValue ? Number(sourceValue) : NaN
+
+      const payload: ProjectLayerInput = {
+        layerId,
+        name: record['name']?.trim() || layerId,
+        alias: alias ? alias : null,
+        backgroundColor: normalizeCsvColor(
+          record['background_color'],
+          DEFAULT_LAYER_COLORS.backgroundColor
+        ),
+        textColor: normalizeCsvColor(record['text_color'], DEFAULT_LAYER_COLORS.textColor),
+        borderColor: normalizeCsvColor(record['border_color'], DEFAULT_LAYER_COLORS.borderColor),
+        sourceDatasetId: !missingFlag && !Number.isNaN(parsedSource) ? parsedSource : null,
+        enabled: true,
+      }
+
+      acc.push(payload)
+      return acc
+    }, [])
+  }
+
+  const handleCopyActive = async () => {
+    try {
+      if (!navigator?.clipboard) {
+        throw new Error('Clipboard API is not available in this browser')
+      }
+      const csv = layersToCsv()
+      await navigator.clipboard.writeText(csv)
+      showSuccessNotification('Copied layers', 'Active palette + missing layers copied to clipboard')
+    } catch (error: any) {
+      showErrorNotification('Failed to copy', error?.message || 'Clipboard access failed')
+    }
+  }
+
+  const handlePasteActive = async () => {
+    if (!navigator?.clipboard) {
+      showErrorNotification('Clipboard unavailable', 'Clipboard API is not available in this browser')
+      return
+    }
+
+    try {
+      setPastingLayers(true)
+      const clipboardText = await navigator.clipboard.readText()
+      const parsedLayers = parseLayerCsv(clipboardText)
+      if (parsedLayers.length === 0) {
+        throw new Error('No valid layer rows found in clipboard CSV')
+      }
+
+      for (const payload of parsedLayers) {
+        await upsertLayer({
+          variables: {
+            projectId: projectIdNum,
+            input: payload,
+          },
+        })
+      }
+
+      const refreshed = await refetchLayers()
+      const refreshedLayers: ProjectLayer[] = (refreshed.data as any)?.projectLayers ?? []
+      setEditableLayers(refreshedLayers)
+      showSuccessNotification(
+        'Layers imported',
+        `Updated palette with ${parsedLayers.length} entr${parsedLayers.length === 1 ? 'y' : 'ies'}`
+      )
+    } catch (error: any) {
+      showErrorNotification('Failed to paste layers', error?.message || 'Clipboard import failed')
+    } finally {
+      setPastingLayers(false)
+    }
+  }
+
   if (!projectIdNum) {
     return null
   }
@@ -370,6 +528,12 @@ export const ProjectLayersPage = () => {
           </p>
         </div>
         <Group gap="sm">
+          <Button variant="outline" onClick={handleCopyActive}>
+            Copy active
+          </Button>
+          <Button variant="outline" onClick={handlePasteActive} disabled={pastingLayers}>
+            {pastingLayers ? 'Pasting…' : 'Paste active'}
+          </Button>
           <Button
             variant="destructive"
             onClick={handleResetLayers}
