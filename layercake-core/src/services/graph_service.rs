@@ -5,6 +5,7 @@ use crate::database::entities::{
 };
 use crate::errors::{GraphError, GraphResult};
 use crate::graph::{Edge, Graph, Layer, Node};
+use indexmap::IndexMap;
 use sea_orm::prelude::Expr;
 use sea_orm::{
     ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
@@ -331,16 +332,21 @@ impl GraphService {
             );
         }
 
-        let graph_layers: Vec<Layer> = palette_layers
+        let mut layer_map: IndexMap<String, Layer> = palette_layers
             .into_iter()
-            .map(|layer| Layer {
-                id: layer.id,
-                label: layer.label,
-                background_color: sanitize_hex(&layer.background_color, "FFFFFF"),
-                text_color: sanitize_hex(&layer.text_color, "000000"),
-                border_color: sanitize_hex(&layer.border_color, "000000"),
-                alias: layer.alias,
-                dataset: layer.dataset,
+            .map(|layer| {
+                (
+                    layer.id.clone(),
+                    Layer {
+                        id: layer.id,
+                        label: layer.label,
+                        background_color: sanitize_hex(&layer.background_color, "FFFFFF"),
+                        text_color: sanitize_hex(&layer.text_color, "000000"),
+                        border_color: sanitize_hex(&layer.border_color, "000000"),
+                        alias: layer.alias,
+                        dataset: layer.dataset,
+                    },
+                )
             })
             .collect();
 
@@ -401,6 +407,33 @@ impl GraphService {
             })
             .collect();
 
+        // Ensure every referenced layer has a placeholder entry so template exporters
+        // always receive a complete layer map (important for DOT/Mermaid/PUML helpers).
+        let mut ensure_layer = |layer_id: &str| {
+            if layer_id.is_empty() || layer_map.contains_key(layer_id) {
+                return;
+            }
+            layer_map.insert(
+                layer_id.to_string(),
+                Layer {
+                    id: layer_id.to_string(),
+                    label: layer_id.to_string(),
+                    background_color: "f7f7f8".to_string(),
+                    text_color: "0f172a".to_string(),
+                    border_color: "1f2933".to_string(),
+                    alias: None,
+                    dataset: None,
+                },
+            );
+        };
+
+        for node in &graph_nodes {
+            ensure_layer(&node.layer);
+        }
+        for edge in &graph_edges {
+            ensure_layer(&edge.layer);
+        }
+
         // Log data quality warnings
         if nodes_missing_label > 0 {
             tracing::warn!(
@@ -421,7 +454,7 @@ impl GraphService {
             name: graph_meta.name,
             nodes: graph_nodes,
             edges: graph_edges,
-            layers: graph_layers,
+            layers: layer_map.into_values().collect(),
             annotations: graph_meta.annotations,
         })
     }
