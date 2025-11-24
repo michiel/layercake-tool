@@ -20,7 +20,10 @@ async fn dataset_layers_alias_roundtrip_xlsx_and_ods() -> Result<()> {
         .import_from_xlsx(project_xlsx.id, &xlsx_bytes)
         .await
         .expect("import XLSX");
-    assert_eq!(xlsx_result.created_count, 1, "expected new dataset from XLSX import");
+    assert_eq!(
+        xlsx_result.created_count, 1,
+        "expected new dataset from XLSX import"
+    );
     assert_alias_preserved(&db, xlsx_result.imported_ids[0]).await?;
 
     // ODS roundtrip
@@ -34,7 +37,10 @@ async fn dataset_layers_alias_roundtrip_xlsx_and_ods() -> Result<()> {
         .import_from_ods(project_ods.id, &ods_bytes)
         .await
         .expect("import ODS");
-    assert_eq!(ods_result.created_count, 1, "expected new dataset from ODS import");
+    assert_eq!(
+        ods_result.created_count, 1,
+        "expected new dataset from ODS import"
+    );
     assert_alias_preserved(&db, ods_result.imported_ids[0]).await?;
 
     Ok(())
