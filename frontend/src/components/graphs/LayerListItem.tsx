@@ -29,15 +29,14 @@ export const LayerListItem: React.FC<LayerListItemProps> = ({
   const [borderPickerOpen, setBorderPickerOpen] = useState(false);
   const [textPickerOpen, setTextPickerOpen] = useState(false);
 
-  const backgroundColor = layer.backgroundColor
-    ? `#${layer.backgroundColor}`
-    : '#f0f0f0';
-  const borderColor = layer.borderColor
-    ? `#${layer.borderColor}`
-    : '#999';
-  const textColor = layer.textColor
-    ? `#${layer.textColor}`
-    : '#000';
+  const formatColor = (value?: string | null, fallback = '#f0f0f0') => {
+    if (!value) return fallback;
+    return value.startsWith('#') ? value : `#${value}`;
+  };
+
+  const backgroundColor = formatColor(layer.backgroundColor, '#f0f0f0');
+  const borderColor = formatColor(layer.borderColor, '#999');
+  const textColor = formatColor(layer.textColor, '#000');
 
   const handleColorChange = (colorType: 'background' | 'border' | 'text', color: string) => {
     if (onColorChange) {
@@ -87,12 +86,24 @@ export const LayerListItem: React.FC<LayerListItemProps> = ({
                 <PopoverContent className="w-auto p-3">
                   <Stack gap="xs">
                     <Label className="text-xs font-medium">Background Color</Label>
-                    <Input
-                      type="color"
-                      value={backgroundColor}
-                      onChange={(e) => handleColorChange('background', e.target.value)}
-                      className="h-8 w-24"
-                    />
+                    <Group gap="xs">
+                      <Input
+                        type="color"
+                        value={backgroundColor}
+                        onChange={(e) => handleColorChange('background', e.target.value)}
+                        className="h-8 w-10"
+                      />
+                      <Input
+                        value={backgroundColor}
+                        onChange={(e) =>
+                          handleColorChange(
+                            'background',
+                            e.target.value.startsWith('#') ? e.target.value : `#${e.target.value.replace(/^#/, '')}`
+                          )
+                        }
+                        className="h-8 w-24 text-xs"
+                      />
+                    </Group>
                   </Stack>
                 </PopoverContent>
               </Popover>
@@ -112,12 +123,24 @@ export const LayerListItem: React.FC<LayerListItemProps> = ({
                 <PopoverContent className="w-auto p-3">
                   <Stack gap="xs">
                     <Label className="text-xs font-medium">Border Color</Label>
-                    <Input
-                      type="color"
-                      value={borderColor}
-                      onChange={(e) => handleColorChange('border', e.target.value)}
-                      className="h-8 w-24"
-                    />
+                    <Group gap="xs">
+                      <Input
+                        type="color"
+                        value={borderColor}
+                        onChange={(e) => handleColorChange('border', e.target.value)}
+                        className="h-8 w-10"
+                      />
+                      <Input
+                        value={borderColor}
+                        onChange={(e) =>
+                          handleColorChange(
+                            'border',
+                            e.target.value.startsWith('#') ? e.target.value : `#${e.target.value.replace(/^#/, '')}`
+                          )
+                        }
+                        className="h-8 w-24 text-xs"
+                      />
+                    </Group>
                   </Stack>
                 </PopoverContent>
               </Popover>
@@ -137,12 +160,24 @@ export const LayerListItem: React.FC<LayerListItemProps> = ({
                 <PopoverContent className="w-auto p-3">
                   <Stack gap="xs">
                     <Label className="text-xs font-medium">Text Color</Label>
-                    <Input
-                      type="color"
-                      value={textColor}
-                      onChange={(e) => handleColorChange('text', e.target.value)}
-                      className="h-8 w-24"
-                    />
+                    <Group gap="xs">
+                      <Input
+                        type="color"
+                        value={textColor}
+                        onChange={(e) => handleColorChange('text', e.target.value)}
+                        className="h-8 w-10"
+                      />
+                      <Input
+                        value={textColor}
+                        onChange={(e) =>
+                          handleColorChange(
+                            'text',
+                            e.target.value.startsWith('#') ? e.target.value : `#${e.target.value.replace(/^#/, '')}`
+                          )
+                        }
+                        className="h-8 w-24 text-xs"
+                      />
+                    </Group>
                   </Stack>
                 </PopoverContent>
               </Popover>

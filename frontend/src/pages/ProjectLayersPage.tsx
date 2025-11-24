@@ -35,6 +35,11 @@ const DEFAULT_LAYER_COLORS = {
   borderColor: '#000000',
 }
 
+const normalizeHexValue = (value: string, fallback: string) => {
+  if (!value) return fallback
+  return value.startsWith('#') ? value : `#${value.replace(/^#/, '')}`
+}
+
 export const ProjectLayersPage = () => {
   const navigate = useNavigate()
   const { projectId } = useParams<{ projectId: string }>()
@@ -445,22 +450,52 @@ export const ProjectLayersPage = () => {
                     value={newLayer.name}
                     onChange={(e) => setNewLayer((prev) => ({ ...prev, name: e.target.value }))}
                   />
-                  <Input
-                    type="color"
-                    value={newLayer.backgroundColor || DEFAULT_LAYER_COLORS.backgroundColor}
-                    onChange={(e) =>
-                      setNewLayer((prev) => ({ ...prev, backgroundColor: e.target.value }))
-                    }
-                    title="Background"
-                  />
-                  <Input
-                    type="color"
-                    value={newLayer.textColor || DEFAULT_LAYER_COLORS.textColor}
-                    onChange={(e) =>
-                      setNewLayer((prev) => ({ ...prev, textColor: e.target.value }))
-                    }
-                    title="Text"
-                  />
+                  <Group gap="xs">
+                    <Input
+                      type="color"
+                      value={newLayer.backgroundColor || DEFAULT_LAYER_COLORS.backgroundColor}
+                      onChange={(e) =>
+                        setNewLayer((prev) => ({ ...prev, backgroundColor: e.target.value }))
+                      }
+                      title="Background"
+                      className="w-12"
+                    />
+                    <Input
+                      placeholder="#ffffff"
+                      value={newLayer.backgroundColor || DEFAULT_LAYER_COLORS.backgroundColor}
+                      onChange={(e) =>
+                        setNewLayer((prev) => ({
+                          ...prev,
+                          backgroundColor: e.target.value.startsWith('#')
+                            ? e.target.value
+                            : `#${e.target.value.replace(/^#/, '')}`
+                        }))
+                      }
+                    />
+                  </Group>
+                  <Group gap="xs">
+                    <Input
+                      type="color"
+                      value={newLayer.textColor || DEFAULT_LAYER_COLORS.textColor}
+                      onChange={(e) =>
+                        setNewLayer((prev) => ({ ...prev, textColor: e.target.value }))
+                      }
+                      title="Text"
+                      className="w-12"
+                    />
+                    <Input
+                      placeholder="#000000"
+                      value={newLayer.textColor || DEFAULT_LAYER_COLORS.textColor}
+                      onChange={(e) =>
+                        setNewLayer((prev) => ({
+                          ...prev,
+                          textColor: e.target.value.startsWith('#')
+                            ? e.target.value
+                            : `#${e.target.value.replace(/^#/, '')}`
+                        }))
+                      }
+                    />
+                  </Group>
                   <Button
                     onClick={() => {
                       if (!newLayer.layerId?.trim() || !newLayer.name?.trim()) {
@@ -513,45 +548,108 @@ export const ProjectLayersPage = () => {
                         />
                       </TableCell>
                       <TableCell>
-                        <Input
-                          type="color"
-                          value={layer.backgroundColor}
-                          onChange={(e) =>
-                            updateEditableLayers((prev) =>
-                              prev.map((l) =>
-                                l.id === layer.id
-                                  ? { ...l, backgroundColor: e.target.value }
-                                  : l
+                        <Group gap="xs">
+                          <Input
+                            type="color"
+                            value={normalizeHexValue(layer.backgroundColor, DEFAULT_LAYER_COLORS.backgroundColor)}
+                            onChange={(e) =>
+                              updateEditableLayers((prev) =>
+                                prev.map((l) =>
+                                  l.id === layer.id
+                                    ? { ...l, backgroundColor: e.target.value }
+                                    : l
+                                )
                               )
-                            )
-                          }
-                        />
+                            }
+                            className="w-12"
+                          />
+                          <Input
+                            value={normalizeHexValue(layer.backgroundColor, DEFAULT_LAYER_COLORS.backgroundColor)}
+                            onChange={(e) =>
+                              updateEditableLayers((prev) =>
+                                prev.map((l) =>
+                                  l.id === layer.id
+                                    ? {
+                                        ...l,
+                                        backgroundColor: normalizeHexValue(
+                                          e.target.value,
+                                          DEFAULT_LAYER_COLORS.backgroundColor
+                                        )
+                                      }
+                                    : l
+                                )
+                              )
+                            }
+                          />
+                        </Group>
                       </TableCell>
                       <TableCell>
-                        <Input
-                          type="color"
-                          value={layer.textColor}
-                          onChange={(e) =>
-                            updateEditableLayers((prev) =>
-                              prev.map((l) =>
-                                l.id === layer.id ? { ...l, textColor: e.target.value } : l
+                        <Group gap="xs">
+                          <Input
+                            type="color"
+                            value={normalizeHexValue(layer.textColor, DEFAULT_LAYER_COLORS.textColor)}
+                            onChange={(e) =>
+                              updateEditableLayers((prev) =>
+                                prev.map((l) =>
+                                  l.id === layer.id ? { ...l, textColor: e.target.value } : l
+                                )
                               )
-                            )
-                          }
-                        />
+                            }
+                            className="w-12"
+                          />
+                          <Input
+                            value={normalizeHexValue(layer.textColor, DEFAULT_LAYER_COLORS.textColor)}
+                            onChange={(e) =>
+                              updateEditableLayers((prev) =>
+                                prev.map((l) =>
+                                  l.id === layer.id
+                                    ? {
+                                        ...l,
+                                        textColor: normalizeHexValue(
+                                          e.target.value,
+                                          DEFAULT_LAYER_COLORS.textColor
+                                        )
+                                      }
+                                    : l
+                                )
+                              )
+                            }
+                          />
+                        </Group>
                       </TableCell>
                       <TableCell>
-                        <Input
-                          type="color"
-                          value={layer.borderColor}
-                          onChange={(e) =>
-                            updateEditableLayers((prev) =>
-                              prev.map((l) =>
-                                l.id === layer.id ? { ...l, borderColor: e.target.value } : l
+                        <Group gap="xs">
+                          <Input
+                            type="color"
+                            value={normalizeHexValue(layer.borderColor, DEFAULT_LAYER_COLORS.borderColor)}
+                            onChange={(e) =>
+                              updateEditableLayers((prev) =>
+                                prev.map((l) =>
+                                  l.id === layer.id ? { ...l, borderColor: e.target.value } : l
+                                )
                               )
-                            )
-                          }
-                        />
+                            }
+                            className="w-12"
+                          />
+                          <Input
+                            value={normalizeHexValue(layer.borderColor, DEFAULT_LAYER_COLORS.borderColor)}
+                            onChange={(e) =>
+                              updateEditableLayers((prev) =>
+                                prev.map((l) =>
+                                  l.id === layer.id
+                                    ? {
+                                        ...l,
+                                        borderColor: normalizeHexValue(
+                                          e.target.value,
+                                          DEFAULT_LAYER_COLORS.borderColor
+                                        )
+                                      }
+                                    : l
+                                )
+                              )
+                            }
+                          />
+                        </Group>
                       </TableCell>
                       <TableCell>
                         <Badge variant="secondary">{getDatasetName(layer.sourceDatasetId)}</Badge>
