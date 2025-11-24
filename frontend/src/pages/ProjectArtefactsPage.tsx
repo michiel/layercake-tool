@@ -4,6 +4,7 @@ import { useMutation, useQuery } from '@apollo/client/react'
 import {
   IconHierarchy2,
   IconGraph,
+  IconBook,
   IconDownload,
   IconEye,
   IconTable,
@@ -75,7 +76,15 @@ type PlanDagResponse = {
 
 type ArtefactEntry =
   | { type: 'graph'; node: PlanDagNode; depth: number }
-  | { type: 'artefact'; node: PlanDagNode; depth: number; config: Record<string, any>; parentGraphId: string }
+  | { type: 'story'; node: PlanDagNode; depth: number }
+  | {
+      type: 'artefact'
+      node: PlanDagNode
+      depth: number
+      config: Record<string, any>
+      parentGraphId?: string
+      parentStoryId?: string
+    }
 
 const parseConfig = (config?: string | null): Record<string, any> => {
   if (!config) return {}
@@ -125,6 +134,7 @@ const ProjectArtefactsPage: React.FC = () => {
   const navigate = useNavigate()
   const { projectId } = useParams<{ projectId: string }>()
   const projectIdNum = Number(projectId || 0)
+  const projectIdParam = projectId ?? (projectIdNum ? String(projectIdNum) : '')
 
   const { data: projectsData } = useQuery<{ projects: Array<{ id: number; name: string }> }>(GET_PROJECTS)
   const selectedProject = projectsData?.projects.find((p: { id: number; name: string }) => p.id === projectIdNum)
@@ -169,6 +179,7 @@ const ProjectArtefactsPage: React.FC = () => {
   )
   const [downloadingNodeId, setDownloadingNodeId] = useState<string | null>(null)
   const [collapsedGraphs, setCollapsedGraphs] = useState<Set<string>>(new Set())
+  const [collapsedStories, setCollapsedStories] = useState<Set<string>>(new Set())
 const [editNodeDialog, setEditNodeDialog] = useState<{
   open: boolean
   nodeId: string | null
@@ -190,6 +201,18 @@ const [editNodeDialog, setEditNodeDialog] = useState<{
         next.delete(graphId)
       } else {
         next.add(graphId)
+      }
+      return next
+    })
+  }
+
+  const toggleStoryCollapse = (storyId: string) => {
+    setCollapsedStories((prev) => {
+      const next = new Set(prev)
+      if (next.has(storyId)) {
+        next.delete(storyId)
+      } else {
+        next.add(storyId)
       }
       return next
     })
@@ -284,29 +307,35 @@ const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
     const graphIds = new Set(graphNodes.map((node) => node.id))
     const outgoing = new Map<string, string[]>()
     const incomingGraphCount = new Map<string, number>()
+    const storyNodes = nodes.filter((node) => node.nodeType === 'StoryNode')
+    const storyIds = new Set(storyNodes.map((node) => node.id))
+    const incomingStoryCount = new Map<string, number>()
 
     edges.forEach((edge) => {
       outgoing.set(edge.source, [...(outgoing.get(edge.source) ?? []), edge.target])
       if (graphIds.has(edge.source) && graphIds.has(edge.target)) {
         incomingGraphCount.set(edge.target, (incomingGraphCount.get(edge.target) ?? 0) + 1)
       }
+      if (storyIds.has(edge.source) && storyIds.has(edge.target)) {
+        incomingStoryCount.set(edge.target, (incomingStoryCount.get(edge.target) ?? 0) + 1)
+      }
     })
 
-    let roots = graphNodes.filter((node) => (incomingGraphCount.get(node.id) ?? 0) === 0)
-    if (!roots.length) {
-      roots = graphNodes
+    let graphRoots = graphNodes.filter((node) => (incomingGraphCount.get(node.id) ?? 0) === 0)
+    if (!graphRoots.length) {
+      graphRoots = graphNodes
     }
 
-    const visited = new Set<string>()
-    const entries: ArtefactEntry[] = []
+    const visitedGraphs = new Set<string>()
+    const graphEntries: ArtefactEntry[] = []
 
     const traverseGraph = (nodeId: string, depth: number) => {
-      if (visited.has(nodeId)) return
-      visited.add(nodeId)
+      if (visitedGraphs.has(nodeId)) return
+      visitedGraphs.add(nodeId)
 
       const node = nodeMap.get(nodeId)
       if (!node) return
-      entries.push({ type: 'graph', node, depth })
+      graphEntries.push({ type: 'graph', node, depth })
 
       const children = outgoing.get(nodeId) ?? []
       const graphChildren = children.filter((id) => graphIds.has(id))
@@ -320,7 +349,7 @@ const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
       graphChildren.forEach((childId) => traverseGraph(childId, depth + 1))
 
       artefactChildren.forEach((child) => {
-        entries.push({
+        graphEntries.push({
           type: 'artefact',
           node: child,
           depth: depth + 1,
@@ -330,14 +359,56 @@ const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
       })
     }
 
-    roots.forEach((root) => traverseGraph(root.id, 0))
+    graphRoots.forEach((root) => traverseGraph(root.id, 0))
     graphNodes.forEach((node) => {
-      if (!visited.has(node.id)) {
+      if (!visitedGraphs.has(node.id)) {
         traverseGraph(node.id, 0)
       }
     })
 
-    return entries
+    let storyRoots = storyNodes.filter((node) => (incomingStoryCount.get(node.id) ?? 0) === 0)
+    if (!storyRoots.length) {
+      storyRoots = storyNodes
+    }
+
+    const visitedStories = new Set<string>()
+    const storyEntries: ArtefactEntry[] = []
+
+    const traverseStory = (nodeId: string, depth: number) => {
+      if (visitedStories.has(nodeId)) return
+      visitedStories.add(nodeId)
+
+      const node = nodeMap.get(nodeId)
+      if (!node) return
+      storyEntries.push({ type: 'story', node, depth })
+
+      const children = outgoing.get(nodeId) ?? []
+      const storyChildren = children.filter((id) => storyIds.has(id))
+      const sequenceChildren = children
+        .map((id) => nodeMap.get(id))
+        .filter((child): child is PlanDagNode => !!child && child.nodeType === 'SequenceArtefactNode')
+
+      storyChildren.forEach((childId) => traverseStory(childId, depth + 1))
+
+      sequenceChildren.forEach((child) => {
+        storyEntries.push({
+          type: 'artefact',
+          node: child,
+          depth: depth + 1,
+          config: parseConfig(child.config),
+          parentStoryId: nodeId,
+        })
+      })
+    }
+
+    storyRoots.forEach((root) => traverseStory(root.id, 0))
+    storyNodes.forEach((node) => {
+      if (!visitedStories.has(node.id)) {
+        traverseStory(node.id, 0)
+      }
+    })
+
+    return [...graphEntries, ...storyEntries]
   }, [data])
 
   const handleGraphData = (graphId?: number | null) => {
@@ -399,7 +470,10 @@ const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
       const label = entry.node.metadata?.label || entry.node.id
       const graphId = entry.node.graphExecution?.graphId ?? null
       const isCollapsed = collapsedGraphs.has(entry.node.id)
-      const hasChildren = index < entries.length - 1 && entries[index + 1].type === 'artefact'
+      const hasChildren = entries.some(
+        (child, childIndex) =>
+          childIndex > index && child.type === 'artefact' && child.parentGraphId === entry.node.id,
+      )
 
       return (
         <div
@@ -466,8 +540,89 @@ const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
       )
     }
 
+    if (entry.type === 'story') {
+      const label = entry.node.metadata?.label || entry.node.id
+      const isCollapsed = collapsedStories.has(entry.node.id)
+      const hasChildren = entries.some(
+        (child, childIndex) =>
+          childIndex > index && child.type === 'artefact' && child.parentStoryId === entry.node.id,
+      )
+      const storyConfig = parseConfig(entry.node.config)
+      const storyId = storyConfig.storyId
+      const storyLink = storyId && projectIdParam ? `/projects/${projectIdParam}/stories/${storyId}` : null
+      const sequenceLink = storyLink ? `${storyLink}/sequences/new` : null
+
+      return (
+        <div
+          key={entry.node.id}
+          className="flex items-center justify-between py-4 px-4 border-b last:border-b-0 bg-muted/30"
+          style={{ paddingLeft: `${16 + entry.depth * 24}px` }}
+        >
+          <Group gap="sm" className="text-sm">
+            {hasChildren && (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6 -ml-2"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  toggleStoryCollapse(entry.node.id)
+                }}
+              >
+                {isCollapsed ? <IconChevronRight size={16} /> : <IconChevronDown size={16} />}
+              </Button>
+            )}
+            {!hasChildren && <div className="w-6" />}
+            <IconBook className="h-4 w-4 text-muted-foreground" />
+            <div>
+              <p className="font-medium">{label}</p>
+              <p className="text-xs text-muted-foreground">Story Node</p>
+            </div>
+          </Group>
+          <Group gap="xs">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                    disabled={!storyLink}
+                    onClick={() => storyLink && navigate(storyLink)}
+                  >
+                    <IconTable size={16} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Open story</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                    disabled={!sequenceLink}
+                    onClick={() => sequenceLink && navigate(sequenceLink)}
+                  >
+                    <IconExternalLink size={16} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Open sequence editor</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </Group>
+        </div>
+      )
+    }
+
     // Check if parent graph is collapsed
-    if (collapsedGraphs.has(entry.parentGraphId)) {
+    if (entry.parentGraphId && collapsedGraphs.has(entry.parentGraphId)) {
+      return null
+    }
+
+    if (entry.parentStoryId && collapsedStories.has(entry.parentStoryId)) {
       return null
     }
 
