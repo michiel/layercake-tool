@@ -130,6 +130,33 @@ impl DataSetBulkService {
         Ok(rows)
     }
 
+    fn ensure_layer_alias_column(rows: &mut Vec<Vec<String>>) {
+        if rows.is_empty() {
+            return;
+        }
+
+        if rows[0].iter().any(|header| header == "alias") {
+            return;
+        }
+
+        let insert_idx = rows[0]
+            .iter()
+            .position(|header| header == "label")
+            .map(|idx| idx + 1)
+            .unwrap_or(rows[0].len());
+
+        for (row_idx, row) in rows.iter_mut().enumerate() {
+            row.insert(
+                insert_idx,
+                if row_idx == 0 {
+                    "alias".to_string()
+                } else {
+                    String::new()
+                },
+            );
+        }
+    }
+
     fn build_sheet_name(
         base: &str,
         suffix: &str,
@@ -217,7 +244,10 @@ impl DataSetBulkService {
                     if array.is_empty() {
                         continue;
                     }
-                    let rows = Self::json_array_to_csv_rows(array)?;
+                    let mut rows = Self::json_array_to_csv_rows(array)?;
+                    if key == "layers" {
+                        Self::ensure_layer_alias_column(&mut rows);
+                    }
                     let sheet_name = Self::build_sheet_name(
                         &dataset.name,
                         label,
@@ -309,7 +339,10 @@ impl DataSetBulkService {
                     if array.is_empty() {
                         continue;
                     }
-                    let rows = Self::json_array_to_csv_rows(array)?;
+                    let mut rows = Self::json_array_to_csv_rows(array)?;
+                    if key == "layers" {
+                        Self::ensure_layer_alias_column(&mut rows);
+                    }
                     let sheet_name =
                         Self::build_sheet_name(&dataset.name, label, &mut used_sheet_names, None);
                     let mut sheet = Sheet::new(&sheet_name);

@@ -13,7 +13,7 @@ Introduce an `alias` attribute on layer definitions so that palette entries can 
 - [x] Schema + ORM updates in `project_layers` / `graph_layers`, migration `m20251207_000002_add_alias_to_layers`, and GraphService alias resolution (including recursive palette lookup + cycle protection).
 - [x] GraphQL types/mutations expose `alias` (`ProjectLayerInput`, `ProjectLayer`, graph `Layer`, layer bulk updates, edit replay).
 - [x] Frontend palette + dataset editors present alias fields, persist via copy/paste (`ProjectLayersPage`, GraphSpreadsheet editor for datasets/graphs).
-- [ ] CSV/JSON import/export, clipboard, and dataset ingestion/export flows emit/parse the alias column consistently.
+- [x] CSV/TSV import/export, clipboard, and dataset ingestion/export flows emit/parse the alias column consistently (dataset XLSX/ODS exports always include alias column).
 - [ ] Artefact renderers / docs / regression tests updated to reflect alias semantics end-to-end.
 
 ## Detailed Steps

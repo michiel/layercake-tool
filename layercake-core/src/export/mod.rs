@@ -96,6 +96,7 @@ pub mod renderer {
             .collect();
 
         for layer in layer_map.values_mut() {
+            strip_alias_metadata(layer);
             if let Some(mode) = overrides.get(&layer.dataset) {
                 apply_layer_style(layer, mode);
             }
@@ -176,6 +177,10 @@ pub mod renderer {
         layer.background_color = palette.0.to_string();
         layer.text_color = palette.1.to_string();
         layer.border_color = palette.2.to_string();
+    }
+
+    fn strip_alias_metadata(layer: &mut Layer) {
+        layer.alias = None;
     }
 }
 

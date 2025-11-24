@@ -192,6 +192,11 @@ async fn process_delimited_layers(file_data: &[u8], delimiter: u8) -> Result<Str
                             layer.insert("text_color".to_string(), json!(field));
                         }
                     }
+                    "alias" => {
+                        if !field.trim().is_empty() {
+                            layer.insert("alias".to_string(), json!(field.trim()));
+                        }
+                    }
                     "z_index" => {
                         if let Ok(z) = field.parse::<i32>() {
                             layer.insert("z_index".to_string(), json!(z));
