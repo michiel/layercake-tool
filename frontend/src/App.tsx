@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Routes, Route, useNavigate, useParams, useLocation } from 'react-router-dom'
+import { Routes, Route, useNavigate, useParams, useLocation, Link } from 'react-router-dom'
 import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconDownload, IconChevronLeft, IconChevronRight, IconFolderPlus, IconBooks, IconAdjustments, IconHierarchy2, IconChevronDown, IconUpload, IconFlask } from '@tabler/icons-react'
 import { useQuery, useMutation } from '@apollo/client/react'
 import { gql } from '@apollo/client'
@@ -366,6 +366,13 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
 
   const projectsButtonActive = location.pathname.startsWith('/projects') && !activeProjectNavKey
 
+  const shouldHandleNavigationClick = (event: React.MouseEvent) => {
+    if (event.defaultPrevented) return false
+    if (event.button !== 0) return false
+    if (event.metaKey || event.altKey || event.ctrlKey || event.shiftKey) return false
+    return true
+  }
+
   // Initialize collapsed sections - collapse all sections by default unless they have an active child
   React.useEffect(() => {
     const sectionsWithChildren = projectNavSections.filter(s => s.children && s.children.length > 0)
@@ -432,16 +439,18 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                     <Button
                       variant={isActiveRoute('/') ? 'default' : 'ghost'}
                       className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start'}
-                      onClick={() => navigate('/')}
+                      asChild
                     >
-                      {navCollapsed ? (
-                        <IconServer className="h-4 w-4" />
-                      ) : (
-                        <>
-                          <IconServer className="h-4 w-4 mr-2" />
-                          Home
-                        </>
-                      )}
+                      <Link to="/">
+                        {navCollapsed ? (
+                          <IconServer className="h-4 w-4" />
+                        ) : (
+                          <>
+                            <IconServer className="h-4 w-4 mr-2" />
+                            Home
+                          </>
+                        )}
+                      </Link>
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="right">Home</TooltipContent>
@@ -452,16 +461,18 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                     <Button
                       variant={isActiveRoute('/library') ? 'default' : 'ghost'}
                       className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start'}
-                      onClick={() => navigate('/library')}
+                      asChild
                     >
-                      {navCollapsed ? (
-                        <IconBooks className="h-4 w-4" />
-                      ) : (
-                        <>
-                          <IconBooks className="h-4 w-4 mr-2" />
-                          Library
-                        </>
-                      )}
+                      <Link to="/library">
+                        {navCollapsed ? (
+                          <IconBooks className="h-4 w-4" />
+                        ) : (
+                          <>
+                            <IconBooks className="h-4 w-4 mr-2" />
+                            Library
+                          </>
+                        )}
+                      </Link>
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="right">Library</TooltipContent>
@@ -472,16 +483,18 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                     <Button
                       variant={projectsButtonActive ? 'default' : 'ghost'}
                       className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start'}
-                      onClick={() => navigate('/projects')}
+                      asChild
                     >
-                      {navCollapsed ? (
-                        <IconDatabase className="h-4 w-4" />
-                      ) : (
-                        <>
-                          <IconDatabase className="h-4 w-4 mr-2" />
-                          Projects
-                        </>
-                      )}
+                      <Link to="/projects">
+                        {navCollapsed ? (
+                          <IconDatabase className="h-4 w-4" />
+                        ) : (
+                          <>
+                            <IconDatabase className="h-4 w-4 mr-2" />
+                            Projects
+                          </>
+                        )}
+                      </Link>
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="right">Projects</TooltipContent>
@@ -512,20 +525,26 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                                       highlightChild ? 'text-primary' : undefined
                                     )}
                                     aria-current={sectionActive || hasActiveChild ? 'page' : undefined}
-                                    onClick={() => {
-                                      navigate(section.route)
-                                      // If this section has children, expand them
-                                      if (hasChildren) {
-                                        setCollapsedSections(prev => {
-                                          const next = new Set(prev)
-                                          next.delete(section.key)  // Remove from collapsed = expand
-                                          return next
-                                        })
-                                      }
-                                    }}
+                                    asChild
                                   >
-                                    {section.icon}
-                                    {!navCollapsed && <span className="ml-2">{section.label}</span>}
+                                    <Link
+                                      to={section.route}
+                                      onClick={(event) => {
+                                        if (!shouldHandleNavigationClick(event)) {
+                                          return
+                                        }
+                                        if (hasChildren) {
+                                          setCollapsedSections(prev => {
+                                            const next = new Set(prev)
+                                            next.delete(section.key)
+                                            return next
+                                          })
+                                        }
+                                      }}
+                                    >
+                                      {section.icon}
+                                      {!navCollapsed && <span className="ml-2">{section.label}</span>}
+                                    </Link>
                                   </Button>
                                   {!navCollapsed && hasChildren && (
                                     <Button
@@ -559,9 +578,9 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                                       variant={childActive ? 'default' : 'ghost'}
                                       aria-current={childActive ? 'page' : undefined}
                                       className="justify-start text-sm"
-                                      onClick={() => navigate(child.route)}
+                                      asChild
                                     >
-                                      {child.label}
+                                      <Link to={child.route}>{child.label}</Link>
                                     </Button>
                                   )
                                 })}
@@ -582,16 +601,18 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                     <Button
                       variant={isActiveRoute('/settings/database') ? 'default' : 'ghost'}
                       className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start'}
-                      onClick={() => navigate('/settings/database')}
+                      asChild
                     >
-                      {navCollapsed ? (
-                        <IconSettings className="h-4 w-4" />
-                      ) : (
-                        <>
-                          <IconSettings className="h-4 w-4 mr-2" />
-                          Database Settings
-                        </>
-                      )}
+                      <Link to="/settings/database">
+                        {navCollapsed ? (
+                          <IconSettings className="h-4 w-4" />
+                        ) : (
+                          <>
+                            <IconSettings className="h-4 w-4 mr-2" />
+                            Database Settings
+                          </>
+                        )}
+                      </Link>
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="right">Database Settings</TooltipContent>
@@ -601,16 +622,18 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                     <Button
                       variant={isActiveRoute('/settings/system') ? 'default' : 'ghost'}
                       className={`${navCollapsed ? 'justify-center px-2' : 'w-full justify-start'} mt-2`}
-                      onClick={() => navigate('/settings/system')}
+                      asChild
                     >
-                      {navCollapsed ? (
-                        <IconAdjustments className="h-4 w-4" />
-                      ) : (
-                        <>
-                          <IconAdjustments className="h-4 w-4 mr-2" />
-                          System Settings
-                        </>
-                      )}
+                      <Link to="/settings/system">
+                        {navCollapsed ? (
+                          <IconAdjustments className="h-4 w-4" />
+                        ) : (
+                          <>
+                            <IconAdjustments className="h-4 w-4 mr-2" />
+                            System Settings
+                          </>
+                        )}
+                      </Link>
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="right">System Settings</TooltipContent>

@@ -82,6 +82,28 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({
     })
   }
 
+  const handleBreadcrumbClick = (
+    event: React.MouseEvent<HTMLAnchorElement>,
+    href: string
+  ) => {
+    if (!onNavigate) {
+      return
+    }
+    if (
+      event.defaultPrevented ||
+      event.button !== 0 ||
+      event.metaKey ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.shiftKey
+    ) {
+      return
+    }
+
+    event.preventDefault()
+    onNavigate(href)
+  }
+
   return (
     <Breadcrumb>
       <BreadcrumbList>
@@ -98,7 +120,8 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({
                   </BreadcrumbPage>
                 ) : (
                   <BreadcrumbLink
-                    onClick={() => onNavigate?.(item.href!)}
+                    href={item.href!}
+                    onClick={(event) => handleBreadcrumbClick(event, item.href!)}
                     className="flex items-center gap-1 cursor-pointer"
                   >
                     {item.icon}
