@@ -442,8 +442,6 @@ impl AppContext {
             .await
             .map_err(|e| anyhow!("Failed to create data set from file: {}", e))?;
 
-        self.attach_data_set_to_plan(project_id, &created).await?;
-
         Ok(DataSetSummary::from(created))
     }
 
@@ -462,8 +460,6 @@ impl AppContext {
             .create_empty(project_id, name, description)
             .await
             .map_err(|e| anyhow!("Failed to create empty data set: {}", e))?;
-
-        self.attach_data_set_to_plan(project_id, &created).await?;
 
         Ok(DataSetSummary::from(created))
     }
@@ -488,7 +484,6 @@ impl AppContext {
                 .await
                 .map_err(|e| anyhow!("Failed to import data set {}: {}", upload.filename, e))?;
 
-            self.attach_data_set_to_plan(project_id, &created).await?;
             results.push(DataSetSummary::from(created));
         }
 
@@ -817,67 +812,11 @@ impl AppContext {
             .await
             .map_err(|e| anyhow!("Failed to load imported datasets: {}", e))?;
 
-        for model in &models {
-            self.attach_data_set_to_plan(model.project_id, model)
-                .await
-                .ok();
-        }
-
         Ok(DataSetImportOutcome {
             data_sets: models.into_iter().map(DataSetSummary::from).collect(),
             created_count: result.created_count,
             updated_count: result.updated_count,
         })
-    }
-
-    async fn attach_data_set_to_plan(
-        &self,
-        project_id: i32,
-        data_set: &data_sets::Model,
-    ) -> Result<()> {
-        let nodes = self
-            .plan_dag_service
-            .get_nodes(project_id, None)
-            .await
-            .unwrap_or_default();
-
-        let already_attached = nodes.iter().any(|node| {
-            serde_json::from_str::<Value>(&node.config)
-                .ok()
-                .and_then(|config| config.get("dataSetId").and_then(|id| id.as_i64()))
-                .map(|id| id as i32 == data_set.id)
-                .unwrap_or(false)
-        });
-
-        if already_attached {
-            return Ok(());
-        }
-
-        let position = Position {
-            x: 100.0,
-            y: 100.0 + (nodes.len() as f64 * 120.0),
-        };
-
-        let metadata = json!({ "label": data_set.name });
-        let config = json!({
-            "dataSetId": data_set.id,
-            "filename": data_set.filename,
-        });
-
-        let _ = self
-            .create_plan_dag_node(
-                project_id,
-                None,
-                PlanDagNodeRequest {
-                    node_type: PlanDagNodeType::DataSet,
-                    position,
-                    metadata,
-                    config,
-                },
-            )
-            .await?;
-
-        Ok(())
     }
 
     pub async fn export_project_as_template(

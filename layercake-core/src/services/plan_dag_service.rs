@@ -51,17 +51,31 @@ impl PlanDagService {
     pub async fn get_or_create_plan(&self, project_id: i32) -> Result<plans::Model> {
         match plans::Entity::find()
             .filter(plans::Column::ProjectId.eq(project_id))
+            .order_by_asc(plans::Column::Id)
             .one(&self.db)
             .await
             .map_err(|e| anyhow!("Database error: {}", e))?
         {
-            Some(plan) => Ok(plan),
+            Some(plan) => {
+                if Self::needs_default_plan_name(&plan, project_id) {
+                    let mut active: plans::ActiveModel = plan.clone().into();
+                    active.name = Set(Self::default_plan_name().to_string());
+                    active.updated_at = Set(Utc::now());
+                    let plan = active
+                        .update(&self.db)
+                        .await
+                        .map_err(|e| anyhow!("Failed to rename plan: {}", e))?;
+                    Ok(plan)
+                } else {
+                    Ok(plan)
+                }
+            }
             None => {
                 let now = Utc::now();
                 let new_plan = plans::ActiveModel {
                     id: sea_orm::ActiveValue::NotSet,
                     project_id: Set(project_id),
-                    name: Set(format!("Plan for Project {}", project_id)),
+                    name: Set(Self::default_plan_name().to_string()),
                     description: Set(None),
                     tags: Set("[]".to_string()),
                     yaml_content: Set("".to_string()),
@@ -77,6 +91,20 @@ impl PlanDagService {
                     .map_err(|e| anyhow!("Failed to create plan: {}", e))
             }
         }
+    }
+
+    fn default_plan_name() -> &'static str {
+        "Main plan"
+    }
+
+    fn needs_default_plan_name(plan: &plans::Model, project_id: i32) -> bool {
+        let trimmed = plan.name.trim();
+        if trimmed.is_empty() {
+            return true;
+        }
+
+        let legacy_name = format!("Plan for Project {}", project_id);
+        trimmed.eq_ignore_ascii_case(&legacy_name)
     }
 
     async fn resolve_plan(&self, project_id: i32, plan_id: Option<i32>) -> Result<plans::Model> {
