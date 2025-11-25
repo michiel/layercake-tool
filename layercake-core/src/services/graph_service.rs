@@ -370,6 +370,14 @@ impl GraphService {
 
                 // Empty layer means inherit default styling
                 let layer = db_node.layer.unwrap_or_default();
+                let comment = db_node.comment.or_else(|| {
+                    db_node
+                        .attrs
+                        .as_ref()
+                        .and_then(|attrs| attrs.get("comment"))
+                        .and_then(|value| value.as_str())
+                        .map(|s| s.to_string())
+                });
 
                 Node {
                     id: db_node.id,
@@ -378,7 +386,7 @@ impl GraphService {
                     is_partition: db_node.is_partition,
                     belongs_to: db_node.belongs_to,
                     weight: db_node.weight.unwrap_or(1.0) as i32,
-                    comment: None, // Could be extracted from attrs if needed
+                    comment,
                     dataset: db_node.dataset_id,
                 }
             })
