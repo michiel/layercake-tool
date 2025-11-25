@@ -1575,10 +1575,6 @@ const ProjectDetailPage = () => {
     )
   }
 
-  const planNodeCount = planDag?.nodes?.length ?? 0
-  const planEdgeCount = planDag?.edges?.length ?? 0
-  const planVersion = planDag?.version ?? 'n/a'
-
   return (
     <PageContainer>
       <Breadcrumbs
@@ -1646,13 +1642,6 @@ const ProjectDetailPage = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <Group gap="sm">
-                  <Badge variant="secondary">Nodes: {planNodeCount}</Badge>
-                  <Badge variant="secondary">Edges: {planEdgeCount}</Badge>
-                </Group>
-                <p className="text-xs text-muted-foreground">
-                  Version: {planVersion}
-                </p>
                 <div className="space-y-2">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Plans</p>
                   {plansLoading ? (
