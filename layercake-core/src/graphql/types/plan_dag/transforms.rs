@@ -173,10 +173,12 @@ impl GraphTransform {
                 Some(annotation)
             }
             GraphTransformKind::DropUnconnectedNodes => {
-                let removed = graph.drop_unconnected_nodes();
+                let exclude_partition_nodes = self.params.exclude_partition_nodes.unwrap_or(true);
+                let removed = graph.drop_unconnected_nodes(exclude_partition_nodes);
                 Some(format!(
-                    "### Transform: Drop Unconnected Nodes\n- Removed: {} nodes\n- Nodes after: {}\n- Edges after: {}",
+                    "### Transform: Drop Unconnected Nodes\n- Removed: {} nodes\n- Exclude partition nodes: {}\n- Nodes after: {}\n- Edges after: {}",
                     removed,
+                    exclude_partition_nodes,
                     graph.nodes.len(),
                     graph.edges.len()
                 ))
@@ -363,6 +365,8 @@ pub struct GraphTransformParams {
     pub enabled: Option<bool>,
     #[serde(alias = "layerConnectionsThreshold")]
     pub layer_connections_threshold: Option<usize>,
+    #[serde(alias = "excludePartitionNodes")]
+    pub exclude_partition_nodes: Option<bool>,
 }
 
 /// Wire format for deserializing TransformNodeConfig supporting both v1 and v2 schemas.
@@ -622,6 +626,74 @@ mod tests {
         }
     }
 
+    fn graph_with_unconnected_partition() -> Graph {
+        Graph {
+            name: "PartitionSample".to_string(),
+            nodes: vec![
+                Node {
+                    id: "partition".to_string(),
+                    label: "Partition".to_string(),
+                    layer: "layer1".to_string(),
+                    is_partition: true,
+                    belongs_to: None,
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+                Node {
+                    id: "connected_a".to_string(),
+                    label: "ConnectedA".to_string(),
+                    layer: "layer1".to_string(),
+                    is_partition: false,
+                    belongs_to: None,
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+                Node {
+                    id: "connected_b".to_string(),
+                    label: "ConnectedB".to_string(),
+                    layer: "layer1".to_string(),
+                    is_partition: false,
+                    belongs_to: None,
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+                Node {
+                    id: "lonely".to_string(),
+                    label: "Lonely".to_string(),
+                    layer: "layer1".to_string(),
+                    is_partition: false,
+                    belongs_to: None,
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+            ],
+            edges: vec![Edge {
+                id: "edge1".to_string(),
+                source: "connected_a".to_string(),
+                target: "connected_b".to_string(),
+                label: "EdgeLabelLong".to_string(),
+                layer: "layer1".to_string(),
+                weight: 1,
+                comment: None,
+                dataset: None,
+            }],
+            layers: vec![Layer {
+                id: "layer1".to_string(),
+                label: "Layer 1".to_string(),
+                background_color: "FFFFFF".to_string(),
+                text_color: "000000".to_string(),
+                border_color: "000000".to_string(),
+                alias: None,
+                dataset: None,
+            }],
+            annotations: None,
+        }
+    }
+
     #[test]
     fn apply_transforms_runs_aggregate_when_present() {
         let mut graph = sample_graph();
@@ -668,6 +740,49 @@ mod tests {
             .expect("transform should succeed");
 
         assert_eq!(graph.edges.len(), 2);
+    }
+
+    #[test]
+    fn drop_unconnected_nodes_retain_partitions_by_default() {
+        let mut graph = graph_with_unconnected_partition();
+        let config = TransformNodeConfig {
+            transforms: vec![GraphTransform {
+                kind: GraphTransformKind::DropUnconnectedNodes,
+                params: GraphTransformParams::default(),
+            }],
+        };
+
+        config
+            .apply_transforms(&mut graph)
+            .expect("transform should succeed");
+
+        let remaining_ids: HashSet<String> = graph.nodes.iter().map(|n| n.id.clone()).collect();
+        assert!(remaining_ids.contains("partition"), "partition node should be retained");
+        assert!(!remaining_ids.contains("lonely"), "lonely node should be dropped");
+        assert_eq!(graph.nodes.len(), 3);
+    }
+
+    #[test]
+    fn drop_unconnected_nodes_drops_partitions_when_requested() {
+        let mut graph = graph_with_unconnected_partition();
+        let config = TransformNodeConfig {
+            transforms: vec![GraphTransform {
+                kind: GraphTransformKind::DropUnconnectedNodes,
+                params: GraphTransformParams {
+                    exclude_partition_nodes: Some(false),
+                    ..Default::default()
+                },
+            }],
+        };
+
+        config
+            .apply_transforms(&mut graph)
+            .expect("transform should succeed");
+
+        let remaining_ids: HashSet<String> = graph.nodes.iter().map(|n| n.id.clone()).collect();
+        assert!(!remaining_ids.contains("partition"), "partition node should be dropped");
+        assert!(!remaining_ids.contains("lonely"), "lonely node should be dropped");
+        assert_eq!(graph.nodes.len(), 2);
     }
 
     #[test]

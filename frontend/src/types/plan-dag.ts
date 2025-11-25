@@ -82,6 +82,7 @@ export interface GraphTransformParams {
   edgeLabelInsertNewlinesAt?: number;
   enabled?: boolean;
   layerConnectionsThreshold?: number;
+  excludePartitionNodes?: boolean;
 }
 
 export interface GraphTransform {

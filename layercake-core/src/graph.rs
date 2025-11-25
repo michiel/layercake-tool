@@ -485,9 +485,10 @@ impl Graph {
         });
     }
 
-    /// Remove non-partition nodes that are not referenced by any edge.
+    /// Remove nodes that are not referenced by any edge.
+    /// When `exclude_partition_nodes` is true, partition nodes are retained even if unconnected.
     /// Returns the number of nodes removed.
-    pub fn drop_unconnected_nodes(&mut self) -> usize {
+    pub fn drop_unconnected_nodes(&mut self, exclude_partition_nodes: bool) -> usize {
         let connected_ids: HashSet<String> = self
             .edges
             .iter()
@@ -496,7 +497,9 @@ impl Graph {
 
         let original_len = self.nodes.len();
         self.nodes
-            .retain(|n| n.is_partition || connected_ids.contains(&n.id));
+            .retain(|n| {
+                connected_ids.contains(&n.id) || (exclude_partition_nodes && n.is_partition)
+            });
 
         let valid_ids: HashSet<String> = self.nodes.iter().map(|n| n.id.clone()).collect();
         self.edges

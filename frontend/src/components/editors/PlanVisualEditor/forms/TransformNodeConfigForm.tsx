@@ -46,7 +46,7 @@ const getDefaultParams = (kind: GraphTransformKind): GraphTransform['params'] =>
     case 'PartitionWidthLimit':
       return { maxPartitionWidth: 3 };
     case 'DropUnconnectedNodes':
-      return { enabled: true };
+      return { enabled: true, excludePartitionNodes: true };
     case 'NodeLabelMaxLength':
       return { nodeLabelMaxLength: 32 };
     case 'NodeLabelInsertNewlines':
@@ -331,6 +331,27 @@ export const TransformNodeConfigForm: React.FC<TransformNodeConfigFormProps> = (
             />
             <p className="text-sm text-muted-foreground">
               Restrict how many non-partition nodes remain within a partition
+            </p>
+          </div>
+        );
+      case 'DropUnconnectedNodes':
+        return (
+          <div className="space-y-2">
+            <div className="flex items-center space-x-2">
+              <Switch
+                id={`drop-unconnected-partitions-${index}`}
+                checked={transform.params.excludePartitionNodes ?? true}
+                onCheckedChange={checked =>
+                  updateTransformParam(index, 'excludePartitionNodes', checked)
+                }
+              />
+              <Label htmlFor={`drop-unconnected-partitions-${index}`}>
+                Exclude partition nodes
+              </Label>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Keep partition nodes even if no edges reference them. Disable to drop unconnected
+              partitions as well.
             </p>
           </div>
         );
