@@ -39,6 +39,7 @@ import { useTagsFilter } from './hooks/useTagsFilter'
 import { EXPORT_PROJECT_ARCHIVE, EXPORT_PROJECT_AS_TEMPLATE } from './graphql/libraryItems'
 import { VALIDATE_AND_MIGRATE_PLAN_DAG } from './graphql/plan-dag'
 import { LIST_PLANS, GET_PLAN } from './graphql/plans'
+import { LIST_STORIES, type Story } from './graphql/stories'
 import { showErrorNotification, showSuccessNotification } from './utils/notifications'
 import { PlansPage } from './components/plans/PlansPage'
 import type { Plan } from './types/plan'
@@ -138,28 +139,6 @@ const GET_PLAN_DAG = gql`
 `
 
 // Query to fetch aggregate project statistics for overview
-const GET_PROJECT_STATS = gql`
-  query GetProjectStats($projectId: Int!) {
-    projectStats(projectId: $projectId) {
-      projectId
-      documents {
-        total
-        indexed
-        notIndexed
-      }
-      knowledgeBase {
-        fileCount
-        chunkCount
-        lastIndexedAt
-      }
-      datasets {
-        total
-        byType
-      }
-    }
-  }
-`
-
 // Layout wrapper component
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate()
@@ -1331,33 +1310,22 @@ const ProjectDetailPage = () => {
     variables: { projectId: projectIdNum },
     skip: !projectId,
   })
-
-  const { data: projectStatsData } = useQuery<{
-    projectStats: {
-      projectId: number
-      documents: {
-        total: number
-        indexed: number
-        notIndexed: number
-      }
-      knowledgeBase: {
-        fileCount: number
-        chunkCount: number
-        lastIndexedAt?: string | null
-      }
-      datasets: {
-        total: number
-        byType: Record<string, number>
-      }
-    }
-  }>(GET_PROJECT_STATS, {
+  const { data: plansData, loading: plansLoading } = useQuery<{ plans: Plan[] }>(LIST_PLANS, {
     variables: { projectId: projectIdNum },
     skip: !projectId,
+    fetchPolicy: 'cache-and-network',
+  })
+  const { data: storiesData, loading: storiesLoading } = useQuery<{ stories: Story[] }>(LIST_STORIES, {
+    variables: { projectId: projectIdNum },
+    skip: !projectId,
+    fetchPolicy: 'cache-and-network',
   })
 
   const projects = projectsData?.projects || []
   const selectedProject = projects.find((p: any) => p.id === projectIdNum)
   const planDag = (planDagData as any)?.planDag
+  const plans = plansData?.plans ?? []
+  const stories = storiesData?.stories ?? []
 
   const [exportDialogOpen, setExportDialogOpen] = useState(false)
   const [includeKnowledgeBase, setIncludeKnowledgeBase] = useState(false)
@@ -1376,10 +1344,16 @@ const ProjectDetailPage = () => {
     VALIDATE_AND_MIGRATE_PLAN_DAG
   )
 
-  // Extract stats from single query
-  const stats = projectStatsData?.projectStats
-  const totalDatasets = stats?.datasets.total || 0
-  const datasetsByType = stats?.datasets.byType || {}
+  const formatUpdatedAt = (value?: string | null) => {
+    if (!value) {
+      return '—'
+    }
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) {
+      return '—'
+    }
+    return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+  }
 
   const handleNavigate = (route: string) => {
     navigate(route)
@@ -1663,36 +1637,7 @@ const ProjectDetailPage = () => {
             </Group>
           </Group>
 
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card className="border hover:shadow-md transition-shadow">
-              <CardHeader className="cursor-pointer" onClick={() => navigate(`/projects/${projectId}/datasets`)}>
-                <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                  <IconFileDatabase className="h-4 w-4 text-primary" />
-                  Data sets
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Total:</span>
-                    <Badge variant="secondary">{totalDatasets}</Badge>
-                  </div>
-                  {Object.entries(datasetsByType).map(([type, count]) => (
-                    <div key={type} className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground capitalize">{type}:</span>
-                      <Badge variant="outline">{count}</Badge>
-                    </div>
-                  ))}
-                  {totalDatasets === 0 && (
-                    <p className="text-sm text-muted-foreground italic">No datasets yet</p>
-                  )}
-                </div>
-                <Button variant="secondary" className="w-full" onClick={() => navigate(`/projects/${projectId}/datasets`)}>
-                  Manage data sets
-                </Button>
-              </CardContent>
-            </Card>
-
+          <div className="grid gap-4 lg:grid-cols-3">
             <Card className="border hover:shadow-md transition-shadow">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base font-semibold">
@@ -1708,6 +1653,37 @@ const ProjectDetailPage = () => {
                 <p className="text-xs text-muted-foreground">
                   Version: {planVersion}
                 </p>
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Plans</p>
+                  {plansLoading ? (
+                    <p className="text-sm text-muted-foreground">Loading plans…</p>
+                  ) : plans.length ? (
+                    <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
+                      {plans.map((plan) => (
+                        <button
+                          key={plan.id}
+                          type="button"
+                          className="w-full rounded-md border px-3 py-2 text-left text-sm hover:bg-muted transition flex flex-col gap-1"
+                          onClick={() => navigate(`/projects/${projectId}/plans/${plan.id}`)}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-medium truncate">{plan.name}</span>
+                            {plan.status && (
+                              <Badge variant="outline" className="text-[11px] uppercase">
+                                {plan.status}
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Updated {formatUpdatedAt(plan.updatedAt)}
+                          </p>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No plans yet.</p>
+                  )}
+                </div>
                 <Button variant="secondary" className="w-full" onClick={() => navigate(`/projects/${projectId}/plans`)}>
                   Open plans
                 </Button>
@@ -1717,36 +1693,81 @@ const ProjectDetailPage = () => {
             <Card className="border hover:shadow-md transition-shadow">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                  <IconDatabase className="h-4 w-4 text-primary" />
-                  Artefacts
+                  <IconBooks className="h-4 w-4 text-primary" />
+                  Stories
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Artefact nodes:</span>
-                    <Badge variant="secondary">
-                      {planDag?.nodes?.filter((n: any) => ['GraphArtefactNode', 'TreeArtefactNode', 'GraphArtefact', 'TreeArtefact'].includes(n.nodeType)).length ?? 0}
-                    </Badge>
+                <p className="text-sm text-muted-foreground">
+                  Craft walkthroughs for stakeholders and capture graph sequences.
+                </p>
+                {storiesLoading ? (
+                  <p className="text-sm text-muted-foreground">Loading stories…</p>
+                ) : stories.length ? (
+                  <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
+                    {stories.map((story) => (
+                      <button
+                        key={story.id}
+                        type="button"
+                        className="w-full rounded-md border px-3 py-2 text-left text-sm hover:bg-muted transition flex flex-col gap-1"
+                        onClick={() => navigate(`/projects/${projectId}/stories/${story.id}`)}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-medium truncate">{story.name}</span>
+                          <Badge variant="outline">{story.sequenceCount} seq</Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Updated {formatUpdatedAt(story.updatedAt)}
+                        </p>
+                      </button>
+                    ))}
                   </div>
-                </div>
-                <Group gap="xs">
-                  <Button className="flex-1" variant="secondary" onClick={() => navigate(`/projects/${projectId}/artefacts`)}>
-                    View artefacts
+                ) : (
+                  <p className="text-sm text-muted-foreground">No stories yet.</p>
+                )}
+                <Button variant="secondary" className="w-full" onClick={() => navigate(`/projects/${projectId}/stories`)}>
+                  Open stories
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="border hover:shadow-md transition-shadow">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                  <IconHierarchy2 className="h-4 w-4 text-primary" />
+                  Build views
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Jump straight into the editors for layers, generated graphs, and artefacts.
+                </p>
+                <div className="space-y-2">
+                  <Button
+                    variant="secondary"
+                    className="w-full justify-start gap-2"
+                    onClick={() => navigate(`/projects/${projectId}/workbench/layers`)}
+                  >
+                    <IconHierarchy2 className="h-4 w-4" />
+                    Layer palette
                   </Button>
                   <Button
-                    className="flex-1"
                     variant="secondary"
-                    disabled={!planDag?.nodes?.length}
-                    onClick={() => {
-                      if (planDag?.nodes?.length) {
-                        navigate(`/projects/${projectId}/graphs`)
-                      }
-                    }}
+                    className="w-full justify-start gap-2"
+                    onClick={() => navigate(`/projects/${projectId}/graphs`)}
                   >
+                    <IconGraph className="h-4 w-4" />
                     Generated graphs
                   </Button>
-                </Group>
+                  <Button
+                    variant="secondary"
+                    className="w-full justify-start gap-2"
+                    onClick={() => navigate(`/projects/${projectId}/artefacts`)}
+                  >
+                    <IconDatabase className="h-4 w-4" />
+                    Artefacts
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </div>
