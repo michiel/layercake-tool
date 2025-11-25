@@ -372,6 +372,13 @@ fn build_sequence_entries(
     let mut alias_set: HashSet<String> = HashSet::new();
     let mut results = Vec::new();
 
+    let mut all_nodes: HashMap<String, &SequenceNode> = HashMap::new();
+    for ctx in dataset_contexts.values() {
+        for (node_id, node) in &ctx.nodes {
+            all_nodes.insert(node_id.clone(), node);
+        }
+    }
+
     for sequence in sequences {
         let edge_order: Vec<SequenceEdgeRef> =
             serde_json::from_str(&sequence.edge_order).unwrap_or_default();
@@ -390,18 +397,21 @@ fn build_sequence_entries(
                 None => continue,
             };
 
-            let source_node = match dataset.nodes.get(&edge.source) {
+            let source_node = match all_nodes.get(&edge.source) {
                 Some(node) => node,
                 None => continue,
             };
-            let target_node = match dataset.nodes.get(&edge.target) {
+            let source_dataset = dataset_contexts.get(&source_node.dataset_id).unwrap();
+
+            let target_node = match all_nodes.get(&edge.target) {
                 Some(node) => node,
                 None => continue,
             };
+            let target_dataset = dataset_contexts.get(&target_node.dataset_id).unwrap();
 
             let source_ref = {
                 let participant = get_or_create_participant(
-                    dataset,
+                    source_dataset,
                     source_node,
                     &mut participants,
                     &mut alias_set,
@@ -413,7 +423,7 @@ fn build_sequence_entries(
             };
             let target_ref = {
                 let participant = get_or_create_participant(
-                    dataset,
+                    target_dataset,
                     target_node,
                     &mut participants,
                     &mut alias_set,
