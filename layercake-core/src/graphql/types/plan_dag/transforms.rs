@@ -873,8 +873,14 @@ mod tests {
             .expect("transform should succeed");
 
         let remaining_ids: HashSet<String> = graph.nodes.iter().map(|n| n.id.clone()).collect();
-        assert!(remaining_ids.contains("partition"), "partition node should be retained");
-        assert!(!remaining_ids.contains("lonely"), "lonely node should be dropped");
+        assert!(
+            remaining_ids.contains("partition"),
+            "partition node should be retained"
+        );
+        assert!(
+            !remaining_ids.contains("lonely"),
+            "lonely node should be dropped"
+        );
         assert_eq!(graph.nodes.len(), 3);
     }
 
@@ -896,8 +902,14 @@ mod tests {
             .expect("transform should succeed");
 
         let remaining_ids: HashSet<String> = graph.nodes.iter().map(|n| n.id.clone()).collect();
-        assert!(!remaining_ids.contains("partition"), "partition node should be dropped");
-        assert!(!remaining_ids.contains("lonely"), "lonely node should be dropped");
+        assert!(
+            !remaining_ids.contains("partition"),
+            "partition node should be dropped"
+        );
+        assert!(
+            !remaining_ids.contains("lonely"),
+            "lonely node should be dropped"
+        );
         assert_eq!(graph.nodes.len(), 2);
     }
 

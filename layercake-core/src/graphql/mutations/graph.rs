@@ -47,11 +47,7 @@ impl GraphMutation {
     }
 
     /// Validate persisted graph structure
-    async fn validate_graph(
-        &self,
-        ctx: &Context<'_>,
-        id: i32,
-    ) -> Result<GraphValidationResult> {
+    async fn validate_graph(&self, ctx: &Context<'_>, id: i32) -> Result<GraphValidationResult> {
         let context = ctx.data::<GraphQLContext>()?;
         let summary = context
             .app

@@ -115,8 +115,8 @@ export const EXPORT_PROJECT_AS_TEMPLATE = gql`
 `
 
 export const EXPORT_PROJECT_ARCHIVE = gql`
-  mutation ExportProjectArchive($projectId: Int!) {
-    exportProjectArchive(projectId: $projectId) {
+  mutation ExportProjectArchive($projectId: Int!, $includeKnowledgeBase: Boolean) {
+    exportProjectArchive(projectId: $projectId, includeKnowledgeBase: $includeKnowledgeBase) {
       filename
       fileContent
     }

@@ -804,9 +804,7 @@ fn parse_bool_token(value: &str) -> bool {
 }
 
 fn normalize_token(value: &str) -> &str {
-    value
-        .trim()
-        .trim_matches(|c| c == '"' || c == '\'')
+    value.trim().trim_matches(|c| c == '"' || c == '\'')
 }
 
 fn parse_export_format(format: &str) -> Result<ExportFileType, String> {

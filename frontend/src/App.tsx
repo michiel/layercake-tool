@@ -28,6 +28,7 @@ import { Alert, AlertDescription } from './components/ui/alert'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'
+import { Switch } from './components/ui/switch'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from './components/ui/tooltip'
 import { Separator } from './components/ui/separator'
 import { Spinner } from './components/ui/spinner'
@@ -1359,7 +1360,14 @@ const ProjectDetailPage = () => {
   const planDag = (planDagData as any)?.planDag
 
   const [exportDialogOpen, setExportDialogOpen] = useState(false)
+  const [includeKnowledgeBase, setIncludeKnowledgeBase] = useState(false)
   const [activeExportTab, setActiveExportTab] = useState<'archive' | 'template'>('archive')
+
+  useEffect(() => {
+    if (!exportDialogOpen) {
+      setIncludeKnowledgeBase(false)
+    }
+  }, [exportDialogOpen])
   const [exportProjectArchiveMutation, { loading: exportArchiveLoading }] = useMutation(EXPORT_PROJECT_ARCHIVE)
   const [exportProjectAsTemplateMutation, { loading: exportTemplateLoading }] = useMutation(
     EXPORT_PROJECT_AS_TEMPLATE
@@ -1528,7 +1536,7 @@ const ProjectDetailPage = () => {
     }
     try {
       const { data } = await exportProjectArchiveMutation({
-        variables: { projectId: projectIdNum },
+        variables: { projectId: projectIdNum, includeKnowledgeBase },
       })
       const payload = (data as any)?.exportProjectArchive
       if (!payload) {
@@ -1759,6 +1767,17 @@ const ProjectDetailPage = () => {
               <p className="text-sm text-muted-foreground">
                 Download a ZIP archive containing this project&apos;s DAG and full dataset contents.
               </p>
+              <div className="rounded-lg border p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium">Include knowledge base</p>
+                    <p className="text-xs text-muted-foreground">
+                      Attach uploaded source files, embeddings, and palette metadata stored in the knowledge base.
+                    </p>
+                  </div>
+                  <Switch checked={includeKnowledgeBase} onCheckedChange={setIncludeKnowledgeBase} />
+                </div>
+              </div>
               <Button onClick={handleExportArchive} disabled={exportArchiveLoading}>
                 {exportArchiveLoading && <Spinner className="mr-2 h-4 w-4" />}
                 Download project (.zip)

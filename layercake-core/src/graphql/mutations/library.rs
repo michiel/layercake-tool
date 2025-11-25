@@ -188,11 +188,12 @@ impl LibraryMutation {
         &self,
         ctx: &Context<'_>,
         #[graphql(name = "projectId")] project_id: i32,
+        #[graphql(name = "includeKnowledgeBase")] include_knowledge_base: Option<bool>,
     ) -> Result<ExportProjectArchivePayload> {
         let context = ctx.data::<GraphQLContext>()?;
         let archive = context
             .app
-            .export_project_archive(project_id)
+            .export_project_archive(project_id, include_knowledge_base.unwrap_or(false))
             .await
             .map_err(|e| StructuredError::service("AppContext::export_project_archive", e))?;
 
