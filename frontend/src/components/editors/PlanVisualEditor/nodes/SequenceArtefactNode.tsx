@@ -47,6 +47,7 @@ export const SequenceArtefactNode = memo((props: ExtendedNodeProps) => {
   const isMermaid = normalizedTarget?.includes('mermaid')
 
   const projectId = data.projectId as number | undefined
+  const planId = data.planId as number | undefined
 
   const [exportNodeOutput] = useMutation(EXPORT_NODE_OUTPUT, {
     onCompleted: (data: any) => {
@@ -85,12 +86,13 @@ export const SequenceArtefactNode = memo((props: ExtendedNodeProps) => {
   })
 
   const handleDownload = async () => {
-    if (!projectId || !isConfiguredNode) return
+    if (!projectId || !planId || !isConfiguredNode) return
 
     setDownloading(true)
     exportNodeOutput({
       variables: {
         projectId,
+        planId,
         nodeId: props.id,
       },
     })
@@ -138,7 +140,7 @@ export const SequenceArtefactNode = memo((props: ExtendedNodeProps) => {
   })
 
   const triggerPreview = (target: 'text' | 'mermaid') => {
-    if (!projectId || !isConfiguredNode) return
+    if (!projectId || !planId || !isConfiguredNode) return
     if (target === 'text') {
       setPreviewContent('')
     } else {
@@ -149,6 +151,7 @@ export const SequenceArtefactNode = memo((props: ExtendedNodeProps) => {
     exportForPreview({
       variables: {
         projectId,
+        planId,
         nodeId: props.id,
       },
     })

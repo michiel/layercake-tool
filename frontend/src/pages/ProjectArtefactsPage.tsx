@@ -427,7 +427,7 @@ const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
   }
 
   const handlePreview = (nodeId: string, target: 'text' | 'mermaid' | 'dot') => {
-    if (!projectIdNum) return
+    if (!projectIdNum || !selectedPlanId) return
     setPreviewLoading({ nodeId, kind: target })
     exportForPreview({
       variables: { projectId: projectIdNum, planId: selectedPlanId, nodeId },
@@ -435,7 +435,7 @@ const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
   }
 
   const handleDownload = (nodeId: string) => {
-    if (!projectIdNum) return
+    if (!projectIdNum || !selectedPlanId) return
     setDownloadingNodeId(nodeId)
     exportNodeOutput({
       variables: { projectId: projectIdNum, planId: selectedPlanId, nodeId },

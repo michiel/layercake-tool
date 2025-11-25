@@ -146,6 +146,7 @@ const ArtefactNodeBase = memo((props: ArtefactNodeProps) => {
   const isMermaidTreemap = kind === 'tree' && normalizedTarget === 'mermaidtreemap'
 
   const projectId = data.projectId as number | undefined
+  const planId = data.planId as number | undefined
 
   const [exportNodeOutput] = useMutation(EXPORT_NODE_OUTPUT, {
     onCompleted: (data: any) => {
@@ -184,12 +185,13 @@ const ArtefactNodeBase = memo((props: ArtefactNodeProps) => {
   })
 
   const handleDownload = async () => {
-    if (!projectId || !isConfigured) return
+    if (!projectId || !planId || !isConfigured) return
 
     setDownloading(true)
     exportNodeOutput({
       variables: {
         projectId,
+        planId,
         nodeId: props.id,
         renderConfig: normalizeRenderConfigForGraphQL(config.renderConfig),
       },
@@ -254,7 +256,7 @@ const ArtefactNodeBase = memo((props: ArtefactNodeProps) => {
   })
 
   const requestPreview = async (target: 'text' | 'mermaid' | 'dot') => {
-    if (!projectId || !isConfigured) return
+    if (!projectId || !planId || !isConfigured) return
 
     setPreviewTarget(target)
     setLoadingTarget(target)
@@ -268,6 +270,7 @@ const ArtefactNodeBase = memo((props: ArtefactNodeProps) => {
     exportForPreview({
       variables: {
         projectId,
+        planId,
         nodeId: props.id,
         renderConfig: normalizeRenderConfigForGraphQL(config.renderConfig),
       },
