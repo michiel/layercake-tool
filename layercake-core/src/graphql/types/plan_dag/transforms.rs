@@ -694,6 +694,74 @@ mod tests {
         }
     }
 
+    fn graph_with_parent_reference_only() -> Graph {
+        Graph {
+            name: "ReferenceOnly".to_string(),
+            nodes: vec![
+                Node {
+                    id: "partition".to_string(),
+                    label: "Partition".to_string(),
+                    layer: "layer1".to_string(),
+                    is_partition: false,
+                    belongs_to: None,
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+                Node {
+                    id: "child".to_string(),
+                    label: "Child".to_string(),
+                    layer: "layer1".to_string(),
+                    is_partition: false,
+                    belongs_to: Some("partition".to_string()),
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+                Node {
+                    id: "connected_a".to_string(),
+                    label: "ConnectedA".to_string(),
+                    layer: "layer1".to_string(),
+                    is_partition: false,
+                    belongs_to: None,
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+                Node {
+                    id: "connected_b".to_string(),
+                    label: "ConnectedB".to_string(),
+                    layer: "layer1".to_string(),
+                    is_partition: false,
+                    belongs_to: None,
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+            ],
+            edges: vec![Edge {
+                id: "edge1".to_string(),
+                source: "connected_a".to_string(),
+                target: "connected_b".to_string(),
+                label: "EdgeLabelLong".to_string(),
+                layer: "layer1".to_string(),
+                weight: 1,
+                comment: None,
+                dataset: None,
+            }],
+            layers: vec![Layer {
+                id: "layer1".to_string(),
+                label: "Layer 1".to_string(),
+                background_color: "FFFFFF".to_string(),
+                text_color: "000000".to_string(),
+                border_color: "000000".to_string(),
+                alias: None,
+                dataset: None,
+            }],
+            annotations: None,
+        }
+    }
+
     #[test]
     fn apply_transforms_runs_aggregate_when_present() {
         let mut graph = sample_graph();
@@ -783,6 +851,31 @@ mod tests {
         assert!(!remaining_ids.contains("partition"), "partition node should be dropped");
         assert!(!remaining_ids.contains("lonely"), "lonely node should be dropped");
         assert_eq!(graph.nodes.len(), 2);
+    }
+
+    #[test]
+    fn drop_unconnected_nodes_respects_parent_relationships() {
+        let mut graph = graph_with_parent_reference_only();
+        let config = TransformNodeConfig {
+            transforms: vec![GraphTransform {
+                kind: GraphTransformKind::DropUnconnectedNodes,
+                params: GraphTransformParams::default(),
+            }],
+        };
+
+        config
+            .apply_transforms(&mut graph)
+            .expect("transform should succeed");
+
+        let remaining_ids: HashSet<String> = graph.nodes.iter().map(|n| n.id.clone()).collect();
+        assert!(
+            remaining_ids.contains("partition"),
+            "parent nodes referenced via belongs_to should be retained"
+        );
+        assert!(
+            !remaining_ids.contains("child"),
+            "child nodes without edges should still be dropped"
+        );
     }
 
     #[test]

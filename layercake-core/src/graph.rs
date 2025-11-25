@@ -495,11 +495,25 @@ impl Graph {
             .flat_map(|e| [e.source.clone(), e.target.clone()])
             .collect();
 
+        let mut protected_ids: HashSet<String> = HashSet::new();
+        if exclude_partition_nodes {
+            for node in &self.nodes {
+                if node.is_partition {
+                    protected_ids.insert(node.id.clone());
+                }
+            }
+            for node in &self.nodes {
+                if let Some(parent) = &node.belongs_to {
+                    protected_ids.insert(parent.clone());
+                }
+            }
+        }
+
         let original_len = self.nodes.len();
-        self.nodes
-            .retain(|n| {
-                connected_ids.contains(&n.id) || (exclude_partition_nodes && n.is_partition)
-            });
+        self.nodes.retain(|n| {
+            connected_ids.contains(&n.id)
+                || (exclude_partition_nodes && protected_ids.contains(&n.id))
+        });
 
         let valid_ids: HashSet<String> = self.nodes.iter().map(|n| n.id.clone()).collect();
         self.edges
