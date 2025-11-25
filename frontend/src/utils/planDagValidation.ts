@@ -1,6 +1,60 @@
 import { PlanDagNodeType, ConnectionType } from '../types/plan-dag'
 import { Node, Edge } from 'reactflow'
 
+export const VALID_NODE_CONNECTIONS: Record<PlanDagNodeType, PlanDagNodeType[]> = {
+  [PlanDagNodeType.DATA_SOURCE]: [
+    PlanDagNodeType.GRAPH,
+    PlanDagNodeType.MERGE,
+    PlanDagNodeType.TRANSFORM,
+    PlanDagNodeType.FILTER,
+    PlanDagNodeType.GRAPH_ARTEFACT,
+    PlanDagNodeType.TREE_ARTEFACT,
+  ],
+  [PlanDagNodeType.GRAPH]: [
+    PlanDagNodeType.GRAPH,
+    PlanDagNodeType.TRANSFORM,
+    PlanDagNodeType.FILTER,
+    PlanDagNodeType.MERGE,
+    PlanDagNodeType.GRAPH_ARTEFACT,
+    PlanDagNodeType.TREE_ARTEFACT,
+  ],
+  [PlanDagNodeType.TRANSFORM]: [
+    PlanDagNodeType.GRAPH,
+    PlanDagNodeType.MERGE,
+    PlanDagNodeType.FILTER,
+    PlanDagNodeType.GRAPH_ARTEFACT,
+    PlanDagNodeType.TREE_ARTEFACT,
+    PlanDagNodeType.TRANSFORM,
+  ],
+  [PlanDagNodeType.FILTER]: [
+    PlanDagNodeType.GRAPH,
+    PlanDagNodeType.MERGE,
+    PlanDagNodeType.TRANSFORM,
+    PlanDagNodeType.FILTER,
+    PlanDagNodeType.GRAPH_ARTEFACT,
+    PlanDagNodeType.TREE_ARTEFACT,
+  ],
+  [PlanDagNodeType.MERGE]: [
+    PlanDagNodeType.GRAPH,
+    PlanDagNodeType.TRANSFORM,
+    PlanDagNodeType.FILTER,
+    PlanDagNodeType.MERGE,
+    PlanDagNodeType.GRAPH_ARTEFACT,
+    PlanDagNodeType.TREE_ARTEFACT,
+  ],
+  [PlanDagNodeType.GRAPH_ARTEFACT]: [],
+  [PlanDagNodeType.TREE_ARTEFACT]: [],
+  [PlanDagNodeType.STORY]: [PlanDagNodeType.SEQUENCE_ARTEFACT],
+  [PlanDagNodeType.SEQUENCE_ARTEFACT]: [],
+}
+
+export const getValidTargetNodeTypes = (sourceType?: PlanDagNodeType): PlanDagNodeType[] => {
+  if (!sourceType) {
+    return []
+  }
+  return VALID_NODE_CONNECTIONS[sourceType] ? [...VALID_NODE_CONNECTIONS[sourceType]] : []
+}
+
 /**
  * Validates if a connection between two node types is allowed
  */
@@ -9,58 +63,7 @@ export const validateConnection = (
   targetType: PlanDagNodeType
 ): ConnectionType => {
   // Define valid connections based on Plan DAG flow logic
-  const validConnections: Record<PlanDagNodeType, PlanDagNodeType[]> = {
-    [PlanDagNodeType.DATA_SOURCE]: [
-      PlanDagNodeType.GRAPH,     // DataSets primarily connect to Graph nodes
-      PlanDagNodeType.MERGE,     // Can also merge multiple data sources
-      PlanDagNodeType.TRANSFORM, // Or transform data directly
-      PlanDagNodeType.FILTER,    // Or filter data directly
-      PlanDagNodeType.GRAPH_ARTEFACT,
-      PlanDagNodeType.TREE_ARTEFACT,
-    ],
-    [PlanDagNodeType.GRAPH]: [
-      PlanDagNodeType.GRAPH,       // Graphs can connect to other graphs
-      PlanDagNodeType.TRANSFORM,
-      PlanDagNodeType.FILTER,
-      PlanDagNodeType.MERGE,
-      PlanDagNodeType.GRAPH_ARTEFACT,
-      PlanDagNodeType.TREE_ARTEFACT,
-    ],
-    [PlanDagNodeType.TRANSFORM]: [
-      PlanDagNodeType.GRAPH,       // Transforms can connect to graphs
-      PlanDagNodeType.MERGE,
-      PlanDagNodeType.FILTER,
-      PlanDagNodeType.GRAPH_ARTEFACT,
-      PlanDagNodeType.TREE_ARTEFACT,
-      PlanDagNodeType.TRANSFORM, // Allow chaining transforms
-    ],
-    [PlanDagNodeType.FILTER]: [
-      PlanDagNodeType.GRAPH,       // Filters can connect to graphs
-      PlanDagNodeType.MERGE,
-      PlanDagNodeType.TRANSFORM,
-      PlanDagNodeType.FILTER,      // Allow chaining filters
-      PlanDagNodeType.GRAPH_ARTEFACT,
-      PlanDagNodeType.TREE_ARTEFACT,
-    ],
-    [PlanDagNodeType.MERGE]: [
-      PlanDagNodeType.GRAPH,       // Merges can connect to graphs
-      PlanDagNodeType.TRANSFORM,
-      PlanDagNodeType.FILTER,
-      PlanDagNodeType.MERGE,       // Merges can chain to other merges
-      PlanDagNodeType.GRAPH_ARTEFACT,
-      PlanDagNodeType.TREE_ARTEFACT,
-    ],
-    [PlanDagNodeType.GRAPH_ARTEFACT]: [],
-    [PlanDagNodeType.TREE_ARTEFACT]: [],
-    // Story nodes output sequence data to sequence artefact nodes
-    [PlanDagNodeType.STORY]: [
-      PlanDagNodeType.SEQUENCE_ARTEFACT,
-    ],
-    // Sequence artefact nodes are terminal (no outputs)
-    [PlanDagNodeType.SEQUENCE_ARTEFACT]: [],
-  }
-
-  const allowedTargets = validConnections[sourceType] || []
+  const allowedTargets = VALID_NODE_CONNECTIONS[sourceType] || []
   const isValid = allowedTargets.includes(targetType)
 
   // Determine data type based on source node

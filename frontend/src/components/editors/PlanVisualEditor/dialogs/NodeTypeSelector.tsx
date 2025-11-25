@@ -14,19 +14,26 @@ interface NodeTypeSelectorProps {
   opened: boolean;
   onClose: () => void;
   onSelect: (nodeType: PlanDagNodeType) => void;
+  allowedNodeTypes?: PlanDagNodeType[];
 }
 
-export const NodeTypeSelector = ({ opened, onClose, onSelect }: NodeTypeSelectorProps) => {
-  const nodeTypes = [
-    PlanDagNodeType.GRAPH,
-    PlanDagNodeType.TRANSFORM,
-    PlanDagNodeType.FILTER,
-    PlanDagNodeType.MERGE,
-    PlanDagNodeType.GRAPH_ARTEFACT,
-    PlanDagNodeType.TREE_ARTEFACT,
-    PlanDagNodeType.STORY,
-    PlanDagNodeType.SEQUENCE_ARTEFACT,
-  ];
+export const NODE_TYPE_SELECTOR_DEFAULTS: PlanDagNodeType[] = [
+  PlanDagNodeType.GRAPH,
+  PlanDagNodeType.TRANSFORM,
+  PlanDagNodeType.FILTER,
+  PlanDagNodeType.MERGE,
+  PlanDagNodeType.GRAPH_ARTEFACT,
+  PlanDagNodeType.TREE_ARTEFACT,
+  PlanDagNodeType.STORY,
+  PlanDagNodeType.SEQUENCE_ARTEFACT,
+];
+
+export const NodeTypeSelector = ({ opened, onClose, onSelect, allowedNodeTypes }: NodeTypeSelectorProps) => {
+  const fallbackTypes =
+    allowedNodeTypes && allowedNodeTypes.length > 0
+      ? NODE_TYPE_SELECTOR_DEFAULTS.filter((type) => allowedNodeTypes.includes(type))
+      : NODE_TYPE_SELECTOR_DEFAULTS;
+  const nodeTypes = fallbackTypes.length > 0 ? fallbackTypes : NODE_TYPE_SELECTOR_DEFAULTS;
 
   return (
     <Dialog open={opened} onOpenChange={(open) => !open && onClose()}>

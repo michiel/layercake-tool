@@ -24,7 +24,7 @@ import { Spinner } from '../../ui/spinner'
 import { Card } from '../../ui/card'
 
 import { PlanDagNodeType, NodeConfig, NodeMetadata, DataSetNodeConfig, ReactFlowEdge, PlanDagNode, PlanDag, StoryNodeConfig } from '../../../types/plan-dag'
-import { validateConnectionWithCycleDetection, canAcceptMultipleInputs, isNodeConfigured } from '../../../utils/planDagValidation'
+import { validateConnectionWithCycleDetection, canAcceptMultipleInputs, isNodeConfigured, getValidTargetNodeTypes } from '../../../utils/planDagValidation'
 import { ReactFlowAdapter } from '../../../adapters/ReactFlowAdapter'
 import { getEdgeColor, getEdgeLabel } from '../../../utils/edgeStyles'
 import type { EdgeDataType } from '../../../utils/edgeStyles'
@@ -39,7 +39,7 @@ import { UserPresenceData } from '../../../types/websocket'
 // Import dialogs
 import { NodeConfigDialog } from './NodeConfigDialog'
 import { EdgeConfigDialog } from './EdgeConfigDialog'
-import { NodeTypeSelector } from './dialogs/NodeTypeSelector'
+import { NodeTypeSelector, NODE_TYPE_SELECTOR_DEFAULTS } from './dialogs/NodeTypeSelector'
 
 // Import extracted components and hooks
 import { AdvancedToolbar } from './components/AdvancedToolbar'
@@ -125,6 +125,7 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
   const [showNodeTypeMenu, setShowNodeTypeMenu] = useState(false)
   const [newNodePosition, setNewNodePosition] = useState<{ x: number; y: number } | null>(null)
   const connectionSourceRef = useRef<{ nodeId: string; handleId: string } | null>(null)
+  const [allowedNodeTypes, setAllowedNodeTypes] = useState<PlanDagNodeType[]>(NODE_TYPE_SELECTOR_DEFAULTS)
 
   // Ref to store nodes for handleNodeEdit (to avoid circular dependency)
   const nodesRef = useRef<Node[]>([])
@@ -1235,6 +1236,17 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
 
         // Store connection info for when user selects node type
         setNewNodePosition(position);
+        const sourceNode = nodesRef.current.find((node) => node.id === connectionSourceRef.current?.nodeId)
+        const nextAllowed = sourceNode
+          ? getValidTargetNodeTypes(sourceNode.data?.nodeType as PlanDagNodeType)
+          : NODE_TYPE_SELECTOR_DEFAULTS
+
+        if (!nextAllowed.length) {
+          alert('The selected node type cannot connect to any downstream nodes.')
+          return
+        }
+
+        setAllowedNodeTypes(nextAllowed)
         setShowNodeTypeMenu(true);
       }
     },
@@ -1727,6 +1739,7 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
         opened={showNodeTypeMenu}
         onClose={() => setShowNodeTypeMenu(false)}
         onSelect={handleNodeTypeSelect}
+        allowedNodeTypes={allowedNodeTypes}
       />
 
       {/* Context Menu removed - advanced operations no longer available */}
