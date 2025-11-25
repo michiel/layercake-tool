@@ -9,11 +9,12 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
-import { GET_PLAN_DAG, VALIDATE_AND_MIGRATE_PLAN_DAG } from '@/graphql/plan-dag'
-import { IconGraph, IconDatabase, IconArrowRight, IconNetwork, IconAdjustments } from '@tabler/icons-react'
+import { VALIDATE_AND_MIGRATE_PLAN_DAG } from '@/graphql/plan-dag'
+import { IconGraph, IconDatabase, IconArrowRight, IconAdjustments, IconBooks, IconHierarchy2 } from '@tabler/icons-react'
 import { showErrorNotification, showSuccessNotification } from '@/utils/notifications'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useProjectPlanSelection } from '@/hooks/useProjectPlanSelection'
+import { LIST_STORIES, type Story } from '@/graphql/stories'
 
 const GET_PROJECTS = gql`
   query GetProjectsForWorkbench {
@@ -41,21 +42,17 @@ export const WorkbenchPage = () => {
   const {
     plans,
     selectedPlanId,
-    selectedPlan,
     loading: plansLoading,
     selectPlan,
   } = useProjectPlanSelection(projectIdNum)
-
-  const { data: planDagData, loading: planDagLoading } = useQuery(GET_PLAN_DAG, {
-    variables: { projectId: projectIdNum, planId: selectedPlanId },
-    skip: !projectIdNum || !selectedPlanId,
+  const { data: storiesData, loading: storiesLoading } = useQuery<{ stories: Story[] }>(LIST_STORIES, {
+    variables: { projectId: projectIdNum },
+    skip: !projectIdNum,
+    fetchPolicy: 'cache-and-network',
   })
 
-  const planDag = (planDagData as any)?.getPlanDag
-  const planNodeCount = planDag?.nodes?.length || 0
-  const planEdgeCount = planDag?.edges?.length || 0
-  const datasetNodeCount = planDag?.nodes?.filter((n: any) => n.nodeType === 'DataSetNode').length || 0
   const planQuerySuffix = selectedPlanId ? `?planId=${selectedPlanId}` : ''
+  const stories = storiesData?.stories ?? []
 
   const [validatePlanDagMutation, { loading: validatePlanDagLoading }] = useMutation(
     VALIDATE_AND_MIGRATE_PLAN_DAG
@@ -100,7 +97,18 @@ export const WorkbenchPage = () => {
     }
   }
 
-  const loading = projectsLoading || planDagLoading || plansLoading
+  const loading = projectsLoading || plansLoading
+
+  const formatUpdatedAt = (value?: string | null) => {
+    if (!value) {
+      return '—'
+    }
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) {
+      return '—'
+    }
+    return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+  }
 
   if (loading) {
     return (
@@ -194,33 +202,49 @@ export const WorkbenchPage = () => {
         </Group>
       </Group>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-3">
         <Card className="border">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base font-semibold">
               <IconGraph className="h-4 w-4 text-primary" />
-              {selectedPlan ? `Plan summary · ${selectedPlan.name}` : 'Plan summary'}
+              Plan summary
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
-            <p className="text-xs text-muted-foreground">
-              {selectedPlan?.description || 'Track node counts and execution state for the active plan.'}
-            </p>
-            <Group gap="sm">
-              <Badge variant="secondary">Nodes: {planNodeCount}</Badge>
-              <Badge variant="secondary">Edges: {planEdgeCount}</Badge>
-            </Group>
-            <p className="text-sm text-muted-foreground">
-              Version: {planDag?.version ?? 'n/a'}
-            </p>
-            <Button
-              variant="secondary"
-              className="w-full"
-              onClick={handleOpenPlanEditor}
-              disabled={!selectedPlanId}
-            >
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Plans</p>
+              {plansLoading ? (
+                <p className="text-sm text-muted-foreground">Loading plans…</p>
+              ) : plans.length ? (
+                <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
+                  {plans.map((plan) => (
+                    <button
+                      key={plan.id}
+                      type="button"
+                      className="w-full rounded-md border px-3 py-2 text-left text-sm hover:bg-muted transition flex flex-col gap-1"
+                      onClick={() => navigate(`/projects/${project.id}/plans/${plan.id}`)}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium truncate">{plan.name}</span>
+                        {plan.status && (
+                          <Badge variant="outline" className="text-[11px] uppercase">
+                            {plan.status}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Updated {formatUpdatedAt(plan.updatedAt)}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No plans yet.</p>
+              )}
+            </div>
+            <Button variant="secondary" className="w-full" onClick={handleOpenPlanEditor}>
               <IconArrowRight className="mr-2 h-4 w-4" />
-              Edit plan
+              Manage plans
             </Button>
           </CardContent>
         </Card>
@@ -228,22 +252,45 @@ export const WorkbenchPage = () => {
         <Card className="border">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base font-semibold">
-              <IconDatabase className="h-4 w-4 text-primary" />
-              Datasets in plan
+              <IconBooks className="h-4 w-4 text-primary" />
+              Stories
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
-            <Badge variant="secondary">{datasetNodeCount}</Badge>
+          <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Count of dataset nodes referenced in the plan DAG.
+              Craft walkthroughs for stakeholders and capture graph sequences.
             </p>
+            {storiesLoading ? (
+              <p className="text-sm text-muted-foreground">Loading stories…</p>
+            ) : stories.length ? (
+              <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
+                {stories.map((story) => (
+                  <button
+                    key={story.id}
+                    type="button"
+                    className="w-full rounded-md border px-3 py-2 text-left text-sm hover:bg-muted transition flex flex-col gap-1"
+                    onClick={() => navigate(`/projects/${project.id}/stories/${story.id}`)}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium truncate">{story.name}</span>
+                      <Badge variant="outline">{story.sequenceCount} seq</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Updated {formatUpdatedAt(story.updatedAt)}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No stories yet.</p>
+            )}
             <Button
               variant="secondary"
               className="w-full"
-              onClick={() => navigate(`/projects/${project.id}/datasets`)}
+              onClick={() => navigate(`/projects/${project.id}/stories`)}
             >
               <IconArrowRight className="mr-2 h-4 w-4" />
-              Manage datasets
+              Manage stories
             </Button>
           </CardContent>
         </Card>
@@ -251,17 +298,40 @@ export const WorkbenchPage = () => {
         <Card className="border">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base font-semibold">
-              <IconNetwork className="h-4 w-4 text-primary" />
-              Outputs & graphs
+              <IconHierarchy2 className="h-4 w-4 text-primary" />
+              Build views
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Review generated graphs and artefacts, or jump to graph listings.
+              Jump straight into the editors for layers, generated graphs, and artefacts.
             </p>
-            <Button className="w-full" variant="secondary" onClick={handleOpenGraphs}>
-              Graphs
-            </Button>
+            <div className="space-y-2">
+              <Button
+                variant="secondary"
+                className="w-full justify-start gap-2"
+                onClick={() => navigate(`/projects/${project.id}/workbench/layers`)}
+              >
+                <IconHierarchy2 className="h-4 w-4" />
+                Layer palette
+              </Button>
+              <Button
+                variant="secondary"
+                className="w-full justify-start gap-2"
+                onClick={handleOpenGraphs}
+              >
+                <IconGraph className="h-4 w-4" />
+                Generated graphs
+              </Button>
+              <Button
+                variant="secondary"
+                className="w-full justify-start gap-2"
+                onClick={() => navigate(`/projects/${project.id}/artefacts`)}
+              >
+                <IconDatabase className="h-4 w-4" />
+                Artefacts
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
