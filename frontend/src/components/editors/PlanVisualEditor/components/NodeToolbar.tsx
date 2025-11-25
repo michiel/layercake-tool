@@ -71,21 +71,21 @@ export const NodeToolbar: React.FC<NodeToolbarProps> = ({ onNodeDragStart, onNod
   const nodeTypes = [
     {
       type: PlanDagNodeType.DATA_SOURCE,
-      label: 'Data Source',
+      label: 'Data Set',
       icon: <IconDatabase size="1.2rem" />,
       color: '#51cf66'
-    },
-    {
-      type: PlanDagNodeType.GRAPH,
-      label: 'Graph',
-      icon: <IconNetwork size="1.2rem" />,
-      color: '#339af0'
     },
     {
       type: PlanDagNodeType.STORY,
       label: 'Story',
       icon: <IconBook size="1.2rem" />,
       color: '#3b82f6'
+    },
+    {
+      type: PlanDagNodeType.GRAPH,
+      label: 'Graph',
+      icon: <IconNetwork size="1.2rem" />,
+      color: '#339af0'
     },
     {
       type: PlanDagNodeType.TRANSFORM,
@@ -97,25 +97,25 @@ export const NodeToolbar: React.FC<NodeToolbarProps> = ({ onNodeDragStart, onNod
       type: PlanDagNodeType.MERGE,
       label: 'Merge',
       icon: <IconGitMerge size="1.2rem" />,
-      color: '#ffd43b'
+      color: '#ff8cc8'
     },
     {
       type: PlanDagNodeType.GRAPH_ARTEFACT,
-      label: 'Graph Artefact',
+      label: 'Graph Export',
       icon: <IconFileExport size="1.2rem" />,
       color: '#ff6b6b'
     },
     {
       type: PlanDagNodeType.TREE_ARTEFACT,
-      label: 'Tree Artefact',
+      label: 'Tree Export',
       icon: <IconFileExport size="1.2rem" />,
-      color: '#845ef7'
+      color: '#ff6b6b'
     },
     {
       type: PlanDagNodeType.SEQUENCE_ARTEFACT,
-      label: 'Sequence',
+      label: 'Sequence Export',
       icon: <IconTimeline size="1.2rem" />,
-      color: '#f59e0b'
+      color: '#ff6b6b'
     },
   ];
 

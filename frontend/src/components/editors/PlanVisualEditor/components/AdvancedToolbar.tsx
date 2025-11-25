@@ -51,7 +51,7 @@ export const AdvancedToolbar: React.FC<AdvancedToolbarProps> = ({
   const nodeTypes = [
     {
       type: PlanDagNodeType.DATA_SOURCE,
-      label: 'Data Source',
+      label: 'Dataset',
       icon: <IconDatabase size="0.7rem" />,
       color: '#10b981' // Emerald-500
     },
@@ -87,21 +87,21 @@ export const AdvancedToolbar: React.FC<AdvancedToolbarProps> = ({
     },
     {
       type: PlanDagNodeType.GRAPH_ARTEFACT,
-      label: 'Graph Artefact',
+      label: 'Graph export',
       icon: <IconFileExport size="0.7rem" />,
       color: '#f59e0b' // Amber-500
     },
     {
       type: PlanDagNodeType.TREE_ARTEFACT,
-      label: 'Tree Artefact',
+      label: 'Tree export',
       icon: <IconFileExport size="0.7rem" />,
-      color: '#a855f7' // Purple-500
+      color: '#f59e0b' // Amber-500
     },
     {
       type: PlanDagNodeType.SEQUENCE_ARTEFACT,
-      label: 'Sequence',
+      label: 'Sequence export',
       icon: <IconTimeline size="0.7rem" />,
-      color: '#f97316' // Orange-500
+      color: '#f59e0b' // Amber-500
     }
   ];
 
