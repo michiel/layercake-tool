@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
-import { useParams, useNavigate, useLocation } from 'react-router-dom'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation } from '@apollo/client/react'
 import {
   IconArrowLeft,
@@ -13,7 +13,6 @@ import {
   IconClock,
   IconX,
   IconTable,
-  IconPalette,
   IconShieldCheck
 } from '@tabler/icons-react'
 import { useForm } from 'react-hook-form'
@@ -30,9 +29,7 @@ import {
   formatFileSize,
   getFileFormatDisplayName
 } from '../../graphql/datasets'
-import { GET_PROJECT_LAYERS, ProjectLayer } from '../../graphql/layers'
 import { GraphSpreadsheetEditor, GraphData } from '../editors/GraphSpreadsheetEditor'
-import type { GraphNode, GraphEdge } from '../editors/GraphSpreadsheetEditor'
 import { Stack, Group } from '../layout-primitives'
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert'
 import { Badge } from '../ui/badge'
@@ -72,19 +69,9 @@ interface DataSetEditorProps {}
 
 export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
   const navigate = useNavigate()
-  const location = useLocation()
   const { projectId, dataSetId } = useParams<{ projectId: string; dataSetId: string }>()
-  const paletteViewRequested = useMemo(() => {
-    const params = new URLSearchParams(location.search)
-    if (params.get('view') === 'palette') {
-      return true
-    }
-    const stateView = (location.state as { view?: string } | null)?.view
-    return stateView === 'palette'
-  }, [location.search, location.state])
 
   const [activeTab, setActiveTab] = useState<string>('edit')
-  const initializedTabRef = useRef(false)
   const [fileUploadMode, setFileUploadMode] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [validationDialogOpen, setValidationDialogOpen] = useState(false)
@@ -115,15 +102,6 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
     errorPolicy: 'all'
   })
 
-  const {
-    data: projectLayersData,
-    loading: projectLayersLoading,
-    error: projectLayersError
-  } = useQuery(GET_PROJECT_LAYERS, {
-    variables: { projectId: parseInt(projectId || '0') },
-    skip: !projectId
-  })
-
   // Mutations
   const [updateDataSet, { loading: updateLoading }] = useMutation(UPDATE_DATASOURCE)
   const [reprocessDataSet, { loading: reprocessLoading }] = useMutation(REPROCESS_DATASOURCE)
@@ -133,105 +111,6 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
   }, { id: number }>(VALIDATE_DATASET)
 
   const dataSource: DataSet | null = (dataSourceData as any)?.dataSet || null
-  const projectPaletteLayers: ProjectLayer[] = useMemo(
-    () =>
-      ((projectLayersData as any)?.projectLayers as ProjectLayer[] | undefined) ?? [],
-    [projectLayersData]
-  )
-
-  const resolvedGraphData = useMemo((): GraphData | null => {
-    if (!dataSource?.graphJson) {
-      return null
-    }
-
-    const ensureColor = (value?: string | null, fallback = '#f7f7f8') => {
-      if (!value) {
-        return fallback
-      }
-      return value.startsWith('#') ? value : `#${value}`
-    }
-
-    try {
-      const parsed = JSON.parse(dataSource.graphJson)
-      const nodesArray = Array.isArray(parsed.nodes) ? parsed.nodes : []
-      const edgesArray = Array.isArray(parsed.edges) ? parsed.edges : []
-
-      const nodes = nodesArray.map((node: any) => ({
-        id: node.id,
-        label: node.label || '',
-        layer: node.layer,
-        weight: node.weight,
-        is_partition: node.is_partition,
-        belongs_to: node.belongs_to,
-        comment: node.comment,
-        ...node
-      }))
-
-      const edges = edgesArray.map((edge: any) => ({
-        id: edge.id,
-        source: edge.source,
-        target: edge.target,
-        label: edge.label || '',
-        layer: edge.layer,
-        weight: edge.weight,
-        comment: edge.comment,
-        ...edge
-      }))
-
-      const referencedLayerIds = new Set<string>()
-      nodes.forEach((node: GraphNode) => {
-        if (node.layer) {
-          referencedLayerIds.add(node.layer)
-        }
-      })
-      edges.forEach((edge: GraphEdge) => {
-        if (edge.layer) {
-          referencedLayerIds.add(edge.layer)
-        }
-      })
-
-      const paletteMap = new Map<
-        string,
-        { label: string; background_color: string; text_color: string; border_color: string }
-      >()
-
-      projectPaletteLayers.forEach(layer => {
-        const entry = {
-          label: layer.name || layer.layerId,
-          background_color: ensureColor(layer.backgroundColor, '#f7f7f8'),
-          text_color: ensureColor(layer.textColor, '#0f172a'),
-          border_color: ensureColor(layer.borderColor, '#dddddd')
-        }
-        paletteMap.set(layer.layerId, entry)
-        layer.aliases?.forEach(alias => {
-          paletteMap.set(alias.aliasLayerId, entry)
-        })
-      })
-
-      const resolvedLayers = Array.from(referencedLayerIds)
-        .sort()
-        .map(layerId => {
-          const resolved = paletteMap.get(layerId)
-          return {
-            id: layerId,
-            label: resolved?.label ?? layerId,
-            background_color: resolved?.background_color ?? '#f7f7f8',
-            text_color: resolved?.text_color ?? '#0f172a',
-            border_color: resolved?.border_color ?? '#dddddd'
-          }
-        })
-
-      return {
-        nodes,
-        edges,
-        layers: resolvedLayers
-      }
-    } catch (error) {
-      console.error('Failed to parse dataset graph JSON', error)
-      return null
-    }
-  }, [dataSource, projectPaletteLayers])
-
   const rawGraphData = useMemo((): GraphData | null => {
     if (!dataSource?.graphJson) {
       return null
@@ -243,8 +122,6 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
       return null
     }
   }, [dataSource?.graphJson])
-
-  const noopPaletteSave = useCallback(async (_graphData: GraphData) => {}, [])
 
   // Form for editing DataSet metadata
   const form = useForm<{name: string; description: string}>({
@@ -263,16 +140,6 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
       })
     }
   }, [dataSource, form])
-
-  useEffect(() => {
-    if (initializedTabRef.current) {
-      return
-    }
-    if (paletteViewRequested) {
-      setActiveTab('palette')
-    }
-    initializedTabRef.current = true
-  }, [paletteViewRequested])
 
   const handleNavigate = (route: string) => {
     navigate(route)
@@ -564,10 +431,6 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
             <IconTable className="mr-2 h-4 w-4" />
             Data Edit
           </TabsTrigger>
-          <TabsTrigger value="palette">
-            <IconPalette className="mr-2 h-4 w-4" />
-            Palette View
-          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="details">
@@ -732,43 +595,6 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="palette">
-          <Card className="border mt-4">
-            <CardContent className="pt-6">
-              {projectLayersLoading && (
-                <Stack align="center" className="py-12">
-                  <Spinner size="lg" />
-                  <p className="text-sm text-muted-foreground">Loading layer palette…</p>
-                </Stack>
-              )}
-              {projectLayersError && (
-                <Alert variant="destructive">
-                  <IconAlertCircle className="h-4 w-4" />
-                  <AlertTitle>Failed to load palette</AlertTitle>
-                  <AlertDescription>{projectLayersError.message}</AlertDescription>
-                </Alert>
-              )}
-              {!projectLayersLoading && !projectLayersError && (
-                resolvedGraphData ? (
-                  <GraphSpreadsheetEditor
-                    graphData={resolvedGraphData}
-                    onSave={noopPaletteSave}
-                    readOnly
-                    layersReadOnly
-                  />
-                ) : (
-                  <Alert variant="destructive">
-                    <IconAlertCircle className="h-4 w-4" />
-                    <AlertTitle>Invalid Graph Data</AlertTitle>
-                    <AlertDescription>
-                      Failed to parse graph JSON data. Please check the data format in the "Graph Data" tab.
-                    </AlertDescription>
-                  </Alert>
-                )
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
 
       <Dialog open={validationDialogOpen} onOpenChange={setValidationDialogOpen}>

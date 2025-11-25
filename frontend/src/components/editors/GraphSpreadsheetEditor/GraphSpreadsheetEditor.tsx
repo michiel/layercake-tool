@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { IconTable, IconDeviceFloppy, IconClipboard, IconClipboardCopy, IconTrash } from '@tabler/icons-react';
+import { IconTable, IconDeviceFloppy, IconClipboard, IconClipboardCopy, IconTrash, IconPlus, IconX } from '@tabler/icons-react';
 import { Stack, Group } from '@/components/layout-primitives';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -70,6 +70,67 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
   const nodeColumnDefs = ['id', 'label', 'layer', 'weight', 'is_partition', 'belongs_to', 'comment'];
   const edgeColumnDefs = ['id', 'source', 'target', 'label', 'layer', 'weight', 'comment'];
   const layerColumnDefs = ['id', 'label', 'alias', 'background_color', 'text_color', 'border_color', 'comment'];
+
+  const handleAddRecord = () => {
+    if (readOnly) {
+      return;
+    }
+    if (activeTab === 'nodes') {
+      setLocalNodes(prev => [
+        ...prev,
+        { id: '', label: '', layer: '', weight: undefined, is_partition: false, belongs_to: '', comment: '' }
+      ]);
+      setHasChanges(true);
+      return;
+    }
+    if (activeTab === 'edges') {
+      setLocalEdges(prev => [
+        ...prev,
+        { id: '', source: '', target: '', label: '', layer: '', weight: undefined, comment: '' }
+      ]);
+      setHasChanges(true);
+      return;
+    }
+    if (!layerEditingDisabled && activeTab === 'layers') {
+      setLocalLayers(prev => [
+        ...prev,
+        {
+          id: '',
+          label: '',
+          alias: '',
+          background_color: '',
+          text_color: '',
+          border_color: '',
+          comment: ''
+        }
+      ]);
+      setHasChanges(true);
+    }
+  };
+
+  const handleDeleteNode = (index: number) => {
+    if (readOnly) {
+      return;
+    }
+    setLocalNodes(prev => prev.filter((_, idx) => idx !== index));
+    setHasChanges(true);
+  };
+
+  const handleDeleteEdge = (index: number) => {
+    if (readOnly) {
+      return;
+    }
+    setLocalEdges(prev => prev.filter((_, idx) => idx !== index));
+    setHasChanges(true);
+  };
+
+  const handleDeleteLayer = (index: number) => {
+    if (layerEditingDisabled) {
+      return;
+    }
+    setLocalLayers(prev => prev.filter((_, idx) => idx !== index));
+    setHasChanges(true);
+  };
 
   const handleNodeChange = (rowIdx: number, field: string, value: string) => {
     setLocalNodes(prevNodes => {
@@ -361,6 +422,15 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
         <Group gap="xs">
           {!readOnly && (
             <>
+              <Button
+                onClick={handleAddRecord}
+                variant="secondary"
+                size="icon"
+                disabled={activeTab === 'layers' && layerEditingDisabled}
+                title="Add record"
+              >
+                <IconPlus className="h-4 w-4" />
+              </Button>
               {activeTab === 'nodes' && (
                 <>
                   <Button
@@ -487,6 +557,11 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
                       {col.replace(/_/g, ' ').toUpperCase()}
                     </TableHead>
                   ))}
+                  {!readOnly && (
+                    <TableHead className="w-12 text-right">
+                      <span className="sr-only">Node Actions</span>
+                    </TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -505,6 +580,19 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
                         )}
                       </TableCell>
                     ))}
+                    {!readOnly && (
+                      <TableCell className="text-right">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => handleDeleteNode(rowIdx)}
+                          className="h-6 w-6 text-muted-foreground"
+                          title="Delete node"
+                        >
+                          <IconX className="h-3.5 w-3.5" />
+                        </Button>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
@@ -522,6 +610,11 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
                       {col.replace(/_/g, ' ').toUpperCase()}
                     </TableHead>
                   ))}
+                  {!readOnly && (
+                    <TableHead className="w-12 text-right">
+                      <span className="sr-only">Edge Actions</span>
+                    </TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -540,6 +633,19 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
                         )}
                       </TableCell>
                     ))}
+                    {!readOnly && (
+                      <TableCell className="text-right">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => handleDeleteEdge(rowIdx)}
+                          className="h-6 w-6 text-muted-foreground"
+                          title="Delete edge"
+                        >
+                          <IconX className="h-3.5 w-3.5" />
+                        </Button>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
@@ -557,6 +663,11 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
                       {col.replace(/_/g, ' ').toUpperCase()}
                     </TableHead>
                   ))}
+                  {!layerEditingDisabled && (
+                    <TableHead className="w-12 text-right">
+                      <span className="sr-only">Layer Actions</span>
+                    </TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -575,6 +686,19 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
                         )}
                       </TableCell>
                     ))}
+                    {!layerEditingDisabled && (
+                      <TableCell className="text-right">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => handleDeleteLayer(rowIdx)}
+                          className="h-6 w-6 text-muted-foreground"
+                          title="Delete layer"
+                        >
+                          <IconX className="h-3.5 w-3.5" />
+                        </Button>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
