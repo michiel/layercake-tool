@@ -702,7 +702,7 @@ mod tests {
                     id: "partition".to_string(),
                     label: "Partition".to_string(),
                     layer: "layer1".to_string(),
-                    is_partition: false,
+                    is_partition: true,
                     belongs_to: None,
                     weight: 1,
                     comment: None,
@@ -743,6 +743,54 @@ mod tests {
                 id: "edge1".to_string(),
                 source: "connected_a".to_string(),
                 target: "connected_b".to_string(),
+                label: "EdgeLabelLong".to_string(),
+                layer: "layer1".to_string(),
+                weight: 1,
+                comment: None,
+                dataset: None,
+            }],
+            layers: vec![Layer {
+                id: "layer1".to_string(),
+                label: "Layer 1".to_string(),
+                background_color: "FFFFFF".to_string(),
+                text_color: "000000".to_string(),
+                border_color: "000000".to_string(),
+                alias: None,
+                dataset: None,
+            }],
+            annotations: None,
+        }
+    }
+
+    fn graph_with_connected_partition() -> Graph {
+        Graph {
+            name: "ConnectedPartition".to_string(),
+            nodes: vec![
+                Node {
+                    id: "partition".to_string(),
+                    label: "Partition".to_string(),
+                    layer: "layer1".to_string(),
+                    is_partition: true,
+                    belongs_to: None,
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+                Node {
+                    id: "child".to_string(),
+                    label: "Child".to_string(),
+                    layer: "layer1".to_string(),
+                    is_partition: false,
+                    belongs_to: Some("partition".to_string()),
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                },
+            ],
+            edges: vec![Edge {
+                id: "edge1".to_string(),
+                source: "partition".to_string(),
+                target: "child".to_string(),
                 label: "EdgeLabelLong".to_string(),
                 layer: "layer1".to_string(),
                 weight: 1,
@@ -875,6 +923,44 @@ mod tests {
         assert!(
             !remaining_ids.contains("child"),
             "child nodes without edges should still be dropped"
+        );
+
+        let partition_node = graph
+            .nodes
+            .iter()
+            .find(|n| n.id == "partition")
+            .expect("partition node exists");
+        assert!(
+            partition_node.is_partition,
+            "drop transform should not modify partition flags"
+        );
+    }
+
+    #[test]
+    fn drop_unconnected_nodes_preserves_flags_for_connected_partitions() {
+        let mut graph = graph_with_connected_partition();
+        let config = TransformNodeConfig {
+            transforms: vec![GraphTransform {
+                kind: GraphTransformKind::DropUnconnectedNodes,
+                params: GraphTransformParams {
+                    exclude_partition_nodes: Some(true),
+                    ..Default::default()
+                },
+            }],
+        };
+
+        config
+            .apply_transforms(&mut graph)
+            .expect("transform should succeed");
+
+        let partition_node = graph
+            .nodes
+            .iter()
+            .find(|n| n.id == "partition")
+            .expect("partition node exists");
+        assert!(
+            partition_node.is_partition,
+            "connected partition nodes should retain their flag"
         );
     }
 

@@ -495,12 +495,8 @@ impl Graph {
             .flat_map(|e| [e.source.clone(), e.target.clone()])
             .collect();
 
-        let original_partition_ids: HashSet<String> = self
-            .nodes
-            .iter()
-            .filter(|n| n.is_partition)
-            .map(|n| n.id.clone())
-            .collect();
+        let original_partition_flags: HashMap<String, bool> =
+            self.nodes.iter().map(|n| (n.id.clone(), n.is_partition)).collect();
 
         let mut protected_ids: HashSet<String> = HashSet::new();
         if exclude_partition_nodes {
@@ -527,7 +523,9 @@ impl Graph {
             .retain(|e| valid_ids.contains(&e.source) && valid_ids.contains(&e.target));
 
         for node in &mut self.nodes {
-            node.is_partition = original_partition_ids.contains(&node.id);
+            if let Some(original_flag) = original_partition_flags.get(&node.id) {
+                node.is_partition = *original_flag;
+            }
         }
 
         original_len.saturating_sub(self.nodes.len())
