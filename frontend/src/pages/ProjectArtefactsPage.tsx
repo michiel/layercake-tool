@@ -41,6 +41,7 @@ import { MermaidPreviewDialog, DotPreviewDialog } from '../components/visualizat
 import { showErrorNotification, showSuccessNotification } from '../utils/notifications'
 import { PlanDagNodeType } from '../types/plan-dag'
 import { useProjectPlanSelection } from '../hooks/useProjectPlanSelection'
+import { cn } from '../lib/utils'
 
 const GET_PROJECTS = gql`
   query GetProjects {
@@ -147,6 +148,12 @@ const ProjectArtefactsPage: React.FC = () => {
     selectPlan,
   } = useProjectPlanSelection(projectIdNum)
   const planQuerySuffix = selectedPlanId ? `?planId=${selectedPlanId}` : ''
+  const handleManagePlans = () => {
+    if (!selectedProject) {
+      return
+    }
+    navigate(`/projects/${selectedProject.id}/plans`)
+  }
 
   const { data, loading: planDagLoading, error } = useQuery<PlanDagResponse>(GET_PLAN_DAG, {
     variables: { projectId: projectIdNum, planId: selectedPlanId },
@@ -772,7 +779,7 @@ const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
               Browse graphs and exported artefacts for {selectedPlan ? selectedPlan.name : 'this project'}
             </p>
           </div>
-          <Group gap="xs" className="flex-wrap justify-end">
+          <Group gap="xs" className="flex-wrap justify-end lg:hidden">
             <Select
               value={selectedPlanId ? selectedPlanId.toString() : ''}
               onValueChange={(value) => selectPlan(Number(value))}
@@ -797,7 +804,7 @@ const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
                 ))}
               </SelectContent>
             </Select>
-            <Button variant="secondary" onClick={() => navigate(`/projects/${selectedProject.id}/plans`)}>
+            <Button variant="secondary" onClick={handleManagePlans}>
               Manage plans
             </Button>
           </Group>
@@ -812,36 +819,83 @@ const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
             </AlertDescription>
           </Alert>
         )}
-
-        {loading && (
-          <div className="flex items-center justify-center py-16">
-            <Spinner />
-          </div>
-        )}
-        {!loading && !entries.length && (
-          <Alert className="max-w-4xl mx-auto">
-            <AlertTitle>No graphs detected</AlertTitle>
-            <AlertDescription>Create graphs in the plan to see their artefacts here.</AlertDescription>
-          </Alert>
-        )}
-        {!!entries.length && (
-          <div className="max-w-4xl mx-auto">
-            <div className="rounded-lg border bg-background shadow-sm">
-              <div className="flex items-center py-3 px-4 border-b bg-muted/50 font-medium text-sm">
-                <div className="flex-shrink-0 min-w-0" style={{ width: '40%' }}>
-                  Name
-                </div>
-                <div className="flex-1 text-center">
-                  Options
-                </div>
-                <div className="flex-shrink-0 text-right" style={{ width: '180px' }}>
-                  Actions
+        <div className="mt-6">
+          <div className="w-full mx-auto max-w-6xl">
+            <div className="lg:flex lg:items-start lg:gap-6">
+              <div className="hidden lg:block w-64 flex-shrink-0">
+                <div className="sticky top-24 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Plans</p>
+                    <Button variant="ghost" size="sm" className="h-7 px-2" onClick={handleManagePlans}>
+                      Manage
+                    </Button>
+                  </div>
+                  {plansLoading ? (
+                    <div className="flex items-center justify-center py-6">
+                      <Spinner />
+                    </div>
+                  ) : plans.length ? (
+                    <div className="space-y-2">
+                      {plans.map(plan => (
+                        <button
+                          type="button"
+                          key={plan.id}
+                          onClick={() => selectPlan(plan.id)}
+                          className={cn(
+                            'w-full rounded-md border px-3 py-2 text-left transition focus:outline-none focus:ring-2 focus:ring-ring',
+                            selectedPlanId === plan.id
+                              ? 'border-primary bg-primary/10 text-primary shadow-sm'
+                              : 'border-transparent bg-muted/40 text-foreground hover:bg-muted'
+                          )}
+                        >
+                          <p className="font-medium truncate">{plan.name}</p>
+                          {plan.description && (
+                            <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
+                              {plan.description}
+                            </p>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No plans available.</p>
+                  )}
                 </div>
               </div>
-              {entries.map((entry, index) => renderEntry(entry, index))}
+              <div className="flex-1">
+                {loading && (
+                  <div className="flex items-center justify-center py-16">
+                    <Spinner />
+                  </div>
+                )}
+                {!loading && !entries.length && (
+                  <Alert className="max-w-4xl mx-auto lg:mx-0">
+                    <AlertTitle>No graphs detected</AlertTitle>
+                    <AlertDescription>Create graphs in the plan to see their artefacts here.</AlertDescription>
+                  </Alert>
+                )}
+                {!loading && !!entries.length && (
+                  <div className="max-w-4xl mx-auto lg:mx-0">
+                    <div className="rounded-lg border bg-background shadow-sm">
+                      <div className="flex items-center py-3 px-4 border-b bg-muted/50 font-medium text-sm">
+                        <div className="flex-shrink-0 min-w-0" style={{ width: '40%' }}>
+                          Name
+                        </div>
+                        <div className="flex-1 text-center">
+                          Options
+                        </div>
+                        <div className="flex-shrink-0 text-right" style={{ width: '180px' }}>
+                          Actions
+                        </div>
+                      </div>
+                      {entries.map((entry, index) => renderEntry(entry, index))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        )}
+        </div>
       </PageContainer>
 
       <GraphDataDialog
