@@ -10,11 +10,19 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { GET_DATASOURCES } from '@/graphql/datasets'
+import { GET_DATASOURCES, CREATE_EMPTY_DATASOURCE, UPDATE_DATASOURCE_GRAPH_DATA } from '@/graphql/datasets'
 import {
   DELETE_PROJECT_LAYER,
   GET_PROJECT_LAYERS,
@@ -45,6 +53,103 @@ const LAYER_CSV_HEADERS = [
   'source_dataset_id',
   'missing',
 ]
+
+type PaletteStyleKey = 'soft' | 'grey' | 'hivis'
+
+interface PaletteStyleConfig {
+  label: string
+  description: string
+  short: string
+}
+
+const PALETTE_STYLE_CONFIG: Record<PaletteStyleKey, PaletteStyleConfig> = {
+  soft: {
+    label: 'Soft',
+    description: 'Pastel colors with gentle contrast',
+    short: 'SOFT',
+  },
+  grey: {
+    label: 'Greyscale',
+    description: 'Neutral tones with monochrome ramps',
+    short: 'GREY',
+  },
+  hivis: {
+    label: 'High-contrast',
+    description: 'Bold, high-visibility colors',
+    short: 'HIVIS',
+  },
+}
+
+interface PaletteColor {
+  background: string
+  text: string
+  border: string
+}
+
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max)
+
+const hslToHex = (h: number, s: number, l: number) => {
+  const normalizedH = ((h % 360) + 360) % 360
+  const normalizedS = clamp(s, 0, 100) / 100
+  const normalizedL = clamp(l, 0, 100) / 100
+
+  const a = normalizedS * Math.min(normalizedL, 1 - normalizedL)
+  const f = (n: number) => {
+    const k = (n + normalizedH / 30) % 12
+    const color = normalizedL - a * Math.max(-1, Math.min(k - 3, Math.min(9 - k, 1)))
+    return Math.round(255 * color)
+  }
+
+  const toHex = (component: number) => component.toString(16).padStart(2, '0')
+
+  return `#${toHex(f(0))}${toHex(f(8))}${toHex(f(4))}`.toUpperCase()
+}
+
+const hexToRgb = (value: string) => {
+  const hex = value.replace('#', '')
+  const bigint = parseInt(hex, 16)
+  const r = (bigint >> 16) & 255
+  const g = (bigint >> 8) & 255
+  const b = bigint & 255
+  return { r, g, b }
+}
+
+const getContrastText = (background: string) => {
+  const { r, g, b } = hexToRgb(background)
+  const brightness = (r * 299 + g * 587 + b * 114) / 1000
+  return brightness > 140 ? '#0f172a' : '#f8fafc'
+}
+
+const createColorFromHsl = (h: number, s: number, l: number): PaletteColor => {
+  const background = hslToHex(h, s, l)
+  const text = getContrastText(background)
+  const border = hslToHex(h, clamp(s - 5, 0, 100), clamp(l - 15, 5, 95))
+  return { background, text, border }
+}
+
+const generatePaletteColor = (style: PaletteStyleKey, index: number): PaletteColor => {
+  switch (style) {
+    case 'soft': {
+      const hue = (index * 47) % 360
+      const saturation = 50 + ((index % 3) * 7)
+      const lightness = 78 - ((index % 4) * 4)
+      return createColorFromHsl(hue, saturation, lightness)
+    }
+    case 'grey': {
+      const hue = 210
+      const saturation = 5 + ((index % 3) * 3)
+      const lightness = 20 + ((index % 12) * 5)
+      return createColorFromHsl(hue, saturation, lightness)
+    }
+    case 'hivis':
+    default: {
+      const hue = (index * 33) % 360
+      const saturation = 90
+      const lightness = 55 + ((index % 2) * 5)
+      return createColorFromHsl(hue, saturation, lightness)
+    }
+  }
+}
 
 const normalizeHexValue = (value: string, fallback: string) => {
   if (!value) return fallback
@@ -97,6 +202,8 @@ export const ProjectLayersPage = () => {
   const [resetProjectLayersMutation, { loading: resettingLayers }] = useMutation(
     RESET_PROJECT_LAYERS
   )
+  const [createAutoPaletteDataset] = useMutation(CREATE_EMPTY_DATASOURCE)
+  const [updateAutoPaletteGraph] = useMutation(UPDATE_DATASOURCE_GRAPH_DATA)
 
   const projectLayers: ProjectLayer[] = useMemo(
     () => ((layersData as any)?.projectLayers as ProjectLayer[] | undefined) ?? [],
@@ -132,6 +239,9 @@ export const ProjectLayersPage = () => {
   const [manageAliasesDialogOpen, setManageAliasesDialogOpen] = useState(false)
   const [selectedAliasLayer, setSelectedAliasLayer] = useState<{ id: number; name: string } | null>(null)
   const [pastingLayers, setPastingLayers] = useState(false)
+  const [generatePaletteDialogOpen, setGeneratePaletteDialogOpen] = useState(false)
+  const [selectedPaletteStyle, setSelectedPaletteStyle] = useState<PaletteStyleKey>('soft')
+  const [generatingPalette, setGeneratingPalette] = useState(false)
 
   // Helper function to calculate dataset enabled state
   // Dataset is enabled if ANY of its layers are enabled (i.e., dataset toggle was not turned off)
@@ -342,6 +452,147 @@ export const ProjectLayersPage = () => {
     }
   }
 
+  const handleGeneratePalette = async () => {
+    if (!selectedPaletteStyle) {
+      showErrorNotification('Select a style', 'Choose a palette style before generating.')
+      return
+    }
+
+    const layerMap = new Map<
+      string,
+      { layerId: string; name: string; alias?: string | null }
+    >()
+
+    paletteLayers.forEach((layer) => {
+      const trimmedId = layer.layerId?.trim()
+      if (!trimmedId || layerMap.has(trimmedId)) {
+        return
+      }
+      layerMap.set(trimmedId, {
+        layerId: trimmedId,
+        name: layer.name || trimmedId,
+        alias: layer.alias ?? null,
+      })
+    })
+    missingLayers.forEach((id) => {
+      const trimmedId = id.trim()
+      if (!trimmedId || layerMap.has(trimmedId)) {
+        return
+      }
+      layerMap.set(trimmedId, { layerId: trimmedId, name: trimmedId })
+    })
+
+    const paletteTargets = Array.from(layerMap.values())
+    if (paletteTargets.length === 0) {
+      showErrorNotification('No layers to generate', 'Activate at least one layer before generating a palette.')
+      return
+    }
+
+    setGeneratingPalette(true)
+    try {
+      const datasetIdsToDisable = layerDatasets
+        .filter((dataset: any) => {
+          const enabled =
+            datasetToggleState[dataset.id] ?? calculateDatasetState(dataset.id, projectLayers)
+          return enabled
+        })
+        .map((dataset: any) => dataset.id)
+
+      if (datasetIdsToDisable.length > 0) {
+        setDatasetToggleState((prev) => {
+          const next = { ...prev }
+          datasetIdsToDisable.forEach((id) => {
+            next[id] = false
+          })
+          return next
+        })
+
+        for (const datasetId of datasetIdsToDisable) {
+          await setDatasetEnabled({
+            variables: { projectId: projectIdNum, dataSetId: datasetId, enabled: false },
+          })
+        }
+      }
+
+      const autoLayers = paletteTargets.map((layer, index) => {
+        const colors = generatePaletteColor(selectedPaletteStyle, index)
+        return {
+          id: layer.layerId,
+          label: layer.name || layer.layerId,
+          name: layer.name || layer.layerId,
+          background_color: colors.background,
+          text_color: colors.text,
+          border_color: colors.border,
+          ...(layer.alias ? { alias: layer.alias } : {}),
+        }
+      })
+
+      const graphJson = JSON.stringify({
+        nodes: [],
+        edges: [],
+        layers: autoLayers,
+      })
+
+      const styleConfig = PALETTE_STYLE_CONFIG[selectedPaletteStyle]
+      const datasetName = `Auto layers (${styleConfig.short})`
+      const datasetDescription = `Automatically generated ${styleConfig.label.toLowerCase()} palette for ${paletteTargets.length} layer(s).`
+
+      const created = await createAutoPaletteDataset({
+        variables: {
+          input: {
+            projectId: projectIdNum,
+            name: datasetName,
+            description: datasetDescription,
+          },
+        },
+      })
+
+      const newDatasetId = (created.data as any)?.createEmptyDataSet?.id
+      if (!newDatasetId) {
+        throw new Error('Failed to create the palette dataset')
+      }
+
+      await updateAutoPaletteGraph({
+        variables: {
+          id: newDatasetId,
+          graphJson,
+        },
+      })
+
+      await setDatasetEnabled({
+        variables: { projectId: projectIdNum, dataSetId: newDatasetId, enabled: true },
+      })
+
+      setDatasetToggleState((prev) => ({ ...prev, [newDatasetId]: true }))
+
+      const manualLayers = projectLayers.filter((layer) => !layer.sourceDatasetId)
+      if (manualLayers.length > 0) {
+        await Promise.all(
+          manualLayers.map((layer) =>
+            deleteLayer({
+              variables: {
+                projectId: projectIdNum,
+                layerId: layer.layerId,
+                sourceDatasetId: null,
+              },
+            })
+          )
+        )
+      }
+
+      await Promise.all([refetchLayers(), refetchDatasets()])
+      setGeneratePaletteDialogOpen(false)
+      showSuccessNotification('Palette generated', `${datasetName} is enabled.`)
+    } catch (error: any) {
+      showErrorNotification(
+        'Failed to generate palette',
+        error?.message || 'Unable to create palette dataset'
+      )
+    } finally {
+      setGeneratingPalette(false)
+    }
+  }
+
   const escapeCsvValue = (value: string) => {
     if (value.includes(',') || value.includes('"') || value.includes('\n')) {
       return `"${value.replace(/"/g, '""')}"`
@@ -493,7 +744,12 @@ export const ProjectLayersPage = () => {
   }
 
   const loading =
-    layersLoading || datasetsLoading || upserting || togglingDataset || resettingLayers
+    layersLoading ||
+    datasetsLoading ||
+    upserting ||
+    togglingDataset ||
+    resettingLayers ||
+    generatingPalette
 
   return (
     <PageContainer>
@@ -533,6 +789,9 @@ export const ProjectLayersPage = () => {
           </Button>
           <Button variant="outline" onClick={handlePasteActive} disabled={pastingLayers}>
             {pastingLayers ? 'Pasting…' : 'Paste active'}
+          </Button>
+          <Button variant="secondary" onClick={() => setGeneratePaletteDialogOpen(true)}>
+            Generate palette
           </Button>
           <Button
             variant="destructive"
@@ -1006,6 +1265,58 @@ export const ProjectLayersPage = () => {
           layerName={selectedAliasLayer.name}
         />
       )}
+      <Dialog open={generatePaletteDialogOpen} onOpenChange={(open) => {
+        if (!generatingPalette) {
+          setGeneratePaletteDialogOpen(open)
+        }
+      }}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>Generate palette</DialogTitle>
+            <DialogDescription>
+              Disable existing layer sources and create a new dataset with fresh colors for every active layer.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Choose a style. This will create a dataset named &ldquo;Auto layers&rdquo; and enable it as the active layer source.
+            </p>
+            <div className="space-y-2">
+              {(Object.keys(PALETTE_STYLE_CONFIG) as PaletteStyleKey[]).map((key) => {
+                const config = PALETTE_STYLE_CONFIG[key]
+                const isSelected = selectedPaletteStyle === key
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    className={`w-full rounded border p-3 text-left transition ${
+                      isSelected ? 'border-primary ring-2 ring-primary/30' : 'border-border hover:border-primary/50'
+                    }`}
+                    onClick={() => setSelectedPaletteStyle(key)}
+                    disabled={generatingPalette}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">{config.label}</p>
+                        <p className="text-xs text-muted-foreground">{config.description}</p>
+                      </div>
+                      <Badge variant="secondary">{config.short}</Badge>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setGeneratePaletteDialogOpen(false)} disabled={generatingPalette}>
+              Cancel
+            </Button>
+            <Button onClick={handleGeneratePalette} disabled={generatingPalette}>
+              {generatingPalette ? 'Generating…' : 'Generate palette'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       </div>
     </PageContainer>
   )
