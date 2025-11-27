@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.3.5 - 2025-11-26
+## v0.3.6 - 2025-11-26
 - Added full Story and Sequence authoring workflows (GraphQL, UI editor, artefact previews, export fixes) so workbench projects can narrate execution paths alongside graph artefacts.
 - Expanded dataset management with validation workflows, streamlined editors (copy/paste helpers, prompt library previews), merge/split helpers, and better metadata so pipelines can curate graph bundles without leaving the app.
 - Overhauled project palette/layer tooling with clipboard import/export, alias management, enforced palette coverage, dataset-provided palettes, and a new “Generate palette” action that seeds auto-colored sources.
