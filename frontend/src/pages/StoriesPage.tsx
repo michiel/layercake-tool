@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation } from '@apollo/client/react'
 import { gql } from '@apollo/client'
@@ -7,6 +7,10 @@ import {
   IconPlus,
   IconTrash,
   IconEdit,
+  IconDownload,
+  IconUpload,
+  IconFileTypeCsv,
+  IconBraces,
 } from '@tabler/icons-react'
 import { Breadcrumbs } from '@/components/common/Breadcrumbs'
 import PageContainer from '@/components/layout/PageContainer'
@@ -19,7 +23,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Spinner } from '@/components/ui/spinner'
-import { LIST_STORIES, CREATE_STORY, DELETE_STORY, Story } from '@/graphql/stories'
+import { LIST_STORIES, CREATE_STORY, DELETE_STORY, IMPORT_STORY, EXPORT_STORY, Story, StoryExport } from '@/graphql/stories'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 
 const GET_PROJECTS = gql`
   query GetProjectsForStories {
@@ -41,6 +46,9 @@ export const StoriesPage = () => {
   const [newStoryDescription, setNewStoryDescription] = useState('')
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [storyToDelete, setStoryToDelete] = useState<Story | null>(null)
+  const [importModalOpen, setImportModalOpen] = useState(false)
+  const [importFormat, setImportFormat] = useState<'CSV' | 'JSON'>('JSON')
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const { data: projectsData, loading: projectsLoading } = useQuery(GET_PROJECTS)
   const projects = (projectsData as any)?.projects || []
@@ -80,6 +88,51 @@ export const StoriesPage = () => {
     },
   })
 
+  const [importStory, { loading: importLoading }] = useMutation(IMPORT_STORY, {
+    onCompleted: (data) => {
+      const result = (data as any)?.importStory
+      if (result) {
+        setImportModalOpen(false)
+        if (fileInputRef.current) {
+          fileInputRef.current.value = ''
+        }
+        refetch()
+
+        let message = `Import completed:\n${result.createdCount} created, ${result.updatedCount} updated`
+        if (result.errors && result.errors.length > 0) {
+          message += `\n\nErrors:\n${result.errors.join('\n')}`
+        }
+        alert(message)
+      }
+    },
+    onError: (error) => {
+      console.error('Failed to import story:', error)
+      alert(`Failed to import story: ${error.message}`)
+    },
+  })
+
+  const [exportStory] = useMutation(EXPORT_STORY, {
+    onCompleted: (data) => {
+      const result = (data as any)?.exportStory as StoryExport
+      if (result) {
+        // Decode base64 and download
+        const blob = new Blob([atob(result.content)], { type: result.mimeType })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = result.filename
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+      }
+    },
+    onError: (error) => {
+      console.error('Failed to export story:', error)
+      alert(`Failed to export story: ${error.message}`)
+    },
+  })
+
   const handleCreateStory = async () => {
     if (!newStoryName.trim()) {
       alert('Please enter a story name')
@@ -115,6 +168,39 @@ export const StoriesPage = () => {
     e.stopPropagation()
     setStoryToDelete(story)
     setDeleteModalOpen(true)
+  }
+
+  const handleOpenImport = () => {
+    setImportModalOpen(true)
+  }
+
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    try {
+      const text = await file.text()
+      await importStory({
+        variables: {
+          projectId: projectIdNum,
+          format: importFormat,
+          content: text,
+        },
+      })
+    } catch (error) {
+      console.error('Failed to read file:', error)
+      alert('Failed to read file')
+    }
+  }
+
+  const handleExportStory = async (storyId: number, format: 'CSV' | 'JSON', e: React.MouseEvent) => {
+    e.stopPropagation()
+    await exportStory({
+      variables: {
+        storyId,
+        format,
+      },
+    })
   }
 
   const loading = projectsLoading || storiesLoading
@@ -158,10 +244,16 @@ export const StoriesPage = () => {
           <h1 className="text-3xl font-bold">Stories</h1>
           <p className="text-muted-foreground">Create narrative sequences from your graph data.</p>
         </div>
-        <Button onClick={handleOpenCreate}>
-          <IconPlus className="mr-2 h-4 w-4" />
-          New Story
-        </Button>
+        <Group gap="sm">
+          <Button variant="outline" onClick={handleOpenImport}>
+            <IconUpload className="mr-2 h-4 w-4" />
+            Import Story
+          </Button>
+          <Button onClick={handleOpenCreate}>
+            <IconPlus className="mr-2 h-4 w-4" />
+            New Story
+          </Button>
+        </Group>
       </Group>
 
       {stories.length === 0 ? (
@@ -221,6 +313,28 @@ export const StoriesPage = () => {
                     <IconEdit className="mr-2 h-3.5 w-3.5" />
                     Edit
                   </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <IconDownload className="mr-2 h-3.5 w-3.5" />
+                        Export
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      <DropdownMenuItem onClick={(e) => handleExportStory(story.id, 'JSON', e)}>
+                        <IconBraces className="mr-2 h-4 w-4" />
+                        Export as JSON
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={(e) => handleExportStory(story.id, 'CSV', e)}>
+                        <IconFileTypeCsv className="mr-2 h-4 w-4" />
+                        Export as CSV
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -292,6 +406,73 @@ export const StoriesPage = () => {
             <Button variant="destructive" onClick={handleDeleteStory} disabled={deleteLoading}>
               {deleteLoading && <Spinner className="mr-2 h-4 w-4" />}
               Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import Story Modal */}
+      <Dialog open={importModalOpen} onOpenChange={setImportModalOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Import Story</DialogTitle>
+          </DialogHeader>
+          <Stack gap="md" className="py-4">
+            <div className="space-y-2">
+              <Label>File Format</Label>
+              <Group gap="sm">
+                <Button
+                  variant={importFormat === 'JSON' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setImportFormat('JSON')}
+                >
+                  <IconBraces className="mr-2 h-4 w-4" />
+                  JSON
+                </Button>
+                <Button
+                  variant={importFormat === 'CSV' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setImportFormat('CSV')}
+                >
+                  <IconFileTypeCsv className="mr-2 h-4 w-4" />
+                  CSV
+                </Button>
+              </Group>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="file-upload">Select File</Label>
+              <Input
+                id="file-upload"
+                ref={fileInputRef}
+                type="file"
+                accept={importFormat === 'JSON' ? '.json' : '.csv'}
+                onChange={handleFileSelect}
+                disabled={importLoading}
+              />
+            </div>
+            {importFormat === 'JSON' && (
+              <p className="text-sm text-muted-foreground">
+                Import stories from a JSON file. Story IDs of 0 will create new stories.
+              </p>
+            )}
+            {importFormat === 'CSV' && (
+              <p className="text-sm text-muted-foreground">
+                Import stories from a CSV file. Required columns: story_name, sequence_name, dataset_id, edge_id
+              </p>
+            )}
+          </Stack>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setImportModalOpen(false)
+                if (fileInputRef.current) {
+                  fileInputRef.current.value = ''
+                }
+              }}
+              disabled={importLoading}
+            >
+              Cancel
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -130,3 +130,54 @@ export interface UpdateStoryInput {
   enabledDatasetIds?: number[]
   layerConfig?: StoryLayerConfig[]
 }
+
+// Import/Export mutations
+
+export const EXPORT_STORY = gql`
+  mutation ExportStory($storyId: Int!, $format: StoryExportFormat!) {
+    exportStory(storyId: $storyId, format: $format) {
+      filename
+      content
+      mimeType
+    }
+  }
+`
+
+export const IMPORT_STORY = gql`
+  mutation ImportStory($projectId: Int!, $format: StoryImportFormat!, $content: String!) {
+    importStory(projectId: $projectId, format: $format, content: $content) {
+      importedStories {
+        id
+        name
+        sequenceCount
+      }
+      createdCount
+      updatedCount
+      errors
+    }
+  }
+`
+
+// Import/Export types
+
+export type StoryExportFormat = 'CSV' | 'JSON'
+export type StoryImportFormat = 'CSV' | 'JSON'
+
+export interface StoryExport {
+  filename: string
+  content: string  // Base64-encoded
+  mimeType: string
+}
+
+export interface StoryImportSummary {
+  id: number
+  name: string
+  sequenceCount: number
+}
+
+export interface StoryImportResult {
+  importedStories: StoryImportSummary[]
+  createdCount: number
+  updatedCount: number
+  errors: string[]
+}

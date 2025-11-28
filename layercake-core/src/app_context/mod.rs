@@ -25,6 +25,7 @@ mod library_operations;
 mod plan_dag_operations;
 mod graph_operations;
 mod preview_operations;
+mod story_operations;
 
 /// Shared application context exposing core services for GraphQL, MCP, and console layers.
 #[derive(Clone)]
@@ -498,4 +499,28 @@ pub fn summarize_graph_counts(graph_json: &str) -> (Option<usize>, Option<usize>
             (node_count, edge_count, layer_count)
         })
         .unwrap_or((None, None, None))
+}
+
+#[derive(Clone)]
+pub struct StoryExportResult {
+    pub filename: String,
+    pub content: Vec<u8>,
+    pub mime_type: String,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StoryImportResult {
+    pub imported_stories: Vec<StoryImportSummary>,
+    pub created_count: i32,
+    pub updated_count: i32,
+    pub errors: Vec<String>,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StoryImportSummary {
+    pub id: i32,
+    pub name: String,
+    pub sequence_count: i32,
 }

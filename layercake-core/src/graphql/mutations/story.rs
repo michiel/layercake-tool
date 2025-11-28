@@ -1,11 +1,16 @@
 use async_graphql::*;
+use base64::Engine;
 use chrono::Utc;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 
 use crate::database::entities::{sequences, stories};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
-use crate::graphql::types::{CreateStoryInput, Story, UpdateStoryInput};
+use crate::graphql::types::{
+    CreateStoryInput, Story, StoryExport, StoryExportFormat, StoryImportFormat,
+    StoryImportResult as GqlStoryImportResult, StoryImportSummary as GqlStoryImportSummary,
+    UpdateStoryInput,
+};
 
 #[derive(Default)]
 pub struct StoryMutation;
@@ -130,5 +135,75 @@ impl StoryMutation {
             .map_err(|e| StructuredError::database("stories::Entity::delete_by_id", e))?;
 
         Ok(result.rows_affected > 0)
+    }
+
+    /// Export a story to CSV or JSON format
+    async fn export_story(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(name = "storyId")] story_id: i32,
+        format: StoryExportFormat,
+    ) -> Result<StoryExport> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        let export_result = match format {
+            StoryExportFormat::Csv => context
+                .app
+                .export_story_csv(story_id)
+                .await
+                .map_err(|e| StructuredError::service("AppContext::export_story_csv", e))?,
+            StoryExportFormat::Json => context
+                .app
+                .export_story_json(story_id)
+                .await
+                .map_err(|e| StructuredError::service("AppContext::export_story_json", e))?,
+        };
+
+        let content_base64 = base64::engine::general_purpose::STANDARD.encode(&export_result.content);
+
+        Ok(StoryExport {
+            filename: export_result.filename,
+            content: content_base64,
+            mime_type: export_result.mime_type,
+        })
+    }
+
+    /// Import stories from CSV or JSON format
+    async fn import_story(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(name = "projectId")] project_id: i32,
+        format: StoryImportFormat,
+        content: String,
+    ) -> Result<GqlStoryImportResult> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        let import_result = match format {
+            StoryImportFormat::Csv => context
+                .app
+                .import_story_csv(project_id, &content)
+                .await
+                .map_err(|e| StructuredError::service("AppContext::import_story_csv", e))?,
+            StoryImportFormat::Json => context
+                .app
+                .import_story_json(project_id, &content)
+                .await
+                .map_err(|e| StructuredError::service("AppContext::import_story_json", e))?,
+        };
+
+        Ok(GqlStoryImportResult {
+            imported_stories: import_result
+                .imported_stories
+                .into_iter()
+                .map(|s| GqlStoryImportSummary {
+                    id: s.id,
+                    name: s.name,
+                    sequence_count: s.sequence_count,
+                })
+                .collect(),
+            created_count: import_result.created_count,
+            updated_count: import_result.updated_count,
+            errors: import_result.errors,
+        })
     }
 }

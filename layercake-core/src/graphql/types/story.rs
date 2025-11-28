@@ -107,3 +107,49 @@ pub struct UpdateStoryInput {
     #[graphql(name = "layerConfig")]
     pub layer_config: Option<Vec<StoryLayerConfig>>,
 }
+
+/// Story export/import enums and types
+
+#[derive(Enum, Copy, Clone, Eq, PartialEq)]
+pub enum StoryExportFormat {
+    #[graphql(name = "CSV")]
+    Csv,
+    #[graphql(name = "JSON")]
+    Json,
+}
+
+#[derive(Enum, Copy, Clone, Eq, PartialEq)]
+pub enum StoryImportFormat {
+    #[graphql(name = "CSV")]
+    Csv,
+    #[graphql(name = "JSON")]
+    Json,
+}
+
+#[derive(SimpleObject)]
+pub struct StoryExport {
+    pub filename: String,
+    /// Base64-encoded file content
+    pub content: String,
+    #[graphql(name = "mimeType")]
+    pub mime_type: String,
+}
+
+#[derive(SimpleObject)]
+pub struct StoryImportResult {
+    #[graphql(name = "importedStories")]
+    pub imported_stories: Vec<StoryImportSummary>,
+    #[graphql(name = "createdCount")]
+    pub created_count: i32,
+    #[graphql(name = "updatedCount")]
+    pub updated_count: i32,
+    pub errors: Vec<String>,
+}
+
+#[derive(SimpleObject)]
+pub struct StoryImportSummary {
+    pub id: i32,
+    pub name: String,
+    #[graphql(name = "sequenceCount")]
+    pub sequence_count: i32,
+}
