@@ -81,7 +81,17 @@ export const StoryPage = () => {
     variables: { projectId: projectIdNum },
     skip: !projectIdNum,
   })
-  const datasets: DataSet[] = (datasetsData as any)?.dataSets || []
+  const allDatasets: DataSet[] = (datasetsData as any)?.dataSets || []
+
+  // Filter to only show datasets with edge data
+  const datasets = allDatasets.filter((ds) => {
+    try {
+      const parsed = JSON.parse(ds.graphJson ?? '{}')
+      return Array.isArray(parsed.edges) && parsed.edges.length > 0
+    } catch {
+      return false
+    }
+  })
 
   const [updateStory, { loading: updateLoading }] = useMutation(UPDATE_STORY, {
     onCompleted: () => {

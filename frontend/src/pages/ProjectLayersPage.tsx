@@ -213,6 +213,7 @@ export const ProjectLayersPage = () => {
     () => ((layersData as any)?.missingLayers as string[] | undefined) ?? [],
     [layersData]
   )
+  // Filter to only show datasets with layer data
   const layerDatasets = useMemo(() => {
     const allDataSets: any[] = ((datasetsData as any)?.dataSets as any[] | undefined) ?? []
     return allDataSets.filter((ds) => {
