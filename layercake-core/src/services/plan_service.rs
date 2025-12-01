@@ -324,8 +324,8 @@ impl PlanService {
 
         self.create_plan(PlanCreateRequest {
             project_id,
-            name: "Main Plan".to_string(),
-            description: Some("Default plan".to_string()),
+            name: "Main plan".to_string(),
+            description: None,
             tags: Some(vec![]),
             yaml_content: "".to_string(),
             dependencies: None,

@@ -86,6 +86,9 @@ impl AppContext {
             .await
             .map_err(|e| anyhow!("Failed to create project: {}", e))?;
 
+        // Create default "Main plan" for new project if no plans exist
+        let _ = self.plan_service.ensure_default_plan(project.id).await;
+
         Ok(ProjectSummary::from(project))
     }
 
