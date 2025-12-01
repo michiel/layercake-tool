@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useLayoutEffect } from 'react'
 import { Tree, NodeRendererProps, TreeApi } from 'react-arborist'
 import {
   IconHierarchy2,
@@ -82,6 +82,20 @@ export const HierarchyTreeEditor = ({
     () => createDragDropManager(HTML5Backend),
     []
   )
+  const treeAreaRef = useRef<HTMLDivElement | null>(null)
+  const [treeAreaHeight, setTreeAreaHeight] = useState(500)
+
+  useLayoutEffect(() => {
+    const element = treeAreaRef.current
+    if (!element) return
+    const observer = new ResizeObserver(entries => {
+      const entry = entries[0]
+      if (!entry) return
+      setTreeAreaHeight(Math.max(320, entry.contentRect.height))
+    })
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
 
   useEffect(() => {
     setNodes(graphData?.nodes || [])
@@ -417,15 +431,16 @@ export const HierarchyTreeEditor = ({
   const renderTree = (view: 'primary' | 'secondary') => {
     const ref = view === 'primary' ? primaryTreeRef : secondaryTreeRef
     return (
-      <div key={view} className="h-full w-full flex-1">
+      <div key={view} className="flex w-full flex-1">
         <Tree<TreeItem>
           data={treeData}
           openByDefault
           onMove={handleMove}
           selection={selectedId ?? undefined}
-          className="h-full"
+          className="w-full"
           rowHeight={32}
           width="100%"
+           height={treeAreaHeight}
           ref={instance => {
             ref.current = instance ?? null
           }}
@@ -443,8 +458,8 @@ export const HierarchyTreeEditor = ({
   }
 
   return (
-    <Card className="border flex h-full flex-col">
-      <CardHeader className="flex flex-row items-center justify-between gap-4">
+    <Card className="border flex h-[calc(100vh-16rem)] flex-col">
+      <CardHeader className="flex flex-row items-center justify-between gap-4 flex-shrink-0">
         <CardTitle className="flex items-center gap-2">
           <IconHierarchy2 className="h-4 w-4" />
           Dataset Hierarchy
@@ -470,15 +485,15 @@ export const HierarchyTreeEditor = ({
           </Button>
         </Group>
       </CardHeader>
-      <CardContent className="p-0">
+      <CardContent className="p-0 flex-1 flex flex-col overflow-hidden">
         {dirty && (
-          <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
+          <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900 flex-shrink-0">
             Unsaved hierarchy changes
           </div>
         )}
-        <div className="flex flex-1 min-h-[480px]">
-          <div className="flex basis-4/5 flex-col border-r pr-2">
-            <div className="flex items-center gap-2 border-b px-4 py-2">
+        <div className="flex flex-1 overflow-hidden">
+          <div className="flex basis-4/5 flex-col border-r pr-2 overflow-hidden">
+            <div className="flex items-center gap-2 border-b px-4 py-2 flex-shrink-0">
               <Button size="sm" variant="secondary" onClick={() => handleAddNode(null)}>
                 <IconPlus className="mr-1 h-4 w-4" />
                 Add root
@@ -527,7 +542,12 @@ export const HierarchyTreeEditor = ({
                 </Button>
               </div>
             </div>
-            <div className={`flex-1 px-2 py-2 ${splitView ? 'flex gap-4' : ''} h-full`}>
+            <div
+              ref={treeAreaRef}
+              className={`flex-1 px-2 py-2 overflow-auto ${
+                splitView ? 'flex gap-4' : ''
+              }`}
+            >
               {splitView ? (
                 <>
                   {renderTree('primary')}
@@ -538,7 +558,7 @@ export const HierarchyTreeEditor = ({
               )}
             </div>
           </div>
-          <div className="basis-1/5 pl-2">
+          <div className="basis-1/5 pl-2 overflow-hidden flex flex-col">
             <ScrollArea className="h-full">
               <div className="space-y-4 px-4 py-4">
                 {selectedNode ? (
