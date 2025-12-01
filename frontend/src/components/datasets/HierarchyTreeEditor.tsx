@@ -14,6 +14,8 @@ import {
   IconArrowsMinimize,
   IconGripVertical,
 } from '@tabler/icons-react'
+import { createDragDropManager } from 'dnd-core'
+import { HTML5Backend } from 'react-dnd-html5-backend'
 import { GraphData, GraphNode, GraphEdge, GraphLayer } from '@/components/editors/GraphSpreadsheetEditor'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -33,6 +35,8 @@ type HierarchyNode = GraphNode & {
 interface DatasetHierarchyTreeEditorProps {
   graphData: GraphData | null
   onSave: (next: GraphData) => Promise<void>
+  splitView: boolean
+  onToggleSplitView: () => void
 }
 
 interface TreeItem {
@@ -59,7 +63,12 @@ const normalizeLayerId = (layerId?: string | null) => {
 
 const UNASSIGNED_LAYER_VALUE = '__unassigned__'
 
-export const HierarchyTreeEditor = ({ graphData, onSave }: DatasetHierarchyTreeEditorProps) => {
+export const HierarchyTreeEditor = ({
+  graphData,
+  onSave,
+  splitView,
+  onToggleSplitView,
+}: DatasetHierarchyTreeEditorProps) => {
   const [nodes, setNodes] = useState<HierarchyNode[]>(graphData?.nodes || [])
   const [edges, setEdges] = useState<GraphEdge[]>(graphData?.edges || [])
   const [layers, setLayers] = useState<GraphLayer[]>(graphData?.layers || [])
@@ -67,7 +76,12 @@ export const HierarchyTreeEditor = ({ graphData, onSave }: DatasetHierarchyTreeE
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [idError, setIdError] = useState<string | null>(null)
-  const treeRef = useRef<TreeApi<TreeItem> | null>(null)
+  const primaryTreeRef = useRef<TreeApi<TreeItem> | null>(null)
+  const secondaryTreeRef = useRef<TreeApi<TreeItem> | null>(null)
+  const sharedDndManager = useMemo(
+    () => createDragDropManager(HTML5Backend),
+    []
+  )
 
   useEffect(() => {
     setNodes(graphData?.nodes || [])
@@ -181,6 +195,22 @@ export const HierarchyTreeEditor = ({ graphData, onSave }: DatasetHierarchyTreeE
     setDirty(true)
   }
 
+  const resolveDragIds = (incoming?: string[]) => {
+    if (incoming && incoming.length) {
+      return incoming
+    }
+    const monitorItem = sharedDndManager?.getMonitor().getItem() as
+      | { dragIds?: string[] }
+      | undefined
+    if (monitorItem?.dragIds?.length) {
+      return monitorItem.dragIds
+    }
+    if (selectedId) {
+      return [selectedId]
+    }
+    return []
+  }
+
   const handleMove = async ({
     dragIds,
     parentId,
@@ -188,14 +218,15 @@ export const HierarchyTreeEditor = ({ graphData, onSave }: DatasetHierarchyTreeE
     dragIds: string[]
     parentId: string | null
   }) => {
-    if (!dragIds.length) return
+    const effectiveDragIds = resolveDragIds(dragIds)
+    if (!effectiveDragIds.length) return
     const normalizedParent = parentId || null
-    if (dragIds.includes(normalizedParent || '')) {
+    if (effectiveDragIds.includes(normalizedParent || '')) {
       return
     }
     setNodes(prev =>
       prev.map(node =>
-        dragIds.includes(node.id)
+        effectiveDragIds.includes(node.id)
           ? {
               ...node,
               belongs_to: normalizedParent ?? undefined,
@@ -379,6 +410,34 @@ export const HierarchyTreeEditor = ({ graphData, onSave }: DatasetHierarchyTreeE
     )
   }
 
+  const renderTree = (view: 'primary' | 'secondary') => {
+    const ref = view === 'primary' ? primaryTreeRef : secondaryTreeRef
+    return (
+      <div key={view} className="h-full w-full flex-1">
+        <Tree<TreeItem>
+          data={treeData}
+          openByDefault
+          onMove={handleMove}
+          selection={selectedId ?? undefined}
+          className="h-full"
+          rowHeight={32}
+          width="100%"
+          ref={instance => {
+            ref.current = instance ?? null
+          }}
+          dndManager={sharedDndManager}
+        >
+          {NodeRow}
+        </Tree>
+      </div>
+    )
+  }
+
+  const applyToTreeViews = (fn: (tree: TreeApi<TreeItem>) => void) => {
+    if (primaryTreeRef.current) fn(primaryTreeRef.current)
+    if (splitView && secondaryTreeRef.current) fn(secondaryTreeRef.current)
+  }
+
   return (
     <Card className="border">
       <CardHeader className="flex flex-row items-center justify-between gap-4">
@@ -441,8 +500,15 @@ export const HierarchyTreeEditor = ({ graphData, onSave }: DatasetHierarchyTreeE
               <div className="ml-auto flex items-center gap-2">
                 <Button
                   size="sm"
+                  variant={splitView ? 'default' : 'outline'}
+                  onClick={onToggleSplitView}
+                >
+                  Split view
+                </Button>
+                <Button
+                  size="sm"
                   variant="ghost"
-                  onClick={() => treeRef.current?.closeAll()}
+                  onClick={() => applyToTreeViews(tree => tree.closeAll())}
                 >
                   <IconArrowsMinimize className="mr-1 h-4 w-4" />
                   Collapse all
@@ -450,26 +516,22 @@ export const HierarchyTreeEditor = ({ graphData, onSave }: DatasetHierarchyTreeE
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => treeRef.current?.openAll()}
+                  onClick={() => applyToTreeViews(tree => tree.openAll())}
                 >
                   <IconArrowsMaximize className="mr-1 h-4 w-4" />
                   Expand all
                 </Button>
               </div>
             </div>
-            <div className="flex-1 px-2 py-2">
-              <Tree<TreeItem>
-                data={treeData}
-                openByDefault
-                onMove={handleMove}
-                selection={selectedId ?? undefined}
-                className="h-full"
-                rowHeight={32}
-                width="100%"
-                ref={treeRef}
-              >
-                {NodeRow}
-              </Tree>
+            <div className={`flex-1 px-2 py-2 ${splitView ? 'flex gap-4' : ''} h-full`}>
+              {splitView ? (
+                <>
+                  {renderTree('primary')}
+                  {renderTree('secondary')}
+                </>
+              ) : (
+                renderTree('primary')
+              )}
             </div>
           </div>
           <div className="basis-1/5 pl-2">

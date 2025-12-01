@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery, useMutation } from '@apollo/client/react'
 import {
   IconArrowLeft,
@@ -71,9 +71,15 @@ interface DataSetEditorProps {}
 
 export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
   const navigate = useNavigate()
+  const location = useLocation()
   const { projectId, dataSetId } = useParams<{ projectId: string; dataSetId: string }>()
 
-  const [activeTab, setActiveTab] = useState<string>('edit')
+  const allowedTabs = ['details', 'data', 'edit', 'hierarchy'] as const
+  type TabValue = typeof allowedTabs[number]
+  const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search])
+  const tabParam = searchParams.get('tab') as TabValue | null
+  const activeTab: TabValue = tabParam && allowedTabs.includes(tabParam) ? tabParam : 'details'
+  const hierarchySplitView = searchParams.get('split') === '1'
   const [fileUploadMode, setFileUploadMode] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [validationDialogOpen, setValidationDialogOpen] = useState(false)
@@ -142,6 +148,41 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
       })
     }
   }, [dataSource, form])
+
+  const setQueryParams = useCallback(
+    (mutator: (params: URLSearchParams) => void) => {
+      const params = new URLSearchParams(location.search)
+      mutator(params)
+      const next = params.toString()
+      navigate(next ? `${location.pathname}?${next}` : location.pathname, { replace: true })
+    },
+    [location.pathname, location.search, navigate]
+  )
+
+  const handleTabChange = useCallback(
+    (value: string) => {
+      if (!allowedTabs.includes(value as TabValue)) return
+      setQueryParams(params => {
+        params.set('tab', value)
+        if (value !== 'hierarchy') {
+          params.delete('split')
+        }
+      })
+    },
+    [setQueryParams]
+  )
+
+  const handleToggleSplitView = useCallback(() => {
+    setQueryParams(params => {
+      const nextState = !hierarchySplitView
+      if (nextState) {
+        params.set('split', '1')
+        params.set('tab', 'hierarchy')
+      } else {
+        params.delete('split')
+      }
+    })
+  }, [hierarchySplitView, setQueryParams])
 
   const handleNavigate = (route: string) => {
     navigate(route)
@@ -413,7 +454,7 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
         </Alert>
       )}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList>
           <TabsTrigger value="details">
             <IconFile className="mr-2 h-4 w-4" />
@@ -609,6 +650,8 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
             <HierarchyTreeEditor
               graphData={rawGraphData}
               onSave={handleSaveGraphData}
+              splitView={hierarchySplitView}
+              onToggleSplitView={handleToggleSplitView}
             />
           </div>
         </TabsContent>
