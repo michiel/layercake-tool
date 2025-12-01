@@ -295,7 +295,62 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
           reason
         })
         editorStateRef.current.sync.isExternalSync = true
-        setNodes(reactFlowData.nodes)
+
+        // BUGFIX: Merge nodes instead of replacing to preserve event handlers
+        // When we replace the entire array, ReactFlow loses event listener bindings
+        if (isCurrentEmpty) {
+          // First load - set directly
+          setNodes(reactFlowData.nodes)
+        } else {
+          // Merge updates: preserve existing nodes, update changed fields, add new nodes
+          setNodes((currentNodes) => {
+            const newNodesMap = new Map(reactFlowData.nodes.map(n => [n.id, n]))
+            const currentNodesMap = new Map(currentNodes.map(n => [n.id, n]))
+
+            // Merge existing nodes with updates
+            const mergedNodes = currentNodes.map(currentNode => {
+              const newNode = newNodesMap.get(currentNode.id)
+              if (!newNode) {
+                // Node was deleted
+                return null
+              }
+
+              // Check if anything actually changed
+              const positionChanged =
+                newNode.position.x !== currentNode.position.x ||
+                newNode.position.y !== currentNode.position.y
+              const dataChanged = JSON.stringify(newNode.data) !== JSON.stringify(currentNode.data)
+
+              if (!positionChanged && !dataChanged) {
+                // Nothing changed, keep existing node object to preserve identity
+                return currentNode
+              }
+
+              // Update changed fields while preserving node identity
+              return {
+                ...currentNode,
+                position: newNode.position,
+                data: {
+                  ...currentNode.data,
+                  ...newNode.data,
+                  // Ensure event handlers are always present
+                  onEdit: currentNode.data.onEdit || newNode.data.onEdit,
+                  onDelete: currentNode.data.onDelete || newNode.data.onDelete,
+                }
+              }
+            }).filter(Boolean) as Node[]
+
+            // Add any new nodes that don't exist in current
+            reactFlowData.nodes.forEach(newNode => {
+              if (!currentNodesMap.has(newNode.id)) {
+                mergedNodes.push(newNode)
+              }
+            })
+
+            return mergedNodes
+          })
+        }
+
         setEdges(reactFlowData.edges)
         editorStateRef.current.sync.previousChangeId = reactFlowDataChange.changeId
         // Use setTimeout to clear the flag after state updates have propagated
