@@ -13,7 +13,8 @@ import {
   IconClock,
   IconX,
   IconTable,
-  IconShieldCheck
+  IconShieldCheck,
+  IconHierarchy2,
 } from '@tabler/icons-react'
 import { useForm } from 'react-hook-form'
 import { Breadcrumbs } from '../common/Breadcrumbs'
@@ -30,6 +31,7 @@ import {
   getFileFormatDisplayName
 } from '../../graphql/datasets'
 import { GraphSpreadsheetEditor, GraphData } from '../editors/GraphSpreadsheetEditor'
+import { HierarchyTreeEditor } from './HierarchyTreeEditor'
 import { Stack, Group } from '../layout-primitives'
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert'
 import { Badge } from '../ui/badge'
@@ -431,6 +433,13 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
             <IconTable className="mr-2 h-4 w-4" />
             Data Edit
           </TabsTrigger>
+          <TabsTrigger
+            value="hierarchy"
+            disabled={dataSource.status !== 'active'}
+          >
+            <IconHierarchy2 className="mr-2 h-4 w-4" />
+            Hierarchy
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="details">
@@ -593,6 +602,15 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="hierarchy">
+          <div className="mt-4">
+            <HierarchyTreeEditor
+              graphData={rawGraphData}
+              onSave={handleSaveGraphData}
+            />
+          </div>
         </TabsContent>
 
       </Tabs>

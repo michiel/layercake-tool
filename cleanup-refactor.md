@@ -19,6 +19,22 @@ The Layercake codebase is a well-structured Rust workspace with three crates tot
 
 ---
 
+## Focused Findings (2025-02-14)
+
+1. **Default feature set compiles every subsystem by default** (`layercake-core/Cargo.toml:17-48`). Building the CLI automatically pulls in `sea-orm`, `axum`, `async-graphql`, `dashmap`, Tauri console bits, MCP, etc., because the `default` feature list is `["server", "mcp", "graphql", "console", "rmcp"]`. Flip the defaults so `default = ["cli"]`, add an explicit `full = ["server", "mcp", "graphql", "console", "rmcp"]`, and gate entry-points/tests with the new combo. This trims clean `cargo build -p layercake-core --no-default-features --features cli` down to the fast CLI path and lets developers/CI opt into heavyweight stacks only when required.
+
+2. **`src/main.rs` re-declares every module that already lives in `lib.rs`** (`layercake-core/src/main.rs:1-200`). The binary target is effectively recompiling the same files twice, inflating incremental builds and creating two copies of the module tree to keep in sync. Replace the `mod foo;` declarations with `use layercake::{foo, ...};` by turning the `bin` target into a thin wrapper around the library’s public API, or move the CLI into `crates/layercake-cli` that depends on the library. This reduces duplicate work and forces all shared logic through a single compilation unit.
+
+3. **`AppContext` eagerly constructs every service regardless of feature usage** (`layercake-core/src/app_context/mod.rs:20-88`). Even CLI-only workflows pay to compile and instantiate Axum/GraphQL/SeaORM-heavy services. Introduce feature-specific builders (e.g., `AppContext::for_pipeline`, `::for_graphql`) that only wire the services needed for that binary, or wrap each `Arc<Service>` in `Option` plus `#[cfg(feature = "...")]` blocks. This keeps compile units smaller and makes it obvious which subsystems are required for a given entry point.
+
+4. **DAG execution is stringly typed and reparses JSON for each node** (`layercake-core/src/pipeline/dag_executor.rs:72-200`). Every node execution re-runs `serde_json::from_str` into `Value`, then matches on raw `"GraphNode"`/`"TransformNode"` strings. Promote `plan_dag_nodes::Model::node_type` into an enum (the GraphQL layer already exposes `PlanDagNodeType`) and deserialize configs into concrete structs up front so `execute_node` gets strongly typed data. Besides readability, this lets the compiler optimise the match arms, avoids repeated parsing work, and makes it easier to unit-test each node handler independently.
+
+5. **Hierarchy helpers repeatedly scan `self.nodes` for parents/children** (`layercake-core/src/graph.rs:157-207`). Functions such as `get_hierarchy_edges` and `get_non_partition_edges` call `get_node_by_id` inside loops, yielding O(n²) behaviour on large datasets. Cache a `HashMap<&str, &Node>` (or keep one on `Graph`) before iterating so each lookup is O(1). While here, remove the unused `tree: &mut Vec<TreeNode>` parameter in `build_tree` to simplify the recursive call signature.
+
+6. **Graph service reparses dataset JSON blobs on every call** (`layercake-core/src/services/graph_service.rs:19-120`). Helpers like `dataset_contains_layers` and `seed_layers_from_dataset` deserialize `graph_json` repeatedly with `serde_json::Value`, then manually dig out fields. Introduce a shared `Graph::try_from_dataset(&data_set)` that returns the strongly typed `Graph` struct already defined in `graph.rs`. That lets you reuse the validation logic, eliminates dozens of `.get("layers")` lookups, and keeps layer colour/alias normalization in one place.
+
+Each of these items is self-contained and can be pursued independently; together they shave compile time, reduce cloning/parsing overhead, and simplify future tree-editor work.
+
 ## 1. Compile Time Optimisation
 
 ### Current Issues
