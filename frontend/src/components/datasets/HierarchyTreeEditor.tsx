@@ -234,6 +234,10 @@ export const HierarchyTreeEditor = ({
           : node
       )
     )
+    if (splitView) {
+      primaryTreeRef.current?.hideCursor()
+      secondaryTreeRef.current?.hideCursor()
+    }
     markDirty()
   }
 
