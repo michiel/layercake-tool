@@ -12,6 +12,7 @@ import {
   IconChevronDown,
   IconArrowsMaximize,
   IconArrowsMinimize,
+  IconGripVertical,
 } from '@tabler/icons-react'
 import { GraphData, GraphNode, GraphEdge, GraphLayer } from '@/components/editors/GraphSpreadsheetEditor'
 import { Button } from '@/components/ui/button'
@@ -56,6 +57,8 @@ const normalizeLayerId = (layerId?: string | null) => {
   return layerId
 }
 
+const UNASSIGNED_LAYER_VALUE = '__unassigned__'
+
 export const HierarchyTreeEditor = ({ graphData, onSave }: DatasetHierarchyTreeEditorProps) => {
   const [nodes, setNodes] = useState<HierarchyNode[]>(graphData?.nodes || [])
   const [edges, setEdges] = useState<GraphEdge[]>(graphData?.edges || [])
@@ -99,12 +102,15 @@ export const HierarchyTreeEditor = ({ graphData, onSave }: DatasetHierarchyTreeE
           const bLabel = b.label || b.id
           return aLabel.localeCompare(bLabel)
         })
-        .map(child => ({
-          id: child.id,
-          name: child.label || child.id,
-          node: child,
-          children: buildTreeItems(child.id),
-        }))
+        .map(child => {
+          const nestedChildren = buildTreeItems(child.id)
+          return {
+            id: child.id,
+            name: child.label || child.id,
+            node: child,
+            children: nestedChildren.length ? nestedChildren : undefined,
+          }
+        })
     },
     [parentMap]
   )
@@ -209,7 +215,8 @@ export const HierarchyTreeEditor = ({ graphData, onSave }: DatasetHierarchyTreeE
 
   const handleLayerChange = (layerId: string) => {
     if (!selectedNode) return
-    updateNodeField(selectedNode.id, 'layer', layerId)
+    const normalized = layerId === UNASSIGNED_LAYER_VALUE ? '' : layerId
+    updateNodeField(selectedNode.id, 'layer', normalized)
   }
 
   const handleIdChange = (value: string) => {
@@ -295,15 +302,22 @@ export const HierarchyTreeEditor = ({ graphData, onSave }: DatasetHierarchyTreeE
     )
   }
 
-  const NodeRow = ({ node, style }: NodeRendererProps<TreeItem>) => {
+  const NodeRow = ({ node, style, dragHandle }: NodeRendererProps<TreeItem>) => {
     const current = node.data.node
     const layerId = normalizeLayerId(current.layer)
     const layer = layerId ? layerMap.get(layerId) : undefined
     const isSelected = selectedId === current.id
+    const isPartition =
+      current.is_partition === true ||
+      (typeof current.is_partition === 'string' && current.is_partition === 'true')
+    const layerLabel = layer?.label || layerId || 'Unassigned'
+    const layerBg = layer?.background_color || '#CBD5F5'
+    const layerText = layer?.text_color || '#1F2937'
+    const layerBorder = layer?.border_color || '#94A3B8'
     return (
       <div
-        style={style}
-        className={`flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-sm ${
+        style={{ ...style, width: '100%' }}
+        className={`flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-sm ${
           isSelected ? 'bg-primary/10 text-primary' : 'hover:bg-muted'
         }`}
         onClick={() => setSelectedId(current.id)}
@@ -334,11 +348,33 @@ export const HierarchyTreeEditor = ({ graphData, onSave }: DatasetHierarchyTreeE
         <span
           className="h-2 w-2 rounded-full"
           style={{
-            backgroundColor: layer?.background_color || '#CBD5F5',
+            backgroundColor: layerBg,
+            color: layerText,
           }}
         />
-        <span className="flex-1 truncate">{current.label || current.id}</span>
-        {current.is_partition && <Badge variant="outline">Partition</Badge>}
+        <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
+          <span className="truncate">{current.label || current.id}</span>
+          <div className="flex items-center gap-2 text-xs">
+            <span
+              className="rounded-md px-2 py-0.5"
+              style={{
+                backgroundColor: layerBg,
+                color: layerText,
+                border: `1px solid ${layerBorder}`,
+              }}
+            >
+              {layerLabel}
+            </span>
+            {isPartition && <Badge variant="outline">Partition</Badge>}
+          </div>
+        </div>
+        <span
+          ref={dragHandle}
+          className="ml-2 flex h-5 w-5 cursor-grab items-center justify-center text-muted-foreground"
+          title="Drag to move"
+        >
+          <IconGripVertical className="h-4 w-4" />
+        </span>
       </div>
     )
   }
@@ -378,7 +414,7 @@ export const HierarchyTreeEditor = ({ graphData, onSave }: DatasetHierarchyTreeE
           </div>
         )}
         <div className="flex h-[620px]">
-          <div className="flex w-3/4 flex-col border-r">
+          <div className="flex basis-4/5 flex-col border-r pr-2">
             <div className="flex items-center gap-2 border-b px-4 py-2">
               <Button size="sm" variant="secondary" onClick={() => handleAddNode(null)}>
                 <IconPlus className="mr-1 h-4 w-4" />
@@ -429,13 +465,14 @@ export const HierarchyTreeEditor = ({ graphData, onSave }: DatasetHierarchyTreeE
                 selection={selectedId ?? undefined}
                 className="h-full"
                 rowHeight={32}
+                width="100%"
                 ref={treeRef}
               >
                 {NodeRow}
               </Tree>
             </div>
           </div>
-          <div className="w-1/4">
+          <div className="basis-1/5 pl-2">
             <ScrollArea className="h-full">
               <div className="space-y-4 px-4 py-4">
                 {selectedNode ? (
@@ -469,7 +506,7 @@ export const HierarchyTreeEditor = ({ graphData, onSave }: DatasetHierarchyTreeE
                     <div>
                       <Label>Layer</Label>
                       <Select
-                        value={normalizeLayerId(selectedNode.layer)}
+                        value={normalizeLayerId(selectedNode.layer) || UNASSIGNED_LAYER_VALUE}
                         onValueChange={handleLayerChange}
                         disabled={layers.length === 0}
                       >
@@ -481,7 +518,7 @@ export const HierarchyTreeEditor = ({ graphData, onSave }: DatasetHierarchyTreeE
                           />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Unassigned</SelectItem>
+                          <SelectItem value={UNASSIGNED_LAYER_VALUE}>Unassigned</SelectItem>
                           {layers.map(layer => (
                             <SelectItem key={layer.id} value={layer.id}>
                               {layer.label || layer.id}
