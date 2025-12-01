@@ -443,7 +443,7 @@ export const HierarchyTreeEditor = ({
   }
 
   return (
-    <Card className="border">
+    <Card className="border flex h-full flex-col">
       <CardHeader className="flex flex-row items-center justify-between gap-4">
         <CardTitle className="flex items-center gap-2">
           <IconHierarchy2 className="h-4 w-4" />
@@ -476,7 +476,7 @@ export const HierarchyTreeEditor = ({
             Unsaved hierarchy changes
           </div>
         )}
-        <div className="flex h-[620px]">
+        <div className="flex flex-1 min-h-[480px]">
           <div className="flex basis-4/5 flex-col border-r pr-2">
             <div className="flex items-center gap-2 border-b px-4 py-2">
               <Button size="sm" variant="secondary" onClick={() => handleAddNode(null)}>

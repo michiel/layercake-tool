@@ -646,7 +646,7 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
         </TabsContent>
 
         <TabsContent value="hierarchy">
-          <div className="mt-4">
+          <div className="mt-4 h-[calc(100vh-280px)] min-h-[520px]">
             <HierarchyTreeEditor
               graphData={rawGraphData}
               onSave={handleSaveGraphData}
