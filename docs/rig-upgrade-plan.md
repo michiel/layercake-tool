@@ -432,7 +432,7 @@ let response: DatasetOutput = agent
 ## Phase 1 Completion Summary
 
 **Completed:** 2025-12-02
-**Commits:** 2f135308
+**Commits:** 2f135308, 9c4310c1
 
 ### Delivered
 - ✅ JSON schema for dataset generation (dataset_schema.rs)
@@ -440,7 +440,9 @@ let response: DatasetOutput = agent
 - ✅ YAML serialization support
 - ✅ Updated DatasetGenerator with structured output
 - ✅ Rig-core 0.25 client API migration (ProviderClient trait)
-- ✅ All tests passing (7/7)
+- ✅ Codebase-wide rig client migration (all providers)
+- ✅ RMCP version conflict resolved (0.8.5 → 0.9.1)
+- ✅ All tests passing (202 core + 7 data-acquisition)
 
 ### Files Modified
 - `layercake-data-acquisition/src/dataset_schema.rs` (new, 330 lines)
@@ -448,6 +450,18 @@ let response: DatasetOutput = agent
 - `layercake-data-acquisition/src/services/mod.rs` (rig API updates)
 - `layercake-data-acquisition/src/lib.rs` (module export)
 - `layercake-data-acquisition/Cargo.toml` (serde_yaml dependency)
+- `layercake-core/src/console/chat/session.rs` (all provider clients migrated)
+- `layercake-core/Cargo.toml` (rmcp 0.9.1 upgrade)
+
+### Migration Details
+**Pattern Established:** DB credentials → temp env vars → from_env()
+- OpenAI: Sets OPENAI_API_KEY and OPENAI_BASE_URL
+- Anthropic: Sets ANTHROPIC_API_KEY and ANTHROPIC_BASE_URL
+- Gemini: Sets GOOGLE_API_KEY and GEMINI_BASE_URL
+- Ollama: Sets OLLAMA_API_KEY (placeholder) and OLLAMA_BASE_URL
+
+**RMCP Version Fix:** Upgraded from 0.8.5 to 0.9.1 to match rig-core's
+dependency, resolving type conflicts between two rmcp versions.
 
 ### Next Steps
 - **Phase 2:** Security audit of API key handling
