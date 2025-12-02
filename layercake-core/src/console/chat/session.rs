@@ -1000,9 +1000,12 @@ impl ChatSession {
                 // Ollama doesn't require a real API key, but from_env() expects it
                 std::env::set_var("OLLAMA_API_KEY", "ollama");
 
-                // Set base URL if provided
+                // Set base URL if provided (defaults to http://localhost:11434 if not set)
                 if let Some(url) = base_url.as_deref() {
-                    std::env::set_var("OLLAMA_BASE_URL", url);
+                    std::env::set_var("OLLAMA_API_BASE_URL", url);
+                } else {
+                    // Ensure default URL is set
+                    std::env::set_var("OLLAMA_API_BASE_URL", "http://localhost:11434");
                 }
 
                 let client = ollama::Client::from_env();
