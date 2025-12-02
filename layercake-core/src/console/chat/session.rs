@@ -27,7 +27,7 @@ use rig::providers::{anthropic, gemini, ollama, openai};
 use rig::OneOrMany;
 use rig::{
     agent::{Agent, AgentBuilder},
-    client::CompletionClient,
+    client::{CompletionClient, ProviderClient},
     completion::{
         message::{
             AssistantContent, Message, Reasoning, ToolCall, ToolFunction, ToolResult,
@@ -897,10 +897,13 @@ impl ChatSession {
             RigAgent::OpenAI(model) => {
                 let client = if api_key.is_empty() {
                     return Err(anyhow!("OpenAI requires API key"));
-                } else if let Some(url) = base_url.as_deref() {
-                    openai::Client::builder(&api_key).base_url(url).build()
                 } else {
-                    openai::Client::new(&api_key)
+                    // Set credentials in environment for from_env()
+                    std::env::set_var("OPENAI_API_KEY", &api_key);
+                    if let Some(url) = base_url.as_deref() {
+                        std::env::set_var("OPENAI_BASE_URL", url);
+                    }
+                    openai::Client::from_env()
                 };
 
                 let mut builder = client.agent(model);
@@ -924,10 +927,15 @@ impl ChatSession {
             }
 
             RigAgent::Anthropic(model) => {
-                let client = if !api_key.is_empty() {
-                    anthropic::Client::new(&api_key)
-                } else {
+                let client = if api_key.is_empty() {
                     return Err(anyhow!("Anthropic requires API key"));
+                } else {
+                    // Set credentials in environment for from_env()
+                    std::env::set_var("ANTHROPIC_API_KEY", &api_key);
+                    if let Some(url) = base_url.as_deref() {
+                        std::env::set_var("ANTHROPIC_BASE_URL", url);
+                    }
+                    anthropic::Client::from_env()
                 };
 
                 let mut builder = client.agent(model);
@@ -951,10 +959,15 @@ impl ChatSession {
             }
 
             RigAgent::Gemini(model) => {
-                let client = if !api_key.is_empty() {
-                    gemini::Client::new(&api_key)
-                } else {
+                let client = if api_key.is_empty() {
                     return Err(anyhow!("Gemini requires API key"));
+                } else {
+                    // Set credentials in environment for from_env()
+                    std::env::set_var("GOOGLE_API_KEY", &api_key);
+                    if let Some(url) = base_url.as_deref() {
+                        std::env::set_var("GEMINI_BASE_URL", url);
+                    }
+                    gemini::Client::from_env()
                 };
 
                 // Create generation config and additional params (required by Gemini)
@@ -984,14 +997,15 @@ impl ChatSession {
             }
 
             RigAgent::Ollama(model) => {
-                // Prefer persisted overrides, then environment, finally library default
-                let client = if let Some(url) = base_url.as_deref() {
-                    ollama::Client::builder().base_url(url).build()
-                } else if let Ok(env_url) = std::env::var("OLLAMA_API_BASE_URL") {
-                    ollama::Client::builder().base_url(&env_url).build()
-                } else {
-                    ollama::Client::new()
-                };
+                // Ollama doesn't require a real API key, but from_env() expects it
+                std::env::set_var("OLLAMA_API_KEY", "ollama");
+
+                // Set base URL if provided
+                if let Some(url) = base_url.as_deref() {
+                    std::env::set_var("OLLAMA_BASE_URL", url);
+                }
+
+                let client = ollama::Client::from_env();
 
                 let mut builder = client.agent(model);
                 if !preamble.is_empty() {
