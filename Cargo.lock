@@ -3187,7 +3187,7 @@ dependencies = [
  "regex",
  "reqwest",
  "rig-core",
- "rmcp",
+ "rmcp 0.8.5",
  "rust_xlsxwriter",
  "sea-orm",
  "sea-orm-migration",
@@ -3231,6 +3231,7 @@ dependencies = [
  "sea-orm-migration",
  "serde",
  "serde_json",
+ "serde_yaml",
  "sha2",
  "thiserror 1.0.69",
  "tokio",
@@ -5182,9 +5183,9 @@ dependencies = [
 
 [[package]]
 name = "rig-core"
-version = "0.24.0"
+version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "112bd2e51d1fadd16509be2b3d45bfa197725787627f6addcaffe57294f64e18"
+checksum = "9bebec2ed450ae89ff9748eb41f47710718d9dbfe7e8fb2345424f6013807cd1"
 dependencies = [
  "as-any",
  "async-stream",
@@ -5199,7 +5200,7 @@ dependencies = [
  "ordered-float 5.1.0",
  "pin-project-lite",
  "reqwest",
- "rmcp",
+ "rmcp 0.9.1",
  "schemars 1.0.4",
  "serde",
  "serde_json",
@@ -5266,7 +5267,7 @@ dependencies = [
  "paste",
  "pin-project-lite",
  "reqwest",
- "rmcp-macros",
+ "rmcp-macros 0.8.5",
  "schemars 1.0.4",
  "serde",
  "serde_json",
@@ -5279,10 +5280,46 @@ dependencies = [
 ]
 
 [[package]]
+name = "rmcp"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eaa07b85b779d1e1df52dd79f6c6bffbe005b191f07290136cc42a142da3409a"
+dependencies = [
+ "async-trait",
+ "base64 0.22.1",
+ "chrono",
+ "futures",
+ "paste",
+ "pin-project-lite",
+ "rmcp-macros 0.9.1",
+ "schemars 1.0.4",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+ "tokio",
+ "tokio-stream",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
 name = "rmcp-macros"
 version = "0.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "01263441d3f8635c628e33856c468b96ebbce1af2d3699ea712ca71432d4ee7a"
+dependencies = [
+ "darling 0.21.3",
+ "proc-macro2",
+ "quote",
+ "serde_json",
+ "syn 2.0.106",
+]
+
+[[package]]
+name = "rmcp-macros"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0f6fa09933cac0d0204c8a5d647f558425538ed6a0134b1ebb1ae4dc00c96db3"
 dependencies = [
  "darling 0.21.3",
  "proc-macro2",

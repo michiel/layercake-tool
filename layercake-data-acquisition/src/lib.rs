@@ -3,6 +3,7 @@
 
 pub mod config;
 pub mod dataset_generation;
+pub mod dataset_schema;
 pub mod embeddings;
 pub mod entities;
 pub mod errors;

@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use anyhow::Result;
+use rig::client::ProviderClient;
 use rig::providers::{ollama, openai};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait,
@@ -117,16 +118,21 @@ impl DataAcquisitionService {
                     .or_else(|| std::env::var("OPENAI_API_KEY").ok());
                 match api_key.filter(|value| !value.is_empty()) {
                     Some(api_key) => {
+                        // Set API key in environment for from_env()
+                        std::env::set_var("OPENAI_API_KEY", &api_key);
+
                         let base_url = provider_config
                             .openai_base_url
                             .clone()
                             .or_else(|| std::env::var("OPENAI_BASE_URL").ok())
                             .filter(|value| !value.is_empty());
-                        let mut builder = openai::Client::builder(api_key.as_str());
-                        if let Some(ref url) = base_url {
-                            builder = builder.base_url(url);
-                        }
-                        let client = builder.build();
+
+                        let client = if let Some(ref url) = base_url {
+                            std::env::set_var("OPENAI_BASE_URL", url);
+                            openai::Client::from_env()
+                        } else {
+                            openai::Client::from_env()
+                        };
                         let model = provider_config
                             .openai_model
                             .clone()
@@ -165,11 +171,16 @@ impl DataAcquisitionService {
                     .or_else(|| std::env::var("OLLAMA_BASE_URL").ok())
                     .or_else(|| std::env::var("OLLAMA_API_BASE_URL").ok())
                     .filter(|value| !value.is_empty());
-                let client = if let Some(ref url) = base_url {
-                    ollama::Client::builder().base_url(url).build()
-                } else {
-                    ollama::Client::new()
-                };
+
+                // Ollama doesn't require API keys, but rig expects one
+                // Use a placeholder value for compatibility
+                std::env::set_var("OLLAMA_API_KEY", "ollama");
+
+                if let Some(ref url) = base_url {
+                    std::env::set_var("OLLAMA_BASE_URL", url);
+                }
+
+                let client = ollama::Client::from_env();
                 let embedding_service = EmbeddingService::ollama(client, model.clone());
                 (
                     Some(embedding_service),
