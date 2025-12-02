@@ -458,7 +458,8 @@ let response: DatasetOutput = agent
 - OpenAI: Sets OPENAI_API_KEY and OPENAI_BASE_URL
 - Anthropic: Sets ANTHROPIC_API_KEY and ANTHROPIC_BASE_URL
 - Gemini: Sets GOOGLE_API_KEY and GEMINI_BASE_URL
-- Ollama: Sets OLLAMA_API_KEY (placeholder) and OLLAMA_BASE_URL
+- Ollama: Sets OLLAMA_API_KEY (placeholder) and OLLAMA_API_BASE_URL
+  - Note: Defaults to http://localhost:11434 if no custom URL configured
 
 **RMCP Version Fix:** Upgraded from 0.8.5 to 0.9.1 to match rig-core's
 dependency, resolving type conflicts between two rmcp versions.
