@@ -31,7 +31,11 @@ pub use plan::*;
 pub use plan_dag::*;
 pub use preview::*;
 pub use project::*;
-pub use sequence::*;
+#[allow(unused_imports)]
+pub use sequence::{
+    CreateSequenceInput, NotePosition as SequenceNotePosition, Sequence, SequenceEdgeRef,
+    UpdateSequenceInput,
+};
 pub use story::*;
 pub use system_setting::*;
 pub use user::*;

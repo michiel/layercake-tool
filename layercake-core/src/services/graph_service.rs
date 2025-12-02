@@ -981,6 +981,7 @@ impl GraphService {
 
     /// Resolve a layer by ID, including aliases
     /// Returns the layer with colors from the target if aliased, but using the requested layer_id
+    #[allow(dead_code)]
     pub async fn resolve_layer(
         &self,
         project_id: i32,

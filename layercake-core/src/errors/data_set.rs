@@ -18,6 +18,8 @@
 //! let err = DataSetError::InvalidCsv("Missing header row".to_string());
 //! ```
 
+#![allow(dead_code)]
+
 use thiserror::Error;
 
 /// Data set operation errors

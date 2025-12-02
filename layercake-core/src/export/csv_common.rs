@@ -24,6 +24,7 @@ use std::error::Error;
 ///     ],
 /// )?;
 /// ```
+#[allow(dead_code)]
 pub fn export_to_csv<T, F>(
     items: impl IntoIterator<Item = T>,
     headers: &[&str],

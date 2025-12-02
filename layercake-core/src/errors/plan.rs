@@ -21,6 +21,8 @@
 //! let err = PlanError::CycleDetected("node-1 -> node-2 -> node-1".to_string());
 //! ```
 
+#![allow(dead_code)]
+
 use thiserror::Error;
 
 /// Plan and DAG execution errors

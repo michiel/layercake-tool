@@ -1,5 +1,5 @@
 use async_graphql::*;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 
 use super::helpers::NodeExecutionResult;
 use crate::app_context::{

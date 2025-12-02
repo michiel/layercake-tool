@@ -3,7 +3,7 @@ use anyhow::{anyhow, Result};
 use super::{AppContext, PlanSummary};
 use crate::database::entities::plans;
 use crate::services::plan_service::{PlanCreateRequest, PlanUpdateRequest};
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
+use sea_orm::{EntityTrait, QueryOrder};
 
 impl AppContext {
     #[allow(dead_code)]

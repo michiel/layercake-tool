@@ -195,6 +195,7 @@ pub struct ParsedDatasetContext {
 }
 
 #[derive(Clone)]
+#[allow(dead_code)]
 pub struct ProjectLayerStyle {
     pub background: String,
     pub text: String,

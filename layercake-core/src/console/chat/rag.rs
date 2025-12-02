@@ -9,6 +9,7 @@ pub struct RagContext {
 
 /// A single retrieved document chunk with metadata
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct RagChunk {
     pub content: String,
     pub source: String,

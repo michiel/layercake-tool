@@ -1,5 +1,4 @@
 use async_graphql::*;
-use sea_orm::{ActiveModelTrait, EntityTrait};
 
 use crate::graphql::context::{GraphQLContext, RequestSession};
 use crate::graphql::errors::StructuredError;

@@ -315,7 +315,7 @@ impl LibraryMutation {
         })?;
 
         use crate::database::entities::library_items;
-        use sea_orm::{ActiveModelTrait, EntityTrait, Set};
+        use sea_orm::{ActiveModelTrait, Set};
 
         let mut active: library_items::ActiveModel = item.into();
         active.metadata = Set(updated_metadata_json);

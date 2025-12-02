@@ -26,6 +26,7 @@ pub struct PartitionWidthAggregation {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct LayerAggregationSummary {
     pub layer_id: String,
     pub belongs_to: Option<String>,
@@ -1278,6 +1279,7 @@ impl Graph {
         Ok(inverted_graph)
     }
 
+    #[allow(dead_code)]
     pub fn build_json_tree(&self) -> serde_json::Value {
         let tree = self.build_tree();
         serde_json::json!(tree)

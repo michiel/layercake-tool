@@ -18,6 +18,8 @@
 //! let err = ImportExportError::UnsupportedFormat("application/xml".to_string());
 //! ```
 
+#![allow(dead_code)]
+
 use thiserror::Error;
 
 /// Import and export operation errors

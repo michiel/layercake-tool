@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use anyhow::Result;
 use chrono::{DateTime, Utc};
 use sea_orm::DatabaseConnection;
 use serde::{Deserialize, Serialize};

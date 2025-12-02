@@ -51,6 +51,7 @@ impl AppContext {
         Ok(apply_preview_limit(content, format, max_rows))
     }
 
+    #[allow(dead_code)]
     pub async fn preview_sequence_export(
         &self,
         project_id: i32,

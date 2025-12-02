@@ -110,7 +110,7 @@ impl AppContext {
                 match node_type {
                     PlanDagNodeType::DataSet => {
                         if let Ok(config) =
-                            serde_json::from_str::<serde_json::Value>(&nodes[idx].config)
+                            serde_json::from_str::<Value>(&nodes[idx].config)
                         {
                             if let Some(data_set_id) = config
                                 .get("dataSetId")

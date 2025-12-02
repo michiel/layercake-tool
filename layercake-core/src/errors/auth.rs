@@ -18,6 +18,8 @@
 //! let err = AuthError::SessionExpired;
 //! ```
 
+#![allow(dead_code)]
+
 use thiserror::Error;
 
 /// Authentication and authorisation errors

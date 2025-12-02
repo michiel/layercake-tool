@@ -18,6 +18,8 @@
 //! let err = GraphError::CycleDetected("A -> B -> C -> A".to_string());
 //! ```
 
+#![allow(dead_code)]
+
 use thiserror::Error;
 
 /// Graph-related errors

@@ -78,15 +78,19 @@ pub use plan::PlanError;
 pub type GraphResult<T> = Result<T, GraphError>;
 
 /// Result type alias for plan operations
+#[allow(dead_code)]
 pub type PlanResult<T> = Result<T, PlanError>;
 
 /// Result type alias for data set operations
+#[allow(dead_code)]
 pub type DataSetResult<T> = Result<T, DataSetError>;
 
 /// Result type alias for authentication operations
+#[allow(dead_code)]
 pub type AuthResult<T> = Result<T, AuthError>;
 
 /// Result type alias for import/export operations
+#[allow(dead_code)]
 pub type ImportExportResult<T> = Result<T, ImportExportError>;
 
 #[cfg(test)]

@@ -1,5 +1,4 @@
 use async_graphql::*;
-use sea_orm::{ActiveModelTrait, EntityTrait};
 
 use crate::app_context::{PlanDagEdgeRequest, PlanDagEdgeUpdateRequest};
 use crate::graphql::context::GraphQLContext;

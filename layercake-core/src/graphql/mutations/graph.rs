@@ -1,5 +1,4 @@
 use async_graphql::*;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 
 use crate::app_context::{GraphLayerUpdateRequest, GraphNodeUpdateRequest};
 use crate::graphql::context::GraphQLContext;
@@ -9,6 +8,7 @@ use crate::graphql::types::graph::{
 };
 use crate::services::graph_edit_service::GraphEditService;
 use crate::services::graph_service::GraphService;
+use sea_orm::{ActiveModelTrait, Set};
 
 #[derive(Default)]
 pub struct GraphMutation;

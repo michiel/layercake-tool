@@ -13,6 +13,8 @@
 //! let graphql_err = err.to_graphql_error();
 //! ```
 
+#![allow(dead_code)]
+
 #[cfg(feature = "graphql")]
 use async_graphql::{Error as GraphQLError, ErrorExtensions};
 

@@ -1,6 +1,6 @@
 use async_graphql::*;
 
-use super::helpers::ensure_local_user_session;
+use super::helpers::{ensure_local_user_session, ensure_project_collaborator};
 use crate::console::chat::ChatProvider;
 use crate::graphql::context::{GraphQLContext, RequestSession};
 use crate::graphql::errors::StructuredError;
