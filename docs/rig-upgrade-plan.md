@@ -432,7 +432,7 @@ let response: DatasetOutput = agent
 ## Phase 1 Completion Summary
 
 **Completed:** 2025-12-02
-**Commits:** 2f135308, 9c4310c1
+**Commits:** 2f135308, 9c4310c1, 4355f586, 6c0c57f9, 243a9080
 
 ### Delivered
 - ✅ JSON schema for dataset generation (dataset_schema.rs)
@@ -442,12 +442,15 @@ let response: DatasetOutput = agent
 - ✅ Rig-core 0.25 client API migration (ProviderClient trait)
 - ✅ Codebase-wide rig client migration (all providers)
 - ✅ RMCP version conflict resolved (0.8.5 → 0.9.1)
+- ✅ Ollama environment variables fixed (OLLAMA_API_BASE_URL)
+- ✅ Ollama embedding dimensions specified (768 for nomic-embed-text)
 - ✅ All tests passing (202 core + 7 data-acquisition)
 
 ### Files Modified
 - `layercake-data-acquisition/src/dataset_schema.rs` (new, 330 lines)
 - `layercake-data-acquisition/src/dataset_generation.rs` (enhanced)
-- `layercake-data-acquisition/src/services/mod.rs` (rig API updates)
+- `layercake-data-acquisition/src/services/mod.rs` (rig API updates, Ollama env vars)
+- `layercake-data-acquisition/src/embeddings.rs` (Ollama embedding dimensions)
 - `layercake-data-acquisition/src/lib.rs` (module export)
 - `layercake-data-acquisition/Cargo.toml` (serde_yaml dependency)
 - `layercake-core/src/console/chat/session.rs` (all provider clients migrated)
@@ -463,6 +466,10 @@ let response: DatasetOutput = agent
 
 **RMCP Version Fix:** Upgraded from 0.8.5 to 0.9.1 to match rig-core's
 dependency, resolving type conflicts between two rmcp versions.
+
+**Ollama Embeddings Fix:** Rig-core 0.25 requires explicit dimensions for
+Ollama embedding models. Changed from `embedding_model(model)` to
+`embedding_model_with_ndims(model, 768)` for nomic-embed-text models.
 
 ### Next Steps
 - **Phase 2:** Security audit of API key handling
