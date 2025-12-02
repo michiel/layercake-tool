@@ -33,6 +33,11 @@ impl ChatMutation {
             Err(_) => ensure_local_user_session(&context.db, session.as_str(), project_id).await?,
         };
 
+        // Local users should have access to all projects - ensure collaborator access
+        if user.user_type == "local" {
+            ensure_project_collaborator(&context.db, project_id, user.id).await?;
+        }
+
         auth_service
             .check_project_read_access(user.id, project_id)
             .await
