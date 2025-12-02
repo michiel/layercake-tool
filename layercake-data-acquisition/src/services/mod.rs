@@ -177,7 +177,10 @@ impl DataAcquisitionService {
                 std::env::set_var("OLLAMA_API_KEY", "ollama");
 
                 if let Some(ref url) = base_url {
-                    std::env::set_var("OLLAMA_BASE_URL", url);
+                    std::env::set_var("OLLAMA_API_BASE_URL", url);
+                } else {
+                    // Ensure default URL is set
+                    std::env::set_var("OLLAMA_API_BASE_URL", "http://localhost:11434");
                 }
 
                 let client = ollama::Client::from_env();
