@@ -93,8 +93,11 @@ impl EmbeddingService {
             EmbeddingBackend::Ollama { client, model } => {
                 // Note: Ollama 0.9.x logs "cannot decode batches" warnings
                 // These are harmless llama.cpp internals - embeddings work correctly
+                //
+                // nomic-embed-text models have 768 dimensions
+                // TODO: Make embedding dimensions configurable per model
                 client
-                    .embedding_model(model)
+                    .embedding_model_with_ndims(model, 768)
                     .embed_texts(chunks.iter().map(|chunk| chunk.text.clone()))
                     .await
                     .map_err(|e| {
@@ -155,7 +158,7 @@ impl EmbeddingService {
                     e
                 })?,
             EmbeddingBackend::Ollama { client, model } => client
-                .embedding_model(model)
+                .embedding_model_with_ndims(model, 768)
                 .embed_texts(vec![text.to_string()])
                 .await
                 .map_err(|e| {
