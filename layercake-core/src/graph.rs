@@ -169,6 +169,7 @@ impl Graph {
                         weight: 1,
                         comment: None,
                         dataset: None,
+                        attributes: None,
                     });
                 }
                 // If parent node not found, skip this edge - could log warning if needed
@@ -404,6 +405,7 @@ impl Graph {
             weight: aggregated_children.iter().map(|child| child.weight).sum(),
             comment,
             dataset: None,
+            attributes: None,
         };
 
         let aggregated_child_ids: HashSet<String> = aggregated_ids.iter().cloned().collect();
@@ -1015,6 +1017,7 @@ impl Graph {
                         weight: 1,
                         comment: None,
                         dataset: None,
+                        attributes: None,
                     });
                 }
             }
@@ -1029,6 +1032,7 @@ impl Graph {
             weight: 0,
             comment: None,
             dataset: None,
+            attributes: None,
         };
 
         // Update existing nodes to belong to the new hierarchy node and drop partition flags
@@ -1084,6 +1088,7 @@ impl Graph {
                 weight: 0,
                 comment: Some("auto-generated".to_string()),
                 dataset: None,
+                attributes: None,
             });
         }
 
@@ -1171,6 +1176,7 @@ impl Graph {
             weight: 0,
             comment: None,
             dataset: None,
+            attributes: None,
         });
 
         fn edge_label(edge: &Edge) -> String {
@@ -1193,6 +1199,7 @@ impl Graph {
                 weight: edge.weight,
                 comment: edge.comment.clone(),
                 dataset: None,
+                attributes: edge.attributes.clone(),
             };
             inverted_graph.nodes.push(new_node.clone());
             edge_to_node_map.insert((edge.source.clone(), edge.target.clone()), new_node);
@@ -1243,6 +1250,7 @@ impl Graph {
                         weight: 1,
                         comment: None,
                         dataset: None,
+                        attributes: None,
                     });
                     edge_counter += 1; // Increment the counter for the next edge
                 }
@@ -1431,6 +1439,8 @@ pub struct Node {
     pub comment: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dataset: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub attributes: Option<serde_json::Value>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -1445,6 +1455,8 @@ pub struct TreeNode {
     pub comment: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dataset: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub attributes: Option<serde_json::Value>,
     pub children: Vec<TreeNode>,
 }
 
@@ -1460,6 +1472,7 @@ impl TreeNode {
             weight: node.weight,
             comment: node.comment.clone(),
             dataset: node.dataset,
+            attributes: node.attributes.clone(),
             children: Vec::new(),
         }
     }
@@ -1476,6 +1489,8 @@ pub struct Edge {
     pub comment: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dataset: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub attributes: Option<serde_json::Value>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -1581,6 +1596,7 @@ impl Node {
                 }
             },
             dataset: None,
+            attributes: None,
         })
     }
 }
@@ -1617,6 +1633,7 @@ impl Edge {
                 }
             },
             dataset: None,
+            attributes: None,
         })
     }
 }
@@ -1654,6 +1671,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Node {
                     id: "2".to_string(),
@@ -1664,6 +1682,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Node {
                     id: "3".to_string(),
@@ -1674,6 +1693,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
             ],
             edges: vec![
@@ -1687,6 +1707,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
             ],
             layers: vec![Layer {
@@ -1697,6 +1718,7 @@ mod tests {
                 border_color: "000000".to_string(),
                 alias: None,
                 dataset: None,
+                attributes: None,
             }],
             annotations: None,
         }
@@ -1716,6 +1738,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 // Children under root1
                 Node {
@@ -1727,6 +1750,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Node {
                     id: "child2".to_string(),
@@ -1737,6 +1761,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Node {
                     id: "child3".to_string(),
@@ -1747,6 +1772,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Node {
                     id: "child4".to_string(),
@@ -1757,6 +1783,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 // Another root
                 Node {
@@ -1768,6 +1795,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 // Children under root2
                 Node {
@@ -1779,6 +1807,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Node {
                     id: "child6".to_string(),
@@ -1789,6 +1818,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
             ],
             edges: vec![
@@ -1801,6 +1831,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Edge {
                     id: "e2".to_string(),
@@ -1811,6 +1842,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Edge {
                     id: "e3".to_string(),
@@ -1821,6 +1853,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Edge {
                     id: "e4".to_string(),
@@ -1831,6 +1864,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Edge {
                     id: "e5".to_string(),
@@ -1841,6 +1875,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
             ],
             layers: vec![
@@ -1852,6 +1887,7 @@ mod tests {
                     border_color: "000000".to_string(),
                     alias: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Layer {
                     id: "layer2".to_string(),
@@ -1861,6 +1897,7 @@ mod tests {
                     border_color: "000000".to_string(),
                     alias: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Layer {
                     id: "aggregated".to_string(),
@@ -1870,6 +1907,7 @@ mod tests {
                     border_color: "DDDDDD".to_string(),
                     alias: None,
                     dataset: None,
+                    attributes: None,
                 },
             ],
             annotations: None,
@@ -2079,6 +2117,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Node {
                     id: "parent2".to_string(),
@@ -2089,6 +2128,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Node {
                     id: "a1".to_string(),
@@ -2099,6 +2139,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Node {
                     id: "a2".to_string(),
@@ -2109,6 +2150,7 @@ mod tests {
                     weight: 2,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Node {
                     id: "a3".to_string(),
@@ -2119,6 +2161,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Node {
                     id: "a4".to_string(),
@@ -2129,6 +2172,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Node {
                     id: "b1".to_string(),
@@ -2139,6 +2183,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Node {
                     id: "b2".to_string(),
@@ -2149,6 +2194,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Node {
                     id: "b3".to_string(),
@@ -2159,6 +2205,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Node {
                     id: "hub".to_string(),
@@ -2169,6 +2216,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Node {
                     id: "side".to_string(),
@@ -2179,6 +2227,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Node {
                     id: "db".to_string(),
@@ -2189,6 +2238,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
             ],
             edges: vec![
@@ -2201,6 +2251,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Edge {
                     id: "e2".to_string(),
@@ -2211,6 +2262,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Edge {
                     id: "e3".to_string(),
@@ -2221,6 +2273,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Edge {
                     id: "e4".to_string(),
@@ -2231,6 +2284,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Edge {
                     id: "e5".to_string(),
@@ -2241,6 +2295,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Edge {
                     id: "e6".to_string(),
@@ -2251,6 +2306,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Edge {
                     id: "e7".to_string(),
@@ -2261,6 +2317,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
             ],
             layers: vec![
@@ -2327,6 +2384,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 // Level 1
                 Node {
@@ -2338,6 +2396,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 // Level 2
                 Node {
@@ -2349,6 +2408,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 // Level 3
                 Node {
@@ -2360,6 +2420,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Node {
                     id: "level3_2".to_string(),
@@ -2370,6 +2431,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
             ],
             edges: vec![Edge {
@@ -2381,6 +2443,7 @@ mod tests {
                 weight: 1,
                 comment: None,
                 dataset: None,
+                attributes: None,
             }],
             layers: vec![Layer {
                 id: "layer1".to_string(),
@@ -2390,6 +2453,7 @@ mod tests {
                 border_color: "000000".to_string(),
                 alias: None,
                 dataset: None,
+                attributes: None,
             }],
             annotations: None,
         };
@@ -2432,6 +2496,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Node {
                     id: "b".to_string(),
@@ -2442,6 +2507,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
             ],
             edges: vec![Edge {
@@ -2453,6 +2519,7 @@ mod tests {
                 weight: 1,
                 comment: None,
                 dataset: None,
+                attributes: None,
             }],
             layers: vec![Layer {
                 id: "layer".to_string(),
@@ -2462,6 +2529,7 @@ mod tests {
                 border_color: "000000".to_string(),
                 alias: None,
                 dataset: None,
+                attributes: None,
             }],
             annotations: None,
         };
@@ -2495,6 +2563,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Node {
                     id: "child".to_string(),
@@ -2505,6 +2574,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Node {
                     id: "grandchild".to_string(),
@@ -2515,6 +2585,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
             ],
             edges: vec![
@@ -2527,6 +2598,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Edge {
                     id: "e2".to_string(),
@@ -2537,6 +2609,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
             ],
             layers: vec![Layer {
@@ -2547,6 +2620,7 @@ mod tests {
                 border_color: "000000".to_string(),
                 alias: None,
                 dataset: None,
+                attributes: None,
             }],
             annotations: None,
         };
@@ -2572,6 +2646,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Node {
                     id: "child1".to_string(),
@@ -2582,6 +2657,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Node {
                     id: "child2".to_string(),
@@ -2592,6 +2668,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Node {
                     id: "child3".to_string(),
@@ -2602,6 +2679,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
             ],
             edges: vec![
@@ -2614,6 +2692,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Edge {
                     id: "e2".to_string(),
@@ -2624,6 +2703,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Edge {
                     id: "e3".to_string(),
@@ -2634,6 +2714,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
             ],
             layers: vec![Layer {
@@ -2644,6 +2725,7 @@ mod tests {
                 border_color: "000000".to_string(),
                 alias: None,
                 dataset: None,
+                attributes: None,
             }],
             annotations: None,
         };
@@ -2675,6 +2757,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Node {
                     id: "2".to_string(),
@@ -2685,6 +2768,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
             ],
             edges: vec![
@@ -2698,6 +2782,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Edge {
                     id: "e2".to_string(),
@@ -2708,6 +2793,7 @@ mod tests {
                     weight: 2,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Edge {
                     id: "e3".to_string(),
@@ -2718,6 +2804,7 @@ mod tests {
                     weight: 3,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
             ],
             layers: vec![Layer {
@@ -2728,6 +2815,7 @@ mod tests {
                 border_color: "000000".to_string(),
                 alias: None,
                 dataset: None,
+                attributes: None,
             }],
             annotations: None,
         };
@@ -2778,6 +2866,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 // Non-partition node
                 Node {
@@ -2789,6 +2878,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
             ],
             edges: vec![
@@ -2802,6 +2892,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
             ],
             layers: vec![Layer {
@@ -2812,6 +2903,7 @@ mod tests {
                 border_color: "000000".to_string(),
                 alias: None,
                 dataset: None,
+                attributes: None,
             }],
             annotations: None,
         };
@@ -2837,6 +2929,7 @@ mod tests {
                 weight: 1,
                 comment: None,
                 dataset: None,
+                attributes: None,
             }],
             edges: vec![
                 // Edge with missing target
@@ -2849,6 +2942,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
             ],
             layers: vec![Layer {
@@ -2859,6 +2953,7 @@ mod tests {
                 border_color: "000000".to_string(),
                 alias: None,
                 dataset: None,
+                attributes: None,
             }],
             annotations: None,
         };

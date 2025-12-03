@@ -1,14 +1,14 @@
 use anyhow::{anyhow, Result};
 use serde_json::{json, Value};
 
-use super::{AppContext, GraphNodeUpdateRequest, GraphLayerUpdateRequest};
+use super::{AppContext, GraphLayerUpdateRequest, GraphNodeUpdateRequest};
 use crate::graphql::types::graph_node::GraphNode as GraphNodeDto;
 use crate::graphql::types::layer::Layer as LayerDto;
 use crate::services::graph_analysis_service::GraphConnectivityReport;
 use crate::services::graph_edit_service::ReplaySummary as GraphEditReplaySummary;
 
 impl AppContext {
-        // ----- Graph editing helpers ------------------------------------------
+    // ----- Graph editing helpers ------------------------------------------
 
     pub async fn update_graph_node(
         &self,
@@ -16,7 +16,7 @@ impl AppContext {
         node_id: String,
         label: Option<String>,
         layer: Option<String>,
-        attrs: Option<Value>,
+        attributes: Option<Value>,
         belongs_to: Option<String>,
     ) -> Result<GraphNodeDto> {
         use crate::database::entities::graph_nodes::{Column as NodeColumn, Entity as GraphNodes};
@@ -44,7 +44,7 @@ impl AppContext {
                 node_id.clone(),
                 label.clone(),
                 layer.clone(),
-                attrs.clone(),
+                attributes.clone(),
                 belongs_to_param.clone(),
             )
             .await
@@ -94,7 +94,7 @@ impl AppContext {
                 }
             }
 
-            if let Some(new_attrs) = &attrs {
+            if let Some(new_attrs) = &attributes {
                 if old_node.attrs.as_ref() != Some(new_attrs) {
                     let _ = self
                         .graph_edit_service
@@ -103,7 +103,7 @@ impl AppContext {
                             "node".to_string(),
                             node_id.clone(),
                             "update".to_string(),
-                            Some("attrs".to_string()),
+                            Some("attributes".to_string()),
                             old_node.attrs.clone(),
                             Some(new_attrs.clone()),
                             None,
@@ -233,7 +233,7 @@ impl AppContext {
                 node_update.node_id,
                 node_update.label,
                 node_update.layer,
-                node_update.attrs,
+                node_update.attributes,
                 node_update.belongs_to,
             )
             .await?;

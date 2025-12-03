@@ -460,6 +460,7 @@ async fn import_nodes_csv(db: &DatabaseConnection, graph_id: i32, csv_data: &str
     let belongs_to_idx = find_column(&headers, &["belongs_to"]);
     let weight_idx = find_column(&headers, &["weight"]);
     let partition_idx = find_column(&headers, &["is_partition", "partition"]);
+    let attributes_idx = find_column(&headers, &["attributes", "attrs"]);
 
     let mut imported = 0usize;
     for record in reader.records() {
@@ -517,8 +518,15 @@ async fn import_nodes_csv(db: &DatabaseConnection, graph_id: i32, csv_data: &str
         if let Some(idx) = partition_idx {
             reserved.insert(idx);
         }
+        if let Some(idx) = attributes_idx {
+            reserved.insert(idx);
+        }
 
-        let attrs = collect_extra_attrs(&headers, &record, &reserved);
+        let attrs = if let Some(idx) = attributes_idx {
+            parse_attributes_cell(record.get(idx))?
+        } else {
+            collect_extra_attrs(&headers, &record, &reserved)
+        };
 
         upsert_node(
             db,
@@ -604,6 +612,7 @@ async fn import_edges_csv(db: &DatabaseConnection, graph_id: i32, csv_data: &str
     let label_idx = find_column(&headers, &["label", "name"]);
     let layer_idx = find_column(&headers, &["layer", "layer_id"]);
     let weight_idx = find_column(&headers, &["weight"]);
+    let attributes_idx = find_column(&headers, &["attributes", "attrs"]);
 
     let mut imported = 0usize;
     for record in reader.records() {
@@ -663,8 +672,15 @@ async fn import_edges_csv(db: &DatabaseConnection, graph_id: i32, csv_data: &str
         if let Some(idx) = weight_idx {
             reserved.insert(idx);
         }
+        if let Some(idx) = attributes_idx {
+            reserved.insert(idx);
+        }
 
-        let attrs = collect_extra_attrs(&headers, &record, &reserved);
+        let attrs = if let Some(idx) = attributes_idx {
+            parse_attributes_cell(record.get(idx))?
+        } else {
+            collect_extra_attrs(&headers, &record, &reserved)
+        };
 
         upsert_edge(
             db, graph_id, edge_id, source, target, label, layer, weight, attrs,
@@ -721,6 +737,47 @@ async fn upsert_edge(
     }
 
     Ok(())
+}
+
+fn validate_attributes_map(value: &Value) -> Result<()> {
+    let map = value.as_object().ok_or_else(|| {
+        anyhow!("attributes must be a JSON object with string keys and string/integer values")
+    })?;
+
+    for (key, val) in map {
+        if key.trim().is_empty() {
+            return Err(anyhow!("attribute keys must be non-empty strings"));
+        }
+        if val.is_string() {
+            continue;
+        }
+        if val.as_i64().is_some() {
+            continue;
+        }
+        return Err(anyhow!(
+            "attribute '{}' must be a string or integer value",
+            key
+        ));
+    }
+
+    Ok(())
+}
+
+fn parse_attributes_cell(cell: Option<&str>) -> Result<Option<Value>> {
+    let raw = match cell {
+        Some(raw) => raw.trim(),
+        None => return Ok(None),
+    };
+
+    if raw.is_empty() {
+        return Ok(None);
+    }
+
+    let parsed: Value = serde_json::from_str(raw)
+        .map_err(|e| anyhow!("attributes column must contain valid JSON object: {}", e))?;
+
+    validate_attributes_map(&parsed)?;
+    Ok(Some(parsed))
 }
 
 fn collect_extra_attrs(

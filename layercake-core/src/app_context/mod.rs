@@ -7,23 +7,22 @@ use serde::{Deserialize, Serialize};
 use crate::database::entities::{data_sets, plans, projects};
 use crate::services::graph_analysis_service::GraphAnalysisService;
 use crate::services::graph_edit_service::GraphEditService;
+use crate::services::plan_service::PlanService;
 use crate::services::{
     data_set_service::DataSetService, dataset_bulk_service::DataSetBulkService, ExportService,
     GraphService, ImportService, PlanDagService,
 };
-use crate::services::plan_service::PlanService;
 use layercake_data_acquisition::{
-    config::EmbeddingProviderConfig,
-    services::DataAcquisitionService,
+    config::EmbeddingProviderConfig, services::DataAcquisitionService,
 };
 
-mod project_operations;
-mod plan_operations;
 mod data_set_operations;
+mod graph_operations;
 mod library_operations;
 mod plan_dag_operations;
-mod graph_operations;
+mod plan_operations;
 mod preview_operations;
+mod project_operations;
 mod story_operations;
 
 /// Shared application context exposing core services for GraphQL, MCP, and console layers.
@@ -415,7 +414,9 @@ pub struct DataSetImportOutcome {
     pub updated_count: i32,
 }
 
-use crate::graphql::types::plan_dag::{PlanDagEdge, PlanDagMetadata, PlanDagNode, PlanDagNodeType, Position};
+use crate::graphql::types::plan_dag::{
+    PlanDagEdge, PlanDagMetadata, PlanDagNode, PlanDagNodeType, Position,
+};
 use serde_json::Value;
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -467,7 +468,7 @@ pub struct GraphNodeUpdateRequest {
     pub node_id: String,
     pub label: Option<String>,
     pub layer: Option<String>,
-    pub attrs: Option<Value>,
+    pub attributes: Option<Value>,
     pub belongs_to: Option<String>,
 }
 

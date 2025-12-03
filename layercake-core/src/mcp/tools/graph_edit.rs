@@ -11,7 +11,7 @@ pub fn get_graph_edit_tools() -> Vec<Tool> {
     vec![
         Tool {
             name: "update_graph_node".to_string(),
-            description: "Update a graph node's metadata (label, layer, attrs, belongsTo)"
+            description: "Update a graph node's metadata (label, layer, attributes, belongsTo)"
                 .to_string(),
             input_schema: json!({
                 "type": "object",
@@ -21,6 +21,7 @@ pub fn get_graph_edit_tools() -> Vec<Tool> {
                     "label": {"type": "string"},
                     "layer": {"type": "string"},
                     "attrs": {"type": "object"},
+                    "attributes": {"type": "object"},
                     "belongs_to": {"type": "string"}
                 },
                 "required": ["graph_id", "node_id"],
@@ -92,7 +93,10 @@ pub async fn update_graph_node(
     let node_id = parse_required_string(&arguments, "node_id")?;
     let label = parse_optional_string(&arguments, "label");
     let layer = parse_optional_string(&arguments, "layer");
-    let attrs = get_optional_param(&arguments, "attrs").cloned();
+    let attrs = normalize_attributes(
+        get_optional_param(&arguments, "attrs").cloned(),
+        get_optional_param(&arguments, "attributes").cloned(),
+    )?;
     let belongs_to = parse_optional_string(&arguments, "belongs_to");
 
     let node = app
@@ -190,6 +194,34 @@ fn parse_optional_string(arguments: &Option<Value>, key: &str) -> Option<String>
         .map(|s| s.to_string())
 }
 
+fn normalize_attributes(
+    attrs: Option<Value>,
+    attributes: Option<Value>,
+) -> McpResult<Option<Value>> {
+    let candidate = attributes.or(attrs);
+    if let Some(val) = candidate {
+        let map = val.as_object().ok_or_else(|| McpError::Validation {
+            message: "attributes must be an object with string keys and string/integer values"
+                .to_string(),
+        })?;
+        for (key, value) in map {
+            if key.trim().is_empty() {
+                return Err(McpError::Validation {
+                    message: "attribute keys must be non-empty strings".to_string(),
+                });
+            }
+            if !(value.is_string() || value.as_i64().is_some()) {
+                return Err(McpError::Validation {
+                    message: format!("attribute '{}' must be a string or integer value", key),
+                });
+            }
+        }
+        Ok(Some(val))
+    } else {
+        Ok(None)
+    }
+}
+
 fn parse_node_updates(arguments: &Option<Value>) -> McpResult<Vec<GraphNodeUpdateRequest>> {
     let nodes = get_optional_param(arguments, "nodes")
         .and_then(|value| value.as_array())
@@ -214,13 +246,14 @@ fn parse_node_updates(arguments: &Option<Value>) -> McpResult<Vec<GraphNodeUpdat
             .get("layer")
             .and_then(Value::as_str)
             .map(|s| s.to_string());
-        let attrs = node.get("attrs").cloned();
+        let attrs =
+            normalize_attributes(node.get("attrs").cloned(), node.get("attributes").cloned())?;
 
         requests.push(GraphNodeUpdateRequest {
             node_id,
             label,
             layer,
-            attrs,
+            attributes: attrs,
             belongs_to: None,
         });
     }
@@ -273,7 +306,8 @@ fn json_node(node: &GraphNodeDto) -> Value {
         "weight": node.weight,
         "isPartition": node.is_partition,
         "belongsTo": node.belongs_to,
-        "attrs": node.attrs,
+        "attrs": node.attrs.clone(),
+        "attributes": node.attrs,
         "datasetId": node.dataset_id,
         "createdAt": node.created_at
     })

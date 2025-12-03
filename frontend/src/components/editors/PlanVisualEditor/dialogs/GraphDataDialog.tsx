@@ -21,6 +21,7 @@ import {
   CREATE_LAYER
 } from '../../../../graphql/graphs';
 import { GraphSpreadsheetEditor, GraphData } from '../../../editors/GraphSpreadsheetEditor/GraphSpreadsheetEditor';
+import { sanitizeAttributes } from '@/utils/attributes';
 
 interface GraphDataDialogProps {
   opened: boolean;
@@ -51,6 +52,8 @@ export const GraphDataDialog: React.FC<GraphDataDialogProps> = ({
   const getGraphData = (): GraphData | null => {
     if (!data?.graph) return null;
 
+    const normalizeAttributes = (attrs?: any) => sanitizeAttributes(attrs);
+
     return {
       nodes: data.graph.graphNodes.map(node => ({
         id: node.id,
@@ -59,7 +62,7 @@ export const GraphDataDialog: React.FC<GraphDataDialogProps> = ({
         weight: node.weight,
         is_partition: node.isPartition,
         belongs_to: node.belongsTo,
-        ...node.attrs
+        attributes: normalizeAttributes((node as any).attributes ?? node.attrs),
       })),
       edges: data.graph.graphEdges.map(edge => ({
         id: edge.id,
@@ -68,7 +71,7 @@ export const GraphDataDialog: React.FC<GraphDataDialogProps> = ({
         label: edge.label,
         layer: edge.layer,
         weight: edge.weight,
-        ...edge.attrs
+        attributes: normalizeAttributes((edge as any).attributes ?? edge.attrs),
       })),
       layers: data.graph.layers.map(layer => ({
         id: layer.layerId,
@@ -118,24 +121,16 @@ export const GraphDataDialog: React.FC<GraphDataDialogProps> = ({
         const oldLayer = normalizeValue(oldNode.layer);
         const newLayer = normalizeValue(newNode.layer);
 
-        const { id, label, layer, is_partition, belongs_to, comment, ...customAttrs } = newNode;
-        const cleanedCustomAttrs: Record<string, any> = {};
-        for (const [key, value] of Object.entries(customAttrs)) {
-          const normalized = normalizeValue(value);
-          if (normalized !== undefined) {
-            cleanedCustomAttrs[key] = normalized;
-          }
-        }
-
-        const oldAttrs = oldNode.attrs || {};
-        const attrsChanged = JSON.stringify(cleanedCustomAttrs) !== JSON.stringify(oldAttrs);
+        const newAttributes = sanitizeAttributes(newNode.attributes);
+        const oldAttrs = sanitizeAttributes((oldNode as any).attributes ?? oldNode.attrs);
+        const attrsChanged = JSON.stringify(newAttributes) !== JSON.stringify(oldAttrs);
 
         if (oldLabel !== newLabel || oldLayer !== newLayer || attrsChanged) {
           updatedNodes.push({
             nodeId: newNode.id,
             label: oldLabel !== newLabel ? newLabel : null,
             layer: oldLayer !== newLayer ? newLayer : null,
-            attrs: attrsChanged ? cleanedCustomAttrs : null,
+            attributes: attrsChanged ? newAttributes : null,
           });
         }
       }
@@ -203,14 +198,8 @@ export const GraphDataDialog: React.FC<GraphDataDialogProps> = ({
 
       // Add new nodes
       for (const node of addedNodes) {
-        const { id, label, layer, is_partition, belongs_to, comment, ...customAttrs } = node;
-        const cleanedAttrs: Record<string, any> = {};
-        for (const [key, value] of Object.entries(customAttrs)) {
-          const normalized = normalizeValue(value);
-          if (normalized !== undefined) {
-            cleanedAttrs[key] = normalized;
-          }
-        }
+        const { id, label, layer, is_partition, belongs_to } = node;
+        const cleanedAttrs = sanitizeAttributes(node.attributes);
 
         await addGraphNode({
           variables: {
@@ -220,21 +209,15 @@ export const GraphDataDialog: React.FC<GraphDataDialogProps> = ({
             layer,
             isPartition: is_partition || false,
             belongsTo: belongs_to,
-            attrs: Object.keys(cleanedAttrs).length > 0 ? cleanedAttrs : null,
+            attributes: Object.keys(cleanedAttrs).length > 0 ? cleanedAttrs : null,
           }
         });
       }
 
       // Add new edges
       for (const edge of addedEdges) {
-        const { id, source, target, label, layer, comment, ...customAttrs } = edge;
-        const cleanedAttrs: Record<string, any> = {};
-        for (const [key, value] of Object.entries(customAttrs)) {
-          const normalized = normalizeValue(value);
-          if (normalized !== undefined) {
-            cleanedAttrs[key] = normalized;
-          }
-        }
+        const { id, source, target, label, layer } = edge;
+        const cleanedAttrs = sanitizeAttributes(edge.attributes);
 
         await addGraphEdge({
           variables: {
@@ -244,7 +227,7 @@ export const GraphDataDialog: React.FC<GraphDataDialogProps> = ({
             target,
             label: label || '',
             layer,
-            attrs: Object.keys(cleanedAttrs).length > 0 ? cleanedAttrs : null,
+            attributes: Object.keys(cleanedAttrs).length > 0 ? cleanedAttrs : null,
           }
         });
       }

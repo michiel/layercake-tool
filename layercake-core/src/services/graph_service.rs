@@ -388,6 +388,7 @@ impl GraphService {
                     weight: db_node.weight.unwrap_or(1.0) as i32,
                     comment,
                     dataset: db_node.dataset_id,
+                    attributes: db_node.attrs,
                 }
             })
             .collect();
@@ -413,6 +414,7 @@ impl GraphService {
                     weight: db_edge.weight.unwrap_or(1.0) as i32,
                     comment: None,
                     dataset: db_edge.dataset_id,
+                    attributes: db_edge.attrs,
                 }
             })
             .collect();

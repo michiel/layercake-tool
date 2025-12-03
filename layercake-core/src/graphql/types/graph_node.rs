@@ -9,6 +9,8 @@ pub struct GraphNodeUpdateInput {
     pub label: Option<String>,
     pub layer: Option<String>,
     pub attrs: Option<serde_json::Value>,
+    /// Preferred alias for node attributes (string/int values only)
+    pub attributes: Option<serde_json::Value>,
 }
 
 #[derive(SimpleObject, Clone, Debug, Serialize, Deserialize)]
@@ -23,7 +25,9 @@ pub struct GraphNode {
     pub is_partition: bool,
     #[graphql(name = "belongsTo")]
     pub belongs_to: Option<String>,
+    /// Deprecated: use attributes
     pub attrs: Option<serde_json::Value>,
+    pub attributes: Option<serde_json::Value>,
     #[graphql(name = "datasetId")]
     pub dataset_id: Option<i32>,
     #[graphql(name = "createdAt")]
@@ -40,7 +44,8 @@ impl From<crate::database::entities::graph_nodes::Model> for GraphNode {
             weight: model.weight,
             is_partition: model.is_partition,
             belongs_to: model.belongs_to,
-            attrs: model.attrs,
+            attrs: model.attrs.clone(),
+            attributes: model.attrs,
             dataset_id: model.dataset_id,
             created_at: model.created_at,
         }

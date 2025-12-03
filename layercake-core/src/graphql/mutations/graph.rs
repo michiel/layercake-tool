@@ -9,9 +9,54 @@ use crate::graphql::types::graph::{
 use crate::services::graph_edit_service::GraphEditService;
 use crate::services::graph_service::GraphService;
 use sea_orm::{ActiveModelTrait, Set};
+use serde_json::Value;
 
 #[derive(Default)]
 pub struct GraphMutation;
+
+fn merge_and_validate_attributes(
+    attrs: Option<crate::graphql::types::scalars::JSON>,
+    attributes: Option<crate::graphql::types::scalars::JSON>,
+) -> Result<Option<Value>> {
+    let candidate = attributes.or(attrs);
+    if let Some(value) = candidate {
+        validate_attributes(&value)
+            .map_err(|message| Error::new(message))?;
+        Ok(Some(value))
+    } else {
+        Ok(None)
+    }
+}
+
+fn validate_attributes(value: &Value) -> Result<(), String> {
+    let map = value.as_object().ok_or_else(|| {
+        "attributes must be a JSON object with string keys and string/integer values".to_string()
+    })?;
+
+    for (key, val) in map {
+        if key.trim().is_empty() {
+            return Err("attribute keys must be non-empty strings".to_string());
+        }
+        if val.is_string() {
+            continue;
+        }
+        if let Some(n) = val.as_i64() {
+            // ensure value is an integer (reject floats)
+            if val.as_f64().map(|f| f.fract() == 0.0).unwrap_or(true)
+                && n >= i64::MIN
+                && n <= i64::MAX
+            {
+                continue;
+            }
+        }
+        return Err(format!(
+            "attribute '{}' must be a string or integer value",
+            key
+        ));
+    }
+
+    Ok(())
+}
 
 #[Object]
 impl GraphMutation {
@@ -112,13 +157,17 @@ impl GraphMutation {
         label: Option<String>,
         layer: Option<String>,
         attrs: Option<crate::graphql::types::scalars::JSON>,
+        #[graphql(name = "attributes")] attributes_arg: Option<
+            crate::graphql::types::scalars::JSON,
+        >,
         belongs_to: Option<String>,
     ) -> Result<crate::graphql::types::graph_node::GraphNode> {
         let context = ctx.data::<GraphQLContext>()?;
+        let attributes = merge_and_validate_attributes(attrs, attributes_arg)?;
 
         let node = context
             .app
-            .update_graph_node(graph_id, node_id, label, layer, attrs, belongs_to)
+            .update_graph_node(graph_id, node_id, label, layer, attributes, belongs_to)
             .await
             .map_err(|e| StructuredError::service("AppContext::update_graph_node", e))?;
 
@@ -157,10 +206,15 @@ impl GraphMutation {
         belongs_to: Option<String>,
         weight: Option<f64>,
         attrs: Option<crate::graphql::types::scalars::JSON>,
+        #[graphql(name = "attributes")] attributes_arg: Option<
+            crate::graphql::types::scalars::JSON,
+        >,
     ) -> Result<crate::graphql::types::graph_node::GraphNode> {
         let context = ctx.data::<GraphQLContext>()?;
         let graph_service = GraphService::new(context.db.clone());
         let edit_service = GraphEditService::new(context.db.clone());
+
+        let attributes = merge_and_validate_attributes(attrs, attributes_arg)?;
 
         // Create the new node
         let node = graph_service
@@ -172,7 +226,7 @@ impl GraphMutation {
                 is_partition,
                 belongs_to.clone(),
                 weight,
-                attrs.clone(),
+                attributes.clone(),
             )
             .await
             .map_err(|e| StructuredError::service("GraphService::add_graph_node", e))?;
@@ -185,7 +239,7 @@ impl GraphMutation {
             "is_partition": is_partition,
             "belongs_to": belongs_to,
             "weight": weight,
-            "attrs": attrs,
+            "attributes": attributes,
         });
 
         let _ = edit_service
@@ -217,6 +271,9 @@ impl GraphMutation {
         layer: Option<String>,
         weight: Option<f64>,
         attrs: Option<crate::graphql::types::scalars::JSON>,
+        #[graphql(name = "attributes")] attributes_arg: Option<
+            crate::graphql::types::scalars::JSON,
+        >,
     ) -> Result<crate::graphql::types::graph_edge::GraphEdge> {
         let context = ctx.data::<GraphQLContext>()?;
         let edit_service = GraphEditService::new(context.db.clone());
@@ -225,6 +282,8 @@ impl GraphMutation {
             ActiveModel as GraphEdgeActiveModel, Entity as GraphEdges,
         };
         use sea_orm::{ActiveValue::Set, EntityTrait};
+
+        let attributes = merge_and_validate_attributes(attrs, attributes_arg)?;
 
         // Create the new edge
         let now = chrono::Utc::now();
@@ -236,7 +295,7 @@ impl GraphMutation {
             label: Set(label.clone()),
             layer: Set(layer.clone()),
             weight: Set(weight),
-            attrs: Set(attrs.clone()),
+            attrs: Set(attributes.clone()),
             dataset_id: Set(None),
             comment: Set(None),
             created_at: Set(now),
@@ -255,7 +314,7 @@ impl GraphMutation {
             "label": label,
             "layer": layer,
             "weight": weight,
-            "attrs": attrs,
+            "attributes": attributes,
         });
 
         let _ = edit_service
@@ -317,7 +376,8 @@ impl GraphMutation {
                 "label": old_edge.label,
                 "layer": old_edge.layer,
                 "weight": old_edge.weight,
-                "attrs": old_edge.attrs,
+                "attrs": old_edge.attrs.clone(),
+                "attributes": old_edge.attrs,
             });
 
             let _ = edit_service
@@ -373,7 +433,8 @@ impl GraphMutation {
             "is_partition": old_node.is_partition,
             "belongs_to": old_node.belongs_to,
             "weight": old_node.weight,
-            "attrs": old_node.attrs,
+            "attrs": old_node.attrs.clone(),
+            "attributes": old_node.attrs,
         });
 
         let _ = edit_service
@@ -406,14 +467,19 @@ impl GraphMutation {
         let node_requests = nodes
             .unwrap_or_default()
             .into_iter()
-            .map(|node_update| GraphNodeUpdateRequest {
-                node_id: node_update.node_id,
-                label: node_update.label,
-                layer: node_update.layer,
-                attrs: node_update.attrs,
-                belongs_to: None,
+            .map(|node_update| {
+                let attributes =
+                    merge_and_validate_attributes(node_update.attrs, node_update.attributes)?;
+
+                Ok(GraphNodeUpdateRequest {
+                    node_id: node_update.node_id,
+                    label: node_update.label,
+                    layer: node_update.layer,
+                    attributes,
+                    belongs_to: None,
+                })
             })
-            .collect();
+            .collect::<Result<Vec<_>>>()?;
 
         let layer_requests = layers
             .unwrap_or_default()

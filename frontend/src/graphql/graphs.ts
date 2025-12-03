@@ -1,4 +1,5 @@
 import { gql } from '@apollo/client'
+import { AttributesMap } from '@/utils/attributes'
 
 export interface Layer {
   id: number;
@@ -21,6 +22,7 @@ export interface GraphNode {
   isPartition: boolean;
   belongsTo?: string;
   attrs?: any;
+  attributes?: AttributesMap;
 }
 
 export interface GraphEdge {
@@ -31,6 +33,7 @@ export interface GraphEdge {
   layer?: string;
   weight?: number;
   attrs?: any;
+  attributes?: AttributesMap;
 }
 
 export interface Graph {
@@ -155,6 +158,7 @@ export const GET_GRAPH_DETAILS = gql`
         isPartition
         belongsTo
         attrs
+        attributes
       }
       graphEdges {
         id
@@ -164,6 +168,7 @@ export const GET_GRAPH_DETAILS = gql`
         layer
         weight
         attrs
+        attributes
       }
     }
   }
@@ -240,7 +245,7 @@ export const UPDATE_GRAPH_NODE = gql`
     $nodeId: String!
     $label: String
     $layer: String
-    $attrs: JSON
+    $attributes: JSON
     $belongsTo: String
   ) {
     updateGraphNode(
@@ -248,13 +253,13 @@ export const UPDATE_GRAPH_NODE = gql`
       nodeId: $nodeId
       label: $label
       layer: $layer
-      attrs: $attrs
+      attributes: $attributes
       belongsTo: $belongsTo
     ) {
       id
       label
       layer
-      attrs
+      attributes
       belongsTo
     }
   }
@@ -269,7 +274,7 @@ export const ADD_GRAPH_NODE = gql`
     $isPartition: Boolean!
     $belongsTo: String
     $weight: Float
-    $attrs: JSON
+    $attributes: JSON
   ) {
     addGraphNode(
       graphId: $graphId
@@ -279,7 +284,7 @@ export const ADD_GRAPH_NODE = gql`
       isPartition: $isPartition
       belongsTo: $belongsTo
       weight: $weight
-      attrs: $attrs
+      attributes: $attributes
     ) {
       id
       label
@@ -287,7 +292,7 @@ export const ADD_GRAPH_NODE = gql`
       isPartition
       belongsTo
       weight
-      attrs
+      attributes
     }
   }
 `
@@ -301,7 +306,7 @@ export const ADD_GRAPH_EDGE = gql`
     $label: String
     $layer: String
     $weight: Float
-    $attrs: JSON
+    $attributes: JSON
   ) {
     addGraphEdge(
       graphId: $graphId
@@ -311,7 +316,7 @@ export const ADD_GRAPH_EDGE = gql`
       label: $label
       layer: $layer
       weight: $weight
-      attrs: $attrs
+      attributes: $attributes
     ) {
       id
       source
@@ -319,7 +324,7 @@ export const ADD_GRAPH_EDGE = gql`
       label
       layer
       weight
-      attrs
+      attributes
     }
   }
 `
@@ -330,21 +335,21 @@ export const UPDATE_GRAPH_EDGE = gql`
     $edgeId: String!
     $label: String
     $layer: String
-    $attrs: JSON
+    $attributes: JSON
   ) {
     updateGraphEdge(
       graphId: $graphId
       edgeId: $edgeId
       label: $label
       layer: $layer
-      attrs: $attrs
+      attributes: $attributes
     ) {
       id
       source
       target
       label
       layer
-      attrs
+      attributes
     }
   }
 `

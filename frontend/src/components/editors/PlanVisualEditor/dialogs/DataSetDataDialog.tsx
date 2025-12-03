@@ -12,6 +12,7 @@ import { IconAlertCircle } from '@tabler/icons-react';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { GET_DATASOURCE, DataSet, UPDATE_DATASOURCE_GRAPH_DATA } from '../../../../graphql/datasets';
 import { GraphSpreadsheetEditor, GraphData } from '../../../editors/GraphSpreadsheetEditor/GraphSpreadsheetEditor';
+import { sanitizeAttributes } from '@/utils/attributes';
 
 interface DataSetDataDialogProps {
   opened: boolean;
@@ -47,7 +48,11 @@ export const DataSetDataDialog: React.FC<DataSetDataDialogProps> = ({
           layer: node.layer,
           is_partition: node.is_partition,
           belongs_to: node.belongs_to,
-          ...node
+          ...(() => {
+            const { attrs, attributes, ...rest } = node;
+            return rest;
+          })(),
+          attributes: sanitizeAttributes(node.attributes ?? node.attrs),
         })),
         edges: (graphJson.edges || []).map((edge: any) => ({
           id: edge.id,
@@ -55,7 +60,11 @@ export const DataSetDataDialog: React.FC<DataSetDataDialogProps> = ({
           target: edge.target,
           label: edge.label,
           layer: edge.layer,
-          ...edge
+          ...(() => {
+            const { attrs, attributes, ...rest } = edge;
+            return rest;
+          })(),
+          attributes: sanitizeAttributes(edge.attributes ?? edge.attrs),
         })),
         layers: (graphJson.layers || []).map((layer: any) => ({
           id: layer.id,

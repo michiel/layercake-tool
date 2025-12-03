@@ -497,6 +497,7 @@ impl DagExecutor {
                                 .map(|s| s.to_string()),
                             comment: node_val["comment"].as_str().map(|s| s.to_string()),
                             dataset: None,
+                            attributes: node_val.get("attributes").cloned(),
                         };
                         graph.nodes.push(node);
                     }
@@ -514,6 +515,7 @@ impl DagExecutor {
                             weight: edge_val["weight"].as_i64().unwrap_or(1) as i32,
                             comment: edge_val["comment"].as_str().map(|s| s.to_string()),
                             dataset: None,
+                            attributes: edge_val.get("attributes").cloned(),
                         };
                         graph.edges.push(edge);
                     }

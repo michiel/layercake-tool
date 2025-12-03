@@ -27,6 +27,8 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Group } from '@/components/layout-primitives'
+import { AttributesEditorDialog } from '@/components/attributes/AttributesEditorDialog'
+import { AttributesMap, attributesToMultiline, sanitizeAttributes } from '@/utils/attributes'
 
 type HierarchyNode = GraphNode & {
   belongs_to?: string | null
@@ -69,7 +71,12 @@ export const HierarchyTreeEditor = ({
   splitView,
   onToggleSplitView,
 }: DatasetHierarchyTreeEditorProps) => {
-  const [nodes, setNodes] = useState<HierarchyNode[]>(graphData?.nodes || [])
+  const normalizeNode = (node: HierarchyNode): HierarchyNode => ({
+    ...node,
+    attributes: sanitizeAttributes(node.attributes),
+  })
+
+  const [nodes, setNodes] = useState<HierarchyNode[]>(graphData?.nodes.map(normalizeNode) || [])
   const [edges, setEdges] = useState<GraphEdge[]>(graphData?.edges || [])
   const [layers, setLayers] = useState<GraphLayer[]>(graphData?.layers || [])
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -84,6 +91,9 @@ export const HierarchyTreeEditor = ({
   )
   const treeAreaRef = useRef<HTMLDivElement | null>(null)
   const [treeAreaHeight, setTreeAreaHeight] = useState(500)
+  const [attributesDialogOpen, setAttributesDialogOpen] = useState(false)
+  const [attributesDraft, setAttributesDraft] = useState<AttributesMap>({})
+  const [attributesNodeId, setAttributesNodeId] = useState<string | null>(null)
 
   useLayoutEffect(() => {
     const element = treeAreaRef.current
@@ -98,7 +108,7 @@ export const HierarchyTreeEditor = ({
   }, [])
 
   useEffect(() => {
-    setNodes(graphData?.nodes || [])
+    setNodes(graphData?.nodes.map(normalizeNode) || [])
     setEdges(graphData?.edges || [])
     setLayers(graphData?.layers || [])
     setSelectedId(null)
@@ -157,6 +167,24 @@ export const HierarchyTreeEditor = ({
 
   const markDirty = () => {
     if (!dirty) setDirty(true)
+  }
+
+  const openAttributesEditor = () => {
+    if (!selectedNode) return
+    setAttributesNodeId(selectedNode.id)
+    setAttributesDraft(sanitizeAttributes(selectedNode.attributes))
+    setAttributesDialogOpen(true)
+  }
+
+  const handleAttributesSave = (attrs: AttributesMap) => {
+    if (!attributesNodeId) return
+    setNodes(prev =>
+      prev.map(node =>
+        node.id === attributesNodeId ? { ...node, attributes: sanitizeAttributes(attrs) } : node
+      )
+    )
+    setDirty(true)
+    setAttributesDialogOpen(false)
   }
 
   const handleAddNode = (parentId: string | null) => {
@@ -589,6 +617,17 @@ export const HierarchyTreeEditor = ({
                         onChange={e => updateNodeField(selectedNode.id, 'comment', e.target.value)}
                       />
                     </div>
+                    <div className="space-y-2">
+                      <Label>Attributes</Label>
+                      <Textarea
+                        value={attributesToMultiline(selectedNode.attributes)}
+                        readOnly
+                        rows={4}
+                      />
+                      <Button variant="outline" size="sm" onClick={openAttributesEditor}>
+                        Edit attributes
+                      </Button>
+                    </div>
                     <div>
                       <Label>Layer</Label>
                       <Select
@@ -646,6 +685,13 @@ export const HierarchyTreeEditor = ({
             </ScrollArea>
           </div>
         </div>
+        <AttributesEditorDialog
+          open={attributesDialogOpen}
+          initialValue={attributesDraft}
+          onClose={() => setAttributesDialogOpen(false)}
+          onSave={handleAttributesSave}
+          title="Edit node attributes"
+        />
       </CardContent>
     </Card>
   )

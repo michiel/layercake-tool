@@ -11,7 +11,9 @@ pub struct GraphEdge {
     pub label: Option<String>,
     pub layer: Option<String>,
     pub weight: Option<f64>,
+    /// Deprecated: use attributes
     pub attrs: Option<serde_json::Value>,
+    pub attributes: Option<serde_json::Value>,
     #[graphql(name = "datasetId")]
     pub dataset_id: Option<i32>,
     #[graphql(name = "createdAt")]
@@ -28,7 +30,8 @@ impl From<crate::database::entities::graph_edges::Model> for GraphEdge {
             label: model.label,
             layer: model.layer,
             weight: model.weight,
-            attrs: model.attrs,
+            attrs: model.attrs.clone(),
+            attributes: model.attrs,
             dataset_id: model.dataset_id,
             created_at: model.created_at,
         }

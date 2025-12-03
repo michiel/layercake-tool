@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { IconTable, IconDeviceFloppy, IconClipboard, IconClipboardCopy, IconTrash, IconPlus, IconX } from '@tabler/icons-react';
 import { Stack, Group } from '@/components/layout-primitives';
 import { Button } from '@/components/ui/button';
@@ -6,6 +6,8 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { AttributesMap, attributesToInlineString, attributesToJson, parseAttributesJson, sanitizeAttributes } from '@/utils/attributes';
+import { AttributesEditorDialog } from '@/components/attributes/AttributesEditorDialog';
 
 export interface GraphNode {
   id: string;
@@ -15,6 +17,7 @@ export interface GraphNode {
   is_partition?: boolean;
   belongs_to?: string;
   comment?: string;
+  attributes?: AttributesMap;
   [key: string]: any;
 }
 
@@ -26,6 +29,7 @@ export interface GraphEdge {
   layer?: string;
   weight?: number;
   comment?: string;
+  attributes?: AttributesMap;
   [key: string]: any;
 }
 
@@ -59,16 +63,38 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
   readOnly = false,
   layersReadOnly = false
 }) => {
+  const normalizeNode = (node: GraphNode): GraphNode => ({
+    ...node,
+    attributes: sanitizeAttributes(node.attributes || (node as any).attrs),
+  });
+
+  const normalizeEdge = (edge: GraphEdge): GraphEdge => ({
+    ...edge,
+    attributes: sanitizeAttributes(edge.attributes || (edge as any).attrs),
+  });
+
   const [activeTab, setActiveTab] = useState<string>('nodes');
-  const [localNodes, setLocalNodes] = useState<GraphNode[]>(graphData.nodes || []);
-  const [localEdges, setLocalEdges] = useState<GraphEdge[]>(graphData.edges || []);
+  const [localNodes, setLocalNodes] = useState<GraphNode[]>(
+    (graphData.nodes || []).map(normalizeNode)
+  );
+  const [localEdges, setLocalEdges] = useState<GraphEdge[]>(
+    (graphData.edges || []).map(normalizeEdge)
+  );
   const [localLayers, setLocalLayers] = useState<GraphLayer[]>(graphData.layers || []);
   const [hasChanges, setHasChanges] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [attributesDialog, setAttributesDialog] = useState<{ type: 'node' | 'edge'; index: number } | null>(null);
   const layerEditingDisabled = readOnly || layersReadOnly;
 
-  const nodeColumnDefs = ['id', 'label', 'layer', 'weight', 'is_partition', 'belongs_to', 'comment'];
-  const edgeColumnDefs = ['id', 'source', 'target', 'label', 'layer', 'weight', 'comment'];
+  useEffect(() => {
+    setLocalNodes((graphData.nodes || []).map(normalizeNode));
+    setLocalEdges((graphData.edges || []).map(normalizeEdge));
+    setLocalLayers(graphData.layers || []);
+    setHasChanges(false);
+  }, [graphData]);
+
+  const nodeColumnDefs = ['id', 'label', 'layer', 'weight', 'is_partition', 'belongs_to', 'comment', 'attributes'];
+  const edgeColumnDefs = ['id', 'source', 'target', 'label', 'layer', 'weight', 'comment', 'attributes'];
   const layerColumnDefs = ['id', 'label', 'alias', 'background_color', 'text_color', 'border_color', 'comment'];
 
   const handleAddRecord = () => {
@@ -78,7 +104,7 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
     if (activeTab === 'nodes') {
       setLocalNodes(prev => [
         ...prev,
-        { id: '', label: '', layer: '', weight: undefined, is_partition: false, belongs_to: '', comment: '' }
+        { id: '', label: '', layer: '', weight: undefined, is_partition: false, belongs_to: '', comment: '', attributes: {} }
       ]);
       setHasChanges(true);
       return;
@@ -86,7 +112,7 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
     if (activeTab === 'edges') {
       setLocalEdges(prev => [
         ...prev,
-        { id: '', source: '', target: '', label: '', layer: '', weight: undefined, comment: '' }
+        { id: '', source: '', target: '', label: '', layer: '', weight: undefined, comment: '', attributes: {} }
       ]);
       setHasChanges(true);
       return;
@@ -174,9 +200,17 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
   const handleSave = async () => {
     setSaving(true);
     try {
+      const normalizedNodes = localNodes.map(node => ({
+        ...node,
+        attributes: sanitizeAttributes(node.attributes),
+      }));
+      const normalizedEdges = localEdges.map(edge => ({
+        ...edge,
+        attributes: sanitizeAttributes(edge.attributes),
+      }));
       await onSave({
-        nodes: localNodes,
-        edges: localEdges,
+        nodes: normalizedNodes,
+        edges: normalizedEdges,
         layers: localLayers
       });
       setHasChanges(false);
@@ -229,8 +263,14 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
     };
 
     const header = columns.join(',');
+    const formatValue = (row: Record<string, any>, col: string) => {
+      if (col === 'attributes') {
+        return attributesToJson(sanitizeAttributes(row.attributes));
+      }
+      return row[col];
+    };
     const rows = data.map(row =>
-      columns.map(col => escapeCSV(row[col])).join(',')
+      columns.map(col => escapeCSV(formatValue(row, col))).join(',')
     );
 
     return [header, ...rows].join('\n');
@@ -301,7 +341,7 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
         is_partition: row.is_partition === 'true' || row.is_partition === '1',
         belongs_to: row.belongs_to,
         comment: row.comment,
-        ...row
+        attributes: sanitizeAttributes(parseAttributesJson((row as any).attributes)),
       }));
 
       setLocalNodes(() => [...newNodes]);
@@ -334,7 +374,7 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
         layer: row.layer,
         weight: row.weight ? parseFloat(row.weight) : 1,
         comment: row.comment,
-        ...row
+        attributes: sanitizeAttributes(parseAttributesJson((row as any).attributes)),
       }));
 
       setLocalEdges(() => [...newEdges]);
@@ -409,6 +449,36 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
     setLocalLayers([]);
     setHasChanges(true);
   };
+
+  const handleAttributesSave = (next: AttributesMap) => {
+    if (!attributesDialog) return;
+    if (attributesDialog.type === 'node') {
+      setLocalNodes(prev => {
+        const updated = [...prev];
+        const target = updated[attributesDialog.index];
+        if (target) {
+          updated[attributesDialog.index] = { ...target, attributes: sanitizeAttributes(next) };
+        }
+        return updated;
+      });
+    } else {
+      setLocalEdges(prev => {
+        const updated = [...prev];
+        const target = updated[attributesDialog.index];
+        if (target) {
+          updated[attributesDialog.index] = { ...target, attributes: sanitizeAttributes(next) };
+        }
+        return updated;
+      });
+    }
+    setHasChanges(true);
+    setAttributesDialog(null);
+  };
+
+  const currentAttributes =
+    attributesDialog?.type === 'node'
+      ? sanitizeAttributes(localNodes[attributesDialog.index]?.attributes)
+      : sanitizeAttributes(localEdges[attributesDialog?.index ?? 0]?.attributes);
 
   return (
     <Stack gap="md">
@@ -569,13 +639,29 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
                   <TableRow key={rowIdx}>
                     {nodeColumnDefs.map(col => (
                       <TableCell key={col}>
-                        {readOnly ? (
+                        {col === 'attributes' ? (
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs text-muted-foreground whitespace-pre-line">
+                              {attributesToInlineString(node.attributes)}
+                            </p>
+                            {!readOnly && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setAttributesDialog({ type: 'node', index: rowIdx })}
+                              >
+                                Edit
+                              </Button>
+                            )}
+                          </div>
+                        ) : readOnly ? (
                           <p className="text-sm">{String(node[col] ?? '')}</p>
                         ) : (
                           <Input
                             value={String(node[col] ?? '')}
                             onChange={(e) => handleNodeChange(rowIdx, col, e.currentTarget.value)}
                             className="h-7 text-xs border-none px-2"
+                            readOnly={col === 'attributes'}
                           />
                         )}
                       </TableCell>
@@ -622,7 +708,22 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
                   <TableRow key={rowIdx}>
                     {edgeColumnDefs.map(col => (
                       <TableCell key={col}>
-                        {readOnly ? (
+                        {col === 'attributes' ? (
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs text-muted-foreground whitespace-pre-line">
+                              {attributesToInlineString(edge.attributes)}
+                            </p>
+                            {!readOnly && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setAttributesDialog({ type: 'edge', index: rowIdx })}
+                              >
+                                Edit
+                              </Button>
+                            )}
+                          </div>
+                        ) : readOnly ? (
                           <p className="text-sm">{String(edge[col] ?? '')}</p>
                         ) : (
                           <Input
@@ -706,6 +807,12 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
           </ScrollArea>
         </TabsContent>
       </Tabs>
+      <AttributesEditorDialog
+        open={!!attributesDialog}
+        initialValue={currentAttributes}
+        onClose={() => setAttributesDialog(null)}
+        onSave={handleAttributesSave}
+      />
     </Stack>
   );
 };

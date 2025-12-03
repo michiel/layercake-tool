@@ -57,7 +57,9 @@ pub struct GraphNodePreview {
     pub layer: Option<String>,
     pub weight: Option<f64>,
     pub is_partition: bool,
+    /// Deprecated: use attributes
     pub attrs: Option<serde_json::Value>,
+    pub attributes: Option<serde_json::Value>,
 }
 
 /// Graph edge for preview
@@ -69,7 +71,9 @@ pub struct GraphEdgePreview {
     pub label: Option<String>,
     pub layer: Option<String>,
     pub weight: Option<f64>,
+    /// Deprecated: use attributes
     pub attrs: Option<serde_json::Value>,
+    pub attributes: Option<serde_json::Value>,
 }
 
 impl From<crate::database::entities::graph_nodes::Model> for GraphNodePreview {
@@ -80,7 +84,8 @@ impl From<crate::database::entities::graph_nodes::Model> for GraphNodePreview {
             layer: model.layer,
             weight: model.weight,
             is_partition: model.is_partition,
-            attrs: model.attrs,
+            attrs: model.attrs.clone(),
+            attributes: model.attrs,
         }
     }
 }
@@ -94,7 +99,8 @@ impl From<crate::database::entities::graph_edges::Model> for GraphEdgePreview {
             label: model.label,
             layer: model.layer,
             weight: model.weight,
-            attrs: model.attrs,
+            attrs: model.attrs.clone(),
+            attributes: model.attrs,
         }
     }
 }
