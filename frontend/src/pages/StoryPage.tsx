@@ -22,7 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Spinner } from '@/components/ui/spinner'
 import { GET_STORY, UPDATE_STORY, Story, StoryLayerConfig, UpdateStoryInput } from '@/graphql/stories'
 import { GET_DATASOURCES, DataSet } from '@/graphql/datasets'
-import { StorySequencesTab } from '@/components/stories/StorySequencesTab'
+import { StorySequencesEditor } from '@/components/stories/StorySequencesEditor'
 import { StoryLayersTab } from '@/components/stories/StoryLayersTab'
 
 const GET_PROJECTS = gql`
@@ -35,7 +35,7 @@ const GET_PROJECTS = gql`
   }
 `
 
-const VALID_TABS = ['sequences', 'datasets', 'layers'] as const
+const VALID_TABS = ['details', 'sequences', 'datasets', 'layers'] as const
 type TabValue = (typeof VALID_TABS)[number]
 
 export const StoryPage = () => {
@@ -45,14 +45,14 @@ export const StoryPage = () => {
   const projectIdNum = Number(projectId || 0)
   const storyIdNum = Number(storyId || 0)
 
-  // Get active tab from URL, default to 'sequences'
+  // Get active tab from URL, default to 'details'
   const tabParam = searchParams.get('tab')
-  const activeTab: TabValue = VALID_TABS.includes(tabParam as TabValue) ? (tabParam as TabValue) : 'sequences'
+  const activeTab: TabValue = VALID_TABS.includes(tabParam as TabValue) ? (tabParam as TabValue) : 'details'
 
   const setActiveTab = (tab: string) => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev)
-      if (tab === 'sequences') {
+      if (tab === 'details') {
         next.delete('tab')
       } else {
         next.set('tab', tab)
@@ -237,6 +237,10 @@ export const StoryPage = () => {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
+          <TabsTrigger value="details">
+            <IconListDetails className="mr-2 h-4 w-4" />
+            Details
+          </TabsTrigger>
           <TabsTrigger value="sequences">
             <IconListDetails className="mr-2 h-4 w-4" />
             Sequences
@@ -251,8 +255,7 @@ export const StoryPage = () => {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="sequences">
-          {/* Story Details Row */}
+        <TabsContent value="details">
           <Card className="border mt-4 mb-4">
             <CardContent className="py-4">
               <div className="grid gap-4 md:grid-cols-3">
@@ -298,7 +301,14 @@ export const StoryPage = () => {
               </div>
             </CardContent>
           </Card>
-          <StorySequencesTab storyId={storyIdNum} projectId={projectIdNum} />
+        </TabsContent>
+
+        <TabsContent value="sequences">
+          <StorySequencesEditor
+            storyId={storyIdNum}
+            projectId={projectIdNum}
+            enabledDatasetIds={enabledDatasetIds}
+          />
         </TabsContent>
 
         <TabsContent value="datasets">

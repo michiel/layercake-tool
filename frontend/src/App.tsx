@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Routes, Route, useNavigate, useParams, useLocation, Link } from 'react-router-dom'
+import { Routes, Route, Navigate, useNavigate, useParams, useLocation, Link } from 'react-router-dom'
 import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconDownload, IconChevronLeft, IconChevronRight, IconFolderPlus, IconBooks, IconAdjustments, IconHierarchy2, IconChevronDown, IconUpload, IconFlask } from '@tabler/icons-react'
 import { useQuery, useMutation } from '@apollo/client/react'
 import { gql } from '@apollo/client'
@@ -1988,7 +1988,6 @@ import { EditProjectPage } from './pages/EditProjectPage'
 import { WorkbenchPage } from './pages/WorkbenchPage'
 import { StoriesPage } from './pages/StoriesPage'
 import { StoryPage } from './pages/StoryPage'
-import { SequenceEditorPage } from './pages/SequenceEditorPage'
 
 // Main App component with routing
 function App() {
@@ -2059,7 +2058,7 @@ function App() {
           } />
           <Route path="/projects/:projectId/stories/:storyId/sequences/:sequenceId" element={
             <ErrorBoundary>
-              <SequenceEditorPage />
+              <Navigate replace to="../?tab=sequences" />
             </ErrorBoundary>
           } />
           <Route path="/projects/:projectId/graphs" element={

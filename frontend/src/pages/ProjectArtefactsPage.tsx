@@ -557,7 +557,7 @@ const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
       const storyConfig = parseConfig(entry.node.config)
       const storyId = storyConfig.storyId
       const storyLink = storyId && projectIdParam ? `/projects/${projectIdParam}/stories/${storyId}` : null
-      const sequenceLink = storyLink ? `${storyLink}/sequences/new` : null
+      const sequenceLink = storyLink ? `${storyLink}?tab=sequences` : null
 
       return (
         <div
