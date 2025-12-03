@@ -4,6 +4,8 @@ export type AttributesMap = Record<string, AttributeValue>;
 const isInteger = (value: unknown): value is number =>
   typeof value === 'number' && Number.isInteger(value);
 
+const VALID_TOKEN = /^[A-Za-z0-9_-]+$/;
+
 export const sanitizeAttributes = (value?: any): AttributesMap => {
   if (!value || typeof value !== 'object') return {};
   const entries: [string, AttributeValue][] = [];
@@ -49,4 +51,43 @@ export const parseAttributesJson = (raw?: string | null): AttributesMap => {
   } catch {
     return {};
   }
+};
+
+export type ParsedAttributesInline =
+  | { ok: true; value: AttributesMap }
+  | { ok: false; error: string };
+
+export const parseAttributesInline = (raw: string): ParsedAttributesInline => {
+  const text = raw.trim();
+  if (!text) return { ok: true, value: {} };
+
+  const parts = text.split(';').map(p => p.trim()).filter(Boolean);
+  const map: AttributesMap = {};
+
+  for (const part of parts) {
+    const [key, ...rest] = part.split(':');
+    const valueRaw = rest.join(':'); // allow colons in value only via join (not encouraged)
+    const keyTrimmed = key.trim();
+    if (!keyTrimmed) {
+      return { ok: false, error: 'Attribute keys cannot be empty' };
+    }
+    if (!VALID_TOKEN.test(keyTrimmed)) {
+      return { ok: false, error: `Invalid key "${keyTrimmed}" (use letters, numbers, _, -)` };
+    }
+
+    const valueTrimmed = valueRaw.trim();
+    if (valueTrimmed.length > 0 && !VALID_TOKEN.test(valueTrimmed)) {
+      return { ok: false, error: `Invalid value "${valueTrimmed}" (use letters, numbers, _, -)` };
+    }
+
+    if (valueTrimmed === '') {
+      map[keyTrimmed] = '';
+    } else if (/^-?\d+$/.test(valueTrimmed)) {
+      map[keyTrimmed] = parseInt(valueTrimmed, 10);
+    } else {
+      map[keyTrimmed] = valueTrimmed;
+    }
+  }
+
+  return { ok: true, value: map };
 };

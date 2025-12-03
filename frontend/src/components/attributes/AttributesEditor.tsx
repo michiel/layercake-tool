@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -48,10 +48,6 @@ const rowsToMap = (rows: AttributeRow[]): AttributesMap => {
 
 export const AttributesEditor: React.FC<AttributesEditorProps> = ({ value, onChange }) => {
   const [rows, setRows] = useState<AttributeRow[]>(() => toRows(value));
-
-  useEffect(() => {
-    setRows(toRows(value));
-  }, [JSON.stringify(value)]);
 
   const emitChange = (nextRows: AttributeRow[]) => {
     setRows(nextRows);

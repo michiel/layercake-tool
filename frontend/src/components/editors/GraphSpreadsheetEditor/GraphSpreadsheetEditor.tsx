@@ -6,8 +6,9 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { AttributesMap, attributesToInlineString, attributesToJson, parseAttributesJson, sanitizeAttributes } from '@/utils/attributes';
+import { AttributesMap, attributesToInlineString, attributesToJson, parseAttributesInline, parseAttributesJson, sanitizeAttributes } from '@/utils/attributes';
 import { AttributesEditorDialog } from '@/components/attributes/AttributesEditorDialog';
+import { IconEdit } from '@tabler/icons-react';
 
 export interface GraphNode {
   id: string;
@@ -84,6 +85,9 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
   const [hasChanges, setHasChanges] = useState(false);
   const [saving, setSaving] = useState(false);
   const [attributesDialog, setAttributesDialog] = useState<{ type: 'node' | 'edge'; index: number } | null>(null);
+  const [attributesTextNodes, setAttributesTextNodes] = useState<Record<string, string>>({});
+  const [attributesTextEdges, setAttributesTextEdges] = useState<Record<string, string>>({});
+  const [attributesErrors, setAttributesErrors] = useState<Record<string, string>>({});
   const layerEditingDisabled = readOnly || layersReadOnly;
 
   useEffect(() => {
@@ -91,6 +95,23 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
     setLocalEdges((graphData.edges || []).map(normalizeEdge));
     setLocalLayers(graphData.layers || []);
     setHasChanges(false);
+    setAttributesTextNodes(
+      Object.fromEntries(
+        (graphData.nodes || []).map(n => [
+          n.id,
+          attributesToInlineString(sanitizeAttributes(n.attributes || (n as any).attrs)),
+        ])
+      )
+    );
+    setAttributesTextEdges(
+      Object.fromEntries(
+        (graphData.edges || []).map(e => [
+          e.id,
+          attributesToInlineString(sanitizeAttributes(e.attributes || (e as any).attrs)),
+        ])
+      )
+    );
+    setAttributesErrors({});
   }, [graphData]);
 
   const nodeColumnDefs = ['id', 'label', 'layer', 'weight', 'is_partition', 'belongs_to', 'comment', 'attributes'];
@@ -132,6 +153,51 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
       ]);
       setHasChanges(true);
     }
+  };
+
+  const handleAttributesInlineChange = (
+    type: 'node' | 'edge',
+    id: string,
+    text: string,
+    rowIdx: number
+  ) => {
+    const parsed = parseAttributesInline(text);
+    if (type === 'node') {
+      setAttributesTextNodes(prev => ({ ...prev, [id]: text }));
+      if (parsed.ok) {
+        setAttributesErrors(prev => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+        setLocalNodes(prev => {
+          const next = [...prev];
+          const target = next[rowIdx];
+          if (target) next[rowIdx] = { ...target, attributes: parsed.value };
+          return next;
+        });
+      } else {
+        setAttributesErrors(prev => ({ ...prev, [id]: parsed.error }));
+      }
+    } else {
+      setAttributesTextEdges(prev => ({ ...prev, [id]: text }));
+      if (parsed.ok) {
+        setAttributesErrors(prev => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+        setLocalEdges(prev => {
+          const next = [...prev];
+          const target = next[rowIdx];
+          if (target) next[rowIdx] = { ...target, attributes: parsed.value };
+          return next;
+        });
+      } else {
+        setAttributesErrors(prev => ({ ...prev, [id]: parsed.error }));
+      }
+    }
+    setHasChanges(true);
   };
 
   const handleDeleteNode = (index: number) => {
@@ -426,6 +492,7 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
     }
 
     setLocalNodes([]);
+    setAttributesTextNodes({});
     setHasChanges(true);
   };
 
@@ -435,6 +502,7 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
     }
 
     setLocalEdges([]);
+    setAttributesTextEdges({});
     setHasChanges(true);
   };
 
@@ -641,18 +709,33 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
                       <TableCell key={col}>
                         {col === 'attributes' ? (
                           <div className="flex items-center gap-2">
-                            <p className="text-xs text-muted-foreground whitespace-pre-line">
-                              {attributesToInlineString(node.attributes)}
-                            </p>
-                            {!readOnly && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setAttributesDialog({ type: 'node', index: rowIdx })}
-                              >
-                                Edit
-                              </Button>
-                            )}
+                            <div className="flex flex-col flex-1 gap-1">
+                              <Input
+                                value={
+                                  attributesTextNodes[node.id] ??
+                                  attributesToInlineString(node.attributes)
+                                }
+                                onChange={(e) =>
+                                  handleAttributesInlineChange('node', node.id, e.target.value, rowIdx)
+                                }
+                                className={`h-7 text-xs px-2 ${attributesErrors[node.id] ? 'border-destructive' : ''}`}
+                                readOnly={readOnly}
+                                placeholder="key:val;priority:1"
+                              />
+                              {attributesErrors[node.id] && (
+                                <p className="text-[11px] text-destructive">
+                                  {attributesErrors[node.id]}
+                                </p>
+                              )}
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setAttributesDialog({ type: 'node', index: rowIdx })}
+                              title="Edit attributes"
+                            >
+                              <IconEdit className="h-4 w-4" />
+                            </Button>
                           </div>
                         ) : readOnly ? (
                           <p className="text-sm">{String(node[col] ?? '')}</p>
@@ -710,18 +793,33 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
                       <TableCell key={col}>
                         {col === 'attributes' ? (
                           <div className="flex items-center gap-2">
-                            <p className="text-xs text-muted-foreground whitespace-pre-line">
-                              {attributesToInlineString(edge.attributes)}
-                            </p>
-                            {!readOnly && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setAttributesDialog({ type: 'edge', index: rowIdx })}
-                              >
-                                Edit
-                              </Button>
-                            )}
+                            <div className="flex flex-col flex-1 gap-1">
+                              <Input
+                                value={
+                                  attributesTextEdges[edge.id] ??
+                                  attributesToInlineString(edge.attributes)
+                                }
+                                onChange={(e) =>
+                                  handleAttributesInlineChange('edge', edge.id, e.target.value, rowIdx)
+                                }
+                                className={`h-7 text-xs px-2 ${attributesErrors[edge.id] ? 'border-destructive' : ''}`}
+                                readOnly={readOnly}
+                                placeholder="key:val;priority:1"
+                              />
+                              {attributesErrors[edge.id] && (
+                                <p className="text-[11px] text-destructive">
+                                  {attributesErrors[edge.id]}
+                                </p>
+                              )}
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setAttributesDialog({ type: 'edge', index: rowIdx })}
+                              title="Edit attributes"
+                            >
+                              <IconEdit className="h-4 w-4" />
+                            </Button>
                           </div>
                         ) : readOnly ? (
                           <p className="text-sm">{String(edge[col] ?? '')}</p>
@@ -812,6 +910,7 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
         initialValue={currentAttributes}
         onClose={() => setAttributesDialog(null)}
         onSave={handleAttributesSave}
+        title="Attributes"
       />
     </Stack>
   );

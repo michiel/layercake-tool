@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { AttributesEditor } from './AttributesEditor';
@@ -25,6 +25,8 @@ export const AttributesEditorDialog: React.FC<AttributesEditorDialogProps> = ({
     setDraft(sanitizeAttributes(initialValue));
   }, [JSON.stringify(initialValue)]);
 
+  const resetKey = useMemo(() => JSON.stringify(initialValue ?? {}), [open, initialValue]);
+
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
       onClose();
@@ -43,7 +45,7 @@ export const AttributesEditorDialog: React.FC<AttributesEditorDialogProps> = ({
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
-        <AttributesEditor value={draft} onChange={setDraft} />
+        <AttributesEditor key={resetKey} value={draft} onChange={setDraft} />
         <DialogFooter className="mt-4">
           <Button variant="ghost" onClick={onClose}>
             Cancel
