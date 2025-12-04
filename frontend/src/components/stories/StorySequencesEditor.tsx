@@ -221,14 +221,16 @@ export const StorySequencesEditor = ({
   }
 
   const handleAppendEdge = async (edge: { datasetId: number; edgeId: string }) => {
-    if (!activeSequenceId) return
-    const seq = sequences.find((s) => s.id === activeSequenceId)
+    const targetSequenceId = activeSequenceId ?? sequences[0]?.id
+    if (!targetSequenceId) return
+    const seq = sequences.find((s) => s.id === targetSequenceId)
     if (!seq) return
     const nextEdgeOrder: SequenceEdgeRef[] = [...seq.edgeOrder, { datasetId: edge.datasetId, edgeId: edge.edgeId }]
     await updateSequence({
-      variables: { id: activeSequenceId, input: { edgeOrder: nextEdgeOrder } },
+      variables: { id: targetSequenceId, input: { edgeOrder: nextEdgeOrder } },
     })
     refetchSequences()
+    setActiveSequenceId(targetSequenceId)
   }
 
   const handleToggleExpand = (id: number) => {
@@ -303,20 +305,18 @@ export const StorySequencesEditor = ({
     const fromSeq = sequences.find((s) => s.id === fromSeqId)
     const toSeq = sequences.find((s) => s.id === toSeqId)
     if (!fromSeq || !toSeq) return
-    const edgeRef = fromSeq.edgeOrder[fromIndex]
+    const fromOrder = [...fromSeq.edgeOrder]
+    const [edgeRef] = fromOrder.splice(fromIndex, 1)
     if (!edgeRef) return
 
-    const nextFromOrder = fromSeq.edgeOrder.filter((_, idx) => idx !== fromIndex)
-    const nextToOrder = [...toSeq.edgeOrder]
-    const insertAt = toIndex === null ? nextToOrder.length : Math.max(0, Math.min(toIndex, nextToOrder.length))
-    nextToOrder.splice(insertAt, 0, edgeRef)
+    const targetOrder = fromSeqId === toSeqId ? fromOrder : [...toSeq.edgeOrder]
+    const insertAt = toIndex === null ? targetOrder.length : Math.max(0, Math.min(toIndex, targetOrder.length))
+    targetOrder.splice(insertAt, 0, edgeRef)
 
-    if (fromSeqId === toSeqId) {
-      await updateSequence({ variables: { id: fromSeqId, input: { edgeOrder: nextToOrder } } })
-    } else {
-      await updateSequence({ variables: { id: fromSeqId, input: { edgeOrder: nextFromOrder } } })
-      await updateSequence({ variables: { id: toSeqId, input: { edgeOrder: nextToOrder } } })
+    if (fromSeqId !== toSeqId) {
+      await updateSequence({ variables: { id: fromSeqId, input: { edgeOrder: fromOrder } } })
     }
+    await updateSequence({ variables: { id: toSeqId, input: { edgeOrder: targetOrder } } })
     refetchSequences()
   }
 
@@ -331,6 +331,7 @@ export const StorySequencesEditor = ({
 
   const handleDrop = (e: DragEvent, targetSequenceId: number, targetIndex: number | null) => {
     e.preventDefault()
+    e.stopPropagation()
     const data = e.dataTransfer.getData('application/json')
     if (!data) return
     try {
@@ -548,88 +549,97 @@ export const StorySequencesEditor = ({
                                 const target = resolveNode(edge.datasetId, edgeData?.target || '')
                                 const sourceColors = getLayerColors(source.layer)
                                 const targetColors = getLayerColors(target.layer)
+                                const isDropHere =
+                                  dragTarget?.sequenceId === sequence.id && dragTarget?.index === idx
                                 return (
-                                  <div
-                                    key={`${edge.datasetId}-${edge.edgeId}-${idx}`}
+                                  <div key={`${edge.datasetId}-${edge.edgeId}-${idx}`} className="space-y-1">
+                                    <div
+                                      className={cn(
+                                        'h-2 rounded border border-dashed border-transparent transition-colors',
+                                        isDropHere && 'border-primary/60 bg-primary/5'
+                                      )}
+                                      onDragEnter={() => handleDragEnter(sequence.id, idx)}
+                                      onDragOver={(e) => e.preventDefault()}
+                                      onDrop={(e) => handleDrop(e, sequence.id, idx)}
+                                    />
+                                    <div
                                       className={cn(
                                         'flex items-center justify-between text-xs px-2 py-1 rounded bg-muted lg:max-w-[50vw] transition-colors',
-                                        isActive && 'border border-primary/40',
-                                        dragTarget?.sequenceId === sequence.id &&
-                                          dragTarget?.index === idx &&
-                                        'ring-2 ring-primary/60'
-                                    )}
-                                    onClick={() => setActiveSequenceId(sequence.id)}
-                                    draggable
-                                    onDragStart={(e) => handleDragStart(e, sequence.id, idx)}
-                                    onDragOver={(e) => e.preventDefault()}
-                                    onDrop={(e) => handleDrop(e, sequence.id, idx)}
-                                    onDragEnter={() => handleDragEnter(sequence.id, idx)}
-                                    onDragEnd={() => setDragTarget(null)}
-                                  >
-                                    <Group gap="xs" className="mr-2">
-                                      <IconGripVertical className="h-4 w-4 text-muted-foreground" />
-                                    </Group>
-                                    <div className="flex-1 space-y-1">
-                                      <div className="grid grid-cols-[1fr_auto_auto_auto_1fr] items-center gap-2">
-                                        <span
-                                          className="px-2 py-0.5 rounded text-xs truncate w-[170px]"
-                                          style={{
-                                            backgroundColor: sourceColors?.bg || '#e5e7eb',
-                                            color: sourceColors?.text || '#000',
-                                          }}
-                                          title={source.label || edgeData?.source || 'Source'}
-                                        >
-                                          {source.label || edgeData?.source || 'Source'}
-                                        </span>
-                                        <IconArrowNarrowRight className="h-3 w-3 text-muted-foreground" />
-                                        <span className="text-[11px] text-muted-foreground text-center px-1 truncate w-[140px]">
-                                          {edgeData?.label || 'edge'}
-                                        </span>
-                                        <IconArrowNarrowRight className="h-3 w-3 text-muted-foreground" />
-                                        <span
-                                          className="px-2 py-0.5 rounded text-xs truncate w-[170px]"
-                                          style={{
-                                            backgroundColor: targetColors?.bg || '#e5e7eb',
-                                            color: targetColors?.text || '#000',
-                                          }}
-                                          title={target.label || edgeData?.target || 'Target'}
-                                        >
-                                          {target.label || edgeData?.target || 'Target'}
-                                        </span>
+                                        isActive && 'border border-primary/40'
+                                      )}
+                                      onClick={() => setActiveSequenceId(sequence.id)}
+                                      draggable
+                                      onDragStart={(e) => handleDragStart(e, sequence.id, idx)}
+                                      onDragOver={(e) => e.preventDefault()}
+                                      onDrop={(e) => handleDrop(e, sequence.id, idx)}
+                                      onDragEnter={() => handleDragEnter(sequence.id, idx)}
+                                      onDragEnd={() => setDragTarget(null)}
+                                    >
+                                      <Group gap="xs" className="mr-2">
+                                        <IconGripVertical className="h-4 w-4 text-muted-foreground" />
+                                      </Group>
+                                      <div className="flex-1">
+                                        <div className="grid grid-cols-[1fr_auto_auto_auto_1fr] items-center gap-2">
+                                          <span
+                                            className="px-2 py-0.5 rounded text-xs truncate w-[170px]"
+                                            style={{
+                                              backgroundColor: sourceColors?.bg || '#e5e7eb',
+                                              color: sourceColors?.text || '#000',
+                                            }}
+                                            title={source.label || edgeData?.source || 'Source'}
+                                          >
+                                            {source.label || edgeData?.source || 'Source'}
+                                          </span>
+                                          <IconArrowNarrowRight className="h-3 w-3 text-muted-foreground" />
+                                          <span className="text-[11px] text-muted-foreground text-center px-1 truncate w-[140px]">
+                                            {edgeData?.label || 'edge'}
+                                          </span>
+                                          <IconArrowNarrowRight className="h-3 w-3 text-muted-foreground" />
+                                          <span
+                                            className="px-2 py-0.5 rounded text-xs truncate w-[170px]"
+                                            style={{
+                                              backgroundColor: targetColors?.bg || '#e5e7eb',
+                                              color: targetColors?.text || '#000',
+                                            }}
+                                            title={target.label || edgeData?.target || 'Target'}
+                                          >
+                                            {target.label || edgeData?.target || 'Target'}
+                                          </span>
+                                        </div>
                                       </div>
+                                      <Group gap="xs" className="ml-2">
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="text-muted-foreground"
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            openEdgeEditor(sequence.id, edge, idx)
+                                          }}
+                                          title="Edit edge"
+                                        >
+                                          <IconAdjustments className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="text-destructive hover:text-destructive/80"
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            handleRemoveEdge(sequence.id, idx)
+                                          }}
+                                          title="Remove edge from sequence"
+                                        >
+                                          <IconX className="h-4 w-4" />
+                                        </Button>
+                                      </Group>
                                     </div>
-                                    <Group gap="xs" className="ml-2">
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="text-muted-foreground"
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          openEdgeEditor(sequence.id, edge, idx)
-                                        }}
-                                        title="Edit edge"
-                                      >
-                                        <IconAdjustments className="h-4 w-4" />
-                                      </Button>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="text-destructive hover:text-destructive/80"
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          handleRemoveEdge(sequence.id, idx)
-                                        }}
-                                        title="Remove edge from sequence"
-                                      >
-                                        <IconX className="h-4 w-4" />
-                                      </Button>
-                                    </Group>
                                   </div>
                                 )
                               })}
                               <div
                                 className={cn(
-                                  'h-2 rounded border border-dashed border-transparent',
+                                  'h-3 rounded border border-dashed border-transparent transition-colors',
                                   dragTarget?.sequenceId === sequence.id &&
                                     dragTarget?.index === null &&
                                     'border-primary/60 bg-primary/5'
