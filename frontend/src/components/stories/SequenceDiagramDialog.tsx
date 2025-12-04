@@ -184,9 +184,25 @@ export const SequenceDiagramDialog = ({
         const partitionLabel = partitionNode?.label || partitionNode?.name || partition
         const partitionLayer = partitionNode?.layer || partitionNode?.attrs?.layer
         const layerColors = getLayerColors(partitionLayer)
-        const bgColor = layerColors?.bg || 'transparent'
 
-        lines.push(`    box ${bgColor} ${escapeLabel(partitionLabel)}`)
+        // Convert color to RGB format that Mermaid supports
+        let boxColor = 'rgb(230, 230, 230)' // Default light grey
+        if (layerColors?.bg && layerColors.bg !== 'transparent') {
+          // Convert hex to rgb format if needed
+          const hexMatch = layerColors.bg.match(/^#([0-9a-f]{6})$/i)
+          if (hexMatch) {
+            const hex = hexMatch[1]
+            const r = parseInt(hex.slice(0, 2), 16)
+            const g = parseInt(hex.slice(2, 4), 16)
+            const b = parseInt(hex.slice(4, 6), 16)
+            boxColor = `rgb(${r}, ${g}, ${b})`
+          } else if (layerColors.bg.startsWith('rgb(')) {
+            // Use RGB as-is
+            boxColor = layerColors.bg
+          }
+        }
+
+        lines.push(`    box ${boxColor} ${escapeLabel(partitionLabel)}`)
         for (const nodeId of nodeIds) {
           const label = participantLabels.get(nodeId) || nodeId
           const participantId = makeParticipantId(nodeId)
