@@ -640,6 +640,7 @@ export const StorySequencesEditor = ({
                                 const targetColors = getLayerColors(target.layer)
                                 const isDropHere =
                                   dragTarget?.sequenceId === sequence.id && dragTarget?.index === idx
+                                const meta = [edgeData?.comments, edge.note].filter(Boolean).join(' • ')
                                 return (
                                   <div key={`${edge.datasetId}-${edge.edgeId}-${idx}`} className="space-y-1">
                                     <div
@@ -669,7 +670,7 @@ export const StorySequencesEditor = ({
                                       </Group>
                                       <div className="flex items-center gap-3 w-full">
                                         <div className="flex-[0_0_60%] min-w-0">
-                                          <div className="grid grid-cols-[1fr_auto_auto_auto_1fr] items-center gap-2">
+                                          <div className="grid grid-cols-[1fr_auto_auto_auto_1fr_auto] items-center gap-2">
                                             <span
                                               className="px-2 py-0.5 rounded text-xs truncate w-[150px]"
                                               style={{
@@ -695,12 +696,10 @@ export const StorySequencesEditor = ({
                                             >
                                               {target.label || edgeData?.target || 'Target'}
                                             </span>
+                                            <span className="text-[11px] text-muted-foreground truncate max-w-[180px]">
+                                              {meta || '\u00a0'}
+                                            </span>
                                           </div>
-                                          {(edgeData?.comments || edge.note) && (
-                                            <div className="text-[11px] text-muted-foreground mt-1 truncate">
-                                              {[edgeData?.comments, edge.note].filter(Boolean).join(' • ')}
-                                            </div>
-                                          )}
                                         </div>
                                         <Group gap="xs" className="ml-auto w-[40%] justify-end flex-shrink-0">
                                           <Button
