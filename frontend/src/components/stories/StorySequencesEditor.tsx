@@ -312,7 +312,7 @@ export const StorySequencesEditor = ({
           </Group>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-3">
-          <div className="space-y-3 h-full">
+          <div className="space-y-3 h-full lg:max-w-[36vw]">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-medium">Available edges</h3>
               <Badge variant="outline">{edgeCatalog.length}</Badge>
@@ -340,7 +340,7 @@ export const StorySequencesEditor = ({
                         <div className="flex items-center gap-2">
                           <span className="font-medium truncate max-w-[140px]">{datasetName}</span>
                         </div>
-                        <div className="grid grid-cols-[1fr_auto_auto_1fr] items-center gap-2 mt-1">
+                        <div className="grid grid-cols-[1fr_auto_auto_1fr_auto] items-center gap-1 mt-1 lg:max-w-[38vw]">
                           <span
                             className="px-2 py-0.5 rounded text-xs truncate max-w-[160px]"
                             style={{
