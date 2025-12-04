@@ -58,6 +58,7 @@ export const StorySequencesEditor = ({
   const [expandedDatasets, setExpandedDatasets] = useState<Set<number>>(new Set())
   // Tracks where a dragged edge would land for visual indicators.
   const [dragTarget, setDragTarget] = useState<{ sequenceId: number; index: number | null } | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
   const [edgeEditorPayload, setEdgeEditorPayload] = useState<{
     edge: GraphEdge | null
     datasetId: number
@@ -239,7 +240,7 @@ export const StorySequencesEditor = ({
     await updateSequence({
       variables: { id: targetSequenceId, input: { edgeOrder: nextEdgeOrder } },
     })
-    await refetchSequences()
+    // Optimistic update will persist until next server refresh
     setActiveSequenceId(targetSequenceId)
   }
 
@@ -253,7 +254,7 @@ export const StorySequencesEditor = ({
       sequences.map((s) => (s.id === sequenceId ? { ...s, edgeOrder: next, edgeCount: next.length } : s))
     )
     await updateSequence({ variables: { id: sequenceId, input: { edgeOrder: next } } })
-    await refetchSequences()
+    // Optimistic update will persist until next server refresh
     setActiveSequenceId(sequenceId)
   }
 
@@ -282,8 +283,11 @@ export const StorySequencesEditor = ({
     const seq = sequences.find((s) => s.id === sequenceId)
     if (!seq) return
     const nextEdgeOrder = seq.edgeOrder.filter((_, idx) => idx !== index)
+    setOptimisticSequences(
+      sequences.map((s) => (s.id === sequenceId ? { ...s, edgeOrder: nextEdgeOrder, edgeCount: nextEdgeOrder.length } : s))
+    )
     await updateSequence({ variables: { id: sequenceId, input: { edgeOrder: nextEdgeOrder } } })
-    refetchSequences()
+    // Optimistic update will persist until next server refresh
   }
 
   const openEdgeEditor = (sequenceId: number, edgeRef: SequenceEdgeRef, index: number) => {
@@ -313,8 +317,11 @@ export const StorySequencesEditor = ({
         ? { ...ref, note: updates.note ?? ref.note, notePosition: updates.notePosition ?? ref.notePosition }
         : ref
     )
+    setOptimisticSequences(
+      sequences.map((s) => (s.id === seq.id ? { ...s, edgeOrder: nextEdgeOrder } : s))
+    )
     await updateSequence({ variables: { id: seq.id, input: { edgeOrder: nextEdgeOrder } } })
-    refetchSequences()
+    // Optimistic update will persist until next server refresh
   }
 
   useEffect(() => {
@@ -357,12 +364,13 @@ export const StorySequencesEditor = ({
       await updateSequence({ variables: { id: fromSeqId, input: { edgeOrder: fromOrder } } })
     }
     await updateSequence({ variables: { id: toSeqId, input: { edgeOrder: targetOrder } } })
-    await refetchSequences()
+    // Optimistic update will persist until next server refresh
   }
 
   const handleDragStart = (e: DragEvent, sequenceId: number, index: number) => {
     e.dataTransfer.setData('application/json', JSON.stringify({ kind: 'sequence', sequenceId, index }))
     e.dataTransfer.effectAllowed = 'move'
+    setIsDragging(true)
   }
 
   const handleAvailableDragStart = (
@@ -371,6 +379,7 @@ export const StorySequencesEditor = ({
   ) => {
     e.dataTransfer.setData('application/json', JSON.stringify({ kind: 'available', edge }))
     e.dataTransfer.effectAllowed = 'copy'
+    setIsDragging(true)
   }
 
   const handleDragEnter = (sequenceId: number, index: number | null) => {
@@ -397,9 +406,11 @@ export const StorySequencesEditor = ({
       }
       setActiveSequenceId(targetSequenceId)
       setExpanded(new Set([targetSequenceId]))
-      setDragTarget(null)
     } catch (err) {
       console.error('Failed to parse drag data', err)
+    } finally {
+      setDragTarget(null)
+      setIsDragging(false)
     }
   }
 
@@ -459,10 +470,10 @@ export const StorySequencesEditor = ({
                               return (
                                 <div
                                   key={`${datasetId}-${edge.id}`}
-                                  className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded border hover:bg-muted/60 lg:max-w-[42vw]"
+                                  className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded border hover:bg-muted/60 lg:max-w-[42vw] transition-colors"
                                 >
                                   <button
-                                    className="p-0.5 rounded hover:bg-background shrink-0"
+                                    className="p-0.5 rounded hover:bg-background shrink-0 cursor-grab active:cursor-grabbing"
                                     draggable
                                     onDragStart={(e) =>
                                       handleAvailableDragStart(e, {
@@ -473,7 +484,10 @@ export const StorySequencesEditor = ({
                                         label: edge.label,
                                       })
                                     }
-                                    onDragEnd={() => setDragTarget(null)}
+                                    onDragEnd={() => {
+                                      setDragTarget(null)
+                                      setIsDragging(false)
+                                    }}
                                     title="Drag to insert into a sequence"
                                   >
                                     <IconGripVertical className="h-3.5 w-3.5 text-muted-foreground" />
@@ -645,8 +659,9 @@ export const StorySequencesEditor = ({
                                   <div key={`${edge.datasetId}-${edge.edgeId}-${idx}`} className="space-y-0">
                                     <div
                                       className={cn(
-                                        'h-1 rounded border border-dashed border-transparent transition-colors',
-                                        isDropHere && 'border-primary/60 bg-primary/5'
+                                        'h-0.5 rounded border-2 border-dashed border-transparent transition-all duration-150',
+                                        isDropHere && 'h-2 border-primary bg-primary/20 shadow-sm',
+                                        isDragging && 'border-muted-foreground/20'
                                       )}
                                       onDragEnter={() => handleDragEnter(sequence.id, idx)}
                                       onDragOver={(e) => e.preventDefault()}
@@ -654,8 +669,9 @@ export const StorySequencesEditor = ({
                                     />
                                     <div
                                       className={cn(
-                                        'flex items-center justify-between text-xs px-1.5 py-0.5 rounded bg-muted lg:max-w-[50vw] transition-colors',
-                                        isActive && 'border border-primary/40'
+                                        'flex items-center justify-between text-xs px-1.5 py-0.5 rounded bg-muted lg:max-w-[50vw] transition-colors cursor-grab active:cursor-grabbing',
+                                        isActive && 'border border-primary/40',
+                                        'hover:bg-muted/80'
                                       )}
                                       onClick={() => setActiveSequenceId(sequence.id)}
                                       draggable
@@ -663,9 +679,12 @@ export const StorySequencesEditor = ({
                                       onDragOver={(e) => e.preventDefault()}
                                       onDrop={(e) => handleDrop(e, sequence.id, idx)}
                                       onDragEnter={() => handleDragEnter(sequence.id, idx)}
-                                      onDragEnd={() => setDragTarget(null)}
+                                      onDragEnd={() => {
+                                        setDragTarget(null)
+                                        setIsDragging(false)
+                                      }}
                                     >
-                                      <Group gap="xs" className="mr-1">
+                                      <Group gap="xs" className="mr-1 cursor-grab">
                                         <IconGripVertical className="h-3.5 w-3.5 text-muted-foreground" />
                                       </Group>
                                       <div className="flex items-center gap-1 w-full min-w-0">
@@ -734,10 +753,11 @@ export const StorySequencesEditor = ({
                               })}
                               <div
                                 className={cn(
-                                  'h-1 rounded border border-dashed border-transparent transition-colors',
+                                  'h-0.5 rounded border-2 border-dashed border-transparent transition-all duration-150',
                                   dragTarget?.sequenceId === sequence.id &&
                                     dragTarget?.index === null &&
-                                    'border-primary/60 bg-primary/5'
+                                    'h-2 border-primary bg-primary/20 shadow-sm',
+                                  isDragging && 'border-muted-foreground/20'
                                 )}
                                 onDragEnter={() => handleDragEnter(sequence.id, null)}
                                 onDragOver={(e) => e.preventDefault()}
