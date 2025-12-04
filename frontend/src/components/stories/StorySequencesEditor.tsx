@@ -71,7 +71,9 @@ export const StorySequencesEditor = ({
   const { data: sequencesData, loading: sequencesLoading, refetch: refetchSequences } = useQuery(LIST_SEQUENCES, {
     variables: { storyId },
   })
-  const sequences: Sequence[] = (sequencesData as any)?.sequences || []
+  const sequencesFromQuery: Sequence[] = (sequencesData as any)?.sequences || []
+  const [optimisticSequences, setOptimisticSequences] = useState<Sequence[] | null>(null)
+  const sequences = optimisticSequences ?? sequencesFromQuery
 
   const { data: datasetsData, loading: datasetsLoading } = useQuery(GET_DATASOURCES, {
     variables: { projectId },
@@ -191,6 +193,11 @@ export const StorySequencesEditor = ({
   const [updateSequence] = useMutation(UPDATE_SEQUENCE)
   const [deleteSequence] = useMutation(DELETE_SEQUENCE)
 
+  useEffect(() => {
+    // Replace optimistic view with server truth when data refreshes.
+    setOptimisticSequences(null)
+  }, [sequencesData])
+
   const handleAddSequence = async () => {
     const defaultName = `Sequence ${sequences.length + 1}`
     const result = await createSequence({
@@ -226,10 +233,13 @@ export const StorySequencesEditor = ({
     const seq = sequences.find((s) => s.id === targetSequenceId)
     if (!seq) return
     const nextEdgeOrder: SequenceEdgeRef[] = [...seq.edgeOrder, { datasetId: edge.datasetId, edgeId: edge.edgeId }]
+    setOptimisticSequences(
+      sequences.map((s) => (s.id === targetSequenceId ? { ...s, edgeOrder: nextEdgeOrder, edgeCount: nextEdgeOrder.length } : s))
+    )
     await updateSequence({
       variables: { id: targetSequenceId, input: { edgeOrder: nextEdgeOrder } },
     })
-    refetchSequences()
+    await refetchSequences()
     setActiveSequenceId(targetSequenceId)
   }
 
@@ -313,11 +323,27 @@ export const StorySequencesEditor = ({
     const insertAt = toIndex === null ? targetOrder.length : Math.max(0, Math.min(toIndex, targetOrder.length))
     targetOrder.splice(insertAt, 0, edgeRef)
 
+    // Optimistic UI update.
+    setOptimisticSequences(
+      sequences.map((s) => {
+        if (s.id === fromSeqId && fromSeqId === toSeqId) {
+          return { ...s, edgeOrder: targetOrder, edgeCount: targetOrder.length }
+        }
+        if (s.id === fromSeqId) {
+          return { ...s, edgeOrder: fromOrder, edgeCount: fromOrder.length }
+        }
+        if (s.id === toSeqId) {
+          return { ...s, edgeOrder: targetOrder, edgeCount: targetOrder.length }
+        }
+        return s
+      })
+    )
+
     if (fromSeqId !== toSeqId) {
       await updateSequence({ variables: { id: fromSeqId, input: { edgeOrder: fromOrder } } })
     }
     await updateSequence({ variables: { id: toSeqId, input: { edgeOrder: targetOrder } } })
-    refetchSequences()
+    await refetchSequences()
   }
 
   const handleDragStart = (e: DragEvent, sequenceId: number, index: number) => {
@@ -329,14 +355,14 @@ export const StorySequencesEditor = ({
     setDragTarget({ sequenceId, index })
   }
 
-  const handleDrop = (e: DragEvent, targetSequenceId: number, targetIndex: number | null) => {
+  const handleDrop = async (e: DragEvent, targetSequenceId: number, targetIndex: number | null) => {
     e.preventDefault()
     e.stopPropagation()
     const data = e.dataTransfer.getData('application/json')
     if (!data) return
     try {
       const parsed = JSON.parse(data) as { sequenceId: number; index: number }
-      moveEdge(parsed.sequenceId, targetSequenceId, parsed.index, targetIndex)
+      await moveEdge(parsed.sequenceId, targetSequenceId, parsed.index, targetIndex)
       setActiveSequenceId(targetSequenceId)
       setExpanded(new Set([targetSequenceId]))
       setDragTarget(null)
@@ -555,7 +581,7 @@ export const StorySequencesEditor = ({
                                   <div key={`${edge.datasetId}-${edge.edgeId}-${idx}`} className="space-y-1">
                                     <div
                                       className={cn(
-                                        'h-2 rounded border border-dashed border-transparent transition-colors',
+                                        'h-3 rounded border border-dashed border-transparent transition-colors',
                                         isDropHere && 'border-primary/60 bg-primary/5'
                                       )}
                                       onDragEnter={() => handleDragEnter(sequence.id, idx)}
