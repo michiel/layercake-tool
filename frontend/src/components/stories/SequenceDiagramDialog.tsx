@@ -80,17 +80,17 @@ export const SequenceDiagramDialog = ({
 
   // Helper to get node label - searches across all enabled datasets
   const getNodeLabel = (nodeId: string): string => {
-    if (!sequence) return nodeId
+    if (!sequence) return 'Unknown'
     for (const dsId of sequence.enabledDatasetIds) {
       const graphData = datasetGraphData[dsId]
       if (!graphData) continue
       const node = graphData.nodes.find((n) => n.id === nodeId)
       if (node) {
         const label = node.label || node.name || node.attrs?.label || node.attrs?.name
-        return label && String(label).trim() ? String(label) : nodeId
+        return label && String(label).trim() ? String(label) : 'Unlabelled'
       }
     }
-    return nodeId
+    return 'Unknown'
   }
 
   // Helper to get edge info
@@ -137,7 +137,7 @@ export const SequenceDiagramDialog = ({
 
     // Add participant declarations
     for (const nodeId of participantOrder) {
-      const label = participantLabels.get(nodeId) || nodeId
+      const label = participantLabels.get(nodeId) || 'Unknown'
       const participantId = makeParticipantId(nodeId)
       lines.push(`    participant ${participantId} as "${escapeLabel(label)}"`)
     }
@@ -164,11 +164,12 @@ export const SequenceDiagramDialog = ({
         }
       }
 
+      // Build message from sequence number, label, and comments (never use edge ID)
       const orderNum = i + 1
       const parts: string[] = [String(orderNum)]
       if (edgeInfo.label) parts.push(escapeLabel(edgeInfo.label))
       if (edgeInfo.comments) parts.push(escapeLabel(edgeInfo.comments))
-      const message = parts.join(': ')
+      const message = parts.length > 1 ? parts.join(': ') : String(orderNum)
       lines.push(`    ${sourceId}->>${targetId}: ${message}`)
     }
 
