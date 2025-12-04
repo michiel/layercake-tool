@@ -415,8 +415,8 @@ export const StorySequencesEditor = ({
             </Button>
           </Group>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-3">
-          <div className="space-y-3 h-full lg:max-w-[30vw]">
+        <CardContent className="grid gap-3 md:grid-cols-3">
+          <div className="space-y-2 h-full lg:max-w-[30vw]">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-medium">Available edges</h3>
               <Badge variant="outline">{edgeCatalog.length}</Badge>
@@ -428,14 +428,14 @@ export const StorySequencesEditor = ({
               className="h-8"
             />
             <ScrollArea className="h-[520px] border rounded-md">
-              <div className="p-2 space-y-3">
+              <div className="p-1.5 space-y-2">
                 {edgeCatalog.length === 0 ? (
                   <p className="text-xs text-muted-foreground px-2 py-1">No edges available from enabled datasets.</p>
                 ) : (
                   groupedEdges.map(({ datasetId, name, edges }) => (
                     <div key={datasetId} className="border rounded-md">
                       <button
-                        className="w-full flex items-center justify-between px-2 py-2 text-left"
+                        className="w-full flex items-center justify-between px-2 py-1.5 text-left"
                         onClick={() => toggleDataset(datasetId)}
                       >
                         <Group gap="sm" align="center">
@@ -449,7 +449,7 @@ export const StorySequencesEditor = ({
                         <Badge variant="secondary">{edges.length}</Badge>
                       </button>
                       {expandedDatasets.has(datasetId) && (
-                        <div className="border-t px-2 py-2 space-y-2">
+                        <div className="border-t px-2 py-1 space-y-0.5">
                           {edges.length === 0 ? (
                             <p className="text-[11px] text-muted-foreground px-1">No edges in this dataset.</p>
                           ) : (
@@ -459,10 +459,10 @@ export const StorySequencesEditor = ({
                               return (
                                 <div
                                   key={`${datasetId}-${edge.id}`}
-                                  className="flex items-center gap-2 text-xs px-2 py-2 rounded border hover:bg-muted lg:max-w-[42vw]"
+                                  className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded border hover:bg-muted/60 lg:max-w-[42vw]"
                                 >
                                   <button
-                                    className="p-1 rounded hover:bg-background"
+                                    className="p-0.5 rounded hover:bg-background shrink-0"
                                     draggable
                                     onDragStart={(e) =>
                                       handleAvailableDragStart(e, {
@@ -476,16 +476,16 @@ export const StorySequencesEditor = ({
                                     onDragEnd={() => setDragTarget(null)}
                                     title="Drag to insert into a sequence"
                                   >
-                                    <IconGripVertical className="h-4 w-4 text-muted-foreground" />
+                                    <IconGripVertical className="h-3.5 w-3.5 text-muted-foreground" />
                                   </button>
                                   <button
-                                    className="flex-1 text-left"
+                                    className="flex-1 text-left min-w-0"
                                     onClick={() => handleAppendEdge({ datasetId, edgeId: edge.id })}
                                     title="Add to active sequence"
                                   >
-                                    <div className="grid grid-cols-[1fr_auto_auto_auto_1fr] items-center gap-1 lg:max-w-[38vw]">
+                                    <div className="flex items-center gap-1 lg:max-w-[38vw] min-w-0">
                                       <span
-                                        className="px-2 py-0.5 rounded text-xs truncate w-[150px]"
+                                        className="px-1.5 py-0.5 rounded text-[11px] leading-tight truncate w-[140px] shrink-0 text-left"
                                         style={{
                                           backgroundColor: sourceColors?.bg || '#e5e7eb',
                                           color: sourceColors?.text || '#000',
@@ -494,13 +494,13 @@ export const StorySequencesEditor = ({
                                       >
                                         {source.label}
                                       </span>
-                                      <IconArrowNarrowRight className="h-3 w-3 text-muted-foreground" />
-                                      <span className="text-[11px] text-muted-foreground text-center px-1 truncate w-[140px]">
+                                      <IconArrowNarrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
+                                      <span className="text-[11px] text-muted-foreground leading-tight truncate w-[130px] shrink-0 text-left">
                                         {edge.label || 'edge'}
                                       </span>
-                                      <IconArrowNarrowRight className="h-3 w-3 text-muted-foreground" />
+                                      <IconArrowNarrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
                                       <span
-                                        className="px-2 py-0.5 rounded text-xs truncate w-[150px]"
+                                        className="px-1.5 py-0.5 rounded text-[11px] leading-tight truncate w-[140px] shrink-0 text-left"
                                         style={{
                                           backgroundColor: targetColors?.bg || '#e5e7eb',
                                           color: targetColors?.text || '#000',
@@ -514,11 +514,11 @@ export const StorySequencesEditor = ({
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="text-muted-foreground"
+                                    className="text-muted-foreground h-6 w-6"
                                     onClick={() => handleAppendEdge({ datasetId, edgeId: edge.id })}
                                     title="Add to active sequence"
                                   >
-                                    <IconPlus className="h-4 w-4" />
+                                    <IconPlus className="h-3.5 w-3.5" />
                                   </Button>
                                 </div>
                               )
@@ -543,7 +543,7 @@ export const StorySequencesEditor = ({
                 <p>No sequences yet. Add a section to start.</p>
               </div>
             ) : (
-              <Stack gap="sm">
+              <Stack gap="xs">
                 {sequences.map((sequence) => {
                   const isActive = activeSequenceId
                     ? activeSequenceId === sequence.id
@@ -558,7 +558,7 @@ export const StorySequencesEditor = ({
                       )}
                     >
                       <button
-                        className="w-full flex items-center justify-between px-3 py-2 text-left"
+                        className="w-full flex items-center justify-between px-3 py-1.5 text-left"
                         onClick={() => handleToggleExpand(sequence.id)}
                       >
                         <Group gap="sm" align="center">
@@ -621,7 +621,7 @@ export const StorySequencesEditor = ({
                         </Group>
                       </button>
                       {isExpanded && (
-                        <div className="px-4 pb-3 space-y-3">
+                        <div className="px-3 pb-2 space-y-2">
                           {sequence.edgeOrder.length === 0 ? (
                             <p className="text-xs text-muted-foreground">No edges yet. Click an edge to add it.</p>
                           ) : (
@@ -642,10 +642,10 @@ export const StorySequencesEditor = ({
                                   dragTarget?.sequenceId === sequence.id && dragTarget?.index === idx
                                 const meta = [edgeData?.comments, edge.note].filter(Boolean).join(' • ')
                                 return (
-                                  <div key={`${edge.datasetId}-${edge.edgeId}-${idx}`} className="space-y-1">
+                                  <div key={`${edge.datasetId}-${edge.edgeId}-${idx}`} className="space-y-0">
                                     <div
                                       className={cn(
-                                        'h-3 rounded border border-dashed border-transparent transition-colors',
+                                        'h-1 rounded border border-dashed border-transparent transition-colors',
                                         isDropHere && 'border-primary/60 bg-primary/5'
                                       )}
                                       onDragEnter={() => handleDragEnter(sequence.id, idx)}
@@ -654,7 +654,7 @@ export const StorySequencesEditor = ({
                                     />
                                     <div
                                       className={cn(
-                                        'flex items-center justify-between text-xs px-2 py-1 rounded bg-muted lg:max-w-[50vw] transition-colors',
+                                        'flex items-center justify-between text-xs px-1.5 py-0.5 rounded bg-muted lg:max-w-[50vw] transition-colors',
                                         isActive && 'border border-primary/40'
                                       )}
                                       onClick={() => setActiveSequenceId(sequence.id)}
@@ -665,14 +665,14 @@ export const StorySequencesEditor = ({
                                       onDragEnter={() => handleDragEnter(sequence.id, idx)}
                                       onDragEnd={() => setDragTarget(null)}
                                     >
-                                      <Group gap="xs" className="mr-2">
-                                        <IconGripVertical className="h-4 w-4 text-muted-foreground" />
+                                      <Group gap="xs" className="mr-1">
+                                        <IconGripVertical className="h-3.5 w-3.5 text-muted-foreground" />
                                       </Group>
-                                      <div className="flex items-center gap-3 w-full">
-                                        <div className="flex-[0_0_60%] min-w-0">
-                                          <div className="grid grid-cols-[150px_auto_140px_auto_150px_200px] items-center gap-2">
+                                      <div className="flex items-center gap-1 w-full min-w-0">
+                                        <div className="flex-1 min-w-0">
+                                          <div className="flex items-center gap-1 min-w-0">
                                             <span
-                                              className="px-2 py-0.5 rounded text-xs truncate w-[150px]"
+                                              className="px-1.5 py-0.5 rounded text-[11px] leading-tight truncate w-[140px] shrink-0 text-left"
                                               style={{
                                                 backgroundColor: sourceColors?.bg || '#e5e7eb',
                                                 color: sourceColors?.text || '#000',
@@ -681,13 +681,13 @@ export const StorySequencesEditor = ({
                                             >
                                               {source.label || edgeData?.source || 'Source'}
                                             </span>
-                                            <IconArrowNarrowRight className="h-3 w-3 text-muted-foreground" />
-                                            <span className="text-[11px] text-muted-foreground text-center px-1 truncate w-[140px]">
+                                            <IconArrowNarrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
+                                            <span className="text-[11px] text-muted-foreground leading-tight truncate w-[130px] shrink-0 text-left">
                                               {edgeData?.label || 'edge'}
                                             </span>
-                                            <IconArrowNarrowRight className="h-3 w-3 text-muted-foreground" />
+                                            <IconArrowNarrowRight className="h-3 w-3 text-muted-foreground shrink-0" />
                                             <span
-                                              className="px-2 py-0.5 rounded text-xs truncate w-[150px]"
+                                              className="px-1.5 py-0.5 rounded text-[11px] leading-tight truncate w-[140px] shrink-0 text-left"
                                               style={{
                                                 backgroundColor: targetColors?.bg || '#e5e7eb',
                                                 color: targetColors?.text || '#000',
@@ -696,35 +696,35 @@ export const StorySequencesEditor = ({
                                             >
                                               {target.label || edgeData?.target || 'Target'}
                                             </span>
-                                            <span className="text-[11px] text-muted-foreground truncate w-[200px]">
+                                            <span className="ml-1 text-[11px] text-muted-foreground truncate max-w-[180px]">
                                               {meta || '\u00a0'}
                                             </span>
                                           </div>
                                         </div>
-                                        <Group gap="xs" className="ml-auto w-[40%] justify-end flex-shrink-0">
+                                        <Group gap="xs" className="ml-1 justify-end flex-shrink-0">
                                           <Button
                                             variant="ghost"
                                             size="icon"
-                                            className="text-muted-foreground"
+                                            className="text-muted-foreground h-6 w-6"
                                             onClick={(e) => {
                                               e.stopPropagation()
                                               openEdgeEditor(sequence.id, edge, idx)
                                             }}
                                             title="Edit edge"
                                           >
-                                            <IconAdjustments className="h-4 w-4" />
+                                            <IconAdjustments className="h-3.5 w-3.5" />
                                           </Button>
                                           <Button
                                             variant="ghost"
                                             size="icon"
-                                            className="text-destructive hover:text-destructive/80"
+                                            className="text-destructive hover:text-destructive/80 h-6 w-6"
                                             onClick={(e) => {
                                               e.stopPropagation()
                                               handleRemoveEdge(sequence.id, idx)
                                             }}
                                             title="Remove edge from sequence"
                                           >
-                                            <IconX className="h-4 w-4" />
+                                            <IconX className="h-3.5 w-3.5" />
                                           </Button>
                                         </Group>
                                       </div>
@@ -734,7 +734,7 @@ export const StorySequencesEditor = ({
                               })}
                               <div
                                 className={cn(
-                                  'h-3 rounded border border-dashed border-transparent transition-colors',
+                                  'h-1 rounded border border-dashed border-transparent transition-colors',
                                   dragTarget?.sequenceId === sequence.id &&
                                     dragTarget?.index === null &&
                                     'border-primary/60 bg-primary/5'
