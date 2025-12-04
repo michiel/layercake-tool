@@ -553,8 +553,8 @@ export const StorySequencesEditor = ({
                     <div
                       key={sequence.id}
                       className={cn(
-                        'border rounded-md',
-                        isActive && 'border-primary shadow-sm'
+                        'border rounded-md transition-colors',
+                        isActive && 'border-primary bg-primary/5 shadow-md ring-1 ring-primary/20'
                       )}
                     >
                       <button
