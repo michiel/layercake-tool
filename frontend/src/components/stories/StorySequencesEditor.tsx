@@ -571,8 +571,8 @@ export const StorySequencesEditor = ({
                         isActive && 'border-primary bg-primary/5 shadow-md ring-1 ring-primary/20'
                       )}
                     >
-                      <button
-                        className="w-full flex items-center justify-between px-3 py-1.5 text-left"
+                      <div
+                        className="w-full flex items-center justify-between px-3 py-1.5 text-left cursor-pointer"
                         onClick={() => handleToggleExpand(sequence.id)}
                       >
                         <Group gap="sm" align="center">
@@ -633,7 +633,7 @@ export const StorySequencesEditor = ({
                             <IconTrash className="h-4 w-4" />
                           </Button>
                         </Group>
-                      </button>
+                      </div>
                       {isExpanded && (
                         <div className="px-3 pb-2 space-y-2 bg-background">
                           {sequence.edgeOrder.length === 0 ? (
