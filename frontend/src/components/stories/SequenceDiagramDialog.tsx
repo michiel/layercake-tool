@@ -139,7 +139,7 @@ export const SequenceDiagramDialog = ({
     for (const nodeId of participantOrder) {
       const label = participantLabels.get(nodeId) || 'Unknown'
       const participantId = makeParticipantId(nodeId)
-      lines.push(`    participant ${participantId} as "${escapeLabel(label)}"`)
+      lines.push(`    participant ${participantId} as ${escapeLabel(label)}`)
     }
 
     // Add edges as messages
