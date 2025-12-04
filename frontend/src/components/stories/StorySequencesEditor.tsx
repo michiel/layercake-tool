@@ -297,34 +297,32 @@ export const StorySequencesEditor = ({
                         onClick={() => handleAppendEdge({ datasetId, edgeId: edge.id })}
                       >
                         <div className="flex items-center gap-2">
-                          <span className="font-medium">{datasetName}</span>
-                          <Badge variant="secondary">{edge.id}</Badge>
+                          <span className="font-medium truncate max-w-[140px]">{datasetName}</span>
                         </div>
-                        <div className="flex items-center gap-2 mt-1">
+                        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 mt-1">
                           <span
-                            className="px-2 py-0.5 rounded"
+                            className="px-2 py-0.5 rounded text-xs truncate max-w-[160px]"
                             style={{
                               backgroundColor: sourceColors?.bg || '#e5e7eb',
                               color: sourceColors?.text || '#000',
                             }}
+                            title={source.label}
                           >
                             {source.label}
                           </span>
-                          <span className="text-muted-foreground">→</span>
+                          <span className="text-[11px] text-muted-foreground text-center px-1 truncate max-w-[140px]">
+                            {edge.label || 'edge'}
+                          </span>
                           <span
-                            className="px-2 py-0.5 rounded"
+                            className="px-2 py-0.5 rounded text-xs truncate max-w-[160px] justify-self-end"
                             style={{
                               backgroundColor: targetColors?.bg || '#e5e7eb',
                               color: targetColors?.text || '#000',
                             }}
+                            title={target.label}
                           >
                             {target.label}
                           </span>
-                          {edge.label && (
-                            <span className="text-[11px] text-muted-foreground truncate">
-                              · {edge.label}
-                            </span>
-                          )}
                         </div>
                       </button>
                     )
@@ -444,27 +442,30 @@ export const StorySequencesEditor = ({
                                     onClick={() => setActiveSequenceId(sequence.id)}
                                   >
                                     <div className="flex-1 space-y-1">
-                                      <div className="flex items-center gap-2">
+                                      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
                                         <span
-                                          className="px-2 py-0.5 rounded"
+                                          className="px-2 py-0.5 rounded text-xs truncate max-w-[160px]"
                                           style={{
                                             backgroundColor: sourceColors?.bg || '#e5e7eb',
                                             color: sourceColors?.text || '#000',
                                           }}
+                                          title={source.label || edgeData?.source || 'Source'}
                                         >
                                           {source.label || edgeData?.source || 'Source'}
                                         </span>
-                                        <span className="text-muted-foreground">→</span>
+                                        <span className="text-[11px] text-muted-foreground text-center px-1 truncate max-w-[140px]">
+                                          {edgeData?.label || 'edge'}
+                                        </span>
                                         <span
-                                          className="px-2 py-0.5 rounded"
+                                          className="px-2 py-0.5 rounded text-xs truncate max-w-[160px] justify-self-end"
                                           style={{
                                             backgroundColor: targetColors?.bg || '#e5e7eb',
                                             color: targetColors?.text || '#000',
                                           }}
+                                          title={target.label || edgeData?.target || 'Target'}
                                         >
                                           {target.label || edgeData?.target || 'Target'}
                                         </span>
-                                        <Badge variant="outline">{edge.edgeId}</Badge>
                                       </div>
                                       <div className="text-[11px] text-muted-foreground flex items-center gap-2">
                                         <span>DS {edge.datasetId}</span>
