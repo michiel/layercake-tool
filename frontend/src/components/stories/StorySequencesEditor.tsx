@@ -491,6 +491,9 @@ export const StorySequencesEditor = ({
                                     onDragOver={(e) => e.preventDefault()}
                                     onDrop={(e) => handleDrop(e, sequence.id, idx)}
                                   >
+                                    <Group gap="xs" className="mr-2">
+                                      <IconGripVertical className="h-4 w-4 text-muted-foreground" />
+                                    </Group>
                                     <div className="flex-1 space-y-1">
                                       <div className="grid grid-cols-[1fr_auto_auto_1fr] items-center gap-2">
                                         <span
@@ -523,8 +526,7 @@ export const StorySequencesEditor = ({
                                         {edge.note && <span>· {edge.note}</span>}
                                       </div>
                                     </div>
-                                    <Group gap="xs">
-                                      <IconGripVertical className="h-4 w-4 text-muted-foreground" />
+                                    <Group gap="xs" className="ml-2">
                                       <Button
                                         variant="ghost"
                                         size="icon"
