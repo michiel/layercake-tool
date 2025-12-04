@@ -1,3 +1,4 @@
+import type { DragEvent } from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery } from '@apollo/client/react'
 import {
@@ -9,6 +10,7 @@ import {
   IconAdjustments,
   IconX,
   IconGripVertical,
+  IconArrowNarrowRight,
 } from '@tabler/icons-react'
 import { Group, Stack } from '@/components/layout-primitives'
 import { Badge } from '@/components/ui/badge'
@@ -53,6 +55,9 @@ export const StorySequencesEditor = ({
   const [editingTitleId, setEditingTitleId] = useState<number | null>(null)
   const [titleDraft, setTitleDraft] = useState('')
   const [edgeEditorOpen, setEdgeEditorOpen] = useState(false)
+  const [expandedDatasets, setExpandedDatasets] = useState<Set<number>>(new Set())
+  // Tracks where a dragged edge would land for visual indicators.
+  const [dragTarget, setDragTarget] = useState<{ sequenceId: number; index: number | null } | null>(null)
   const [edgeEditorPayload, setEdgeEditorPayload] = useState<{
     edge: GraphEdge | null
     datasetId: number
@@ -146,6 +151,41 @@ export const StorySequencesEditor = ({
     })
     return filtered
   }, [datasets, enabledDatasetIds, datasetGraphs, resolveNode, edgeFilter])
+
+  const groupedEdges = useMemo(() => {
+    const groups = new Map<number, { name: string; edges: typeof edgeCatalog }>()
+    datasets.forEach((ds) => {
+      if (!enabledDatasetIds.includes(ds.id)) return
+      groups.set(ds.id, { name: ds.name, edges: [] as any })
+    })
+    edgeCatalog.forEach((item) => {
+      const group = groups.get(item.datasetId)
+      if (group) {
+        group.edges.push(item)
+      }
+    })
+    return Array.from(groups.entries()).map(([datasetId, group]) => ({
+      datasetId,
+      name: group.name,
+      edges: group.edges,
+    }))
+  }, [edgeCatalog, datasets, enabledDatasetIds])
+
+  useEffect(() => {
+    if (expandedDatasets.size === 0 && groupedEdges.length > 0) {
+      setExpandedDatasets(new Set(groupedEdges.map((g) => g.datasetId)))
+    }
+  }, [groupedEdges, expandedDatasets])
+
+  const toggleDataset = (datasetId: number) => {
+    const next = new Set(expandedDatasets)
+    if (next.has(datasetId)) {
+      next.delete(datasetId)
+    } else {
+      next.add(datasetId)
+    }
+    setExpandedDatasets(next)
+  }
 
   const [createSequence] = useMutation(CREATE_SEQUENCE)
   const [updateSequence] = useMutation(UPDATE_SEQUENCE)
@@ -280,12 +320,16 @@ export const StorySequencesEditor = ({
     refetchSequences()
   }
 
-  const handleDragStart = (e: React.DragEvent, sequenceId: number, index: number) => {
+  const handleDragStart = (e: DragEvent, sequenceId: number, index: number) => {
     e.dataTransfer.setData('application/json', JSON.stringify({ sequenceId, index }))
     e.dataTransfer.effectAllowed = 'move'
   }
 
-  const handleDrop = (e: React.DragEvent, targetSequenceId: number, targetIndex: number | null) => {
+  const handleDragEnter = (sequenceId: number, index: number | null) => {
+    setDragTarget({ sequenceId, index })
+  }
+
+  const handleDrop = (e: DragEvent, targetSequenceId: number, targetIndex: number | null) => {
     e.preventDefault()
     const data = e.dataTransfer.getData('application/json')
     if (!data) return
@@ -294,6 +338,7 @@ export const StorySequencesEditor = ({
       moveEdge(parsed.sequenceId, targetSequenceId, parsed.index, targetIndex)
       setActiveSequenceId(targetSequenceId)
       setExpanded(new Set([targetSequenceId]))
+      setDragTarget(null)
     } catch (err) {
       console.error('Failed to parse drag data', err)
     }
@@ -312,7 +357,7 @@ export const StorySequencesEditor = ({
           </Group>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-3">
-          <div className="space-y-3 h-full lg:max-w-[36vw]">
+          <div className="space-y-3 h-full lg:max-w-[30vw]">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-medium">Available edges</h3>
               <Badge variant="outline">{edgeCatalog.length}</Badge>
@@ -324,51 +369,75 @@ export const StorySequencesEditor = ({
               className="h-8"
             />
             <ScrollArea className="h-[520px] border rounded-md">
-              <div className="p-2 space-y-2">
+              <div className="p-2 space-y-3">
                 {edgeCatalog.length === 0 ? (
                   <p className="text-xs text-muted-foreground px-2 py-1">No edges available from enabled datasets.</p>
                 ) : (
-                  edgeCatalog.map(({ datasetId, datasetName, edge, source, target }) => {
-                    const sourceColors = getLayerColors(source.layer)
-                    const targetColors = getLayerColors(target.layer)
-                    return (
+                  groupedEdges.map(({ datasetId, name, edges }) => (
+                    <div key={datasetId} className="border rounded-md">
                       <button
-                        key={`${datasetId}-${edge.id}`}
-                        className="w-full text-left text-xs px-2 py-2 rounded border hover:bg-muted lg:max-w-[50vw]"
-                        onClick={() => handleAppendEdge({ datasetId, edgeId: edge.id })}
+                        className="w-full flex items-center justify-between px-2 py-2 text-left"
+                        onClick={() => toggleDataset(datasetId)}
                       >
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium truncate max-w-[140px]">{datasetName}</span>
-                        </div>
-                        <div className="grid grid-cols-[1fr_auto_auto_1fr_auto] items-center gap-1 mt-1 lg:max-w-[38vw]">
-                          <span
-                            className="px-2 py-0.5 rounded text-xs truncate max-w-[160px]"
-                            style={{
-                              backgroundColor: sourceColors?.bg || '#e5e7eb',
-                              color: sourceColors?.text || '#000',
-                            }}
-                            title={source.label}
-                          >
-                            {source.label}
-                          </span>
-                          <span className="text-muted-foreground text-xs">→</span>
-                          <span className="text-[11px] text-muted-foreground text-center px-1 truncate max-w-[140px]">
-                            {edge.label || 'edge'}
-                          </span>
-                          <span
-                            className="px-2 py-0.5 rounded text-xs truncate max-w-[160px] justify-self-end"
-                            style={{
-                              backgroundColor: targetColors?.bg || '#e5e7eb',
-                              color: targetColors?.text || '#000',
-                            }}
-                            title={target.label}
-                          >
-                            {target.label}
-                          </span>
-                        </div>
+                        <Group gap="sm" align="center">
+                          {expandedDatasets.has(datasetId) ? (
+                            <IconChevronDown className="h-4 w-4" />
+                          ) : (
+                            <IconChevronRight className="h-4 w-4" />
+                          )}
+                          <span className="font-medium text-sm truncate max-w-[160px]">{name}</span>
+                        </Group>
+                        <Badge variant="secondary">{edges.length}</Badge>
                       </button>
-                    )
-                  })
+                      {expandedDatasets.has(datasetId) && (
+                        <div className="border-t px-2 py-2 space-y-2">
+                          {edges.length === 0 ? (
+                            <p className="text-[11px] text-muted-foreground px-1">No edges in this dataset.</p>
+                          ) : (
+                            edges.map(({ edge, source, target }) => {
+                              const sourceColors = getLayerColors(source.layer)
+                              const targetColors = getLayerColors(target.layer)
+                              return (
+                                <button
+                                  key={`${datasetId}-${edge.id}`}
+                                  className="w-full text-left text-xs px-2 py-2 rounded border hover:bg-muted lg:max-w-[42vw]"
+                                  onClick={() => handleAppendEdge({ datasetId, edgeId: edge.id })}
+                                >
+                                  <div className="grid grid-cols-[1fr_auto_auto_auto_1fr] items-center gap-1 lg:max-w-[38vw]">
+                                    <span
+                                      className="px-2 py-0.5 rounded text-xs truncate w-[150px]"
+                                      style={{
+                                        backgroundColor: sourceColors?.bg || '#e5e7eb',
+                                        color: sourceColors?.text || '#000',
+                                      }}
+                                      title={source.label}
+                                    >
+                                      {source.label}
+                                    </span>
+                                    <IconArrowNarrowRight className="h-3 w-3 text-muted-foreground" />
+                                    <span className="text-[11px] text-muted-foreground text-center px-1 truncate w-[140px]">
+                                      {edge.label || 'edge'}
+                                    </span>
+                                    <IconArrowNarrowRight className="h-3 w-3 text-muted-foreground" />
+                                    <span
+                                      className="px-2 py-0.5 rounded text-xs truncate w-[150px]"
+                                      style={{
+                                        backgroundColor: targetColors?.bg || '#e5e7eb',
+                                        color: targetColors?.text || '#000',
+                                      }}
+                                      title={target.label}
+                                    >
+                                      {target.label}
+                                    </span>
+                                  </div>
+                                </button>
+                              )
+                            })
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))
                 )}
               </div>
             </ScrollArea>
@@ -469,7 +538,8 @@ export const StorySequencesEditor = ({
                             <Stack
                               gap="xs"
                               onDragOver={(e) => e.preventDefault()}
-                              onDrop={(e) => handleDrop(e, sequence.id, null)}
+                              onDrop={(e) => handleDrop(e, sequence.id, dragTarget?.index ?? null)}
+                              onDragEnter={() => handleDragEnter(sequence.id, null)}
                             >
                               {sequence.edgeOrder.map((edge, idx) => {
                                 const dsGraph = datasetGraphs.get(edge.datasetId)
@@ -481,23 +551,28 @@ export const StorySequencesEditor = ({
                                 return (
                                   <div
                                     key={`${edge.datasetId}-${edge.edgeId}-${idx}`}
-                                    className={cn(
-                                      'flex items-center justify-between text-xs px-2 py-1 rounded bg-muted lg:max-w-[50vw]',
-                                      isActive && 'border border-primary/40'
+                                      className={cn(
+                                        'flex items-center justify-between text-xs px-2 py-1 rounded bg-muted lg:max-w-[50vw] transition-colors',
+                                        isActive && 'border border-primary/40',
+                                        dragTarget?.sequenceId === sequence.id &&
+                                          dragTarget?.index === idx &&
+                                        'ring-2 ring-primary/60'
                                     )}
                                     onClick={() => setActiveSequenceId(sequence.id)}
                                     draggable
                                     onDragStart={(e) => handleDragStart(e, sequence.id, idx)}
                                     onDragOver={(e) => e.preventDefault()}
                                     onDrop={(e) => handleDrop(e, sequence.id, idx)}
+                                    onDragEnter={() => handleDragEnter(sequence.id, idx)}
+                                    onDragEnd={() => setDragTarget(null)}
                                   >
                                     <Group gap="xs" className="mr-2">
                                       <IconGripVertical className="h-4 w-4 text-muted-foreground" />
                                     </Group>
                                     <div className="flex-1 space-y-1">
-                                      <div className="grid grid-cols-[1fr_auto_auto_1fr] items-center gap-2">
+                                      <div className="grid grid-cols-[1fr_auto_auto_auto_1fr] items-center gap-2">
                                         <span
-                                          className="px-2 py-0.5 rounded text-xs truncate max-w-[160px]"
+                                          className="px-2 py-0.5 rounded text-xs truncate w-[170px]"
                                           style={{
                                             backgroundColor: sourceColors?.bg || '#e5e7eb',
                                             color: sourceColors?.text || '#000',
@@ -506,12 +581,13 @@ export const StorySequencesEditor = ({
                                         >
                                           {source.label || edgeData?.source || 'Source'}
                                         </span>
-                                        <span className="text-muted-foreground text-xs">→</span>
-                                        <span className="text-[11px] text-muted-foreground text-center px-1 truncate max-w-[140px]">
+                                        <IconArrowNarrowRight className="h-3 w-3 text-muted-foreground" />
+                                        <span className="text-[11px] text-muted-foreground text-center px-1 truncate w-[140px]">
                                           {edgeData?.label || 'edge'}
                                         </span>
+                                        <IconArrowNarrowRight className="h-3 w-3 text-muted-foreground" />
                                         <span
-                                          className="px-2 py-0.5 rounded text-xs truncate max-w-[160px] justify-self-end"
+                                          className="px-2 py-0.5 rounded text-xs truncate w-[170px]"
                                           style={{
                                             backgroundColor: targetColors?.bg || '#e5e7eb',
                                             color: targetColors?.text || '#000',
@@ -520,10 +596,6 @@ export const StorySequencesEditor = ({
                                         >
                                           {target.label || edgeData?.target || 'Target'}
                                         </span>
-                                      </div>
-                                      <div className="text-[11px] text-muted-foreground flex items-center gap-2">
-                                        <span>DS {edge.datasetId}</span>
-                                        {edge.note && <span>· {edge.note}</span>}
                                       </div>
                                     </div>
                                     <Group gap="xs" className="ml-2">
@@ -555,6 +627,17 @@ export const StorySequencesEditor = ({
                                   </div>
                                 )
                               })}
+                              <div
+                                className={cn(
+                                  'h-2 rounded border border-dashed border-transparent',
+                                  dragTarget?.sequenceId === sequence.id &&
+                                    dragTarget?.index === null &&
+                                    'border-primary/60 bg-primary/5'
+                                )}
+                                onDragEnter={() => handleDragEnter(sequence.id, null)}
+                                onDragOver={(e) => e.preventDefault()}
+                                onDrop={(e) => handleDrop(e, sequence.id, null)}
+                              />
                             </Stack>
                           )}
                         </div>
