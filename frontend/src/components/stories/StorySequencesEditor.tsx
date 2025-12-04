@@ -670,7 +670,7 @@ export const StorySequencesEditor = ({
                                       </Group>
                                       <div className="flex items-center gap-3 w-full">
                                         <div className="flex-[0_0_60%] min-w-0">
-                                          <div className="grid grid-cols-[1fr_auto_auto_auto_1fr_auto] items-center gap-2">
+                                          <div className="grid grid-cols-[150px_auto_140px_auto_150px_auto] items-center gap-2">
                                             <span
                                               className="px-2 py-0.5 rounded text-xs truncate w-[150px]"
                                               style={{
@@ -696,7 +696,7 @@ export const StorySequencesEditor = ({
                                             >
                                               {target.label || edgeData?.target || 'Target'}
                                             </span>
-                                            <span className="text-[11px] text-muted-foreground truncate max-w-[180px]">
+                                            <span className="text-[11px] text-muted-foreground truncate min-w-0">
                                               {meta || '\u00a0'}
                                             </span>
                                           </div>
