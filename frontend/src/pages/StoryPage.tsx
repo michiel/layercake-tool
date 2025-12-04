@@ -45,18 +45,14 @@ export const StoryPage = () => {
   const projectIdNum = Number(projectId || 0)
   const storyIdNum = Number(storyId || 0)
 
-  // Get active tab from URL, default to 'details'
+  // Get active tab from URL, default to 'sequences'
   const tabParam = searchParams.get('tab')
-  const activeTab: TabValue = VALID_TABS.includes(tabParam as TabValue) ? (tabParam as TabValue) : 'details'
+  const activeTab: TabValue = VALID_TABS.includes(tabParam as TabValue) ? (tabParam as TabValue) : 'sequences'
 
   const setActiveTab = (tab: string) => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev)
-      if (tab === 'details') {
-        next.delete('tab')
-      } else {
-        next.set('tab', tab)
-      }
+      next.set('tab', tab)
       return next
     }, { replace: true })
   }
