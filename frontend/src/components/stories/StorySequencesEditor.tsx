@@ -8,6 +8,7 @@ import {
   IconEye,
   IconAdjustments,
   IconX,
+  IconGripVertical,
 } from '@tabler/icons-react'
 import { Group, Stack } from '@/components/layout-primitives'
 import { Badge } from '@/components/ui/badge'
@@ -258,6 +259,46 @@ export const StorySequencesEditor = ({
     }
   }, [sequences, activeSequenceId])
 
+  const moveEdge = async (fromSeqId: number, toSeqId: number, fromIndex: number, toIndex: number | null) => {
+    const fromSeq = sequences.find((s) => s.id === fromSeqId)
+    const toSeq = sequences.find((s) => s.id === toSeqId)
+    if (!fromSeq || !toSeq) return
+    const edgeRef = fromSeq.edgeOrder[fromIndex]
+    if (!edgeRef) return
+
+    const nextFromOrder = fromSeq.edgeOrder.filter((_, idx) => idx !== fromIndex)
+    const nextToOrder = [...toSeq.edgeOrder]
+    const insertAt = toIndex === null ? nextToOrder.length : Math.max(0, Math.min(toIndex, nextToOrder.length))
+    nextToOrder.splice(insertAt, 0, edgeRef)
+
+    if (fromSeqId === toSeqId) {
+      await updateSequence({ variables: { id: fromSeqId, input: { edgeOrder: nextToOrder } } })
+    } else {
+      await updateSequence({ variables: { id: fromSeqId, input: { edgeOrder: nextFromOrder } } })
+      await updateSequence({ variables: { id: toSeqId, input: { edgeOrder: nextToOrder } } })
+    }
+    refetchSequences()
+  }
+
+  const handleDragStart = (e: React.DragEvent, sequenceId: number, index: number) => {
+    e.dataTransfer.setData('application/json', JSON.stringify({ sequenceId, index }))
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  const handleDrop = (e: React.DragEvent, targetSequenceId: number, targetIndex: number | null) => {
+    e.preventDefault()
+    const data = e.dataTransfer.getData('application/json')
+    if (!data) return
+    try {
+      const parsed = JSON.parse(data) as { sequenceId: number; index: number }
+      moveEdge(parsed.sequenceId, targetSequenceId, parsed.index, targetIndex)
+      setActiveSequenceId(targetSequenceId)
+      setExpanded(new Set([targetSequenceId]))
+    } catch (err) {
+      console.error('Failed to parse drag data', err)
+    }
+  }
+
   return (
     <>
       <Card className="border mt-4">
@@ -293,13 +334,13 @@ export const StorySequencesEditor = ({
                     return (
                       <button
                         key={`${datasetId}-${edge.id}`}
-                        className="w-full text-left text-xs px-2 py-2 rounded border hover:bg-muted"
+                        className="w-full text-left text-xs px-2 py-2 rounded border hover:bg-muted lg:max-w-[50vw]"
                         onClick={() => handleAppendEdge({ datasetId, edgeId: edge.id })}
                       >
                         <div className="flex items-center gap-2">
                           <span className="font-medium truncate max-w-[140px]">{datasetName}</span>
                         </div>
-                        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 mt-1">
+                        <div className="grid grid-cols-[1fr_auto_auto_1fr] items-center gap-2 mt-1">
                           <span
                             className="px-2 py-0.5 rounded text-xs truncate max-w-[160px]"
                             style={{
@@ -310,6 +351,7 @@ export const StorySequencesEditor = ({
                           >
                             {source.label}
                           </span>
+                          <span className="text-muted-foreground text-xs">→</span>
                           <span className="text-[11px] text-muted-foreground text-center px-1 truncate max-w-[140px]">
                             {edge.label || 'edge'}
                           </span>
@@ -424,7 +466,11 @@ export const StorySequencesEditor = ({
                           {sequence.edgeOrder.length === 0 ? (
                             <p className="text-xs text-muted-foreground">No edges yet. Click an edge to add it.</p>
                           ) : (
-                            <Stack gap="xs">
+                            <Stack
+                              gap="xs"
+                              onDragOver={(e) => e.preventDefault()}
+                              onDrop={(e) => handleDrop(e, sequence.id, null)}
+                            >
                               {sequence.edgeOrder.map((edge, idx) => {
                                 const dsGraph = datasetGraphs.get(edge.datasetId)
                                 const edgeData = dsGraph?.graph.edges.find((e) => e.id === edge.edgeId)
@@ -436,13 +482,17 @@ export const StorySequencesEditor = ({
                                   <div
                                     key={`${edge.datasetId}-${edge.edgeId}-${idx}`}
                                     className={cn(
-                                      'flex items-center justify-between text-xs px-2 py-1 rounded bg-muted',
+                                      'flex items-center justify-between text-xs px-2 py-1 rounded bg-muted lg:max-w-[50vw]',
                                       isActive && 'border border-primary/40'
                                     )}
                                     onClick={() => setActiveSequenceId(sequence.id)}
+                                    draggable
+                                    onDragStart={(e) => handleDragStart(e, sequence.id, idx)}
+                                    onDragOver={(e) => e.preventDefault()}
+                                    onDrop={(e) => handleDrop(e, sequence.id, idx)}
                                   >
                                     <div className="flex-1 space-y-1">
-                                      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                                      <div className="grid grid-cols-[1fr_auto_auto_1fr] items-center gap-2">
                                         <span
                                           className="px-2 py-0.5 rounded text-xs truncate max-w-[160px]"
                                           style={{
@@ -453,6 +503,7 @@ export const StorySequencesEditor = ({
                                         >
                                           {source.label || edgeData?.source || 'Source'}
                                         </span>
+                                        <span className="text-muted-foreground text-xs">→</span>
                                         <span className="text-[11px] text-muted-foreground text-center px-1 truncate max-w-[140px]">
                                           {edgeData?.label || 'edge'}
                                         </span>
@@ -473,6 +524,7 @@ export const StorySequencesEditor = ({
                                       </div>
                                     </div>
                                     <Group gap="xs">
+                                      <IconGripVertical className="h-4 w-4 text-muted-foreground" />
                                       <Button
                                         variant="ghost"
                                         size="icon"
