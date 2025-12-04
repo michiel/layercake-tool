@@ -78,18 +78,6 @@ export const SequenceDiagramDialog = ({
     return result
   }, [allDatasets, sequence])
 
-  // Helper to find a node across all enabled datasets
-  const findNode = (nodeId: string): GraphNode | null => {
-    if (!sequence) return null
-    for (const dsId of sequence.enabledDatasetIds) {
-      const graphData = datasetGraphData[dsId]
-      if (!graphData) continue
-      const node = graphData.nodes.find((n) => n.id === nodeId)
-      if (node) return node
-    }
-    return null
-  }
-
   // Helper to get node label - searches across all enabled datasets
   const getNodeLabel = (nodeId: string): string => {
     if (!sequence) return nodeId
@@ -121,12 +109,11 @@ export const SequenceDiagramDialog = ({
   // Generate Mermaid sequence diagram
   const mermaidDiagram = useMemo(() => {
     if (!sequence || !sequence.edgeOrder.length) {
-      return 'sequenceDiagram\n    Note over A: No edges in sequence'
+      return 'sequenceDiagram\n    participant A as Empty\n    participant B as Sequence\n    Note over A,B: No edges in sequence'
     }
 
     const participantOrder: string[] = []
     const participantLabels: Map<string, string> = new Map()
-    const participantPartitions: Map<string, string | null> = new Map()
 
     // First pass: collect participants in order of first appearance
     for (const ref of sequence.edgeOrder) {
@@ -137,22 +124,13 @@ export const SequenceDiagramDialog = ({
         if (!participantLabels.has(nodeId)) {
           participantOrder.push(nodeId)
           participantLabels.set(nodeId, getNodeLabel(nodeId))
-          // Get partition (belongs_to) for this node
-          const node = findNode(nodeId)
-          const belongsTo = node?.belongs_to || node?.attrs?.belongs_to || null
-          participantPartitions.set(nodeId, belongsTo)
         }
       }
     }
 
-    // Group participants by partition
-    const partitionGroups: Map<string | null, string[]> = new Map()
-    for (const nodeId of participantOrder) {
-      const partition = participantPartitions.get(nodeId) || null
-      if (!partitionGroups.has(partition)) {
-        partitionGroups.set(partition, [])
-      }
-      partitionGroups.get(partition)!.push(nodeId)
+    // If no valid participants found, return a placeholder
+    if (participantOrder.length === 0) {
+      return 'sequenceDiagram\n    participant A as Empty\n    participant B as Sequence\n    Note over A,B: No valid edges found'
     }
 
     const lines: string[] = ['sequenceDiagram']
@@ -194,7 +172,9 @@ export const SequenceDiagramDialog = ({
       lines.push(`    ${sourceId}->>${targetId}: ${message}`)
     }
 
-    return lines.join('\n')
+    const diagram = lines.join('\n')
+    console.log('Generated Mermaid diagram:', diagram)
+    return diagram
   }, [sequence, datasetGraphData])
 
   return (
