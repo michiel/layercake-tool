@@ -243,6 +243,20 @@ export const StorySequencesEditor = ({
     setActiveSequenceId(targetSequenceId)
   }
 
+  const insertEdgeAt = async (sequenceId: number, index: number | null, edgeRef: SequenceEdgeRef) => {
+    const seq = sequences.find((s) => s.id === sequenceId)
+    if (!seq) return
+    const next = [...seq.edgeOrder]
+    const insertAt = index === null ? next.length : Math.max(0, Math.min(index, next.length))
+    next.splice(insertAt, 0, edgeRef)
+    setOptimisticSequences(
+      sequences.map((s) => (s.id === sequenceId ? { ...s, edgeOrder: next, edgeCount: next.length } : s))
+    )
+    await updateSequence({ variables: { id: sequenceId, input: { edgeOrder: next } } })
+    await refetchSequences()
+    setActiveSequenceId(sequenceId)
+  }
+
   const handleToggleExpand = (id: number) => {
     setExpanded(new Set([id]))
     setActiveSequenceId(id)
@@ -347,8 +361,16 @@ export const StorySequencesEditor = ({
   }
 
   const handleDragStart = (e: DragEvent, sequenceId: number, index: number) => {
-    e.dataTransfer.setData('application/json', JSON.stringify({ sequenceId, index }))
+    e.dataTransfer.setData('application/json', JSON.stringify({ kind: 'sequence', sequenceId, index }))
     e.dataTransfer.effectAllowed = 'move'
+  }
+
+  const handleAvailableDragStart = (
+    e: DragEvent,
+    edge: { datasetId: number; edgeId: string; source: string; target: string; label?: string }
+  ) => {
+    e.dataTransfer.setData('application/json', JSON.stringify({ kind: 'available', edge }))
+    e.dataTransfer.effectAllowed = 'copy'
   }
 
   const handleDragEnter = (sequenceId: number, index: number | null) => {
@@ -361,8 +383,18 @@ export const StorySequencesEditor = ({
     const data = e.dataTransfer.getData('application/json')
     if (!data) return
     try {
-      const parsed = JSON.parse(data) as { sequenceId: number; index: number }
-      await moveEdge(parsed.sequenceId, targetSequenceId, parsed.index, targetIndex)
+      const parsed = JSON.parse(data) as
+        | { kind: 'sequence'; sequenceId: number; index: number }
+        | { kind: 'available'; edge: { datasetId: number; edgeId: string } }
+
+      if (parsed.kind === 'sequence') {
+        await moveEdge(parsed.sequenceId, targetSequenceId, parsed.index, targetIndex)
+      } else if (parsed.kind === 'available') {
+        await insertEdgeAt(targetSequenceId, targetIndex, {
+          datasetId: parsed.edge.datasetId,
+          edgeId: parsed.edge.edgeId,
+        })
+      }
       setActiveSequenceId(targetSequenceId)
       setExpanded(new Set([targetSequenceId]))
       setDragTarget(null)
@@ -425,39 +457,70 @@ export const StorySequencesEditor = ({
                               const sourceColors = getLayerColors(source.layer)
                               const targetColors = getLayerColors(target.layer)
                               return (
-                                <button
+                                <div
                                   key={`${datasetId}-${edge.id}`}
-                                  className="w-full text-left text-xs px-2 py-2 rounded border hover:bg-muted lg:max-w-[42vw]"
-                                  onClick={() => handleAppendEdge({ datasetId, edgeId: edge.id })}
+                                  className="flex items-center gap-2 text-xs px-2 py-2 rounded border hover:bg-muted lg:max-w-[42vw]"
                                 >
-                                  <div className="grid grid-cols-[1fr_auto_auto_auto_1fr] items-center gap-1 lg:max-w-[38vw]">
-                                    <span
-                                      className="px-2 py-0.5 rounded text-xs truncate w-[150px]"
-                                      style={{
-                                        backgroundColor: sourceColors?.bg || '#e5e7eb',
-                                        color: sourceColors?.text || '#000',
-                                      }}
-                                      title={source.label}
-                                    >
-                                      {source.label}
-                                    </span>
-                                    <IconArrowNarrowRight className="h-3 w-3 text-muted-foreground" />
-                                    <span className="text-[11px] text-muted-foreground text-center px-1 truncate w-[140px]">
-                                      {edge.label || 'edge'}
-                                    </span>
-                                    <IconArrowNarrowRight className="h-3 w-3 text-muted-foreground" />
-                                    <span
-                                      className="px-2 py-0.5 rounded text-xs truncate w-[150px]"
-                                      style={{
-                                        backgroundColor: targetColors?.bg || '#e5e7eb',
-                                        color: targetColors?.text || '#000',
-                                      }}
-                                      title={target.label}
-                                    >
-                                      {target.label}
-                                    </span>
-                                  </div>
-                                </button>
+                                  <button
+                                    className="p-1 rounded hover:bg-background"
+                                    draggable
+                                    onDragStart={(e) =>
+                                      handleAvailableDragStart(e, {
+                                        datasetId,
+                                        edgeId: edge.id,
+                                        source: edge.source,
+                                        target: edge.target,
+                                        label: edge.label,
+                                      })
+                                    }
+                                    onDragEnd={() => setDragTarget(null)}
+                                    title="Drag to insert into a sequence"
+                                  >
+                                    <IconGripVertical className="h-4 w-4 text-muted-foreground" />
+                                  </button>
+                                  <button
+                                    className="flex-1 text-left"
+                                    onClick={() => handleAppendEdge({ datasetId, edgeId: edge.id })}
+                                    title="Add to active sequence"
+                                  >
+                                    <div className="grid grid-cols-[1fr_auto_auto_auto_1fr] items-center gap-1 lg:max-w-[38vw]">
+                                      <span
+                                        className="px-2 py-0.5 rounded text-xs truncate w-[150px]"
+                                        style={{
+                                          backgroundColor: sourceColors?.bg || '#e5e7eb',
+                                          color: sourceColors?.text || '#000',
+                                        }}
+                                        title={source.label}
+                                      >
+                                        {source.label}
+                                      </span>
+                                      <IconArrowNarrowRight className="h-3 w-3 text-muted-foreground" />
+                                      <span className="text-[11px] text-muted-foreground text-center px-1 truncate w-[140px]">
+                                        {edge.label || 'edge'}
+                                      </span>
+                                      <IconArrowNarrowRight className="h-3 w-3 text-muted-foreground" />
+                                      <span
+                                        className="px-2 py-0.5 rounded text-xs truncate w-[150px]"
+                                        style={{
+                                          backgroundColor: targetColors?.bg || '#e5e7eb',
+                                          color: targetColors?.text || '#000',
+                                        }}
+                                        title={target.label}
+                                      >
+                                        {target.label}
+                                      </span>
+                                    </div>
+                                  </button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="text-muted-foreground"
+                                    onClick={() => handleAppendEdge({ datasetId, edgeId: edge.id })}
+                                    title="Add to active sequence"
+                                  >
+                                    <IconPlus className="h-4 w-4" />
+                                  </Button>
+                                </div>
                               )
                             })
                           )}
