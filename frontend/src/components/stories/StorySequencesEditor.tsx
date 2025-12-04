@@ -667,61 +667,68 @@ export const StorySequencesEditor = ({
                                       <Group gap="xs" className="mr-2">
                                         <IconGripVertical className="h-4 w-4 text-muted-foreground" />
                                       </Group>
-                                      <div className="flex-1">
-                                        <div className="grid grid-cols-[1fr_auto_auto_auto_1fr] items-center gap-2">
-                                          <span
-                                            className="px-2 py-0.5 rounded text-xs truncate w-[170px]"
-                                            style={{
-                                              backgroundColor: sourceColors?.bg || '#e5e7eb',
-                                              color: sourceColors?.text || '#000',
-                                            }}
-                                            title={source.label || edgeData?.source || 'Source'}
-                                          >
-                                            {source.label || edgeData?.source || 'Source'}
-                                          </span>
-                                          <IconArrowNarrowRight className="h-3 w-3 text-muted-foreground" />
-                                          <span className="text-[11px] text-muted-foreground text-center px-1 truncate w-[140px]">
-                                            {edgeData?.label || 'edge'}
-                                          </span>
-                                          <IconArrowNarrowRight className="h-3 w-3 text-muted-foreground" />
-                                          <span
-                                            className="px-2 py-0.5 rounded text-xs truncate w-[170px]"
-                                            style={{
-                                              backgroundColor: targetColors?.bg || '#e5e7eb',
-                                              color: targetColors?.text || '#000',
-                                            }}
-                                            title={target.label || edgeData?.target || 'Target'}
-                                          >
-                                            {target.label || edgeData?.target || 'Target'}
-                                          </span>
+                                      <div className="flex items-center gap-3 w-full">
+                                        <div className="flex-[0_0_60%] min-w-0">
+                                          <div className="grid grid-cols-[1fr_auto_auto_auto_1fr] items-center gap-2">
+                                            <span
+                                              className="px-2 py-0.5 rounded text-xs truncate w-[150px]"
+                                              style={{
+                                                backgroundColor: sourceColors?.bg || '#e5e7eb',
+                                                color: sourceColors?.text || '#000',
+                                              }}
+                                              title={source.label || edgeData?.source || 'Source'}
+                                            >
+                                              {source.label || edgeData?.source || 'Source'}
+                                            </span>
+                                            <IconArrowNarrowRight className="h-3 w-3 text-muted-foreground" />
+                                            <span className="text-[11px] text-muted-foreground text-center px-1 truncate w-[140px]">
+                                              {edgeData?.label || 'edge'}
+                                            </span>
+                                            <IconArrowNarrowRight className="h-3 w-3 text-muted-foreground" />
+                                            <span
+                                              className="px-2 py-0.5 rounded text-xs truncate w-[150px]"
+                                              style={{
+                                                backgroundColor: targetColors?.bg || '#e5e7eb',
+                                                color: targetColors?.text || '#000',
+                                              }}
+                                              title={target.label || edgeData?.target || 'Target'}
+                                            >
+                                              {target.label || edgeData?.target || 'Target'}
+                                            </span>
+                                          </div>
+                                          {(edgeData?.comments || edge.note) && (
+                                            <div className="text-[11px] text-muted-foreground mt-1 truncate">
+                                              {[edgeData?.comments, edge.note].filter(Boolean).join(' • ')}
+                                            </div>
+                                          )}
                                         </div>
+                                        <Group gap="xs" className="ml-auto w-[40%] justify-end flex-shrink-0">
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="text-muted-foreground"
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              openEdgeEditor(sequence.id, edge, idx)
+                                            }}
+                                            title="Edit edge"
+                                          >
+                                            <IconAdjustments className="h-4 w-4" />
+                                          </Button>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="text-destructive hover:text-destructive/80"
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              handleRemoveEdge(sequence.id, idx)
+                                            }}
+                                            title="Remove edge from sequence"
+                                          >
+                                            <IconX className="h-4 w-4" />
+                                          </Button>
+                                        </Group>
                                       </div>
-                                      <Group gap="xs" className="ml-2">
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          className="text-muted-foreground"
-                                          onClick={(e) => {
-                                            e.stopPropagation()
-                                            openEdgeEditor(sequence.id, edge, idx)
-                                          }}
-                                          title="Edit edge"
-                                        >
-                                          <IconAdjustments className="h-4 w-4" />
-                                        </Button>
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          className="text-destructive hover:text-destructive/80"
-                                          onClick={(e) => {
-                                            e.stopPropagation()
-                                            handleRemoveEdge(sequence.id, idx)
-                                          }}
-                                          title="Remove edge from sequence"
-                                        >
-                                          <IconX className="h-4 w-4" />
-                                        </Button>
-                                      </Group>
                                     </div>
                                   </div>
                                 )
