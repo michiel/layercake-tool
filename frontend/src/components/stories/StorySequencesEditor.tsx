@@ -621,7 +621,7 @@ export const StorySequencesEditor = ({
                         </Group>
                       </button>
                       {isExpanded && (
-                        <div className="px-3 pb-2 space-y-2">
+                        <div className="px-3 pb-2 space-y-2 bg-background">
                           {sequence.edgeOrder.length === 0 ? (
                             <p className="text-xs text-muted-foreground">No edges yet. Click an edge to add it.</p>
                           ) : (
