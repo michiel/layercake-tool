@@ -120,6 +120,7 @@ zip = { workspace = true }
 
 # Data acquisition
 layercake-data-acquisition = { path = "../layercake-data-acquisition" }
+layercake-code-analysis = { path = "../layercake-code-analysis" }
 
 [dev-dependencies]
 # Test dependencies for E2E tests

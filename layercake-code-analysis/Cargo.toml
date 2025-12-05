@@ -1,0 +1,23 @@
+[package]
+name = "layercake-code-analysis"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+csv = { workspace = true }
+chrono = { workspace = true }
+ignore = "0.4"
+rayon = "1.7"
+rustpython-ast = { version = "0.3.0", features = ["visitor"] }
+rustpython-parser = "0.3.0"
+serde = { workspace = true, features = ["derive"] }
+tracing = { workspace = true }
+walkdir = "2.4"
+
+[dev-dependencies]
+tempfile = "3"

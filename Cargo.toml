@@ -1,5 +1,5 @@
 [workspace]
-members = [
+members = ["layercake-code-analysis",
     "layercake-core", "layercake-data-acquisition",
     "src-tauri",
 ]
