@@ -6,11 +6,7 @@ use std::fs;
 use std::path::PathBuf;
 
 #[derive(Args, Debug)]
-#[command(
-    name = "code-analysis",
-    alias = "ca",
-    about = "Analyze code and emit Layercake datasets"
-)]
+#[command(name = "code-analysis", about = "Analyze code and emit Layercake datasets")]
 pub struct CodeAnalysisArgs {
     #[command(subcommand)]
     pub command: CodeAnalysisCommand,
