@@ -62,16 +62,24 @@ impl CodeAnalysisService {
         file_path: String,
         dataset_id: Option<i32>,
     ) -> Result<CodeAnalysisProfile> {
-        let model = code_analysis_profiles::ActiveModel {
+        let id = Uuid::new_v4().to_string();
+        let active = code_analysis_profiles::ActiveModel {
             id: Set(Uuid::new_v4().to_string()),
             project_id: Set(project_id),
             file_path: Set(file_path),
             dataset_id: Set(dataset_id),
             last_run: Set(None),
             report: Set(None),
-        }
-        .insert(&self.db)
-        .await?;
+        };
+
+        code_analysis_profiles::Entity::insert(active.clone())
+            .exec(&self.db)
+            .await?;
+
+        let model = code_analysis_profiles::Entity::find_by_id(id.clone())
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| anyhow!("Failed to find inserted item"))?;
 
         Ok(CodeAnalysisProfile::from(model))
     }
