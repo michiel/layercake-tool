@@ -18,6 +18,10 @@ rustpython-parser = "0.3.0"
 serde = { workspace = true, features = ["derive"] }
 tracing = { workspace = true }
 walkdir = "2.4"
+swc_common = "18.0.1"
+swc_ecma_parser = "29.0.0"
+swc_ecma_visit = "19.0.0"
+swc_ecma_ast = "19.0.0"
 
 [dev-dependencies]
 tempfile = "3"

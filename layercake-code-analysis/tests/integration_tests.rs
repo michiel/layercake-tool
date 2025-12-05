@@ -48,3 +48,47 @@ if __name__ == "__main__":
         .expect("main function exists");
     assert_eq!(main_fn.complexity, 1);
 }
+
+#[test]
+fn analyzes_javascript_project() {
+    let temp_dir = tempfile::tempdir().expect("temp dir");
+    let file_path = temp_dir.path().join("example.js");
+    let content = r#"
+import fs from 'fs';
+
+function fetch() {
+  return apiCall();
+}
+
+class Runner {
+  process(data) {
+    if (data && data.ok) {
+      return data;
+    }
+    return null;
+  }
+
+  main() {
+    const value = fetch();
+    const alias = value;
+    this.process(alias);
+  }
+}
+
+if (require.main === module) {
+  new Runner().main();
+}
+"#;
+    fs::write(&file_path, content).expect("write sample js");
+
+    let run = analyze_path(temp_dir.path()).expect("analysis run");
+    assert_eq!(run.files_scanned, 1);
+    let result = run.result;
+
+    assert!(!result.functions.is_empty());
+    assert_eq!(result.entry_points.len(), 1);
+    assert!(!result.data_flows.is_empty());
+
+    let imports: Vec<_> = result.imports.iter().map(|i| i.module.as_str()).collect();
+    assert!(imports.contains(&"fs"));
+}
