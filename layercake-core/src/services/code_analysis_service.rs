@@ -64,7 +64,7 @@ impl CodeAnalysisService {
     ) -> Result<CodeAnalysisProfile> {
         let id = Uuid::new_v4().to_string();
         let active = code_analysis_profiles::ActiveModel {
-            id: Set(Uuid::new_v4().to_string()),
+            id: Set(id.clone()),
             project_id: Set(project_id),
             file_path: Set(file_path),
             dataset_id: Set(dataset_id),
