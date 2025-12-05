@@ -1,17 +1,18 @@
-use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use layercake_code_analysis::analyzer::analyze_path;
 use layercake_code_analysis::report::markdown::{strip_csv_blocks, MarkdownReporter};
-use sea_orm::DatabaseConnection;
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, IntoActiveModel, QueryFilter,
+    Set,
+};
 use serde::{Deserialize, Serialize};
-use tokio::sync::Mutex;
 use uuid::Uuid;
 
 use crate::code_analysis_graph::analysis_to_graph;
+use crate::database::entities::code_analysis_profiles;
 use crate::services::data_set_service::DataSetService;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -24,27 +25,35 @@ pub struct CodeAnalysisProfile {
     pub report: Option<String>,
 }
 
+impl From<code_analysis_profiles::Model> for CodeAnalysisProfile {
+    fn from(model: code_analysis_profiles::Model) -> Self {
+        Self {
+            id: model.id,
+            project_id: model.project_id,
+            file_path: model.file_path,
+            dataset_id: model.dataset_id,
+            last_run: model.last_run,
+            report: model.report,
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct CodeAnalysisService {
     db: DatabaseConnection,
-    profiles: Arc<Mutex<HashMap<String, CodeAnalysisProfile>>>,
 }
 
 impl CodeAnalysisService {
     pub fn new(db: DatabaseConnection) -> Self {
-        Self {
-            db,
-            profiles: Arc::new(Mutex::new(HashMap::new())),
-        }
+        Self { db }
     }
 
     pub async fn list(&self, project_id: i32) -> Result<Vec<CodeAnalysisProfile>> {
-        let profiles = self.profiles.lock().await;
-        Ok(profiles
-            .values()
-            .filter(|p| p.project_id == project_id)
-            .cloned()
-            .collect())
+        let results = code_analysis_profiles::Entity::find()
+            .filter(code_analysis_profiles::Column::ProjectId.eq(project_id))
+            .all(&self.db)
+            .await?;
+        Ok(results.into_iter().map(CodeAnalysisProfile::from).collect())
     }
 
     pub async fn create(
@@ -53,18 +62,18 @@ impl CodeAnalysisService {
         file_path: String,
         dataset_id: Option<i32>,
     ) -> Result<CodeAnalysisProfile> {
-        let profile = CodeAnalysisProfile {
-            id: Uuid::new_v4().to_string(),
-            project_id,
-            file_path,
-            dataset_id,
-            last_run: None,
-            report: None,
-        };
+        let model = code_analysis_profiles::ActiveModel {
+            id: Set(Uuid::new_v4().to_string()),
+            project_id: Set(project_id),
+            file_path: Set(file_path),
+            dataset_id: Set(dataset_id),
+            last_run: Set(None),
+            report: Set(None),
+        }
+        .insert(&self.db)
+        .await?;
 
-        let mut profiles = self.profiles.lock().await;
-        profiles.insert(profile.id.clone(), profile.clone());
-        Ok(profile)
+        Ok(CodeAnalysisProfile::from(model))
     }
 
     pub async fn update(
@@ -73,34 +82,39 @@ impl CodeAnalysisService {
         file_path: Option<String>,
         dataset_id: Option<Option<i32>>,
     ) -> Result<CodeAnalysisProfile> {
-        let mut profiles = self.profiles.lock().await;
-        let profile = profiles
-            .get_mut(id)
-            .ok_or_else(|| anyhow!("Profile not found"))?;
+        let mut model = code_analysis_profiles::Entity::find_by_id(id.to_string())
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| anyhow!("Profile not found"))?
+            .into_active_model();
 
         if let Some(path) = file_path {
-            profile.file_path = path;
+            model.file_path = Set(path);
         }
         if let Some(ds) = dataset_id {
-            profile.dataset_id = ds;
+            model.dataset_id = Set(ds);
         }
 
-        Ok(profile.clone())
+        let updated = model.update(&self.db).await?;
+        Ok(CodeAnalysisProfile::from(updated))
     }
 
     pub async fn delete(&self, id: &str) -> Result<bool> {
-        let mut profiles = self.profiles.lock().await;
-        Ok(profiles.remove(id).is_some())
+        let result = code_analysis_profiles::Entity::delete_by_id(id.to_string())
+            .exec(&self.db)
+            .await?;
+        Ok(result.rows_affected > 0)
+    }
+
+    async fn get_by_id(&self, id: &str) -> Result<code_analysis_profiles::Model> {
+        code_analysis_profiles::Entity::find_by_id(id.to_string())
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| anyhow!("Profile not found"))
     }
 
     pub async fn run(&self, id: &str) -> Result<CodeAnalysisProfile> {
-        let profile = {
-            let profiles = self.profiles.lock().await;
-            profiles
-                .get(id)
-                .cloned()
-                .ok_or_else(|| anyhow!("Profile not found"))?
-        };
+        let profile = self.get_by_id(id).await?;
 
         let reporter = MarkdownReporter::default();
         let path: PathBuf = profile.file_path.clone().into();
@@ -112,7 +126,6 @@ impl CodeAnalysisService {
         )?;
         let cleaned_report = strip_csv_blocks(&report_markdown);
 
-        // Persist graph into dataset
         let dataset_id = match profile.dataset_id {
             Some(id) => id,
             None => {
@@ -135,14 +148,12 @@ impl CodeAnalysisService {
         let ds_service = DataSetService::new(self.db.clone());
         ds_service.update_graph_data(dataset_id, graph_json).await?;
 
-        let mut profiles = self.profiles.lock().await;
-        let updated = profiles
-            .get_mut(id)
-            .ok_or_else(|| anyhow!("Profile missing after run"))?;
-        updated.dataset_id = Some(dataset_id);
-        updated.last_run = Some(Utc::now());
-        updated.report = Some(cleaned_report);
+        let mut active = profile.into_active_model();
+        active.dataset_id = Set(Some(dataset_id));
+        active.last_run = Set(Some(Utc::now()));
+        active.report = Set(Some(cleaned_report));
 
-        Ok(updated.clone())
+        let updated = active.update(&self.db).await?;
+        Ok(CodeAnalysisProfile::from(updated))
     }
 }

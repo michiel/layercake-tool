@@ -1,6 +1,7 @@
 pub mod chat_credentials;
 pub mod chat_messages;
 pub mod chat_sessions;
+pub mod code_analysis_profiles;
 pub mod common_types;
 pub mod data_sets;
 pub mod library_items;
