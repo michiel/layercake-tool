@@ -123,6 +123,8 @@ impl<'a> JsVisitor<'a> {
             functions: self.functions,
             data_flows: self.data_flows,
             entry_points: self.entry_points,
+            files: Vec::new(),
+            directories: Vec::new(),
         }
     }
 

@@ -49,6 +49,8 @@ pub struct AnalysisResult {
     pub functions: Vec<FunctionInfo>,
     pub data_flows: Vec<DataFlow>,
     pub entry_points: Vec<EntryPoint>,
+    pub files: Vec<String>,
+    pub directories: Vec<String>,
 }
 
 impl AnalysisResult {
@@ -57,6 +59,8 @@ impl AnalysisResult {
         self.functions.extend(other.functions);
         self.data_flows.extend(other.data_flows);
         self.entry_points.extend(other.entry_points);
+        self.files.extend(other.files);
+        self.directories.extend(other.directories);
         self
     }
 
@@ -106,6 +110,11 @@ impl AnalysisResult {
                 b.condition.as_str(),
             ))
         });
+
+        self.files.sort();
+        self.files.dedup();
+        self.directories.sort();
+        self.directories.dedup();
     }
 }
 
@@ -155,6 +164,7 @@ pub struct AnalysisRun {
 
 pub fn analyze_path(path: &Path) -> Result<AnalysisRun> {
     let registry = AnalyzerRegistry::default();
+    let root = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
     let walker = WalkBuilder::new(path)
         .hidden(false)
         .parents(true)
@@ -184,12 +194,29 @@ pub fn analyze_path(path: &Path) -> Result<AnalysisRun> {
         .filter(|path| registry.find_for_path(path).is_some())
         .collect();
 
+    #[derive(Default, Clone)]
+    struct PartialResult {
+        result: AnalysisResult,
+    }
+
     let aggregated = supported_files
         .par_iter()
         .filter_map(|file_path| {
             let analyzer = registry.find_for_path(file_path)?;
+            let relative = file_path
+                .strip_prefix(&root)
+                .unwrap_or(file_path)
+                .to_string_lossy()
+                .to_string();
+            let dirs = collect_directories(&relative);
+
             match analyzer.analyze(file_path) {
-                Ok(result) => Some(result),
+                Ok(mut result) => {
+                    normalize_paths(&mut result, &relative);
+                    result.files.push(relative.clone());
+                    result.directories.extend(dirs);
+                    Some(PartialResult { result })
+                }
                 Err(err) => {
                     warn!(
                         "Failed to analyze {:?} with {}: {}",
@@ -201,7 +228,10 @@ pub fn analyze_path(path: &Path) -> Result<AnalysisRun> {
                 }
             }
         })
-        .reduce(AnalysisResult::default, |left, right| left.merge(right));
+        .reduce(PartialResult::default, |left, right| PartialResult {
+            result: left.result.merge(right.result),
+        })
+        .result;
 
     let mut result = aggregated;
     result.sort_deterministic();
@@ -210,4 +240,34 @@ pub fn analyze_path(path: &Path) -> Result<AnalysisRun> {
         result,
         files_scanned: supported_files.len(),
     })
+}
+
+fn normalize_paths(result: &mut AnalysisResult, relative: &str) {
+    for import in &mut result.imports {
+        import.file_path = relative.to_string();
+    }
+    for function in &mut result.functions {
+        function.file_path = relative.to_string();
+    }
+    for flow in &mut result.data_flows {
+        flow.file_path = relative.to_string();
+    }
+    for entry in &mut result.entry_points {
+        entry.file_path = relative.to_string();
+    }
+}
+
+fn collect_directories(file: &str) -> Vec<String> {
+    let mut parts = Vec::new();
+    let path = Path::new(file);
+    if let Some(parent) = path.parent() {
+        let mut current = PathBuf::new();
+        for part in parent.iter() {
+            current.push(part);
+            if let Some(rel) = current.to_str() {
+                parts.push(rel.to_string());
+            }
+        }
+    }
+    parts
 }
