@@ -1,3 +1,4 @@
+use super::CallEdge;
 use super::{AnalysisResult, Analyzer, DataFlow, EntryPoint, FunctionInfo, Import};
 use anyhow::{Context, Result};
 use rustpython_ast::{self as ast, Visitor};
@@ -64,6 +65,7 @@ struct PythonVisitor<'a> {
     imports: Vec<Import>,
     functions: Vec<FunctionInfo>,
     data_flows: Vec<DataFlow>,
+    call_edges: Vec<CallEdge>,
     entry_points: Vec<EntryPoint>,
     class_stack: Vec<String>,
     function_stack: Vec<String>,
@@ -80,6 +82,7 @@ impl<'a> PythonVisitor<'a> {
             imports: Vec::new(),
             functions: Vec::new(),
             data_flows: Vec::new(),
+            call_edges: Vec::new(),
             entry_points: Vec::new(),
             class_stack: Vec::new(),
             function_stack: Vec::new(),
@@ -94,6 +97,7 @@ impl<'a> PythonVisitor<'a> {
             imports: self.imports,
             functions: self.functions,
             data_flows: self.data_flows,
+            call_edges: self.call_edges,
             entry_points: self.entry_points,
             files: Vec::new(),
             directories: Vec::new(),
@@ -116,6 +120,11 @@ impl<'a> PythonVisitor<'a> {
         self.scope_stack.push(HashMap::new());
         self.complexity_stack.push(1);
         self.current_function = Some(context);
+        self.call_edges.push(CallEdge {
+            caller: self.function_stack.join("."),
+            callee: self.function_stack.join("."),
+            file_path: self.file_path_string(),
+        });
     }
 
     fn exit_function(&mut self) {
@@ -414,6 +423,13 @@ impl<'a> Visitor for PythonVisitor<'a> {
 
         if let Some(context) = self.current_function.as_mut() {
             context.calls.push(callee);
+            if let Some(caller) = self.function_stack.last().cloned() {
+                self.call_edges.push(CallEdge {
+                    caller,
+                    callee: callee_raw,
+                    file_path: self.file_path_string(),
+                });
+            }
         }
 
         self.generic_visit_expr_call(node);

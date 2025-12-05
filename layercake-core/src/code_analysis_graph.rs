@@ -8,11 +8,15 @@ pub fn analysis_to_graph(result: &AnalysisResult, annotation: Option<String>) ->
     let mut edges: Vec<Edge> = Vec::new();
     let mut layers: Vec<Layer> = Vec::new();
 
-    let mut function_ids = std::collections::HashMap::new();
-    let mut library_ids = std::collections::HashMap::new();
-    let mut data_ids = std::collections::HashMap::new();
+    let mut function_ids: std::collections::HashMap<String, String> =
+        std::collections::HashMap::new();
+    let mut library_ids: std::collections::HashMap<String, String> =
+        std::collections::HashMap::new();
+    let _data_ids: std::collections::HashMap<String, String> = std::collections::HashMap::new();
     let mut entry_ids = Vec::new();
     let mut id_counts = std::collections::HashMap::<String, usize>::new();
+    let mut function_imports: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
 
     let mut ensure_layer = |id: &str, label: &str, bg: &str, text: &str, border: &str| {
         if !layers.iter().any(|l| l.id == id) {
@@ -170,6 +174,10 @@ pub fn analysis_to_graph(result: &AnalysisResult, annotation: Option<String>) ->
                 attributes: None,
             });
         }
+        function_imports
+            .entry(import.file_path.clone())
+            .or_default()
+            .push(import.module.clone());
     }
 
     for entry in &result.entry_points {
@@ -218,64 +226,55 @@ pub fn analysis_to_graph(result: &AnalysisResult, annotation: Option<String>) ->
             )
         });
 
-        if let Some(var) = flow.variable.as_ref().filter(|v| !v.is_empty()) {
-            let data_id = data_ids
-                .entry(var.clone())
-                .or_insert_with(|| {
-                    let id = unique_id(&format!("data_{var}"));
-                    nodes.push(Node {
-                        id: id.clone(),
-                        label: var.clone(),
-                        layer: "data".to_string(),
-                        is_partition: false,
-                        belongs_to: Some(scope_id.clone()),
-                        weight: 1,
-                        comment: Some(flow.file_path.clone()),
-                        dataset: None,
-                        attributes: None,
-                    });
-                    id
-                })
-                .clone();
-
-            edges.push(Edge {
-                id: next_edge_id(),
-                source: src_id.clone(),
-                target: data_id.clone(),
-                label: var.clone(),
-                layer: "data".to_string(),
-                weight: 1,
-                comment: None,
-                dataset: None,
-                attributes: None,
-            });
-
-            edges.push(Edge {
-                id: next_edge_id(),
-                source: data_id,
-                target: sink_id,
-                label: var.clone(),
-                layer: "data".to_string(),
-                weight: 1,
-                comment: None,
-                dataset: None,
-                attributes: None,
-            });
-        } else {
-            edges.push(Edge {
-                id: next_edge_id(),
-                source: src_id,
-                target: sink_id,
-                label: flow.variable.clone().unwrap_or_default(),
-                layer: "function".to_string(),
-                weight: 1,
-                comment: None,
-                dataset: None,
-                attributes: None,
-            });
-        }
+        edges.push(Edge {
+            id: next_edge_id(),
+            source: src_id.clone(),
+            target: sink_id.clone(),
+            label: flow.variable.clone().unwrap_or_default(),
+            layer: "dataflow".to_string(),
+            weight: 1,
+            comment: None,
+            dataset: None,
+            attributes: None,
+        });
     }
 
+    for call in &result.call_edges {
+        let caller_id = function_ids.get(&call.caller).cloned().unwrap_or_else(|| {
+            add_function_node(
+                &mut function_ids,
+                &mut nodes,
+                &call.caller,
+                Some(&call.file_path),
+                file_nodes.get(&call.file_path).cloned(),
+                json!({"generated": true}),
+                &mut unique_id,
+            )
+        });
+        let callee_id = function_ids.get(&call.callee).cloned().unwrap_or_else(|| {
+            add_function_node(
+                &mut function_ids,
+                &mut nodes,
+                &call.callee,
+                Some(&call.file_path),
+                file_nodes.get(&call.file_path).cloned(),
+                json!({"generated": true}),
+                &mut unique_id,
+            )
+        });
+
+        edges.push(Edge {
+            id: next_edge_id(),
+            source: caller_id,
+            target: callee_id,
+            label: call.callee.clone(),
+            layer: "controlflow".to_string(),
+            weight: 1,
+            comment: None,
+            dataset: None,
+            attributes: None,
+        });
+    }
     for (file_path, entry_id) in &entry_ids {
         for function in &result.functions {
             if &function.file_path == file_path {
@@ -304,6 +303,42 @@ pub fn analysis_to_graph(result: &AnalysisResult, annotation: Option<String>) ->
                     dataset: None,
                     attributes: None,
                 });
+            }
+        }
+    }
+
+    // Import edges: library -> function using it
+    for function in &result.functions {
+        if let Some(libs) = function_imports.get(&function.file_path) {
+            let func_id = function_ids
+                .get(&function.name)
+                .cloned()
+                .unwrap_or_else(|| {
+                    add_function_node(
+                        &mut function_ids,
+                        &mut nodes,
+                        &function.name,
+                        Some(&function.file_path),
+                        file_nodes.get(&function.file_path).cloned(),
+                        json!({}),
+                        &mut unique_id,
+                    )
+                });
+
+            for lib in libs {
+                if let Some(lib_id) = library_ids.get(lib) {
+                    edges.push(Edge {
+                        id: next_edge_id(),
+                        source: lib_id.clone(),
+                        target: func_id.clone(),
+                        label: lib.clone(),
+                        layer: "import".to_string(),
+                        weight: 1,
+                        comment: None,
+                        dataset: None,
+                        attributes: None,
+                    });
+                }
             }
         }
     }

@@ -37,6 +37,13 @@ pub struct DataFlow {
 }
 
 #[derive(Debug, Default, Clone)]
+pub struct CallEdge {
+    pub caller: String,
+    pub callee: String,
+    pub file_path: String,
+}
+
+#[derive(Debug, Default, Clone)]
 pub struct EntryPoint {
     pub file_path: String,
     pub line_number: usize,
@@ -48,6 +55,7 @@ pub struct AnalysisResult {
     pub imports: Vec<Import>,
     pub functions: Vec<FunctionInfo>,
     pub data_flows: Vec<DataFlow>,
+    pub call_edges: Vec<CallEdge>,
     pub entry_points: Vec<EntryPoint>,
     pub files: Vec<String>,
     pub directories: Vec<String>,
@@ -58,6 +66,7 @@ impl AnalysisResult {
         self.imports.extend(other.imports);
         self.functions.extend(other.functions);
         self.data_flows.extend(other.data_flows);
+        self.call_edges.extend(other.call_edges);
         self.entry_points.extend(other.entry_points);
         self.files.extend(other.files);
         self.directories.extend(other.directories);
@@ -101,6 +110,14 @@ impl AnalysisResult {
                     b.sink.as_str(),
                     b.variable.as_deref().unwrap_or(""),
                 ))
+        });
+
+        self.call_edges.sort_by(|a, b| {
+            (a.file_path.as_str(), a.caller.as_str(), a.callee.as_str()).cmp(&(
+                b.file_path.as_str(),
+                b.caller.as_str(),
+                b.callee.as_str(),
+            ))
         });
 
         self.entry_points.sort_by(|a, b| {

@@ -1,4 +1,4 @@
-use super::{AnalysisResult, Analyzer, DataFlow, EntryPoint, FunctionInfo, Import};
+use super::{AnalysisResult, Analyzer, CallEdge, DataFlow, EntryPoint, FunctionInfo, Import};
 use anyhow::{anyhow, Context, Result};
 use std::collections::HashMap;
 use std::path::Path;
@@ -92,6 +92,7 @@ struct JsVisitor<'a> {
     imports: Vec<Import>,
     functions: Vec<FunctionInfo>,
     data_flows: Vec<DataFlow>,
+    call_edges: Vec<CallEdge>,
     entry_points: Vec<EntryPoint>,
     class_stack: Vec<String>,
     function_stack: Vec<String>,
@@ -108,6 +109,7 @@ impl<'a> JsVisitor<'a> {
             imports: Vec::new(),
             functions: Vec::new(),
             data_flows: Vec::new(),
+            call_edges: Vec::new(),
             entry_points: Vec::new(),
             class_stack: Vec::new(),
             function_stack: Vec::new(),
@@ -122,6 +124,7 @@ impl<'a> JsVisitor<'a> {
             imports: self.imports,
             functions: self.functions,
             data_flows: self.data_flows,
+            call_edges: self.call_edges,
             entry_points: self.entry_points,
             files: Vec::new(),
             directories: Vec::new(),
@@ -517,7 +520,8 @@ impl<'a> Visit for JsVisitor<'a> {
     }
 
     fn visit_call_expr(&mut self, n: &CallExpr) {
-        let callee = self.get_callee_name(&n.callee);
+        let callee_raw = self.get_callee_name(&n.callee);
+        let callee = callee_raw.clone();
         for arg in &n.args {
             if let Expr::Ident(id) = &*arg.expr {
                 if let Some(source) = self.resolve_variable(&id.sym.to_string()) {
@@ -532,7 +536,14 @@ impl<'a> Visit for JsVisitor<'a> {
         }
 
         if let Some(ctx) = self.current_function.as_mut() {
-            ctx.calls.push(callee);
+            ctx.calls.push(callee_raw.clone());
+            if let Some(caller) = self.function_stack.last().cloned() {
+                self.call_edges.push(CallEdge {
+                    caller,
+                    callee: callee_raw,
+                    file_path: self.file_path_string(),
+                });
+            }
         }
 
         n.visit_children_with(self);
