@@ -5,8 +5,8 @@ use chrono::{DateTime, Utc};
 use layercake_code_analysis::analyzer::analyze_path;
 use layercake_code_analysis::report::markdown::{strip_csv_blocks, MarkdownReporter};
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, IntoActiveModel, QueryFilter,
-    Set,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait,
+    IntoActiveModel, QueryFilter, Set, Statement,
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -48,7 +48,26 @@ impl CodeAnalysisService {
         Self { db }
     }
 
+    async fn ensure_table(&self) -> Result<()> {
+        let sql = "CREATE TABLE IF NOT EXISTS code_analysis_profiles (
+            id TEXT PRIMARY KEY,
+            project_id INTEGER NOT NULL,
+            file_path TEXT NOT NULL,
+            dataset_id INTEGER,
+            last_run TEXT,
+            report TEXT
+        )";
+        self.db
+            .execute(Statement::from_string(
+                self.db.get_database_backend(),
+                sql.to_string(),
+            ))
+            .await?;
+        Ok(())
+    }
+
     pub async fn list(&self, project_id: i32) -> Result<Vec<CodeAnalysisProfile>> {
+        self.ensure_table().await?;
         let results = code_analysis_profiles::Entity::find()
             .filter(code_analysis_profiles::Column::ProjectId.eq(project_id))
             .all(&self.db)
@@ -62,6 +81,7 @@ impl CodeAnalysisService {
         file_path: String,
         dataset_id: Option<i32>,
     ) -> Result<CodeAnalysisProfile> {
+        self.ensure_table().await?;
         let id = Uuid::new_v4().to_string();
         let active = code_analysis_profiles::ActiveModel {
             id: Set(id.clone()),
@@ -90,6 +110,7 @@ impl CodeAnalysisService {
         file_path: Option<String>,
         dataset_id: Option<Option<i32>>,
     ) -> Result<CodeAnalysisProfile> {
+        self.ensure_table().await?;
         let mut model = code_analysis_profiles::Entity::find_by_id(id.to_string())
             .one(&self.db)
             .await?
@@ -108,6 +129,7 @@ impl CodeAnalysisService {
     }
 
     pub async fn delete(&self, id: &str) -> Result<bool> {
+        self.ensure_table().await?;
         let result = code_analysis_profiles::Entity::delete_by_id(id.to_string())
             .exec(&self.db)
             .await?;
@@ -115,6 +137,7 @@ impl CodeAnalysisService {
     }
 
     async fn get_by_id(&self, id: &str) -> Result<code_analysis_profiles::Model> {
+        self.ensure_table().await?;
         code_analysis_profiles::Entity::find_by_id(id.to_string())
             .one(&self.db)
             .await?
