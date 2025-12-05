@@ -1,3 +1,4 @@
+pub mod code_analysis_graph;
 pub mod common;
 pub mod data_loader;
 pub mod errors;
