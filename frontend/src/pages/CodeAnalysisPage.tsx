@@ -109,25 +109,28 @@ export const CodeAnalysisPage: React.FC = () => {
 
   const selectedProjectName = useMemo(() => `Project ${projectId ?? ''}`, [projectId])
 
-  const { data: profilesData, loading: profilesLoading, refetch: refetchProfiles } = useQuery(
-    GET_PROFILES,
-    {
-      skip: !projectId,
-      variables: { projectId: projectId ? parseInt(projectId, 10) : undefined },
-      fetchPolicy: 'cache-and-network',
-      onCompleted: data => {
-        const mapped: Profile[] =
-          data?.codeAnalysisProfiles?.map((p: any) => ({
-            id: p.id,
-            filePath: p.filePath,
-            datasetId: p.datasetId,
-            lastRun: p.lastRun,
-            report: p.report,
-          })) || []
-        setProfiles(mapped)
-      },
-    },
-  )
+  const {
+    data: profilesData,
+    loading: profilesLoading,
+    error: profilesError,
+    refetch: refetchProfiles,
+  } = useQuery(GET_PROFILES, {
+    skip: !projectId,
+    variables: { projectId: projectId ? parseInt(projectId, 10) : undefined },
+    fetchPolicy: 'cache-and-network',
+  })
+
+  React.useEffect(() => {
+    const mapped: Profile[] =
+      profilesData?.codeAnalysisProfiles?.map((p: any) => ({
+        id: p.id,
+        filePath: p.filePath,
+        datasetId: p.datasetId,
+        lastRun: p.lastRun,
+        report: p.report,
+      })) || []
+    setProfiles(mapped)
+  }, [profilesData])
 
   const { data: datasetsData } = useQuery(GET_DATASETS, {
     skip: !projectId,
@@ -233,6 +236,11 @@ export const CodeAnalysisPage: React.FC = () => {
           <CardTitle>Profiles</CardTitle>
         </CardHeader>
         <CardContent>
+          {profilesError && (
+            <div className="mb-3 text-sm text-red-600">
+              Failed to load profiles: {profilesError.message}
+            </div>
+          )}
           {profilesLoading ? (
             <div className="py-8 flex justify-center">
               <Spinner className="h-6 w-6" />
