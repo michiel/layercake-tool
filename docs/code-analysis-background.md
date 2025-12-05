@@ -4,6 +4,7 @@
  - This crate will be used to analyze codebases and return the analysis as rich layercake format datasets
  - The code for analyzing codebases of a specific language will be different, but they will all perform the same analysis and return data in common `layercake-code-analysis` structs. These structs will implement a Trait for transforming data to layercake dataset structs. The calling code will handle persistence of that data
  - The first language will be Python (see below), with placeholders (using unimplemented!() macros) for Javascript
+ - implement the cli command `layercake code-analysis report PATH -o report.md` alias the code-analysis command to `ca`. the PATH is the directory, which parses the project and ignores .gitignore patterns, the -o target is the markdown file to write the full report to, this report contains inline CSV outputs of the codebase analysis in layercake format in code fence block (```CSV```), with a markdown summary and other details, if there is no -o the output is to STDOUT
 
 # Python
 
