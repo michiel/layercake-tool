@@ -47,8 +47,10 @@ impl DatasetGenerator {
             .map_err(|e| anyhow::anyhow!("Dataset generation failed: {}", e))?;
 
         // Parse the JSON response into our schema type
-        let response: DatasetGenerationResponse = serde_json::from_str(&response_json)
-            .map_err(|e| anyhow::anyhow!("Failed to parse LLM response as dataset schema: {}", e))?;
+        let response: DatasetGenerationResponse =
+            serde_json::from_str(&response_json).map_err(|e| {
+                anyhow::anyhow!("Failed to parse LLM response as dataset schema: {}", e)
+            })?;
 
         // Convert to YAML for storage
         response
@@ -62,7 +64,9 @@ impl DatasetGenerator {
 
         // System instructions
         prompt.push_str("You are a data acquisition specialist that creates graph datasets for the Layercake pipeline.\n\n");
-        prompt.push_str("IMPORTANT: Your response must be valid JSON matching the provided schema.\n\n");
+        prompt.push_str(
+            "IMPORTANT: Your response must be valid JSON matching the provided schema.\n\n",
+        );
         prompt.push_str("Guidelines:\n");
         prompt.push_str("- Create meaningful node IDs (lowercase, underscores)\n");
         prompt.push_str("- Use descriptive labels for nodes and edges\n");

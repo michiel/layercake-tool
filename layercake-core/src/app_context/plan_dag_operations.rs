@@ -3,8 +3,8 @@ use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde_json::Value;
 use uuid::Uuid;
 
-use super::{AppContext, PlanDagSnapshot, PlanDagNodeRequest, PlanDagNodeUpdateRequest};
-use super::{PlanDagNodePositionRequest, PlanDagEdgeRequest, PlanDagEdgeUpdateRequest};
+use super::{AppContext, PlanDagNodeRequest, PlanDagNodeUpdateRequest, PlanDagSnapshot};
+use super::{PlanDagEdgeRequest, PlanDagEdgeUpdateRequest, PlanDagNodePositionRequest};
 use crate::database::entities::{data_sets, graphs, projects};
 use crate::graphql::types::plan_dag::{
     DataSetExecutionMetadata, GraphExecutionMetadata, PlanDagEdge, PlanDagMetadata, PlanDagNode,
@@ -67,7 +67,7 @@ fn generate_edge_id(_source: &str, _target: &str) -> String {
 }
 
 impl AppContext {
-        // ----- Plan DAG helpers -------------------------------------------------
+    // ----- Plan DAG helpers -------------------------------------------------
     pub async fn load_plan_dag(
         &self,
         project_id: i32,
@@ -109,9 +109,7 @@ impl AppContext {
 
                 match node_type {
                     PlanDagNodeType::DataSet => {
-                        if let Ok(config) =
-                            serde_json::from_str::<Value>(&nodes[idx].config)
-                        {
+                        if let Ok(config) = serde_json::from_str::<Value>(&nodes[idx].config) {
                             if let Some(data_set_id) = config
                                 .get("dataSetId")
                                 .and_then(|v| v.as_i64())
@@ -375,5 +373,4 @@ impl AppContext {
             .delete_edge(project_id, plan_id, edge_id)
             .await
     }
-
 }

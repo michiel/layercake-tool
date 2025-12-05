@@ -237,10 +237,8 @@ impl AppContext {
         let mut errors = Vec::new();
 
         // Group rows by story
-        let mut story_map: std::collections::HashMap<
-            (i32, String),
-            Vec<StoryCsvImportRow>,
-        > = std::collections::HashMap::new();
+        let mut story_map: std::collections::HashMap<(i32, String), Vec<StoryCsvImportRow>> =
+            std::collections::HashMap::new();
 
         for row in rows {
             story_map
@@ -265,7 +263,10 @@ impl AppContext {
             // Validate dataset IDs
             let story_dataset_ids = parse_csv_int_list(&first_row.story_enabled_dataset_ids);
             for dataset_id in &story_dataset_ids {
-                if !self.validate_dataset_exists(project_id, *dataset_id).await? {
+                if !self
+                    .validate_dataset_exists(project_id, *dataset_id)
+                    .await?
+                {
                     errors.push(format!(
                         "Dataset {} not found in project {}",
                         dataset_id, project_id
@@ -293,9 +294,10 @@ impl AppContext {
                     ..Default::default()
                 };
 
-                let model = new_story.insert(&txn).await.map_err(|e| {
-                    anyhow!("Failed to create story '{}': {}", story_name, e)
-                })?;
+                let model = new_story
+                    .insert(&txn)
+                    .await
+                    .map_err(|e| anyhow!("Failed to create story '{}': {}", story_name, e))?;
                 created_count += 1;
                 model
             } else {
@@ -314,12 +316,14 @@ impl AppContext {
                             Some(first_row.story_description.clone())
                         });
                         active.tags = Set(first_row.story_tags.clone());
-                        active.enabled_dataset_ids = Set(serde_json::to_string(&story_dataset_ids)?);
+                        active.enabled_dataset_ids =
+                            Set(serde_json::to_string(&story_dataset_ids)?);
                         active.updated_at = Set(Utc::now());
 
-                        let model = active.update(&txn).await.map_err(|e| {
-                            anyhow!("Failed to update story {}: {}", story_id, e)
-                        })?;
+                        let model = active
+                            .update(&txn)
+                            .await
+                            .map_err(|e| anyhow!("Failed to update story {}: {}", story_id, e))?;
                         updated_count += 1;
                         model
                     }
@@ -443,12 +447,12 @@ impl AppContext {
                         Some(existing) => {
                             let mut active: sequences::ActiveModel = existing.into();
                             active.name = Set(sequence_name.clone());
-                            active.description = Set(if first_seq_row.sequence_description.is_empty()
-                            {
-                                None
-                            } else {
-                                Some(first_seq_row.sequence_description.clone())
-                            });
+                            active.description =
+                                Set(if first_seq_row.sequence_description.is_empty() {
+                                    None
+                                } else {
+                                    Some(first_seq_row.sequence_description.clone())
+                                });
                             active.enabled_dataset_ids =
                                 Set(serde_json::to_string(&seq_dataset_ids)?);
                             active.edge_order = Set(serde_json::to_string(&edge_order)?);
@@ -464,11 +468,13 @@ impl AppContext {
                             let new_sequence = sequences::ActiveModel {
                                 story_id: Set(story_model.id),
                                 name: Set(sequence_name.clone()),
-                                description: Set(if first_seq_row.sequence_description.is_empty() {
-                                    None
-                                } else {
-                                    Some(first_seq_row.sequence_description.clone())
-                                }),
+                                description: Set(
+                                    if first_seq_row.sequence_description.is_empty() {
+                                        None
+                                    } else {
+                                        Some(first_seq_row.sequence_description.clone())
+                                    },
+                                ),
                                 enabled_dataset_ids: Set(serde_json::to_string(&seq_dataset_ids)?),
                                 edge_order: Set(serde_json::to_string(&edge_order)?),
                                 created_at: Set(Utc::now()),
@@ -515,8 +521,8 @@ impl AppContext {
         project_id: i32,
         content: &str,
     ) -> Result<StoryImportResult> {
-        let import_data: StoryExportJson = serde_json::from_str(content)
-            .map_err(|e| anyhow!("Failed to parse JSON: {}", e))?;
+        let import_data: StoryExportJson =
+            serde_json::from_str(content).map_err(|e| anyhow!("Failed to parse JSON: {}", e))?;
 
         let mut errors = Vec::new();
         let mut imported_stories = Vec::new();
@@ -532,7 +538,10 @@ impl AppContext {
         for story_data in import_data.stories {
             // Validate dataset IDs
             for dataset_id in &story_data.enabled_dataset_ids {
-                if !self.validate_dataset_exists(project_id, *dataset_id).await? {
+                if !self
+                    .validate_dataset_exists(project_id, *dataset_id)
+                    .await?
+                {
                     errors.push(format!(
                         "Dataset {} not found in project {}",
                         dataset_id, project_id
@@ -564,16 +573,19 @@ impl AppContext {
                     name: Set(story_data.name.clone()),
                     description: Set(story_data.description.clone()),
                     tags: Set(serde_json::to_string(&story_data.tags)?),
-                    enabled_dataset_ids: Set(serde_json::to_string(&story_data.enabled_dataset_ids)?),
+                    enabled_dataset_ids: Set(serde_json::to_string(
+                        &story_data.enabled_dataset_ids,
+                    )?),
                     layer_config: Set(serde_json::to_string(&story_data.layer_config)?),
                     created_at: Set(Utc::now()),
                     updated_at: Set(Utc::now()),
                     ..Default::default()
                 };
 
-                let model = new_story.insert(&txn).await.map_err(|e| {
-                    anyhow!("Failed to create story '{}': {}", story_data.name, e)
-                })?;
+                let model = new_story
+                    .insert(&txn)
+                    .await
+                    .map_err(|e| anyhow!("Failed to create story '{}': {}", story_data.name, e))?;
                 created_count += 1;
                 model
             } else {
@@ -678,10 +690,10 @@ impl AppContext {
                             let mut active: sequences::ActiveModel = existing.into();
                             active.name = Set(sequence_data.name.clone());
                             active.description = Set(sequence_data.description.clone());
-                            active.enabled_dataset_ids = Set(serde_json::to_string(
-                                &sequence_data.enabled_dataset_ids,
-                            )?);
-                            active.edge_order = Set(serde_json::to_string(&sequence_data.edge_order)?);
+                            active.enabled_dataset_ids =
+                                Set(serde_json::to_string(&sequence_data.enabled_dataset_ids)?);
+                            active.edge_order =
+                                Set(serde_json::to_string(&sequence_data.edge_order)?);
                             active.updated_at = Set(Utc::now());
 
                             active.update(&txn).await.map_err(|e| {
@@ -758,8 +770,13 @@ impl AppContext {
             .map_err(|e| anyhow!("Failed to fetch dataset {}: {}", dataset_id, e))?
             .ok_or_else(|| anyhow!("Dataset {} not found", dataset_id))?;
 
-        let graph_json: Value = serde_json::from_str(&dataset.graph_json)
-            .map_err(|e| anyhow!("Failed to parse graph_json for dataset {}: {}", dataset_id, e))?;
+        let graph_json: Value = serde_json::from_str(&dataset.graph_json).map_err(|e| {
+            anyhow!(
+                "Failed to parse graph_json for dataset {}: {}",
+                dataset_id,
+                e
+            )
+        })?;
 
         let edges = graph_json
             .get("edges")

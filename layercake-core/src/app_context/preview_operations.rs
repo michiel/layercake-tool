@@ -30,7 +30,7 @@ fn apply_preview_limit(content: String, format: ExportFileType, max_rows: Option
 }
 
 impl AppContext {
-        pub async fn preview_graph_export(
+    pub async fn preview_graph_export(
         &self,
         graph_id: i32,
         format: ExportFileType,
@@ -76,5 +76,4 @@ impl AppContext {
 
         Ok(rendered)
     }
-
 }

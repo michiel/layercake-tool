@@ -159,7 +159,8 @@ impl StoryMutation {
                 .map_err(|e| StructuredError::service("AppContext::export_story_json", e))?,
         };
 
-        let content_base64 = base64::engine::general_purpose::STANDARD.encode(&export_result.content);
+        let content_base64 =
+            base64::engine::general_purpose::STANDARD.encode(&export_result.content);
 
         Ok(StoryExport {
             filename: export_result.filename,

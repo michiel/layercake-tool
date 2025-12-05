@@ -20,8 +20,7 @@ fn merge_and_validate_attributes(
 ) -> Result<Option<Value>> {
     let candidate = attributes.or(attrs);
     if let Some(value) = candidate {
-        validate_attributes(&value)
-            .map_err(|message| Error::new(message))?;
+        validate_attributes(&value).map_err(|message| Error::new(message))?;
         Ok(Some(value))
     } else {
         Ok(None)

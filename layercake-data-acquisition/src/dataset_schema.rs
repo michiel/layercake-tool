@@ -5,7 +5,6 @@
 ///
 /// The schema ensures type-safe, validated dataset generation that directly
 /// deserializes into Layercake's Graph format without manual parsing.
-
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 

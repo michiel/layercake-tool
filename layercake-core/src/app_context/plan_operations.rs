@@ -111,5 +111,4 @@ impl AppContext {
                 .ok_or_else(|| anyhow!("Project {} has no plan", project_id))
         }
     }
-
 }
