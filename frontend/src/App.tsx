@@ -16,6 +16,7 @@ import { useConnectionStatus } from './hooks/useConnectionStatus'
 import { ProjectChatPage } from './pages/ProjectChatPage'
 import { ChatLogsPage } from './pages/ChatLogsPage'
 import { KnowledgeBasePage } from './pages/KnowledgeBasePage'
+import { CodeAnalysisPage } from './pages/CodeAnalysisPage'
 import { DatasetCreationPage } from './pages/DatasetCreationPage'
 import { ProjectArtefactsPage } from './pages/ProjectArtefactsPage'
 import { ProjectLayersPage } from './pages/ProjectLayersPage'
@@ -242,6 +243,12 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
         label: 'Data sets',
         route: `/projects/${projectId}/datasets`,
         isActive: makeRouteMatcher(`/projects/${projectId}/datasets`),
+      },
+      {
+        key: 'code-analysis',
+        label: 'Code analysis',
+        route: `/projects/${projectId}/data-acquisition/code-analysis`,
+        isActive: makeRouteMatcher(`/projects/${projectId}/data-acquisition/code-analysis`),
       },
     ]
 
@@ -2094,6 +2101,11 @@ function App() {
           <Route path="/projects/:projectId/data-acquisition/knowledge-base" element={
             <ErrorBoundary>
               <KnowledgeBasePage />
+            </ErrorBoundary>
+          } />
+          <Route path="/projects/:projectId/data-acquisition/code-analysis" element={
+            <ErrorBoundary>
+              <CodeAnalysisPage />
             </ErrorBoundary>
           } />
           <Route path="/projects/:projectId/data-acquisition/datasets" element={
