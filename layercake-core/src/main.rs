@@ -1,4 +1,5 @@
 mod app_context;
+mod code_analysis_graph;
 mod common;
 mod data_loader;
 mod errors;

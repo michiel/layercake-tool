@@ -1,6 +1,7 @@
 pub mod auth_service;
 pub mod authorization;
 pub mod chat_history_service;
+pub mod code_analysis_service;
 pub mod collaboration_service;
 pub mod data_set_service;
 pub mod dataset_bulk_service;

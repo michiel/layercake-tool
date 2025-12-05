@@ -7,6 +7,7 @@ use crate::database::entities::{
 };
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
+use crate::graphql::types::code_analysis::CodeAnalysisProfile;
 use crate::graphql::types::graph::Graph;
 use crate::graphql::types::plan::Plan;
 use crate::graphql::types::plan_dag::DataSetReference;
@@ -58,6 +59,24 @@ impl Query {
             .map_err(|e| StructuredError::service("AppContext::get_project", e))?;
 
         Ok(project.map(Project::from))
+    }
+
+    async fn code_analysis_profiles(
+        &self,
+        ctx: &Context<'_>,
+        project_id: i32,
+    ) -> Result<Vec<CodeAnalysisProfile>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let profiles = context
+            .app
+            .code_analysis_service()
+            .list(project_id)
+            .await
+            .map_err(|e| StructuredError::service("CodeAnalysisService::list", e))?;
+        Ok(profiles
+            .into_iter()
+            .map(CodeAnalysisProfile::from)
+            .collect())
     }
 
     /// Get aggregate statistics for a project (for overview page)

@@ -9,8 +9,9 @@ use crate::services::graph_analysis_service::GraphAnalysisService;
 use crate::services::graph_edit_service::GraphEditService;
 use crate::services::plan_service::PlanService;
 use crate::services::{
-    data_set_service::DataSetService, dataset_bulk_service::DataSetBulkService, ExportService,
-    GraphService, ImportService, PlanDagService,
+    code_analysis_service::CodeAnalysisService, data_set_service::DataSetService,
+    dataset_bulk_service::DataSetBulkService, ExportService, GraphService, ImportService,
+    PlanDagService,
 };
 use layercake_data_acquisition::{
     config::EmbeddingProviderConfig, services::DataAcquisitionService,
@@ -39,6 +40,7 @@ pub struct AppContext {
     graph_edit_service: Arc<GraphEditService>,
     graph_analysis_service: Arc<GraphAnalysisService>,
     data_acquisition_service: Arc<DataAcquisitionService>,
+    code_analysis_service: Arc<CodeAnalysisService>,
 }
 
 impl AppContext {
@@ -68,6 +70,7 @@ impl AppContext {
         let graph_analysis_service = Arc::new(GraphAnalysisService::new(db.clone()));
         let data_set_service = Arc::new(DataSetService::new(db.clone()));
         let data_set_bulk_service = Arc::new(DataSetBulkService::new(db.clone()));
+        let code_analysis_service = Arc::new(CodeAnalysisService::new(db.clone()));
 
         Self {
             db,
@@ -81,6 +84,7 @@ impl AppContext {
             graph_edit_service,
             graph_analysis_service,
             data_acquisition_service,
+            code_analysis_service,
         }
     }
 
@@ -116,6 +120,10 @@ impl AppContext {
 
     pub fn plan_service(&self) -> &Arc<PlanService> {
         &self.plan_service
+    }
+
+    pub fn code_analysis_service(&self) -> &Arc<CodeAnalysisService> {
+        &self.code_analysis_service
     }
 
     #[allow(dead_code)]

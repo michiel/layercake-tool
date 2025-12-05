@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { IconPlayerPlay, IconPlus, IconTrash } from '@tabler/icons-react'
+import { gql, useMutation, useQuery } from '@apollo/client'
 
 import PageContainer from '../components/layout/PageContainer'
 import { Breadcrumbs } from '../components/common/Breadcrumbs'
@@ -15,72 +16,165 @@ import { Spinner } from '../components/ui/spinner'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table'
 import { Textarea } from '../components/ui/textarea'
 import { Group, Stack } from '../components/layout-primitives'
+import { showSuccessNotification, showErrorNotification } from '../utils/notifications'
 
 type Profile = {
   id: string
   filePath: string
-  datasetId?: string
-  lastRun?: string
-  status?: 'idle' | 'running' | 'complete'
-  report?: string
+  datasetId?: number | null
+  lastRun?: string | null
+  report?: string | null
 }
 
-const mockDatasets = [
-  { id: 'ds-1', name: 'Code Analysis - Default' },
-  { id: 'ds-2', name: 'Graphs - Sandbox' },
-]
+type DataSetOption = { id: number; name: string }
+
+const GET_PROFILES = gql`
+  query CodeAnalysisProfiles($projectId: Int!) {
+    codeAnalysisProfiles(projectId: $projectId) {
+      id
+      projectId
+      filePath
+      datasetId
+      lastRun
+      report
+    }
+  }
+`
+
+const CREATE_PROFILE = gql`
+  mutation CreateCodeAnalysisProfile($input: CreateCodeAnalysisProfileInput!) {
+    createCodeAnalysisProfile(input: $input) {
+      id
+      projectId
+      filePath
+      datasetId
+      lastRun
+      report
+    }
+  }
+`
+
+const UPDATE_PROFILE = gql`
+  mutation UpdateCodeAnalysisProfile($input: UpdateCodeAnalysisProfileInput!) {
+    updateCodeAnalysisProfile(input: $input) {
+      id
+      projectId
+      filePath
+      datasetId
+      lastRun
+      report
+    }
+  }
+`
+
+const DELETE_PROFILE = gql`
+  mutation DeleteCodeAnalysisProfile($id: String!) {
+    deleteCodeAnalysisProfile(id: $id)
+  }
+`
+
+const RUN_PROFILE = gql`
+  mutation RunCodeAnalysisProfile($id: String!) {
+    runCodeAnalysisProfile(id: $id) {
+      profile {
+        id
+        projectId
+        filePath
+        datasetId
+        lastRun
+        report
+      }
+    }
+  }
+`
+
+const GET_DATASETS = gql`
+  query DataSets($projectId: Int!) {
+    dataSets(projectId: $projectId) {
+      id
+      name
+    }
+  }
+`
 
 export const CodeAnalysisPage: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>()
   const navigate = useNavigate()
-  const [profiles, setProfiles] = useState<Profile[]>([
-    {
-      id: 'p-1',
-      filePath: '/home/user/project',
-      datasetId: 'ds-1',
-      lastRun: 'Never',
-      status: 'idle',
-      report: 'No report generated yet.',
-    },
-  ])
+  const [profiles, setProfiles] = useState<Profile[]>([])
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Profile | null>(null)
   const [filePath, setFilePath] = useState('')
-  const [datasetId, setDatasetId] = useState<string | undefined>()
+  const [datasetId, setDatasetId] = useState<number | undefined>()
 
   const selectedProjectName = useMemo(() => `Project ${projectId ?? ''}`, [projectId])
 
-  const handlePlay = (id: string) => {
-    setProfiles(prev =>
-      prev.map(p =>
-        p.id === id
-          ? {
-              ...p,
-              status: 'running',
-              report: 'Running analysis...',
-            }
-          : p,
-      ),
-    )
+  const { data: profilesData, loading: profilesLoading, refetch: refetchProfiles } = useQuery(
+    GET_PROFILES,
+    {
+      skip: !projectId,
+      variables: { projectId: projectId ? parseInt(projectId, 10) : undefined },
+      fetchPolicy: 'cache-and-network',
+      onCompleted: data => {
+        const mapped: Profile[] =
+          data?.codeAnalysisProfiles?.map((p: any) => ({
+            id: p.id,
+            filePath: p.filePath,
+            datasetId: p.datasetId,
+            lastRun: p.lastRun,
+            report: p.report,
+          })) || []
+        setProfiles(mapped)
+      },
+    },
+  )
 
-    setTimeout(() => {
-      setProfiles(prev =>
-        prev.map(p =>
-          p.id === id
-            ? {
-                ...p,
-                status: 'complete',
-                lastRun: new Date().toLocaleString(),
-                report: `Code analysis complete for ${p.filePath}\n\nData flow and function metrics have been written to dataset ${p.datasetId ?? 'unlinked'}.`,
-              }
-            : p,
-        ),
-      )
-    }, 800)
+  const { data: datasetsData } = useQuery(GET_DATASETS, {
+    skip: !projectId,
+    variables: { projectId: projectId ? parseInt(projectId, 10) : undefined },
+    fetchPolicy: 'cache-and-network',
+  })
+  const datasetOptions: DataSetOption[] = datasetsData?.dataSets ?? []
+
+  const [createProfile] = useMutation(CREATE_PROFILE, {
+    onCompleted: () => {
+      showSuccessNotification('Profile created')
+      refetchProfiles()
+    },
+    onError: err => showErrorNotification(err.message),
+  })
+  const [updateProfile] = useMutation(UPDATE_PROFILE, {
+    onCompleted: () => {
+      showSuccessNotification('Profile updated')
+      refetchProfiles()
+    },
+    onError: err => showErrorNotification(err.message),
+  })
+  const [deleteProfileMutation] = useMutation(DELETE_PROFILE, {
+    onCompleted: () => {
+      showSuccessNotification('Profile deleted')
+      refetchProfiles()
+    },
+    onError: err => showErrorNotification(err.message),
+  })
+  const [runProfile] = useMutation(RUN_PROFILE, {
+    onCompleted: data => {
+      const updated = data?.runCodeAnalysisProfile?.profile
+      if (updated) {
+        setProfiles(prev =>
+          prev.map(p => (p.id === updated.id ? { ...p, ...updated } : p)),
+        )
+      }
+      showSuccessNotification('Code analysis completed')
+    },
+    onError: err => showErrorNotification(err.message),
+  })
+
+  const handlePlay = (id: string) => {
+    runProfile({ variables: { id } })
   }
 
   const handleDelete = (id: string) => {
-    setProfiles(prev => prev.filter(p => p.id !== id))
+    deleteProfileMutation({ variables: { id } })
   }
 
   const handleOpenModal = (profile?: Profile) => {
@@ -93,23 +187,19 @@ export const CodeAnalysisPage: React.FC = () => {
   const handleSave = () => {
     if (!filePath) return
     if (editing) {
-      setProfiles(prev =>
-        prev.map(p =>
-          p.id === editing.id
-            ? { ...p, filePath, datasetId }
-            : p,
-        ),
-      )
+      updateProfile({
+        variables: { input: { id: editing.id, filePath, datasetId } },
+      })
     } else {
-      const newProfile: Profile = {
-        id: `p-${Date.now()}`,
-        filePath,
-        datasetId,
-        lastRun: 'Never',
-        status: 'idle',
-        report: 'No report generated yet.',
-      }
-      setProfiles(prev => [...prev, newProfile])
+      createProfile({
+        variables: {
+          input: {
+            projectId: projectId ? parseInt(projectId, 10) : 0,
+            filePath,
+            datasetId,
+          },
+        },
+      })
     }
     setModalOpen(false)
   }
@@ -142,9 +232,12 @@ export const CodeAnalysisPage: React.FC = () => {
           <CardTitle>Profiles</CardTitle>
         </CardHeader>
         <CardContent>
-          {profiles.length === 0 ? (
-            <Stack align="center" gap="md" className="py-10">
+          {profilesLoading ? (
+            <div className="py-8 flex justify-center">
               <Spinner className="h-6 w-6" />
+            </div>
+          ) : profiles.length === 0 ? (
+            <Stack align="center" gap="md" className="py-10">
               <p className="text-muted-foreground">No profiles yet. Create one to get started.</p>
             </Stack>
           ) : (
@@ -163,10 +256,10 @@ export const CodeAnalysisPage: React.FC = () => {
                   <TableRow key={profile.id}>
                     <TableCell className="font-medium">{profile.filePath}</TableCell>
                     <TableCell>
-                      {mockDatasets.find(ds => ds.id === profile.datasetId)?.name ?? 'Not linked'}
+                      {datasetOptions.find(ds => ds.id === profile.datasetId)?.name ?? 'Not linked'}
                     </TableCell>
-                    <TableCell>{profile.lastRun ?? 'Never'}</TableCell>
-                    <TableCell className="capitalize">{profile.status ?? 'idle'}</TableCell>
+                    <TableCell>{profile.lastRun ? new Date(profile.lastRun).toLocaleString() : 'Never'}</TableCell>
+                    <TableCell className="capitalize">{profile.report ? 'complete' : 'idle'}</TableCell>
                     <TableCell className="text-right">
                       <Group gap="xs" justify="end">
                         <Button size="sm" variant="secondary" onClick={() => handleOpenModal(profile)}>
@@ -201,7 +294,7 @@ export const CodeAnalysisPage: React.FC = () => {
                 <div>
                   <div className="text-xs text-muted-foreground">Dataset</div>
                   <div className="text-sm">
-                    {mockDatasets.find(ds => ds.id === profile.datasetId)?.name ?? 'Not linked'}
+                    {datasetOptions.find(ds => ds.id === profile.datasetId)?.name ?? 'Not linked'}
                   </div>
                 </div>
                 <Separator orientation="vertical" className="h-6" />
@@ -233,13 +326,16 @@ export const CodeAnalysisPage: React.FC = () => {
             </div>
             <div className="space-y-2">
               <Label>Linked dataset</Label>
-              <Select value={datasetId} onValueChange={setDatasetId}>
+              <Select
+                value={datasetId ? datasetId.toString() : undefined}
+                onValueChange={(value) => setDatasetId(value ? parseInt(value, 10) : undefined)}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select dataset" />
                 </SelectTrigger>
                 <SelectContent>
-                  {mockDatasets.map(ds => (
-                    <SelectItem key={ds.id} value={ds.id}>{ds.name}</SelectItem>
+                  {datasetOptions.map(ds => (
+                    <SelectItem key={ds.id} value={ds.id.toString()}>{ds.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

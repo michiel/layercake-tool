@@ -9,6 +9,7 @@ pub mod plan_dag_delta;
 // Mutation modules
 mod auth;
 mod chat;
+mod code_analysis;
 mod collaboration;
 mod data_acquisition;
 mod data_set;
@@ -36,6 +37,7 @@ pub struct Mutation(
     pub auth::AuthMutation,
     pub chat::ChatMutation,
     pub collaboration::CollaborationMutation,
+    pub code_analysis::CodeAnalysisMutation,
     pub data_set::DataSetMutation,
     pub data_acquisition::DataAcquisitionMutation,
     pub graph::GraphMutation,
