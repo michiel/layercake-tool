@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { IconPlayerPlay, IconPlus, IconTrash } from '@tabler/icons-react'
-import { gql, useMutation, useQuery } from '@apollo/client'
+import { gql } from '@apollo/client'
+import { useMutation, useQuery } from '@apollo/client/react'
 
 import PageContainer from '../components/layout/PageContainer'
 import { Breadcrumbs } from '../components/common/Breadcrumbs'
