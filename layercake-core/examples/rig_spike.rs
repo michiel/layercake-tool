@@ -11,6 +11,7 @@
 ///
 /// Set OPENAI_API_KEY environment variable for testing
 use anyhow::Result;
+use rig::client::ProviderClient;
 
 #[tokio::main]
 async fn main() -> Result<()> {

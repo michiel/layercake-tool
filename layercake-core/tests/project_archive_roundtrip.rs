@@ -11,7 +11,8 @@ use layercake_core::graphql::types::sequence::SequenceEdgeRef;
 use layercake_core::services::data_set_service::DataSetService;
 use layercake_core::services::plan_service::PlanCreateRequest;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, Database, EntityTrait, QueryFilter, Set,
+    ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, Database, EntityTrait, PaginatorTrait,
+    QueryFilter, Set,
 };
 use sea_orm_migration::MigratorTrait;
 use serde_json::{json, Value};
@@ -64,6 +65,11 @@ async fn project_export_import_roundtrip_restores_assets() -> Result<()> {
         },
     )
     .await?;
+
+    let plan_count_before = plans::Entity::find()
+        .filter(plans::Column::ProjectId.eq(project.id))
+        .count(&db)
+        .await?;
 
     let now = Utc::now();
     let layer = project_layers::ActiveModel {
@@ -273,7 +279,11 @@ async fn project_export_import_roundtrip_restores_assets() -> Result<()> {
         .filter(plans::Column::ProjectId.eq(imported.id))
         .all(&db)
         .await?;
-    assert_eq!(imported_plans.len(), 1, "plans index should be recreated");
+    assert_eq!(
+        imported_plans.len(),
+        plan_count_before as usize,
+        "plans index should be recreated"
+    );
     let imported_plan = imported_plans
         .first()
         .expect("expected plan row for imported project");

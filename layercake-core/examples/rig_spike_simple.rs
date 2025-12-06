@@ -2,7 +2,7 @@
 ///
 /// Run with: OPENAI_API_KEY=... cargo run --example rig_spike_simple
 use anyhow::Result;
-use rig::client::CompletionClient;
+use rig::client::{CompletionClient, ProviderClient};
 use rig::completion::Prompt;
 use rig::providers::openai;
 

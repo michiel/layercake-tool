@@ -14,14 +14,12 @@ impl MigrationTrait for Migration {
                     .col(
                         ColumnDef::new(DatasetGraphLayers::Id)
                             .string()
-                            .not_null()
-                            .primary_key(),
+                            .not_null(),
                     )
                     .col(
                         ColumnDef::new(DatasetGraphLayers::DatasetId)
                             .integer()
-                            .not_null()
-                            .primary_key(),
+                            .not_null(),
                     )
                     .col(
                         ColumnDef::new(DatasetGraphLayers::Label)
@@ -43,6 +41,11 @@ impl MigrationTrait for Migration {
                             .string()
                             .not_null(),
                     )
+                    .primary_key(
+                        Index::create()
+                            .col(DatasetGraphLayers::Id)
+                            .col(DatasetGraphLayers::DatasetId),
+                    )
                     .to_owned(),
             )
             .await?;
@@ -55,14 +58,12 @@ impl MigrationTrait for Migration {
                     .col(
                         ColumnDef::new(DatasetGraphNodes::Id)
                             .string()
-                            .not_null()
-                            .primary_key(),
+                            .not_null(),
                     )
                     .col(
                         ColumnDef::new(DatasetGraphNodes::DatasetId)
                             .integer()
-                            .not_null()
-                            .primary_key(),
+                            .not_null(),
                     )
                     .col(ColumnDef::new(DatasetGraphNodes::Label).string().not_null())
                     .col(ColumnDef::new(DatasetGraphNodes::Layer).string().not_null())
@@ -84,6 +85,11 @@ impl MigrationTrait for Migration {
                             .json_binary()
                             .null(),
                     )
+                    .primary_key(
+                        Index::create()
+                            .col(DatasetGraphNodes::Id)
+                            .col(DatasetGraphNodes::DatasetId),
+                    )
                     .to_owned(),
             )
             .await?;
@@ -96,14 +102,12 @@ impl MigrationTrait for Migration {
                     .col(
                         ColumnDef::new(DatasetGraphEdges::Id)
                             .string()
-                            .not_null()
-                            .primary_key(),
+                            .not_null(),
                     )
                     .col(
                         ColumnDef::new(DatasetGraphEdges::DatasetId)
                             .integer()
-                            .not_null()
-                            .primary_key(),
+                            .not_null(),
                     )
                     .col(
                         ColumnDef::new(DatasetGraphEdges::Source)
@@ -128,6 +132,11 @@ impl MigrationTrait for Migration {
                         ColumnDef::new(DatasetGraphEdges::Attributes)
                             .json_binary()
                             .null(),
+                    )
+                    .primary_key(
+                        Index::create()
+                            .col(DatasetGraphEdges::Id)
+                            .col(DatasetGraphEdges::DatasetId),
                     )
                     .to_owned(),
             )

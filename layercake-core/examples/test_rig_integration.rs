@@ -6,7 +6,7 @@
 /// cargo run --example test_rig_integration --features console
 /// ```
 use anyhow::Result;
-use rig::client::CompletionClient;
+use rig::client::{CompletionClient, ProviderClient};
 use rig::completion::Prompt;
 
 #[tokio::main]
@@ -75,7 +75,7 @@ async fn test_gemini() -> Result<()> {
     };
 
     let api_key = std::env::var("GOOGLE_API_KEY")?;
-    let client = gemini::Client::new(&api_key);
+    let client = gemini::Client::new(&api_key)?;
 
     // Create generation config and additional params (required by Gemini)
     let gen_cfg = GenerationConfig::default();

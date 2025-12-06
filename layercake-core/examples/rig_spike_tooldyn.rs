@@ -3,7 +3,7 @@
 /// This demonstrates wrapping MCP-style dynamic tools for use with rig.
 /// Run with: OPENAI_API_KEY=... cargo run --example rig_spike_tooldyn
 use anyhow::Result;
-use rig::client::CompletionClient;
+use rig::client::{CompletionClient, ProviderClient};
 use rig::completion::{Prompt, ToolDefinition};
 use rig::providers::openai;
 use rig::tool::{Tool, ToolDyn};
