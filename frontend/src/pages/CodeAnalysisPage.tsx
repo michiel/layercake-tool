@@ -213,7 +213,8 @@ export const CodeAnalysisPage: React.FC = () => {
   }
 
   const handleSave = () => {
-    if (!filePath) return
+    const trimmedPath = filePath.trim()
+    if (!trimmedPath) return
     const options = JSON.stringify({
       includeDataFlow,
       includeControlFlow,
@@ -222,14 +223,14 @@ export const CodeAnalysisPage: React.FC = () => {
     })
     if (editing) {
       updateProfile({
-        variables: { input: { id: editing.id, filePath, datasetId, noInfra, options } },
+        variables: { input: { id: editing.id, filePath: trimmedPath, datasetId, noInfra, options } },
       })
     } else {
       createProfile({
         variables: {
           input: {
             projectId: projectId ? parseInt(projectId, 10) : 0,
-            filePath,
+            filePath: trimmedPath,
             datasetId,
             noInfra,
             options,

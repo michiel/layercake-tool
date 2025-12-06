@@ -146,7 +146,6 @@ impl Graph {
             None
         };
 
-        let mut mapped_functions = 0usize;
         let mut unmatched_functions = 0usize;
 
         for node in &self.nodes {
@@ -173,7 +172,6 @@ impl Graph {
             let file_id = resolve_file(&hints).or_else(|| scope_root.clone());
             if let Some(file_id) = file_id {
                 function_to_file.insert(node.id.clone(), file_id);
-                mapped_functions += 1;
             } else {
                 unmatched_functions += 1;
             }

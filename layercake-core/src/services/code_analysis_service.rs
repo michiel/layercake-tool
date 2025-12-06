@@ -18,6 +18,10 @@ use crate::graph::{Edge, Graph, Layer};
 use crate::infra_graph::infra_to_graph;
 use crate::services::data_set_service::DataSetService;
 
+fn normalize_path(path: &str) -> String {
+    path.trim().to_string()
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CodeAnalysisProfile {
     pub id: String,
@@ -267,7 +271,7 @@ impl CodeAnalysisService {
         let active = code_analysis_profiles::ActiveModel {
             id: Set(id.clone()),
             project_id: Set(project_id),
-            file_path: Set(file_path),
+            file_path: Set(normalize_path(&file_path)),
             dataset_id: Set(dataset_id),
             last_run: Set(None),
             report: Set(None),
@@ -303,7 +307,7 @@ impl CodeAnalysisService {
             .into_active_model();
 
         if let Some(path) = file_path {
-            model.file_path = Set(path);
+            model.file_path = Set(normalize_path(&path));
         }
         if let Some(ds) = dataset_id {
             model.dataset_id = Set(ds);
@@ -347,7 +351,11 @@ impl CodeAnalysisService {
         let no_infra_flag = profile.no_infra.unwrap_or(false);
 
         let reporter = MarkdownReporter::default();
-        let path: PathBuf = profile.file_path.clone().into();
+        let normalized_path = normalize_path(&profile.file_path);
+        let path: PathBuf = normalized_path.clone().into();
+        if !path.exists() {
+            return Err(anyhow!("Code analysis path does not exist: {}", normalized_path));
+        }
         let path_for_task = path.clone();
         let analysis = tokio::task::spawn_blocking(move || analyze_path(&path_for_task)).await??;
         let opts: CodeAnalysisOptions = profile
