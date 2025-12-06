@@ -553,7 +553,7 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
                           <p className="font-medium">{dataSource.name}</p>
                           {dataSource.description && (
                             <p className="text-xs text-muted-foreground mt-0.5">
-                              {dataSource.description}
+                              {truncateDescription(dataSource.description)}
                             </p>
                           )}
                         </div>
@@ -927,3 +927,7 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
     </>
   )
 }
+  const truncateDescription = (text?: string | null) => {
+    if (!text) return ''
+    return text.length > 16 ? `${text.slice(0, 16)}…` : text
+  }
