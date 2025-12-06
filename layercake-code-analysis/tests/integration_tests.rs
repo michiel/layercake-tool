@@ -1,5 +1,6 @@
 use layercake_code_analysis::analyzer::analyze_path;
 use std::fs;
+use std::path::Path;
 
 #[test]
 fn analyzes_python_project_and_reports_metrics() {
@@ -91,4 +92,87 @@ if (require.main === module) {
 
     let imports: Vec<_> = result.imports.iter().map(|i| i.module.as_str()).collect();
     assert!(imports.contains(&"fs"));
+}
+
+#[test]
+fn analyzes_agentcore_onboarding_reference_project() {
+    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("workspace root");
+    let sample_path = repo_root
+        .join("resources/reference-codebases/sample-amazon-bedrock-agentcore-onboarding");
+    assert!(
+        sample_path.exists(),
+        "expected sample project at {:?}",
+        sample_path
+    );
+
+    let run = analyze_path(&sample_path).expect("analysis run");
+    assert!(
+        run.files_scanned >= 10,
+        "should scan many files, got {}",
+        run.files_scanned
+    );
+
+    let result = run.result;
+    assert!(
+        !result.functions.is_empty(),
+        "should discover functions in reference project"
+    );
+    assert!(
+        !result.imports.is_empty(),
+        "should discover imports in reference project"
+    );
+    assert!(
+        !result.data_flows.is_empty() || !result.call_edges.is_empty(),
+        "should discover flows/calls in reference project"
+    );
+
+    let has_dir = |needle: &str| result.directories.iter().any(|d| d.contains(needle));
+    for dir in [
+        "01_code_interpreter",
+        "02_runtime",
+        "03_identity",
+        "04_gateway",
+        "05_observability",
+        "06_memory",
+    ] {
+        assert!(
+            has_dir(dir),
+            "expected directory '{}' to be captured in analysis",
+            dir
+        );
+    }
+
+    let has_func_in_dir = |needle: &str| {
+        result
+            .functions
+            .iter()
+            .any(|f| f.file_path.contains(needle))
+    };
+
+    assert!(
+        has_func_in_dir("01_code_interpreter"),
+        "code interpreter functions should be present"
+    );
+    assert!(
+        has_func_in_dir("02_runtime"),
+        "runtime functions should be present"
+    );
+    assert!(
+        has_func_in_dir("03_identity"),
+        "identity functions should be present"
+    );
+    assert!(
+        has_func_in_dir("04_gateway"),
+        "gateway functions should be present"
+    );
+    assert!(
+        has_func_in_dir("05_observability"),
+        "observability functions should be present"
+    );
+    assert!(
+        has_func_in_dir("06_memory"),
+        "memory functions should be present"
+    );
 }
