@@ -56,5 +56,5 @@
 - **Correlation accuracy**: Start with env-var and handler-file heuristics; gate experimental matches behind feature flags/config.
 
 ## Status
-- Scaffolding in place: infra domain model, graph adapter to Layercake Graph, reporter hook for infra summary, CLI plumbing ready to consume infra graph.
-- Pending: concrete parsers for Terraform/CFN/Bicep/CDK, correlation heuristics, end-to-end fixtures/tests, CLI flags and wiring into dataset ingestion.
+- Implemented: infra domain model, graph adapter to Layercake Graph, CLI/reporting hooks, Terraform/CFN/Bicep/CDK (Py/TS) parsers, dataset graph merge, basic tests, and service wiring to include infra graphs + annotations on run.
+- Pending: richer correlation heuristics (env vars/handlers), import edges into datasets, feature flags/toggles, and expanded fixtures/golden outputs.

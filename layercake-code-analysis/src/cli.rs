@@ -1,4 +1,5 @@
 use crate::analyzer::{analyze_path, AnalysisRun};
+use crate::infra::analyze_infra;
 use crate::report::{markdown::MarkdownReporter, ReportMetadata};
 use anyhow::Result;
 use clap::{Args, Subcommand};
@@ -34,10 +35,11 @@ pub fn run(args: CodeAnalysisArgs) -> Result<()> {
                 result,
                 files_scanned,
             } = analyze_path(&path)?;
+            let infra_graph = analyze_infra(&path)?;
 
             let metadata = ReportMetadata::new(path, files_scanned);
             let reporter = MarkdownReporter::default();
-            let rendered = reporter.render(&result, &metadata)?;
+            let rendered = reporter.render_with_infra(&result, &metadata, Some(&infra_graph))?;
 
             if let Some(output_path) = output {
                 fs::write(&output_path, rendered)?;

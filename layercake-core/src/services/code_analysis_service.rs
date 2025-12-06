@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use layercake_code_analysis::analyzer::analyze_path;
+use layercake_code_analysis::infra::analyze_infra;
 use layercake_code_analysis::report::markdown::{strip_csv_blocks, MarkdownReporter};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait,
@@ -13,6 +14,8 @@ use uuid::Uuid;
 
 use crate::code_analysis_graph::analysis_to_graph;
 use crate::database::entities::code_analysis_profiles;
+use crate::graph::Graph;
+use crate::infra_graph::infra_to_graph;
 use crate::services::data_set_service::DataSetService;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -36,6 +39,63 @@ impl From<code_analysis_profiles::Model> for CodeAnalysisProfile {
             report: model.report,
         }
     }
+}
+
+fn merge_graphs(mut primary: Graph, secondary: Graph, annotation: Option<String>) -> Graph {
+    use std::collections::HashSet;
+
+    let mut node_ids: HashSet<String> = primary.nodes.iter().map(|n| n.id.clone()).collect();
+    let mut edge_ids: HashSet<String> = primary.edges.iter().map(|e| e.id.clone()).collect();
+    let mut id_map = std::collections::HashMap::new();
+
+    for node in &secondary.nodes {
+        let mut new_id = node.id.clone();
+        while node_ids.contains(&new_id) {
+            new_id = format!("infra_{}", new_id);
+        }
+        id_map.insert(node.id.clone(), new_id.clone());
+        node_ids.insert(new_id);
+    }
+
+    for mut node in secondary.nodes {
+        if let Some(mapped) = id_map.get(&node.id) {
+            node.id = mapped.clone();
+        }
+        if let Some(parent) = node.belongs_to.clone() {
+            if let Some(mapped_parent) = id_map.get(&parent) {
+                node.belongs_to = Some(mapped_parent.clone());
+            }
+        }
+        primary.nodes.push(node);
+    }
+
+    for mut edge in secondary.edges {
+        edge.source = id_map.get(&edge.source).cloned().unwrap_or(edge.source);
+        edge.target = id_map.get(&edge.target).cloned().unwrap_or(edge.target);
+        let mut new_edge_id = edge.id.clone();
+        while edge_ids.contains(&new_edge_id) {
+            new_edge_id = format!("infra_{}", new_edge_id);
+        }
+        edge.id = new_edge_id.clone();
+        edge_ids.insert(new_edge_id);
+        primary.edges.push(edge);
+    }
+
+    for layer in secondary.layers {
+        if !primary.layers.iter().any(|l| l.id == layer.id) {
+            primary.layers.push(layer);
+        }
+    }
+
+    if let Some(text) = annotation {
+        primary.append_annotation(text);
+    }
+
+    primary.nodes.sort_by(|a, b| a.id.cmp(&b.id));
+    primary.edges.sort_by(|a, b| a.id.cmp(&b.id));
+    primary.layers.sort_by(|a, b| a.id.cmp(&b.id));
+
+    primary
 }
 
 #[derive(Clone)]
@@ -151,9 +211,12 @@ impl CodeAnalysisService {
         let path: PathBuf = profile.file_path.clone().into();
         let path_for_task = path.clone();
         let analysis = tokio::task::spawn_blocking(move || analyze_path(&path_for_task)).await??;
-        let report_markdown = reporter.render(
+        let infra_graph = analyze_infra(&path)?;
+
+        let report_markdown = reporter.render_with_infra(
             &analysis.result,
             &layercake_code_analysis::report::ReportMetadata::new(path, analysis.files_scanned),
+            Some(&infra_graph),
         )?;
         let cleaned_report = strip_csv_blocks(&report_markdown);
 
@@ -172,10 +235,12 @@ impl CodeAnalysisService {
             }
         };
 
-        let graph_json = serde_json::to_string(&analysis_to_graph(
-            &analysis.result,
+        let combined_graph = merge_graphs(
+            analysis_to_graph(&analysis.result, None),
+            infra_to_graph(&infra_graph, None),
             Some(cleaned_report.clone()),
-        ))?;
+        );
+        let graph_json = serde_json::to_string(&combined_graph)?;
         let annotation_text = cleaned_report.clone();
         let ds_service = DataSetService::new(self.db.clone());
         ds_service.update_graph_data(dataset_id, graph_json).await?;

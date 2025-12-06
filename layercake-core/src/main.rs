@@ -6,6 +6,7 @@ mod errors;
 mod export;
 mod generate_commands;
 mod graph;
+mod infra_graph;
 mod pipeline;
 mod plan;
 mod plan_execution;

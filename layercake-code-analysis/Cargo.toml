@@ -16,6 +16,7 @@ rayon = "1.7"
 rustpython-ast = { version = "0.3.0", features = ["visitor"] }
 rustpython-parser = "0.3.0"
 serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
 tracing = { workspace = true }
 walkdir = "2.4"
 swc_common = "18.0.1"
@@ -23,6 +24,8 @@ swc_ecma_parser = "29.0.0"
 swc_ecma_visit = "19.0.0"
 swc_ecma_ast = "19.0.0"
 tokei = "12.1"
+hcl-rs = "0.18"
+serde_yaml = "0.9"
 
 [dev-dependencies]
 tempfile = "3"
