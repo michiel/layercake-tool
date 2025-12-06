@@ -51,6 +51,12 @@ pub struct CodeAnalysisOptions {
     #[serde(alias = "coalesceFunctions")]
     #[serde(default)]
     pub coalesce_functions: bool,
+    #[serde(alias = "excludeKnownSupportFiles")]
+    #[serde(default)]
+    pub exclude_known_support_files: bool,
+    #[serde(alias = "excludeInferredSupport")]
+    #[serde(default)]
+    pub exclude_inferred_support: bool,
 }
 
 fn default_true() -> bool {
@@ -216,6 +222,77 @@ impl CodeAnalysisService {
         Self { db }
     }
 
+    fn is_known_support_file(path: &str) -> bool {
+        let filename = std::path::Path::new(path)
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+
+        matches!(
+            filename.as_str(),
+            "package-lock.json"
+                | "yarn.lock"
+                | "pnpm-lock.yaml"
+                | "pnpm-lock.yml"
+                | "package.json"
+                | "pyproject.toml"
+                | "requirements.txt"
+                | "requirements-dev.txt"
+                | "pipfile"
+                | "pipfile.lock"
+                | "poetry.lock"
+                | "setup.py"
+                | "setup.cfg"
+                | "tox.ini"
+                | "makefile"
+                | "makefile.toml"
+        )
+    }
+
+    fn is_inferred_support_path(path: &str) -> bool {
+        let lowered = path.to_lowercase();
+        let parts: Vec<&str> = lowered.split(&['/', '\\'][..]).collect();
+        for part in &parts {
+            if part.contains("test")
+                || part.contains("spec")
+                || part.contains("__tests__")
+                || part.contains("fixture")
+                || part.contains("fixtures")
+                || part.contains("mocks")
+                || part.contains("mock")
+            {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn should_exclude(path: &str, opts: &CodeAnalysisOptions) -> bool {
+        (opts.exclude_known_support_files && Self::is_known_support_file(path))
+            || (opts.exclude_inferred_support && Self::is_inferred_support_path(path))
+    }
+
+    fn filter_support_files(mut result: AnalysisResult, opts: &CodeAnalysisOptions) -> AnalysisResult {
+        result.functions.retain(|f| !Self::should_exclude(&f.file_path, opts));
+        result.imports.retain(|i| !Self::should_exclude(&i.file_path, opts));
+        result.data_flows
+            .retain(|f| !Self::should_exclude(&f.file_path, opts));
+        result.call_edges
+            .retain(|c| !Self::should_exclude(&c.file_path, opts));
+        result.entry_points
+            .retain(|e| !Self::should_exclude(&e.file_path, opts));
+        result.env_vars
+            .retain(|e| !Self::should_exclude(&e.file_path, opts));
+        result
+            .files
+            .retain(|f| !Self::should_exclude(f, opts));
+        result
+            .directories
+            .retain(|d| !Self::should_exclude(d, opts));
+        result
+    }
+
     async fn ensure_table(&self) -> Result<()> {
         let sql = "CREATE TABLE IF NOT EXISTS code_analysis_profiles (
             id TEXT PRIMARY KEY,
@@ -373,8 +450,13 @@ impl CodeAnalysisService {
                 include_imports: true,
                 include_infra: true,
                 coalesce_functions: false,
+                exclude_known_support_files: false,
+                exclude_inferred_support: false,
             });
         let mut result = analysis.result;
+        if opts.exclude_known_support_files || opts.exclude_inferred_support {
+            result = Self::filter_support_files(result, &opts);
+        }
         if !opts.include_data_flow {
             result.data_flows.clear();
         }

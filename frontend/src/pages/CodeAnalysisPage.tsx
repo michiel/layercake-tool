@@ -122,6 +122,8 @@ export const CodeAnalysisPage: React.FC = () => {
   const [includeControlFlow, setIncludeControlFlow] = useState(true)
   const [includeImports, setIncludeImports] = useState(true)
   const [coalesceFunctions, setCoalesceFunctions] = useState(false)
+  const [excludeKnownSupport, setExcludeKnownSupport] = useState(false)
+  const [excludeInferredSupport, setExcludeInferredSupport] = useState(false)
 
   const selectedProjectName = useMemo(() => `Project ${projectId ?? ''}`, [projectId])
 
@@ -209,6 +211,8 @@ export const CodeAnalysisPage: React.FC = () => {
     setIncludeControlFlow(opts.includeControlFlow ?? true)
     setIncludeImports(opts.includeImports ?? true)
     setCoalesceFunctions(opts.coalesceFunctions ?? false)
+    setExcludeKnownSupport(opts.excludeKnownSupportFiles ?? false)
+    setExcludeInferredSupport(opts.excludeInferredSupport ?? false)
     setModalOpen(true)
   }
 
@@ -220,6 +224,8 @@ export const CodeAnalysisPage: React.FC = () => {
       includeControlFlow,
       includeImports,
       coalesceFunctions,
+      excludeKnownSupportFiles: excludeKnownSupport,
+      excludeInferredSupport,
     })
     if (editing) {
       updateProfile({
@@ -432,6 +438,22 @@ export const CodeAnalysisPage: React.FC = () => {
                   onChange={(e) => setCoalesceFunctions(e.target.checked)}
                 />
                 Coalesce functions into files (aggregate edges)
+              </Label>
+              <Label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={excludeKnownSupport}
+                  onChange={(e) => setExcludeKnownSupport(e.target.checked)}
+                />
+                Exclude known support files (locks, manifests, setup)
+              </Label>
+              <Label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={excludeInferredSupport}
+                  onChange={(e) => setExcludeInferredSupport(e.target.checked)}
+                />
+                Exclude inferred support/tests (test/spec/fixtures)
               </Label>
             </div>
           </Stack>
