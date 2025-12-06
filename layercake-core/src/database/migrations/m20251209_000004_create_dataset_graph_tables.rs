@@ -1,0 +1,189 @@
+use sea_orm_migration::prelude::*;
+
+#[derive(DeriveMigrationName)]
+pub struct Migration;
+
+#[async_trait::async_trait]
+impl MigrationTrait for Migration {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table(DatasetGraphLayers::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(DatasetGraphLayers::Id)
+                            .string()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(
+                        ColumnDef::new(DatasetGraphLayers::DatasetId)
+                            .integer()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(
+                        ColumnDef::new(DatasetGraphLayers::Label)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(DatasetGraphLayers::BackgroundColor)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(DatasetGraphLayers::TextColor)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(DatasetGraphLayers::BorderColor)
+                            .string()
+                            .not_null(),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_table(
+                Table::create()
+                    .table(DatasetGraphNodes::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(DatasetGraphNodes::Id)
+                            .string()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(
+                        ColumnDef::new(DatasetGraphNodes::DatasetId)
+                            .integer()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(DatasetGraphNodes::Label).string().not_null())
+                    .col(ColumnDef::new(DatasetGraphNodes::Layer).string().not_null())
+                    .col(
+                        ColumnDef::new(DatasetGraphNodes::Weight)
+                            .integer()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(DatasetGraphNodes::IsPartition)
+                            .boolean()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(DatasetGraphNodes::BelongsTo).string().null())
+                    .col(ColumnDef::new(DatasetGraphNodes::Comment).string().null())
+                    .col(ColumnDef::new(DatasetGraphNodes::Dataset).integer().null())
+                    .col(
+                        ColumnDef::new(DatasetGraphNodes::Attributes)
+                            .json_binary()
+                            .null(),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_table(
+                Table::create()
+                    .table(DatasetGraphEdges::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(DatasetGraphEdges::Id)
+                            .string()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(
+                        ColumnDef::new(DatasetGraphEdges::DatasetId)
+                            .integer()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(
+                        ColumnDef::new(DatasetGraphEdges::Source)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(DatasetGraphEdges::Target)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(DatasetGraphEdges::Label).string().not_null())
+                    .col(ColumnDef::new(DatasetGraphEdges::Layer).string().not_null())
+                    .col(
+                        ColumnDef::new(DatasetGraphEdges::Weight)
+                            .integer()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(DatasetGraphEdges::Comment).string().null())
+                    .col(ColumnDef::new(DatasetGraphEdges::Dataset).integer().null())
+                    .col(
+                        ColumnDef::new(DatasetGraphEdges::Attributes)
+                            .json_binary()
+                            .null(),
+                    )
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(DatasetGraphEdges::Table).to_owned())
+            .await?;
+        manager
+            .drop_table(Table::drop().table(DatasetGraphNodes::Table).to_owned())
+            .await?;
+        manager
+            .drop_table(Table::drop().table(DatasetGraphLayers::Table).to_owned())
+            .await
+    }
+}
+
+#[derive(Iden)]
+enum DatasetGraphNodes {
+    Table,
+    Id,
+    DatasetId,
+    Label,
+    Layer,
+    Weight,
+    IsPartition,
+    BelongsTo,
+    Comment,
+    Dataset,
+    Attributes,
+}
+
+#[derive(Iden)]
+enum DatasetGraphEdges {
+    Table,
+    Id,
+    DatasetId,
+    Source,
+    Target,
+    Label,
+    Layer,
+    Weight,
+    Comment,
+    Dataset,
+    Attributes,
+}
+
+#[derive(Iden)]
+enum DatasetGraphLayers {
+    Table,
+    Id,
+    DatasetId,
+    Label,
+    BackgroundColor,
+    TextColor,
+    BorderColor,
+}

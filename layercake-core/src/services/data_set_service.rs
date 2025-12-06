@@ -1,10 +1,14 @@
 use anyhow::{anyhow, Result};
-use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
+    QueryOrder, QuerySelect, Set, TransactionTrait,
+};
 use std::collections::{HashMap, HashSet};
 
 use crate::app_context::DataSetValidationSummary;
 use crate::database::entities::common_types::{DataType, FileFormat};
 use crate::database::entities::data_sets::{self};
+use crate::database::entities::{dataset_graph_edges, dataset_graph_layers, dataset_graph_nodes};
 use crate::database::entities::{plan_dag_edges, plan_dag_nodes, projects};
 use crate::graph::{Edge, Graph, Layer, Node};
 use crate::services::{file_type_detection, source_processing};
@@ -269,12 +273,72 @@ impl DataSetService {
             .await?
             .ok_or_else(|| anyhow!("DataSet not found"))?;
 
+        let parsed: Graph = serde_json::from_str(&graph_json)?;
+        let txn = self.db.begin().await?;
+        dataset_graph_nodes::Entity::delete_many()
+            .filter(dataset_graph_nodes::Column::DatasetId.eq(id))
+            .exec(&txn)
+            .await?;
+        dataset_graph_edges::Entity::delete_many()
+            .filter(dataset_graph_edges::Column::DatasetId.eq(id))
+            .exec(&txn)
+            .await?;
+        dataset_graph_layers::Entity::delete_many()
+            .filter(dataset_graph_layers::Column::DatasetId.eq(id))
+            .exec(&txn)
+            .await?;
+
+        for layer in &parsed.layers {
+            let model = dataset_graph_layers::ActiveModel {
+                id: Set(layer.id.clone()),
+                dataset_id: Set(id),
+                label: Set(layer.label.clone()),
+                background_color: Set(layer.background_color.clone()),
+                text_color: Set(layer.text_color.clone()),
+                border_color: Set(layer.border_color.clone()),
+            };
+            model.insert(&txn).await?;
+        }
+
+        for node in &parsed.nodes {
+            let model = dataset_graph_nodes::ActiveModel {
+                id: Set(node.id.clone()),
+                dataset_id: Set(id),
+                label: Set(node.label.clone()),
+                layer: Set(node.layer.clone()),
+                weight: Set(node.weight),
+                is_partition: Set(node.is_partition),
+                belongs_to: Set(node.belongs_to.clone()),
+                comment: Set(node.comment.clone()),
+                dataset: Set(node.dataset),
+                attributes: Set(node.attributes.clone()),
+            };
+            model.insert(&txn).await?;
+        }
+
+        for edge in &parsed.edges {
+            let model = dataset_graph_edges::ActiveModel {
+                id: Set(edge.id.clone()),
+                dataset_id: Set(id),
+                source: Set(edge.source.clone()),
+                target: Set(edge.target.clone()),
+                label: Set(edge.label.clone()),
+                layer: Set(edge.layer.clone()),
+                weight: Set(edge.weight),
+                comment: Set(edge.comment.clone()),
+                dataset: Set(edge.dataset),
+                attributes: Set(edge.attributes.clone()),
+            };
+            model.insert(&txn).await?;
+        }
+
         let mut active_model: data_sets::ActiveModel = data_set.into();
         active_model.graph_json = Set(graph_json);
         active_model.processed_at = Set(Some(chrono::Utc::now()));
         active_model.updated_at = Set(chrono::Utc::now());
 
-        let updated = active_model.update(&self.db).await?;
+        let updated = active_model.update(&txn).await?;
+        txn.commit().await?;
         Ok(updated)
     }
 
@@ -310,6 +374,29 @@ impl DataSetService {
     }
 
     pub async fn get_graph_summary(&self, dataset_id: i32) -> Result<GraphSummaryData> {
+        let layer_rows = dataset_graph_layers::Entity::find()
+            .filter(dataset_graph_layers::Column::DatasetId.eq(dataset_id))
+            .all(&self.db)
+            .await?;
+        let node_count = dataset_graph_nodes::Entity::find()
+            .filter(dataset_graph_nodes::Column::DatasetId.eq(dataset_id))
+            .count(&self.db)
+            .await?;
+        let edge_count = dataset_graph_edges::Entity::find()
+            .filter(dataset_graph_edges::Column::DatasetId.eq(dataset_id))
+            .count(&self.db)
+            .await?;
+        if node_count > 0 || edge_count > 0 {
+            let mut layers: Vec<String> = layer_rows.into_iter().map(|l| l.id).collect();
+            layers.sort();
+            return Ok(GraphSummaryData {
+                node_count: node_count as usize,
+                edge_count: edge_count as usize,
+                layer_count: layers.len(),
+                layers,
+            });
+        }
+
         let model = data_sets::Entity::find_by_id(dataset_id)
             .one(&self.db)
             .await?
@@ -332,6 +419,91 @@ impl DataSetService {
         offset: usize,
         filter_layers: Option<Vec<String>>,
     ) -> Result<GraphPageData> {
+        let filter_set: Option<HashSet<String>> =
+            filter_layers.clone().map(|v| v.into_iter().collect());
+        let mut node_query = dataset_graph_nodes::Entity::find()
+            .filter(dataset_graph_nodes::Column::DatasetId.eq(dataset_id))
+            .order_by_asc(dataset_graph_nodes::Column::Id)
+            .limit(limit as u64)
+            .offset(offset as u64);
+        if let Some(filter) = &filter_set {
+            node_query =
+                node_query.filter(dataset_graph_nodes::Column::Layer.is_in(filter.clone()));
+        }
+        let nodes_rows = node_query.all(&self.db).await?;
+        let total_rows = dataset_graph_nodes::Entity::find()
+            .filter(dataset_graph_nodes::Column::DatasetId.eq(dataset_id))
+            .count(&self.db)
+            .await? as usize;
+
+        if !nodes_rows.is_empty() {
+            let node_ids: HashSet<String> = nodes_rows.iter().map(|n| n.id.clone()).collect();
+            let mut edges_rows = dataset_graph_edges::Entity::find()
+                .filter(dataset_graph_edges::Column::DatasetId.eq(dataset_id))
+                .all(&self.db)
+                .await?;
+            if let Some(filter) = &filter_set {
+                edges_rows.retain(|e| filter.contains(&e.layer));
+            }
+            edges_rows.retain(|e| node_ids.contains(&e.source) && node_ids.contains(&e.target));
+
+            let mut layers_rows = dataset_graph_layers::Entity::find()
+                .filter(dataset_graph_layers::Column::DatasetId.eq(dataset_id))
+                .all(&self.db)
+                .await?;
+            if let Some(filter) = &filter_set {
+                layers_rows.retain(|l| filter.contains(&l.id));
+            }
+
+            let nodes = nodes_rows
+                .into_iter()
+                .map(|n| Node {
+                    id: n.id,
+                    label: n.label,
+                    layer: n.layer,
+                    belongs_to: n.belongs_to,
+                    weight: n.weight,
+                    is_partition: n.is_partition,
+                    comment: n.comment,
+                    dataset: n.dataset,
+                    attributes: n.attributes,
+                })
+                .collect();
+            let edges = edges_rows
+                .into_iter()
+                .map(|e| Edge {
+                    id: e.id,
+                    source: e.source,
+                    target: e.target,
+                    label: e.label,
+                    layer: e.layer,
+                    weight: e.weight,
+                    comment: e.comment,
+                    dataset: e.dataset,
+                    attributes: e.attributes,
+                })
+                .collect();
+            let layers = layers_rows
+                .into_iter()
+                .map(|l| Layer {
+                    id: l.id,
+                    label: l.label,
+                    background_color: l.background_color,
+                    text_color: l.text_color,
+                    border_color: l.border_color,
+                    alias: None,
+                    dataset: None,
+                })
+                .collect();
+
+            return Ok(GraphPageData {
+                nodes,
+                edges,
+                layers,
+                has_more: offset + limit < total_rows,
+            });
+        }
+
         let model = data_sets::Entity::find_by_id(dataset_id)
             .one(&self.db)
             .await?
