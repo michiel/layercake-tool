@@ -347,6 +347,7 @@ impl GraphService {
                         border_color: sanitize_hex(&layer.border_color, "000000"),
                         alias: layer.alias,
                         dataset: layer.dataset,
+                        attributes: None,
                     },
                 )
             })
@@ -435,6 +436,7 @@ impl GraphService {
                     border_color: "1f2933".to_string(),
                     alias: None,
                     dataset: None,
+                    attributes: None,
                 },
             );
         };
@@ -1028,6 +1030,7 @@ impl GraphService {
                     border_color,
                     alias: Some(target.layer_id),
                     dataset: target.source_dataset_id,
+                    attributes: None,
                 }));
             }
         }
@@ -1080,6 +1083,7 @@ impl GraphService {
                         border_color,
                         alias: Some(target.layer_id.clone()),
                         dataset: target.source_dataset_id,
+                        attributes: None,
                     });
                 }
             }
@@ -1104,6 +1108,7 @@ impl GraphService {
             border_color,
             alias: layer.alias,
             dataset: layer.source_dataset_id,
+            attributes: None,
         })
     }
 

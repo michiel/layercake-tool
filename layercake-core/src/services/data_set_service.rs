@@ -493,6 +493,7 @@ impl DataSetService {
                     border_color: l.border_color,
                     alias: None,
                     dataset: None,
+                    attributes: None,
                 })
                 .collect();
 

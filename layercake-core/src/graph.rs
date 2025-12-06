@@ -1428,7 +1428,7 @@ impl Graph {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct Node {
     pub id: String,
     pub label: String,
@@ -1478,7 +1478,7 @@ impl TreeNode {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct Edge {
     pub id: String,
     pub source: String,
@@ -1504,6 +1504,8 @@ pub struct Layer {
     pub alias: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dataset: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub attributes: Option<serde_json::Value>,
 }
 
 impl Layer {
@@ -1522,6 +1524,7 @@ impl Layer {
             border_color: border_color.to_string(),
             alias: None,
             dataset: None,
+            attributes: None,
         }
     }
 }
@@ -1648,6 +1651,7 @@ impl Layer {
             text_color: get_stripped_value(record, 4, "text_color")?,
             alias: None,
             dataset: None,
+            attributes: None,
         })
     }
 }

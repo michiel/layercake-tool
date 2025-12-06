@@ -579,6 +579,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Node {
                     id: "B".to_string(),
@@ -589,6 +590,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
             ],
             edges: vec![
@@ -601,6 +603,7 @@ mod tests {
                     weight: 1,
                     comment: None,
                     dataset: None,
+                    attributes: None,
                 },
                 Edge {
                     id: "e2".to_string(),

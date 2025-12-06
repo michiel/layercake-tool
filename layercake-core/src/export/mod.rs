@@ -203,6 +203,7 @@ mod tests {
             weight: 1,
             comment: None,
             dataset: None,
+            attributes: None,
         }
     }
 
