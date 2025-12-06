@@ -44,6 +44,7 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .default(false),
                     )
+                    .col(ColumnDef::new(CodeAnalysisProfiles::Options).text().null())
                     .to_owned(),
             )
             .await
@@ -66,4 +67,5 @@ enum CodeAnalysisProfiles {
     LastRun,
     Report,
     NoInfra,
+    Options,
 }

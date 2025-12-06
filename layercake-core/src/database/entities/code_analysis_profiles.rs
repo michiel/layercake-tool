@@ -12,6 +12,7 @@ pub struct Model {
     pub last_run: Option<ChronoDateTimeUtc>,
     pub report: Option<String>,
     pub no_infra: Option<bool>,
+    pub options: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

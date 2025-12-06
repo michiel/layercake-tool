@@ -17,6 +17,7 @@ import { ProjectChatPage } from './pages/ProjectChatPage'
 import { ChatLogsPage } from './pages/ChatLogsPage'
 import { KnowledgeBasePage } from './pages/KnowledgeBasePage'
 import { CodeAnalysisPage } from './pages/CodeAnalysisPage'
+import { CodeAnalysisDetailPage } from './pages/CodeAnalysisDetailPage'
 import { DatasetCreationPage } from './pages/DatasetCreationPage'
 import { ProjectArtefactsPage } from './pages/ProjectArtefactsPage'
 import { ProjectLayersPage } from './pages/ProjectLayersPage'
@@ -2106,6 +2107,11 @@ function App() {
           <Route path="/projects/:projectId/data-acquisition/code-analysis" element={
             <ErrorBoundary>
               <CodeAnalysisPage />
+            </ErrorBoundary>
+          } />
+          <Route path="/projects/:projectId/data-acquisition/code-analysis/:profileId" element={
+            <ErrorBoundary>
+              <CodeAnalysisDetailPage />
             </ErrorBoundary>
           } />
           <Route path="/projects/:projectId/data-acquisition/datasets" element={

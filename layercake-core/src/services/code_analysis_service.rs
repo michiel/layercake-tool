@@ -27,6 +27,23 @@ pub struct CodeAnalysisProfile {
     pub last_run: Option<DateTime<Utc>>,
     pub report: Option<String>,
     pub no_infra: bool,
+    pub options: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CodeAnalysisOptions {
+    #[serde(default = "default_true")]
+    pub include_data_flow: bool,
+    #[serde(default = "default_true")]
+    pub include_control_flow: bool,
+    #[serde(default = "default_true")]
+    pub include_imports: bool,
+    #[serde(default = "default_true")]
+    pub include_infra: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 impl From<code_analysis_profiles::Model> for CodeAnalysisProfile {
@@ -39,6 +56,7 @@ impl From<code_analysis_profiles::Model> for CodeAnalysisProfile {
             last_run: model.last_run,
             report: model.report,
             no_infra: model.no_infra.unwrap_or(false),
+            options: model.options,
         }
     }
 }
@@ -195,7 +213,8 @@ impl CodeAnalysisService {
             dataset_id INTEGER,
             last_run TEXT,
             report TEXT,
-            no_infra INTEGER DEFAULT 0
+            no_infra INTEGER DEFAULT 0,
+            options TEXT
         )";
         self.db
             .execute(Statement::from_string(
@@ -211,6 +230,14 @@ impl CodeAnalysisService {
             .execute(Statement::from_string(
                 self.db.get_database_backend(),
                 alter.to_string(),
+            ))
+            .await;
+        let alter_opts = "ALTER TABLE code_analysis_profiles ADD COLUMN options TEXT";
+        let _ = self
+            .db
+            .execute(Statement::from_string(
+                self.db.get_database_backend(),
+                alter_opts.to_string(),
             ))
             .await;
         Ok(())
@@ -231,6 +258,7 @@ impl CodeAnalysisService {
         file_path: String,
         dataset_id: Option<i32>,
         no_infra: bool,
+        options: Option<String>,
     ) -> Result<CodeAnalysisProfile> {
         self.ensure_table().await?;
         let id = Uuid::new_v4().to_string();
@@ -242,6 +270,7 @@ impl CodeAnalysisService {
             last_run: Set(None),
             report: Set(None),
             no_infra: Set(Some(no_infra)),
+            options: Set(options),
         };
 
         code_analysis_profiles::Entity::insert(active.clone())
@@ -262,6 +291,7 @@ impl CodeAnalysisService {
         file_path: Option<String>,
         dataset_id: Option<Option<i32>>,
         no_infra: Option<bool>,
+        options: Option<Option<String>>,
     ) -> Result<CodeAnalysisProfile> {
         self.ensure_table().await?;
         let mut model = code_analysis_profiles::Entity::find_by_id(id.to_string())
@@ -278,6 +308,9 @@ impl CodeAnalysisService {
         }
         if let Some(flag) = no_infra {
             model.no_infra = Set(Some(flag));
+        }
+        if let Some(opts) = options {
+            model.options = Set(opts);
         }
 
         let updated = model.update(&self.db).await?;
@@ -300,6 +333,13 @@ impl CodeAnalysisService {
             .ok_or_else(|| anyhow!("Profile not found"))
     }
 
+    pub async fn get(&self, id: String) -> Result<Option<CodeAnalysisProfile>> {
+        let model = code_analysis_profiles::Entity::find_by_id(id)
+            .one(&self.db)
+            .await?;
+        Ok(model.map(CodeAnalysisProfile::from))
+    }
+
     pub async fn run(&self, id: &str) -> Result<CodeAnalysisProfile> {
         let profile = self.get_by_id(id).await?;
         let no_infra_flag = profile.no_infra.unwrap_or(false);
@@ -308,16 +348,37 @@ impl CodeAnalysisService {
         let path: PathBuf = profile.file_path.clone().into();
         let path_for_task = path.clone();
         let analysis = tokio::task::spawn_blocking(move || analyze_path(&path_for_task)).await??;
-        let (infra_graph, correlation) = if no_infra_flag {
+        let opts: CodeAnalysisOptions = profile
+            .options
+            .as_ref()
+            .and_then(|raw| serde_json::from_str(raw).ok())
+            .unwrap_or(CodeAnalysisOptions {
+                include_data_flow: true,
+                include_control_flow: true,
+                include_imports: true,
+                include_infra: true,
+            });
+        let mut result = analysis.result;
+        if !opts.include_data_flow {
+            result.data_flows.clear();
+        }
+        if !opts.include_control_flow {
+            result.call_edges.clear();
+        }
+        if !opts.include_imports {
+            result.imports.clear();
+        }
+
+        let (infra_graph, correlation) = if no_infra_flag || !opts.include_infra {
             (None, None)
         } else {
             let infra = analyze_infra(&path)?;
-            let corr = correlate_code_infra(&analysis.result, &infra);
+            let corr = correlate_code_infra(&result, &infra);
             (Some(infra), Some(corr))
         };
 
         let report_markdown = reporter.render_with_infra(
-            &analysis.result,
+            &result,
             &layercake_code_analysis::report::ReportMetadata::new(path, analysis.files_scanned),
             infra_graph.as_ref(),
             correlation.as_ref(),
@@ -341,13 +402,13 @@ impl CodeAnalysisService {
 
         let combined_graph = if let Some(infra_graph) = infra_graph {
             merge_graphs(
-                analysis_to_graph(&analysis.result, None),
+                analysis_to_graph(&result, None),
                 infra_to_graph(&infra_graph, None),
                 Some(cleaned_report.clone()),
                 correlation.as_ref(),
             )
         } else {
-            analysis_to_graph(&analysis.result, Some(cleaned_report.clone()))
+            analysis_to_graph(&result, Some(cleaned_report.clone()))
         };
         let graph_json = serde_json::to_string(&combined_graph)?;
         let annotation_text = cleaned_report.clone();

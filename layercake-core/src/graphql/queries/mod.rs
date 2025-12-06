@@ -79,6 +79,21 @@ impl Query {
             .collect())
     }
 
+    async fn code_analysis_profile(
+        &self,
+        ctx: &Context<'_>,
+        id: String,
+    ) -> Result<Option<CodeAnalysisProfile>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let profile = context
+            .app
+            .code_analysis_service()
+            .get(id)
+            .await
+            .map_err(|e| StructuredError::service("CodeAnalysisService::get", e))?;
+        Ok(profile.map(CodeAnalysisProfile::from))
+    }
+
     /// Get aggregate statistics for a project (for overview page)
     async fn project_stats(
         &self,

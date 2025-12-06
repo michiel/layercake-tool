@@ -18,6 +18,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Textarea } from '../components/ui/textarea'
 import { Group, Stack } from '../components/layout-primitives'
 import { showSuccessNotification, showErrorNotification } from '../utils/notifications'
+import { Link } from 'react-router-dom'
 
 type Profile = {
   id: string
@@ -26,6 +27,7 @@ type Profile = {
   lastRun?: string | null
   report?: string | null
   noInfra?: boolean
+  options?: string | null
 }
 
 type DataSetOption = { id: number; name: string }
@@ -40,6 +42,7 @@ const GET_PROFILES = gql`
       lastRun
       report
       noInfra
+      options
     }
   }
 `
@@ -54,6 +57,7 @@ const CREATE_PROFILE = gql`
       lastRun
       report
       noInfra
+      options
     }
   }
 `
@@ -68,6 +72,7 @@ const UPDATE_PROFILE = gql`
       lastRun
       report
       noInfra
+      options
     }
   }
 `
@@ -89,6 +94,7 @@ const RUN_PROFILE = gql`
         lastRun
         report
         noInfra
+        options
       }
     }
   }
@@ -112,6 +118,9 @@ export const CodeAnalysisPage: React.FC = () => {
   const [filePath, setFilePath] = useState('')
   const [datasetId, setDatasetId] = useState<number | undefined>()
   const [noInfra, setNoInfra] = useState(false)
+  const [includeDataFlow, setIncludeDataFlow] = useState(true)
+  const [includeControlFlow, setIncludeControlFlow] = useState(true)
+  const [includeImports, setIncludeImports] = useState(true)
 
   const selectedProjectName = useMemo(() => `Project ${projectId ?? ''}`, [projectId])
 
@@ -135,6 +144,7 @@ export const CodeAnalysisPage: React.FC = () => {
         lastRun: p.lastRun,
         report: p.report,
         noInfra: p.noInfra,
+        options: p.options,
       })) || []
     setProfiles(mapped)
   }, [profilesData])
@@ -193,14 +203,19 @@ export const CodeAnalysisPage: React.FC = () => {
     setFilePath(profile?.filePath ?? '')
     setDatasetId(profile?.datasetId)
     setNoInfra(profile?.noInfra ?? false)
+    const opts = profile?.options ? JSON.parse(profile.options) : {}
+    setIncludeDataFlow(opts.includeDataFlow ?? true)
+    setIncludeControlFlow(opts.includeControlFlow ?? true)
+    setIncludeImports(opts.includeImports ?? true)
     setModalOpen(true)
   }
 
   const handleSave = () => {
     if (!filePath) return
+    const options = JSON.stringify({ includeDataFlow, includeControlFlow, includeImports })
     if (editing) {
       updateProfile({
-        variables: { input: { id: editing.id, filePath, datasetId, noInfra } },
+        variables: { input: { id: editing.id, filePath, datasetId, noInfra, options } },
       })
     } else {
       createProfile({
@@ -210,6 +225,7 @@ export const CodeAnalysisPage: React.FC = () => {
             filePath,
             datasetId,
             noInfra,
+            options,
           },
         },
       })
@@ -280,6 +296,11 @@ export const CodeAnalysisPage: React.FC = () => {
                     <TableCell className="capitalize">{profile.report ? 'complete' : 'idle'}</TableCell>
                     <TableCell className="text-right">
                       <Group gap="xs" justify="end">
+                        <Button size="sm" variant="outline" asChild>
+                          <Link to={`/projects/${projectId}/data-acquisition/code-analysis/${profile.id}`}>
+                            View
+                          </Link>
+                        </Button>
                         <Button size="sm" variant="secondary" onClick={() => handleOpenModal(profile)}>
                           Edit
                         </Button>
@@ -362,6 +383,40 @@ export const CodeAnalysisPage: React.FC = () => {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={noInfra}
+                  onChange={(e) => setNoInfra(e.target.checked)}
+                />
+                Disable infra correlation
+              </Label>
+              <Label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={includeDataFlow}
+                  onChange={(e) => setIncludeDataFlow(e.target.checked)}
+                />
+                Include data flow
+              </Label>
+              <Label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={includeControlFlow}
+                  onChange={(e) => setIncludeControlFlow(e.target.checked)}
+                />
+                Include control flow
+              </Label>
+              <Label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={includeImports}
+                  onChange={(e) => setIncludeImports(e.target.checked)}
+                />
+                Include imports
+              </Label>
             </div>
           </Stack>
           <DialogFooter className="mt-4">
