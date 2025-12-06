@@ -18,15 +18,29 @@ pub fn correlate_code_infra(
 ) -> CorrelationReport {
     let mut report = CorrelationReport::default();
     let files: HashSet<String> = code.files.iter().cloned().collect();
+    let file_names: HashSet<String> = files
+        .iter()
+        .filter_map(|f| std::path::Path::new(f).file_name().and_then(|n| n.to_str()))
+        .map(|s| s.to_ascii_lowercase())
+        .collect();
     let functions: HashSet<String> = code.functions.iter().map(|f| f.name.clone()).collect();
+    let functions_lower: HashSet<String> = functions.iter().map(|f| f.to_ascii_lowercase()).collect();
     let env_vars: HashSet<String> = code.env_vars.iter().map(|e| e.name.clone()).collect();
+    let env_vars_lower: HashSet<String> = env_vars.iter().map(|e| e.to_ascii_lowercase()).collect();
 
     for resource in infra.resources.values() {
         let mut matched = false;
         for (k, v) in &resource.properties {
-            // File match: property contains a code file path
-            if files.iter().any(|f| v.contains(f)) {
-                for f in files.iter().filter(|f| v.contains(*f)) {
+            let v_lower = v.to_ascii_lowercase();
+            let k_lower = k.to_ascii_lowercase();
+            // File match: property contains a code file path or filename
+            if files.iter().any(|f| v.contains(f))
+                || file_names.iter().any(|name| v_lower.contains(name))
+            {
+                for f in files
+                    .iter()
+                    .filter(|f| v.contains(*f) || v_lower.contains(&f.to_ascii_lowercase()))
+                {
                     report.matches.push(CorrelationMatch {
                         code_node: f.clone(),
                         infra_node: resource.id.clone(),
@@ -35,9 +49,15 @@ pub fn correlate_code_infra(
                     matched = true;
                 }
             }
-            // Function/handler match by name
-            if functions.iter().any(|func| v.contains(func)) {
-                for func in functions.iter().filter(|func| v.contains(*func)) {
+            // Function/handler match by name (supports handler strings like module.func)
+            if functions_lower.iter().any(|func| v_lower.contains(func)) {
+                for func in functions.iter().filter(|func| {
+                    let lower = func.to_ascii_lowercase();
+                    v_lower.contains(&lower)
+                        || v_lower
+                            .split(|c| c == ':' || c == '/' || c == '.')
+                            .any(|part| part == lower)
+                }) {
                     report.matches.push(CorrelationMatch {
                         code_node: func.clone(),
                         infra_node: resource.id.clone(),
@@ -47,8 +67,14 @@ pub fn correlate_code_infra(
                 }
             }
             // Env var match by value
-            if env_vars.iter().any(|env| v.contains(env)) {
-                for env in env_vars.iter().filter(|env| v.contains(*env)) {
+            if env_vars_lower.iter().any(|env| v_lower.contains(env)) {
+                for env in env_vars.iter().filter(|env| {
+                    let lower = env.to_ascii_lowercase();
+                    v_lower.contains(&lower)
+                        || v_lower
+                            .split(|c| c == ':' || c == '/' || c == '.')
+                            .any(|part| part == lower)
+                }) {
                     report.matches.push(CorrelationMatch {
                         code_node: env.clone(),
                         infra_node: resource.id.clone(),
@@ -58,7 +84,7 @@ pub fn correlate_code_infra(
                 }
             }
             // Env var match by key
-            if env_vars.contains(k) {
+            if env_vars_lower.contains(&k_lower) {
                 report.matches.push(CorrelationMatch {
                     code_node: k.clone(),
                     infra_node: resource.id.clone(),
