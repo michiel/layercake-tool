@@ -739,19 +739,50 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
                 <Group justify="between">
                   <p className="font-medium">Processed Graph Data</p>
                   <p className="text-sm text-muted-foreground">
-                    {dataSource.graphJson.length} characters
+                    {summaryData?.graphSummary
+                      ? `${summaryData.graphSummary.nodeCount} nodes · ${summaryData.graphSummary.edgeCount} edges`
+                      : `${dataSource.graphJson.length} characters`}
                   </p>
                 </Group>
 
-                <ScrollArea className="h-[400px]">
-                  <pre className="text-xs bg-muted p-4 rounded-md overflow-x-auto">
-                    <code>{JSON.stringify(JSON.parse(dataSource.graphJson), null, 2)}</code>
-                  </pre>
-                </ScrollArea>
+                {graphPageLoading ? (
+                  <div className="py-6 flex justify-center">
+                    <Spinner className="h-4 w-4" />
+                  </div>
+                ) : graphPage ? (
+                  <>
+                    <ScrollArea className="h-[400px]">
+                      <pre className="text-xs bg-muted p-4 rounded-md overflow-x-auto">
+                        <code>
+                          {JSON.stringify(
+                            {
+                              nodes: graphPage.nodes,
+                              edges: graphPage.edges,
+                              layers: graphPage.layers,
+                              truncated: graphPage.hasMore,
+                            },
+                            null,
+                            2,
+                          )}
+                        </code>
+                      </pre>
+                    </ScrollArea>
+                    {graphPage.hasMore && (
+                      <Button variant="secondary" size="sm" onClick={handleLoadMore}>
+                        Load more nodes (offset {graphNodes.length})
+                      </Button>
+                    )}
+                  </>
+                ) : (
+                  <ScrollArea className="h-[400px]">
+                    <pre className="text-xs bg-muted p-4 rounded-md overflow-x-auto">
+                      <code>{JSON.stringify(JSON.parse(dataSource.graphJson), null, 2)}</code>
+                    </pre>
+                  </ScrollArea>
+                )}
 
                 <p className="text-xs text-muted-foreground">
-                  This is the processed graph data that will be available to Plan DAG nodes.
-                  The format includes nodes, edges, and layers arrays as defined by the graph schema.
+                  This is the processed graph data available to Plan DAG nodes. Large graphs are paged; use layer filters or load more to inspect additional nodes.
                 </p>
               </Stack>
             </CardContent>
