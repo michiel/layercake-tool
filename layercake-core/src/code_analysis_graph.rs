@@ -3,7 +3,11 @@ use serde_json::json;
 
 use crate::graph::{Edge, Graph, Layer, Node};
 
-pub fn analysis_to_graph(result: &AnalysisResult, annotation: Option<String>) -> Graph {
+pub fn analysis_to_graph(
+    result: &AnalysisResult,
+    annotation: Option<String>,
+    coalesce_functions: bool,
+) -> Graph {
     let mut nodes: Vec<Node> = Vec::new();
     let mut edges: Vec<Edge> = Vec::new();
     let mut layers: Vec<Layer> = Vec::new();
@@ -387,11 +391,16 @@ pub fn analysis_to_graph(result: &AnalysisResult, annotation: Option<String>) ->
     edges.sort_by(|a, b| a.id.cmp(&b.id));
     layers.sort_by(|a, b| a.id.cmp(&b.id));
 
-    Graph {
+    let mut graph = Graph {
         name: "code-analysis".to_string(),
         nodes,
         edges,
         layers,
         annotations: annotation,
+    };
+    graph.sanitize_labels();
+    if coalesce_functions {
+        graph.coalesce_functions_to_files();
     }
+    graph
 }

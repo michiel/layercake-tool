@@ -40,6 +40,8 @@ pub struct CodeAnalysisOptions {
     pub include_imports: bool,
     #[serde(default = "default_true")]
     pub include_infra: bool,
+    #[serde(default)]
+    pub coalesce_functions: bool,
 }
 
 fn default_true() -> bool {
@@ -357,6 +359,7 @@ impl CodeAnalysisService {
                 include_control_flow: true,
                 include_imports: true,
                 include_infra: true,
+                coalesce_functions: false,
             });
         let mut result = analysis.result;
         if !opts.include_data_flow {
@@ -402,13 +405,13 @@ impl CodeAnalysisService {
 
         let combined_graph = if let Some(infra_graph) = infra_graph {
             merge_graphs(
-                analysis_to_graph(&result, None),
+                analysis_to_graph(&result, None, opts.coalesce_functions),
                 infra_to_graph(&infra_graph, None),
                 Some(cleaned_report.clone()),
                 correlation.as_ref(),
             )
         } else {
-            analysis_to_graph(&result, Some(cleaned_report.clone()))
+            analysis_to_graph(&result, Some(cleaned_report.clone()), opts.coalesce_functions)
         };
         let graph_json = serde_json::to_string(&combined_graph)?;
         let annotation_text = cleaned_report.clone();

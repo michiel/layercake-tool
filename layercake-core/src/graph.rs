@@ -1,5 +1,5 @@
 use csv::StringRecord;
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use tracing::{debug, error, info, warn};
@@ -8,6 +8,7 @@ use crate::data_loader::{DfEdgeLoadProfile, DfNodeLoadProfile};
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct Graph {
+    #[serde(default)]
     pub name: String,
     pub nodes: Vec<Node>,
     pub edges: Vec<Edge>,
@@ -90,6 +91,124 @@ impl Graph {
         }
 
         (sanitized_nodes, sanitized_edges)
+    }
+
+    /// Coalesce function nodes into their owning file nodes and aggregate duplicate edges.
+    /// File nodes become flow nodes (`is_partition = false`). Function nodes are removed
+    /// once edges are rewired, and duplicate edges between the same source/target/layer
+    /// are merged with summed weights and merged labels.
+    pub fn coalesce_functions_to_files(&mut self) -> Option<String> {
+        let mut file_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
+        let mut function_to_file: std::collections::HashMap<String, String> =
+            std::collections::HashMap::new();
+        let mut scope_root: Option<String> = None;
+
+        for node in &self.nodes {
+            if node.layer == "scope" && node.belongs_to.is_none() {
+                scope_root = Some(node.id.clone());
+            }
+        }
+
+        for node in &self.nodes {
+            if node.layer == "function" {
+                if let Some(file_id) = node.belongs_to.clone() {
+                    function_to_file.insert(node.id.clone(), file_id);
+                } else if let Some(comment) = &node.comment {
+                    if let Some(file_node) =
+                        self.nodes.iter().find(|n| n.label == *comment || n.comment.as_deref() == Some(comment))
+                    {
+                        function_to_file.insert(node.id.clone(), file_node.id.clone());
+                    }
+                } else if let Some(scope) = scope_root.clone() {
+                    function_to_file.insert(node.id.clone(), scope);
+                }
+            }
+        }
+
+        if function_to_file.is_empty() {
+            return None;
+        }
+
+        for node in &mut self.nodes {
+            if function_to_file.values().any(|f| f == &node.id) {
+                file_ids.insert(node.id.clone());
+                node.is_partition = false;
+            }
+        }
+
+        let mut aggregated: indexmap::IndexMap<(String, String, String), (Edge, i32, IndexSet<String>)> =
+            indexmap::IndexMap::new();
+
+        for edge in self.edges.iter() {
+            let mut new_edge = edge.clone();
+            if let Some(file) = function_to_file.get(&edge.source) {
+                new_edge.source = file.clone();
+            }
+            if let Some(file) = function_to_file.get(&edge.target) {
+                new_edge.target = file.clone();
+            }
+
+            let weight = std::cmp::max(1, new_edge.weight);
+            let key = (new_edge.source.clone(), new_edge.target.clone(), new_edge.layer.clone());
+            let labels = new_edge
+                .label
+                .split(',')
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .map(|s| s.to_string())
+                .collect::<Vec<_>>();
+
+            aggregated
+                .entry(key)
+                .and_modify(|(edge_ref, total, seen_labels)| {
+                    *total += weight;
+                    for lbl in &labels {
+                        seen_labels.insert(lbl.clone());
+                    }
+                    if edge_ref.comment.is_none() {
+                        edge_ref.comment = new_edge.comment.clone();
+                    }
+                    if edge_ref.dataset.is_none() {
+                        edge_ref.dataset = new_edge.dataset;
+                    }
+                })
+                .or_insert_with(|| {
+                    let mut label_set = indexmap::IndexSet::new();
+                    for lbl in labels {
+                        label_set.insert(lbl);
+                    }
+                    (new_edge.clone(), weight, label_set)
+                });
+        }
+
+        let mut next_id: usize = 1;
+        self.edges = aggregated
+            .into_iter()
+            .map(|((_s, _t, _l), (mut edge, total_weight, labels))| {
+                edge.id = format!("edge_coalesced_{next_id}");
+                next_id += 1;
+                edge.weight = total_weight;
+                if !labels.is_empty() {
+                    edge.label = labels.into_iter().collect::<Vec<_>>().join(", ");
+                } else {
+                    edge.label = edge.label.clone();
+                }
+                edge
+            })
+            .collect();
+
+        let before_nodes = self.nodes.len();
+        self.nodes
+            .retain(|n| n.layer != "function" || !function_to_file.contains_key(&n.id));
+        let removed_nodes = before_nodes.saturating_sub(self.nodes.len());
+
+        let annotation = format!(
+            "Coalesced functions into files: {} function nodes removed; {} edges aggregated.",
+            removed_nodes,
+            next_id.saturating_sub(1)
+        );
+        self.append_annotation(annotation.clone());
+        Some(annotation)
     }
 
     pub fn get_layer_map(&self) -> IndexMap<String, Layer> {
@@ -1551,8 +1670,11 @@ pub struct Edge {
 pub struct Layer {
     pub id: String,
     pub label: String,
+    #[serde(default = "Layer::default_background")]
     pub background_color: String,
+    #[serde(default = "Layer::default_text_color")]
     pub text_color: String,
+    #[serde(default = "Layer::default_border")]
     pub border_color: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub alias: Option<String>,
@@ -1580,6 +1702,18 @@ impl Layer {
             dataset: None,
             attributes: None,
         }
+    }
+
+    fn default_background() -> String {
+        "#ffffff".to_string()
+    }
+
+    fn default_text_color() -> String {
+        "#000000".to_string()
+    }
+
+    fn default_border() -> String {
+        "#000000".to_string()
     }
 }
 

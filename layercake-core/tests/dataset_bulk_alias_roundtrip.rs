@@ -69,13 +69,15 @@ async fn insert_layer_dataset(
                 "label": "Layer A",
                 "background_color": "#ffffff",
                 "text_color": "#000000",
+                "border_color": "#000000",
                 "alias": "primary"
             },
             {
                 "id": "primary",
                 "label": "Primary Palette",
                 "background_color": "#f7f7f8",
-                "text_color": "#0f172a"
+                "text_color": "#0f172a",
+                "border_color": "#cbd5e1"
             }
         ]
     });

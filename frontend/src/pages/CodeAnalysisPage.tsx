@@ -121,6 +121,7 @@ export const CodeAnalysisPage: React.FC = () => {
   const [includeDataFlow, setIncludeDataFlow] = useState(true)
   const [includeControlFlow, setIncludeControlFlow] = useState(true)
   const [includeImports, setIncludeImports] = useState(true)
+  const [coalesceFunctions, setCoalesceFunctions] = useState(false)
 
   const selectedProjectName = useMemo(() => `Project ${projectId ?? ''}`, [projectId])
 
@@ -207,12 +208,18 @@ export const CodeAnalysisPage: React.FC = () => {
     setIncludeDataFlow(opts.includeDataFlow ?? true)
     setIncludeControlFlow(opts.includeControlFlow ?? true)
     setIncludeImports(opts.includeImports ?? true)
+    setCoalesceFunctions(opts.coalesceFunctions ?? false)
     setModalOpen(true)
   }
 
   const handleSave = () => {
     if (!filePath) return
-    const options = JSON.stringify({ includeDataFlow, includeControlFlow, includeImports })
+    const options = JSON.stringify({
+      includeDataFlow,
+      includeControlFlow,
+      includeImports,
+      coalesceFunctions,
+    })
     if (editing) {
       updateProfile({
         variables: { input: { id: editing.id, filePath, datasetId, noInfra, options } },
@@ -416,6 +423,14 @@ export const CodeAnalysisPage: React.FC = () => {
                   onChange={(e) => setIncludeImports(e.target.checked)}
                 />
                 Include imports
+              </Label>
+              <Label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={coalesceFunctions}
+                  onChange={(e) => setCoalesceFunctions(e.target.checked)}
+                />
+                Coalesce functions into files (aggregate edges)
               </Label>
             </div>
           </Stack>
