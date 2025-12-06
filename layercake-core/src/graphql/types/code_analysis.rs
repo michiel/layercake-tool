@@ -10,6 +10,8 @@ pub struct CodeAnalysisProfile {
     pub dataset_id: Option<i32>,
     pub last_run: Option<DateTime<Utc>>,
     pub report: Option<String>,
+    #[graphql(name = "noInfra")]
+    pub no_infra: bool,
 }
 
 impl From<ServiceProfile> for CodeAnalysisProfile {
@@ -21,6 +23,7 @@ impl From<ServiceProfile> for CodeAnalysisProfile {
             dataset_id: profile.dataset_id,
             last_run: profile.last_run,
             report: profile.report,
+            no_infra: profile.no_infra,
         }
     }
 }
@@ -30,6 +33,8 @@ pub struct CreateCodeAnalysisProfileInput {
     pub project_id: i32,
     pub file_path: String,
     pub dataset_id: Option<i32>,
+    #[graphql(name = "noInfra")]
+    pub no_infra: Option<bool>,
 }
 
 #[derive(InputObject)]
@@ -37,6 +42,8 @@ pub struct UpdateCodeAnalysisProfileInput {
     pub id: String,
     pub file_path: Option<String>,
     pub dataset_id: Option<i32>,
+    #[graphql(name = "noInfra")]
+    pub no_infra: Option<bool>,
 }
 
 #[derive(SimpleObject)]

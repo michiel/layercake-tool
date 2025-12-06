@@ -1,10 +1,18 @@
 use layercake_code_analysis::analyzer::{AnalysisResult, EnvVarUsage, FunctionInfo};
-use layercake_code_analysis::infra::{correlate_code_infra, EdgeType, GraphEdge, InfrastructureGraph, ResourceNode, ResourceType};
+use layercake_code_analysis::infra::{
+    correlate_code_infra, EdgeType, GraphEdge, InfrastructureGraph, ResourceNode, ResourceType,
+};
 
 fn sample_infra() -> InfrastructureGraph {
     let mut graph = InfrastructureGraph::new("infra");
-    let mut node = ResourceNode::new("aws_lambda_func", ResourceType::Aws("aws_lambda_function".into()), "handler", "main.tf");
-    node.properties.insert("handler".into(), "app.lambda_handler".into());
+    let mut node = ResourceNode::new(
+        "aws_lambda_func",
+        ResourceType::Aws("aws_lambda_function".into()),
+        "handler",
+        "main.tf",
+    );
+    node.properties
+        .insert("handler".into(), "app.lambda_handler".into());
     node.properties.insert("ENV".into(), "TABLE_NAME".into());
     node.properties.insert("file".into(), "src/app.py".into());
     graph.add_resource(node);

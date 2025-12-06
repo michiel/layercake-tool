@@ -24,8 +24,10 @@ pub fn correlate_code_infra(
         .map(|s| s.to_ascii_lowercase())
         .collect();
     let functions: HashSet<String> = code.functions.iter().map(|f| f.name.clone()).collect();
-    let functions_lower: HashSet<String> = functions.iter().map(|f| f.to_ascii_lowercase()).collect();
-    let mut functions_by_file: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+    let functions_lower: HashSet<String> =
+        functions.iter().map(|f| f.to_ascii_lowercase()).collect();
+    let mut functions_by_file: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
     for func in &code.functions {
         functions_by_file
             .entry(func.file_path.to_ascii_lowercase())
@@ -83,10 +85,15 @@ pub fn correlate_code_infra(
                 }) {
                     let path_clean = path_part.replace(':', "");
                     if file_names.iter().any(|n| path_clean.contains(n))
-                        || files.iter().any(|f| f.to_ascii_lowercase().contains(&path_clean))
+                        || files
+                            .iter()
+                            .any(|f| f.to_ascii_lowercase().contains(&path_clean))
                     {
                         if functions_lower.contains(func_part) {
-                            if let Some(func_original) = functions.iter().find(|f| f.to_ascii_lowercase() == func_part) {
+                            if let Some(func_original) = functions
+                                .iter()
+                                .find(|f| f.to_ascii_lowercase() == func_part)
+                            {
                                 report.matches.push(CorrelationMatch {
                                     code_node: func_original.clone(),
                                     infra_node: resource.id.clone(),

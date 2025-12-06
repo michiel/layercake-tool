@@ -21,7 +21,12 @@ impl CodeAnalysisMutation {
         let profile = context
             .app
             .code_analysis_service()
-            .create(input.project_id, input.file_path, input.dataset_id)
+            .create(
+                input.project_id,
+                input.file_path,
+                input.dataset_id,
+                input.no_infra.unwrap_or(false),
+            )
             .await
             .map_err(|e| StructuredError::service("CodeAnalysisService::create", e))?;
         Ok(CodeAnalysisProfile::from(profile))
@@ -36,7 +41,12 @@ impl CodeAnalysisMutation {
         let profile = context
             .app
             .code_analysis_service()
-            .update(&input.id, input.file_path, Some(input.dataset_id))
+            .update(
+                &input.id,
+                input.file_path,
+                Some(input.dataset_id),
+                input.no_infra,
+            )
             .await
             .map_err(|e| StructuredError::service("CodeAnalysisService::update", e))?;
         Ok(CodeAnalysisProfile::from(profile))

@@ -26,6 +26,7 @@ pub struct CodeAnalysisProfile {
     pub dataset_id: Option<i32>,
     pub last_run: Option<DateTime<Utc>>,
     pub report: Option<String>,
+    pub no_infra: bool,
 }
 
 impl From<code_analysis_profiles::Model> for CodeAnalysisProfile {
@@ -37,6 +38,7 @@ impl From<code_analysis_profiles::Model> for CodeAnalysisProfile {
             dataset_id: model.dataset_id,
             last_run: model.last_run,
             report: model.report,
+            no_infra: model.no_infra.unwrap_or(false),
         }
     }
 }
@@ -192,7 +194,8 @@ impl CodeAnalysisService {
             file_path TEXT NOT NULL,
             dataset_id INTEGER,
             last_run TEXT,
-            report TEXT
+            report TEXT,
+            no_infra INTEGER DEFAULT 0
         )";
         self.db
             .execute(Statement::from_string(
@@ -200,6 +203,16 @@ impl CodeAnalysisService {
                 sql.to_string(),
             ))
             .await?;
+
+        // backfill column if missing
+        let alter = "ALTER TABLE code_analysis_profiles ADD COLUMN no_infra INTEGER DEFAULT 0";
+        let _ = self
+            .db
+            .execute(Statement::from_string(
+                self.db.get_database_backend(),
+                alter.to_string(),
+            ))
+            .await;
         Ok(())
     }
 
@@ -217,6 +230,7 @@ impl CodeAnalysisService {
         project_id: i32,
         file_path: String,
         dataset_id: Option<i32>,
+        no_infra: bool,
     ) -> Result<CodeAnalysisProfile> {
         self.ensure_table().await?;
         let id = Uuid::new_v4().to_string();
@@ -227,6 +241,7 @@ impl CodeAnalysisService {
             dataset_id: Set(dataset_id),
             last_run: Set(None),
             report: Set(None),
+            no_infra: Set(Some(no_infra)),
         };
 
         code_analysis_profiles::Entity::insert(active.clone())
@@ -246,6 +261,7 @@ impl CodeAnalysisService {
         id: &str,
         file_path: Option<String>,
         dataset_id: Option<Option<i32>>,
+        no_infra: Option<bool>,
     ) -> Result<CodeAnalysisProfile> {
         self.ensure_table().await?;
         let mut model = code_analysis_profiles::Entity::find_by_id(id.to_string())
@@ -259,6 +275,9 @@ impl CodeAnalysisService {
         }
         if let Some(ds) = dataset_id {
             model.dataset_id = Set(ds);
+        }
+        if let Some(flag) = no_infra {
+            model.no_infra = Set(Some(flag));
         }
 
         let updated = model.update(&self.db).await?;
@@ -283,19 +302,25 @@ impl CodeAnalysisService {
 
     pub async fn run(&self, id: &str) -> Result<CodeAnalysisProfile> {
         let profile = self.get_by_id(id).await?;
+        let no_infra_flag = profile.no_infra.unwrap_or(false);
 
         let reporter = MarkdownReporter::default();
         let path: PathBuf = profile.file_path.clone().into();
         let path_for_task = path.clone();
         let analysis = tokio::task::spawn_blocking(move || analyze_path(&path_for_task)).await??;
-        let infra_graph = analyze_infra(&path)?;
-        let correlation = correlate_code_infra(&analysis.result, &infra_graph);
+        let (infra_graph, correlation) = if no_infra_flag {
+            (None, None)
+        } else {
+            let infra = analyze_infra(&path)?;
+            let corr = correlate_code_infra(&analysis.result, &infra);
+            (Some(infra), Some(corr))
+        };
 
         let report_markdown = reporter.render_with_infra(
             &analysis.result,
             &layercake_code_analysis::report::ReportMetadata::new(path, analysis.files_scanned),
-            Some(&infra_graph),
-            Some(&correlation),
+            infra_graph.as_ref(),
+            correlation.as_ref(),
         )?;
         let cleaned_report = strip_csv_blocks(&report_markdown);
 
@@ -314,12 +339,16 @@ impl CodeAnalysisService {
             }
         };
 
-        let combined_graph = merge_graphs(
-            analysis_to_graph(&analysis.result, None),
-            infra_to_graph(&infra_graph, None),
-            Some(cleaned_report.clone()),
-            Some(&correlation),
-        );
+        let combined_graph = if let Some(infra_graph) = infra_graph {
+            merge_graphs(
+                analysis_to_graph(&analysis.result, None),
+                infra_to_graph(&infra_graph, None),
+                Some(cleaned_report.clone()),
+                correlation.as_ref(),
+            )
+        } else {
+            analysis_to_graph(&analysis.result, Some(cleaned_report.clone()))
+        };
         let graph_json = serde_json::to_string(&combined_graph)?;
         let annotation_text = cleaned_report.clone();
         let ds_service = DataSetService::new(self.db.clone());
