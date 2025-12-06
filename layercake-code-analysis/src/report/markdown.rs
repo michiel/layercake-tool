@@ -1,5 +1,5 @@
 use crate::analyzer::AnalysisResult;
-use crate::infra::InfrastructureGraph;
+use crate::infra::{CorrelationReport, InfrastructureGraph};
 use crate::report::ReportMetadata;
 use anyhow::Result;
 use csv::WriterBuilder;
@@ -11,7 +11,7 @@ pub struct MarkdownReporter;
 
 impl MarkdownReporter {
     pub fn render(&self, result: &AnalysisResult, metadata: &ReportMetadata) -> Result<String> {
-        self.render_with_infra(result, metadata, None)
+        self.render_with_infra(result, metadata, None, None)
     }
 
     pub fn render_with_infra(
@@ -19,6 +19,7 @@ impl MarkdownReporter {
         result: &AnalysisResult,
         metadata: &ReportMetadata,
         infra: Option<&InfrastructureGraph>,
+        correlation: Option<&CorrelationReport>,
     ) -> Result<String> {
         let mut output = String::new();
         output.push_str("# Code Analysis Report\n");
@@ -42,6 +43,28 @@ impl MarkdownReporter {
                 }
             }
             output.push_str("\n");
+        }
+
+        if let Some(corr) = correlation {
+            output.push_str("## Correlation summary\n");
+            output.push_str(&format!("- Matches: {}\n", corr.matches.len()));
+            output.push_str(&format!("- Unresolved: {}\n", corr.unresolved.len()));
+            if !corr.matches.is_empty() {
+                output.push_str("\n### Matches\n");
+                for m in &corr.matches {
+                    output.push_str(&format!(
+                        "- Code `{}` ↔ Infra `{}` ({})\n",
+                        m.code_node, m.infra_node, m.reason
+                    ));
+                }
+            }
+            if !corr.unresolved.is_empty() {
+                output.push_str("\n### Unresolved\n");
+                for u in &corr.unresolved {
+                    output.push_str(&format!("- {u}\n"));
+                }
+            }
+            output.push('\n');
         }
 
         for (name, headers, rows) in datasets(result) {

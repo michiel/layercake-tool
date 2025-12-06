@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use layercake_code_analysis::analyzer::analyze_path;
-use layercake_code_analysis::infra::analyze_infra;
+use layercake_code_analysis::infra::{analyze_infra, correlate_code_infra};
 use layercake_code_analysis::report::markdown::{strip_csv_blocks, MarkdownReporter};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait,
@@ -212,11 +212,13 @@ impl CodeAnalysisService {
         let path_for_task = path.clone();
         let analysis = tokio::task::spawn_blocking(move || analyze_path(&path_for_task)).await??;
         let infra_graph = analyze_infra(&path)?;
+        let correlation = correlate_code_infra(&analysis.result, &infra_graph);
 
         let report_markdown = reporter.render_with_infra(
             &analysis.result,
             &layercake_code_analysis::report::ReportMetadata::new(path, analysis.files_scanned),
             Some(&infra_graph),
+            Some(&correlation),
         )?;
         let cleaned_report = strip_csv_blocks(&report_markdown);
 
