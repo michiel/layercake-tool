@@ -24,8 +24,12 @@ import {
   REPROCESS_DATASOURCE,
   UPDATE_DATASOURCE_GRAPH_DATA,
   VALIDATE_DATASET,
+  GET_GRAPH_SUMMARY,
+  GET_GRAPH_PAGE,
   DataSet,
   DataSetValidationResult,
+  GraphSummary,
+  GraphPageSlice,
   UpdateDataSetInput,
   formatFileSize,
   getFileFormatDisplayName
@@ -100,6 +104,8 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
   const selectedProject = projects.find(p => p.id === parseInt(projectId || '0'))
 
   // Query for DataSet
+  const datasetIdNum = parseInt(dataSetId || '0')
+
   const {
     data: dataSourceData,
     loading: dataSourceLoading,
@@ -109,6 +115,20 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
     variables: { id: parseInt(dataSetId || '0') },
     errorPolicy: 'all'
   })
+
+  const { data: summaryData } = useQuery<{ graphSummary: GraphSummary }>(GET_GRAPH_SUMMARY, {
+    skip: !datasetIdNum,
+    variables: { datasetId: datasetIdNum }
+  })
+
+  const PAGE_LIMIT = 200
+  const { data: graphPageData, loading: graphPageLoading } = useQuery<{ graphPage: GraphPageSlice }>(
+    GET_GRAPH_PAGE,
+    {
+      skip: !datasetIdNum,
+      variables: { datasetId: datasetIdNum, limit: PAGE_LIMIT, offset: 0 }
+    }
+  )
 
   // Mutations
   const [updateDataSet, { loading: updateLoading }] = useMutation(UPDATE_DATASOURCE)
@@ -120,7 +140,42 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
 
   const dataSource: DataSet | null = (dataSourceData as any)?.dataSet || null
   const annotationMarkdown = dataSource?.annotations || ''
+  const graphPage = graphPageData?.graphPage
   const rawGraphData = useMemo((): GraphData | null => {
+    if (graphPage && graphPage.nodes.length > 0) {
+      return {
+        nodes: graphPage.nodes.map(n => ({
+          id: n.id,
+          label: n.label,
+          layer: n.layer,
+          is_partition: n.isPartition,
+          belongs_to: n.belongsTo || undefined,
+          weight: n.weight,
+          comment: n.comment || undefined,
+          dataset: n.dataset || undefined,
+          attributes: n.attributes || undefined,
+        })),
+        edges: graphPage.edges.map(e => ({
+          id: e.id,
+          source: e.source,
+          target: e.target,
+          label: e.label,
+          layer: e.layer,
+          weight: e.weight,
+          comment: e.comment || undefined,
+          dataset: e.dataset || undefined,
+          attributes: e.attributes || undefined,
+        })),
+        layers: graphPage.layers.map(l => ({
+          id: l.id,
+          label: l.label,
+          background: l.backgroundColor || '#eef2ff',
+          text_color: l.textColor || '#0f172a',
+          border_color: l.borderColor || '#94a3b8',
+        })),
+        annotations: dataSource?.graphJson ? undefined : undefined,
+      }
+    }
     if (!dataSource?.graphJson) {
       return null
     }
@@ -130,7 +185,7 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
       console.error('Failed to parse dataset graph JSON', error)
       return null
     }
-  }, [dataSource?.graphJson])
+  }, [graphPage, dataSource?.graphJson])
 
   // Form for editing DataSet metadata
   const form = useForm<{name: string; description: string}>({
@@ -452,6 +507,25 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
           <IconAlertCircle className="h-4 w-4" />
           <AlertTitle>Processing Error</AlertTitle>
           <AlertDescription>{dataSource.errorMessage}</AlertDescription>
+        </Alert>
+      )}
+
+      {summaryData?.graphSummary && (
+        <Alert variant="info" className="mb-4">
+          <AlertTitle>Graph summary</AlertTitle>
+          <AlertDescription>
+            Nodes: {summaryData.graphSummary.nodeCount} · Edges: {summaryData.graphSummary.edgeCount} · Layers:{' '}
+            {summaryData.graphSummary.layers.join(', ') || 'none'}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {graphPage?.hasMore && (
+        <Alert variant="warning" className="mb-4">
+          <AlertTitle>Truncated view</AlertTitle>
+          <AlertDescription>
+            Showing the first {PAGE_LIMIT} nodes for performance. Use layer filters or download the dataset to view all elements.
+          </AlertDescription>
         </Alert>
       )}
 

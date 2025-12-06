@@ -362,6 +362,94 @@ export interface DataSet {
   hasLayers?: boolean
 }
 
+export const GET_GRAPH_SUMMARY = gql`
+  query GraphSummary($datasetId: Int!) {
+    graphSummary(datasetId: $datasetId) {
+      nodeCount
+      edgeCount
+      layerCount
+      layers
+    }
+  }
+`
+
+export const GET_GRAPH_PAGE = gql`
+  query GraphPage($datasetId: Int!, $limit: Int!, $offset: Int!, $layers: [String!]) {
+    graphPage(datasetId: $datasetId, limit: $limit, offset: $offset, layers: $layers) {
+      hasMore
+      nodes {
+        id
+        label
+        layer
+        belongsTo
+        weight
+        isPartition
+        comment
+        dataset
+        attributes
+      }
+      edges {
+        id
+        source
+        target
+        label
+        layer
+        weight
+        comment
+        dataset
+        attributes
+      }
+      layers {
+        id
+        label
+        backgroundColor
+        textColor
+        borderColor
+      }
+    }
+  }
+`
+
+export interface GraphSummary {
+  nodeCount: number
+  edgeCount: number
+  layerCount: number
+  layers: string[]
+}
+
+export interface GraphPageSlice {
+  hasMore: boolean
+  nodes: Array<{
+    id: string
+    label: string
+    layer: string
+    belongsTo?: string | null
+    weight: number
+    isPartition: boolean
+    comment?: string | null
+    dataset?: string | null
+    attributes?: any
+  }>
+  edges: Array<{
+    id: string
+    source: string
+    target: string
+    label: string
+    layer: string
+    weight: number
+    comment?: string | null
+    dataset?: string | null
+    attributes?: any
+  }>
+  layers: Array<{
+    id: string
+    label: string
+    backgroundColor?: string | null
+    textColor?: string | null
+    borderColor?: string | null
+  }>
+}
+
 export interface CreateDataSetInput {
   projectId: number
   name: string
