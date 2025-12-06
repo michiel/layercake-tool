@@ -96,7 +96,8 @@ impl Graph {
     /// Coalesce function nodes into their owning file nodes and aggregate duplicate edges.
     /// File nodes become flow nodes (`is_partition = false`). Function nodes are removed
     /// once edges are rewired, and duplicate edges between the same source/target/layer
-    /// are merged with summed weights and merged labels.
+    /// are merged with summed weights and merged labels. Only functions with a resolvable
+    /// file match are coalesced; unmatched functions remain.
     pub fn coalesce_functions_to_files(&mut self) -> Option<String> {
         let mut file_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
         let mut function_to_file: std::collections::HashMap<String, String> =
@@ -109,19 +110,72 @@ impl Graph {
             }
         }
 
-        for node in &self.nodes {
-            if node.layer == "function" {
-                if let Some(file_id) = node.belongs_to.clone() {
-                    function_to_file.insert(node.id.clone(), file_id);
-                } else if let Some(comment) = &node.comment {
-                    if let Some(file_node) =
-                        self.nodes.iter().find(|n| n.label == *comment || n.comment.as_deref() == Some(comment))
+        // Potential file nodes (scope nodes that look like files)
+        let file_candidates: Vec<&Node> = self
+            .nodes
+            .iter()
+            .filter(|n| {
+                n.layer == "scope"
+                    && (n.label.contains('.')
+                        || n.comment
+                            .as_deref()
+                            .map(|c| c.contains('.'))
+                            .unwrap_or(false))
+            })
+            .collect();
+
+        let mut resolve_file = |hints: &[String]| -> Option<String> {
+            for candidate in &file_candidates {
+                for hint in hints {
+                    if candidate.id == *hint
+                        || candidate.label.ends_with(hint)
+                        || candidate
+                            .comment
+                            .as_deref()
+                            .map(|c| c.ends_with(hint))
+                            .unwrap_or(false)
+                        || std::path::Path::new(&candidate.label)
+                            .file_name()
+                            .map(|f| f.to_string_lossy() == hint.as_str())
+                            .unwrap_or(false)
                     {
-                        function_to_file.insert(node.id.clone(), file_node.id.clone());
+                        return Some(candidate.id.clone());
                     }
-                } else if let Some(scope) = scope_root.clone() {
-                    function_to_file.insert(node.id.clone(), scope);
                 }
+            }
+            None
+        };
+
+        let mut mapped_functions = 0usize;
+        let mut unmatched_functions = 0usize;
+
+        for node in &self.nodes {
+            if node.layer != "function" {
+                continue;
+            }
+
+            let mut hints = Vec::new();
+            if let Some(belongs) = node.belongs_to.clone() {
+                hints.push(belongs);
+            }
+            if let Some(comment) = node.comment.clone() {
+                hints.push(comment);
+            }
+            if let Some(attrs) = &node.attributes {
+                if let Some(file) = attrs.get("file").and_then(|v| v.as_str()) {
+                    hints.push(file.to_string());
+                }
+                if let Some(file) = attrs.get("file_path").and_then(|v| v.as_str()) {
+                    hints.push(file.to_string());
+                }
+            }
+
+            let file_id = resolve_file(&hints).or_else(|| scope_root.clone());
+            if let Some(file_id) = file_id {
+                function_to_file.insert(node.id.clone(), file_id);
+                mapped_functions += 1;
+            } else {
+                unmatched_functions += 1;
             }
         }
 
@@ -198,13 +252,18 @@ impl Graph {
             .collect();
 
         let before_nodes = self.nodes.len();
-        self.nodes
-            .retain(|n| n.layer != "function" || !function_to_file.contains_key(&n.id));
+        self.nodes.retain(|n| {
+            if n.layer == "function" && function_to_file.contains_key(&n.id) {
+                return false;
+            }
+            true
+        });
         let removed_nodes = before_nodes.saturating_sub(self.nodes.len());
 
         let annotation = format!(
-            "Coalesced functions into files: {} function nodes removed; {} edges aggregated.",
+            "Coalesced functions into files: {} function nodes removed ({} unmatched kept); {} edges aggregated.",
             removed_nodes,
+            unmatched_functions,
             next_id.saturating_sub(1)
         );
         self.append_annotation(annotation.clone());
