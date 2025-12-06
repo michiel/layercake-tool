@@ -22,6 +22,7 @@ swc_common = "18.0.1"
 swc_ecma_parser = "29.0.0"
 swc_ecma_visit = "19.0.0"
 swc_ecma_ast = "19.0.0"
+tokei = "12.1"
 
 [dev-dependencies]
 tempfile = "3"

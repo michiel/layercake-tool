@@ -2,6 +2,8 @@ use crate::analyzer::AnalysisResult;
 use crate::report::ReportMetadata;
 use anyhow::Result;
 use csv::WriterBuilder;
+use std::path::Path;
+use tokei::{Config, Languages};
 
 #[derive(Default)]
 pub struct MarkdownReporter;
@@ -11,6 +13,12 @@ impl MarkdownReporter {
         let mut output = String::new();
         output.push_str("# Code Analysis Report\n");
         output.push_str(&format!("{}\n\n", metadata.summary(result)));
+
+        if let Some(stats) = codebase_stats(&metadata.root_path) {
+            output.push_str("## Codebase stats\n");
+            output.push_str(&stats);
+            output.push_str("\n\n");
+        }
 
         for (name, headers, rows) in datasets(result) {
             output.push_str(&format!("## {}\n", name));
@@ -146,4 +154,36 @@ fn to_csv(headers: &[String], rows: &[Vec<String>]) -> Result<String> {
         writer.flush()?;
     }
     Ok(String::from_utf8(buffer)?)
+}
+
+fn codebase_stats(root: &Path) -> Option<String> {
+    let mut languages = Languages::new();
+    let config = Config::default();
+    languages.get_statistics(&[root.to_path_buf()], &[], &config);
+
+    let total = languages.total();
+    let total_lines = total.lines();
+    if total_lines == 0 {
+        return None;
+    }
+
+    let mut by_lang: Vec<(String, usize)> = languages
+        .iter()
+        .map(|(lang, stats)| (lang.to_string(), stats.lines()))
+        .collect();
+    by_lang.sort_by(|a, b| b.1.cmp(&a.1));
+    let top = by_lang.into_iter().take(5).collect::<Vec<_>>();
+
+    let mut out = String::new();
+    out.push_str(&format!("- Total code lines: {total_lines}\n",));
+    if !top.is_empty() {
+        out.push_str("- Top languages by code lines: ");
+        let parts: Vec<String> = top
+            .into_iter()
+            .map(|(name, code)| format!("{name} ({code})"))
+            .collect();
+        out.push_str(&parts.join(", "));
+        out.push('\n');
+    }
+    Some(out.trim_end().to_string())
 }
