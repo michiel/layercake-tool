@@ -38,12 +38,12 @@ The codebase has been successfully upgraded to rig-core 0.25.0. This document ou
 
 ### Primary Usage Locations
 
-1. **layercake-data-acquisition/src/embeddings.rs** (Lines 2-4)
+1. **layercake-genai/src/embeddings.rs** (Lines 2-4)
    - Uses: `EmbeddingsClient`, `EmbeddingModel`, `openai::Client`, `ollama::Client`
    - Purpose: Embedding document chunks for RAG
    - Status: ✅ Working, no changes needed
 
-2. **layercake-data-acquisition/src/dataset_generation.rs** (Lines 2-3)
+2. **layercake-genai/src/dataset_generation.rs** (Lines 2-3)
    - Uses: `CompletionClient`, `Prompt`, `openai::Client`
    - Purpose: AI-powered dataset generation
    - Status: ⚠️ Can benefit from structured output
@@ -75,7 +75,7 @@ The codebase has been successfully upgraded to rig-core 0.25.0. This document ou
 
 #### Current State
 ```rust
-// layercake-data-acquisition/src/dataset_generation.rs:39
+// layercake-genai/src/dataset_generation.rs:39
 let completion = agent.prompt(prompt_text).await?;
 // Returns unstructured text that needs parsing
 ```
@@ -127,8 +127,8 @@ let agent = self.openai
 - [ ] Document schema format
 
 **Files to Modify:**
-- `layercake-data-acquisition/src/dataset_generation.rs`
-- Add new file: `layercake-data-acquisition/src/dataset_schema.rs`
+- `layercake-genai/src/dataset_generation.rs`
+- Add new file: `layercake-genai/src/dataset_schema.rs`
 
 ---
 
@@ -140,7 +140,7 @@ let agent = self.openai
 #### Audit Checklist
 
 1. **Header Manipulation Review**
-   - [ ] Check `layercake-data-acquisition/src/services/mod.rs`
+   - [ ] Check `layercake-genai/src/services/mod.rs`
    - [ ] Check `layercake-core/src/console/chat/providers.rs`
    - [ ] Verify no custom headers expose secrets
 
@@ -161,9 +161,9 @@ let agent = self.openai
    - [ ] Check frontend error displays
 
 **Files to Audit:**
-- `layercake-data-acquisition/src/embeddings.rs`
-- `layercake-data-acquisition/src/dataset_generation.rs`
-- `layercake-data-acquisition/src/services/mod.rs`
+- `layercake-genai/src/embeddings.rs`
+- `layercake-genai/src/dataset_generation.rs`
+- `layercake-genai/src/services/mod.rs`
 - `layercake-core/src/console/chat/providers.rs`
 - All Tauri command handlers using rig
 
@@ -218,7 +218,7 @@ Aligns with RAG-plan.md Phase 5 (Dataset generation workflows)
 1. **Structured Embedding Metadata**
    - Use JSON schemas for embedding metadata
    - Validate chunk structure before storage
-   - **Files:** `layercake-data-acquisition/src/embeddings.rs`
+   - **Files:** `layercake-genai/src/embeddings.rs`
 
 2. **Multi-Provider Support**
    - Leverage consolidated client init
@@ -270,13 +270,13 @@ Aligns with RAG-plan.md Phase 5 (Dataset generation workflows)
 
 ```bash
 # Test structured output
-cargo test --package layercake-data-acquisition dataset_generation
+cargo test --package layercake-genai dataset_generation
 
 # Test embeddings
-cargo test --package layercake-data-acquisition embeddings
+cargo test --package layercake-genai embeddings
 
 # Test security (no API key leaks in logs)
-cargo test --package layercake-data-acquisition -- --nocapture 2>&1 | grep -i "sk-"
+cargo test --package layercake-genai -- --nocapture 2>&1 | grep -i "sk-"
 ```
 
 ### Integration Tests
@@ -377,7 +377,7 @@ cargo test --package layercake-core rag_integration_test
 - [ ] `docs/RAG-plan.md` - Reference structured output
 - [ ] `docs/ARCHITECTURE.md` - Document rig integration patterns
 - [ ] `README.md` - Update rig-core version notes
-- [ ] `layercake-data-acquisition/README.md` - Dataset schema format
+- [ ] `layercake-genai/README.md` - Dataset schema format
 
 ### New Documentation
 - [ ] `docs/dataset-schema.md` - Structured output schema reference
@@ -447,12 +447,12 @@ let response: DatasetOutput = agent
 - ✅ All tests passing (202 core + 7 data-acquisition)
 
 ### Files Modified
-- `layercake-data-acquisition/src/dataset_schema.rs` (new, 330 lines)
-- `layercake-data-acquisition/src/dataset_generation.rs` (enhanced)
-- `layercake-data-acquisition/src/services/mod.rs` (rig API updates, Ollama env vars)
-- `layercake-data-acquisition/src/embeddings.rs` (Ollama embedding dimensions)
-- `layercake-data-acquisition/src/lib.rs` (module export)
-- `layercake-data-acquisition/Cargo.toml` (serde_yaml dependency)
+- `layercake-genai/src/dataset_schema.rs` (new, 330 lines)
+- `layercake-genai/src/dataset_generation.rs` (enhanced)
+- `layercake-genai/src/services/mod.rs` (rig API updates, Ollama env vars)
+- `layercake-genai/src/embeddings.rs` (Ollama embedding dimensions)
+- `layercake-genai/src/lib.rs` (module export)
+- `layercake-genai/Cargo.toml` (serde_yaml dependency)
 - `layercake-core/src/console/chat/session.rs` (all provider clients migrated)
 - `layercake-core/Cargo.toml` (rmcp 0.9.1 upgrade)
 

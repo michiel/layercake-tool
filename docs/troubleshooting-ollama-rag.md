@@ -62,7 +62,7 @@ sudo systemctl restart ollama
 The default chunk size has been reduced from 2,048 to 1,024 characters:
 
 ```rust
-// layercake-data-acquisition/src/config.rs
+// layercake-genai/src/config.rs
 impl Default for DataAcquisitionConfig {
     fn default() -> Self {
         Self {
@@ -100,7 +100,7 @@ Detailed logging has been added to embedding operations:
 RUST_LOG=debug cargo run -- <command>
 
 # Filter for embedding-specific logs
-RUST_LOG=layercake_data_acquisition::embeddings=debug cargo run -- <command>
+RUST_LOG=layercake_genai::embeddings=debug cargo run -- <command>
 ```
 
 Look for logs showing:

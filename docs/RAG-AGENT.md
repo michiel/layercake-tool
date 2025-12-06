@@ -8,12 +8,12 @@ Enable chat agents to access the project's knowledge base using Retrieval Augmen
 
 ### Existing Components
 
-1. **Vector Store** (`layercake-data-acquisition/src/vector_store.rs`)
+1. **Vector Store** (`layercake-genai/src/vector_store.rs`)
    - `SqliteVectorStore` with cosine similarity search
    - Stores document chunks with embeddings
    - Indexed by project_id and file_id
 
-2. **Embedding Service** (`layercake-data-acquisition/src/embeddings.rs`)
+2. **Embedding Service** (`layercake-genai/src/embeddings.rs`)
    - Supports OpenAI and Ollama providers
    - Generates embeddings for text chunks
    - Used during document ingestion
@@ -23,7 +23,7 @@ Enable chat agents to access the project's knowledge base using Retrieval Augmen
    - Uses `rig` crate for agent creation
    - Currently no RAG integration
 
-4. **Data Acquisition Service** (`layercake-data-acquisition/src/services/mod.rs`)
+4. **Data Acquisition Service** (`layercake-genai/src/services/mod.rs`)
    - `search_context()` method already exists
    - Returns `VectorSearchResult` with chunks and similarity scores
 
@@ -60,7 +60,7 @@ pub struct ChatSession {
 
 ```rust
 use anyhow::Result;
-use layercake_data_acquisition::vector_store::VectorSearchResult;
+use layercake_genai::vector_store::VectorSearchResult;
 
 pub struct RagContext {
     pub chunks: Vec<RagChunk>,
@@ -786,9 +786,9 @@ The RAG (Retrieval Augmented Generation) system is now fully functional across t
 **Files Modified**:
 - `layercake-core/src/console/chat/rag.rs` (new)
 - `layercake-core/src/console/chat/session.rs`
-- `layercake-data-acquisition/src/vector_store.rs`
-- `layercake-data-acquisition/src/embeddings.rs`
-- `layercake-data-acquisition/src/entities/kb_documents.rs`
+- `layercake-genai/src/vector_store.rs`
+- `layercake-genai/src/embeddings.rs`
+- `layercake-genai/src/entities/kb_documents.rs`
 - `layercake-core/src/database/migrations/m20251112_000022_add_rag_to_chat_sessions.rs` (new)
 - `layercake-core/src/database/entities/chat_sessions.rs`
 - `layercake-core/src/graphql/types/chat.rs`

@@ -119,7 +119,7 @@ icu_locid = { workspace = true }
 zip = { workspace = true }
 
 # Data acquisition
-layercake-data-acquisition = { path = "../layercake-data-acquisition" }
+layercake-genai = { path = "../layercake-genai" }
 layercake-code-analysis = { path = "../layercake-code-analysis" }
 
 [dev-dependencies]

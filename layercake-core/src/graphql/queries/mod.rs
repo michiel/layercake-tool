@@ -23,7 +23,7 @@ use crate::services::{
     graph_edit_service::GraphEditService, library_item_service::LibraryItemFilter,
     library_item_service::LibraryItemService, sample_project_service::SampleProjectService,
 };
-use layercake_data_acquisition::entities::tags as acquisition_tags;
+use layercake_genai::entities::tags as acquisition_tags;
 
 pub struct Query;
 

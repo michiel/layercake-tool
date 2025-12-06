@@ -7,12 +7,12 @@
 - Deliver a tagged knowledge graph that unifies raw files, generated datasets, and existing project graph nodes/edges for downstream DAG execution.
 
 ## Scope & Boundaries
-- **In scope:** new workspace crate (`layercake-data-acquisition`), SeaORM entities/migrations for files/tags/vector store, ingestion/parsing pipelines, rig-backed embedding + RAG orchestration, backend APIs, frontend (Source management, Knowledge base, Data set creation) views, tests and docs.
+- **In scope:** new workspace crate (`layercake-genai`), SeaORM entities/migrations for files/tags/vector store, ingestion/parsing pipelines, rig-backed embedding + RAG orchestration, backend APIs, frontend (Source management, Knowledge base, Data set creation) views, tests and docs.
 - **Out of scope:** vendor-specific hosted vector databases, cross-project knowledge sharing, generalized document redaction, or authz changes beyond tag visibility within a project.
 - **Assumptions:** legacy “Data source” entities have already been renamed to “Data sets”; rig-core OpenAI provider remains available; SQLite DB size is acceptable for initial release.
 
 ## Architecture Overview
-- **Workspace crate:** `layercake-data-acquisition` under `layercake-core/` workspace. Exposes feature-gated modules for ingestion, tagging, vector store management, and dataset generation. Re-exports integration traits consumed by CLI/API/Tauri layers.
+- **Workspace crate:** `layercake-genai` under `layercake-core/` workspace. Exposes feature-gated modules for ingestion, tagging, vector store management, and dataset generation. Re-exports integration traits consumed by CLI/API/Tauri layers.
 - **Database layer (SeaORM):**
   - `files` table: id (uuid), project_id, filename, media_type, size_bytes, blob (BLOB), checksum, created_by, created_at.
   - `file_tags` join table.
@@ -38,7 +38,7 @@
 | Phase | Duration | Deliverables |
 | --- | --- | --- |
 | **0. Prerequisite validation** | 0.5 week | Confirm “Data sets” rename migrations are merged; audit existing rig-core usage; document DB size and retention expectations. |
-| **1. Crate & schema foundation** | 1 week | Scaffold `layercake-data-acquisition` crate (lib + feature flags). Add SeaORM entities and migrations for `files`, `tags`, joins, `kb_documents`, `vector_index_state`. Update workspace manifests and CI to build/test the new crate. |
+| **1. Crate & schema foundation** | 1 week | Scaffold `layercake-genai` crate (lib + feature flags). Add SeaORM entities and migrations for `files`, `tags`, joins, `kb_documents`, `vector_index_state`. Update workspace manifests and CI to build/test the new crate. |
 | **2. File ingestion pipeline** | 1.5 weeks | Implement upload APIs (CLI/API/Tauri) writing BLOBs to SQLite with streaming to avoid memory spikes. Build parser trait with adapters: plain text/markdown via `pulldown_cmark`, CSV via `csv` crate, spreadsheets via `calamine`, PDFs via `pdf_extract` (stubbing for binary formats until libs chosen). Add checksum dedupe & tagging. Unit + integration tests with fixture files under `sample/`. |
 | **3. Embedding & vector store integration** | 1 week | Implement rig-backed `EmbeddingService`, chunking heuristics, batching, and persistence to `kb_documents`. Build SQLite-backed `VectorStore` impl (or adapt rig’s existing connectors) with configurable similarity search parameters. Expose background jobs for reindexing and UI-triggered rebuild/clear. |
 | **4. Knowledge base + tagging UX** | 1 week | Backend endpoints for listing KB docs, search previews, status metrics. Frontend components for Source Management + Knowledge Base sections, including tag management modals. Wire to Tauri commands and ensure CLI parity. |

@@ -1,7 +1,7 @@
 # Data Acquisition / RAG Implementation Notes
 
 ## Crate Layout
-- `layercake-data-acquisition` is a dedicated workspace crate that houses:
+- `layercake-genai` is a dedicated workspace crate that houses:
   - `services::DataAcquisitionService` – orchestrates ingestion, tagging, embedding, vector search, and dataset generation.
   - `ingestion` – pluggable parsers (`text/plain` enabled by default) with `DocumentChunk` abstractions.
   - `embeddings` – thin wrapper over rig/openai embedding models.
@@ -12,12 +12,12 @@
 Creating the service:
 
 ```rust
-use layercake_data_acquisition::services::DataAcquisitionService;
+use layercake_genai::services::DataAcquisitionService;
 
 let provider_hint = std::env::var("LAYERCAKE_EMBEDDING_PROVIDER")
     .ok()
     .or_else(|| std::env::var("LAYERCAKE_CHAT_PROVIDER").ok());
-let provider_config = layercake_data_acquisition::config::EmbeddingProviderConfig::from_env();
+let provider_config = layercake_genai::config::EmbeddingProviderConfig::from_env();
 let acquisition = DataAcquisitionService::new(db.clone(), provider_hint, provider_config);
 ```
 

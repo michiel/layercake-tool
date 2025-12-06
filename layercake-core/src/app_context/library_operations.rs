@@ -26,7 +26,7 @@ use crate::services::library_item_service::{
     LibraryItemService, ITEM_TYPE_PROJECT, ITEM_TYPE_PROJECT_TEMPLATE,
 };
 use crate::services::plan_service::PlanCreateRequest;
-use layercake_data_acquisition::entities::{
+use layercake_genai::entities::{
     file_tags as kb_file_tags, files as kb_files, kb_documents as kb_docs, tags as kb_tags,
     vector_index_state as kb_vector_state,
 };

@@ -5,7 +5,7 @@
 - `AppContext` drags in SeaORM entities, every service, exporter logic, GraphQL DTOs, and the data-acquisition crate unconditionally (`src/app_context.rs`). Optional deps never compile out.
 - Exporters + Handlebars helpers live in-core (`src/export`, `src/common/handlebars.rs`) and bring `handlebars`, `zip`, `rust_xlsxwriter`, etc. into every build.
 - A single binary target mixes synchronous CLI commands with async server startup (`src/main.rs`), forcing tokio/axum builds even for CLI runs.
-- `layercake-data-acquisition` is an unconditional dependency, so reqwest/tokio/embedding providers compile for every target.
+- `layercake-genai` is an unconditional dependency, so reqwest/tokio/embedding providers compile for every target.
 
 ## Proposed Workspace Layout
 ```
@@ -19,7 +19,7 @@ layercake-core (new lib with CLI-facing primitives only)
  ├─ layercake-mcp (MCP server, tokio-tungstenite, axum-mcp)
  └─ layercake-console (REPL + rig integration)
 ```
-External crates (`layercake-data-acquisition`, `axum-mcp`, etc.) remain workspace members but become optional deps of the modules that actually use them.
+External crates (`layercake-genai`, `axum-mcp`, etc.) remain workspace members but become optional deps of the modules that actually use them.
 
 ## Refactor Steps
 1. **Split `layercake-core`:**
@@ -33,7 +33,7 @@ External crates (`layercake-data-acquisition`, `axum-mcp`, etc.) remain workspac
    - Move server entry points into `layercake-server` bin; other binaries (GraphQL, MCP, console) can wrap it or enable features as needed.
 4. **Feature Cleanup:**
    - Default workspace features: minimal CLI (no server/GraphQL/MCP). Provide `--features server`, `graphql`, `mcp`, `console`.
-   - Make `layercake-data-acquisition` gated behind `data-acquisition` feature; only server/GraphQL builds enable it.
+   - Make `layercake-genai` gated behind `data-acquisition` feature; only server/GraphQL builds enable it.
 5. **Documentation & Tooling:**
    - Update `BUILD.md`, `README.md`, and npm scripts to target the new binaries.
    - Document new features/flags and add guidance for developers on when to run `cargo test -p layercake-server`, etc.

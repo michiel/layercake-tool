@@ -3,9 +3,9 @@ use std::io::Read;
 use anyhow::Error as AnyError;
 use async_graphql::{Context, Object, Result};
 
-use layercake_data_acquisition::dataset_generation::DatasetGenerationRequest;
-use layercake_data_acquisition::errors::DataAcquisitionError;
-use layercake_data_acquisition::services::{
+use layercake_genai::dataset_generation::DatasetGenerationRequest;
+use layercake_genai::errors::DataAcquisitionError;
+use layercake_genai::services::{
     FileIngestionRequest, KnowledgeBaseCommand, UpdateIngestedFileRequest,
 };
 use uuid::Uuid;

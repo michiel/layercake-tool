@@ -1,6 +1,8 @@
 [workspace]
-members = ["layercake-code-analysis",
-    "layercake-core", "layercake-data-acquisition",
+members = [
+    "layercake-code-analysis",
+    "layercake-core",
+    "layercake-genai",
     "src-tauri",
 ]
 resolver = "2"

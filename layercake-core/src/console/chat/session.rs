@@ -51,7 +51,7 @@ use crate::database::entities::{
 };
 use crate::mcp::security::build_user_security_context;
 use crate::services::system_settings_service::SystemSettingsService;
-use layercake_data_acquisition::services::DataAcquisitionService;
+use layercake_genai::services::DataAcquisitionService;
 
 use super::{
     config::{ChatConfig, ChatCredentialStore},
@@ -246,7 +246,7 @@ impl ChatSession {
             .ok()
             .and_then(|s| s.value);
         let embedding_config =
-            layercake_data_acquisition::config::EmbeddingProviderConfig::from_env();
+            layercake_genai::config::EmbeddingProviderConfig::from_env();
         let data_acquisition = Arc::new(DataAcquisitionService::new(
             db.clone(),
             embedding_provider,
@@ -357,7 +357,7 @@ impl ChatSession {
             .ok()
             .and_then(|s| s.value);
         let embedding_config =
-            layercake_data_acquisition::config::EmbeddingProviderConfig::from_env();
+            layercake_genai::config::EmbeddingProviderConfig::from_env();
         let data_acquisition = Arc::new(DataAcquisitionService::new(
             db.clone(),
             embedding_provider,

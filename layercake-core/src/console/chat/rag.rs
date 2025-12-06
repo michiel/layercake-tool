@@ -1,4 +1,4 @@
-use layercake_data_acquisition::vector_store::VectorSearchResult;
+use layercake_genai::vector_store::VectorSearchResult;
 
 /// Context built from retrieved document chunks for RAG
 #[derive(Debug, Clone)]

@@ -1,7 +1,7 @@
 // RAG Integration Tests
 // Tests the RAG context building and filtering logic
 
-use layercake_data_acquisition::vector_store::VectorSearchResult;
+use layercake_genai::vector_store::VectorSearchResult;
 use uuid::Uuid;
 
 // Helper to create RagContext for testing

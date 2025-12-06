@@ -338,7 +338,7 @@ impl TryFrom<graph_nodes::Model> for GraphNodeDto {
 
 The codebase uses a workspace with three crates:
 - `layercake-core` - Monolithic core with all functionality
-- `layercake-data-acquisition` - Separate data acquisition logic ✅
+- `layercake-genai` - Separate data acquisition logic ✅
 - `src-tauri` - Tauri desktop application wrapper
 
 ### Recommendations
