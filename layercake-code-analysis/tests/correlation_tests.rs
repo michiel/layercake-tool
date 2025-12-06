@@ -6,6 +6,7 @@ fn sample_infra() -> InfrastructureGraph {
     let mut node = ResourceNode::new("aws_lambda_func", ResourceType::Aws("aws_lambda_function".into()), "handler", "main.tf");
     node.properties.insert("handler".into(), "app.lambda_handler".into());
     node.properties.insert("ENV".into(), "TABLE_NAME".into());
+    node.properties.insert("file".into(), "src/app.py".into());
     graph.add_resource(node);
     graph.add_edge(GraphEdge {
         from: "aws_lambda_func".into(),

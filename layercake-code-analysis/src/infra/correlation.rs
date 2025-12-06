@@ -25,6 +25,13 @@ pub fn correlate_code_infra(
         .collect();
     let functions: HashSet<String> = code.functions.iter().map(|f| f.name.clone()).collect();
     let functions_lower: HashSet<String> = functions.iter().map(|f| f.to_ascii_lowercase()).collect();
+    let mut functions_by_file: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+    for func in &code.functions {
+        functions_by_file
+            .entry(func.file_path.to_ascii_lowercase())
+            .or_default()
+            .push(func.name.clone());
+    }
     let env_vars: HashSet<String> = code.env_vars.iter().map(|e| e.name.clone()).collect();
     let env_vars_lower: HashSet<String> = env_vars.iter().map(|e| e.to_ascii_lowercase()).collect();
 
@@ -64,6 +71,44 @@ pub fn correlate_code_infra(
                         reason: format!("property references handler/function {func}"),
                     });
                     matched = true;
+                }
+            }
+            // Handler match combining file + function (e.g., "src/app.lambda_handler")
+            if v_lower.contains('/') && v_lower.contains('.') {
+                let parts: Vec<&str> = v_lower.split('.').collect();
+                if let Some((path_part, func_part)) = parts.split_last().and_then(|(last, rest)| {
+                    let func = *last;
+                    let path = rest.join(".");
+                    Some((path, func))
+                }) {
+                    let path_clean = path_part.replace(':', "");
+                    if file_names.iter().any(|n| path_clean.contains(n))
+                        || files.iter().any(|f| f.to_ascii_lowercase().contains(&path_clean))
+                    {
+                        if functions_lower.contains(func_part) {
+                            if let Some(func_original) = functions.iter().find(|f| f.to_ascii_lowercase() == func_part) {
+                                report.matches.push(CorrelationMatch {
+                                    code_node: func_original.clone(),
+                                    infra_node: resource.id.clone(),
+                                    reason: format!("handler maps to {path_part}.{func_part}"),
+                                });
+                                matched = true;
+                            }
+                        }
+                    }
+                    // Try by file association
+                    for (file, funcs) in &functions_by_file {
+                        if file.contains(&path_clean) {
+                            for f in funcs {
+                                report.matches.push(CorrelationMatch {
+                                    code_node: f.clone(),
+                                    infra_node: resource.id.clone(),
+                                    reason: format!("handler references file {path_part}"),
+                                });
+                                matched = true;
+                            }
+                        }
+                    }
                 }
             }
             // Env var match by value
