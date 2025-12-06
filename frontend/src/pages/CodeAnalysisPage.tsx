@@ -25,6 +25,7 @@ type Profile = {
   datasetId?: number | null
   lastRun?: string | null
   report?: string | null
+  noInfra?: boolean
 }
 
 type DataSetOption = { id: number; name: string }
@@ -38,6 +39,7 @@ const GET_PROFILES = gql`
       datasetId
       lastRun
       report
+      noInfra
     }
   }
 `
@@ -51,6 +53,7 @@ const CREATE_PROFILE = gql`
       datasetId
       lastRun
       report
+      noInfra
     }
   }
 `
@@ -64,6 +67,7 @@ const UPDATE_PROFILE = gql`
       datasetId
       lastRun
       report
+      noInfra
     }
   }
 `
@@ -84,6 +88,7 @@ const RUN_PROFILE = gql`
         datasetId
         lastRun
         report
+        noInfra
       }
     }
   }
@@ -106,6 +111,7 @@ export const CodeAnalysisPage: React.FC = () => {
   const [editing, setEditing] = useState<Profile | null>(null)
   const [filePath, setFilePath] = useState('')
   const [datasetId, setDatasetId] = useState<number | undefined>()
+  const [noInfra, setNoInfra] = useState(false)
 
   const selectedProjectName = useMemo(() => `Project ${projectId ?? ''}`, [projectId])
 
@@ -128,6 +134,7 @@ export const CodeAnalysisPage: React.FC = () => {
         datasetId: p.datasetId,
         lastRun: p.lastRun,
         report: p.report,
+        noInfra: p.noInfra,
       })) || []
     setProfiles(mapped)
   }, [profilesData])
@@ -185,6 +192,7 @@ export const CodeAnalysisPage: React.FC = () => {
     setEditing(profile ?? null)
     setFilePath(profile?.filePath ?? '')
     setDatasetId(profile?.datasetId)
+    setNoInfra(profile?.noInfra ?? false)
     setModalOpen(true)
   }
 
@@ -192,7 +200,7 @@ export const CodeAnalysisPage: React.FC = () => {
     if (!filePath) return
     if (editing) {
       updateProfile({
-        variables: { input: { id: editing.id, filePath, datasetId } },
+        variables: { input: { id: editing.id, filePath, datasetId, noInfra } },
       })
     } else {
       createProfile({
@@ -201,6 +209,7 @@ export const CodeAnalysisPage: React.FC = () => {
             projectId: projectId ? parseInt(projectId, 10) : 0,
             filePath,
             datasetId,
+            noInfra,
           },
         },
       })
@@ -246,9 +255,9 @@ export const CodeAnalysisPage: React.FC = () => {
               <Spinner className="h-6 w-6" />
             </div>
           ) : profiles.length === 0 ? (
-            <Stack align="center" gap="md" className="py-10">
-              <p className="text-muted-foreground">No profiles yet. Create one to get started.</p>
-            </Stack>
+              <Stack align="center" gap="md" className="py-10">
+                <p className="text-muted-foreground">No profiles yet. Create one to get started.</p>
+              </Stack>
           ) : (
             <Table>
               <TableHeader>
@@ -310,6 +319,11 @@ export const CodeAnalysisPage: React.FC = () => {
                 <div>
                   <div className="text-xs text-muted-foreground">Last run</div>
                   <div className="text-sm">{profile.lastRun ?? 'Never'}</div>
+                </div>
+                <Separator orientation="vertical" className="h-6" />
+                <div>
+                  <div className="text-xs text-muted-foreground">Infra correlation</div>
+                  <div className="text-sm">{profile.noInfra ? 'Disabled' : 'Enabled'}</div>
                 </div>
               </Group>
               <Textarea readOnly value={profile.report ?? 'No report'} className="min-h-[140px]" />
