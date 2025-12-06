@@ -262,6 +262,37 @@ impl DataSetService {
         Ok(updated)
     }
 
+    /// Update annotation text (graph_json untouched)
+    pub async fn update_annotation(
+        &self,
+        id: i32,
+        annotation: Option<String>,
+    ) -> Result<data_sets::Model> {
+        let data_set = self
+            .get_by_id(id)
+            .await?
+            .ok_or_else(|| anyhow!("DataSet not found"))?;
+
+        let mut active_model: data_sets::ActiveModel = data_set.into();
+        // Persist as description fallback since data_sets has no annotations column
+        if let Some(text) = annotation {
+            let merged = match active_model.description.clone().into_value() {
+                Some(sea_orm::Value::String(Some(boxed))) => Some((*boxed).to_string()),
+                _ => None,
+            };
+            let combined = if let Some(existing) = merged {
+                format!("{existing}\n\n{text}")
+            } else {
+                text.clone()
+            };
+            active_model.description = Set(Some(combined));
+        }
+        active_model.updated_at = Set(chrono::Utc::now());
+
+        let updated = active_model.update(&self.db).await?;
+        Ok(updated)
+    }
+
     /// Update DataSet file and reprocess
     pub async fn update_file(
         &self,

@@ -176,8 +176,12 @@ impl CodeAnalysisService {
             &analysis.result,
             Some(cleaned_report.clone()),
         ))?;
+        let annotation_text = cleaned_report.clone();
         let ds_service = DataSetService::new(self.db.clone());
         ds_service.update_graph_data(dataset_id, graph_json).await?;
+        let _ = ds_service
+            .update_annotation(dataset_id, Some(annotation_text))
+            .await;
 
         let mut active = profile.into_active_model();
         active.dataset_id = Set(Some(dataset_id));
