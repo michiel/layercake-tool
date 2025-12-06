@@ -112,7 +112,7 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
     error: dataSourceError,
     refetch: refetchDataSet
   } = useQuery(GET_DATASOURCE, {
-    variables: { id: parseInt(dataSetId || '0') },
+    variables: { id: datasetIdNum },
     errorPolicy: 'all'
   })
 
@@ -122,11 +122,30 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
   })
 
   const PAGE_LIMIT = 200
-  const { data: graphPageData, loading: graphPageLoading } = useQuery<{ graphPage: GraphPageSlice }>(
+  const [graphNodes, setGraphNodes] = useState<GraphPageSlice['nodes']>([])
+  const [graphEdges, setGraphEdges] = useState<GraphPageSlice['edges']>([])
+  const [graphLayers, setGraphLayers] = useState<GraphPageSlice['layers']>([])
+  const [graphHasMore, setGraphHasMore] = useState(false)
+  const [graphOffset, setGraphOffset] = useState(0)
+  const [graphLayerFilters, setGraphLayerFilters] = useState<string[]>([])
+
+  const { loading: graphPageLoading, refetch: refetchGraphPage } = useQuery<{ graphPage: GraphPageSlice }>(
     GET_GRAPH_PAGE,
     {
       skip: !datasetIdNum,
-      variables: { datasetId: datasetIdNum, limit: PAGE_LIMIT, offset: 0 }
+      variables: { datasetId: datasetIdNum, limit: PAGE_LIMIT, offset: graphOffset, layers: graphLayerFilters },
+      onCompleted: (result) => {
+        const page = result.graphPage
+        if (graphOffset === 0) {
+          setGraphNodes(page.nodes)
+          setGraphEdges(page.edges)
+        } else {
+          setGraphNodes(prev => [...prev, ...page.nodes])
+          setGraphEdges(prev => [...prev, ...page.edges])
+        }
+        setGraphLayers(page.layers)
+        setGraphHasMore(page.hasMore)
+      },
     }
   )
 
@@ -140,7 +159,7 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
 
   const dataSource: DataSet | null = (dataSourceData as any)?.dataSet || null
   const annotationMarkdown = dataSource?.annotations || ''
-  const graphPage = graphPageData?.graphPage
+  const graphPage = graphNodes.length ? { nodes: graphNodes, edges: graphEdges, layers: graphLayers, hasMore: graphHasMore } : undefined
   const rawGraphData = useMemo((): GraphData | null => {
     if (graphPage && graphPage.nodes.length > 0) {
       return {
@@ -246,6 +265,34 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
 
   const handleBack = () => {
     navigate(`/projects/${projectId}/datasets`)
+  }
+
+  const handleLayerToggle = (layer: string) => {
+    setGraphOffset(0)
+    setGraphNodes([])
+    setGraphEdges([])
+    setGraphLayerFilters(prev =>
+      prev.includes(layer) ? prev.filter(l => l !== layer) : [...prev, layer]
+    )
+    refetchGraphPage({
+      datasetId: datasetIdNum,
+      limit: PAGE_LIMIT,
+      offset: 0,
+      layers: graphLayerFilters.includes(layer)
+        ? graphLayerFilters.filter(l => l !== layer)
+        : [...graphLayerFilters, layer],
+    })
+  }
+
+  const handleLoadMore = () => {
+    const nextOffset = graphNodes.length
+    setGraphOffset(nextOffset)
+    refetchGraphPage({
+      datasetId: datasetIdNum,
+      limit: PAGE_LIMIT,
+      offset: nextOffset,
+      layers: graphLayerFilters,
+    })
   }
 
   // Convert file to base64
@@ -527,6 +574,24 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
             Showing the first {PAGE_LIMIT} nodes for performance. Use layer filters or download the dataset to view all elements.
           </AlertDescription>
         </Alert>
+          )}
+
+      {summaryData?.graphSummary?.layers && summaryData.graphSummary.layers.length > 0 && (
+        <div className="mb-4 flex flex-wrap gap-2">
+          {summaryData.graphSummary.layers.map(layer => {
+            const active = graphLayerFilters.includes(layer)
+            return (
+              <Button
+                key={layer}
+                variant={active ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => handleLayerToggle(layer)}
+              >
+                {layer}
+              </Button>
+            )
+          })}
+        </div>
       )}
 
       <Tabs value={activeTab} onValueChange={handleTabChange}>

@@ -46,8 +46,10 @@ pub struct GraphNodeSlice {
     pub id: String,
     pub label: String,
     pub layer: String,
+    #[graphql(name = "belongsTo")]
     pub belongs_to: Option<String>,
     pub weight: i32,
+    #[graphql(name = "isPartition")]
     pub is_partition: bool,
     pub comment: Option<String>,
     pub dataset: Option<String>,
