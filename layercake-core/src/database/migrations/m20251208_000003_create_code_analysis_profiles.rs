@@ -17,10 +17,26 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(CodeAnalysisProfiles::ProjectId).integer().not_null())
-                    .col(ColumnDef::new(CodeAnalysisProfiles::FilePath).string().not_null())
-                    .col(ColumnDef::new(CodeAnalysisProfiles::DatasetId).integer().null())
-                    .col(ColumnDef::new(CodeAnalysisProfiles::LastRun).timestamp().null())
+                    .col(
+                        ColumnDef::new(CodeAnalysisProfiles::ProjectId)
+                            .integer()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(CodeAnalysisProfiles::FilePath)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(CodeAnalysisProfiles::DatasetId)
+                            .integer()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(CodeAnalysisProfiles::LastRun)
+                            .timestamp()
+                            .null(),
+                    )
                     .col(ColumnDef::new(CodeAnalysisProfiles::Report).text().null())
                     .to_owned(),
             )

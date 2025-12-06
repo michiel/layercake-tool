@@ -4,9 +4,7 @@ use crate::{
     app_context::AppContext,
     console::chat::ChatConfig,
     graphql::chat_manager::ChatManager,
-    services::{
-        ExportService, GraphService, ImportService, PlanDagService, SystemSettingsService,
-    },
+    services::{ExportService, GraphService, ImportService, PlanDagService, SystemSettingsService},
 };
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicI32, Ordering};
