@@ -38,6 +38,60 @@ pub struct LayerAggregationSummary {
 }
 
 impl Graph {
+    fn sanitize_label_value(label: &str) -> String {
+        let cleaned: String = label
+            .chars()
+            .filter_map(|c| {
+                if matches!(c, '\n' | '\r' | '\t') {
+                    Some(' ')
+                } else if matches!(c, '"' | '\'' | '`' | '\\') {
+                    Some(' ')
+                } else if c.is_control() {
+                    None
+                } else {
+                    Some(c)
+                }
+            })
+            .collect();
+
+        cleaned
+            .split_whitespace()
+            .filter(|chunk| !chunk.is_empty())
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
+    /// Remove control/quote characters from node and edge labels, recording an annotation when changes occur.
+    pub fn sanitize_labels(&mut self) -> (usize, usize) {
+        let mut sanitized_nodes = 0;
+        let mut sanitized_edges = 0;
+
+        for node in &mut self.nodes {
+            let cleaned = Self::sanitize_label_value(&node.label);
+            if cleaned != node.label {
+                node.label = cleaned;
+                sanitized_nodes += 1;
+            }
+        }
+
+        for edge in &mut self.edges {
+            let cleaned = Self::sanitize_label_value(&edge.label);
+            if cleaned != edge.label {
+                edge.label = cleaned;
+                sanitized_edges += 1;
+            }
+        }
+
+        if sanitized_nodes > 0 || sanitized_edges > 0 {
+            self.append_annotation(format!(
+                "Sanitized labels: removed quotes/newlines/control characters from {} nodes and {} edges.",
+                sanitized_nodes, sanitized_edges
+            ));
+        }
+
+        (sanitized_nodes, sanitized_edges)
+    }
+
     pub fn get_layer_map(&self) -> IndexMap<String, Layer> {
         let layers: IndexMap<String, Layer> = self
             .layers
@@ -2970,5 +3024,46 @@ mod tests {
         if let Err(errors) = result {
             assert!(errors.iter().any(|e| e.contains("not found in nodes")));
         }
+    }
+
+    #[test]
+    fn sanitize_labels_strips_quotes_and_controls() {
+        let mut graph = Graph {
+            name: "".into(),
+            nodes: vec![Node {
+                id: "n1".into(),
+                label: "\"Tricky`\nlabel\twith\\quotes'".into(),
+                layer: "l".into(),
+                weight: 1,
+                is_partition: false,
+                belongs_to: None,
+                comment: None,
+                dataset: None,
+                attributes: None,
+            }],
+            edges: vec![Edge {
+                id: "e1".into(),
+                source: "n1".into(),
+                target: "n1".into(),
+                label: "Edge\n\"label\"\\with\tjunk'`".into(),
+                layer: "l".into(),
+                weight: 1,
+                comment: None,
+                dataset: None,
+                attributes: None,
+            }],
+            layers: vec![],
+            annotations: None,
+        };
+
+        let (nodes, edges) = graph.sanitize_labels();
+        assert_eq!(nodes, 1);
+        assert_eq!(edges, 1);
+        assert_eq!(graph.nodes[0].label, "Tricky label with quotes");
+        assert_eq!(graph.edges[0].label, "Edge label with junk");
+        assert!(graph
+            .annotations
+            .unwrap_or_default()
+            .contains("Sanitized labels"));
     }
 }

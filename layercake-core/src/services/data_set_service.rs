@@ -273,7 +273,9 @@ impl DataSetService {
             .await?
             .ok_or_else(|| anyhow!("DataSet not found"))?;
 
-        let parsed: Graph = serde_json::from_str(&graph_json)?;
+        let mut parsed: Graph = serde_json::from_str(&graph_json)?;
+        parsed.sanitize_labels();
+        let sanitized_graph_json = serde_json::to_string(&parsed)?;
         let txn = self.db.begin().await?;
         dataset_graph_nodes::Entity::delete_many()
             .filter(dataset_graph_nodes::Column::DatasetId.eq(id))
@@ -333,7 +335,7 @@ impl DataSetService {
         }
 
         let mut active_model: data_sets::ActiveModel = data_set.into();
-        active_model.graph_json = Set(graph_json);
+        active_model.graph_json = Set(sanitized_graph_json);
         active_model.processed_at = Set(Some(chrono::Utc::now()));
         active_model.updated_at = Set(chrono::Utc::now());
 

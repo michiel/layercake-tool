@@ -4,6 +4,7 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 
 use crate::database::entities::common_types::{DataType, FileFormat};
+use crate::graph::Graph;
 
 /// Shared routines for processing dataset files into graph JSON payloads
 pub async fn process_file(
@@ -83,7 +84,7 @@ async fn process_delimited_nodes(file_data: &[u8], delimiter: u8) -> Result<Stri
         "layers": []
     });
 
-    Ok(serde_json::to_string(&graph_json)?)
+    sanitize_graph_json(serde_json::to_string(&graph_json)?)
 }
 
 async fn process_delimited_edges(file_data: &[u8], delimiter: u8) -> Result<String> {
@@ -141,7 +142,7 @@ async fn process_delimited_edges(file_data: &[u8], delimiter: u8) -> Result<Stri
         "layers": []
     });
 
-    Ok(serde_json::to_string(&graph_json)?)
+    sanitize_graph_json(serde_json::to_string(&graph_json)?)
 }
 
 async fn process_delimited_layers(file_data: &[u8], delimiter: u8) -> Result<String> {
@@ -220,7 +221,7 @@ async fn process_delimited_layers(file_data: &[u8], delimiter: u8) -> Result<Str
         "layers": layers
     });
 
-    Ok(serde_json::to_string(&graph_json)?)
+    sanitize_graph_json(serde_json::to_string(&graph_json)?)
 }
 
 async fn process_json_graph(file_data: &[u8]) -> Result<String> {
@@ -245,5 +246,13 @@ async fn process_json_graph(file_data: &[u8]) -> Result<String> {
         return Err(anyhow!("'nodes', 'edges', and 'layers' must be arrays"));
     }
 
-    Ok(serde_json::to_string(&graph_data)?)
+    let mut graph: Graph = serde_json::from_value(graph_data)?;
+    graph.sanitize_labels();
+    Ok(serde_json::to_string(&graph)?)
+}
+
+fn sanitize_graph_json(graph_json: String) -> Result<String> {
+    let mut graph: Graph = serde_json::from_str(&graph_json)?;
+    graph.sanitize_labels();
+    Ok(serde_json::to_string(&graph)?)
 }
