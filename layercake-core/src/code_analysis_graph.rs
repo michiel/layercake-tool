@@ -137,6 +137,36 @@ pub fn analysis_to_graph(result: &AnalysisResult, annotation: Option<String>) ->
         id
     }
 
+    fn ensure_library_node(
+        library_ids: &mut std::collections::HashMap<String, String>,
+        nodes: &mut Vec<Node>,
+        unique_id: &mut impl FnMut(&str) -> String,
+        scope_id: &str,
+        module: &str,
+        file: Option<&str>,
+    ) -> String {
+        if let Some(id) = library_ids.get(module) {
+            // verify it exists
+            if nodes.iter().any(|n| &n.id == id) {
+                return id.clone();
+            }
+        }
+        let id = unique_id(&format!("lib_{}", module));
+        library_ids.insert(module.to_string(), id.clone());
+        nodes.push(Node {
+            id: id.clone(),
+            label: module.to_string(),
+            layer: "library".to_string(),
+            is_partition: false,
+            belongs_to: Some(scope_id.to_string()),
+            weight: 1,
+            comment: file.map(|f| f.to_string()),
+            dataset: None,
+            attributes: None,
+        });
+        id
+    }
+
     for function in &result.functions {
         let attrs = json!({
             "complexity": function.complexity,
@@ -145,35 +175,30 @@ pub fn analysis_to_graph(result: &AnalysisResult, annotation: Option<String>) ->
             "line": function.line_number,
             "args": function.args,
         });
+        let parent = file_nodes
+            .get(&function.file_path)
+            .cloned()
+            .or_else(|| Some(scope_id.clone()));
         add_function_node(
             &mut function_ids,
             &mut nodes,
             &function.name,
             Some(&function.file_path),
-            file_nodes.get(&function.file_path).cloned(),
+            parent,
             attrs,
             &mut unique_id,
         );
     }
 
     for import in &result.imports {
-        let id = unique_id(&format!("lib_{}", import.module));
-        if library_ids
-            .insert(import.module.clone(), id.clone())
-            .is_none()
-        {
-            nodes.push(Node {
-                id: id.clone(),
-                label: import.module.clone(),
-                layer: "library".to_string(),
-                is_partition: false,
-                belongs_to: Some(scope_id.clone()),
-                weight: 1,
-                comment: Some(import.file_path.clone()),
-                dataset: None,
-                attributes: None,
-            });
-        }
+        ensure_library_node(
+            &mut library_ids,
+            &mut nodes,
+            &mut unique_id,
+            &scope_id,
+            &import.module,
+            Some(&import.file_path),
+        );
         function_imports
             .entry(import.file_path.clone())
             .or_default()
@@ -246,7 +271,10 @@ pub fn analysis_to_graph(result: &AnalysisResult, annotation: Option<String>) ->
                 &mut nodes,
                 &call.caller,
                 Some(&call.file_path),
-                file_nodes.get(&call.file_path).cloned(),
+                file_nodes
+                    .get(&call.file_path)
+                    .cloned()
+                    .or_else(|| Some(scope_id.clone())),
                 json!({"generated": true}),
                 &mut unique_id,
             )
@@ -257,7 +285,10 @@ pub fn analysis_to_graph(result: &AnalysisResult, annotation: Option<String>) ->
                 &mut nodes,
                 &call.callee,
                 Some(&call.file_path),
-                file_nodes.get(&call.file_path).cloned(),
+                file_nodes
+                    .get(&call.file_path)
+                    .cloned()
+                    .or_else(|| Some(scope_id.clone())),
                 json!({"generated": true}),
                 &mut unique_id,
             )
@@ -287,7 +318,10 @@ pub fn analysis_to_graph(result: &AnalysisResult, annotation: Option<String>) ->
                             &mut nodes,
                             &function.name,
                             Some(&function.file_path),
-                            file_nodes.get(&function.file_path).cloned(),
+                            file_nodes
+                                .get(&function.file_path)
+                                .cloned()
+                                .or_else(|| Some(scope_id.clone())),
                             json!({}),
                             &mut unique_id,
                         )
@@ -326,19 +360,25 @@ pub fn analysis_to_graph(result: &AnalysisResult, annotation: Option<String>) ->
                 });
 
             for lib in libs {
-                if let Some(lib_id) = library_ids.get(lib) {
-                    edges.push(Edge {
-                        id: next_edge_id(),
-                        source: lib_id.clone(),
-                        target: func_id.clone(),
-                        label: lib.clone(),
-                        layer: "import".to_string(),
-                        weight: 1,
-                        comment: None,
-                        dataset: None,
-                        attributes: None,
-                    });
-                }
+                let lib_id = ensure_library_node(
+                    &mut library_ids,
+                    &mut nodes,
+                    &mut unique_id,
+                    &scope_id,
+                    lib,
+                    None,
+                );
+                edges.push(Edge {
+                    id: next_edge_id(),
+                    source: lib_id,
+                    target: func_id.clone(),
+                    label: lib.clone(),
+                    layer: "import".to_string(),
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                    attributes: None,
+                });
             }
         }
     }
