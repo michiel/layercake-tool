@@ -36,14 +36,19 @@ pub struct CodeAnalysisProfile {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct CodeAnalysisOptions {
+    #[serde(alias = "includeDataFlow")]
     #[serde(default = "default_true")]
     pub include_data_flow: bool,
+    #[serde(alias = "includeControlFlow")]
     #[serde(default = "default_true")]
     pub include_control_flow: bool,
+    #[serde(alias = "includeImports")]
     #[serde(default = "default_true")]
     pub include_imports: bool,
+    #[serde(alias = "includeInfra")]
     #[serde(default = "default_true")]
     pub include_infra: bool,
+    #[serde(alias = "coalesceFunctions")]
     #[serde(default)]
     pub coalesce_functions: bool,
 }
