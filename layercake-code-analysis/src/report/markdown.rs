@@ -49,6 +49,9 @@ impl MarkdownReporter {
             output.push_str("## Correlation summary\n");
             output.push_str(&format!("- Matches: {}\n", corr.matches.len()));
             output.push_str(&format!("- Unresolved: {}\n", corr.unresolved.len()));
+            if !corr.warnings.is_empty() {
+                output.push_str(&format!("- Warnings: {}\n", corr.warnings.len()));
+            }
             if !corr.matches.is_empty() {
                 output.push_str("\n### Matches\n");
                 for m in &corr.matches {
@@ -56,6 +59,12 @@ impl MarkdownReporter {
                         "- Code `{}` ↔ Infra `{}` ({})\n",
                         m.code_node, m.infra_node, m.reason
                     ));
+                }
+            }
+            if !corr.warnings.is_empty() {
+                output.push_str("\n### Warnings\n");
+                for w in &corr.warnings {
+                    output.push_str(&format!("- {w}\n"));
                 }
             }
             if !corr.unresolved.is_empty() {

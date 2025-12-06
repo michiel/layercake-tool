@@ -9,6 +9,7 @@ use super::model::CorrelationMatch;
 pub struct CorrelationReport {
     pub matches: Vec<CorrelationMatch>,
     pub unresolved: Vec<String>,
+    pub warnings: Vec<String>,
 }
 
 pub fn correlate_code_infra(
@@ -72,6 +73,12 @@ pub fn correlate_code_infra(
                 .unresolved
                 .push(format!("No code correlation for resource {}", resource.id));
         }
+    }
+
+    if report.matches.is_empty() && !infra.resources.is_empty() {
+        report
+            .warnings
+            .push("Infra resources detected but no code correlations found".to_string());
     }
 
     report

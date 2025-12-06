@@ -158,6 +158,10 @@ fn merge_graphs(
                 }
             }
         }
+        if !corr.warnings.is_empty() {
+            let warnings = corr.warnings.join("\n");
+            primary.append_annotation(format!("Infra correlation warnings:\n{warnings}"));
+        }
     }
 
     if let Some(text) = annotation {
