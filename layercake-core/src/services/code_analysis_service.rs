@@ -53,6 +53,28 @@ fn merge_graphs(
     let mut edge_ids: HashSet<String> = primary.edges.iter().map(|e| e.id.clone()).collect();
     let mut id_map = std::collections::HashMap::new();
 
+    let mut code_label_map: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
+    for node in &primary.nodes {
+        code_label_map
+            .entry(node.label.clone())
+            .or_default()
+            .push(node.id.clone());
+        if let Some(comment) = &node.comment {
+            code_label_map
+                .entry(comment.clone())
+                .or_default()
+                .push(node.id.clone());
+        }
+        if let Some(attrs) = &node.attributes {
+            let as_str = attrs.to_string();
+            code_label_map
+                .entry(as_str)
+                .or_default()
+                .push(node.id.clone());
+        }
+    }
+
     for node in &secondary.nodes {
         let mut new_id = node.id.clone();
         while node_ids.contains(&new_id) {
@@ -116,13 +138,9 @@ fn merge_graphs(
                 .get(&m.infra_node)
                 .cloned()
                 .unwrap_or(m.infra_node.clone());
-            let code_id = primary
-                .nodes
-                .iter()
-                .find(|n| {
-                    n.label == m.code_node || n.comment.as_deref() == Some(m.code_node.as_str())
-                })
-                .map(|n| n.id.clone());
+            let code_id = code_label_map
+                .get(&m.code_node)
+                .and_then(|list| list.first().cloned());
             if let Some(code_id) = code_id {
                 let key = (code_id.clone(), infra_id.clone());
                 if seen.insert(key) {

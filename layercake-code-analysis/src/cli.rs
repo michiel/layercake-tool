@@ -25,26 +25,38 @@ pub enum CodeAnalysisCommand {
         /// Optional path to write the markdown report; defaults to STDOUT
         #[arg(short, long)]
         output: Option<PathBuf>,
+        /// Disable infrastructure scanning and correlation
+        #[arg(long)]
+        no_infra: bool,
     },
 }
 
 pub fn run(args: CodeAnalysisArgs) -> Result<()> {
     match args.command {
-        CodeAnalysisCommand::Report { path, output } => {
+        CodeAnalysisCommand::Report {
+            path,
+            output,
+            no_infra,
+        } => {
             let AnalysisRun {
                 result,
                 files_scanned,
             } = analyze_path(&path)?;
-            let infra_graph = analyze_infra(&path)?;
-            let correlation = infra::correlate_code_infra(&result, &infra_graph);
+            let (infra_graph, correlation) = if no_infra {
+                (None, None)
+            } else {
+                let infra = analyze_infra(&path)?;
+                let corr = infra::correlate_code_infra(&result, &infra);
+                (Some(infra), Some(corr))
+            };
 
             let metadata = ReportMetadata::new(path, files_scanned);
             let reporter = MarkdownReporter::default();
             let rendered = reporter.render_with_infra(
                 &result,
                 &metadata,
-                Some(&infra_graph),
-                Some(&correlation),
+                infra_graph.as_ref(),
+                correlation.as_ref(),
             )?;
 
             if let Some(output_path) = output {
