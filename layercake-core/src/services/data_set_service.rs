@@ -6,13 +6,29 @@ use crate::app_context::DataSetValidationSummary;
 use crate::database::entities::common_types::{DataType, FileFormat};
 use crate::database::entities::data_sets::{self};
 use crate::database::entities::{plan_dag_edges, plan_dag_nodes, projects};
-use crate::graph::{Graph, Layer};
+use crate::graph::{Edge, Graph, Layer, Node};
 use crate::services::{file_type_detection, source_processing};
 
 /// Service for managing DataSets with file processing capabilities
 #[derive(Clone)]
 pub struct DataSetService {
     db: DatabaseConnection,
+}
+
+#[derive(Debug, Clone)]
+pub struct GraphSummaryData {
+    pub node_count: usize,
+    pub edge_count: usize,
+    pub layer_count: usize,
+    pub layers: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct GraphPageData {
+    pub nodes: Vec<Node>,
+    pub edges: Vec<Edge>,
+    pub layers: Vec<Layer>,
+    pub has_more: bool,
 }
 
 impl DataSetService {
@@ -291,6 +307,64 @@ impl DataSetService {
 
         let updated = active_model.update(&self.db).await?;
         Ok(updated)
+    }
+
+    pub async fn get_graph_summary(&self, dataset_id: i32) -> Result<GraphSummaryData> {
+        let model = data_sets::Entity::find_by_id(dataset_id)
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| anyhow!("DataSet not found"))?;
+        let graph: Graph = serde_json::from_str(&model.graph_json)?;
+        let mut layers: Vec<String> = graph.layers.iter().map(|l| l.id.clone()).collect();
+        layers.sort();
+        Ok(GraphSummaryData {
+            node_count: graph.nodes.len(),
+            edge_count: graph.edges.len(),
+            layer_count: graph.layers.len(),
+            layers,
+        })
+    }
+
+    pub async fn get_graph_page(
+        &self,
+        dataset_id: i32,
+        limit: usize,
+        offset: usize,
+        filter_layers: Option<Vec<String>>,
+    ) -> Result<GraphPageData> {
+        let model = data_sets::Entity::find_by_id(dataset_id)
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| anyhow!("DataSet not found"))?;
+        let mut graph: Graph = serde_json::from_str(&model.graph_json)?;
+
+        if let Some(layers) = filter_layers.clone() {
+            let set: HashSet<String> = layers.into_iter().collect();
+            graph.nodes.retain(|n| set.contains(&n.layer));
+            graph.edges.retain(|e| set.contains(&e.layer));
+            graph.layers.retain(|l| set.contains(&l.id));
+        }
+
+        graph.nodes.sort_by(|a, b| a.id.cmp(&b.id));
+        graph.edges.sort_by(|a, b| a.id.cmp(&b.id));
+        let total = graph.nodes.len();
+        let slice = graph.nodes.iter().skip(offset).take(limit);
+        let node_ids: HashSet<String> = slice.clone().map(|n| n.id.clone()).collect();
+
+        let nodes: Vec<Node> = slice.cloned().collect();
+        let edges: Vec<Edge> = graph
+            .edges
+            .into_iter()
+            .filter(|e| node_ids.contains(&e.source) && node_ids.contains(&e.target))
+            .collect();
+        let has_more = offset + nodes.len() < total;
+
+        Ok(GraphPageData {
+            nodes,
+            edges,
+            layers: graph.layers,
+            has_more,
+        })
     }
 
     /// Update DataSet file and reprocess

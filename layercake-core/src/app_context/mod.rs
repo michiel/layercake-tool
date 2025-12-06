@@ -13,9 +13,7 @@ use crate::services::{
     dataset_bulk_service::DataSetBulkService, ExportService, GraphService, ImportService,
     PlanDagService,
 };
-use layercake_genai::{
-    config::EmbeddingProviderConfig, services::DataAcquisitionService,
-};
+use layercake_genai::{config::EmbeddingProviderConfig, services::DataAcquisitionService};
 
 mod data_set_operations;
 mod graph_operations;

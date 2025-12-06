@@ -32,9 +32,7 @@ use async_graphql::{
 use async_graphql_axum::{GraphQLRequest, GraphQLResponse as AxumGraphQLResponse};
 
 use super::handlers::{health, library};
-use layercake_genai::{
-    config::EmbeddingProviderConfig, services::DataAcquisitionService,
-};
+use layercake_genai::{config::EmbeddingProviderConfig, services::DataAcquisitionService};
 
 #[derive(Clone)]
 pub struct AppState {

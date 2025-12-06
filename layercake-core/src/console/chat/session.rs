@@ -245,8 +245,7 @@ impl ChatSession {
             .await
             .ok()
             .and_then(|s| s.value);
-        let embedding_config =
-            layercake_genai::config::EmbeddingProviderConfig::from_env();
+        let embedding_config = layercake_genai::config::EmbeddingProviderConfig::from_env();
         let data_acquisition = Arc::new(DataAcquisitionService::new(
             db.clone(),
             embedding_provider,
@@ -356,8 +355,7 @@ impl ChatSession {
             .await
             .ok()
             .and_then(|s| s.value);
-        let embedding_config =
-            layercake_genai::config::EmbeddingProviderConfig::from_env();
+        let embedding_config = layercake_genai::config::EmbeddingProviderConfig::from_env();
         let data_acquisition = Arc::new(DataAcquisitionService::new(
             db.clone(),
             embedding_provider,

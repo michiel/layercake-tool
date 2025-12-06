@@ -19,6 +19,7 @@ use crate::graphql::types::{
     LayerAlias, LibraryItem, LibraryItemFilterInput, ProjectCollaborator, ProjectLayer, Sequence,
     Story, SystemSetting, TableColumn, TableRow, User, UserFilter, UserSession,
 };
+use crate::graphql::types::{GraphPage, GraphSummary};
 use crate::services::{
     graph_edit_service::GraphEditService, library_item_service::LibraryItemFilter,
     library_item_service::LibraryItemService, sample_project_service::SampleProjectService,
@@ -92,6 +93,40 @@ impl Query {
             .await
             .map_err(|e| StructuredError::service("CodeAnalysisService::get", e))?;
         Ok(profile.map(CodeAnalysisProfile::from))
+    }
+
+    async fn graph_summary(&self, ctx: &Context<'_>, dataset_id: i32) -> Result<GraphSummary> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let summary = context
+            .app
+            .data_set_service()
+            .get_graph_summary(dataset_id)
+            .await
+            .map_err(|e| StructuredError::service("DataSetService::get_graph_summary", e))?;
+        Ok(GraphSummary::from(summary))
+    }
+
+    async fn graph_page(
+        &self,
+        ctx: &Context<'_>,
+        dataset_id: i32,
+        limit: i32,
+        offset: i32,
+        layers: Option<Vec<String>>,
+    ) -> Result<GraphPage> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let page = context
+            .app
+            .data_set_service()
+            .get_graph_page(
+                dataset_id,
+                limit.max(0) as usize,
+                offset.max(0) as usize,
+                layers,
+            )
+            .await
+            .map_err(|e| StructuredError::service("DataSetService::get_graph_page", e))?;
+        Ok(GraphPage::from(page))
     }
 
     /// Get aggregate statistics for a project (for overview page)
