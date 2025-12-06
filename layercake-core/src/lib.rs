@@ -5,6 +5,7 @@ pub mod errors;
 pub mod export;
 pub mod generate_commands;
 pub mod graph;
+pub mod infra_graph;
 pub mod pipeline;
 pub mod plan;
 pub mod plan_execution;

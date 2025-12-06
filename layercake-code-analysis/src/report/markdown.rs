@@ -1,4 +1,5 @@
 use crate::analyzer::AnalysisResult;
+use crate::infra::InfrastructureGraph;
 use crate::report::ReportMetadata;
 use anyhow::Result;
 use csv::WriterBuilder;
@@ -10,6 +11,15 @@ pub struct MarkdownReporter;
 
 impl MarkdownReporter {
     pub fn render(&self, result: &AnalysisResult, metadata: &ReportMetadata) -> Result<String> {
+        self.render_with_infra(result, metadata, None)
+    }
+
+    pub fn render_with_infra(
+        &self,
+        result: &AnalysisResult,
+        metadata: &ReportMetadata,
+        infra: Option<&InfrastructureGraph>,
+    ) -> Result<String> {
         let mut output = String::new();
         output.push_str("# Code Analysis Report\n");
         output.push_str(&format!("{}\n\n", metadata.summary(result)));
@@ -18,6 +28,20 @@ impl MarkdownReporter {
             output.push_str("## Codebase stats\n");
             output.push_str(&stats);
             output.push_str("\n\n");
+        }
+
+        if let Some(infra_graph) = infra {
+            output.push_str("## Infrastructure summary\n");
+            let counts = infra_counts(infra_graph);
+            output.push_str(&counts);
+            output.push('\n');
+            if !infra_graph.diagnostics.is_empty() {
+                output.push_str("\n### Infra diagnostics\n");
+                for diag in &infra_graph.diagnostics {
+                    output.push_str(&format!("- {diag}\n"));
+                }
+            }
+            output.push_str("\n");
         }
 
         for (name, headers, rows) in datasets(result) {
@@ -186,4 +210,25 @@ fn codebase_stats(root: &Path) -> Option<String> {
         out.push('\n');
     }
     Some(out.trim_end().to_string())
+}
+
+fn infra_counts(graph: &InfrastructureGraph) -> String {
+    let mut counts = std::collections::HashMap::<String, usize>::new();
+    for node in graph.resources.values() {
+        let kind = format!("{:?}", node.resource_type);
+        *counts.entry(kind).or_insert(0) += 1;
+    }
+    if counts.is_empty() {
+        return "- No infrastructure resources detected.\n".to_string();
+    }
+    let mut parts: Vec<String> = counts
+        .into_iter()
+        .map(|(kind, count)| format!("{kind}: {count}"))
+        .collect();
+    parts.sort();
+    format!(
+        "- Resource counts: {}\n- Edges: {}\n",
+        parts.join(", "),
+        graph.edges.len()
+    )
 }

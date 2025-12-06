@@ -1,5 +1,6 @@
 pub mod analyzer;
 pub mod cli;
+pub mod infra;
 pub mod report;
 
 pub use analyzer::{
