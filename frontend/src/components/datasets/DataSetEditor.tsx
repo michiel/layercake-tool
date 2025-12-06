@@ -74,7 +74,7 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
   const location = useLocation()
   const { projectId, dataSetId } = useParams<{ projectId: string; dataSetId: string }>()
 
-  const allowedTabs = ['details', 'data', 'edit', 'hierarchy'] as const
+  const allowedTabs = ['details', 'data', 'edit', 'hierarchy', 'annotations'] as const
   type TabValue = typeof allowedTabs[number]
   const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search])
   const tabParam = searchParams.get('tab') as TabValue | null
@@ -119,6 +119,7 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
   }, { id: number }>(VALIDATE_DATASET)
 
   const dataSource: DataSet | null = (dataSourceData as any)?.dataSet || null
+  const annotationMarkdown = dataSource?.annotations || ''
   const rawGraphData = useMemo((): GraphData | null => {
     if (!dataSource?.graphJson) {
       return null
@@ -481,6 +482,10 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
             <IconHierarchy2 className="mr-2 h-4 w-4" />
             Hierarchy
           </TabsTrigger>
+          <TabsTrigger value="annotations">
+            <IconFile className="mr-2 h-4 w-4" />
+            Annotations
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="details">
@@ -652,6 +657,20 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
             splitView={hierarchySplitView}
             onToggleSplitView={handleToggleSplitView}
           />
+        </TabsContent>
+
+        <TabsContent value="annotations">
+          <Card className="border mt-4">
+            <CardContent className="pt-6">
+              {annotationMarkdown ? (
+                <ScrollArea className="max-h-[520px]">
+                  <pre className="whitespace-pre-wrap text-sm">{annotationMarkdown}</pre>
+                </ScrollArea>
+              ) : (
+                <div className="text-sm text-muted-foreground">No annotations available.</div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
       </Tabs>
