@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { gql, useMutation, useQuery } from '@apollo/client'
+import { gql } from '@apollo/client'
+import { useMutation, useQuery } from '@apollo/client/react'
 
 import PageContainer from '../components/layout/PageContainer'
 import { Breadcrumbs } from '../components/common/Breadcrumbs'
@@ -53,13 +54,13 @@ export const CodeAnalysisDetailPage: React.FC = () => {
   const { projectId, profileId } = useParams<{ projectId: string; profileId: string }>()
   const navigate = useNavigate()
 
-  const { data, loading, error, refetch } = useQuery(GET_PROFILE, {
+  const { data, loading, error, refetch } = useQuery<any>(GET_PROFILE, {
     variables: { id: profileId },
     skip: !profileId,
     fetchPolicy: 'cache-and-network',
   })
 
-  const { data: datasetsData } = useQuery(GET_DATASETS, {
+  const { data: datasetsData } = useQuery<any>(GET_DATASETS, {
     skip: !projectId,
     variables: { projectId: projectId ? parseInt(projectId, 10) : undefined },
     fetchPolicy: 'cache-and-network',

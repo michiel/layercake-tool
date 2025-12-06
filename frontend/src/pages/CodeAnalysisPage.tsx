@@ -129,7 +129,7 @@ export const CodeAnalysisPage: React.FC = () => {
     loading: profilesLoading,
     error: profilesError,
     refetch: refetchProfiles,
-  } = useQuery(GET_PROFILES, {
+  } = useQuery<any>(GET_PROFILES, {
     skip: !projectId,
     variables: { projectId: projectId ? parseInt(projectId, 10) : undefined },
     fetchPolicy: 'cache-and-network',
@@ -149,35 +149,35 @@ export const CodeAnalysisPage: React.FC = () => {
     setProfiles(mapped)
   }, [profilesData])
 
-  const { data: datasetsData } = useQuery(GET_DATASETS, {
+  const { data: datasetsData } = useQuery<any>(GET_DATASETS, {
     skip: !projectId,
     variables: { projectId: projectId ? parseInt(projectId, 10) : undefined },
     fetchPolicy: 'cache-and-network',
   })
   const datasetOptions: DataSetOption[] = datasetsData?.dataSets ?? []
 
-  const [createProfile] = useMutation(CREATE_PROFILE, {
+  const [createProfile] = useMutation<any>(CREATE_PROFILE, {
     onCompleted: () => {
       showSuccessNotification('Profile created')
       refetchProfiles()
     },
     onError: err => showErrorNotification(err.message),
   })
-  const [updateProfile] = useMutation(UPDATE_PROFILE, {
+  const [updateProfile] = useMutation<any>(UPDATE_PROFILE, {
     onCompleted: () => {
       showSuccessNotification('Profile updated')
       refetchProfiles()
     },
     onError: err => showErrorNotification(err.message),
   })
-  const [deleteProfileMutation] = useMutation(DELETE_PROFILE, {
+  const [deleteProfileMutation] = useMutation<any>(DELETE_PROFILE, {
     onCompleted: () => {
       showSuccessNotification('Profile deleted')
       refetchProfiles()
     },
     onError: err => showErrorNotification(err.message),
   })
-  const [runProfile] = useMutation(RUN_PROFILE, {
+  const [runProfile] = useMutation<any>(RUN_PROFILE, {
     onCompleted: data => {
       const updated = data?.runCodeAnalysisProfile?.profile
       if (updated) {
@@ -201,7 +201,7 @@ export const CodeAnalysisPage: React.FC = () => {
   const handleOpenModal = (profile?: Profile) => {
     setEditing(profile ?? null)
     setFilePath(profile?.filePath ?? '')
-    setDatasetId(profile?.datasetId)
+    setDatasetId(profile?.datasetId ?? undefined)
     setNoInfra(profile?.noInfra ?? false)
     const opts = profile?.options ? JSON.parse(profile.options) : {}
     setIncludeDataFlow(opts.includeDataFlow ?? true)

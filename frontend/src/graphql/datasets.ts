@@ -345,6 +345,7 @@ export interface DataSet {
   projectId: number
   name: string
   description?: string
+  annotations?: string | null
   fileFormat: string
   origin: string
   filename: string
