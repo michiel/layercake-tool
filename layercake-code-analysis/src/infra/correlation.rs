@@ -18,10 +18,11 @@ pub fn correlate_code_infra(
     let mut report = CorrelationReport::default();
     let files: HashSet<String> = code.files.iter().cloned().collect();
     let functions: HashSet<String> = code.functions.iter().map(|f| f.name.clone()).collect();
+    let env_vars: HashSet<String> = code.env_vars.iter().map(|e| e.name.clone()).collect();
 
     for resource in infra.resources.values() {
         let mut matched = false;
-        for (_k, v) in &resource.properties {
+        for (k, v) in &resource.properties {
             // File match: property contains a code file path
             if files.iter().any(|f| v.contains(f)) {
                 for f in files.iter().filter(|f| v.contains(*f)) {
@@ -43,6 +44,26 @@ pub fn correlate_code_infra(
                     });
                     matched = true;
                 }
+            }
+            // Env var match by value
+            if env_vars.iter().any(|env| v.contains(env)) {
+                for env in env_vars.iter().filter(|env| v.contains(*env)) {
+                    report.matches.push(CorrelationMatch {
+                        code_node: env.clone(),
+                        infra_node: resource.id.clone(),
+                        reason: format!("property references env var {env}"),
+                    });
+                    matched = true;
+                }
+            }
+            // Env var match by key
+            if env_vars.contains(k) {
+                report.matches.push(CorrelationMatch {
+                    code_node: k.clone(),
+                    infra_node: resource.id.clone(),
+                    reason: format!("property key matches env var {k}"),
+                });
+                matched = true;
             }
         }
 

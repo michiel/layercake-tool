@@ -1,5 +1,5 @@
 use super::CallEdge;
-use super::{AnalysisResult, Analyzer, DataFlow, EntryPoint, FunctionInfo, Import};
+use super::{AnalysisResult, Analyzer, DataFlow, EntryPoint, EnvVarUsage, FunctionInfo, Import};
 use anyhow::{Context, Result};
 use rustpython_ast::{self as ast, Visitor};
 use rustpython_parser::{parse, Mode};
@@ -67,6 +67,7 @@ struct PythonVisitor<'a> {
     data_flows: Vec<DataFlow>,
     call_edges: Vec<CallEdge>,
     entry_points: Vec<EntryPoint>,
+    env_vars: Vec<EnvVarUsage>,
     class_stack: Vec<String>,
     function_stack: Vec<String>,
     scope_stack: Vec<HashMap<String, String>>,
@@ -84,6 +85,7 @@ impl<'a> PythonVisitor<'a> {
             data_flows: Vec::new(),
             call_edges: Vec::new(),
             entry_points: Vec::new(),
+            env_vars: Vec::new(),
             class_stack: Vec::new(),
             function_stack: Vec::new(),
             scope_stack: vec![HashMap::new()],
@@ -99,6 +101,7 @@ impl<'a> PythonVisitor<'a> {
             data_flows: self.data_flows,
             call_edges: self.call_edges,
             entry_points: self.entry_points,
+            env_vars: self.env_vars,
             files: Vec::new(),
             directories: Vec::new(),
         }
@@ -209,6 +212,89 @@ impl<'a> PythonVisitor<'a> {
             Ok(idx) => idx + 1,
             Err(idx) => idx.max(1),
         }
+    }
+
+    fn record_env_var(&self, name: String, line: usize, kind: &str) -> EnvVarUsage {
+        EnvVarUsage {
+            name,
+            file_path: self.file_path_string(),
+            line_number: line,
+            kind: kind.to_string(),
+        }
+    }
+
+    fn extract_env_var(&self, call: &ast::ExprCall) -> Option<EnvVarUsage> {
+        let callee = &call.func;
+        let line = self.line_for_range(call.range);
+        if let ast::Expr::Attribute(attr) = callee.as_ref() {
+            if attr.attr.to_string() == "getenv" {
+                if let ast::Expr::Name(name) = attr.value.as_ref() {
+                    if name.id.to_string() == "os" {
+                        if let Some(var) = self.first_string_arg(call) {
+                            return Some(self.record_env_var(var, line, "os.getenv"));
+                        }
+                    }
+                }
+            }
+            if attr.attr.to_string() == "get" {
+                if let ast::Expr::Attribute(inner) = attr.value.as_ref() {
+                    if inner.attr.to_string() == "environ" {
+                        if let Some(var) = self.first_string_arg(call) {
+                            return Some(self.record_env_var(var, line, "os.environ.get"));
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    fn first_string_arg(&self, call: &ast::ExprCall) -> Option<String> {
+        call.args.get(0).and_then(|arg| match arg {
+            ast::Expr::Constant(c) => match &c.value {
+                ast::Constant::Str(s) => Some(s.to_string()),
+                _ => None,
+            },
+            _ => None,
+        })
+    }
+
+    fn extract_env_var_from_subscript(&self, node: &ast::ExprSubscript) -> Option<EnvVarUsage> {
+        if let ast::Expr::Attribute(attr) = node.value.as_ref() {
+            if attr.attr.to_string() == "environ" {
+                if let ast::Expr::Name(name) = attr.value.as_ref() {
+                    if name.id.to_string() == "os" {
+                        if let Some(var) = self.subscript_to_string(node) {
+                            let line = self.line_for_range(node.range);
+                            return Some(self.record_env_var(var, line, "os.environ[]"));
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    fn subscript_to_string(&self, node: &ast::ExprSubscript) -> Option<String> {
+        match &*node.slice {
+            ast::Expr::Constant(c) => match &c.value {
+                ast::Constant::Str(s) => Some(s.to_string()),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    fn extract_env_var_from_attribute(&self, node: &ast::ExprAttribute) -> Option<EnvVarUsage> {
+        if node.attr.to_string() == "environ" {
+            if let ast::Expr::Name(name) = node.value.as_ref() {
+                if name.id.to_string() == "os" {
+                    let line = self.line_for_range(node.range);
+                    return Some(self.record_env_var("environ".into(), line, "os.environ"));
+                }
+            }
+        }
+        None
     }
 
     fn build_function_name(&self, raw: &str) -> String {
@@ -432,7 +518,18 @@ impl<'a> Visitor for PythonVisitor<'a> {
             }
         }
 
+        if let Some(env) = self.extract_env_var(&node) {
+            self.env_vars.push(env);
+        }
+
         self.generic_visit_expr_call(node);
+    }
+
+    fn visit_expr_subscript(&mut self, node: ast::ExprSubscript) {
+        if let Some(env) = self.extract_env_var_from_subscript(&node) {
+            self.env_vars.push(env);
+        }
+        self.generic_visit_expr_subscript(node);
     }
 
     fn visit_stmt_if(&mut self, node: ast::StmtIf) {
@@ -457,6 +554,13 @@ impl<'a> Visitor for PythonVisitor<'a> {
     fn visit_stmt_async_for(&mut self, node: ast::StmtAsyncFor) {
         self.increment_complexity(1);
         self.generic_visit_stmt_async_for(node);
+    }
+
+    fn visit_expr_attribute(&mut self, node: ast::ExprAttribute) {
+        if let Some(env) = self.extract_env_var_from_attribute(&node) {
+            self.env_vars.push(env);
+        }
+        self.generic_visit_expr_attribute(node);
     }
 
     fn visit_stmt_while(&mut self, node: ast::StmtWhile) {

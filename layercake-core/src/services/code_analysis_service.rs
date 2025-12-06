@@ -14,7 +14,7 @@ use uuid::Uuid;
 
 use crate::code_analysis_graph::analysis_to_graph;
 use crate::database::entities::code_analysis_profiles;
-use crate::graph::Graph;
+use crate::graph::{Edge, Graph, Layer};
 use crate::infra_graph::infra_to_graph;
 use crate::services::data_set_service::DataSetService;
 
@@ -41,7 +41,12 @@ impl From<code_analysis_profiles::Model> for CodeAnalysisProfile {
     }
 }
 
-fn merge_graphs(mut primary: Graph, secondary: Graph, annotation: Option<String>) -> Graph {
+fn merge_graphs(
+    mut primary: Graph,
+    secondary: Graph,
+    annotation: Option<String>,
+    correlation: Option<&layercake_code_analysis::infra::CorrelationReport>,
+) -> Graph {
     use std::collections::HashSet;
 
     let mut node_ids: HashSet<String> = primary.nodes.iter().map(|n| n.id.clone()).collect();
@@ -84,6 +89,56 @@ fn merge_graphs(mut primary: Graph, secondary: Graph, annotation: Option<String>
     for layer in secondary.layers {
         if !primary.layers.iter().any(|l| l.id == layer.id) {
             primary.layers.push(layer);
+        }
+    }
+
+    if let Some(corr) = correlation {
+        if !primary.layers.iter().any(|l| l.id == "infra-code-link") {
+            primary.layers.push(Layer::new(
+                "infra-code-link",
+                "Code ↔ Infra",
+                "#e0f2fe",
+                "#0ea5e9",
+                "#0ea5e9",
+            ));
+        }
+
+        let mut seen = HashSet::new();
+        let mut next_edge_id = || loop {
+            let cand = format!("edge_{}", edge_ids.len() + 1);
+            if edge_ids.insert(cand.clone()) {
+                break cand;
+            }
+        };
+
+        for m in &corr.matches {
+            let infra_id = id_map
+                .get(&m.infra_node)
+                .cloned()
+                .unwrap_or(m.infra_node.clone());
+            let code_id = primary
+                .nodes
+                .iter()
+                .find(|n| {
+                    n.label == m.code_node || n.comment.as_deref() == Some(m.code_node.as_str())
+                })
+                .map(|n| n.id.clone());
+            if let Some(code_id) = code_id {
+                let key = (code_id.clone(), infra_id.clone());
+                if seen.insert(key) {
+                    primary.edges.push(Edge {
+                        id: next_edge_id(),
+                        source: code_id.clone(),
+                        target: infra_id.clone(),
+                        label: m.reason.clone(),
+                        layer: "infra-code-link".to_string(),
+                        weight: 1,
+                        comment: None,
+                        dataset: None,
+                        attributes: None,
+                    });
+                }
+            }
         }
     }
 
@@ -241,6 +296,7 @@ impl CodeAnalysisService {
             analysis_to_graph(&analysis.result, None),
             infra_to_graph(&infra_graph, None),
             Some(cleaned_report.clone()),
+            Some(&correlation),
         );
         let graph_json = serde_json::to_string(&combined_graph)?;
         let annotation_text = cleaned_report.clone();

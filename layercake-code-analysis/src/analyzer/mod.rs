@@ -57,6 +57,7 @@ pub struct AnalysisResult {
     pub data_flows: Vec<DataFlow>,
     pub call_edges: Vec<CallEdge>,
     pub entry_points: Vec<EntryPoint>,
+    pub env_vars: Vec<EnvVarUsage>,
     pub files: Vec<String>,
     pub directories: Vec<String>,
 }
@@ -68,6 +69,7 @@ impl AnalysisResult {
         self.data_flows.extend(other.data_flows);
         self.call_edges.extend(other.call_edges);
         self.entry_points.extend(other.entry_points);
+        self.env_vars.extend(other.env_vars);
         self.files.extend(other.files);
         self.directories.extend(other.directories);
         self
@@ -128,6 +130,21 @@ impl AnalysisResult {
             ))
         });
 
+        self.env_vars.sort_by(|a, b| {
+            (
+                a.file_path.as_str(),
+                a.line_number,
+                a.name.as_str(),
+                a.kind.as_str(),
+            )
+                .cmp(&(
+                    b.file_path.as_str(),
+                    b.line_number,
+                    b.name.as_str(),
+                    b.kind.as_str(),
+                ))
+        });
+
         self.files.sort();
         self.files.dedup();
         self.directories.sort();
@@ -177,6 +194,14 @@ impl Default for AnalyzerRegistry {
 pub struct AnalysisRun {
     pub result: AnalysisResult,
     pub files_scanned: usize,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct EnvVarUsage {
+    pub name: String,
+    pub file_path: String,
+    pub line_number: usize,
+    pub kind: String,
 }
 
 pub fn analyze_path(path: &Path) -> Result<AnalysisRun> {

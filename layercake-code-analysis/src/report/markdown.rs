@@ -151,6 +151,16 @@ fn datasets(result: &AnalysisResult) -> Vec<(&'static str, Vec<String>, Vec<Vec<
         ]);
     }
 
+    let mut env_rows = Vec::with_capacity(result.env_vars.len());
+    for env in &result.env_vars {
+        env_rows.push(vec![
+            env.file_path.clone(),
+            env.name.clone(),
+            env.kind.clone(),
+            env.line_number.to_string(),
+        ]);
+    }
+
     vec![
         (
             "imports",
@@ -184,6 +194,11 @@ fn datasets(result: &AnalysisResult) -> Vec<(&'static str, Vec<String>, Vec<Vec<
             "entry_points",
             vec!["file".into(), "line".into(), "condition".into()],
             entry_rows,
+        ),
+        (
+            "env_vars",
+            vec!["file".into(), "name".into(), "kind".into(), "line".into()],
+            env_rows,
         ),
     ]
 }

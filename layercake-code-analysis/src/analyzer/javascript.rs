@@ -1,4 +1,6 @@
-use super::{AnalysisResult, Analyzer, CallEdge, DataFlow, EntryPoint, FunctionInfo, Import};
+use super::{
+    AnalysisResult, Analyzer, CallEdge, DataFlow, EntryPoint, EnvVarUsage, FunctionInfo, Import,
+};
 use anyhow::{anyhow, Context, Result};
 use std::collections::HashMap;
 use std::path::Path;
@@ -94,6 +96,7 @@ struct JsVisitor<'a> {
     data_flows: Vec<DataFlow>,
     call_edges: Vec<CallEdge>,
     entry_points: Vec<EntryPoint>,
+    env_vars: Vec<EnvVarUsage>,
     class_stack: Vec<String>,
     function_stack: Vec<String>,
     scope_stack: Vec<HashMap<String, String>>,
@@ -111,6 +114,7 @@ impl<'a> JsVisitor<'a> {
             data_flows: Vec::new(),
             call_edges: Vec::new(),
             entry_points: Vec::new(),
+            env_vars: Vec::new(),
             class_stack: Vec::new(),
             function_stack: Vec::new(),
             scope_stack: vec![HashMap::new()],
@@ -126,6 +130,7 @@ impl<'a> JsVisitor<'a> {
             data_flows: self.data_flows,
             call_edges: self.call_edges,
             entry_points: self.entry_points,
+            env_vars: self.env_vars,
             files: Vec::new(),
             directories: Vec::new(),
         }
@@ -137,6 +142,48 @@ impl<'a> JsVisitor<'a> {
 
     fn line_for_span(&self, span: Span) -> usize {
         self.cm.lookup_char_pos(span.lo()).line + 1
+    }
+
+    fn record_env_var(&self, name: String, span: Span, kind: &str) -> EnvVarUsage {
+        EnvVarUsage {
+            name,
+            file_path: self.file_path_string(),
+            line_number: self.line_for_span(span),
+            kind: kind.to_string(),
+        }
+    }
+
+    fn extract_env_var(&self, member: &swc_ecma_ast::MemberExpr) -> Option<EnvVarUsage> {
+        // process.env.VAR or process.env["VAR"]
+        if let swc_ecma_ast::Expr::Member(base) = &*member.obj {
+            if self.is_process_env(base) {
+                if let Some(name) = self.prop_to_string(&member.prop) {
+                    return Some(self.record_env_var(name, member.span, "process.env"));
+                }
+            }
+        }
+        None
+    }
+
+    fn is_process_env(&self, member: &swc_ecma_ast::MemberExpr) -> bool {
+        if let (swc_ecma_ast::Expr::Ident(obj), swc_ecma_ast::MemberProp::Ident(prop)) =
+            (&*member.obj, &member.prop)
+        {
+            obj.sym == *"process" && prop.sym == *"env"
+        } else {
+            false
+        }
+    }
+
+    fn prop_to_string(&self, prop: &MemberProp) -> Option<String> {
+        match prop {
+            MemberProp::Ident(id) => Some(id.sym.to_string()),
+            MemberProp::Computed(c) => match &*c.expr {
+                Expr::Lit(swc_ecma_ast::Lit::Str(s)) => Some(s.value.to_string_lossy().to_string()),
+                _ => None,
+            },
+            _ => None,
+        }
     }
 
     fn increment_complexity(&mut self, amount: usize) {
@@ -355,6 +402,13 @@ impl<'a> Visit for JsVisitor<'a> {
             file_path: self.file_path_string(),
             line_number: self.line_for_span(n.span),
         });
+    }
+
+    fn visit_member_expr(&mut self, n: &swc_ecma_ast::MemberExpr) {
+        if let Some(env) = self.extract_env_var(n) {
+            self.env_vars.push(env);
+        }
+        n.visit_children_with(self);
     }
 
     fn visit_export_named_specifier(&mut self, n: &ExportNamedSpecifier) {
