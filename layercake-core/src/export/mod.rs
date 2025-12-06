@@ -134,18 +134,49 @@ pub mod renderer {
     pub fn create_standard_context(graph: &Graph, render_config: &RenderConfig) -> Value {
         let data = prepare_graph_data(graph, render_config);
 
+        let flow_edges = with_relative_weight(&data.flow_edges);
+        let hierarchy_edges = with_relative_weight(&data.hierarchy_edges);
+
         json!({
             "graph_name": &graph.name,
             "config": render_config,
             "hierarchy_nodes": data.hierarchy_nodes,
-            "hierarchy_edges": data.hierarchy_edges,
+            "hierarchy_edges": hierarchy_edges,
             "hierarchy_tree": data.hierarchy_tree,
             "hierarchy_tree_edges": data.hierarchy_tree_edges,
             "flow_nodes": data.flow_nodes,
-            "flow_edges": data.flow_edges,
+            "flow_edges": flow_edges,
             "layers": data.layers,
             "layer_map": data.layer_map,
         })
+    }
+
+    fn with_relative_weight(edges: &[Edge]) -> Vec<Value> {
+        if edges.is_empty() {
+            return Vec::new();
+        }
+
+        let (min_w, max_w) = edges.iter().fold((i32::MAX, i32::MIN), |(min_w, max_w), e| {
+            let w = std::cmp::max(1, e.weight);
+            (min_w.min(w), max_w.max(w))
+        });
+
+        let range = (max_w - min_w).max(1) as f64;
+
+        edges
+            .iter()
+            .map(|edge| {
+                let weight = std::cmp::max(1, edge.weight) as f64;
+                let ratio = ((weight - min_w as f64) / range).clamp(0.0, 1.0);
+                let rel = (1.0 + (ratio * 5.0)).round() as i32; // 1-6 inclusive
+
+                let mut value = serde_json::to_value(edge).unwrap_or(Value::Null);
+                if let Some(map) = value.as_object_mut() {
+                    map.insert("relative_weight".to_string(), Value::from(rel));
+                }
+                value
+            })
+            .collect()
     }
 
     fn reset_node_weights(nodes: &mut [Node]) {
