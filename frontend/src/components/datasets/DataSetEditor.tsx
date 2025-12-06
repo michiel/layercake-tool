@@ -129,23 +129,11 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
   const [graphOffset, setGraphOffset] = useState(0)
   const [graphLayerFilters, setGraphLayerFilters] = useState<string[]>([])
 
-  const { loading: graphPageLoading, refetch: refetchGraphPage } = useQuery<{ graphPage: GraphPageSlice }>(
+  const { loading: graphPageLoading, data: graphPageData } = useQuery<{ graphPage: GraphPageSlice }>(
     GET_GRAPH_PAGE,
     {
       skip: !datasetIdNum,
       variables: { datasetId: datasetIdNum, limit: PAGE_LIMIT, offset: graphOffset, layers: graphLayerFilters },
-      onCompleted: (result) => {
-        const page = result.graphPage
-        if (graphOffset === 0) {
-          setGraphNodes(page.nodes)
-          setGraphEdges(page.edges)
-        } else {
-          setGraphNodes(prev => [...prev, ...page.nodes])
-          setGraphEdges(prev => [...prev, ...page.edges])
-        }
-        setGraphLayers(page.layers)
-        setGraphHasMore(page.hasMore)
-      },
     }
   )
 
@@ -191,8 +179,7 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
           background: l.backgroundColor || '#eef2ff',
           text_color: l.textColor || '#0f172a',
           border_color: l.borderColor || '#94a3b8',
-        })),
-        annotations: dataSource?.graphJson ? undefined : undefined,
+        }))
       }
     }
     if (!dataSource?.graphJson) {
@@ -205,6 +192,20 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
       return null
     }
   }, [graphPage, dataSource?.graphJson])
+
+  useEffect(() => {
+    if (!graphPageData?.graphPage) return
+    const page = graphPageData.graphPage
+    if (graphOffset === 0) {
+      setGraphNodes(page.nodes)
+      setGraphEdges(page.edges)
+    } else {
+      setGraphNodes(prev => [...prev, ...page.nodes])
+      setGraphEdges(prev => [...prev, ...page.edges])
+    }
+    setGraphLayers(page.layers)
+    setGraphHasMore(page.hasMore)
+  }, [graphPageData, graphOffset])
 
   // Form for editing DataSet metadata
   const form = useForm<{name: string; description: string}>({
@@ -274,25 +275,11 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
     setGraphLayerFilters(prev =>
       prev.includes(layer) ? prev.filter(l => l !== layer) : [...prev, layer]
     )
-    refetchGraphPage({
-      datasetId: datasetIdNum,
-      limit: PAGE_LIMIT,
-      offset: 0,
-      layers: graphLayerFilters.includes(layer)
-        ? graphLayerFilters.filter(l => l !== layer)
-        : [...graphLayerFilters, layer],
-    })
   }
 
   const handleLoadMore = () => {
     const nextOffset = graphNodes.length
     setGraphOffset(nextOffset)
-    refetchGraphPage({
-      datasetId: datasetIdNum,
-      limit: PAGE_LIMIT,
-      offset: nextOffset,
-      layers: graphLayerFilters,
-    })
   }
 
   // Convert file to base64
@@ -558,7 +545,7 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
       )}
 
       {summaryData?.graphSummary && (
-        <Alert variant="info" className="mb-4">
+        <Alert variant="default" className="mb-4 border-blue-200 bg-blue-50 text-blue-900">
           <AlertTitle>Graph summary</AlertTitle>
           <AlertDescription>
             Nodes: {summaryData.graphSummary.nodeCount} · Edges: {summaryData.graphSummary.edgeCount} · Layers:{' '}
@@ -568,7 +555,7 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
       )}
 
       {graphPage?.hasMore && (
-        <Alert variant="warning" className="mb-4">
+        <Alert variant="default" className="mb-4 border-amber-200 bg-amber-50 text-amber-900">
           <AlertTitle>Truncated view</AlertTitle>
           <AlertDescription>
             Showing the first {PAGE_LIMIT} nodes for performance. Use layer filters or download the dataset to view all elements.

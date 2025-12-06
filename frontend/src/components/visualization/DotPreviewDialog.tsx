@@ -55,7 +55,7 @@ export const DotPreviewDialog = ({ open, onClose, diagram, title }: DotPreviewDi
           throw new Error(`Element not found: ${selector}`)
         }
 
-        const viz = graphviz(selector)
+        const viz = (graphviz(selector) as any)
           .fit(true)
           .zoom(false)
           .on('end', () => {
@@ -72,6 +72,19 @@ export const DotPreviewDialog = ({ open, onClose, diagram, title }: DotPreviewDi
                   height: bbox.height || svgElement.clientHeight
                 })
               }
+            }
+          })
+          .onerror((err: unknown) => {
+            if (!cancelled) {
+              console.error('Failed to render Graphviz diagram', err)
+              const message =
+                err instanceof Error
+                  ? err.message
+                  : typeof err === 'string'
+                    ? err
+                    : 'Failed to render Graphviz diagram'
+              setError(message)
+              setIsRendering(false)
             }
           })
           .renderDot(diagram)
