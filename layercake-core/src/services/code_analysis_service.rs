@@ -193,6 +193,62 @@ fn merge_graphs(
             }
         };
 
+        let find_node_for_handler = |path_hint: &str, func_label: &str| -> Option<String> {
+            let norm_path = path_hint.replace('\\', "/");
+            let mut variants = vec![norm_path.clone()];
+            if !norm_path.ends_with(".py") {
+                variants.push(format!("{norm_path}.py"));
+            }
+            if !norm_path.ends_with("/__init__") {
+                variants.push(format!("{norm_path}/__init__.py"));
+            }
+
+            for variant in &variants {
+                if let Some(ids) = file_hint_map.get(variant) {
+                    if let Some(id) = ids
+                        .iter()
+                        .find(|id| {
+                            primary
+                                .nodes
+                                .iter()
+                                .find(|n| &n.id == *id && n.label == func_label)
+                                .is_some()
+                        })
+                        .cloned()
+                    {
+                        return Some(id);
+                    }
+                }
+            }
+
+            for node in &primary.nodes {
+                if node.label != func_label {
+                    continue;
+                }
+                let mut file_matches = false;
+                if let Some(comment) = &node.comment {
+                    let c = comment.replace('\\', "/");
+                    file_matches = variants.iter().any(|v| c.ends_with(v));
+                }
+                if !file_matches {
+                    if let Some(attrs) = &node.attributes {
+                        if let Some(file) = attrs.get("file").and_then(|v| v.as_str()) {
+                            let f = file.replace('\\', "/");
+                            file_matches |= variants.iter().any(|v| f.ends_with(v));
+                        }
+                        if let Some(file) = attrs.get("file_path").and_then(|v| v.as_str()) {
+                            let f = file.replace('\\', "/");
+                            file_matches |= variants.iter().any(|v| f.ends_with(v));
+                        }
+                    }
+                }
+                if file_matches {
+                    return Some(node.id.clone());
+                }
+            }
+            None
+        };
+
         for m in &corr.matches {
             let infra_id = id_map
                 .get(&m.infra_node)
@@ -203,20 +259,11 @@ fn merge_graphs(
                 if parts.len() >= 2 {
                     let func = parts.last().unwrap().to_string();
                     let path = parts[..parts.len() - 1].join("::");
-                    let path_normalized = path.replace('\\', "/");
-                    let candidates = code_label_map.get(&func).cloned().unwrap_or_default();
-                    let by_file = file_hint_map
-                        .iter()
-                        .filter(|(file, _)| {
-                            let norm = file.replace('\\', "/");
-                            norm.ends_with(&path_normalized) || path_normalized.ends_with(&norm)
-                        })
-                        .flat_map(|(_, ids)| ids.clone())
-                        .collect::<Vec<_>>();
-                    candidates
-                        .into_iter()
-                        .find(|id| by_file.contains(id))
-                        .or_else(|| by_file.first().cloned())
+                    find_node_for_handler(&path, &func).or_else(|| {
+                        code_label_map
+                            .get(&func)
+                            .and_then(|list| list.first().cloned())
+                    })
                 } else {
                     code_label_map
                         .get(&m.code_node)
